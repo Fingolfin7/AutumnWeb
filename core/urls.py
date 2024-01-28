@@ -1,9 +1,9 @@
 from django.urls import path
-from core.views import start, stop, status, create_project, get_projects, get_session_logs
+from core.views import *
 
 urlpatterns = [
     # path('start_timer', views.start_timer, name='start_timer'),
-    path('', get_projects),
+    path('', home),
     path('start/', start),
     path('stop/', stop),
     path('status/', status),
