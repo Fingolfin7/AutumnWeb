@@ -1,7 +1,7 @@
 /* style sheet for a black background terminal page similar to cmd or powershell */
 * {
     box-sizing: border-box;
-    --primary-color: #000000;
+    --primary-color: rgba(52,53,65, 1);
     --accent-color: #ff8800;
     --border-color: #D0D3D4;
     --text-color: #CCCCCC;

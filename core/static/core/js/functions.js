@@ -1,4 +1,4 @@
-function projects(output){
+function projects(output, command_args){
     // send the command to the backend
     $.ajax({
         url: 'get_projects/',
@@ -61,4 +61,84 @@ function projects(output){
 
         }
     })
+}
+
+function start(output, command_args){
+    // get the project name and subprojects to send to the backend
+    let post_data = {
+        'name': command_args[0],
+        'subprojects': command_args.slice(1)
+    };
+
+    console.log(post_data['name']);
+    console.log(post_data['subprojects']);
+
+    // check if the project name is in the list of projects (get_projects)
+    $.ajax({
+        url: 'get_projects/',
+        datatype: 'json',
+        success: function(data) {
+            if (!data.includes(post_data['name'])){
+                output.append("<p> <span class='highlight-project'>" + post_data['name'] + "</span> does not exist." +
+                    "Create it? \n[Y/n]: </p>");
+
+                // get the user's response
+                let create_project = prompt("Create project? [Y/n]");
+                if (create_project.toLowerCase() === 'y'){
+                    console.log('Here');
+                    $.ajax({
+                        url: 'create_project/',
+                        method: 'POST',
+                        data: JSON.stringify(post_data),
+                        contentType: 'application/json',  // Add this line
+                        datatype: 'json',
+                        success: function(data){
+                            output.append("<p> Created <span class='highlight-project'>" + post_data['name'] + "</span>" +
+                                format_subprojects(post_data['subprojects']) + "</p>")
+
+                            // send the command to the backend
+                            $.ajax({
+                                url: 'start/',
+                                method: 'POST',
+                                data: JSON.stringify(post_data),
+                                contentType: 'application/json',  // Add this line
+                                datatype: 'json',
+                                success: function(data){
+                                    output.append("<p> Started <span class='highlight-project'>" + post_data['name'] + "</span>" +
+                                        format_subprojects(post_data['subprojects']) + "</p>")
+                                },
+                                error: function(data){
+                                    output.append("<p> Error: " + data + "</p>")
+                                }
+
+                            });
+                        },
+                        error: function(data){
+                            output.append("<p> Error: " + data['responseJSON']['detail'] + "</p>")
+                        }
+                    });
+                }
+            }
+            else{
+                // send the command to the backend
+                $.ajax({
+                    url: 'start/',
+                    method: 'POST',
+                    data: JSON.stringify(post_data),
+                    contentType: 'application/json',  // Add this line
+                    datatype: 'json',
+                    success: function(data){
+                        output.append("<p> Started <span class='highlight-project'>" + post_data['name'] + "</span>" +
+                            format_subprojects(post_data['subprojects']) + "</p>")
+                    },
+                    error: function(data){
+                        output.append("<p> Error: " + data + "</p>")
+                    }
+
+                });
+            }
+        }
+    });
+
+
 }

@@ -12,6 +12,7 @@
     <script src= "https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
     <script src="{% static 'core/js/functions.js' %}"></script>
     <script src="{% static 'core/js/commands.js' %}"></script>
+    <script src="{% static 'core/js/utils.js' %}"></script>
     <link rel="stylesheet" href="{% static 'core/style.css' %}">
 </head>
 <body>
@@ -19,6 +20,9 @@
      see the results of their commands at the top of the page -->
 
     <div id="output"></div>
+
+    <!-- add csrf token to the page -->
+    <input type="hidden" id="csrf_token" value="{{ csrf_token }}">
 
     <div id="input" class="input-bottom">
         <div id="autocomplete-cont"></div>

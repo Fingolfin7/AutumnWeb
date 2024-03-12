@@ -4,6 +4,7 @@ $(document).ready(function() {
 
     let command_dict = {
         'projects': projects,
+        'start': start,
     }
 
     run_command.click(function() {
@@ -22,7 +23,7 @@ $(document).ready(function() {
         );
 
         if(command_name in command_dict){
-            command_dict[command_name](output);
+            command_dict[command_name](output, command_args);
         }
         else{
             output.append("<p>Invalid Command: " + command_name + "</p>");

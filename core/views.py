@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import datetime, timedelta
@@ -11,10 +12,11 @@ def home(request):
     return render(request, 'core/home.html')
 
 
+@csrf_exempt
 @api_view(['POST'])
 def start(request):
-    project_name = request.data['project_name']
-    subproject_names = request.data.get('subproject_names', [])
+    project_name = request.POST['name']
+    subproject_names = request.POST.get('subprojects', [])
 
     project = get_object_or_404(Projects, name=project_name)
     subprojects = SubProjects.objects.filter(name__in=subproject_names)
@@ -31,6 +33,7 @@ def start(request):
     return Response({'status': 'success'})
 
 
+@csrf_exempt
 @api_view(['POST'])
 def stop(request):
     session_id = request.data['session_id']
@@ -46,6 +49,7 @@ def stop(request):
     return Response({'status': 'success'})
 
 
+@csrf_exempt
 @api_view(['GET'])
 def status(request):
     sessions = Sessions.objects.filter(is_active=True)
@@ -53,9 +57,11 @@ def status(request):
     return Response(serializer.data)
 
 
+@csrf_exempt
 @api_view(['POST'])
 def create_project(request):
     name = request.data['name']
+    subprojects = request.data.get('subprojects', [])
     start_date = request.data.get('start_date', timezone.now().date())
     last_updated = request.data.get('last_updated', timezone.now().date())
     total_time = request.data.get('total_time', 0.0)
@@ -70,9 +76,17 @@ def create_project(request):
     )
     project.save()
 
+    for subproject in subprojects:
+        sub = SubProjects(
+            name=subproject,
+            parent_project=project,
+        )
+        sub.save()
+
     return Response({'status': 'success'})
 
 
+@csrf_exempt
 @api_view(['GET'])
 def get_projects(request):
     _status = request.query_params.get('status', None)
@@ -86,6 +100,7 @@ def get_projects(request):
     return Response(serializer.data)
 
 
+@csrf_exempt
 @api_view(['GET'])
 def get_session_logs(request):
     if 'start_date' in request.query_params and 'end_date' in request.query_params:
