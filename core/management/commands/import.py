@@ -15,6 +15,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         filepath = options['filepath']
         self.stdout.write(f'Reading data from {filepath}...')
+        skipped = []
 
         try:
             with open(filepath) as f:
@@ -25,6 +26,10 @@ class Command(BaseCommand):
             raise CommandError(f'Invalid JSON file: {filepath}')
 
         for project_name, project_data in data.items():
+            if Projects.objects.filter(name=project_name).exists():
+                skipped.append(project_name)
+                continue
+
             self.stdout.write(f"Importing '{project_name}'...")
             project = Projects.objects.create(
                 name=project_name,
@@ -48,10 +53,10 @@ class Command(BaseCommand):
             for session_data in project_data['Session History']:
                 session = Sessions.objects.create(
                     project=project,
-                    start_time=timezone.make_aware(
-                        datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}",
-                                          '%m-%d-%Y %H:%M:%S')
-                    ),
+                    # start_time=timezone.make_aware(
+                    #     datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}",
+                    #                       '%m-%d-%Y %H:%M:%S')
+                    # ),
                     end_time=timezone.make_aware(
                         datetime.strptime(f"{session_data['Date']} {session_data['End Time']}",
                                           '%m-%d-%Y %H:%M:%S')
@@ -62,11 +67,23 @@ class Command(BaseCommand):
 
                 for subproject_name in session_data['Sub-Projects']:
                     try:
-                        subproject = SubProjects.objects.get(name=subproject_name)
+                        subproject = SubProjects.objects.get(name=subproject_name, parent_project=project)
                     except SubProjects.DoesNotExist:
                         raise CommandError(f'Sub-project not found: {subproject_name}')
                     session.subprojects.add(subproject)
 
                 session.save()
 
+                # Update the start_time to the desired value
+                session.start_time = timezone.make_aware(
+                    datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}", '%m-%d-%Y %H:%M:%S')
+                )
+                session.save()
+
         self.stdout.write(self.style.SUCCESS('Data imported successfully!'))
+
+        if len(skipped) > 0:
+            self.stdout.write(self.style.WARNING(f'Skipped the following projects '
+                                                 f'as they already exist in the database:'))
+            for num, project_name in enumerate(skipped):
+                self.stdout.write(f'{num}. {project_name}{", " if num < len(skipped) - 1 else ""}')

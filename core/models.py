@@ -25,7 +25,7 @@ class Projects(models.Model):
 
 
 class SubProjects(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     start_date = models.DateField(auto_now=True)
     last_updated = models.DateField(auto_now=True)
     total_time = models.FloatField(default=0.0)
@@ -41,7 +41,7 @@ class SubProjects(models.Model):
 class Sessions(models.Model):
     project = models.ForeignKey(Projects, on_delete=models.CASCADE)
     subprojects = models.ManyToManyField(SubProjects)
-    start_time = models.DateTimeField(auto_now=True)
+    start_time = models.DateTimeField(auto_now_add=True)
     end_time = models.DateTimeField(null=True, blank=True)
     note = models.TextField()
     is_active = models.BooleanField(default=True)
