@@ -1,16 +1,49 @@
-<!DOCTYPE html>
-{% load static %}
+{% extends 'core/base.html' %}
+{% block content %}
+    <div class="card" id="active-timers">
+        <h2>Active Timers</h2>
+        <div class="timer">
+            <span class="timer-title">Mars</span>
+            <span class="timer-time">1 hour 11 minutes 23 seconds</span>
+            <button class="timer-button">Stop</button>
+            <button class="timer-button">Restart</button>
+            <button class="secondary-button">Remove</button> <!-- Secondary button with cyan color -->
+        </div>
+    </div>
 
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autumn</title>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-</head>
-<body>
-    Wow, such empty. (reddit reference) <br>
-    But seriously, I decided to get rid of the old terminal-like page and I'm working on a dashboard interface. <br>
-    So far though? Nothin'. <br>
-</body>
-</html>
+    <div class="card" id="session-logs">
+        <h2>Recent Sessions</h2>
+        <p><u>Today</u> (27 minutes 04 seconds)</p>
+        <div class="session">
+            <span class="session-from-to">10:00 to 10:27</span>
+            <span class="session-duration">(27 minutes 04 seconds)</span>
+            <span class="session-project">Mars</span>
+            <span class="session-subprojects">[Falcon Heavy, Thrusters]</span>
+            ->
+            <span class="session-note-preview">Testing the new raptor engines for the Falcon Heavy. Initial results show...</span>
+        </div>
+    </div>
+
+    <div class="card" id="totals">
+        <h2>Totals by Project</h2>
+        <div class="lookup-window">
+            <span class="label-input">
+                <label for="window-start">From:</label>
+                <input type="date" id="window-start" name="window-start">
+            </span>
+            <span class="label-input">
+                <label for="window-end">To:</label>
+                <input type="date" id="window-end" name="window-end">
+            </span>
+        </div>
+    </div>
+
+    <div class="small-chart" id="bar-chart">
+        <!-- Small bar chart goes here -->
+    </div>
+
+    <div class="small-chart" id="pie-chart">
+        <!-- Small pie chart goes here -->
+    </div>
+
+{% endblock %}
