@@ -1,3 +1,4 @@
+from datetime import datetime, time
 from django.db import models
 
 
@@ -22,6 +23,14 @@ class Projects(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def get_start(self):
+        return datetime.combine(self.start_date, time())
+
+    @property
+    def get_end(self):
+        return datetime.combine(self.last_updated, time())
+
 
 
 class SubProjects(models.Model):
@@ -36,6 +45,15 @@ class SubProjects(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def get_start(self):
+        return datetime.combine(self.start_date, time())
+
+    @property
+    def get_end(self):
+        return datetime.combine(self.last_updated, time())
+
 
 
 class Sessions(models.Model):
@@ -55,9 +73,22 @@ class Sessions(models.Model):
 
     @property
     def duration(self):
+        """
+        Return the duration of the session in minutes or None if the session is still active
+        :return:
+        """
         if self.end_time is None:
             return None
         else:
             return (self.end_time - self.start_time).total_seconds() / 60.0
+
+    @property
+    def get_start(self):
+        return self.start_time
+
+
+    @property
+    def get_end(self):
+        return self.end_time
 
 
