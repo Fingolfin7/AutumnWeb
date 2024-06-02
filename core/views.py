@@ -30,6 +30,10 @@ def list_projects(request):
         end = request.query_params['end']
         projects = Projects.objects.all()
         projects = in_window(projects, start, end)
+    elif 'start' in request.query_params:
+        start = request.query_params['start']
+        projects = Projects.objects.all()
+        projects = in_window(projects, start)
     else:
         projects = Projects.objects.all()
 
@@ -135,11 +139,17 @@ def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str 
 
     # can't use the filter property of a QuerySet because it doesn't support the get_start and get_end properties
     try:
-        return [item for item in data if item.get_start >= start and item.get_end <= end]
+        if end:
+            return [item for item in data if item.get_start >= start and item.get_end <= end]
+        else:
+            return [item for item in data if item.get_start >= start]
     except TypeError:
         start = timezone.make_aware(start)
-        end = timezone.make_aware(end)
-        return [item for item in data if item.get_start >= start and item.get_end <= end]
+        if end:
+            end = timezone.make_aware(end)
+            return [item for item in data if item.get_start >= start and item.get_end <= end]
+        else:
+            return [item for item in data if item.get_start >= start]
 
 
 def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: str = None,
@@ -261,6 +271,9 @@ def list_sessions(request):
         start = request.query_params['start']
         end = request.query_params['end']
         sessions = in_window(sessions, start, end)
+    if 'start' in request.query_params:
+        start = request.query_params['start']
+        sessions = in_window(sessions, start)
 
     if 'project' in request.query_params and 'subproject' not in request.query_params:
         project_name = request.query_params['project']
