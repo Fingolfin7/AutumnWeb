@@ -6,6 +6,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import datetime, timedelta
 from core.models import *
+from core.models import Projects, SubProjects, Sessions
 from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
 
 
@@ -14,77 +15,6 @@ def home(request):
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions
-@api_view(['POST'])
-def create_project(request):
-    serializer = ProjectSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors)
-
-
-@api_view(['GET'])
-def list_projects(request):
-    if 'start' in request.query_params and 'end' in request.query_params:
-        start = request.query_params['start']
-        end = request.query_params['end']
-        projects = Projects.objects.all()
-        projects = in_window(projects, start, end)
-    elif 'start' in request.query_params:
-        start = request.query_params['start']
-        projects = Projects.objects.all()
-        projects = in_window(projects, start)
-    else:
-        projects = Projects.objects.all()
-
-    serializer = ProjectSerializer(projects, many=True)
-    return Response(serializer.data)
-
-
-@api_view(['GET'])
-def get_project(request, project_name):
-    project = get_object_or_404(Projects, name=project_name)
-    serializer = ProjectSerializer(project)
-    return Response(serializer.data)
-
-
-@api_view(['DELETE'])
-def delete_project(request, project_name):
-    project = get_object_or_404(Projects, name=project_name)
-    project.delete()
-    return Response(status=204)
-
-
-@api_view(['POST'])
-def create_subproject(request):
-    # check if the parent project exists
-    if not Projects.objects.filter(name=request.data['parent_project']).exists():
-        return Response({'error': 'Parent project ' + request.data['parent_project'] + ' does not exist'})
-
-    serializer = SubProjectSerializer(data=request.data)
-
-    if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
-
-    return Response(serializer.errors)
-
-
-@api_view(['GET'])
-def list_subprojects(request, project_name):
-    subprojects = SubProjects.objects.filter(parent_project__name=project_name)
-    serializer = SubProjectSerializer(subprojects, many=True)
-    return Response(serializer.data)
-
-
-@api_view(['DELETE'])
-def delete_subproject(request, project_name, subproject_name):
-    subproject = get_object_or_404(SubProjects, name=subproject_name, parent_project__name=project_name)
-    subproject.delete()
-    return Response(status=204)  # status 204 means no content, i.e. the subproject was deleted successfully
-
-
-# Sessions
 
 def update_time_totals(session: Sessions, is_delete=False):
     """
@@ -153,7 +83,7 @@ def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str 
 
 
 def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: str = None,
-                       names: list[str] = None) -> list | QuerySet[Projects | SubProjects | Sessions]:
+                       names: list[str] = None) -> QuerySet:
     """
     filter a queryset of data and return a list of items that match the given name or names
     :param data: a queryset of data
@@ -178,6 +108,76 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
             return data.filter(project__name__in=names)
     else:
         return data
+
+
+@api_view(['POST'])
+def create_project(request):
+    serializer = ProjectSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors)
+
+
+@api_view(['GET'])
+def list_projects(request):
+    if 'start' in request.query_params and 'end' in request.query_params:
+        start = request.query_params['start']
+        end = request.query_params['end']
+        projects = Projects.objects.all()
+        projects = in_window(projects, start, end)
+    elif 'start' in request.query_params:
+        start = request.query_params['start']
+        projects = Projects.objects.all()
+        projects = in_window(projects, start)
+    else:
+        projects = Projects.objects.all()
+
+    serializer = ProjectSerializer(projects, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+def get_project(request, project_name):
+    project = get_object_or_404(Projects, name=project_name)
+    serializer = ProjectSerializer(project)
+    return Response(serializer.data)
+
+
+@api_view(['DELETE'])
+def delete_project(request, project_name):
+    project = get_object_or_404(Projects, name=project_name)
+    project.delete()
+    return Response(status=204)
+
+
+@api_view(['POST'])
+def create_subproject(request):
+    # check if the parent project exists
+    if not Projects.objects.filter(name=request.data['parent_project']).exists():
+        return Response({'error': 'Parent project ' + request.data['parent_project'] + ' does not exist'})
+
+    serializer = SubProjectSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+
+    return Response(serializer.errors)
+
+
+@api_view(['GET'])
+def list_subprojects(request, project_name):
+    subprojects = SubProjects.objects.filter(parent_project__name=project_name)
+    serializer = SubProjectSerializer(subprojects, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['DELETE'])
+def delete_subproject(request, project_name, subproject_name):
+    subproject = get_object_or_404(SubProjects, name=subproject_name, parent_project__name=project_name)
+    subproject.delete()
+    return Response(status=204)  # status 204 means no content, i.e. the subproject was deleted successfully
 
 
 @api_view(['POST'])
