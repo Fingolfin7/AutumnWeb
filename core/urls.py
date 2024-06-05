@@ -4,6 +4,9 @@ from core.views import *
 urlpatterns = [
     # path('start_timer', views.start_timer, name='start_timer'),
     path('', home),
+    path('projects/', ProjectsListView.as_view(), name='projects'),
+
+    # api paths
     path('api/create_project/', create_project, name='create_project'),
     path('api/list_projects/', list_projects, name='list_projects'),
     path('api/get_project/<str:project_name>/', get_project, name='get_project'),

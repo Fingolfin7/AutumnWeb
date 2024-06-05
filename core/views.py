@@ -5,6 +5,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import datetime, timedelta
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from core.models import *
 from core.models import Projects, SubProjects, Sessions
 from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
@@ -12,6 +13,27 @@ from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSer
 
 def home(request):
     return render(request, 'core/home.html')
+
+
+class ProjectsListView(ListView):
+    model = Projects
+    template_name = 'core/projects_list.html'
+    context_object_name = 'projects'
+    ordering = ['name']
+
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Projects'
+
+        return context
+
+    def get_queryset(self):
+        return Projects.objects.all()
+
+
+# class ProjectUpdateView(UpdateView):
+
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions

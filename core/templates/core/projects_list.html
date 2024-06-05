@@ -1,0 +1,37 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+{% block content %}
+    <div class="grid-rows">
+        {% for project in projects %}
+            <div class="card" id="project-{{ project.id }}">
+                <table>
+                    <tr>
+                        <td class="text-red">
+                            <h3>{{ project.name }}</h3>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <em>{{ project.status }}</em>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-green">
+                            {{ project.total_time|min_formatter }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span class="text-cyan">{{ project.start_date }}</span>
+
+                            ->
+
+                            <span class="text-cyan">{{ project.last_updated }}</span>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}
