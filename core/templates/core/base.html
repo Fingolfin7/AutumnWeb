@@ -18,7 +18,9 @@
     <body>
         <div class="container">
             <div class="ribbon"> <!-- ribbon at the top of the page -->
-                <h1 class="main-title">Autumn</h1>
+                <h1 class="main-title">
+                    <a href="{% url 'home' %}" class="plain-link">Autumn</a>
+                </h1>
                 <div class="ribbon-buttons">
                     <i class="fas fa-bars burger-menu" id="burger-menu"></i> <!-- Added burger menu icon -->
                     <label class="switch">
@@ -61,7 +63,7 @@
 
             <nav class="left-panel">
                 <a href="{% url 'projects'  %}" class="main-link"><i class="fas fa-project-diagram"></i> Manage Projects</a>
-                <a href="#" class="main-link"><i class="fas fa-clock"></i> Timers</a>
+                <a href="{% url 'timers' %}" class="main-link"><i class="fas fa-clock"></i> Timers</a>
                 <a href="#" class="main-link"><i class="fas fa-book"></i> Session Logs</a>
                 <a href="#" class="main-link"><i class="fas fa-chart-bar"></i> Charts</a>
                 <a href="#" class="main-link"><i class="fas fa-cog"></i> Settings</a>

@@ -1,0 +1,36 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+{% block content %}
+    <div id="search-projects">
+        <input type="text" id="search-projects-input" placeholder="Search projects...">
+        <div id="search-projects-results">
+            {% for project in projects %}
+                <span class="card">
+                    <a href="#" class="plain-link">
+                        <i class="fa fa-select"></i>
+                        {{ project.name }}
+                    </a>
+                </span>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="sub-projects">
+         {% for sub in project.subprojects.all %}
+            <span class="card">
+                <a href="#" class="plain-link">
+                    <i class="fa fa-select"></i>
+                    {{ sub.name }}
+                </a>
+            </span>
+        {% endfor %}
+    </div>
+
+    <button type="submit" id="start-timer" class="timer-button">
+        <a href="#" class="plain-link">
+            <i class="fa fa-hourglass-start"></i>
+            Start Timer
+        </a>
+    </button>
+{% endblock %}

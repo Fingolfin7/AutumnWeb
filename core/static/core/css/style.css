@@ -47,6 +47,11 @@ body.dark-mode {
     margin: 0;
 }
 
+.plain-link {
+    text-decoration: none;
+    color: inherit;
+}
+
 .ribbon {
     padding: 2%;
     display: flex;
@@ -56,6 +61,7 @@ body.dark-mode {
     background-color: var(--primary-color);
     color: var(--light-background);
 }
+
 
 .ribbon-buttons{
     display: flex;
@@ -122,6 +128,10 @@ body.dark-mode .main-link {
     background-color: var(--primary-color);
 }
 
+.timer-button:hover a, .primary-button:hover a {
+    background-color: var(--primary-color);
+}
+
 .secondary-button {
     background-color: var(--secondary-accent-color);
     border: none;
@@ -168,6 +178,7 @@ body.dark-mode .main-link {
     margin-left: 16%;
     padding: 2%;
     border-left: var(--section-border-width) solid #ccc;
+    /*min-height: calc(100vh - 90px);*/
 }
 
 .card {
@@ -198,9 +209,12 @@ body.dark-mode .main-link {
 }
 
 .grid-rows > * {
-    margin: 1rem 0;
+    margin: 0.5rem 0;
 }
 
+.timer-row{
+    border-spacing: 1rem 0;
+}
 
 
 body.dark-mode .card {

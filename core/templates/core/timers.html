@@ -1,0 +1,50 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+{% block content %}
+    <button id="start-timer" class="timer-button">
+        <a href="#" class="plain-link">
+            <i class="fa fa-plus"></i>
+            New Timer
+        </a>
+    </button>
+    <div id="active-timers">
+        {% for timer in timers %}
+            <div class="card" id="timer-{{ timer.id }}">
+                <table class="timer-row">
+                    <tr>
+                        <td>
+                            [{{ forloop.counter0 }}]: Started
+                        </td>
+                        <td class="text-red">
+                            {{ timer.project.name }}
+                        </td>
+                        <td >
+                            [
+                            {% for subproject in timer.subprojects.all %}
+                                '<span class="text-cyan">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                            ]
+                        </td>
+                        <td class="text-green">
+                            {{ timer.duration|min_formatter }} ago
+                        </td>
+                        <td>
+                            <button class="timer-button">
+                                <a href="#" class="plain-link">
+                                    <i class="fa fa-check"></i>
+                                </a>
+                            </button>
+                            <button class="timer-button">
+                                <a href="#" class="plain-link">
+                                    <i class="fa fa-trash"></i>
+                                </a>
+                            </button>
+                        </td>
+
+                    </tr>
+                </table>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

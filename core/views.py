@@ -32,7 +32,20 @@ class ProjectsListView(ListView):
         return Projects.objects.all()
 
 
-# class ProjectUpdateView(UpdateView):
+class TimerListView(ListView):
+    model = Sessions
+    template_name = 'core/timers.html'
+    context_object_name = 'timers'
+    ordering = ['-start_time']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Timers'
+
+        return context
+
+    def get_queryset(self):
+        return Sessions.objects.filter(is_active=True)
 
 
 

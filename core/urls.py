@@ -3,8 +3,9 @@ from core.views import *
 
 urlpatterns = [
     # path('start_timer', views.start_timer, name='start_timer'),
-    path('', home),
+    path('', home, name='home'),
     path('projects/', ProjectsListView.as_view(), name='projects'),
+    path('timers/', TimerListView.as_view(), name='timers'),
 
     # api paths
     path('api/create_project/', create_project, name='create_project'),
