@@ -6,14 +6,18 @@ urlpatterns = [
     path('', home, name='home'),
     path('projects/', ProjectsListView.as_view(), name='projects'),
     path('timers/', TimerListView.as_view(), name='timers'),
+    path('start_timer/', start_timer, name='start_timer'),
 
     # api paths
     path('api/create_project/', create_project, name='create_project'),
     path('api/list_projects/', list_projects, name='list_projects'),
+    path('api/search_projects/', search_projects, name='search_projects'),
     path('api/get_project/<str:project_name>/', get_project, name='get_project'),
     path('api/delete_project/<str:project_name>/', delete_project, name='delete_project'),
     path('api/create_subproject/', create_subproject, name='create_subproject'),
     path('api/list_subprojects/<str:project_name>/', list_subprojects, name='list_subprojects'),
+    path('api/list_subprojects/', list_subprojects, name='list_subprojects_param'),
+    path('api/search_subprojects/', search_subprojects, name='search_subprojects'),
     path('api/delete_subproject/<str:project_name>/<str:subproject_name>/', delete_subproject, name='delete_subproject'),
     path('api/start_session/', start_session, name='start_session'),
     path('api/end_session/', end_session, name='end_session'),

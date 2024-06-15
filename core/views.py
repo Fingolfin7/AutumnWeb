@@ -1,5 +1,6 @@
+from django.contrib import messages
 from django.db.models import QuerySet
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
@@ -13,6 +14,11 @@ from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSer
 
 def home(request):
     return render(request, 'core/home.html')
+
+
+def start_timer(request):
+
+    return render(request, 'core/start_timer.html')
 
 
 class ProjectsListView(ListView):
@@ -46,7 +52,6 @@ class TimerListView(ListView):
 
     def get_queryset(self):
         return Sessions.objects.filter(is_active=True)
-
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions
@@ -173,6 +178,14 @@ def list_projects(request):
 
 
 @api_view(['GET'])
+def search_projects(request):
+    search_term = request.query_params['search_term']
+    projects = Projects.objects.filter(name__icontains=search_term)
+    serializer = ProjectSerializer(projects, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
 def get_project(request, project_name):
     project = get_object_or_404(Projects, name=project_name)
     serializer = ProjectSerializer(project)
@@ -202,8 +215,20 @@ def create_subproject(request):
 
 
 @api_view(['GET'])
-def list_subprojects(request, project_name):
+def list_subprojects(request, **kwargs):
+    project_name = request.query_params['project_name'] if 'project_name' in request.query_params else kwargs['project_name']
     subprojects = SubProjects.objects.filter(parent_project__name=project_name)
+    serializer = SubProjectSerializer(subprojects, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+def search_subprojects(request):
+    parent_project = request.query_params['project_name']
+    search_term = request.query_params['search_term']
+    subprojects = SubProjects.objects.filter(parent_project__name=parent_project, name__icontains=search_term)
+    if not subprojects.exists():
+        subprojects = SubProjects.objects.filter(parent_project__name=parent_project)
     serializer = SubProjectSerializer(subprojects, many=True)
     return Response(serializer.data)
 
@@ -217,14 +242,15 @@ def delete_subproject(request, project_name, subproject_name):
 
 @api_view(['POST'])
 def start_session(request):
-    project = get_object_or_404(Projects, name=request.data['project'])
-    subprojects = [get_object_or_404(SubProjects, name=subproject_name, parent_project=project)
-                   for subproject_name in request.data['subprojects']]
+    project = Projects.objects.filter(name=request.data['project']).first()
+    all_subprojects = SubProjects.objects.filter(parent_project__name=project)
+    subprojects = [all_subprojects.filter(name=subproject_name, parent_project=project).first()
+                   for subproject_name in request.data.getlist('subprojects[]')]
 
     session = Sessions.objects.create(
         project=project,
         # subprojects=subprojects,
-        start_time=timezone.now(),
+        start_time=timezone.make_aware(datetime.now()),
         is_active=True
     )
 
@@ -234,6 +260,16 @@ def start_session(request):
     session.save()
 
     return Response(status=201)
+
+
+@api_view(['POST'])
+def restart_session(request):
+    session = get_object_or_404(Sessions, pk=request.data['session_id'])
+    session.start_time = timezone.now()
+    session.is_active = True
+
+    session.save()
+    return Response(status=200)
 
 
 @api_view(['POST'])

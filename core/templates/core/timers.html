@@ -3,7 +3,7 @@
 {% load time_formats %}
 {% block content %}
     <button id="start-timer" class="timer-button">
-        <a href="#" class="plain-link">
+        <a href="{% url 'start_timer' %}" class="plain-link">
             <i class="fa fa-plus"></i>
             New Timer
         </a>
