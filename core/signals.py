@@ -13,6 +13,8 @@ def set_session_is_active(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Sessions)
 def update_last_updated(sender, instance, **kwargs):
+    if not instance.end_time:
+        return
 
     if instance.end_time > instance.project.last_updated:
         instance.project.last_updated = instance.end_time
