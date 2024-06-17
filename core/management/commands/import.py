@@ -1,25 +1,66 @@
 import json
-from datetime import datetime
+import zlib
+import base64
+from datetime import datetime, timedelta
 from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
+
 from core.models import Projects, SubProjects, Sessions
 
 
-# usage:  python manage.py import project_file.json
+def json_decompress(content: dict | str) -> dict:
+    ZIPJSON_KEY = 'base64(zip(o))'
+
+    if isinstance(content, str):
+        try:
+            content = json.loads(content)
+        except ...:
+            raise RuntimeError("Could not interpret the contents")
+
+    try:
+        assert (content[ZIPJSON_KEY])
+        assert (set(content.keys()) == {ZIPJSON_KEY})
+    except ...:
+        raise RuntimeError("JSON not in the expected format {" + str(ZIPJSON_KEY) + ": zipstring}")
+
+    try:
+        content = zlib.decompress(base64.b64decode(content[ZIPJSON_KEY]))
+    except RuntimeError:
+        raise RuntimeError("Could not decode/unzip the contents")
+
+    try:
+        content = json.loads(content)
+    except RuntimeError:
+        raise RuntimeError("Could interpret the unzipped contents")
+
+    return content
+
+
+# usage:  python manage.py import project_file.json --force --tolerance 0.5
 class Command(BaseCommand):
     help = 'Import data from projects.json'
 
     def add_arguments(self, parser):
         parser.add_argument('filepath', type=str, help='Path to an Autumn project json file')
+        parser.add_argument('--force', action='store_true', help='Force import even if projects already exist')
+        parser.add_argument('--tolerance', type=float, default=0.5, help='Tolerance for total time mismatch in minutes'
+                                                                         'due to rounding errors '
+                                                                         '(default 0.5)')
 
     def handle(self, *args, **options):
         filepath = options['filepath']
+        tolerance = options['tolerance']
+
         self.stdout.write(f'Reading data from {filepath}...')
         skipped = []
 
         try:
             with open(filepath) as f:
-                data = json.load(f)
+                try:  # import compressed json
+                    data = json_decompress(f.read())
+                except RuntimeError:
+                    data = json.load(f)
+
         except FileNotFoundError:
             raise CommandError(f'File not found: {filepath}')
         except json.JSONDecodeError:
@@ -27,15 +68,18 @@ class Command(BaseCommand):
 
         for project_name, project_data in data.items():
             if Projects.objects.filter(name=project_name).exists():
-                skipped.append(project_name)
-                continue
+                if options['force']:
+                    Projects.objects.filter(name=project_name).delete()
+                else:
+                    skipped.append(project_name)
+                    continue
 
             self.stdout.write(f"Importing '{project_name}'...")
             project = Projects.objects.create(
                 name=project_name,
                 start_date=timezone.make_aware(datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
                 last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
-                total_time=project_data['Total Time'],
+                total_time=0.0,  # no need to read in total time because it will be recalculated with the sessions saves
                 status=project_data['Status'],
             )
             project.save()
@@ -45,22 +89,31 @@ class Command(BaseCommand):
                     name=subproject_name,
                     start_date=project.start_date,
                     last_updated=project.last_updated,
-                    total_time=subproject_time,
+                    total_time=0.0,
+                    # no need to read in total time because it will be recalculated with the sessions saves
                     parent_project=project,
                 )
                 subproject.save()
 
             for session_data in project_data['Session History']:
+                start_time = timezone.make_aware(
+                    datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}",
+                                      '%m-%d-%Y %H:%M:%S')
+                )
+                end_time = timezone.make_aware(
+                    datetime.strptime(f"{session_data['Date']} {session_data['End Time']}",
+                                      '%m-%d-%Y %H:%M:%S')
+                )
+
+                # Check if end_time is earlier than start_time
+                if end_time < start_time:
+                    # If so, subtract one day from start_time
+                    start_time -= timedelta(days=1)
+
                 session = Sessions.objects.create(
                     project=project,
-                    # start_time=timezone.make_aware(
-                    #     datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}",
-                    #                       '%m-%d-%Y %H:%M:%S')
-                    # ),
-                    end_time=timezone.make_aware(
-                        datetime.strptime(f"{session_data['Date']} {session_data['End Time']}",
-                                          '%m-%d-%Y %H:%M:%S')
-                    ),
+                    start_time=start_time,
+                    end_time=end_time,
                     is_active=False,
                     note=session_data['Note'],
                 )
@@ -74,11 +127,12 @@ class Command(BaseCommand):
 
                 session.save()
 
-                # Update the start_time to the desired value
-                session.start_time = timezone.make_aware(
-                    datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}", '%m-%d-%Y %H:%M:%S')
-                )
-                session.save()
+            # compare the total time read in from the file to the total time calculated from the sessions
+            if (project.total_time - project_data['Total Time']) > tolerance:  # allow for rounding errors in totals
+                raise CommandError(f"Total time mismatch for project '{project_name}': "
+                                   f"expected {project_data['Total Time']}, got {project.total_time}")
+
+        #
 
         self.stdout.write(self.style.SUCCESS('Data imported successfully!'))
 

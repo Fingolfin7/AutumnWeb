@@ -23,11 +23,11 @@
                     </tr>
                     <tr>
                         <td>
-                            <span class="text-cyan">{{ project.start_date }}</span>
+                            <span class="text-cyan">{{ project.start_date|date_formatter }}</span>
 
                             ->
 
-                            <span class="text-cyan">{{ project.last_updated }}</span>
+                            <span class="text-cyan">{{ project.last_updated|date_formatter }}</span>
                         </td>
                     </tr>
                 </table>

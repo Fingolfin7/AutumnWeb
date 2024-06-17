@@ -1,6 +1,7 @@
 from datetime import timedelta, time, datetime
 
 from django import template
+from django.utils import timezone
 
 register = template.Library()
 
@@ -41,3 +42,31 @@ def min_formatter(td: timedelta | float | int):
         sec_str = ""
 
     return f"{days_str}{hrs_str}{min_str}{sec_str}"
+
+
+@register.filter
+def date_formatter(date: datetime):
+    """
+    Converts datetime objects into formatted date strings. E.g. 12 June 2021
+    :param date: datetime objects
+    :return: string formatted to day month year.
+    """
+    if timezone.is_naive(date):
+        date = timezone.make_aware(date)
+    else:
+        date = date.astimezone(timezone.get_default_timezone())
+    return date.strftime("%d %B %Y")
+
+
+@register.filter
+def day_date_formatter(date: datetime):
+    """
+    Converts datetime objects into formatted date strings. E.g. Saturday 12 June 2021
+    :param date: datetime objects
+    :return: string formatted to day month year.
+    """
+    if timezone.is_naive(date):
+        date = timezone.make_aware(date)
+    else:
+        date = date.astimezone(timezone.get_default_timezone())
+    return date.strftime("%A %d %b %Y")
