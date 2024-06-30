@@ -7,18 +7,111 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from datetime import datetime, timedelta
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from core.forms import *
 from core.models import *
 from core.models import Projects, SubProjects, Sessions
 from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
 
 
 def home(request):
-    return render(request, 'core/home.html')
+    context = {
+        'timers': Sessions.objects.filter(is_active=True)[:3]
+    }
+    return render(request, 'core/home.html', context)
 
 
 def start_timer(request):
+    if request.method == "POST":
+        try:
+            project_name = request.POST.get('project')
+            subproject_names = request.POST.getlist('subprojects')
 
-    return render(request, 'core/start_timer.html')
+            # Fetch the project
+            project = Projects.objects.filter(name=project_name).first()
+            if not project:
+                raise ValueError("Project not found")
+
+            # Fetch all subprojects related to the project and in the list of submitted subproject names
+            subprojects = SubProjects.objects.filter(name__in=subproject_names, parent_project=project)
+            if not subprojects.exists() and len(subproject_names) > 0:
+                raise ValueError("No subprojects found for the selected project")
+
+            # Create a new session
+            session = Sessions.objects.create(
+                project=project,
+                start_time=timezone.make_aware(datetime.now()),
+                is_active=True
+            )
+
+            # Add the subprojects to the session
+            for subproject in subprojects:
+                session.subprojects.add(subproject)
+
+            session.save()
+            messages.success(request, "Started timer")
+            return redirect('timers')
+
+        except ValueError as ve:
+            messages.error(request, str(ve))
+            return redirect('start_timer')
+
+        except Exception as e:
+            messages.error(request, f"An error occurred while starting the timer. Error: {e}")
+            return redirect('start_timer')
+
+    context = {
+        'title': 'Start Timer'
+    }
+
+    return render(request, 'core/start_timer.html', context)
+
+
+def stop_timer(request, session_id: int):
+    timer = Sessions.objects.get(id=session_id)
+
+    if request.method == "POST":
+        timer.is_active = False
+        timer.end_time = timezone.now()
+
+        if 'session_note' in request.POST:
+            timer.note = request.POST['session_note']
+
+        timer.save()
+        messages.success(request, "Stopped timer")
+        return redirect('timers')
+
+    context = {
+        'title': 'Stop Timer',
+        'timer': timer
+    }
+
+    return render(request, 'core/stop_timer.html', context)
+
+
+def restart_timer(request, session_id: int):
+    timer = Sessions.objects.get(id=session_id)
+
+    timer.start_time = timezone.now()
+
+    timer.save()
+    messages.success(request, "Restarted timer")
+
+    return redirect('timers')
+
+def remove_timer(request, session_id: int):
+    timer = Sessions.objects.get(id=session_id)
+
+    if request.method == "POST":
+        timer.delete()
+        messages.success(request, "Removed timer")
+        return redirect('timers')
+
+    context = {
+        'title': 'Remove Timer',
+        'timer': timer
+    }
+
+    return render(request, 'core/remove_timer.html', context)
 
 
 class ProjectsListView(ListView):
@@ -26,7 +119,6 @@ class ProjectsListView(ListView):
     template_name = 'core/projects_list.html'
     context_object_name = 'projects'
     ordering = ['name']
-
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -55,34 +147,6 @@ class TimerListView(ListView):
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions
-
-def update_time_totals(session: Sessions, is_delete=False):
-    """
-    Update the total time for the project and subprojects associated with the given session
-    :param session: a session object
-    :param is_delete: a boolean indicating whether the session is being deleted (if so, the time will be subtracted)
-    :return: True if the session duration was updated, False otherwise
-    """
-    if session.duration is None:
-        return False
-
-    update_value = session.duration
-
-    if is_delete:
-        update_value *= -1
-
-    try:
-        parent_project = session.project
-        parent_project.total_time += update_value
-        parent_project.save()
-
-        for sub_project in session.subprojects.all():
-            sub_project.total_time += update_value
-            sub_project.save()
-
-        return True
-    except ...:
-        return False
 
 
 def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str = None) -> list:
@@ -180,7 +244,11 @@ def list_projects(request):
 @api_view(['GET'])
 def search_projects(request):
     search_term = request.query_params['search_term']
-    projects = Projects.objects.filter(name__icontains=search_term)
+    if 'status' in request.query_params:
+        status = request.query_params['status']
+        projects = Projects.objects.filter(name__icontains=search_term, status=status)
+    else:
+        projects = Projects.objects.filter(name__icontains=search_term)
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
 
@@ -216,7 +284,9 @@ def create_subproject(request):
 
 @api_view(['GET'])
 def list_subprojects(request, **kwargs):
-    project_name = request.query_params['project_name'] if 'project_name' in request.query_params else kwargs['project_name']
+    project_name = request.query_params['project_name'] if 'project_name' in request.query_params else kwargs[
+        'project_name']
+    print(project_name)
     subprojects = SubProjects.objects.filter(parent_project__name=project_name)
     serializer = SubProjectSerializer(subprojects, many=True)
     return Response(serializer.data)
@@ -288,8 +358,6 @@ def end_session(request):
 
     session.save()
 
-    update_time_totals(session)
-
     return Response(status=200)
 
 
@@ -323,9 +391,6 @@ def log_session(request):
 @api_view(['DELETE'])
 def delete_session(request, session_id):
     session = get_object_or_404(Sessions, pk=session_id)
-
-    update_time_totals(session, is_delete=True)
-
     session.delete()
     return Response(status=204)
 
@@ -352,7 +417,6 @@ def list_sessions(request):
     elif 'projects' in request.query_params:
         project_names = request.query_params['projects'].split(',')
         sessions = filter_by_projects(sessions, names=project_names)
-
 
     serializer = SessionSerializer(sessions, many=True)
     return Response(serializer.data)

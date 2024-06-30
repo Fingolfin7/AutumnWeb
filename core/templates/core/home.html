@@ -1,18 +1,59 @@
 {% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'core/js/dynamic_timers.js' %}" type="text/javascript"></script>
+{% endblock %}
+
 {% block content %}
-    <div class="card" id="active-timers">
-        <h2>Active Timers</h2>
-        <div class="timer">
-            <span class="timer-title">Mars</span>
-            <span class="timer-time">1 hour 11 minutes 23 seconds</span>
-            <button class="timer-button">Stop</button>
-            <button class="timer-button">Restart</button>
-            <button class="secondary-button">Remove</button> <!-- Secondary button with cyan color -->
-        </div>
+    <h2>
+        <a href="{% url 'timers' %}" class="plain-link">
+            <u>Active Timers</u>
+        </a>
+    </h2>
+    <div id="active-timers">
+        {% for timer in timers %}
+            <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|date:"Y-m-d H:i:s" }}">
+                <table class="timer-row">
+                    <tr>
+                        <td>
+                            [{{ forloop.counter0 }}]: Started
+                        </td>
+                        <td class="text-red">
+                            {{ timer.project.name }}
+                        </td>
+                        <td >
+                            [
+                            {% for subproject in timer.subprojects.all %}
+                                '<span class="text-cyan">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                            ]
+                        </td>
+                        <td>
+                            <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
+                        </td>
+                        <td>
+                            <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
+                                <i class="fas fa-redo-alt"></i>
+                            </button>
+                            <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'">
+                                <i class="fa fa-stopwatch"></i>
+                            </button>
+                            <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </td>
+
+                    </tr>
+                </table>
+            </div>
+        {% endfor %}
     </div>
 
+    <h2>Recent Sessions</h2>
     <div class="card" id="session-logs">
-        <h2>Recent Sessions</h2>
         <p><u>Today</u> (27 minutes 04 seconds)</p>
         <div class="session">
             <span class="session-from-to">10:00 to 10:27</span>
@@ -24,8 +65,8 @@
         </div>
     </div>
 
+    <h2>Totals by Project</h2>
     <div class="card" id="totals">
-        <h2>Totals by Project</h2>
         <div class="lookup-window">
             <span class="label-input">
                 <label for="window-start">From:</label>

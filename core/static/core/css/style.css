@@ -177,7 +177,7 @@ body.dark-mode .main-link {
 .main-body {
     margin-left: 16%;
     padding: 2%;
-    border-left: var(--section-border-width) solid #ccc;
+    /*border-left: var(--section-border-width) solid #ccc;*/
     /*min-height: calc(100vh - 90px);*/
 }
 
@@ -212,13 +212,14 @@ body.dark-mode .main-link {
     margin: 0.5rem 0;
 }
 
-.timer-row{
+.timer-row, .table-row{
     border-spacing: 1rem 0;
 }
 
 
 body.dark-mode .card {
     background-color: var(--card-background-dark);
+    color: var(--dark-text);
     box-shadow: 0 2px 5px rgba(0,0,0,0.5);
 }
 
@@ -259,7 +260,7 @@ body.dark-mode .label-input label {
 }
 
 
-.label-input input {
+.label-input input, textarea {
     padding: 0.8rem 0.6rem 0.6rem 0.6rem;
     border: 1px solid #ccc;
     border-radius: 4px;
@@ -281,7 +282,7 @@ body.dark-mode .label-input label {
     margin-left: 10px;
 }
   
-.switch input { 
+.switch input{
     opacity: 0;
     width: 0;
     height: 0;

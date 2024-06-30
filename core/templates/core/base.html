@@ -11,6 +11,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="description" content="Autumn is a time management application">
         <link rel="stylesheet" type="text/css" href="{% static 'core/css/style.css' %}">
+        <link rel="stylesheet" type="text/css" href="{% static 'core/css/colours.css' %}">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
         <script type="text/javascript" src="{% static 'core/js/script.js' %}"></script>
 
@@ -45,7 +46,17 @@
                 </div>
             </div>
 
-            <section id="messages">
+            <nav class="left-panel">
+                <a href="{% url 'projects'  %}" class="main-link"><i class="fas fa-project-diagram"></i> Manage Projects</a>
+                <a href="{% url 'timers' %}" class="main-link"><i class="fas fa-clock"></i> Timers</a>
+                <a href="#" class="main-link"><i class="fas fa-book"></i> Session Logs</a>
+                <a href="#" class="main-link"><i class="fas fa-chart-bar"></i> Charts</a>
+                <a href="#" class="main-link"><i class="fas fa-cog"></i> Settings</a>
+                <a href="#" class="main-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
+            </nav>
+
+            <div class="main-body">
+                <section id="messages">
                 {% if messages %}
                     {% for message in messages%}
                         {% if message.tags == 'error'%}
@@ -64,17 +75,6 @@
                     {% endfor %}
                 {% endif %}
             </section>
-
-            <nav class="left-panel">
-                <a href="{% url 'projects'  %}" class="main-link"><i class="fas fa-project-diagram"></i> Manage Projects</a>
-                <a href="{% url 'timers' %}" class="main-link"><i class="fas fa-clock"></i> Timers</a>
-                <a href="#" class="main-link"><i class="fas fa-book"></i> Session Logs</a>
-                <a href="#" class="main-link"><i class="fas fa-chart-bar"></i> Charts</a>
-                <a href="#" class="main-link"><i class="fas fa-cog"></i> Settings</a>
-                <a href="#" class="main-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
-            </nav>
-
-            <div class="main-body">
                 {% block content %}
                 {% endblock %}
             </div>

@@ -1,16 +1,20 @@
 {% extends 'core/base.html' %}
 {% load static %}
 {% load time_formats %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'core/js/dynamic_timers.js' %}" type="text/javascript"></script>
+{% endblock %}
+
 {% block content %}
-    <button id="start-timer" class="timer-button">
-        <a href="{% url 'start_timer' %}" class="plain-link">
-            <i class="fa fa-plus"></i>
-            New Timer
-        </a>
+    <button id="start-timer" class="timer-button" onclick="window.location.href='{% url 'start_timer' %}'">
+        <i class="fa fa-plus"></i>
+        New Timer
     </button>
     <div id="active-timers">
         {% for timer in timers %}
-            <div class="card" id="timer-{{ timer.id }}">
+            <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|date:"Y-m-d H:i:s" }}">
                 <table class="timer-row">
                     <tr>
                         <td>
@@ -26,19 +30,18 @@
                             {% endfor %}
                             ]
                         </td>
-                        <td class="text-green">
-                            {{ timer.duration|min_formatter }} ago
+                        <td>
+                            <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
                         </td>
                         <td>
-                            <button class="timer-button">
-                                <a href="#" class="plain-link">
-                                    <i class="fa fa-check"></i>
-                                </a>
+                            <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
+                                <i class="fas fa-redo-alt"></i>
                             </button>
-                            <button class="timer-button">
-                                <a href="#" class="plain-link">
-                                    <i class="fa fa-trash"></i>
-                                </a>
+                            <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'">
+                                <i class="fa fa-stopwatch"></i>
+                            </button>
+                            <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'">
+                                <i class="fa fa-trash"></i>
                             </button>
                         </td>
 

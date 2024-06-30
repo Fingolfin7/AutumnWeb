@@ -130,11 +130,6 @@ class Sessions(models.Model):
         # Calculate the difference in duration
         update_value = self.duration - previous_duration
 
-        # if update_value < 0:
-        #     print(f"Something weird happened: {update_value}, "
-        #           f"start: {self.start_time}, end: {self.end_time}, "
-        #           f"is_active: {self.is_active}")
-
         # Update parent project total time
         self.project.total_time += update_value
         self.project.save()

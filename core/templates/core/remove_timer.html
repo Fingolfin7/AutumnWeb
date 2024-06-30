@@ -1,0 +1,47 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'core/js/dynamic_timers.js' %}" type="text/javascript"></script>
+{% endblock %}
+
+{% block content %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <h3>Are you sure you want to remove this timer?</h3>
+
+        <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|date:"Y-m-d H:i:s" }}">
+                <table class="timer-row">
+                    <tr>
+                        <td class="text-red">
+                            {{ timer.project.name }}
+                        </td>
+                        <td>
+                            [
+                            {% for subproject in timer.subprojects.all %}
+                                '<span class="text-cyan">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                            {% endfor %}
+                            ]
+                        </td>
+                        <td>
+                            started <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+        <div class="button-row">
+            <button type="button" class="timer-button" onclick="window.location.href='{% url 'timers' %}'">
+                 <i class="fa fa-arrow-left"></i>
+                Back
+            </button>
+            <button type="submit" id="start-timer" class="timer-button">
+                <i class="fa fa-trash"></i>
+                Delete
+            </button>
+        </div>
+    </form>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+
+{% block content %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="card" id="timer-{{ timer.id }}">
+            <table class="timer-row">
+                <tr>
+                    <td>
+                        Stopping <span class="text-red">{{ timer.project.name }}</span>
+                    </td>
+                    <td>
+                        [
+                        {% for subproject in timer.subprojects.all %}
+                            '<span class="text-cyan">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                        ]
+                    </td>
+                    <td>
+                        started <span class="text-green">{{ timer.duration|min_formatter }}</span> ago
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <textarea class="card" id="session_note" name="session_note" rows="4" cols="50" placeholder="Session Note..."></textarea>
+
+        <div class="button-row">
+            <button type="button" class="timer-button" onclick="window.location.href='{% url 'timers' %}'">
+                 <i class="fa fa-arrow-left"></i>
+                Back
+            </button>
+            <button type="submit" id="start-timer" class="timer-button">
+                <i class="fa fa-stopwatch"></i>
+                Stop
+            </button>
+        </div>
+    </form>
+{% endblock %}

@@ -12,4 +12,3 @@ class SearchProjectForm(forms.Form):
 
     status = forms.ChoiceField(required=False, choices=status_choices,
                                widget=forms.Select(attrs={'placeholder': 'Status'}))
-
