@@ -2,7 +2,13 @@
 {% load static %}
 {% load time_formats %}
 {% block content %}
-    <div class="grid-rows">
+    <section id="options">
+        <button id="create-project" class="primary-button" onclick="window.location.href='{% url 'create_project' %}'">
+            <i class="fa fa-plus"></i>
+            Create Project
+        </button>
+    </section>
+    <section id="projects-list" class="grid-rows">
         {% for project in projects %}
             <div class="card" id="project-{{ project.id }}">
                 <table>
@@ -30,8 +36,19 @@
                             <span class="text-cyan">{{ project.last_updated|date_formatter }}</span>
                         </td>
                     </tr>
+                    <tr>
+                        <td>
+                            <button class="primary-button">
+                                <i class="fa fa-pen"></i>
+                            </button>
+
+                            <button class="primary-button">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
                 </table>
             </div>
         {% endfor %}
-    </div>
+    </section>
 {% endblock %}

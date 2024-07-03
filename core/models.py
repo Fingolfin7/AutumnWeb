@@ -17,6 +17,7 @@ class Projects(models.Model):
     last_updated = models.DateTimeField(default=timezone.now)
     total_time = models.FloatField(default=0.0)
     status = models.CharField(max_length=25, choices=status_choices, default='active')
+    description = models.TextField(null=True, blank=True)
 
 
     class Meta:
@@ -46,6 +47,7 @@ class SubProjects(models.Model):
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(null=True, blank=True)
     total_time = models.FloatField(default=0.0)
+    description = models.TextField(null=True, blank=True)
     parent_project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='subprojects')
 
     class Meta:

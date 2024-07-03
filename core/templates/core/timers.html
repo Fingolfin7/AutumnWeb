@@ -8,11 +8,13 @@
 {% endblock %}
 
 {% block content %}
-    <button id="start-timer" class="timer-button" onclick="window.location.href='{% url 'start_timer' %}'">
-        <i class="fa fa-plus"></i>
-        New Timer
-    </button>
-    <div id="active-timers">
+    <section id="options">
+        <button id="start-timer" class="timer-button" onclick="window.location.href='{% url 'start_timer' %}'">
+            <i class="fa fa-plus"></i>
+            New Timer
+        </button>
+    </section>
+    <section id="active-timers">
         {% for timer in timers %}
             <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|date:"Y-m-d H:i:s" }}">
                 <table class="timer-row">
@@ -49,5 +51,5 @@
                 </table>
             </div>
         {% endfor %}
-    </div>
+    </section>
 {% endblock %}

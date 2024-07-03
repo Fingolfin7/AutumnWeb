@@ -7,24 +7,24 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
-    <script src="{% static 'core/js/search.js' %}" type="text/javascript"></script>
+    <script src="{% static 'core/js/timer_search_projects.js' %}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
     <form class="card" method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        <div id="search-projects">
+        <section id="search-projects">
             <span class="label-input">
                 <label for="project-search"><i class="fa fa-search"></i> Search</label>
                 <input type="text" id="project-search" name="project" placeholder="Projects" class="half-width"
                        data-ajax_url="{% url 'search_projects' %}">
             </span>
             <div id="project-search-results"></div>
-        </div>
+        </section>
 
         <br>
 
-        <div class="pick-subprojects">
+        <section class="pick-subprojects">
             <input type="hidden" id="list_subs" data-ajax_url="{% url 'list_subprojects_param' %}">
             <!-- dynamically fill in a combobox with the subprojects of the selected project -->
             <div class="grid-rows">
@@ -42,7 +42,7 @@
                 <!-- subprojects will be added here -->
             </div>
 
-        </div>
+        </section>
 
         <br>
 

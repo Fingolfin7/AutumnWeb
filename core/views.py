@@ -98,6 +98,7 @@ def restart_timer(request, session_id: int):
 
     return redirect('timers')
 
+
 def remove_timer(request, session_id: int):
     timer = Sessions.objects.get(id=session_id)
 
@@ -112,22 +113,6 @@ def remove_timer(request, session_id: int):
     }
 
     return render(request, 'core/remove_timer.html', context)
-
-
-class ProjectsListView(ListView):
-    model = Projects
-    template_name = 'core/projects_list.html'
-    context_object_name = 'projects'
-    ordering = ['name']
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['title'] = 'Projects'
-
-        return context
-
-    def get_queryset(self):
-        return Projects.objects.all()
 
 
 class TimerListView(ListView):
@@ -146,8 +131,68 @@ class TimerListView(ListView):
         return Sessions.objects.filter(is_active=True)
 
 
-# api endpoints to create, list, and delete projects, subprojects, and sessions
+class ProjectsListView(ListView):
+    model = Projects
+    template_name = 'core/projects_list.html'
+    context_object_name = 'projects'
+    ordering = ['name']
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Projects'
+
+        return context
+
+    def get_queryset(self):
+        return Projects.objects.all()
+
+
+class CreateProjectView(CreateView):
+    model = Projects
+    context_object_name = 'project'
+    form_class = CreateProjectForm
+    template_name = 'core/create_project.html'
+
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Create Project'
+
+        return context
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, "Project created successfully")
+        return redirect('projects')
+
+
+class CreateSubProjectView(CreateView):
+    model = SubProjects
+    form_class = CreateSubProjectForm
+    template_name = 'core/create_subproject.html'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        # Get the project's primary key from the URL
+        project_pk = self.kwargs.get('pk')
+        if project_pk:
+            # Set the initial value for the 'parent_project' field to the project instance
+            initial['parent_project'] = project_pk
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Create Subproject'
+        return context
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, "Subproject created successfully")
+        return redirect('projects')
+
+
+
+# api endpoints to create, list, and delete projects, subprojects, and sessions
 
 def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str = None) -> list:
     """

@@ -1,0 +1,22 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% block content %}
+    <form class="card" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {{ form }}
+
+        <!-- link to the create subproject page-->
+{#        <a href="{% url 'create_subproject' project.id %}">#}
+{#            <button type="button" class="secondary-button">#}
+{#                <i class="fa fa-plus"></i>#}
+{#                Create Subproject#}
+{#            </button>#}
+{#        </a>#}
+
+        <button type="submit" id="create-project" class="primary-button">
+            <i class="fa fa-check-circle"></i>
+            Create Project
+        </button>
+    </form>
+{% endblock %}

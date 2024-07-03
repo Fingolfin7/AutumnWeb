@@ -1,0 +1,14 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% block content %}
+    <form class="card" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {{ form }}
+
+        <button type="submit" id="create-subproject" class="primary-button">
+            <i class="fa fa-check-circle"></i>
+            Create Subproject
+        </button>
+    </form>
+{% endblock %}
