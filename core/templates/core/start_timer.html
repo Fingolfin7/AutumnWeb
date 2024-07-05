@@ -26,7 +26,7 @@
 
         <section class="pick-subprojects">
             <input type="hidden" id="list_subs" data-ajax_url="{% url 'list_subprojects_param' %}">
-            <!-- dynamically fill in a combobox with the subprojects of the selected project -->
+
             <div class="grid-rows">
                 <a class="plain-link" id="get_subs_list"><h3>Subprojects</h3></a>
 
@@ -40,6 +40,17 @@
 
             <div class="grid-rows" id="subproject_options">
                 <!-- subprojects will be added here -->
+            </div>
+
+            <br>
+
+            <!-- Assuming 'create_subproject' URL without a project ID looks like '/projects/create_subproject/' -->
+            <div class="grid-rows">
+                <span style="display: none;" id="create-subproject-link" data-base-url="{% url 'create_subproject' 'PROJECT_NAME' %}"></span>
+                <button type="button" id="create-subproject-button" class="primary-button" style="display:none;" >
+                    <i class="fa fa-plus"></i>
+                    Create Subproject
+                </button>
             </div>
 
         </section>

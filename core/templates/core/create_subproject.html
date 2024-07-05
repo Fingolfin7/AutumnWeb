@@ -1,10 +1,27 @@
 {% extends 'core/base.html' %}
 {% load static %}
+{% load crispy_forms_tags %}
 {% block content %}
     <form class="card" method="post" enctype="multipart/form-data">
         {% csrf_token %}
 
-        {{ form }}
+        {{ form.parent_project }}
+        {{ form.parent_project.errors }}
+
+        <span class="label-input">
+            {{ form.name.label_tag }}
+            {{ form.name }}
+            {{ form.name.errors }}
+        </span>
+
+        <br> <br>
+
+        <span class="label-input">
+            {{ form.description }}
+            {{ form.description.errors }}
+        </span>
+
+        <br> <br>
 
         <button type="submit" id="create-subproject" class="primary-button">
             <i class="fa fa-check-circle"></i>

@@ -173,11 +173,10 @@ class CreateSubProjectView(CreateView):
 
     def get_initial(self):
         initial = super().get_initial()
-        # Get the project's primary key from the URL
-        project_pk = self.kwargs.get('pk')
-        if project_pk:
-            # Set the initial value for the 'parent_project' field to the project instance
-            initial['parent_project'] = project_pk
+        if 'pk' in self.kwargs:
+            initial['parent_project'] = Projects.objects.get(pk=self.kwargs.get('pk'))
+        elif 'project_name' in self.kwargs:
+            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'))
         return initial
 
     def get_context_data(self, **kwargs):
@@ -189,6 +188,10 @@ class CreateSubProjectView(CreateView):
         form.save()
         messages.success(self.request, "Subproject created successfully")
         return redirect('projects')
+
+    def form_invalid(self, form):
+        messages.error(self.request, "An error occurred while creating the subproject")
+        return redirect('create_subproject')
 
 
 

@@ -19,8 +19,8 @@ class CreateProjectForm(forms.ModelForm):
         model = Projects
         fields = ['name', 'description']
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Project Name'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'required': False}),
+            'name': forms.TextInput(attrs={'placeholder': 'Project Name', 'class': 'half-width'}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width', 'required': False}),
         }
 
 
@@ -31,9 +31,7 @@ class CreateSubProjectForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Subproject Name'}),
             'description': forms.Textarea(attrs={'placeholder': 'Description', 'required': False}),
-            'parent_project': forms.TextInput(attrs={'placeholder': 'Parent Project', 'id': 'parent_project',
-                                                     'hidden': True}),
-            # we'll use the project search.js script for this
+            'parent_project': forms.TextInput(attrs={'id': 'parent_project', 'hidden': True}),
         }
 
 

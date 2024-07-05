@@ -27,8 +27,9 @@ $(document).ready(function() {
                     appendTo: '#project-search-results',
                     source: names,
                     select: function(event, ui) {
-                        // Call fill_subprojects when a project is selected
-                        fill_subprojects(ui.item.value);
+                        // Call fillSubprojects when a project is selected
+                        fillSubprojects(ui.item.value);
+                        updateCreateSubprojectsLink(ui.item.value);
                     }
                 });
             }
@@ -40,8 +41,13 @@ $(document).ready(function() {
         $(this).trigger('keyup');
     });
 
+    $('#select-all').click(function() {
+        let checked = $(this).prop('checked');
+        $('input[name="subprojects"]').prop('checked', checked);
+    });
 
-    function fill_subprojects(project_name) {
+
+    function fillSubprojects(project_name) {
         let url = $("#list_subs").attr("data-ajax_url");;
         if (project_name !== "") {
             $('#pick-subprojects').show('slow');
@@ -67,8 +73,17 @@ $(document).ready(function() {
         }
     }
 
-    $('#select-all').click(function() {
-        let checked = $(this).prop('checked');
-        $('input[name="subprojects"]').prop('checked', checked);
-    });
+
+    function updateCreateSubprojectsLink(project_name) {
+        let createSubprojectsLink = $('#create-subproject-link');
+        let url = createSubprojectsLink.data('base-url');
+        url = url.replace('PROJECT_NAME', project_name);
+
+        let createSubprojectsButton = $('#create-subproject-button');
+        createSubprojectsButton.on('click', function() {
+            window.location.href = url;
+        });
+
+        createSubprojectsButton.show('slow');
+    }
 });

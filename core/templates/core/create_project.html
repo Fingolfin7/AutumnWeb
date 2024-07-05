@@ -1,18 +1,24 @@
 {% extends 'core/base.html' %}
 {% load static %}
+{% load crispy_forms_tags %}
 {% block content %}
     <form class="card" method="post" enctype="multipart/form-data">
         {% csrf_token %}
 
-        {{ form }}
+        <span class="label-input">
+            {{ form.name.label_tag }}
+            {{ form.name }}
+            {{ form.name.errors }}
+        </span>
 
-        <!-- link to the create subproject page-->
-{#        <a href="{% url 'create_subproject' project.id %}">#}
-{#            <button type="button" class="secondary-button">#}
-{#                <i class="fa fa-plus"></i>#}
-{#                Create Subproject#}
-{#            </button>#}
-{#        </a>#}
+        <br> <br>
+
+        <span class="label-input">
+            {{ form.description }}
+            {{ form.description.errors }}
+        </span>
+
+        <br> <br>
 
         <button type="submit" id="create-project" class="primary-button">
             <i class="fa fa-check-circle"></i>
