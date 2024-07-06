@@ -189,6 +189,14 @@ body.dark-mode .main-link {
     border-radius: 10px;
 }
 
+.bordered-top {
+    border-top: 2px solid #ccc;
+}
+
+.lighten:before {
+  opacity: 0.5;
+}
+
 .quarters-width {
     width: 25%;
 }
@@ -217,7 +225,7 @@ body.dark-mode .main-link {
 }
 
 
-body.dark-mode .card {
+body.dark-mode .card{
     background-color: var(--card-background-dark);
     color: var(--dark-text);
     box-shadow: 0 2px 5px rgba(0,0,0,0.5);
@@ -235,7 +243,7 @@ body.dark-mode .card {
     margin-top: 2rem ;
 }
 
-.session > * {
+.session > *, .spaced > * {
     margin-right: 0.7rem
 }
 
@@ -260,7 +268,7 @@ body.dark-mode .label-input label {
 }
 
 
-.label-input input, textarea {
+.label-input input, textarea, select {
     padding: 0.8rem 0.6rem 0.6rem 0.6rem;
     border: 1px solid #ccc;
     border-radius: 4px;

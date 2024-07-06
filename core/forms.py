@@ -40,9 +40,10 @@ class UpdateProjectForm(forms.ModelForm):
         model = Projects
         fields = ['name', 'description', 'status']
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Project Name'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'required': False}),
-            'status': forms.Select(attrs={'placeholder': 'Status'}),
+            'name': forms.TextInput(attrs={'placeholder': 'Project Name', 'class': 'half-width'}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width',
+                                                 'required': False}),
+            'status': forms.Select(attrs={'placeholder': 'Status', 'class': 'half-width'}),
         }
 
 

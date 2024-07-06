@@ -38,7 +38,8 @@
                     </tr>
                     <tr>
                         <td>
-                            <button class="primary-button">
+                            <button class="primary-button"
+                                    onclick="window.location.href = '{% url 'update_project' project.name %}' ">
                                 <i class="fa fa-pen"></i>
                             </button>
 

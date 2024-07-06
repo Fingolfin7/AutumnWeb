@@ -11,6 +11,7 @@ urlpatterns = [
     path('remove_timer/<int:session_id>/', remove_timer, name='remove_timer'),
     path('create_subproject/', CreateProjectView.as_view(), name='create_project'),
     path('create_subproject/<str:project_name>/', CreateSubProjectView.as_view(), name='create_subproject'),
+    path('update_project/<str:project_name>/', UpdateProjectView.as_view(), name='update_project'),
 
     # api paths
     # path('api/create_project/', create_project, name='create_project'),

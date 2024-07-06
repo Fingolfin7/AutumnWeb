@@ -194,6 +194,31 @@ class CreateSubProjectView(CreateView):
         return redirect('create_subproject')
 
 
+class UpdateProjectView(UpdateView):
+    model = Projects
+    form_class = UpdateProjectForm
+    template_name = 'core/update_project.html'
+    context_object_name = 'project'
+
+    def get_object(self, queryset=None):
+        project = get_object_or_404(Projects, name=self.kwargs['project_name'])
+        project.audit_total_time()
+        return project
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Update Project'
+        context['subprojects'] = self.object.subprojects.all() # get all subprojects related to the project
+        context['session_count'] = self.object.sessions.count() # get the number of sessions related to the project
+        context['average_session_duration'] = self.object.total_time / context['session_count'] if context['session_count'] > 0 else 0
+        return context
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, "Project updated successfully")
+        return redirect('projects')
+
+
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions
 
