@@ -3,98 +3,123 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% block content %}
-    <form class="card" method="post" enctype="multipart/form-data">
+    <form class="flex-row" method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        <span class="label-input">
-            {{ form.name.label_tag }}
-            {{ form.name }}
-            {{ form.name.errors }}
-        </span>
+        <section id="input-fields" class="card stacked half-width">
+            <span class="label-input">
+                {{ form.name.label_tag }}
+                {{ form.name }}
+                {{ form.name.errors }}
+            </span>
 
-        <br> <br>
+            <span class="label-input">
+                {{ form.status.label_tag }}
+                {{ form.status }}
+                {{ form.status.errors }}
+            </span>
 
-        <span>
-            Total time:
-            <span class="text-green" >{{ project.total_time|min_formatter }}</span>
-        </span>
+            <span class="label-input">
+                {{ form.description }}
+                {{ form.description.errors }}
+            </span>
 
-        <br> <br>
+            <span>
+                <button type="submit" id="update-project" class="primary-button">
+                    <i class="fa fa-check-circle"></i>
+                    Update Project
+                </button>
 
-        <span>
-            Session Count:
-            <span class="text-green" >{{ session_count }}</span>
-        </span>
+                <button type="button" class="primary-button"
+                onclick="window.location.href = '{% url 'delete_project' project.name %}' ">
+                    <i class="fa fa-trash"></i>
+                    Delete Project
+                </button>
+            </span>
+        </section>
 
-        <br> <br>
+        <section id="meta-data" class="card stacked half-width space-around">
+            <span>
+                Total time:
+                <span class="text-green" >{{ project.total_time|min_formatter }}</span>
+            </span>
 
-        <span>
-            Average time per session:
-            <span class="text-green" >{{ average_session_duration|min_formatter }}</span>
-        </span>
+            <span>
+                Created:
+                <span class="text-cyan" >{{ project.start_date|date_formatter }}</span>
+            </span>
 
-        <br> <br>
+            <span>
+                Last Updated:
+                <span class="text-cyan" >{{ project.last_updated|date_formatter }}</span>
+            </span>
 
-        <span class="label-input">
-            {{ form.status.label_tag }}
-            {{ form.status }}
-            {{ form.status.errors }}
-        </span>
+            <span>
+                Session Count:
+                <span class="text-cyan" >{{ session_count }}</span>
+            </span>
 
-        <br> <br>
-
-        <span class="label-input">
-            {{ form.description }}
-            {{ form.description.errors }}
-        </span>
-
-        <br> <br>
-
-        <button type="submit" id="update-subproject" class="primary-button">
-            <i class="fa fa-check-circle"></i>
-            Update Subproject
-        </button>
-
-        <br><br>
-
-        <section id="subprojects-list" class="grid-rows">
-            {% for subproject in subprojects %}
-                <div class="card bordered-top" id="subproject-{{ subproject.id }}">
-                    <table>
-                        <tr>
-                            <td class="text-cyan">
-                                <h3>{{ subproject.name }}</h3>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="text-green">
-                                {{ subproject.total_time|min_formatter }}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <span>{{ subproject.start_date|date_formatter }}</span>
-
-                                ->
-
-                                <span>{{ subproject.last_updated|date_formatter }}</span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td>
-                                <button class="primary-button">
-                                    <i class="fa fa-pen"></i>
-                                </button>
-
-                                <button class="primary-button">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-            {% endfor %}
+            <span>
+                Average time per session:
+                <span class="text-cyan" >{{ average_session_duration|min_formatter }}</span>
+            </span>
         </section>
     </form>
+
+    <br><br>
+
+    <button type="button" id="create-subproject-button" class="primary-button"
+            onclick="window.location.href= '{% url 'create_subproject' project.name %}'">
+        <i class="fa fa-plus"></i>
+        Create Subproject
+    </button>
+
+    <br><br>
+
+    <section id="subprojects-list" class="grid-rows">
+
+        {% for subproject in subprojects %}
+            <div class="card bordered-top" id="subproject-{{ subproject.id }}">
+                <table>
+                    <tr>
+                        <td class="text-blue">
+                            <h3>
+                                <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                    {{ subproject.name }}
+                                </a>
+                            </h3>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-green">
+                            {{ subproject.total_time|min_formatter }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <span>{{ subproject.start_date|date_formatter }}</span>
+
+                            ->
+
+                            <span>{{ subproject.last_updated|date_formatter }}</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <button type="button" class="primary-button"
+                            onclick="window.location.href = '{% url 'update_subproject' subproject.id %}' ">
+                                <i class="fa fa-pen"></i>
+                            </button>
+
+                            <button type="button" class="primary-button"
+                            onclick="window.location.href = '{% url 'delete_subproject' subproject.id %}' ">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        {% endfor %}
+    </section>
 
 
 

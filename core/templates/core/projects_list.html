@@ -14,7 +14,11 @@
                 <table>
                     <tr>
                         <td class="text-red">
-                            <h3>{{ project.name }}</h3>
+                            <h3>
+                                <a class="plain-link" href="{% url 'update_project' project.name %}">
+                                    {{ project.name }}
+                                </a>
+                            </h3>
                         </td>
                     </tr>
                     <tr>
@@ -34,18 +38,6 @@
                             ->
 
                             <span class="text-cyan">{{ project.last_updated|date_formatter }}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <button class="primary-button"
-                                    onclick="window.location.href = '{% url 'update_project' project.name %}' ">
-                                <i class="fa fa-pen"></i>
-                            </button>
-
-                            <button class="primary-button">
-                                <i class="fa fa-trash"></i>
-                            </button>
                         </td>
                     </tr>
                 </table>

@@ -12,20 +12,30 @@ $(document).ready(function() {
     }
 
     function formatTime(milliseconds) {
-        var seconds = Math.floor(milliseconds / 1000);
-        var minutes = Math.floor(seconds / 60);
-        var hours = Math.floor(minutes / 60);
-        var days = Math.floor(hours / 24);
+        let totalSeconds = Math.floor(milliseconds / 1000);
+        let hours = Math.floor(totalSeconds / 3600);
+        let remainingSecondsAfterHours = totalSeconds % 3600;
+        let minutes = Math.floor(remainingSecondsAfterHours / 60);
+        let seconds = remainingSecondsAfterHours % 60;
+        let days = Math.floor(hours / 24);
+        hours = hours % 24; // Remaining hours after days
+
+        let build_time = '';
+
 
         if (days > 0) {
-            return days + ' day' + (days !== 1 ? 's' : '') + ' ' + (hours % 24) + ' hour' + (hours % 24 !== 1 ? 's' : '');
-        } else if (hours > 0) {
-            return hours + ' hour' + (hours !== 1 ? 's' : '') + ' ' + (minutes % 60) + ' minute' + (minutes % 60 !== 1 ? 's' : '');
-        } else if (minutes > 0) {
-            return minutes + ' minute' + (minutes !== 1 ? 's' : '') + ' ' + (seconds % 60) + ' second' + (seconds % 60 !== 1 ? 's' : '');
-        } else {
-            return seconds + ' second' + (seconds !== 1 ? 's' : '');
+             build_time += days + ' day' + (days !== 1 ? 's ' : ' ');
         }
+        if (hours > 0) {
+           build_time += hours + ' hour' + (hours !== 1 ? 's ' : ' ');
+        }
+        if (minutes > 0) {
+            build_time += minutes + ' minute' + (minutes !== 1 ? 's ' : ' ') ;
+        }
+
+        build_time += seconds + ' second' + (seconds !== 1 ? 's' : '');
+
+        return build_time;
     }
 
     // Update durations every second

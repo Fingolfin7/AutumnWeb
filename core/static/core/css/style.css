@@ -19,18 +19,52 @@
     --main-green: #008000;
     --main-red: #800000;
     --main-cyan: #008080;
+    --main-blue: #005fd7;
+    --main-yellow: #808000;
+    --main-magenta: #800080;
+    --main-muted: #5f8787;
 
     /*
+    https://www.ditig.com/publications/256-colors-cheat-sheet
     "black": "\u001b[30m" -> #000000
     "red": "\u001b[31m" -> #800000
     "green": "\u001b[32m" -> #008000
     "yellow": "\u001b[33m" -> #808000
-    "blue": "\u001b[34m" -> #000080
+    "blue": "\u001b[26m" -> #005fd7
     "magenta": "\u001b[35m" -> #800080
     "cyan": "\u001b[36m" -> #008080
     "white": "\u001b[37m" -> #C0C0C0
      */
 }
+
+.text-primary {
+    color: var(--primary-color);
+}
+
+.text-accent {
+    color: var(--accent-color);
+}
+
+.text-muted {
+    color: var(--main-muted);
+}
+
+.text-green{
+    color: var(--main-green);
+}
+
+.text-red{
+    color: var(--main-red);
+}
+
+.text-cyan{
+    color: var(--main-cyan);
+}
+
+.text-blue{
+    color: var(--main-blue);
+}
+
 
 body.light-mode {
     background-color: var(--light-background);
@@ -147,33 +181,6 @@ body.dark-mode .main-link {
 }
 
 
-.text-primary {
-    color: var(--primary-color);
-}
-
-.text-accent {
-    color: var(--accent-color);
-}
-
-.text-muted {
-    color: #ccc;
-}
-
-.text-green{
-    color: var(--main-green);
-}
-
-.text-red{
-    color: var(--main-red);
-}
-
-.text-cyan{
-    color: var(--main-cyan);
-}
-
-
-
-
 .main-body {
     margin-left: 16%;
     padding: 2%;
@@ -209,6 +216,27 @@ body.dark-mode .main-link {
     width: 50%;
 }
 
+.two-thirds-width {
+    width: 66.66%;
+}
+
+.three-quarters-width {
+    width: 75%;
+}
+
+.full-width {
+    width: 100%;
+}
+
+.flex-row{
+    display: flex;
+    gap: 1rem;
+}
+
+.align-center {
+    align-items: center;
+}
+
 .grid-rows {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -234,13 +262,18 @@ body.dark-mode .card{
 .stacked {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    /*align-items: flex-start;*/
+    gap: 1.5rem;
+}
+
+.space-around {
+    justify-content: space-around;
 }
 
 .lookup-window {
     display: grid;
     grid-template-columns: 1fr 1fr; 
-    margin-top: 2rem ;
+    margin-top: 2rem;
 }
 
 .session > *, .spaced > * {

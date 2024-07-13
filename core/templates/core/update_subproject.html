@@ -1,0 +1,75 @@
+{% extends 'core/base.html' %}
+{% load time_formats %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+    <form class="flex-row" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <section id="input-fields" class="card stacked two-thirds-width space-around">
+            <span class="label-input">
+                {{ form.name.label_tag }}
+                {{ form.name }}
+                {{ form.name.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.description }}
+                {{ form.description.errors }}
+            </span>
+
+            <span>
+                <button type="submit" id="update-subproject" class="primary-button">
+                    <i class="fa fa-check-circle"></i>
+                    Update Subproject
+                </button>
+                <button type="button" class="primary-button"
+                onclick="window.location.href = '{% url 'delete_subproject' subproject.id %}' ">
+                    <i class="fa fa-trash"></i>
+                    Delete Subproject
+                </button>
+            </span>
+        </section>
+
+
+        <section id="meta-data" class="card stacked thirds-width space-around">
+            <span>
+                From Project:
+                <span class="text-red">
+                    <a class="plain-link" href="{% url 'update_project' subproject.parent_project.name %}">
+                        {{ subproject.parent_project.name }}
+                    </a>
+                </span>
+            </span>
+
+            <span>
+                Total time:
+                <span class="text-green" >{{ subproject.total_time|min_formatter }}</span>
+            </span>
+
+            <span>
+                Created:
+                <span class="text-cyan" >{{ subproject.start_date|date_formatter }}</span>
+            </span>
+
+            <span>
+                Last Updated:
+                <span class="text-cyan" >{{ subproject.last_updated|date_formatter }}</span>
+            </span>
+
+            <span>
+                Session Count:
+                <span class="text-cyan" >{{ session_count }}</span>
+            </span>
+
+            <span>
+                Average time per session:
+                <span class="text-cyan" >{{ average_session_duration|min_formatter }}</span>
+            </span>
+        </section>
+
+    </form>
+
+
+
+{% endblock %}

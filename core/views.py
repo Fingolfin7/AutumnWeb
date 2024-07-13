@@ -210,14 +210,73 @@ class UpdateProjectView(UpdateView):
         context['title'] = 'Update Project'
         context['subprojects'] = self.object.subprojects.all() # get all subprojects related to the project
         context['session_count'] = self.object.sessions.count() # get the number of sessions related to the project
-        context['average_session_duration'] = self.object.total_time / context['session_count'] if context['session_count'] > 0 else 0
+        context['average_session_duration'] = self.object.total_time / context['session_count'] \
+            if context['session_count'] > 0 else 0
         return context
 
     def form_valid(self, form):
         form.save()
         messages.success(self.request, "Project updated successfully")
-        return redirect('projects')
+        return redirect('update_project', project_name=self.kwargs['project_name'])
 
+
+
+class UpdateSubProjectView(UpdateView):
+    model = SubProjects
+    form_class = UpdateSubProjectForm
+    template_name = 'core/update_subproject.html'
+    context_object_name = 'subproject'
+
+    def get_object(self, queryset=None):
+        subproject = super().get_object(queryset)
+        subproject.audit_total_time()
+        return subproject
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Update Subproject'
+        context['session_count'] = self.object.sessions.count()  # get the number of sessions related to the project
+        context['average_session_duration'] = self.object.total_time / context['session_count'] \
+            if context['session_count'] > 0 else 0
+        return context
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, "Subproject updated successfully")
+        return redirect('update_subproject', pk=self.kwargs['pk'])
+
+
+class DeleteProjectView(DeleteView):
+    model = Projects
+    template_name = 'core/delete_project.html'
+    context_object_name = 'project'
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(Projects, name=self.kwargs['project_name'])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Delete Project'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, "Project deleted successfully")
+        return reverse('projects')
+
+
+class DeleteSubProjectView(DeleteView):
+    model = SubProjects
+    template_name = 'core/delete_subproject.html'
+    context_object_name = 'subproject'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Delete Subproject'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, "Subproject deleted successfully")
+        return reverse('projects')
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions

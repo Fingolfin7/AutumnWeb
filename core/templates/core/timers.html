@@ -28,7 +28,7 @@
                         <td >
                             [
                             {% for subproject in timer.subprojects.all %}
-                                '<span class="text-cyan">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
                             {% endfor %}
                             ]
                         </td>

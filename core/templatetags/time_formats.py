@@ -41,7 +41,8 @@ def min_formatter(td: timedelta | float | int):
     else:
         sec_str = ""
 
-    return f"{days_str}{hrs_str}{min_str}{sec_str}"
+    build_string = f"{days_str}{hrs_str}{min_str}{sec_str}"
+    return build_string if build_string else "0 seconds"
 
 
 @register.filter
