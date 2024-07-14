@@ -46,12 +46,37 @@ def min_formatter(td: timedelta | float | int):
 
 
 @register.filter
-def date_formatter(date: datetime):
+def duration_formatter(td: timedelta | float | int):
+    """
+    Converts timedelta objects into formatted time strings showing durations. E.g. 1 day 2 hours 28 minutes 56 seconds
+    :param td: timedelta objects
+    :return: string formatted to days, hours, minutes and seconds.
+    """
+    if isinstance(td, (float, int)):
+        td = timedelta(minutes=td)
+
+    d_total = str(td).split(".")[0]
+    d_total = datetime.strptime(d_total, "%H:%M:%S")
+
+    if d_total.hour > 0:
+        return d_total.strftime("%Hh %Mm")
+    else:
+        return d_total.strftime("%Mm %Ss")
+
+
+@register.filter
+def date_formatter(date: datetime | str):
     """
     Converts datetime objects into formatted date strings. E.g. 12 June 2021
     :param date: datetime objects
     :return: string formatted to day month year.
     """
+    if isinstance(date, str):
+        try:
+            date = datetime.strptime(date, "%m-%d-%Y")
+        except ValueError:
+            date = datetime.strptime(date, "%Y-%m-%d")
+
     if timezone.is_naive(date):
         date = timezone.make_aware(date)
     else:
@@ -60,12 +85,32 @@ def date_formatter(date: datetime):
 
 
 @register.filter
-def day_date_formatter(date: datetime):
+def time_formatter(date: datetime):
+    """
+    Converts datetime objects into formatted time strings. E.g. 12:30
+    :param date: datetime objects
+    :return: string formatted to hour and minutes.
+    """
+    if timezone.is_naive(date):
+        date = timezone.make_aware(date)
+    else:
+        date = date.astimezone(timezone.get_default_timezone())
+    return date.strftime("%H:%M:%S")
+
+
+@register.filter
+def day_date_formatter(date: datetime| str):
     """
     Converts datetime objects into formatted date strings. E.g. Saturday 12 June 2021
     :param date: datetime objects
     :return: string formatted to day month year.
     """
+    if isinstance(date, str):
+        try:
+            date = datetime.strptime(date, "%m-%d-%Y")
+        except ValueError:
+            date = datetime.strptime(date, "%Y-%m-%d")
+
     if timezone.is_naive(date):
         date = timezone.make_aware(date)
     else:

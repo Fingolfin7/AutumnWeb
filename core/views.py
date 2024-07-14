@@ -279,6 +279,65 @@ class DeleteSubProjectView(DeleteView):
         return reverse('projects')
 
 
+class SessionsListView(ListView):
+    model=Sessions
+    template_name = 'core/list_sessions.html'
+    context_object_name = 'sessions'
+    ordering = ['-start_time']
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Sessions'
+        context['search_form'] = SearchProjectForm(
+            initial={
+                'project_name': self.request.GET.get('project_name'),
+                'start_date': self.request.GET.get('start_date'),
+                'end_date': self.request.GET.get('end_date')
+            }
+        )
+        return context
+
+    def get_queryset(self):
+        # get the sessions for the last 7 days by default.
+        # Use search parameters to filter by project or date
+        sessions = Sessions.objects.filter(is_active=False)
+        default_start = timezone.now() - timedelta(days=7)
+
+        if 'project_name' in self.request.GET:
+            project_name = self.request.GET['project_name']
+            sessions = sessions.filter(project__name=project_name) if project_name else sessions
+
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+
+        if start_date and end_date:
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+            sessions = in_window(sessions, start, end)
+        elif start_date:
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            sessions = in_window(sessions, start)
+        else:
+            sessions = in_window(sessions, default_start) # default to the last 7 days
+
+        # Group by session_date
+        grouped_sessions = {}
+        for session in sessions:
+            session_date = session.start_time.strftime('%m-%d-%Y')
+            if session_date not in grouped_sessions:
+                grouped_sessions[session_date] = {'sessions': [session], 'total_duration': session.duration}
+            else:
+                grouped_sessions[session_date]['sessions'].append(session)
+                grouped_sessions[session_date]['total_duration'] += session.duration
+
+        return grouped_sessions
+
+
+    def get_success_url(self):
+        messages.success(self.request, "Search completed successfully")
+        return reverse('list_sessions')
+
+
 # api endpoints to create, list, and delete projects, subprojects, and sessions
 
 def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str = None) -> list:
@@ -418,7 +477,6 @@ def create_subproject(request):
 def list_subprojects(request, **kwargs):
     project_name = request.query_params['project_name'] if 'project_name' in request.query_params else kwargs[
         'project_name']
-    print(project_name)
     subprojects = SubProjects.objects.filter(parent_project__name=project_name)
     serializer = SubProjectSerializer(subprojects, many=True)
     return Response(serializer.data)

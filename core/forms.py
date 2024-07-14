@@ -3,15 +3,19 @@ from .models import *
 
 
 class SearchProjectForm(forms.Form):
-    project_name = forms.CharField(required=False, widget=forms.TextInput(attrs={'placeholder': 'Project Name'}))
+    project_name = forms.CharField(required=False, widget=forms.TextInput(attrs={'placeholder': 'Projects',
+                                                                                 'id': 'project-search',
+                                                                                 'data-ajax_url': '/api/search_projects/'
+                                                                                 })
+                                   )
 
     start_date = forms.DateField(required=False,
-                                 widget=forms.DateInput(attrs={'type': 'date', 'placeholder': 'Start Date'}))
+                                 widget=forms.DateInput(attrs={'type': 'date', 'placeholder': 'Start Date',
+                                                               'id': 'start_date'}))
 
-    end_date = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date','placeholder': 'End Date'}))
+    end_date = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date','placeholder': 'End Date',
+                                                                             'id': 'end_date'}))
 
-    status = forms.ChoiceField(required=False, choices=status_choices,
-                               widget=forms.Select(attrs={'placeholder': 'Status'}))
 
 
 class CreateProjectForm(forms.ModelForm):

@@ -1,0 +1,108 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    <script src="{% static 'core/js/search_projects.js' %}" type="text/javascript"></script>
+    <script src="{% static 'core/js/session_note_slider.js' %}" type="text/javascript"></script>
+{% endblock %}
+
+{% block content %}
+    <section id="search_options">
+        <form method="get" id="search_form" class="card flex-row" enctype="multipart/form-data">
+            <div id="search_projects">
+                <span class="label-input">
+                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
+                    {{ search_form.project_name }}
+                    {{ search_form.project.errors }}
+                </span>
+                <span id="project-search-results"></span>
+            </div>
+
+            <span class="label-input" id="filter_start">
+                <label for="start_date"><i class="fa fa-calendar"></i> Start Date</label>
+                {{ search_form.start_date }}
+                {{ search_form.start_date.errors }}
+            </span>
+
+            <span class="label-input" id="filter_end">
+                <label for="end_date"><i class="fa fa-calendar"></i> End Date</label>
+                {{ search_form.end_date }}
+                {{ search_form.end_date.errors }}
+            </span>
+
+            <span>
+                <button type="submit" class="primary-button" id="search_button">
+                    <i class="fa fa-search"></i>
+                    Search
+                </button>
+            </span>
+        </form>
+    </section>
+
+    <section id="sessions-list">
+        {% if not sessions %}
+            <div class="full-width centered-pic">
+                <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}"
+                 alt="No sessions found">
+            </div>
+        {% endif %}
+
+        {% for date, data in sessions.items %}
+            <h3>{{ date|day_date_formatter }}
+                <span class="text-green">
+                    ({{ data.total_duration|duration_formatter }})
+                </span>
+            </h3>
+            {% for session in data.sessions %}
+                <div class="card" id="session-{{ session.id }}">
+                    <table class="table-row">
+                        <tr>
+                            <td>
+                                <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
+                                to
+                                <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
+                            </td>
+                            <td>
+                                {{ session.duration|duration_formatter }}
+                            </td>
+                            <td class="text-red">
+                                {{ session.project.name }}
+                            </td>
+                            <td>
+                                [
+                                {% for subproject in session.subprojects.all %}
+                                    '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                                ]
+                            </td>
+
+                            <td>
+                                {% if session.note %}
+                                    ->
+                                    <div class="note-container">
+                                        <span class="text-yellow session-note" id="note-{{ session.id }}" data-note="{{ session.note }}">
+                                            {{ session.note }}
+                                        </span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="primary-button">
+                                    <i class="fa fa-pen"></i>
+                                </button>
+                                <button class="primary-button">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            {% endfor %}
+        {% endfor %}
+    </section>
+{% endblock %}

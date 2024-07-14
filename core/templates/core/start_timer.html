@@ -17,7 +17,7 @@
             <span class="label-input">
                 <label for="project-search"><i class="fa fa-search"></i> Search</label>
                 <input type="text" id="project-search" name="project" placeholder="Projects" class="half-width"
-                       data-ajax_url="{% url 'search_projects' %}">
+                       data-ajax_url="{% url 'api_search_projects' %}">
             </span>
             <div id="project-search-results"></div>
         </section>
@@ -25,7 +25,7 @@
         <br>
 
         <section class="pick-subprojects">
-            <input type="hidden" id="list_subs" data-ajax_url="{% url 'list_subprojects_param' %}">
+            <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_list_subprojects_param' %}">
 
             <div class="grid-rows">
                 <a class="plain-link" id="get_subs_list"><h3>Subprojects</h3></a>
