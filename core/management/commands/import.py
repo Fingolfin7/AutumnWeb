@@ -128,9 +128,17 @@ class Command(BaseCommand):
                 session.save()
 
             # compare the total time read in from the file to the total time calculated from the sessions
-            if (project.total_time - project_data['Total Time']) > tolerance:  # allow for rounding errors in totals
+
+            # run audits on the project and subprojects
+            project.audit_total_time()
+            for subproject in project.subprojects.all():
+                subproject.audit_total_time()
+
+            mismatch = abs(project.total_time - project_data['Total Time'])
+            if mismatch > tolerance:  # allow for rounding errors in totals
                 raise CommandError(f"Total time mismatch for project '{project_name}': "
-                                   f"expected {project_data['Total Time']}, got {project.total_time}")
+                                   f"expected {project_data['Total Time']}, got {project.total_time}. "
+                                   f"Mismatch: {mismatch}")
 
         #
 
