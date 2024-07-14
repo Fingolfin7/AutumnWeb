@@ -16,6 +16,9 @@ class SearchProjectForm(forms.Form):
     end_date = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date','placeholder': 'End Date',
                                                                              'id': 'end_date'}))
 
+    note_snippet = forms.CharField(required=False, widget=forms.TextInput(attrs={'placeholder': 'Note Snippet',
+                                                                                 'id': 'note_snippet'}))
+
 
 
 class CreateProjectForm(forms.ModelForm):

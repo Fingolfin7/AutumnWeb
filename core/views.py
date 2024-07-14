@@ -153,7 +153,6 @@ class CreateProjectView(CreateView):
     form_class = CreateProjectForm
     template_name = 'core/create_project.html'
 
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Create Project'
@@ -208,8 +207,8 @@ class UpdateProjectView(UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Update Project'
-        context['subprojects'] = self.object.subprojects.all() # get all subprojects related to the project
-        context['session_count'] = self.object.sessions.count() # get the number of sessions related to the project
+        context['subprojects'] = self.object.subprojects.all()  # get all subprojects related to the project
+        context['session_count'] = self.object.sessions.count()  # get the number of sessions related to the project
         context['average_session_duration'] = self.object.total_time / context['session_count'] \
             if context['session_count'] > 0 else 0
         return context
@@ -218,7 +217,6 @@ class UpdateProjectView(UpdateView):
         form.save()
         messages.success(self.request, "Project updated successfully")
         return redirect('update_project', project_name=self.kwargs['project_name'])
-
 
 
 class UpdateSubProjectView(UpdateView):
@@ -280,10 +278,11 @@ class DeleteSubProjectView(DeleteView):
 
 
 class SessionsListView(ListView):
-    model=Sessions
+    model = Sessions
     template_name = 'core/list_sessions.html'
     context_object_name = 'sessions'
     ordering = ['-start_time']
+    paginate_by = 7
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -292,37 +291,16 @@ class SessionsListView(ListView):
             initial={
                 'project_name': self.request.GET.get('project_name'),
                 'start_date': self.request.GET.get('start_date'),
-                'end_date': self.request.GET.get('end_date')
+                'end_date': self.request.GET.get('end_date'),
+                'note_snippet': self.request.GET.get('note_snippet')
             }
         )
-        return context
 
-    def get_queryset(self):
-        # get the sessions for the last 7 days by default.
-        # Use search parameters to filter by project or date
-        sessions = Sessions.objects.filter(is_active=False)
-        default_start = timezone.now() - timedelta(days=7)
-
-        if 'project_name' in self.request.GET:
-            project_name = self.request.GET['project_name']
-            sessions = sessions.filter(project__name=project_name) if project_name else sessions
-
-        start_date = self.request.GET.get('start_date')
-        end_date = self.request.GET.get('end_date')
-
-        if start_date and end_date:
-            start = datetime.strptime(start_date, '%Y-%m-%d')
-            end = datetime.strptime(end_date, '%Y-%m-%d')
-            sessions = in_window(sessions, start, end)
-        elif start_date:
-            start = datetime.strptime(start_date, '%Y-%m-%d')
-            sessions = in_window(sessions, start)
-        else:
-            sessions = in_window(sessions, default_start) # default to the last 7 days
+        paginated_sessions = context['object_list']
 
         # Group by session_date
         grouped_sessions = {}
-        for session in sessions:
+        for session in paginated_sessions:
             session_date = session.start_time.strftime('%m-%d-%Y')
             if session_date not in grouped_sessions:
                 grouped_sessions[session_date] = {'sessions': [session], 'total_duration': session.duration}
@@ -330,19 +308,58 @@ class SessionsListView(ListView):
                 grouped_sessions[session_date]['sessions'].append(session)
                 grouped_sessions[session_date]['total_duration'] += session.duration
 
-        return grouped_sessions
+        context['grouped_sessions'] = grouped_sessions
 
+        # Check if any search-related query parameters are present. we only want to display the message on a search
+        if (self.request.GET.get('project_name') or self.request.GET.get('start_date') or self.request.GET.get(
+                'end_date')
+                or self.request.GET.get('note_snippet')):
+            messages.success(self.request, f"Found {len(self.get_queryset())} results")
 
-    def get_success_url(self):
-        messages.success(self.request, "Search completed successfully")
-        return reverse('list_sessions')
+        return context
+
+    def get_queryset(self):
+        # get the sessions for the last 7 days by default.
+        # Use search parameters to filter by project or date
+        sessions = Sessions.objects.filter(is_active=False)
+
+        if 'project_name' in self.request.GET:
+            project_name = self.request.GET['project_name']
+            sessions = filter_by_projects(sessions, project_name) if project_name else sessions
+
+        # search for sessions with a note snippet
+        snippet = self.request.GET.get('note_snippet')
+        if snippet:
+            sessions = sessions.filter(note__icontains=snippet)
+
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+
+        if start_date and end_date:  # do these last since in_window returns a list
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            start = timezone.make_aware(start)
+
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+            end = timezone.make_aware(end)
+
+            sessions = sessions.filter(start_time__range=(start, end))
+            
+        elif start_date:
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            start = timezone.make_aware(start)
+
+            sessions = sessions.filter(start_time__gte=start)
+
+        return sessions
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions
 
 def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str = None) -> list:
     """
-    Return a list of items in the data set that fall within the given window
+    Return a list of items in the data set that fall within the given window. Use this only when you need to
+    filter a queryset of items by the get_start and get_end properties of the items since those cant be used in a filter
+    query. Otherwise, use the filter method of the QuerySet since it's more efficient.
 
     :param data: a queryset of items
     :param start: the start of the window (%m-%d-%Y) or (%m-%d-%Y %H:%M:%S)

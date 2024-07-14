@@ -186,7 +186,8 @@ body.dark-mode .main-link {
 }
 
 .secondary-button:hover {
-    background-color: darken(var(--secondary-accent-color), 10%);
+    background-color: var(--accent-color);
+    color: var(--dark-text);
 }
 
 
@@ -367,7 +368,7 @@ input:checked + .slider {
 }
   
 input:checked + .slider:before {
-    transform: translateX(14px);
+    transform: translateX(0.8rem);
 }
 
 
@@ -376,19 +377,23 @@ input:checked + .slider:before {
 }
 
 .container.show-sidebar .main-body {
-    margin-left: 220px; /* Adjust main body margin when sidebar is visible */
+    margin-left: 13.75rem; /* Adjust main body margin when sidebar is visible */
 }
 
 /* session note slider */
-.note-container {
-    max-width: 300px; /* Adjust width as needed */
+.session-note-slider, .project-name-slider {
+    max-width: 25rem; /* Adjust width as needed */
     overflow: hidden;
     white-space: nowrap;
     display: inline-flex;
     position: relative;
 }
 
-.session-note {
+.project-name-slider {
+    max-width: 10rem; /* Adjust width as needed */
+}
+
+.session-note, .project-name {
     display: inline-block;
     white-space: nowrap;
     position: relative;

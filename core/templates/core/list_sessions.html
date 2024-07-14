@@ -1,6 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 {% load time_formats %}
+{% load param_replace %}
 
 {% block head_includes %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -8,7 +9,7 @@
     <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
     <script src="{% static 'core/js/search_projects.js' %}" type="text/javascript"></script>
-    <script src="{% static 'core/js/session_note_slider.js' %}" type="text/javascript"></script>
+    <script src="{% static 'core/js/session_sliders.js' %}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
@@ -35,6 +36,12 @@
                 {{ search_form.end_date.errors }}
             </span>
 
+            <span class="label-input">
+                <label for="note_snippet"><i class="fa fa-sticky-note"></i> Note</label>
+                {{ search_form.note_snippet }}
+                {{ search_form.note_snippet.errors }}
+            </span>
+
             <span>
                 <button type="submit" class="primary-button" id="search_button">
                     <i class="fa fa-search"></i>
@@ -50,10 +57,14 @@
                 <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}"
                  alt="No sessions found">
             </div>
+        {% else %}
+            <h2 class="text-center">Sessions</h2>
+            <br>
         {% endif %}
 
-        {% for date, data in sessions.items %}
-            <h3>{{ date|day_date_formatter }}
+        {% for date, data in grouped_sessions.items %}
+            <h3>
+                <u>{{ date|day_date_formatter }}</u>
                 <span class="text-green">
                     ({{ data.total_duration|duration_formatter }})
                 </span>
@@ -71,7 +82,11 @@
                                 {{ session.duration|duration_formatter }}
                             </td>
                             <td class="text-red">
-                                {{ session.project.name }}
+                                <div class="project-name-slider">
+                                    <span class="project-name">
+                                        {{ session.project.name }}
+                                    </span>
+                                </div>
                             </td>
                             <td>
                                 [
@@ -84,8 +99,8 @@
                             <td>
                                 {% if session.note %}
                                     ->
-                                    <div class="note-container">
-                                        <span class="text-yellow session-note" id="note-{{ session.id }}" data-note="{{ session.note }}">
+                                    <div class="session-note-slider">
+                                        <span class="text-yellow session-note" id="note-{{ session.id }}">
                                             {{ session.note }}
                                         </span>
                                     </div>
@@ -104,5 +119,41 @@
                 </div>
             {% endfor %}
         {% endfor %}
+    </section>
+
+    <section id="pagination">
+        {% if is_paginated %}
+            <div class="flex-row full-width">
+                {% if page_obj.has_previous %}
+                    <button type="button" onclick="window.location.href='?{% param_replace page=1 %}'" class="secondary-button">
+                        <i class="fa fa-angle-double-left"></i>
+                    </button>
+                    <button type="button" onclick="window.location.href='?{% param_replace page=page_obj.previous_page_number %}'" class="secondary-button">
+                        <i class="fa fa-angle-left"></i>
+                    </button>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                        <button type="button" onclick="window.location.href='?{% param_replace page=num %}'" class="secondary-button">
+                            <span style="font-size: 18px; padding:0.4rem;">{{num}}</span>
+                        </button>
+                    {% elif  num > page_obj.number|add:'-2' and num < page_obj.number|add:'2' %}
+                        <button type="button" onclick="window.location.href='?{% param_replace page=num %}'" class="secondary-button">
+                            <span style="font-size: 18px; padding:0.4rem;">{{num}}</span>
+                        </button>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <button type="button" onclick="window.location.href='?{% param_replace page=page_obj.next_page_number %}'" class="secondary-button">
+                        <i class="fa fa-angle-right"></i>
+                    </button>
+                    <button type="button" onclick="window.location.href='?{% param_replace page=page_obj.paginator.num_pages %}'" class="secondary-button">
+                        <i class="fa fa-angle-double-right"></i>
+                    </button>
+                {% endif %}
+            </div>
+        {% endif %}
     </section>
 {% endblock %}
