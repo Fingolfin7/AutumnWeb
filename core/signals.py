@@ -10,15 +10,23 @@ logger = logging.getLogger('signals')
 
 @receiver(pre_save, sender=Sessions)
 def set_session_is_active(sender, instance, **kwargs):
+    if instance.is_active or not instance.pk:  # Also check if instance is saved here
+        return
+
     if instance.end_time:  # when there is a value for end_time
         instance.is_active = False
     else:  # set to active if end_time is None
         instance.is_active = True
 
 
+
+
 @receiver(pre_save, sender=Sessions)
 def update_project_time(sender, instance, **kwargs):
     if not instance.end_time:
+        return
+
+    if instance.is_active or not instance.pk:  # Also check if instance is saved here
         return
 
     with transaction.atomic():
@@ -35,18 +43,19 @@ def update_project_time(sender, instance, **kwargs):
             return
 
         logger.info(f"Saving/Updating session {instance.id}.")
-        logger.info(
-            f"Project: {instance.project}, "
-            f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
+        logger.info(f"Project: {instance.project}")
+        if len(instance.subprojects.all()) > 0:
+            logger.info(f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
         logger.info(f"Project total time before update: {instance.project.total_time}")
         logger.info(f"Change/update value: {update_value}")
 
         instance.project.total_time += update_value
         instance.project.save()
 
-        for sub_project in instance.subprojects.all():
-            sub_project.total_time += update_value
-            sub_project.save()
+        if instance.subprojects.exists() > 0:
+            for sub_project in instance.subprojects.all():
+                sub_project.total_time += update_value
+                sub_project.save()
 
         logger.info(f"Project total time after update: {instance.project.total_time}\n")
 
@@ -54,6 +63,9 @@ def update_project_time(sender, instance, **kwargs):
 @receiver(post_save, sender=Sessions)
 def update_last_updated(sender, instance, **kwargs):
     if not instance.end_time:
+        return
+
+    if instance.is_active or not instance.pk:  # Also check if instance is saved here
         return
 
     with transaction.atomic():
@@ -76,21 +88,25 @@ def update_project_time_on_delete(sender, instance, **kwargs):
     if instance.is_active:
         return
 
+    if instance.is_active or not instance.pk:  # Also check if instance is saved here
+        return
+
     with transaction.atomic():
         update_value = -instance.duration  # subtract the duration of the session
 
         logger.info(f"Deleting session {instance.id}.")
-        logger.info(
-            f"Project: {instance.project}, "
-            f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
+        logger.info(f"Project: {instance.project}")
+        if len(instance.subprojects.all()) > 0:
+            logger.info(f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
         logger.info(f"Project total time before deletion: {instance.project.total_time}")
         logger.info(f"Change/update value: {update_value}")
 
         instance.project.total_time += update_value
         instance.project.save()
 
-        for sub_project in instance.subprojects.all():
-            sub_project.total_time += update_value
-            sub_project.save()
+        if instance.subprojects.exists() > 0:
+            for sub_project in instance.subprojects.all():
+                sub_project.total_time += update_value
+                sub_project.save()
 
         logger.info(f"Project total time after deletion: {instance.project.total_time}\n")

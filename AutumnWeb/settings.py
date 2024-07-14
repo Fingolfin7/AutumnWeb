@@ -144,10 +144,23 @@ LOGGING = {
             'backupCount': 5,
             'formatter': 'simple',
         },
+        'models': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'models.log'),
+            'when': 'W1',
+            'backupCount': 5,
+            'formatter': 'simple',
+        },
     },
     'loggers': {
         'signals': {
             'handlers': ['signals'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'models': {
+            'handlers': ['models'],
             'level': 'INFO',
             'propagate': False,
         },
