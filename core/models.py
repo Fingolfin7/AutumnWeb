@@ -114,49 +114,5 @@ class Sessions(models.Model):
         else:
             return (self.end_time - self.start_time).total_seconds() / 60.0
 
-    def save(self, *args, **kwargs):
-        if self.is_active or self.end_time is None:
-            super(Sessions, self).save(*args, **kwargs)
-            return
-
-        if self.pk:
-            # Existing instance, get the previous duration
-            previous_instance = Sessions.objects.get(pk=self.pk)
-            previous_duration = previous_instance.duration
-        else:
-            previous_duration = 0
-
-
-        super(Sessions, self).save(*args, **kwargs)
-
-        # Calculate the difference in duration
-        update_value = self.duration - previous_duration
-
-        # Update parent project total time
-        self.project.total_time += update_value
-        self.project.save()
-
-        # Update subprojects total time
-        for sub_project in self.subprojects.all():
-            sub_project.total_time += update_value
-            sub_project.save()
-
-    def delete(self, *args, **kwargs):
-        if self.is_active:
-            super(Sessions, self).delete(*args, **kwargs)
-            return
-
-        # Subtract the session duration from parent project and subprojects
-        update_value = -self.duration
-
-        self.project.total_time += update_value
-        self.project.save()
-
-        for sub_project in self.subprojects.all():
-            sub_project.total_time += update_value
-            sub_project.save()
-
-        super(Sessions, self).delete(*args, **kwargs)
-
 
 

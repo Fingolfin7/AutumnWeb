@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import logging.handlers
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -26,7 +27,7 @@ SECRET_KEY = 'django-insecure-dx9-ysl287ls=#8mye^$w1j2h+6wt^*pe)g(k&7dek9#=_#o7-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
 
 
 # Application definition
@@ -114,6 +115,44 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+
+# Logging
+LOG_DIR = os.path.join(BASE_DIR, 'Logs')
+
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[%(asctime)s] [%(levelname)s] [%(module)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+        'simple': {
+            'format': '[%(asctime)s] [%(module)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        },
+    },
+    'handlers': {
+        'signals': {
+            'level': 'INFO',
+            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'signals.log'),
+            'when': 'W1',
+            'backupCount': 5,
+        },
+    },
+    'loggers': {
+        'signals': {
+            'handlers': ['signals'],
+            'level': 'INFO',
+            'propagate': False,
+            'formatter': 'simple',
+        },
+    },
+}
 
 
 # Internationalization

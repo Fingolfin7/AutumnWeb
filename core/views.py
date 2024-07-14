@@ -73,7 +73,7 @@ def stop_timer(request, session_id: int):
         timer.is_active = False
         timer.end_time = timezone.now()
 
-        if 'session_note' in request.POST:
+        if request.POST['session_note']:
             timer.note = request.POST['session_note']
 
         timer.save()
@@ -201,7 +201,7 @@ class UpdateProjectView(UpdateView):
 
     def get_object(self, queryset=None):
         project = get_object_or_404(Projects, name=self.kwargs['project_name'])
-        project.audit_total_time()
+        # project.audit_total_time()
         return project
 
     def get_context_data(self, **kwargs):
@@ -227,7 +227,7 @@ class UpdateSubProjectView(UpdateView):
 
     def get_object(self, queryset=None):
         subproject = super().get_object(queryset)
-        subproject.audit_total_time()
+        # subproject.audit_total_time()
         return subproject
 
     def get_context_data(self, **kwargs):
@@ -319,15 +319,12 @@ class SessionsListView(ListView):
         return context
 
     def get_queryset(self):
-        # get the sessions for the last 7 days by default.
-        # Use search parameters to filter by project or date
         sessions = Sessions.objects.filter(is_active=False)
 
         if 'project_name' in self.request.GET:
             project_name = self.request.GET['project_name']
             sessions = filter_by_projects(sessions, project_name) if project_name else sessions
 
-        # search for sessions with a note snippet
         snippet = self.request.GET.get('note_snippet')
         if snippet:
             sessions = sessions.filter(note__icontains=snippet)
@@ -335,15 +332,15 @@ class SessionsListView(ListView):
         start_date = self.request.GET.get('start_date')
         end_date = self.request.GET.get('end_date')
 
-        if start_date and end_date:  # do these last since in_window returns a list
+        if start_date and end_date:
             start = datetime.strptime(start_date, '%Y-%m-%d')
             start = timezone.make_aware(start)
 
             end = datetime.strptime(end_date, '%Y-%m-%d')
             end = timezone.make_aware(end)
 
-            sessions = sessions.filter(start_time__range=(start, end))
-            
+            sessions = sessions.filter(start_time__range=[start, end])
+
         elif start_date:
             start = datetime.strptime(start_date, '%Y-%m-%d')
             start = timezone.make_aware(start)
