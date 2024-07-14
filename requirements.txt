@@ -1,0 +1,5 @@
+Django==4.2
+djangorestframework
+django-crispy-forms
+crispy-bootstrap4
+lxml

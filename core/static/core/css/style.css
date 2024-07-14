@@ -303,7 +303,7 @@ body.dark-mode .card{
     transition: 0.3s;
     background-color: var(--light-background);
     pointer-events: none;
-    border-radius: 0px 0px 2px 0px;
+    border-radius: 0 0 2px 0;
 }
 
 body.dark-mode .label-input label {
@@ -458,6 +458,9 @@ input:checked + .slider:before {
 
 /* Responsive Styles */
 @media (max-width: 768px) {
+    * {
+        font-size: 8px;
+    }
     .left-panel {
         display: none;
         transition: transform 0.3s ease-in-out;
