@@ -142,6 +142,7 @@ LOGGING = {
             'filename': os.path.join(LOG_DIR, 'signals.log'),
             'when': 'W1',
             'backupCount': 5,
+            'formatter': 'simple',
         },
     },
     'loggers': {
@@ -149,7 +150,6 @@ LOGGING = {
             'handlers': ['signals'],
             'level': 'INFO',
             'propagate': False,
-            'formatter': 'simple',
         },
     },
 }

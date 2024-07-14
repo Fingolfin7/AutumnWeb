@@ -68,6 +68,7 @@ class SubProjects(models.Model):
         self.total_time = sum(session.duration for session in self.sessions.all() if session.duration is not None)
         self.save()
 
+
     # when a subproject is deleted, remove it from all its sessions
     def delete(self, *args, **kwargs):
         for session in self.sessions.all():
