@@ -106,6 +106,7 @@ def day_date_formatter(date: datetime| str):
     :return: string formatted to day month year.
     """
     if isinstance(date, str):
+
         try:
             date = datetime.strptime(date, "%m-%d-%Y")
         except ValueError:

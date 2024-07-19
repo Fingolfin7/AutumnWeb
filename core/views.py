@@ -281,7 +281,7 @@ class SessionsListView(ListView):
     model = Sessions
     template_name = 'core/list_sessions.html'
     context_object_name = 'sessions'
-    ordering = ['-start_time']
+    ordering = ['-end_time']
     paginate_by = 7
 
     def get_context_data(self, **kwargs):
@@ -301,7 +301,11 @@ class SessionsListView(ListView):
         # Group by session_date
         grouped_sessions = {}
         for session in paginated_sessions:
-            session_date = session.start_time.strftime('%m-%d-%Y')
+            if session.end_time.tzinfo != timezone.get_default_timezone(): # convert utc to local timezone
+                session_date = session.end_time.astimezone(timezone.get_default_timezone()).strftime('%m-%d-%Y')
+            else:
+                session_date = timezone.make_aware(session.end_time).strftime('%m-%d-%Y')
+
             if session_date not in grouped_sessions:
                 grouped_sessions[session_date] = {'sessions': [session], 'total_duration': session.duration}
             else:

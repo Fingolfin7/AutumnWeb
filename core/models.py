@@ -93,7 +93,7 @@ class Sessions(models.Model):
 
     class Meta:
         verbose_name_plural = 'Sessions'
-        ordering = ['-start_time']
+        ordering = ['-end_time']
 
     def __str__(self):
         sub_list = [sub.name for sub in self.subprojects.all()]
