@@ -1,4 +1,4 @@
-Django==4.2
+Django==4.2.14
 djangorestframework
 django-crispy-forms
 crispy-bootstrap4
