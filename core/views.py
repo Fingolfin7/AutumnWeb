@@ -115,6 +115,22 @@ def remove_timer(request, session_id: int):
     return render(request, 'core/remove_timer.html', context)
 
 
+def ChartsView(request):
+    search_form = SearchProjectForm(
+        initial={
+            'project_name': request.GET.get('project_name'),
+            'start_date': request.GET.get('start_date'),
+            'end_date': request.GET.get('end_date'),
+        }
+    )
+
+    context = {
+        'title': 'Charts',
+        'search_form': search_form
+    }
+    return render(request, 'core/charts.html', context)
+
+
 class TimerListView(ListView):
     model = Sessions
     template_name = 'core/timers.html'

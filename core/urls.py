@@ -17,6 +17,8 @@ urlpatterns = [
     path('delete_subproject/<int:pk>/', DeleteSubProjectView.as_view(), name='delete_subproject'),
     path('sessions/', SessionsListView.as_view(), name='sessions'),
 
+    path('charts/', ChartsView, name='charts'),
+
     # api paths
     path('api/create_project/', create_project, name='api_create_project'),
     path('api/list_projects/', list_projects, name='api_list_projects'),

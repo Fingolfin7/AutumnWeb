@@ -49,7 +49,7 @@ class Projects(models.Model):
 class SubProjects(models.Model):
     name = models.CharField(max_length=255)
     start_date = models.DateTimeField(default=timezone.now)
-    last_updated = models.DateTimeField(null=True, blank=True)
+    last_updated = models.DateTimeField(default=timezone.now)
     total_time = models.FloatField(default=0.0)
     description = models.TextField(null=True, blank=True)
     parent_project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='subprojects')
