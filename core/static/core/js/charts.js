@@ -60,8 +60,8 @@ function get_project_data(type) {
 
 // Function to generate a random color
 function generateRandomColor(element_position, element_count) {
-    let hue = Math.floor(element_position * 360 / element_count);
-    return `hsl(${hue}, 80%, 50%)`;
+    let hue = (element_position * 360) / element_count;
+    return `hsl(${hue}, 100%, 50%)`;
 }
 
 function pie_chart(data, ctx) {
@@ -148,8 +148,6 @@ function scatter_graph(data, ctx) {
         const endTime = new Date(item.end_time);
         const duration = (endTime - startTime) / (1000 * 60 * 60); // duration in hours
 
-        console.log(`Start Time: ${startTime}, End Time: ${endTime}, Duration: ${duration} hours`);
-
         return {
             x: startTime,
             y: duration,
@@ -174,8 +172,6 @@ function scatter_graph(data, ctx) {
             projectColors[item.project.name] = generateRandomColor(index, sessionData.length);
         }
     });
-
-    console.log(projectColors);
 
     // Prepare the data for Chart.js
     const chartData = {
