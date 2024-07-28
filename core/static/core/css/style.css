@@ -149,6 +149,14 @@ body.dark-mode {
     height: 3.7rem;
 }
 
+#canvas_container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 40rem;
+}
+
 body.dark-mode .main-link {
     color: var(--light-background);
 }
@@ -225,6 +233,7 @@ body.dark-mode .main-link {
 .half-width {
     width: 50%;
 }
+
 
 .two-thirds-width {
     width: 66.66%;
