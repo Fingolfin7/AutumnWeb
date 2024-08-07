@@ -8,6 +8,8 @@ $(document).ready(function(){
             'pie': pie_chart,
             'bar': bar_graph,
             'scatter': scatter_graph,
+            'calendar': calendar_graph,
+            'scatter heatmap': scatter_heatmap,
         }
 
         get_project_data(type).then(data => {
@@ -32,7 +34,7 @@ function get_project_data(type) {
     // by default get the data from all the projects for all time
     let url = ""
 
-    let requires_session_data = ['scatter', 'calendar', 'heatmap'];
+    let requires_session_data = ['scatter', 'calendar', 'heatmap', 'scatter heatmap'];
 
     if (jQuery.inArray(type, requires_session_data) > -1){
         url = $('#sessions_link').val();
@@ -241,6 +243,223 @@ function scatter_graph(data, ctx) {
                             return label;
                         }
                     }
+                }
+            }
+        }
+    });
+}
+
+
+function calendar_graph(data, ctx, title = "Projects Calendar") {
+    // Aggregate data by date
+    const dateTotals = data.reduce((acc, item) => {
+        const date = new Date(item.start_time).toISOString().split('T')[0];
+        const startTime = new Date(item.start_time);
+        const endTime = new Date(item.end_time);
+        const duration = (endTime - startTime) / (1000 * 60 * 60); // duration in hours
+
+        if (!acc[date]) {
+            acc[date] = duration;
+        } else {
+            acc[date] += duration;
+        }
+        return acc;
+    }, {});
+
+    // Get all dates for the current year
+    const year = new Date().getFullYear();
+    const start = new Date(year, 0, 1);
+    const end = new Date(year + 1, 0, 1);
+    const dateList = [];
+    for (let date = start; date < end; date.setDate(date.getDate() + 1)) {
+        dateList.push(new Date(date));
+    }
+
+    // Create data array for each date with their duration
+    const chartData = dateList.map(date => {
+        const dateStr = date.toISOString().split('T')[0];
+        return {
+            x: date,
+            y: date.getDay(),
+            d: dateTotals[dateStr] || 0
+        };
+    });
+
+    // Find maximum duration for scaling color intensity
+    const maxDuration = Math.max(...chartData.map(d => d.d));
+
+    // Destroy existing chart if it exists
+    let existingChart = Chart.getChart(ctx);
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+    // Create the chart
+    new Chart(ctx, {
+        type: 'matrix',
+        data: {
+            datasets: [{
+                label: 'Daily Activity',
+                data: chartData,
+                backgroundColor: chartData.map(d => {
+                    const intensity = d.d / maxDuration;
+                    return `rgba(0, 128, 0, ${intensity})`; // Green color with varying opacity
+                }),
+                borderColor: 'rgba(0, 128, 0, 1)',
+                borderWidth: 1,
+                width: ctx => ctx.chart.width / 54, // 54 weeks for padding
+                height: ctx => ctx.chart.height / 7
+            }]
+        },
+        options: {
+            title: {
+                display: true,
+                text: title
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    position: 'bottom',
+                    time: {
+                        unit: 'week',
+                        displayFormats: {
+                            week: 'MMM'
+                        }
+                    },
+                    grid: {
+                        display: false
+                    }
+                },
+                y: {
+                    type: 'category',
+                    labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+                    offset: true,
+                    grid: {
+                        display: false
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: (context) => `Date: ${context[0].label}`,
+                        label: (context) => `Duration: ${context.raw.d.toFixed(2)} hours`
+                    }
+                }
+            }
+        }
+    });
+}
+
+
+
+
+function scatter_heatmap(data, ctx) {
+    // Group data by date and sum durations
+    const groupedData = data.reduce((acc, item) => {
+        const startTime = new Date(item.start_time);
+        const endTime = new Date(item.end_time);
+        const duration = (endTime - startTime) / (1000 * 60 * 60); // duration in hours
+        const date = startTime.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+        if (!acc[date]) {
+            acc[date] = { total: 0, projects: {} };
+        }
+        acc[date].total += duration;
+
+        if (!acc[date].projects[item.project.name]) {
+            acc[date].projects[item.project.name] = 0;
+        }
+        acc[date].projects[item.project.name] += duration;
+
+        return acc;
+    }, {});
+
+    // Convert grouped data to array format required by Chart.js
+    const heatmapData = Object.entries(groupedData).map(([date, value]) => {
+        const [year, month, day] = date.split('-').map(Number);
+        return {
+            x: new Date(year, month - 1, day), // JavaScript months are 0-indexed
+            y: new Date(year, month - 1, day).getDay(), // 0 (Sunday) to 6 (Saturday)
+            value: value.total,
+            projects: value.projects
+        };
+    });
+
+    // Destroy existing chart if it exists
+    let existingChart = Chart.getChart(ctx);
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+    // Create the chart
+    new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Time Spent',
+                data: heatmapData,
+                backgroundColor: (context) => {
+                    const value = context.raw.value;
+                    const alpha = Math.min(value / 8, 1); // Assuming 8 hours is max intensity
+                    return `rgba(75, 192, 192, ${alpha})`;
+                },
+                pointRadius: 10,
+                pointHoverRadius: 12,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'month',
+                        displayFormats: {
+                            month: 'MMM YYYY'
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    min: 0,
+                    max: 6,
+                    reverse: true,
+                    ticks: {
+                        stepSize: 1,
+                        callback: function(value, index, values) {
+                            return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][value];
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Day of Week'
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function(context) {
+                            return context[0].raw.x.toDateString();
+                        },
+                        label: function(context) {
+                            const value = context.raw;
+                            let label = `Total: ${value.value.toFixed(2)} hours\n`;
+                            Object.entries(value.projects).forEach(([project, hours]) => {
+                                label += `${project}: ${hours.toFixed(2)} hours\n`;
+                            });
+                            return label.split('\n');
+                        }
+                    }
+                },
+                legend: {
+                    display: false
                 }
             }
         }
