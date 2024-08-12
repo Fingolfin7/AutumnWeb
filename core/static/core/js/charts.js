@@ -281,12 +281,14 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
         return {
             x: date,
             y: date.getDay(),
-            d: dateTotals[dateStr] || 0
+            d: dateStr,
+            v: dateTotals[dateStr] || 0
         };
     });
 
     // Find maximum duration for scaling color intensity
-    const maxDuration = Math.max(...chartData.map(d => d.d));
+    const maxDuration = Math.max(...chartData.map(d => d.v));
+    console.log("max Duration: " + maxDuration);
 
     // Destroy existing chart if it exists
     let existingChart = Chart.getChart(ctx);
@@ -295,58 +297,103 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
     }
 
     // Create the chart
+    const scales = {
+        x: {
+            type: 'time',
+            position: 'bottom',
+            offset: true,
+            time: {
+                unit: 'week',
+                round: 'week',
+                displayFormats: {
+                    month: 'MMM dd'
+                }
+            },
+            ticks: {
+                maxRotation: 0
+            },
+            grid: {
+                display: false,
+                drawBorder: false
+            }
+        },
+        y: {
+            type: 'time',
+            offset: true,
+            time: {
+                unit: 'day',
+                displayFormats: {
+                    day: 'ddd'
+                }
+            },
+            reverse: true,
+            position: 'left',
+            ticks: {
+                maxRotation: 0,
+                callback: function(value) {
+                    return moment(value, 'e').format('ddd');
+                }
+            },
+            grid: {
+                display: false,
+                drawBorder: false
+            }
+        }
+    };
+
     new Chart(ctx, {
         type: 'matrix',
         data: {
             datasets: [{
-                label: 'Daily Activity',
                 data: chartData,
-                backgroundColor: chartData.map(d => {
-                    const intensity = d.d / maxDuration;
-                    return `rgba(0, 128, 0, ${intensity})`; // Green color with varying opacity
-                }),
-                borderColor: 'rgba(0, 128, 0, 1)',
+                backgroundColor(c) {
+                    let value = c.dataset.data[c.dataIndex].v;
+                    let alpha = value / maxDuration;
+                    if (alpha < 0.1){
+                        return `rgb(137, 148, 153)`;
+                    }
+                    return `rgba(0, 128, 0, ${alpha})`;
+                },
                 borderWidth: 1,
-                width: ctx => ctx.chart.width / 54, // 54 weeks for padding
-                height: ctx => ctx.chart.height / 7
+                hoverBackgroundColor: 'yellow',
+                hoverBorderColor: 'yellowgreen',
+                width(c) {
+                    let a = c.chart.chartArea || {};
+                    return (a.right - a.left) / 53;
+                }
+                // height(c) {
+                //     const a = c.chart.chartArea || {};
+                //     return (a.bottom - a.top) / 7;
+                // }
             }]
         },
         options: {
-            title: {
-                display: true,
-                text: title
-            },
-            scales: {
-                x: {
-                    type: 'time',
-                    position: 'bottom',
-                    time: {
-                        unit: 'week',
-                        displayFormats: {
-                            week: 'MMM'
+            aspectRatio: 5,
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    displayColors: false,
+                    callbacks: {
+                        title() {
+                            return '';
+                        },
+                        label(context) {
+                            const v = context.dataset.data[context.dataIndex];
+                            return ['date: ' + v.d, 'total: ' + v.v.toFixed(2)];
                         }
-                    },
-                    grid: {
-                        display: false
                     }
                 },
-                y: {
-                    type: 'category',
-                    labels: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-                    offset: true,
-                    grid: {
-                        display: false
-                    }
-                }
             },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        title: (context) => `Date: ${context[0].label}`,
-                        label: (context) => `Duration: ${context.raw.d.toFixed(2)} hours`
-                    }
-                }
-            }
+            scales: scales,
+            // layout: {
+            //     padding: {
+            //         top: 10
+            //     }
+            // }
         }
     });
 }
