@@ -9,7 +9,6 @@ $(document).ready(function(){
             'bar': bar_graph,
             'scatter': scatter_graph,
             'calendar': calendar_graph,
-            'scatter heatmap': scatter_heatmap,
         }
 
         get_project_data(type).then(data => {
@@ -60,10 +59,33 @@ function get_project_data(type) {
     });
 }
 
-// Function to generate a random color
 function generateRandomColor(element_position, element_count) {
     let hue = (element_position * 360) / element_count;
-    return `hsl(${hue}, 100%, 50%)`;
+    return `hsl(${hue}, 100%, 70%)`;
+}
+
+function fillDates(minDate, maxDate) {
+    // Generate all dates between minDate and maxDate
+    const dateList = [];
+    for (let date = new Date(minDate); date <= maxDate; date.setDate(date.getDate() + 1)) {
+        dateList.push(new Date(date));
+    }
+    return dateList;
+}
+
+function getChartUnit(endDate, startDate, chartUnit='week') {
+    let dateDifference = (endDate - startDate) / (1000 * 60 * 60 * 24); // difference in days
+    console.log("dateDifference: " + dateDifference);
+    if (dateDifference < 7) {
+        chartUnit = 'day';
+    } else if (dateDifference < 30) {
+        chartUnit = 'week';
+    } else if (dateDifference > 30) {
+        chartUnit = 'month';
+    } else if ((dateDifference / 365) > 1) {
+        chartUnit = 'year';
+    }
+    return chartUnit;
 }
 
 function pie_chart(data, ctx) {
@@ -107,7 +129,6 @@ function pie_chart(data, ctx) {
     });
 }
 
-
 function bar_graph(data, ctx) {
     // Generate colors dynamically based on the number of data points
     let colors = data.map((element, index) => generateRandomColor(index, data.length));
@@ -140,10 +161,7 @@ function bar_graph(data, ctx) {
     });
 }
 
-
 function scatter_graph(data, ctx) {
-    console.log(data[0]);
-
     // Extract session dates and durations
     const sessionData = data.map(item => {
         const startTime = new Date(item.start_time);
@@ -151,7 +169,7 @@ function scatter_graph(data, ctx) {
         const duration = (endTime - startTime) / (1000 * 60 * 60); // duration in hours
 
         return {
-            x: startTime,
+            x: endTime,
             y: duration,
             projectName: item.project.name
         };
@@ -167,13 +185,19 @@ function scatter_graph(data, ctx) {
         }, {})
     );
 
+    //sort the grouped data by project name
+    groupedData.sort((a, b) => a[0].localeCompare(b[0]));
+
     // Generate colors based on project names
     const projectColors = {};
-    data.forEach((item, index) => {
-        if (!projectColors[item.project.name]) {
-            projectColors[item.project.name] = generateRandomColor(index, sessionData.length);
+
+    groupedData.map((item, index) => {
+        if (!projectColors[item[0]]) {
+            projectColors[item[0]] = generateRandomColor(index, groupedData.length);
         }
     });
+
+    console.log(projectColors);
 
     // Prepare the data for Chart.js
     const chartData = {
@@ -181,6 +205,9 @@ function scatter_graph(data, ctx) {
             label: projectName,
             data: data,
             backgroundColor: projectColors[projectName],
+            pointHoverRadius: 6,
+            pointStyle: 'rect',
+            pointRotation: 45,
         }))
     };
 
@@ -190,19 +217,10 @@ function scatter_graph(data, ctx) {
         existingChart.destroy();
     }
 
-    let chartUnit = 'week';
-    if (sessionData.length < 7){
-        chartUnit = 'day';
-    }
-    else if (sessionData.length < 30){
-        chartUnit = 'week';
-    }
-    else if (sessionData.length < 365){
-        chartUnit = 'month';
-    }
-    else{
-        chartUnit = 'year';
-    }
+    // Calculate the difference in days between the first and last session
+    let endDate = new Date(sessionData[0].x); // array is sorted in descending order
+    let startDate  = new Date(sessionData[sessionData.length - 1].y);
+    let chartUnit = getChartUnit(endDate, startDate);
 
     // Create the chart
     new Chart(ctx, {
@@ -249,14 +267,13 @@ function scatter_graph(data, ctx) {
     });
 }
 
-
 function calendar_graph(data, ctx, title = "Projects Calendar") {
     // Aggregate data by date
     const dateTotals = data.reduce((acc, item) => {
-        const date = new Date(item.start_time).toISOString().split('T')[0];
-        const startTime = new Date(item.start_time);
-        const endTime = new Date(item.end_time);
-        const duration = (endTime - startTime) / (1000 * 60 * 60); // duration in hours
+        let date = new Date(item.start_time).toISOString().split('T')[0];
+        let startTime = new Date(item.start_time);
+        let endTime = new Date(item.end_time);
+        let duration = (endTime - startTime) / (1000 * 60 * 60); // duration in hours
 
         if (!acc[date]) {
             acc[date] = duration;
@@ -266,21 +283,25 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
         return acc;
     }, {});
 
-    // Get all dates for the current year
-    const year = new Date().getFullYear();
-    const start = new Date(year, 0, 1);
-    const end = new Date(year + 1, 0, 1);
-    const dateList = [];
-    for (let date = start; date < end; date.setDate(date.getDate() + 1)) {
-        dateList.push(new Date(date));
-    }
+    console.log("dateTotals: ", dateTotals);
+
+    // let dates = Object.keys(dateTotals).map(date => new Date(date));
+    // let minDate = new Date(Math.min(...dates));
+    // let maxDate = new Date(Math.max(...dates));
+
+    // sort dates and get the first date
+    let year = new Date(Object.keys(dateTotals).sort()[0]).getFullYear();
+    let minDate = new Date(year, 0, 1);
+    let maxDate = new Date(year + 1, 0, 1);
+
+    const dateList = fillDates(minDate, maxDate);
 
     // Create data array for each date with their duration
     const chartData = dateList.map(date => {
-        const dateStr = date.toISOString().split('T')[0];
+        let dateStr = date.toISOString().split('T')[0];
         return {
             x: date,
-            y: date.getDay(),
+            y: date.getDay(), // 0 is Sunday, 6 is Saturday
             d: dateStr,
             v: dateTotals[dateStr] || 0
         };
@@ -288,13 +309,17 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
 
     // Find maximum duration for scaling color intensity
     const maxDuration = Math.max(...chartData.map(d => d.v));
-    console.log("max Duration: " + maxDuration);
 
     // Destroy existing chart if it exists
     let existingChart = Chart.getChart(ctx);
     if (existingChart) {
         existingChart.destroy();
     }
+
+    // Calculate the difference in days between the first and last session
+    let startDate = new Date(chartData[0].x); // array is sorted in descending order
+    let endDate  = new Date(chartData[chartData.length - 1].x);
+    let chartUnit = getChartUnit(endDate, startDate);
 
     // Create the chart
     const scales = {
@@ -303,11 +328,11 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
             position: 'bottom',
             offset: true,
             time: {
-                unit: 'week',
+                unit: chartUnit,
                 round: 'week',
-                displayFormats: {
-                    month: 'MMM dd'
-                }
+                // displayFormats: {
+                //     month: 'MMM dd'
+                // }
             },
             ticks: {
                 maxRotation: 0
@@ -318,25 +343,20 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
             }
         },
         y: {
-            type: 'time',
-            offset: true,
-            time: {
-                unit: 'day',
-                displayFormats: {
-                    day: 'ddd'
-                }
-            },
+            type: 'linear',
+            min: 0,
+            max: 6,
             reverse: true,
             position: 'left',
             ticks: {
                 maxRotation: 0,
                 callback: function(value) {
-                    return moment(value, 'e').format('ddd');
+                    return ['Sat', 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'][(value)];
                 }
             },
             grid: {
                 display: false,
-                drawBorder: false
+                drawBorder: false,
             }
         }
     };
@@ -349,21 +369,17 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
                 backgroundColor(c) {
                     let value = c.dataset.data[c.dataIndex].v;
                     let alpha = value / maxDuration;
-                    if (alpha < 0.1){
-                        return `rgb(137, 148, 153)`;
+                    if (alpha === 0) {
+                        return `rgba(82, 76, 66, 0.37)`;
                     }
                     return `rgba(0, 128, 0, ${alpha})`;
                 },
                 borderWidth: 1,
                 hoverBackgroundColor: 'yellow',
                 hoverBorderColor: 'yellowgreen',
-                width(c) {
-                    let a = c.chart.chartArea || {};
-                    return (a.right - a.left) / 53;
-                }
-                // height(c) {
-                //     const a = c.chart.chartArea || {};
-                //     return (a.bottom - a.top) / 7;
+                // width(c) {
+                //     let a = c.chart.chartArea || {};
+                //     return (a.right - a.left) / Math.round(dateList.length/5.5);
                 // }
             }]
         },
@@ -376,140 +392,29 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
                     display: false
                 },
                 tooltip: {
-                    displayColors: false,
+                    displayColors: true,
                     callbacks: {
                         title() {
-                            return '';
+                           return ''
                         },
                         label(context) {
-                            const v = context.dataset.data[context.dataIndex];
-                            return ['date: ' + v.d, 'total: ' + v.v.toFixed(2)];
+                            const data = context.dataset.data[context.dataIndex];
+                            return [
+                                new Date(data.d).toLocaleDateString('en-US', {
+                                    weekday: 'short', // Short day (e.g., Thu)
+                                    day: 'numeric',   // Day (e.g., 1, 2, 3)
+                                    month: 'short',   // Short month (e.g., Apr)
+                                    year: 'numeric'   // Year (e.g., 2023)
+                                }),
+                                data.v.toFixed(2) + ' hours'
+                            ];
                         }
                     }
                 },
             },
             scales: scales,
-            // layout: {
-            //     padding: {
-            //         top: 10
-            //     }
-            // }
         }
     });
 }
 
-
-
-
-function scatter_heatmap(data, ctx) {
-    // Group data by date and sum durations
-    const groupedData = data.reduce((acc, item) => {
-        const startTime = new Date(item.start_time);
-        const endTime = new Date(item.end_time);
-        const duration = (endTime - startTime) / (1000 * 60 * 60); // duration in hours
-        const date = startTime.toISOString().split('T')[0]; // YYYY-MM-DD format
-
-        if (!acc[date]) {
-            acc[date] = { total: 0, projects: {} };
-        }
-        acc[date].total += duration;
-
-        if (!acc[date].projects[item.project.name]) {
-            acc[date].projects[item.project.name] = 0;
-        }
-        acc[date].projects[item.project.name] += duration;
-
-        return acc;
-    }, {});
-
-    // Convert grouped data to array format required by Chart.js
-    const heatmapData = Object.entries(groupedData).map(([date, value]) => {
-        const [year, month, day] = date.split('-').map(Number);
-        return {
-            x: new Date(year, month - 1, day), // JavaScript months are 0-indexed
-            y: new Date(year, month - 1, day).getDay(), // 0 (Sunday) to 6 (Saturday)
-            value: value.total,
-            projects: value.projects
-        };
-    });
-
-    // Destroy existing chart if it exists
-    let existingChart = Chart.getChart(ctx);
-    if (existingChart) {
-        existingChart.destroy();
-    }
-
-    // Create the chart
-    new Chart(ctx, {
-        type: 'scatter',
-        data: {
-            datasets: [{
-                label: 'Time Spent',
-                data: heatmapData,
-                backgroundColor: (context) => {
-                    const value = context.raw.value;
-                    const alpha = Math.min(value / 8, 1); // Assuming 8 hours is max intensity
-                    return `rgba(75, 192, 192, ${alpha})`;
-                },
-                pointRadius: 10,
-                pointHoverRadius: 12,
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    type: 'time',
-                    time: {
-                        unit: 'month',
-                        displayFormats: {
-                            month: 'MMM YYYY'
-                        }
-                    },
-                    title: {
-                        display: true,
-                        text: 'Date'
-                    }
-                },
-                y: {
-                    type: 'linear',
-                    min: 0,
-                    max: 6,
-                    reverse: true,
-                    ticks: {
-                        stepSize: 1,
-                        callback: function(value, index, values) {
-                            return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][value];
-                        }
-                    },
-                    title: {
-                        display: true,
-                        text: 'Day of Week'
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        title: function(context) {
-                            return context[0].raw.x.toDateString();
-                        },
-                        label: function(context) {
-                            const value = context.raw;
-                            let label = `Total: ${value.value.toFixed(2)} hours\n`;
-                            Object.entries(value.projects).forEach(([project, hours]) => {
-                                label += `${project}: ${hours.toFixed(2)} hours\n`;
-                            });
-                            return label.split('\n');
-                        }
-                    }
-                },
-                legend: {
-                    display: false
-                }
-            }
-        }
-    });
-}
 

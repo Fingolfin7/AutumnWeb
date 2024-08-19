@@ -14,14 +14,14 @@ def json_decompress(content: dict | str) -> dict:
     if isinstance(content, str):
         try:
             content = json.loads(content)
-        except ...:
+        except Exception:
             raise RuntimeError("Could not interpret the contents")
 
     try:
         assert (content[ZIPJSON_KEY])
         assert (set(content.keys()) == {ZIPJSON_KEY})
-    except ...:
-        raise RuntimeError("JSON not in the expected format {" + str(ZIPJSON_KEY) + ": zipstring}")
+    except Exception:
+        return content
 
     try:
         content = zlib.decompress(base64.b64decode(content[ZIPJSON_KEY]))
@@ -136,9 +136,13 @@ class Command(BaseCommand):
 
             mismatch = abs(project.total_time - project_data['Total Time'])
             if mismatch > tolerance:  # allow for rounding errors in totals
+                # delete the project that hit the mismatch
+                tally = project.total_time
+                project.delete()
                 raise CommandError(f"Total time mismatch for project '{project_name}': "
-                                   f"expected {project_data['Total Time']}, got {project.total_time}. "
+                                   f"expected {project_data['Total Time']}, got {tally}. "
                                    f"Mismatch: {mismatch}")
+
 
         #
 
