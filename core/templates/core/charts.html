@@ -43,10 +43,20 @@
                 {{ search_form.end_date.errors }}
             </span>
 
+             <span class="label-input">
+                <label for="chart_type"><i class="fa fa-chart-bar"></i>Type</label>
+                <select id="chart_type" name="chart_type">
+                    <option value="pie">Pie</option>
+                    <option value="bar">Bar</option>
+                    <option value="scatter">Scatter</option>
+                    <option value="calendar">Calendar</option>
+                </select>
+            </span>
+
             <span>
-                <button type="submit" class="primary-button" id="search_button">
-                    <i class="fa fa-search"></i>
-                    Search
+                <button type="button" class="primary-button" id="draw">
+                    <i class="fa fa-chart-line"></i>
+                    Draw
                 </button>
             </span>
         </form>
@@ -58,15 +68,7 @@
         <input type="hidden" id="subprojects_link" value="{% url 'api_list_subprojects_param' %}">
         <input type="hidden" id="sessions_link" value="{% url 'api_list_sessions' %}">
 
-        <span class="label-input">
-            <label for="chart_type"><i class="fa fa-chart-bar"></i>Type</label>
-            <select id="chart_type" name="chart_type" class="quarters-width">
-                <option value="pie">Pie</option>
-                <option value="bar">Bar</option>
-                <option value="scatter">Scatter</option>
-                <option value="calendar">Calendar</option>
-            </select>
-        </span>
+
 
         <!-- display the graph using chart js -->
         <div id="canvas_container">

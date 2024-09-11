@@ -1,4 +1,15 @@
 $(document).ready(function(){
+
+    function format_date(date){
+        //get month
+        let month = date.getMonth() + 1;
+        //get day
+        let day = date.getDate();
+        //get year
+        let year = date.getFullYear();
+        //format date
+        return `${month}-${day}-${year}`;
+    }
     function render(type) {
         // get the chart canvas, and selected type from the "chart_type" select element
         let canvas = $("#chart")[0].getContext('2d');
@@ -11,7 +22,18 @@ $(document).ready(function(){
             'calendar': calendar_graph,
         }
 
-        get_project_data(type).then(data => {
+        // get filter values
+        let start_date = $('#start_date').val() || "";
+        let end_date = $('#end_date').val() || "";
+        let project_name = $('#project-search').val() || "";
+
+        console.log('project_name:', project_name);
+
+        // change the date formats to date objects and convert the format to %m-%d-%Y
+        start_date = start_date ? format_date(new Date(start_date)) : "";
+        end_date = end_date ? format_date(new Date(end_date)) : "";
+
+        get_project_data(type, start_date, end_date, project_name).then(data => {
             chart_types[type](data, canvas);
         }).catch(error => {
             console.error('Error fetching project data:', error);
@@ -19,17 +41,18 @@ $(document).ready(function(){
     }
 
     let selectType = $("#chart_type");
+    let draw = $("#draw");
 
     render(selectType.val());
 
-    selectType.on('change', function(){
-        let type = $(this).val();
+    draw.on('click', function(){
+        let type = selectType.val();
         render(type);
     });
 
 });
 
-function get_project_data(type) {
+function get_project_data(type, start_date="", end_date="", project_name=""){
     // by default get the data from all the projects for all time
     let url = ""
 
@@ -37,9 +60,26 @@ function get_project_data(type) {
 
     if (jQuery.inArray(type, requires_session_data) > -1){
         url = $('#sessions_link').val();
+        if (project_name){
+            url += `?project=${project_name}`;
+        }
     }
     else{
         url = $("#projects_link").val();
+    }
+
+    if (start_date){
+        if (!url.includes("?")){ // if the project filter is not present
+            url += "?";
+        }
+        else{ // if the project filter is present just append the date filters
+            url += "&";
+        }
+
+        url += `start=${start_date}`;
+            if (end_date){
+            url += `&end=${end_date}`;
+        }
     }
 
     console.log(url);

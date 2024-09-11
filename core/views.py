@@ -121,6 +121,7 @@ def ChartsView(request):
             'project_name': request.GET.get('project_name'),
             'start_date': request.GET.get('start_date'),
             'end_date': request.GET.get('end_date'),
+            'chart_type': request.GET.get('chart_type'),
         }
     )
 
@@ -627,6 +628,13 @@ def list_sessions(request):
     """
     sessions = Sessions.objects.filter(is_active=False)
 
+    if 'project' in request.query_params and 'subproject' not in request.query_params:
+        project_name = request.query_params['project']
+        sessions = filter_by_projects(sessions, project_name)
+    elif 'projects' in request.query_params:
+        project_names = request.query_params['projects'].split(',')
+        sessions = filter_by_projects(sessions, names=project_names)
+
     if 'start' in request.query_params and 'end' in request.query_params:
         start = request.query_params['start']
         end = request.query_params['end']
@@ -635,12 +643,7 @@ def list_sessions(request):
         start = request.query_params['start']
         sessions = in_window(sessions, start)
 
-    if 'project' in request.query_params and 'subproject' not in request.query_params:
-        project_name = request.query_params['project']
-        sessions = filter_by_projects(sessions, project_name)
-    elif 'projects' in request.query_params:
-        project_names = request.query_params['projects'].split(',')
-        sessions = filter_by_projects(sessions, names=project_names)
+    print(len(sessions))
 
     serializer = SessionSerializer(sessions, many=True)
     return Response(serializer.data)
