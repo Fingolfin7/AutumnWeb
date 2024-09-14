@@ -8,7 +8,7 @@ logger = logging.getLogger('models')
 status_choices = (
     ('active', 'Active'),
     ('paused', 'Paused'),
-    ('completed', 'Completed'),
+    ('complete', 'Complete'),
 )
 
 
