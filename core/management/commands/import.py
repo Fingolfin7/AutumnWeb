@@ -36,13 +36,46 @@ def json_decompress(content: dict | str) -> dict:
     return content
 
 
-# usage:  python manage.py import project_file.json --force --tolerance 0.5
+def session_exists(project, start_time, end_time, subproject_names, note, time_tolerance=timedelta(minutes=2)):
+    """
+    Check if a session already exists in the database based on start and end time (with tolerance),
+    subprojects, and session notes.
+
+    :param project: Project instance the session belongs to
+    :param start_time: Start time of the session
+    :param end_time: End time of the session
+    :param subproject_names: List of subproject names for the session
+    :param note: The note associated with the session
+    :param time_tolerance: Allowed time difference between existing session and new session
+    :return: True if a matching session exists, False otherwise
+    """
+    # Ensure subproject names are case-insensitive during comparison
+    subproject_names_lower = {name.lower() for name in subproject_names}
+
+    matching_sessions = Sessions.objects.filter(
+        project=project,
+        start_time__range=(start_time - time_tolerance, start_time + time_tolerance),
+        end_time__range=(end_time - time_tolerance, end_time + time_tolerance),
+        note=note
+    )
+
+    for session in matching_sessions:
+        session_subproject_names = {name.lower() for name in session.subprojects.values_list('name', flat=True)}
+        if subproject_names_lower == session_subproject_names:
+            return True
+
+    return False
+
+
+# usage:  python manage.py import project_file.json --force/--merge --tolerance 0.5
 class Command(BaseCommand):
     help = 'Import data from projects.json'
 
     def add_arguments(self, parser):
         parser.add_argument('filepath', type=str, help='Path to an Autumn project json file')
         parser.add_argument('--force', action='store_true', help='Force import even if projects already exist')
+        parser.add_argument('--merge', action='store_true',
+                            help='Merge sessions and subprojects into existing projects')
         parser.add_argument('--tolerance', type=float, default=0.5, help='Tolerance for total time mismatch in minutes'
                                                                          'due to rounding errors '
                                                                          '(default 0.5)')
@@ -50,6 +83,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         filepath = options['filepath']
         tolerance = options['tolerance']
+        merge = options['merge']
 
         self.stdout.write(f'Reading data from {filepath}...')
         skipped = []
@@ -67,47 +101,76 @@ class Command(BaseCommand):
             raise CommandError(f'Invalid JSON file: {filepath}')
 
         for project_name, project_data in data.items():
-            if Projects.objects.filter(name=project_name).exists():
+            project = Projects.objects.filter(name=project_name).first()
+
+            if project:
                 if options['force']:
                     Projects.objects.filter(name=project_name).delete()
+                    project = None  # to ensure a fresh creation
+                elif merge:
+                    self.stdout.write(self.style.NOTICE(f"Merging new sessions and subprojects into '{project_name}'..."))
                 else:
                     skipped.append(project_name)
                     continue
 
-            self.stdout.write(f"Importing '{project_name}'...")
-            project = Projects.objects.create(
-                name=project_name,
-                start_date=timezone.make_aware(datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
-                last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
-                total_time=0.0,  # no need to read in total time because it will be recalculated with the sessions saves
-                status=project_data['Status'],
-            )
-            project.save()
-
-            for subproject_name, subproject_time in project_data['Sub Projects'].items():
-                subproject = SubProjects.objects.create(
-                    name=subproject_name,
-                    start_date=project.start_date,
-                    last_updated=project.last_updated,
+            if not project:
+                self.stdout.write(self.style.NOTICE(f"Importing '{project_name}'..."))
+                project = Projects.objects.create(
+                    name=project_name,
+                    start_date=timezone.make_aware(datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                    last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
                     total_time=0.0,
-                    # no need to read in total time because it will be recalculated with the sessions saves
-                    parent_project=project,
+                    status=project_data['Status'],
                 )
-                subproject.save()
+                project.save()
 
+            # Variables to track earliest and latest session times
+            earliest_start = None
+            latest_end = None
+
+            # Import or merge subprojects
+            for subproject_name, subproject_time in project_data['Sub Projects'].items():
+                subproject_name_lower = subproject_name.lower()  # Ensure case-insensitive handling
+                subproject, created = SubProjects.objects.get_or_create(
+                    name=subproject_name_lower,  # Always use lowercase when saving
+                    parent_project=project,
+                    defaults={
+                        'start_date': project.start_date,
+                        'last_updated': project.last_updated,
+                        'total_time': 0.0,
+                    }
+                )
+                if created:
+                    self.stdout.write(f"Created new subproject '{subproject_name}' under project '{project_name}'.")
+
+            # Import or merge session history
             for session_data in project_data['Session History']:
                 start_time = timezone.make_aware(
-                    datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}",
-                                      '%m-%d-%Y %H:%M:%S')
+                    datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}", '%m-%d-%Y %H:%M:%S')
                 )
                 end_time = timezone.make_aware(
-                    datetime.strptime(f"{session_data['Date']} {session_data['End Time']}",
-                                      '%m-%d-%Y %H:%M:%S')
+                    datetime.strptime(f"{session_data['Date']} {session_data['End Time']}", '%m-%d-%Y %H:%M:%S')
                 )
 
-                # Check if end_time is earlier than start_time
+                subproject_names = [name.lower() for name in session_data['Sub-Projects']]  # Convert to lowercase
+                note = session_data['Note']
+
+                # Track the earliest start and latest end time
+                if earliest_start is None or start_time < earliest_start:
+                    earliest_start = start_time
+                if latest_end is None or end_time > latest_end:
+                    latest_end = end_time
+
+                # Check if the session already exists
+                if session_exists(project, start_time, end_time, subproject_names, note,
+                                  time_tolerance=timedelta(minutes=tolerance)):
+                    self.stdout.write(
+                        f"Skipping existing session on {session_data['Date']} from {session_data['Start Time']} to "
+                        f"{session_data['End Time']}.")
+                    continue
+
+                # If end_time is earlier than start_time, adjust start_time
                 if end_time < start_time:
-                    # If so, subtract one day from start_time
                     start_time -= timedelta(days=1)
 
                 session = Sessions.objects.create(
@@ -115,10 +178,10 @@ class Command(BaseCommand):
                     start_time=start_time,
                     end_time=end_time,
                     is_active=False,
-                    note=session_data['Note'],
+                    note=note,
                 )
 
-                for subproject_name in session_data['Sub-Projects']:
+                for subproject_name in subproject_names:
                     try:
                         subproject = SubProjects.objects.get(name=subproject_name, parent_project=project)
                     except SubProjects.DoesNotExist:
@@ -127,24 +190,31 @@ class Command(BaseCommand):
 
                 session.save()
 
-            # compare the total time read in from the file to the total time calculated from the sessions
-
-            # run audits on the project and subprojects
+            # Run audits on the project and subprojects
             project.audit_total_time()
             for subproject in project.subprojects.all():
                 subproject.audit_total_time()
 
-            mismatch = abs(project.total_time - project_data['Total Time'])
-            if mismatch > tolerance:  # allow for rounding errors in totals
-                # delete the project that hit the mismatch
-                tally = project.total_time
-                project.delete()
-                raise CommandError(f"Total time mismatch for project '{project_name}': "
-                                   f"expected {project_data['Total Time']}, got {tally}. "
-                                   f"Mismatch: {mismatch}")
+            # Update project and subproject dates if merging
+            if merge and earliest_start and latest_end:
+                project.start_date = earliest_start
+                project.last_updated = latest_end
+                project.save()
 
+                # Update subprojects' start and last updated dates
+                for subproject in project.subprojects.all():
+                    subproject.start_date = earliest_start
+                    subproject.last_updated = latest_end
+                    subproject.save()
 
-        #
+            if not merge:
+                mismatch = abs(project.total_time - project_data['Total Time'])
+                if mismatch > tolerance:
+                    tally = project.total_time
+                    project.delete()
+                    raise CommandError(f"Total time mismatch for project '{project_name}': "
+                                       f"expected {project_data['Total Time']}, got {tally}. "
+                                       f"Mismatch: {mismatch}")
 
         self.stdout.write(self.style.SUCCESS('Data imported successfully!'))
 

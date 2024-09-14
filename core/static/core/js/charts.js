@@ -11,12 +11,12 @@ $(document).ready(function(){
             'calendar': calendar_graph,
         }
 
-        // get filter values
-        let start_date = $('#start_date').val() || "";
-        let end_date = $('#end_date').val() || "";
+        // get filter values (default to start of the current year and current date)
+        let start_date = $('#start_date').val() || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+        let end_date = $('#end_date').val() || new Date().toISOString().split('T')[0];
         let project_name = $('#project-search').val() || "";
 
-        console.log('project_name:', project_name);
+        console.log('project_name:', project_name, 'start_date:', start_date, 'end_date:', end_date);
 
         // change the date formats to date objects and convert the format to %m-%d-%Y
         start_date = start_date ? format_date(new Date(start_date)) : "";
@@ -102,21 +102,20 @@ function fillDates(minDate, maxDate) {
     return dateList;
 }
 
-function getChartUnit(endDate, startDate, chartUnit='week') {
-    let monthDifference = endDate.getMonth() - startDate.getMonth();
-    let dateDifference = endDate.getDate() - startDate.getDate();
+function getChartUnit(endDate, startDate, defaultUnit = 'week') {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const daysDifference = Math.round((endDate - startDate) / msPerDay);
+    const monthsDifference = (endDate.getFullYear() - startDate.getFullYear()) * 12 + endDate.getMonth() - startDate.getMonth();
 
-    if (dateDifference < 21 && monthDifference === 0) {
-        chartUnit = 'day';
-    } else if (dateDifference < 31 && monthDifference < 2) {
-        chartUnit = 'week';
-    } else if (monthDifference > 1 && monthDifference < 12) {
-        chartUnit = 'month';
-    } else if (monthDifference >= 12) {
-        chartUnit = 'year';
+    if (daysDifference <= 21) {
+        return 'day';
+    } else if (daysDifference <= 90) {
+        return 'week';
+    } else if (monthsDifference <= 18) {
+        return 'month';
+    } else {
+        return 'year';
     }
-    console.log("chartUnit: " + chartUnit);
-    return chartUnit;
 }
 
 function format_date(date){
