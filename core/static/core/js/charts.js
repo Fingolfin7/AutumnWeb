@@ -1,15 +1,4 @@
 $(document).ready(function(){
-
-    function format_date(date){
-        //get month
-        let month = date.getMonth() + 1;
-        //get day
-        let day = date.getDate();
-        //get year
-        let year = date.getFullYear();
-        //format date
-        return `${month}-${day}-${year}`;
-    }
     function render(type) {
         // get the chart canvas, and selected type from the "chart_type" select element
         let canvas = $("#chart")[0].getContext('2d');
@@ -114,18 +103,29 @@ function fillDates(minDate, maxDate) {
 }
 
 function getChartUnit(endDate, startDate, chartUnit='week') {
-    let dateDifference = (endDate - startDate) / (1000 * 60 * 60 * 24); // difference in days
-    console.log("dateDifference: " + dateDifference);
-    if (dateDifference < 7) {
+    let monthDifference = endDate.getMonth() - startDate.getMonth();
+    let dateDifference = endDate.getDate() - startDate.getDate();
+
+    if (dateDifference < 21 && monthDifference === 0) {
         chartUnit = 'day';
-    } else if (dateDifference < 30) {
+    } else if (dateDifference < 31 && monthDifference < 2) {
         chartUnit = 'week';
-    } else if (dateDifference > 30) {
+    } else if (monthDifference > 1 && monthDifference < 12) {
         chartUnit = 'month';
-    } else if ((dateDifference / 365) > 1) {
+    } else if (monthDifference >= 12) {
         chartUnit = 'year';
     }
+    console.log("chartUnit: " + chartUnit);
     return chartUnit;
+}
+
+function format_date(date){
+    let month = date.getMonth() + 1;
+    let day = date.getDate();
+    let year = date.getFullYear();
+
+    //format date
+    return `${month}-${day}-${year}`;
 }
 
 function pie_chart(data, ctx) {
@@ -259,7 +259,7 @@ function scatter_graph(data, ctx) {
 
     // Calculate the difference in days between the first and last session
     let endDate = new Date(sessionData[0].x); // array is sorted in descending order
-    let startDate  = new Date(sessionData[sessionData.length - 1].y);
+    let startDate  = new Date(sessionData[sessionData.length - 1].x);
     let chartUnit = getChartUnit(endDate, startDate);
 
     // Create the chart
@@ -323,7 +323,7 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
         return acc;
     }, {});
 
-    console.log("dateTotals: ", dateTotals);
+    //console.log("dateTotals: ", dateTotals);
 
     // let dates = Object.keys(dateTotals).map(date => new Date(date));
     // let minDate = new Date(Math.min(...dates));
