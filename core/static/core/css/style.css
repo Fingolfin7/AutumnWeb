@@ -122,8 +122,8 @@ body.dark-mode {
 .profile-pic {
     border-radius: 50%;
     margin-left: 1rem;
-    width: 75px;
-    height: auto; /* This will maintain the aspect ratio */
+    height: 100px;
+    width: 100px;
 }
 
 .centered-pic {
@@ -175,6 +175,15 @@ body.dark-mode .main-link {
     transition: background-color 0.3s ease;
 }
 
+.transparent-button {
+    background-color: transparent;
+    color: var(--light-background);
+    border: none;
+    padding: 10px;
+    margin: 0.2rem;
+    border-radius: 0.2rem;
+}
+
 .timer-button:hover, .primary-button:hover {
     background-color: var(--primary-color);
 }
@@ -204,6 +213,10 @@ body.dark-mode .main-link {
     padding: 2%;
     /*border-left: var(--section-border-width) solid #ccc;*/
     /*min-height: calc(100vh - 90px);*/
+}
+
+.body {
+    padding: 2%;
 }
 
 .card {
@@ -287,6 +300,10 @@ body.dark-mode .card{
 
 .space-around {
     justify-content: space-around;
+}
+
+.space-between {
+    justify-content: space-between;
 }
 
 .lookup-window {
@@ -407,6 +424,39 @@ input:checked + .slider:before {
     white-space: nowrap;
     position: relative;
 }
+
+/*file upload button*/
+
+.custom-file-upload{
+  display: inline-block;
+  padding: 6px 12px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+  background-color: var(--accent-color);
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  height: 100%;
+  transition: 0.3s;
+}
+
+.custom-file-upload:hover{
+  background-color: var(--primary-color);
+}
+
+
+.round-upload{
+  width: auto;
+  border-radius: 100%;
+}
+
+.custom-file-upload > input[type="file"],
+label > input[type="file"] {
+    display: none;
+}
+
 
 
 @keyframes slideText {

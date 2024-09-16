@@ -1,5 +1,6 @@
 Django==4.2.14
-djangorestframework
+djangorestframework~=3.14.0
 django-crispy-forms
 crispy-bootstrap4
 lxml
+Pillow~=9.5.0

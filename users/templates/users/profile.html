@@ -1,0 +1,72 @@
+{% extends 'core/base.html' %}
+{% load time_formats %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block head_includes %}
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+{% endblock %}
+
+{% block content %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <section class="card stacked">
+            <h2>Update Profile</h2>
+
+            <span class="spaced flex-row align-center">
+                <img class="profile-pic" src="{{ user.profile.image.url }}" alt="profile picture">
+
+                <label for="{{ profile_form.image.id_for_label }}" class="custom-file-upload">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    Upload Image
+                    {{ profile_form.image }}
+                </label>
+                <script>
+                    // Add the selected file name to the label so that the user can preview it
+                    $('#id_image').on('change',function(){
+                        //get the file name
+                        let fileName = $(this).val().split('\\').pop();
+
+                        // change the image preview
+                        if (this.files && this.files[0]) {
+                            let reader = new FileReader();
+
+                            reader.onload = function (e) {
+                                $('.profile-pic').attr('src', e.target.result);
+                            }
+                            reader.readAsDataURL(this.files[0]);
+                        }
+
+                        //replace the "Choose a file" label
+                        $(this).next('.custom-file-upload').html('<i class="fas fa-cloud-upload-alt"></i> '
+                            + fileName
+                            + '{{ profile_form.image }}'
+                        );
+                    })
+
+                </script>
+            </span>
+
+            <span class="label-input">
+                {{ user_form.username.errors }}
+                {{ user_form.username.label_tag }}
+                {{ user_form.username }}
+            </span>
+
+            <span class="label-input">
+                {{ user_form.email.errors }}
+                {{ user_form.email.label_tag }}
+                {{ user_form.email }}
+            </span>
+
+            <span>
+                <button type="submit" id="update-profile" class="primary-button">
+                    <i class="fa fa-check-circle"></i>
+                    Update Profile
+                </button>
+            </span>
+        </section>
+    </form>
+
+
+{% endblock %}

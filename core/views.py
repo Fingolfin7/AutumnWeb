@@ -11,8 +11,11 @@ from core.forms import *
 from core.models import *
 from core.models import Projects, SubProjects, Sessions
 from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 
+@login_required
 def home(request):
     context = {
         'timers': Sessions.objects.filter(is_active=True)[:3]
@@ -20,6 +23,7 @@ def home(request):
     return render(request, 'core/home.html', context)
 
 
+@login_required
 def start_timer(request):
     if request.method == "POST":
         try:
@@ -27,7 +31,7 @@ def start_timer(request):
             subproject_names = request.POST.getlist('subprojects')
 
             # Fetch the project
-            project = Projects.objects.filter(name=project_name).first()
+            project = Projects.objects.filter(name=project_name, user=request.user).first()
             if not project:
                 raise ValueError("Project not found")
 
@@ -38,6 +42,7 @@ def start_timer(request):
 
             # Create a new session
             session = Sessions.objects.create(
+                user=request.user,
                 project=project,
                 start_time=timezone.make_aware(datetime.now()),
                 is_active=True
@@ -66,6 +71,7 @@ def start_timer(request):
     return render(request, 'core/start_timer.html', context)
 
 
+@login_required
 def stop_timer(request, session_id: int):
     timer = Sessions.objects.get(id=session_id)
 
@@ -88,6 +94,7 @@ def stop_timer(request, session_id: int):
     return render(request, 'core/stop_timer.html', context)
 
 
+@login_required
 def restart_timer(request, session_id: int):
     timer = Sessions.objects.get(id=session_id)
 
@@ -99,6 +106,7 @@ def restart_timer(request, session_id: int):
     return redirect('timers')
 
 
+@login_required
 def remove_timer(request, session_id: int):
     timer = Sessions.objects.get(id=session_id)
 
@@ -115,6 +123,7 @@ def remove_timer(request, session_id: int):
     return render(request, 'core/remove_timer.html', context)
 
 
+@login_required
 def ChartsView(request):
     search_form = SearchProjectForm(
         initial={
@@ -132,7 +141,7 @@ def ChartsView(request):
     return render(request, 'core/charts.html', context)
 
 
-class TimerListView(ListView):
+class TimerListView(LoginRequiredMixin, ListView):
     model = Sessions
     template_name = 'core/timers.html'
     context_object_name = 'timers'
@@ -145,10 +154,10 @@ class TimerListView(ListView):
         return context
 
     def get_queryset(self):
-        return Sessions.objects.filter(is_active=True)
+        return Sessions.objects.filter(is_active=True, user=self.request.user)
 
 
-class ProjectsListView(ListView):
+class ProjectsListView(LoginRequiredMixin, ListView):
     model = Projects
     template_name = 'core/projects_list.html'
     context_object_name = 'projects'
@@ -161,10 +170,10 @@ class ProjectsListView(ListView):
         return context
 
     def get_queryset(self):
-        return Projects.objects.all()
+        return Projects.objects.filter(user=self.request.user)
 
 
-class CreateProjectView(CreateView):
+class CreateProjectView(LoginRequiredMixin, CreateView):
     model = Projects
     context_object_name = 'project'
     form_class = CreateProjectForm
@@ -177,12 +186,13 @@ class CreateProjectView(CreateView):
         return context
 
     def form_valid(self, form):
+        form.instance.user = self.request.user  # set the user field of the project to the current user
         form.save()
         messages.success(self.request, "Project created successfully")
         return redirect('projects')
 
 
-class CreateSubProjectView(CreateView):
+class CreateSubProjectView(LoginRequiredMixin, CreateView):
     model = SubProjects
     form_class = CreateSubProjectForm
     template_name = 'core/create_subproject.html'
@@ -190,9 +200,9 @@ class CreateSubProjectView(CreateView):
     def get_initial(self):
         initial = super().get_initial()
         if 'pk' in self.kwargs:
-            initial['parent_project'] = Projects.objects.get(pk=self.kwargs.get('pk'))
+            initial['parent_project'] = Projects.objects.get(pk=self.kwargs.get('pk'), user=self.request.user)
         elif 'project_name' in self.kwargs:
-            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'))
+            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'), user=self.request.user)
         return initial
 
     def get_context_data(self, **kwargs):
@@ -201,6 +211,7 @@ class CreateSubProjectView(CreateView):
         return context
 
     def form_valid(self, form):
+        form.instance.user = self.request.user
         form.save()
         messages.success(self.request, "Subproject created successfully")
         return redirect('projects')
@@ -210,14 +221,14 @@ class CreateSubProjectView(CreateView):
         return redirect('create_subproject')
 
 
-class UpdateProjectView(UpdateView):
+class UpdateProjectView(LoginRequiredMixin, UpdateView):
     model = Projects
     form_class = UpdateProjectForm
     template_name = 'core/update_project.html'
     context_object_name = 'project'
 
     def get_object(self, queryset=None):
-        project = get_object_or_404(Projects, name=self.kwargs['project_name'])
+        project = get_object_or_404(Projects, name=self.kwargs['project_name'], user=self.request.user)
         # project.audit_total_time()
         return project
 
@@ -236,7 +247,7 @@ class UpdateProjectView(UpdateView):
         return redirect('update_project', project_name=self.kwargs['project_name'])
 
 
-class UpdateSubProjectView(UpdateView):
+class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
     model = SubProjects
     form_class = UpdateSubProjectForm
     template_name = 'core/update_subproject.html'
@@ -261,13 +272,13 @@ class UpdateSubProjectView(UpdateView):
         return redirect('update_subproject', pk=self.kwargs['pk'])
 
 
-class DeleteProjectView(DeleteView):
+class DeleteProjectView(LoginRequiredMixin, DeleteView):
     model = Projects
     template_name = 'core/delete_project.html'
     context_object_name = 'project'
 
     def get_object(self, queryset=None):
-        return get_object_or_404(Projects, name=self.kwargs['project_name'])
+        return get_object_or_404(Projects, name=self.kwargs['project_name'], user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -279,7 +290,7 @@ class DeleteProjectView(DeleteView):
         return reverse('projects')
 
 
-class DeleteSubProjectView(DeleteView):
+class DeleteSubProjectView(LoginRequiredMixin, DeleteView):
     model = SubProjects
     template_name = 'core/delete_subproject.html'
     context_object_name = 'subproject'
@@ -294,7 +305,7 @@ class DeleteSubProjectView(DeleteView):
         return reverse('projects')
 
 
-class SessionsListView(ListView):
+class SessionsListView(LoginRequiredMixin, ListView):
     model = Sessions
     template_name = 'core/list_sessions.html'
     context_object_name = 'sessions'
@@ -318,7 +329,7 @@ class SessionsListView(ListView):
         # Group by session_date
         grouped_sessions = {}
         for session in paginated_sessions:
-            if session.end_time.tzinfo != timezone.get_default_timezone(): # convert utc to local timezone
+            if session.end_time.tzinfo != timezone.get_default_timezone():  # convert utc to local timezone
                 session_date = session.end_time.astimezone(timezone.get_default_timezone()).strftime('%m-%d-%Y')
             else:
                 session_date = timezone.make_aware(session.end_time).strftime('%m-%d-%Y')
@@ -340,7 +351,7 @@ class SessionsListView(ListView):
         return context
 
     def get_queryset(self):
-        sessions = Sessions.objects.filter(is_active=False)
+        sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
 
         if 'project_name' in self.request.GET:
             project_name = self.request.GET['project_name']
@@ -385,7 +396,6 @@ def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str 
 
     :return: a list of items that fall within the window
     """
-
     def parse_date_or_datetime(date_str):
         try:
             return datetime.strptime(date_str, '%m-%d-%Y')
@@ -396,6 +406,8 @@ def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str 
         start = parse_date_or_datetime(start)
     if isinstance(end, str):
         end = parse_date_or_datetime(end)
+
+    end = end + timedelta(days=1) if end else None # add a day to the end date to include all sessions on that day
 
     # can't use the filter property of a QuerySet because it doesn't support the get_start and get_end properties
     try:
@@ -421,6 +433,9 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
     :param names: if you need to filter for multiple names
     :return: list of items that match the given name or names
     """
+    if len(data) == 0:
+        return data
+
     item = data[0]  # get the first item in the queryset to determine the type of data
     if name:
         if isinstance(item, Projects):
@@ -440,6 +455,7 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
         return data
 
 
+@login_required
 @api_view(['POST'])
 def create_project(request):
     serializer = ProjectSerializer(data=request.data)
@@ -449,54 +465,59 @@ def create_project(request):
     return Response(serializer.errors)
 
 
+@login_required
 @api_view(['GET'])
 def list_projects(request):
     if 'start' in request.query_params and 'end' in request.query_params:
         start = request.query_params['start']
         end = request.query_params['end']
-        projects = Projects.objects.all()
+        projects = Projects.objects.filter(user=request.user)
         projects = in_window(projects, start, end)
     elif 'start' in request.query_params:
         start = request.query_params['start']
-        projects = Projects.objects.all()
+        projects = Projects.objects.filter(user=request.user)
         projects = in_window(projects, start)
     else:
-        projects = Projects.objects.all()
+        projects = Projects.objects.filter(user=request.user)
 
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
 
 
+@login_required
 @api_view(['GET'])
 def search_projects(request):
     search_term = request.query_params['search_term']
     if 'status' in request.query_params:
         status = request.query_params['status']
-        projects = Projects.objects.filter(name__icontains=search_term, status=status)
+        projects = Projects.objects.filter(name__icontains=search_term, status=status, user=request.user)
     else:
-        projects = Projects.objects.filter(name__icontains=search_term)
+        projects = Projects.objects.filter(name__icontains=search_term, user=request.user)
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
 
 
+@login_required
 @api_view(['GET'])
 def get_project(request, project_name):
-    project = get_object_or_404(Projects, name=project_name)
+    project = get_object_or_404(Projects, name=project_name, user=request.user)
     serializer = ProjectSerializer(project)
     return Response(serializer.data)
 
 
+@login_required
 @api_view(['DELETE'])
 def delete_project(request, project_name):
-    project = get_object_or_404(Projects, name=project_name)
+    project = get_object_or_404(Projects, name=project_name, user=request.user)
     project.delete()
     return Response(status=204)
 
 
+@login_required
 @api_view(['POST'])
 def create_subproject(request):
     # check if the parent project exists
-    if not Projects.objects.filter(name=request.data['parent_project']).exists():
+    if not Projects.objects.filter(name=request.data['parent_project'], user=request.user).exists():
         return Response({'error': 'Parent project ' + request.data['parent_project'] + ' does not exist'})
 
     serializer = SubProjectSerializer(data=request.data)
@@ -508,41 +529,47 @@ def create_subproject(request):
     return Response(serializer.errors)
 
 
+@login_required
 @api_view(['GET'])
 def list_subprojects(request, **kwargs):
     project_name = request.query_params['project_name'] if 'project_name' in request.query_params else kwargs[
         'project_name']
-    subprojects = SubProjects.objects.filter(parent_project__name=project_name)
+    subprojects = SubProjects.objects.filter(parent_project__name=project_name, user=request.user)
     serializer = SubProjectSerializer(subprojects, many=True)
     return Response(serializer.data)
 
 
+@login_required
 @api_view(['GET'])
 def search_subprojects(request):
     parent_project = request.query_params['project_name']
     search_term = request.query_params['search_term']
-    subprojects = SubProjects.objects.filter(parent_project__name=parent_project, name__icontains=search_term)
+    subprojects = SubProjects.objects.filter(parent_project__name=parent_project, name__icontains=search_term,
+                                             user=request.user)
     if not subprojects.exists():
-        subprojects = SubProjects.objects.filter(parent_project__name=parent_project)
+        subprojects = SubProjects.objects.filter(parent_project__name=parent_project, user=request.user)
     serializer = SubProjectSerializer(subprojects, many=True)
     return Response(serializer.data)
 
 
+@login_required
 @api_view(['DELETE'])
 def delete_subproject(request, project_name, subproject_name):
-    subproject = get_object_or_404(SubProjects, name=subproject_name, parent_project__name=project_name)
+    subproject = get_object_or_404(SubProjects, name=subproject_name, parent_project__name=project_name, user=request.user)
     subproject.delete()
     return Response(status=204)  # status 204 means no content, i.e. the subproject was deleted successfully
 
 
+@login_required
 @api_view(['POST'])
 def start_session(request):
-    project = Projects.objects.filter(name=request.data['project']).first()
+    project = Projects.objects.filter(name=request.data['project'], user=request.user).first()
     all_subprojects = SubProjects.objects.filter(parent_project__name=project)
     subprojects = [all_subprojects.filter(name=subproject_name, parent_project=project).first()
                    for subproject_name in request.data.getlist('subprojects[]')]
 
     session = Sessions.objects.create(
+        user=request.user,
         project=project,
         # subprojects=subprojects,
         start_time=timezone.make_aware(datetime.now()),
@@ -557,9 +584,10 @@ def start_session(request):
     return Response(status=201)
 
 
+@login_required
 @api_view(['POST'])
 def restart_session(request):
-    session = get_object_or_404(Sessions, pk=request.data['session_id'])
+    session = get_object_or_404(Sessions, pk=request.data['session_id'], user=request.user)
     session.start_time = timezone.now()
     session.is_active = True
 
@@ -567,6 +595,7 @@ def restart_session(request):
     return Response(status=200)
 
 
+@login_required
 @api_view(['POST'])
 def end_session(request):
     """
@@ -574,7 +603,7 @@ def end_session(request):
     :param request:
     :return:
     """
-    session = get_object_or_404(Sessions, pk=request.data['session_id'])
+    session = get_object_or_404(Sessions, pk=request.data['session_id'], user=request.user)
     session.end_time = timezone.now()
     session.is_active = False
 
@@ -586,13 +615,15 @@ def end_session(request):
     return Response(status=200)
 
 
+@login_required
 @api_view(['POST'])
 def log_session(request):
-    project = get_object_or_404(Projects, name=request.data['project'])
+    project = get_object_or_404(Projects, name=request.data['project'], user=request.user)
     subprojects = [get_object_or_404(SubProjects, name=subproject_name, parent_project=project)
                    for subproject_name in request.data['subprojects']]
 
     session = Sessions.objects.create(
+        user=request.user,
         project=project,
         start_time=timezone.make_aware(
             datetime.strptime(f"{request.data['date']} {request.data['start_time']}",
@@ -613,6 +644,7 @@ def log_session(request):
     return Response(status=201)
 
 
+@login_required
 @api_view(['DELETE'])
 def delete_session(request, session_id):
     session = get_object_or_404(Sessions, pk=session_id)
@@ -620,14 +652,15 @@ def delete_session(request, session_id):
     return Response(status=204)
 
 
+@login_required
 @api_view(['GET'])
 def list_sessions(request):
     """
     List all the saved (i.e. not active) sessions
     :param request: takes in optional filter parameters 'start' and 'end' or 'project(s)'
     """
-    sessions = Sessions.objects.filter(is_active=False)
 
+    sessions = Sessions.objects.filter(is_active=False, user=request.user)
     if 'project' in request.query_params and 'subproject' not in request.query_params:
         project_name = request.query_params['project']
         sessions = filter_by_projects(sessions, project_name)
@@ -639,7 +672,7 @@ def list_sessions(request):
         start = request.query_params['start']
         end = request.query_params['end']
         sessions = in_window(sessions, start, end)
-    if 'start' in request.query_params:
+    elif 'start' in request.query_params:
         start = request.query_params['start']
         sessions = in_window(sessions, start)
 
@@ -649,11 +682,12 @@ def list_sessions(request):
     return Response(serializer.data)
 
 
+@login_required
 @api_view(['GET'])
 def list_active_sessions(request):
     """
     List all active sessions
     """
-    sessions = Sessions.objects.filter(is_active=True)
+    sessions = Sessions.objects.filter(is_active=True, user=request.user)
     serializer = SessionSerializer(sessions, many=True)
     return Response(serializer.data)

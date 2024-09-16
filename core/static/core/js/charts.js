@@ -23,7 +23,11 @@ $(document).ready(function(){
         end_date = end_date ? format_date(new Date(end_date)) : "";
 
         get_project_data(type, start_date, end_date, project_name).then(data => {
+            if (data.length > 0) {
             chart_types[type](data, canvas);
+            } else {
+                console.warn('No data available for the selected filters.');
+            }
         }).catch(error => {
             console.error('Error fetching project data:', error);
         });

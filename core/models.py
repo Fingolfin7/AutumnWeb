@@ -1,6 +1,7 @@
 from datetime import datetime, time
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import User
 import logging
 
 logger = logging.getLogger('models')
@@ -12,8 +13,12 @@ status_choices = (
 )
 
 
+User._meta.get_field('email')._unique = True  # make email field unique
+
+
 # model to track the projects that a user is working on
 class Projects(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, unique=True)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
@@ -47,6 +52,7 @@ class Projects(models.Model):
 
 
 class SubProjects(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
@@ -84,6 +90,7 @@ class SubProjects(models.Model):
 
 
 class Sessions(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='sessions')
     subprojects = models.ManyToManyField(SubProjects, related_name='sessions')
     start_time = models.DateTimeField(default=timezone.now)

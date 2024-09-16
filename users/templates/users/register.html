@@ -1,0 +1,49 @@
+{% extends 'users/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+    <h2>Register</h2>
+        <form method="post" class="card stacked">
+            {% csrf_token %}
+            <span class="label-input">
+                {{ form.username.errors }}
+                {{ form.username.label_tag }}
+                {{ form.username }}
+            </span>
+
+            <span class="label-input">
+                {{ form.email.errors }}
+                {{ form.email.label_tag }}
+                {{ form.email }}
+            </span>
+
+            <span class="label-input">
+                {{ form.password1.errors }}
+                {{ form.password1.label_tag }}
+                {{ form.password1 }}
+            </span>
+
+            <span class="label-input">
+                {{ form.password2.errors }}
+                {{ form.password2.label_tag }}
+                {{ form.password2 }}
+            </span>
+
+            <span>
+                <button type="submit" class="primary-button">
+                    Register
+                    <i class="fa fa-check-circle"></i>
+                </button>
+
+                <br> <br>
+
+                <a href="{% url 'login' %}" class="plain-link transparent-button">
+                    <small>
+                        <i>Already have an account? Log in.</i>
+                        <i class="fa fa-sign-in"></i>
+                    </small>
+                </a>
+            </span>
+        </form>
+{% endblock %}

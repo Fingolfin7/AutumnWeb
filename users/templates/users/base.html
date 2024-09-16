@@ -32,25 +32,10 @@
                         <input type="checkbox" id="theme-switch">
                         <span class="slider round"></span>
                     </label>
-                    <div class="profile">
-                        <a href="{% url 'profile' %}" class="plain-link">
-                            <b>{{ user.username }}</b>
-                        </a>
-                        <img class="profile-pic" src="{{ user.profile.image.url }}" alt="profile picture">
-                    </div>
                 </div>
             </div>
 
-            <nav class="left-panel">
-                <a href="{% url 'projects'  %}" class="main-link"><i class="fas fa-project-diagram"></i> Manage Projects</a>
-                <a href="{% url 'timers' %}" class="main-link"><i class="fas fa-clock"></i> Timers</a>
-                <a href="{% url 'sessions' %}" class="main-link"><i class="fas fa-book"></i> Session Logs</a>
-                <a href="{% url 'charts' %}" class="main-link"><i class="fas fa-chart-bar"></i> Charts</a>
-                <a href="#" class="main-link"><i class="fas fa-cog"></i> Settings</a>
-                <a href="{% url 'logout' %}" class="main-link"><i class="fas fa-sign-out-alt"></i> Log out</a>
-            </nav>
-
-            <div class="main-body">
+            <div class="body width-90">
                 <section id="messages">
                 {% if messages %}
                     {% for message in messages%}
