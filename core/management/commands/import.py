@@ -2,6 +2,8 @@ import json
 import zlib
 import base64
 from datetime import datetime, timedelta
+
+from django.contrib.auth.models import User
 from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
 
@@ -36,11 +38,12 @@ def json_decompress(content: dict | str) -> dict:
     return content
 
 
-def session_exists(project, start_time, end_time, subproject_names, note, time_tolerance=timedelta(minutes=2)):
+def session_exists(user, project, start_time, end_time, subproject_names, note, time_tolerance=timedelta(minutes=2)):
     """
     Check if a session already exists in the database based on start and end time (with tolerance),
     subprojects, and session notes.
 
+    :param user: User instance the session belongs to
     :param project: Project instance the session belongs to
     :param start_time: Start time of the session
     :param end_time: End time of the session
@@ -53,6 +56,7 @@ def session_exists(project, start_time, end_time, subproject_names, note, time_t
     subproject_names_lower = {name.lower() for name in subproject_names}
 
     matching_sessions = Sessions.objects.filter(
+        user=user,
         project=project,
         start_time__range=(start_time - time_tolerance, start_time + time_tolerance),
         end_time__range=(end_time - time_tolerance, end_time + time_tolerance),
@@ -67,11 +71,12 @@ def session_exists(project, start_time, end_time, subproject_names, note, time_t
     return False
 
 
-# usage:  python manage.py import project_file.json --force/--merge --tolerance 0.5
+# usage:  python manage.py import 'username' project_file.json --force/--merge --tolerance 0.5
 class Command(BaseCommand):
     help = 'Import data from projects.json'
 
     def add_arguments(self, parser):
+        parser.add_argument('username', type=str, help='Username of the user to import the data for')
         parser.add_argument('filepath', type=str, help='Path to an Autumn project json file')
         parser.add_argument('--force', action='store_true', help='Force import even if projects already exist')
         parser.add_argument('--merge', action='store_true',
@@ -84,6 +89,12 @@ class Command(BaseCommand):
         filepath = options['filepath']
         tolerance = options['tolerance']
         merge = options['merge']
+
+        # check if the user exists
+        try:
+            user = User.objects.get(username=options['username'])
+        except User.DoesNotExist:
+            raise CommandError(f'User not found: {options["username"]}')
 
         self.stdout.write(f'Reading data from {filepath}...')
         skipped = []
@@ -116,6 +127,7 @@ class Command(BaseCommand):
             if not project:
                 self.stdout.write(self.style.NOTICE(f"Importing '{project_name}'..."))
                 project = Projects.objects.create(
+                    user=user,
                     name=project_name,
                     start_date=timezone.make_aware(datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
                     last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
@@ -132,6 +144,7 @@ class Command(BaseCommand):
             for subproject_name, subproject_time in project_data['Sub Projects'].items():
                 subproject_name_lower = subproject_name.lower()  # Ensure case-insensitive handling
                 subproject, created = SubProjects.objects.get_or_create(
+                    user=user,
                     name=subproject_name_lower,  # Always use lowercase when saving
                     parent_project=project,
                     defaults={
@@ -162,7 +175,7 @@ class Command(BaseCommand):
                     latest_end = end_time
 
                 # Check if the session already exists
-                if session_exists(project, start_time, end_time, subproject_names, note,
+                if session_exists(user, project, start_time, end_time, subproject_names, note,
                                   time_tolerance=timedelta(minutes=tolerance)):
                     self.stdout.write(
                         f"Skipping existing session on {session_data['Date']} from {session_data['Start Time']} to "
@@ -174,6 +187,7 @@ class Command(BaseCommand):
                     start_time -= timedelta(days=1)
 
                 session = Sessions.objects.create(
+                    user=user,
                     project=project,
                     start_time=start_time,
                     end_time=end_time,
@@ -183,7 +197,7 @@ class Command(BaseCommand):
 
                 for subproject_name in subproject_names:
                     try:
-                        subproject = SubProjects.objects.get(name=subproject_name, parent_project=project)
+                        subproject = SubProjects.objects.get(user=user, name=subproject_name, parent_project=project)
                     except SubProjects.DoesNotExist:
                         raise CommandError(f'Sub-project not found: {subproject_name}')
                     session.subprojects.add(subproject)
