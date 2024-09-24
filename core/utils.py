@@ -112,7 +112,7 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
     if start_date:
         start = timezone.make_aware(parse_date_or_datetime(start_date))
         if end_date:
-            end = timezone.make_aware(parse_date_or_datetime(end_date))
+            end = timezone.make_aware(parse_date_or_datetime(end_date) + timedelta(days=1))
             sessions = sessions.filter(start_time__range=[start, end])
         else:
             sessions = sessions.filter(start_time__gte=start)
