@@ -383,13 +383,13 @@ def create_project(request):
 @login_required
 @api_view(['GET'])
 def list_projects(request):
-    if 'start' in request.query_params and 'end' in request.query_params:
-        start = request.query_params['start']
-        end = request.query_params['end']
+    if 'start_date' in request.query_params and 'end_date' in request.query_params:
+        start = request.query_params['start_date']
+        end = request.query_params['end_date']
         projects = Projects.objects.filter(user=request.user)
         projects = in_window(projects, start, end)
-    elif 'start' in request.query_params:
-        start = request.query_params['start']
+    elif 'start_date' in request.query_params:
+        start = request.query_params['start_date']
         projects = Projects.objects.filter(user=request.user)
         projects = in_window(projects, start)
     else:
@@ -401,7 +401,7 @@ def list_projects(request):
 
 @login_required
 @api_view(['GET'])
-def tally_projects_in_window(request):
+def tally_by_sessions(request):
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
     sessions = filter_sessions_by_params(request, sessions)
     project_durations = tally_project_durations(sessions)

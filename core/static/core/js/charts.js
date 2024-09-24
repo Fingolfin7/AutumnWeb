@@ -24,7 +24,8 @@ $(document).ready(function(){
 
         get_project_data(type, start_date, end_date, project_name).then(data => {
             if (data.length > 0) {
-            chart_types[type](data, canvas);
+                // console.log('data:', data);
+                chart_types[type](data, canvas);
             } else {
                 console.warn('No data available for the selected filters.');
             }
@@ -83,6 +84,7 @@ function get_project_data(type, start_date="", end_date="", project_name=""){
             type: 'GET',
             dataType: 'json',
             success: function(data) {
+
                 resolve(data);
             },
             error: function(error) {

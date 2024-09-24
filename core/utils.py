@@ -121,7 +121,7 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
     return sessions
 
 
-def tally_project_durations(sessions) -> list[tuple[str, timedelta]]:
+def tally_project_durations(sessions) -> list[dict]:
     """
     Tally the total duration of each project in the given list of sessions
     :param sessions: iterable of sessions
@@ -135,4 +135,5 @@ def tally_project_durations(sessions) -> list[tuple[str, timedelta]]:
         duration = session.end_time - session.start_time
         project_durations[project_name] += duration
 
-    return list(project_durations.items())
+
+    return [{'name': name, 'total_time': total.total_seconds()/60} for name, total in project_durations.items()]
