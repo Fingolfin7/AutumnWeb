@@ -54,7 +54,7 @@ function get_project_data(type, start_date="", end_date="", project_name=""){
     if (jQuery.inArray(type, requires_session_data) > -1){
         url = $('#sessions_link').val();
         if (project_name){
-            url += `?project=${project_name}`;
+            url += `?project_name=${project_name}`;
         }
     }
     else{
@@ -69,9 +69,9 @@ function get_project_data(type, start_date="", end_date="", project_name=""){
             url += "&";
         }
 
-        url += `start=${start_date}`;
+        url += `start_date=${start_date}`;
             if (end_date){
-            url += `&end=${end_date}`;
+            url += `&end_date=${end_date}`;
         }
     }
 

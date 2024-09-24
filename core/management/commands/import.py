@@ -72,6 +72,9 @@ def session_exists(user, project, start_time, end_time, subproject_names, note, 
 
 
 # usage:  python manage.py import 'username' project_file.json --force/--merge --tolerance 0.5
+# e.g.: python manage.py import kuda "C:\Users\User\Documents\Programming\Python\Autumn\Source\projects.json"
+# --merge --tolerance 2
+
 class Command(BaseCommand):
     help = 'Import data from projects.json'
 

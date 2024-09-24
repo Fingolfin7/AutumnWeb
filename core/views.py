@@ -1,14 +1,15 @@
 from django.contrib import messages
-from django.db.models import QuerySet
 from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from datetime import datetime, timedelta
+from datetime import datetime
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from core.forms import *
-from core.models import *
+from core.forms import (CreateProjectForm, CreateSubProjectForm, UpdateProjectForm,
+                        UpdateSubProjectForm, SearchProjectForm)
+from core.utils import (parse_date_or_datetime, in_window, filter_by_projects,
+                        tally_project_durations, filter_sessions_by_params)
 from core.models import Projects, SubProjects, Sessions
 from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
 from django.contrib.auth.decorators import login_required
@@ -342,117 +343,31 @@ class SessionsListView(LoginRequiredMixin, ListView):
 
         context['grouped_sessions'] = grouped_sessions
 
+        year_start = timezone.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime(
+            "%Y-%m-%d")
+
         # Check if any search-related query parameters are present. we only want to display the message on a search
-        if (self.request.GET.get('project_name') or self.request.GET.get('start_date') or self.request.GET.get(
-                'end_date')
-                or self.request.GET.get('note_snippet')):
+        if (self.request.GET.get('project_name') or (self.request.GET.get('start_date') != year_start)
+                or self.request.GET.get('end_date') or self.request.GET.get('note_snippet')):
             messages.success(self.request, f"Found {len(self.get_queryset())} results")
 
         return context
 
     def get_queryset(self):
         sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
-
-        if 'project_name' in self.request.GET:
-            project_name = self.request.GET['project_name']
-            sessions = filter_by_projects(sessions, project_name) if project_name else sessions
-
-        snippet = self.request.GET.get('note_snippet')
-        if snippet:
-            sessions = sessions.filter(note__icontains=snippet)
-
+        # if start and end dates are empty set the start date to the beginning of the year
         start_date = self.request.GET.get('start_date')
-        end_date = self.request.GET.get('end_date')
+        if not start_date:
+            start_date = timezone.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            # update the request object with the start date
+            self.request.GET = self.request.GET.copy()
+            self.request.GET['start_date'] = start_date.strftime("%Y-%m-%d")
 
-        if start_date and end_date:
-            start = datetime.strptime(start_date, '%Y-%m-%d')
-            start = timezone.make_aware(start)
-
-            end = datetime.strptime(end_date, '%Y-%m-%d')
-            end = timezone.make_aware(end)
-
-            sessions = sessions.filter(start_time__range=[start, end])
-
-        elif start_date:
-            start = datetime.strptime(start_date, '%Y-%m-%d')
-            start = timezone.make_aware(start)
-
-            sessions = sessions.filter(start_time__gte=start)
-
-        return sessions
+        return filter_sessions_by_params(self.request, sessions)
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions
 
-def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str = None) -> list:
-    """
-    Return a list of items in the data set that fall within the given window. Use this only when you need to
-    filter a queryset of items by the get_start and get_end properties of the items since those cant be used in a filter
-    query. Otherwise, use the filter method of the QuerySet since it's more efficient.
-
-    :param data: a queryset of items
-    :param start: the start of the window (%m-%d-%Y) or (%m-%d-%Y %H:%M:%S)
-    :param end: the end of the window (%m-%d-%Y) or (%m-%d-%Y %H:%M:%S)
-
-    :return: a list of items that fall within the window
-    """
-    def parse_date_or_datetime(date_str):
-        try:
-            return datetime.strptime(date_str, '%m-%d-%Y')
-        except ValueError:
-            return datetime.strptime(date_str, '%m-%d-%Y %H:%M:%S')
-
-    if isinstance(start, str):
-        start = parse_date_or_datetime(start)
-    if isinstance(end, str):
-        end = parse_date_or_datetime(end)
-
-    end = end + timedelta(days=1) if end else None # add a day to the end date to include all sessions on that day
-
-    # can't use the filter property of a QuerySet because it doesn't support the get_start and get_end properties
-    try:
-        if end:
-            return [item for item in data if item.get_start >= start and item.get_end <= end]
-        else:
-            return [item for item in data if item.get_start >= start]
-    except TypeError:
-        start = timezone.make_aware(start)
-        if end:
-            end = timezone.make_aware(end)
-            return [item for item in data if item.get_start >= start and item.get_end <= end]
-        else:
-            return [item for item in data if item.get_start >= start]
-
-
-def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: str = None,
-                       names: list[str] = None) -> QuerySet:
-    """
-    filter a queryset of data and return a list of items that match the given name or names
-    :param data: a queryset of data
-    :param name: if you need to filter for 1 name
-    :param names: if you need to filter for multiple names
-    :return: list of items that match the given name or names
-    """
-    if len(data) == 0:
-        return data
-
-    item = data[0]  # get the first item in the queryset to determine the type of data
-    if name:
-        if isinstance(item, Projects):
-            return data.filter(name=name)
-        elif isinstance(item, SubProjects):
-            return data.filter(parent_project__name=name)
-        elif isinstance(item, Sessions):
-            return data.filter(project__name=name)
-    elif names:
-        if isinstance(item, Projects):
-            return data.filter(name__in=names)
-        elif isinstance(item, SubProjects):
-            return data.filter(parent_project__name__in=names)
-        elif isinstance(item, Sessions):
-            return data.filter(project__name__in=names)
-    else:
-        return data
 
 
 @login_required
@@ -482,6 +397,15 @@ def list_projects(request):
 
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
+
+
+@login_required
+@api_view(['GET'])
+def tally_projects_in_window(request):
+    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = filter_sessions_by_params(request, sessions)
+    project_durations = tally_project_durations(sessions)
+    return Response(project_durations)
 
 
 @login_required
@@ -659,25 +583,8 @@ def list_sessions(request):
     List all the saved (i.e. not active) sessions
     :param request: takes in optional filter parameters 'start' and 'end' or 'project(s)'
     """
-
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
-    if 'project' in request.query_params and 'subproject' not in request.query_params:
-        project_name = request.query_params['project']
-        sessions = filter_by_projects(sessions, project_name)
-    elif 'projects' in request.query_params:
-        project_names = request.query_params['projects'].split(',')
-        sessions = filter_by_projects(sessions, names=project_names)
-
-    if 'start' in request.query_params and 'end' in request.query_params:
-        start = request.query_params['start']
-        end = request.query_params['end']
-        sessions = in_window(sessions, start, end)
-    elif 'start' in request.query_params:
-        start = request.query_params['start']
-        sessions = in_window(sessions, start)
-
-    print(len(sessions))
-
+    sessions = filter_sessions_by_params(request, sessions)
     serializer = SessionSerializer(sessions, many=True)
     return Response(serializer.data)
 
