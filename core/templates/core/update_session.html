@@ -1,0 +1,72 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    <script src="{% static 'core/js/search_projects.js' %}" type="text/javascript"></script>
+{% endblock %}
+
+{% block content %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <section id="input-fields" class="card stacked">
+           <div id="search-projects">
+                <span class="label-input">
+                    {{ form.project_name.label_tag }}
+                    {{ form.project_name}}
+                    {{ form.project_name.errors }}
+                </span>
+                <div id="project-search-results"></div>
+            </div>
+
+           <div id="date-fields" class="flex-row">
+                <span class="label-input">
+                    {{ form.start_time.label_tag }}
+                    {{ form.start_time }}
+                    {{ form.start_time.errors }}
+                </span>
+
+                <span class="label-input">
+                    {{ form.end_time.label_tag }}
+                    {{ form.end_time }}
+                    {{ form.end_time.errors }}
+                </span>
+           </div>
+
+            <!--edit session notes-->
+            <span class="label-input">
+                {{ form.note.label_tag }}
+                {{ form.note }}
+                {{ form.note.errors }}
+            </span>
+        </section>
+
+        <section class="card pick-subprojects">
+            <a class="plain-link"><h3>Subprojects</h3></a>
+
+            <br>
+
+            <div class="grid-rows" id="subproject_options">
+                <!-- list the subprojects of the parent project and show the ones that are selected for the session -->
+                {% for item in filtered_subs %}
+                    <span>
+                        <input type="checkbox" id="subproject-{{ item.subproject.id }}"
+                               name="subprojects" value="{{ item.subproject.name }}"
+                        {% if item.is_selected %} checked {% endif %}>
+                        <label for="subproject-{{ item.subproject.id }}">{{ item.subproject.name }}</label>
+                    </span>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section id="submit-row">
+            <button type="submit" id="update-session" class="primary-button">
+                <i class="fa fa-check-circle"></i>
+                Update Session
+            </button>
+        </section>
+    </form>
+{% endblock %}

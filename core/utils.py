@@ -117,7 +117,7 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
         else:
             sessions = sessions.filter(start_time__gte=start)
 
-    print(len(sessions))
+    # print(len(sessions))
     return sessions
 
 

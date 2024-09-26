@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.db import transaction
 from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -7,7 +8,7 @@ from rest_framework.response import Response
 from datetime import datetime
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from core.forms import (CreateProjectForm, CreateSubProjectForm, UpdateProjectForm,
-                        UpdateSubProjectForm, SearchProjectForm)
+                        UpdateSubProjectForm, SearchProjectForm, UpdateSessionForm)
 from core.utils import (parse_date_or_datetime, in_window, filter_by_projects,
                         tally_project_durations, filter_sessions_by_params)
 from core.models import Projects, SubProjects, Sessions
@@ -37,7 +38,8 @@ def start_timer(request):
                 raise ValueError("Project not found")
 
             # Fetch all subprojects related to the project and in the list of submitted subproject names
-            subprojects = SubProjects.objects.filter(name__in=subproject_names, parent_project=project)
+            subprojects = SubProjects.objects.filter(name__in=subproject_names, parent_project=project,
+                                                     user=request.user)
             if not subprojects.exists() and len(subproject_names) > 0:
                 raise ValueError("No subprojects found for the selected project")
 
@@ -70,6 +72,87 @@ def start_timer(request):
     }
 
     return render(request, 'core/start_timer.html', context)
+
+
+@login_required
+def update_session(request, session_id: int):
+    """
+    Allow user to change session details, including project, subprojects, start time, end time, and note.
+    Deletes the existing session (to ensure all the totals for the related project and subprojects are updated),
+    and creates a new session with the updated details.
+    """
+
+    if request.method == "POST":
+        try:
+            project_name = request.POST.get('project_name')
+            subproject_names = request.POST.getlist('subprojects')
+            current_session = Sessions.objects.get(id=session_id)
+
+            # Fetch the project
+            project = Projects.objects.filter(name=project_name, user=request.user).first()
+            if not project:
+                raise ValueError("Project not found")
+
+            # Fetch all subprojects related to the project and in the list of submitted subproject names
+            subprojects = SubProjects.objects.filter(name__in=subproject_names, parent_project=project,
+                                                     user=request.user)
+
+            if not subprojects.exists() and len(subproject_names) > 0:
+                raise ValueError("No subprojects found for the selected project")
+
+            # Create a new session
+            session = Sessions.objects.create(
+                user=request.user,
+                project=project,
+                start_time=timezone.make_aware(parse_date_or_datetime(request.POST.get('start_time'))),
+                end_time=timezone.make_aware(parse_date_or_datetime(request.POST.get('end_time'))),
+                note=request.POST.get('note'),
+                is_active=False
+            )
+
+            # Add the subprojects to the session
+            for subproject in subprojects:
+                session.subprojects.add(subproject)
+
+            try:
+                with transaction.atomic():
+                    # Delete the current session
+                    current_session.delete()
+
+                    # Save the new session
+                    session.save()
+
+                    messages.success(request, "Updated session")
+                    return redirect('update_session', session_id=session.id)
+            except Exception as e:
+                messages.error(request, f"An error occurred while updating the session. Error: {e}")
+                return redirect('update_session', session_id=session_id)
+
+        except ValueError as ve:
+            messages.error(request, str(ve))
+            return redirect('update_session', session_id=session_id)
+
+        except Exception as e:
+            messages.error(request, f"An error occurred while updating the session. Error: {e}")
+            return redirect('update_session', session_id=session_id)
+    else:
+        current_session = Sessions.objects.get(id=session_id)
+        form = UpdateSessionForm(instance=current_session,
+                                 initial={
+                                     'project_name': current_session.project.name if current_session.project else ''
+                                 })
+
+        subprojects = SubProjects.objects.filter(parent_project=current_session.project)
+        session_subs = current_session.subprojects.all()
+        filtered_subs = [{'subproject': sp, 'is_selected': sp in session_subs} for sp in subprojects]
+
+        context = {
+            'title': 'Update Session',
+            'filtered_subs': filtered_subs,
+            'form': form
+        }
+
+        return render(request, 'core/update_session.html', context)
 
 
 @login_required
@@ -203,7 +286,8 @@ class CreateSubProjectView(LoginRequiredMixin, CreateView):
         if 'pk' in self.kwargs:
             initial['parent_project'] = Projects.objects.get(pk=self.kwargs.get('pk'), user=self.request.user)
         elif 'project_name' in self.kwargs:
-            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'), user=self.request.user)
+            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'),
+                                                             user=self.request.user)
         return initial
 
     def get_context_data(self, **kwargs):
@@ -367,9 +451,6 @@ class SessionsListView(LoginRequiredMixin, ListView):
 
 
 # api endpoints to create, list, and delete projects, subprojects, and sessions
-
-
-
 @login_required
 @api_view(['POST'])
 def create_project(request):
@@ -479,7 +560,8 @@ def search_subprojects(request):
 @login_required
 @api_view(['DELETE'])
 def delete_subproject(request, project_name, subproject_name):
-    subproject = get_object_or_404(SubProjects, name=subproject_name, parent_project__name=project_name, user=request.user)
+    subproject = get_object_or_404(SubProjects, name=subproject_name, parent_project__name=project_name,
+                                   user=request.user)
     subproject.delete()
     return Response(status=204)  # status 204 means no content, i.e. the subproject was deleted successfully
 

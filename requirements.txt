@@ -1,6 +1,7 @@
-Django==4.2.15
-djangorestframework~=3.14.0
+Django
+djangorestframework
 django-crispy-forms
 crispy-bootstrap4
 lxml
-Pillow~=9.5.0
+Pillow
+concurrent-log-handler

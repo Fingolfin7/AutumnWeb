@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+from concurrent_log_handler import ConcurrentRotatingFileHandler
 import logging.handlers
 import os
 
@@ -139,17 +140,17 @@ LOGGING = {
     'handlers': {
         'signals': {
             'level': 'INFO',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOG_DIR, 'signals.log'),
-            'when': 'W1',
+            'maxBytes': 5 * 1024 * 1024,  # Rotate when the file reaches 5MB
             'backupCount': 5,
             'formatter': 'simple',
         },
         'models': {
             'level': 'INFO',
-            'class': 'logging.handlers.TimedRotatingFileHandler',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOG_DIR, 'models.log'),
-            'when': 'W1',
+            'maxBytes': 5 * 1024 * 1024,  # Rotate when the file reaches 5MB
             'backupCount': 5,
             'formatter': 'simple',
         },

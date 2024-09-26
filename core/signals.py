@@ -115,7 +115,7 @@ def update_project_time_on_delete(sender, instance, **kwargs):
                 logger.info(f"Final project time after delete: {instance.project.total_time}\n")
             elif instance.project.total_time < 0.001:
                 logger.error(f"Error! Negative time value after update: {instance.project.total_time}\n")
-            else:
-                logger.error(f"Error! Large time value after update: {instance.project.total_time}\n")
+            # else:
+            #     logger.error(f"Error! Large time value after update: {instance.project.total_time}\n")
         else:
             logger.info(f"Project total time after delete: {instance.project.total_time}\n")

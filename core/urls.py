@@ -16,6 +16,7 @@ urlpatterns = [
     path('delete_project/<str:project_name>/', DeleteProjectView.as_view(), name='delete_project'),
     path('delete_subproject/<int:pk>/', DeleteSubProjectView.as_view(), name='delete_subproject'),
     path('sessions/', SessionsListView.as_view(), name='sessions'),
+    path('update_session/<int:session_id>/', update_session, name='update_session'),
 
     path('charts/', ChartsView, name='charts'),
 

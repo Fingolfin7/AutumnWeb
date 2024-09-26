@@ -3,11 +3,14 @@ from .models import *
 
 
 class SearchProjectForm(forms.Form):
-    project_name = forms.CharField(required=False, widget=forms.TextInput(attrs={'placeholder': 'Projects',
-                                                                                 'id': 'project-search',
-                                                                                 'data-ajax_url': '/api/search_projects/'
-                                                                                 })
-                                   )
+    project_name = forms.CharField(required=False, widget=forms.TextInput(
+        attrs={
+            'placeholder': 'Projects',
+            'id': 'project-search',
+            'data-ajax_url': '/api/search_projects/',
+            'autocomplete': 'off'
+        })
+    )
 
     start_date = forms.DateField(required=False,
                                  widget=forms.DateInput(attrs={'type': 'date', 'placeholder': 'Start Date',
@@ -61,4 +64,23 @@ class UpdateSubProjectForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Subproject Name'}),
             'description': forms.Textarea(attrs={'placeholder': 'Description', 'required': False}),
+        }
+
+
+class UpdateSessionForm(forms.ModelForm):
+    project_name = forms.CharField(required=False, widget=forms.TextInput(
+        attrs={
+            'placeholder': 'Projects',
+            'id': 'project-search',
+            'data-ajax_url': '/api/search_projects/',
+            'class': 'half-width',
+            'autocomplete': 'off'
+        })
+    )
+
+    class Meta:
+        model = Sessions
+        fields = ['start_time', 'end_time', 'note']
+        widgets = {
+            'note': forms.Textarea(attrs={'placeholder': 'Note', 'class': 'half-width', 'required': False}),
         }

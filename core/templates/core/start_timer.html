@@ -17,7 +17,7 @@
             <span class="label-input">
                 <label for="project-search"><i class="fa fa-search"></i> Search</label>
                 <input type="text" id="project-search" name="project" placeholder="Projects" class="half-width"
-                       data-ajax_url="{% url 'api_search_projects' %}">
+                       autocomplete="off" data-ajax_url="{% url 'api_search_projects' %}">
             </span>
             <div id="project-search-results"></div>
         </section>
