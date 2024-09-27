@@ -75,84 +75,79 @@ def start_timer(request):
 
 
 @login_required
+@transaction.atomic
 def update_session(request, session_id: int):
     """
     Allow user to change session details, including project, subprojects, start time, end time, and note.
-    Deletes the existing session (to ensure all the totals for the related project and subprojects are updated),
-    and creates a new session with the updated details.
+    Deletes the existing session and creates a new one with the updated details.
     """
+    current_session = get_object_or_404(Sessions, id=session_id, user=request.user)
 
     if request.method == "POST":
-        try:
-            project_name = request.POST.get('project_name')
-            subproject_names = request.POST.getlist('subprojects')
-            current_session = Sessions.objects.get(id=session_id)
-
-            # Fetch the project
-            project = Projects.objects.filter(name=project_name, user=request.user).first()
-            if not project:
-                raise ValueError("Project not found")
-
-            # Fetch all subprojects related to the project and in the list of submitted subproject names
-            subprojects = SubProjects.objects.filter(name__in=subproject_names, parent_project=project,
-                                                     user=request.user)
-
-            if not subprojects.exists() and len(subproject_names) > 0:
-                raise ValueError("No subprojects found for the selected project")
-
-            # Create a new session
-            session = Sessions.objects.create(
-                user=request.user,
-                project=project,
-                start_time=timezone.make_aware(parse_date_or_datetime(request.POST.get('start_time'))),
-                end_time=timezone.make_aware(parse_date_or_datetime(request.POST.get('end_time'))),
-                note=request.POST.get('note'),
-                is_active=False
-            )
-
-            # Add the subprojects to the session
-            for subproject in subprojects:
-                session.subprojects.add(subproject)
-
+        form = UpdateSessionForm(request.POST, instance=current_session)
+        if form.is_valid():
             try:
-                with transaction.atomic():
-                    # Delete the current session
-                    current_session.delete()
+                project_name = form.cleaned_data['project_name']
+                subproject_names = request.POST.getlist('subprojects')
 
-                    # Save the new session
-                    session.save()
+                project = get_object_or_404(Projects, name=project_name, user=request.user)
 
-                    messages.success(request, "Updated session")
-                    return redirect('update_session', session_id=session.id)
+                subprojects = SubProjects.objects.filter(
+                    name__in=subproject_names,
+                    parent_project=project,
+                    user=request.user
+                )
+
+                if not subprojects.exists() and subproject_names:
+                    raise ValueError("No subprojects found for the selected project")
+
+                # Create a new session
+                new_session = Sessions.objects.create(
+                    user=request.user,
+                    project=project,
+                    start_time=form.cleaned_data['start_time'],  # form.cleaned_data returns an aware datetime object
+                    end_time=form.cleaned_data['end_time'],
+                    note=form.cleaned_data['note'],
+                    is_active=False
+                )
+
+                new_session.subprojects.add(*subprojects)
+                new_session.save()  # Save changes after setting subprojects
+
+                # Delete the current session
+                current_session.delete()
+
+                # Run audits on the project and subprojects
+                project.audit_total_time()
+                for subproject in project.subprojects.all():
+                    subproject.audit_total_time()
+
+                messages.success(request, "Updated session")
+                return redirect('update_session', session_id=new_session.id)
+
+            except ValueError as ve:
+                messages.error(request, str(ve))
             except Exception as e:
                 messages.error(request, f"An error occurred while updating the session. Error: {e}")
-                return redirect('update_session', session_id=session_id)
-
-        except ValueError as ve:
-            messages.error(request, str(ve))
-            return redirect('update_session', session_id=session_id)
-
-        except Exception as e:
-            messages.error(request, f"An error occurred while updating the session. Error: {e}")
-            return redirect('update_session', session_id=session_id)
+        else:
+            messages.error(request, "Invalid form data. Please check your inputs.")
     else:
-        current_session = Sessions.objects.get(id=session_id)
         form = UpdateSessionForm(instance=current_session,
                                  initial={
                                      'project_name': current_session.project.name if current_session.project else ''
                                  })
 
-        subprojects = SubProjects.objects.filter(parent_project=current_session.project)
-        session_subs = current_session.subprojects.all()
-        filtered_subs = [{'subproject': sp, 'is_selected': sp in session_subs} for sp in subprojects]
+    subprojects = SubProjects.objects.filter(parent_project=current_session.project)
+    session_subs = current_session.subprojects.all()
+    filtered_subs = [{'subproject': sp, 'is_selected': sp in session_subs} for sp in subprojects]
 
-        context = {
-            'title': 'Update Session',
-            'filtered_subs': filtered_subs,
-            'form': form
-        }
+    context = {
+        'title': 'Update Session',
+        'filtered_subs': filtered_subs,
+        'form': form
+    }
 
-        return render(request, 'core/update_session.html', context)
+    return render(request, 'core/update_session.html', context)
 
 
 @login_required
