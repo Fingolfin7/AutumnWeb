@@ -19,72 +19,62 @@ def set_session_is_active(sender, instance, **kwargs):
         instance.is_active = True
 
 
-
-
 @receiver(pre_save, sender=Sessions)
-def update_project_time(sender, instance, **kwargs):
-    if not instance.end_time:
+def set_old_duration(sender, instance, **kwargs):
+    if not instance.end_time or instance.is_active:
         return
 
-    if instance.is_active or not instance.pk:  # Also check if instance is saved here
-        return
+    if instance.pk:
+        instance.pre_save_duration = Sessions.objects.get(pk=instance.pk).duration
+    else:
+        instance.pre_save_duration = 0.0  # handle a new instance
 
-    with transaction.atomic():
-        if instance.pk:
-            old_instance = Sessions.objects.get(pk=instance.pk)
-            if old_instance.end_time:
-                update_value = instance.duration - old_instance.duration
-            else:
-                update_value = instance.duration
-        else:
-            update_value = instance.duration
+    logger.info(f"Setting old duration for session {instance.id} to {instance.pre_save_duration}.\n")
 
-        if abs(update_value) < 1e-9:  # floating point comparison allowance
-            return
-
-        logger.info(f"Saving/Updating session {instance.id}.")
-        logger.info(f"Project: {instance.project}")
-        if len(instance.subprojects.all()) > 0:
-            logger.info(f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
-        logger.info(f"Project total time before update: {instance.project.total_time}")
-        logger.info(f"Change/update value: {update_value}")
-
-        instance.project.total_time += update_value
-        instance.project.save()
-
-        if instance.subprojects.exists() > 0:
-            for sub_project in instance.subprojects.all():
-                sub_project.total_time += update_value
-                sub_project.save()
-
-        logger.info(f"Project total time after update: {instance.project.total_time}\n")
 
 
 @receiver(post_save, sender=Sessions)
-def update_last_updated(sender, instance, **kwargs):
-    if not instance.end_time:
-        return
-
-    if instance.is_active or not instance.pk:  # Also check if instance is saved here
+def update_project_info(sender, instance, created, **kwargs):
+    if not instance.end_time or instance.is_active or not instance.pk:
         return
 
     with transaction.atomic():
+        update_value = instance.duration - instance.pre_save_duration
+
+        instance = Sessions.objects.prefetch_related('subprojects').get(pk=instance.pk)
+
+        # update the project and subprojects total times
+        if abs(update_value) >= 1e-9:  # check if the update value is not too small
+            logger.info(f"Saving/Updating session {instance.id}.")
+            logger.info(f"Project: {instance.project}")
+            if len(instance.subprojects.all()) > 0:
+                logger.info(f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
+            logger.info(f"Project total time before update: {instance.project.total_time}")
+            logger.info(f"Change/update value: {update_value}")
+
+            instance.project.total_time += update_value
+            instance.project.save()
+
+            if instance.subprojects.exists() > 0:
+                for sub_project in instance.subprojects.all():
+                    sub_project.total_time += update_value
+                    sub_project.save()
+
+            logger.info(f"Project total time after update: {instance.project.total_time}\n")
+
+        # update the project and subprojects last_updated fields
         if instance.end_time > instance.project.last_updated:
             instance.project.last_updated = instance.end_time
             instance.project.save()
 
-        instance = Sessions.objects.prefetch_related('subprojects').get(pk=instance.pk)
-
         for sub_project in instance.subprojects.all():
-            if not sub_project.last_updated:
+            if not sub_project.last_updated or instance.end_time > sub_project.last_updated:
                 sub_project.last_updated = instance.end_time
-            elif instance.end_time > sub_project.last_updated:
-                sub_project.last_updated = instance.end_time
-            sub_project.save()
+                sub_project.save()
 
 
 @receiver(pre_delete, sender=Sessions)
-def update_project_time_on_delete(sender, instance, **kwargs):
+def update_time_on_delete(sender, instance, **kwargs):
     if instance.is_active:
         return
 

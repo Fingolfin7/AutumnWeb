@@ -97,6 +97,7 @@ class Sessions(models.Model):
     end_time = models.DateTimeField(null=True, blank=True)
     note = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    pre_save_duration = models.FloatField(default=0.0)
 
     class Meta:
         verbose_name_plural = 'Sessions'
