@@ -12,8 +12,8 @@ $(document).ready(function(){
         }
 
         // get filter values (default to start of the current year and current date)
-        let start_date = $('#start_date').val() || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-        let end_date = $('#end_date').val() || new Date().toISOString().split('T')[0];
+        let start_date = $('#start_date').val();
+        let end_date = $('#end_date').val();
         let project_name = $('#project-search').val() || "";
 
         console.log('project_name:', project_name, 'start_date:', start_date, 'end_date:', end_date);
@@ -37,6 +37,9 @@ $(document).ready(function(){
     let selectType = $("#chart_type");
     let draw = $("#draw");
 
+    $("#start_date").val(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]);
+    $("#end_date").val(new Date().toISOString().split('T')[0]);
+
     render(selectType.val());
 
     draw.on('click', function(){
@@ -54,12 +57,13 @@ function get_project_data(type, start_date="", end_date="", project_name=""){
 
     if (jQuery.inArray(type, requires_session_data) > -1){
         url = $('#sessions_link').val();
-        if (project_name){
-            url += `?project_name=${project_name}`;
-        }
     }
     else{
         url = $("#projects_link").val();
+    }
+
+    if (project_name){
+        url += `?project_name=${project_name}`;
     }
 
     if (start_date){

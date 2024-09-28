@@ -1,47 +1,129 @@
 {% extends 'core/base.html' %}
 {% load static %}
 {% load time_formats %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    <script src="{% static 'core/js/search_projects.js' %}" type="text/javascript"></script>
+{% endblock %}
+
 {% block content %}
     <section id="options">
+        <form method="get" id="search_form" class="card flex-row" enctype="multipart/form-data">
+            <div id="search_projects">
+                <span class="label-input">
+                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
+                    {{ search_form.project_name }}
+                    {{ search_form.project.errors }}
+                </span>
+                <span id="project-search-results"></span>
+            </div>
+
+            <span class="label-input" id="filter_start">
+                <label for="start_date"><i class="fa fa-calendar"></i> Start Date</label>
+                {{ search_form.start_date }}
+                {{ search_form.start_date.errors }}
+            </span>
+
+            <span class="label-input" id="filter_end">
+                <label for="end_date"><i class="fa fa-calendar"></i> End Date</label>
+                {{ search_form.end_date }}
+                {{ search_form.end_date.errors }}
+            </span>
+
+            <span>
+                <button type="submit" class="primary-button" id="search_button">
+                    <i class="fa fa-search"></i>
+                    Search
+                </button>
+            </span>
+        </form>
+
         <button id="create-project" class="primary-button" onclick="window.location.href='{% url 'create_project' %}'">
             <i class="fa fa-plus"></i>
             Create Project
         </button>
     </section>
-    <section id="projects-list" class="grid-rows">
-        {% for project in projects %}
-            <div class="card" id="project-{{ project.id }}">
-                <table>
-                    <tr>
-                        <td class="text-red">
-                            <h3>
-                                <a class="plain-link" href="{% url 'update_project' project.name %}">
-                                    {{ project.name }}
-                                </a>
-                            </h3>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <em>{{ project.status }}</em>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="text-green">
-                            {{ project.total_time|min_formatter }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <span class="text-cyan">{{ project.start_date|date_formatter }}</span>
 
-                            ->
+    <br>
 
-                            <span class="text-cyan">{{ project.last_updated|date_formatter }}</span>
-                        </td>
-                    </tr>
-                </table>
+    <section id="projects-list" class="stacked">
+
+        {% if not grouped_projects %}
+             <div class="full-width centered-pic">
+                <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}"
+                 alt="No sessions found">
             </div>
+        {% endif %}
+
+        {% for status_group in grouped_projects %}
+            {%  if status_group.projects %}
+                <a class="plain-link" onclick="collapse_section('{{ status_group.status }}')">
+                    <h2>
+                        <u>{{ status_group.status }}</u>
+                        <small>
+                            ({{ status_group.projects|length }})
+                            <i class="fa fa-caret-down" id="{{ status_group.status }}-caret"></i>
+                        </small>
+                    </h2>
+                </a>
+                <div id="{{ status_group.status }}-project" class="grid-rows">
+                    {% for project in status_group.projects %}
+                        <div class="card" id="project-{{ project.id }}">
+                            <table>
+                                <tr>
+                                    <td class="text-red">
+                                        <h3>
+                                            <a class="plain-link" href="{% url 'update_project' project.name %}">
+                                                {{ project.name }}
+                                            </a>
+                                        </h3>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <em>{{ project.status }}</em>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-green">
+                                        {{ project.total_time|min_formatter }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <span class="text-cyan">{{ project.start_date|date_formatter }}</span>
+
+                                        ->
+
+                                        <span class="text-cyan">{{ project.last_updated|date_formatter }}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
         {% endfor %}
     </section>
+
+    <script>
+        function collapse_section(section_id) {
+            let section = $("#" + section_id + "-project");
+            section.toggle("slow");
+
+            let icon = $("#" + section_id + "-caret");
+
+            if (icon.hasClass('fa-caret-down')) {
+                icon.removeClass('fa-caret-down');
+                icon.addClass('fa-caret-right');
+            } else {
+                icon.removeClass('fa-caret-right');
+                icon.addClass('fa-caret-down');
+            }
+        }
+    </script>
 {% endblock %}

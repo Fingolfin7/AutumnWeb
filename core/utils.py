@@ -65,11 +65,11 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
     item = data[0]  # get the first item in the queryset to determine the type of data
     if name:
         if isinstance(item, Projects):
-            return data.filter(name=name)
+            return data.filter(name__icontains=name)
         elif isinstance(item, SubProjects):
-            return data.filter(parent_project__name=name)
+            return data.filter(parent_project__name__icontains=name)
         elif isinstance(item, Sessions):
-            return data.filter(project__name=name)
+            return data.filter(project__name__icontains=name)
     elif names:
         if isinstance(item, Projects):
             return data.filter(name__in=names)

@@ -1,3 +1,5 @@
+from lib2to3.pgen2.tokenize import group
+
 from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, render, redirect, reverse
@@ -5,13 +7,13 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
-from datetime import datetime
+from datetime import datetime, timedelta
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from core.forms import (CreateProjectForm, CreateSubProjectForm, UpdateProjectForm,
                         UpdateSubProjectForm, SearchProjectForm, UpdateSessionForm)
 from core.utils import (parse_date_or_datetime, in_window, filter_by_projects,
                         tally_project_durations, filter_sessions_by_params)
-from core.models import Projects, SubProjects, Sessions
+from core.models import Projects, SubProjects, Sessions, status_choices
 from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -116,11 +118,6 @@ def update_session(request, session_id: int):
 
                 # Delete the current session
                 current_session.delete()
-
-                # Run audits on the project and subprojects
-                project.audit_total_time()
-                for subproject in project.subprojects.all():
-                    subproject.audit_total_time()
 
                 messages.success(request, "Updated session")
                 return redirect('update_session', session_id=new_session.id)
@@ -240,16 +237,51 @@ class ProjectsListView(LoginRequiredMixin, ListView):
     model = Projects
     template_name = 'core/projects_list.html'
     context_object_name = 'projects'
-    ordering = ['name']
+    ordering = ['-last_updated']
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Projects'
 
+        context['search_form'] = SearchProjectForm(
+            initial={
+                'project_name': self.request.GET.get('project_name'),
+                'start_date': self.request.GET.get('start_date'),
+                'end_date': self.request.GET.get('end_date'),
+            }
+        )
+
+        ungrouped_projects = context['object_list']
+
+        # group by project status (active, paused, complete) from the status_choices tuple
+        grouped_projects = []
+        for status, displayName in status_choices:  # db_Status is how the status is stored in the database
+            grouped_projects.append({'status': displayName,
+                                     'projects': ungrouped_projects.filter(status=status).order_by('-last_updated')})
+
+        context['grouped_projects'] = grouped_projects
+
         return context
 
     def get_queryset(self):
-        return Projects.objects.filter(user=self.request.user)
+        projects = Projects.objects.filter(user=self.request.user)
+        search_name = self.request.GET.get('project_name')
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+
+        if search_name:
+            projects = filter_by_projects(projects, name=search_name)
+
+        if start_date:
+            start = timezone.make_aware(parse_date_or_datetime(start_date))
+            if end_date:
+                end = timezone.make_aware(parse_date_or_datetime(end_date) + timedelta(days=1))
+                projects = projects.filter(start_date__range=[start, end])
+            else:
+                projects = projects.filter(start_date__gte=start)
+
+
+        return projects
 
 
 class CreateProjectView(LoginRequiredMixin, CreateView):
@@ -479,6 +511,10 @@ def list_projects(request):
 @api_view(['GET'])
 def tally_by_sessions(request):
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    project = request.query_params.get('project_name')
+    if project:
+        sessions = filter_by_projects(sessions, name=project)
+
     sessions = filter_sessions_by_params(request, sessions)
     project_durations = tally_project_durations(sessions)
     return Response(project_durations)
