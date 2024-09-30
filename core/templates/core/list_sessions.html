@@ -71,54 +71,45 @@
             </h3>
             {% for session in data.sessions %}
                 <div class="card" id="session-{{ session.id }}">
-                    <table class="table-row">
-                        <tr>
-                            <td>
-                                <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-                                to
-                                <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
-                            </td>
-                            <td>
-                                {{ session.duration|duration_formatter }}
-                            </td>
-                            <td class="text-red">
-                                <div class="project-name-slider">
-                                    <span class="text-red" id="project-name">
-                                        <a class="plain-link" href="{% url 'update_project' session.project.name %}">
-                                            {{ session.project.name }}
-                                        </a>
-                                    </span>
-                                </div>
-                            </td>
-                            <td>
-                                {% for subproject in session.subprojects.all %}
-                                    <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                                        ['<span class="text-blue">{{ subproject.name }}</span>']
-                                    </a>
-                                    {% if not forloop.last %}, {% endif %}
-                                {% endfor %}
-                            </td>
+                    <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
+                    to
+                    <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
 
-                            <td>
-                                {% if session.note %}
-                                    ->
-                                    <div class="session-note-slider">
-                                        <span class="text-yellow session-note" id="note-{{ session.id }}">
-                                            {{ session.note }}
-                                        </span>
-                                    </div>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
-                                    <i class="fa fa-pen"></i>
-                                </button>
-                                <button class="primary-button">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    </table>
+                    {{ session.duration|duration_formatter }}
+
+                    <span class="text-red project-name-slider" id="project-name">
+                        <a class="plain-link" href="{% url 'update_project' session.project.name %}">
+                            {{ session.project.name }}
+                        </a>
+                    </span>
+
+                    <span>
+                        {% for subproject in session.subprojects.all %}
+                            <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                {% if forloop.first %}[{% endif %}
+                                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                {% if forloop.last %}]{% endif %}
+                            </a>
+                        {% endfor %}
+                        {% if not session.subprojects.all %}->{% endif %}
+                    </span>
+
+                    {% if session.note %}
+                        <div class="session-note-slider">
+                            <span class="text-yellow session-note" id="note-{{ session.id }}">
+                                {{ session.note }}
+                            </span>
+                        </div>
+                    {% endif %}
+
+                    <span>
+                        <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
+                            <i class="fa fa-pen"></i>
+                        </button>
+                        <button class="primary-button">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </span>
                 </div>
             {% endfor %}
         {% endfor %}
