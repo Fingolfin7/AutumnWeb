@@ -74,6 +74,24 @@ def session_exists(user, project, start_time, end_time, subproject_names, time_t
     return False
 
 
+def sessions_get_earliest_latest(sessions):
+    """
+    Get the earliest start time and latest end time from a queryset of sessions.
+
+    :param sessions: Queryset of session instances
+    :return: Tuple of earliest start time and latest end time
+    """
+    earliest_start = None
+    latest_end = None
+
+    for session in sessions:
+        if not earliest_start or session.start_time < earliest_start:
+            earliest_start = session.start_time
+        if not latest_end or session.end_time > latest_end:
+            latest_end = session.end_time
+
+    return earliest_start, latest_end
+
 # usage:  python manage.py import 'username' project_file.json --force/--merge --tolerance 0.5
 # e.g.: python manage.py import kuda "C:\Users\User\Documents\Programming\Python\Autumn\Source\projects.json"
 # --merge --tolerance 2
@@ -212,11 +230,8 @@ class Command(BaseCommand):
                 subproject.audit_total_time()
 
             sessions = Sessions.objects.filter(project=project)
-            for session in sessions:
-                if earliest_start is None or session.start_time < earliest_start:
-                    earliest_start = session.start_time
-                if latest_end is None or session.end_time > latest_end:
-                    latest_end = session.end_time
+            earliest_start, latest_end = sessions_get_earliest_latest(sessions)
+
 
             # Update project and subproject dates if merging
             if merge and earliest_start and latest_end:
@@ -226,8 +241,9 @@ class Command(BaseCommand):
 
                 # Update subprojects' start and last updated dates
                 for subproject in project.subprojects.all():
-                    subproject.start_date = earliest_start
-                    subproject.last_updated = latest_end
+                    earliest_start, latest_end = sessions_get_earliest_latest(subproject.sessions.all())
+                    subproject.start_date = earliest_start if earliest_start else project.start_date
+                    subproject.last_updated = latest_end if latest_end else project.last_updated
                     subproject.save()
 
             if not merge:
