@@ -168,7 +168,7 @@ class Command(BaseCommand):
                         'total_time': 0.0,
                     }
                 )
-                if created:
+                if created and verbose:
                     self.stdout.write(f"Created new subproject '{subproject_name}' under project '{project_name}'.")
 
             # Import or merge session history
