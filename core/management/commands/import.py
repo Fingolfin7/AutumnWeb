@@ -102,13 +102,13 @@ class Command(BaseCommand):
         parser.add_argument('--tolerance', type=float, default=0.5, help='Tolerance for total time mismatch in minutes'
                                                                          'due to rounding errors '
                                                                          '(default 0.5)')
-        parser.add_argument('--verbosity', action='store_true', help='Print verbose output')
+        parser.add_argument('--verbose', action='store_true', help='Print verbose output')
 
     def handle(self, *args, **options):
         filepath = options['filepath']
         tolerance = options['tolerance']
         merge = options['merge']
-        verbose = options['verbosity']
+        verbose = options['verbose']
 
         # check if the user exists
         try:
