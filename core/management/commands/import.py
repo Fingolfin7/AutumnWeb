@@ -38,7 +38,7 @@ def json_decompress(content: dict | str) -> dict:
     return content
 
 
-def session_exists(user, project, start_time, end_time, subproject_names, time_tolerance=timedelta(minutes=2)):
+def session_exists(user, project, start_time, end_time, subproject_names, time_tolerance=timedelta(minutes=2)) -> bool:
     """
     Check if a session already exists in the database based on start and end time (with tolerance),
     subprojects, and session notes.
@@ -74,7 +74,7 @@ def session_exists(user, project, start_time, end_time, subproject_names, time_t
     return False
 
 
-def sessions_get_earliest_latest(sessions):
+def sessions_get_earliest_latest(sessions) -> tuple[datetime, datetime]:
     """
     Get the earliest start time and latest end time from a queryset of sessions.
 
