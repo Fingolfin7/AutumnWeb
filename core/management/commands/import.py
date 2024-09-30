@@ -2,9 +2,9 @@ import json
 import zlib
 import base64
 from datetime import datetime, timedelta
-
-from django.contrib.auth.models import User
 from django.utils import timezone
+from django.db.models import Min, Max
+from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 
 from core.models import Projects, SubProjects, Sessions
@@ -81,16 +81,8 @@ def sessions_get_earliest_latest(sessions):
     :param sessions: Queryset of session instances
     :return: Tuple of earliest start time and latest end time
     """
-    earliest_start = None
-    latest_end = None
-
-    for session in sessions:
-        if not earliest_start or session.start_time < earliest_start:
-            earliest_start = session.start_time
-        if not latest_end or session.end_time > latest_end:
-            latest_end = session.end_time
-
-    return earliest_start, latest_end
+    aggregated_times = sessions.aggregate(earliest_start=Min('start_time'), latest_end=Max('end_time'))
+    return aggregated_times['earliest_start'], aggregated_times['latest_end']
 
 # usage:  python manage.py import 'username' project_file.json --force/--merge --tolerance 0.5
 # e.g.: python manage.py import kuda "C:\Users\User\Documents\Programming\Python\Autumn\Source\projects.json"
@@ -159,10 +151,6 @@ class Command(BaseCommand):
                     status=project_data['Status'],
                 )
                 project.save()
-
-            # Variables to track earliest and latest session times
-            earliest_start = None
-            latest_end = None
 
             # Import or merge subprojects
             for subproject_name, subproject_time in project_data['Sub Projects'].items():
