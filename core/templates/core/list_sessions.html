@@ -88,7 +88,7 @@
                             <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
                                 {% if forloop.first %}[{% endif %}
                                 '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                                {% if forloop.last %}]{% endif %}
+                                {% if forloop.last %}] ->{% endif %}
                             </a>
                         {% endfor %}
                         {% if not session.subprojects.all %}->{% endif %}
