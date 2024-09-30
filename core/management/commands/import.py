@@ -6,7 +6,6 @@ from django.utils import timezone
 from django.db.models import Min, Max
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
-from win32comext.adsi.demos.scp import verbose
 
 from core.models import Projects, SubProjects, Sessions
 
