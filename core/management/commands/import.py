@@ -6,6 +6,7 @@ from django.utils import timezone
 from django.db.models import Min, Max
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
+from win32comext.adsi.demos.scp import verbose
 
 from core.models import Projects, SubProjects, Sessions
 
@@ -101,11 +102,13 @@ class Command(BaseCommand):
         parser.add_argument('--tolerance', type=float, default=0.5, help='Tolerance for total time mismatch in minutes'
                                                                          'due to rounding errors '
                                                                          '(default 0.5)')
+        parser.add_argument('--verbosity', action='store_true', help='Print verbose output')
 
     def handle(self, *args, **options):
         filepath = options['filepath']
         tolerance = options['tolerance']
         merge = options['merge']
+        verbose = options['verbosity']
 
         # check if the user exists
         try:
@@ -191,9 +194,10 @@ class Command(BaseCommand):
                                   time_tolerance=timedelta(minutes=tolerance)):
                     continue
 
-                self.stdout.write(
-                    f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
-                    f"{session_data['End Time']}...")
+                if verbose:
+                    self.stdout.write(
+                        f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
+                        f"{session_data['End Time']}...")
 
                 session = Sessions.objects.create(
                     user=user,
