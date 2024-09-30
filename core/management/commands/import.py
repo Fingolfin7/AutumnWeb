@@ -84,6 +84,7 @@ def sessions_get_earliest_latest(sessions):
     aggregated_times = sessions.aggregate(earliest_start=Min('start_time'), latest_end=Max('end_time'))
     return aggregated_times['earliest_start'], aggregated_times['latest_end']
 
+
 # usage:  python manage.py import 'username' project_file.json --force/--merge --tolerance 0.5
 # e.g.: python manage.py import kuda "C:\Users\User\Documents\Programming\Python\Autumn\Source\projects.json"
 # --merge --tolerance 2
