@@ -38,7 +38,7 @@ def json_decompress(content: dict | str) -> dict:
     return content
 
 
-def session_exists(user, project, start_time, end_time, subproject_names, note, time_tolerance=timedelta(minutes=2)):
+def session_exists(user, project, start_time, end_time, subproject_names, time_tolerance=timedelta(minutes=2)):
     """
     Check if a session already exists in the database based on start and end time (with tolerance),
     subprojects, and session notes.
@@ -48,19 +48,22 @@ def session_exists(user, project, start_time, end_time, subproject_names, note, 
     :param start_time: Start time of the session
     :param end_time: End time of the session
     :param subproject_names: List of subproject names for the session
-    :param note: The note associated with the session
     :param time_tolerance: Allowed time difference between existing session and new session
     :return: True if a matching session exists, False otherwise
     """
     # Ensure subproject names are case-insensitive during comparison
     subproject_names_lower = {name.lower() for name in subproject_names}
 
+    # If end_time is earlier than start_time, adjust start_time (the days probably switched over at midnight)
+    if end_time < start_time:
+        start_time -= timedelta(days=1)
+
     matching_sessions = Sessions.objects.filter(
         user=user,
         project=project,
         start_time__range=(start_time - time_tolerance, start_time + time_tolerance),
-        end_time__range=(end_time - time_tolerance, end_time + time_tolerance),
-        note=note
+        end_time__range=(end_time - time_tolerance, end_time + time_tolerance)
+        # note=note # commented out to allow for note differences (e.g. typos and edits might occur)
     )
 
     for session in matching_sessions:
@@ -171,23 +174,19 @@ class Command(BaseCommand):
                 subproject_names = [name.lower() for name in session_data['Sub-Projects']]  # Convert to lowercase
                 note = session_data['Note']
 
-                # Track the earliest start and latest end time
-                if earliest_start is None or start_time < earliest_start:
-                    earliest_start = start_time
-                if latest_end is None or end_time > latest_end:
-                    latest_end = end_time
-
-                # Check if the session already exists
-                if session_exists(user, project, start_time, end_time, subproject_names, note,
-                                  time_tolerance=timedelta(minutes=tolerance)):
-                    self.stdout.write(
-                        f"Skipping existing session on {session_data['Date']} from {session_data['Start Time']} to "
-                        f"{session_data['End Time']}.")
-                    continue
-
-                # If end_time is earlier than start_time, adjust start_time
+                # If end_time is earlier than start_time,
+                # adjust start_time (the days probably switched over at midnight)
                 if end_time < start_time:
                     start_time -= timedelta(days=1)
+
+                # Check if the session already exists
+                if session_exists(user, project, start_time, end_time, subproject_names,
+                                  time_tolerance=timedelta(minutes=tolerance)):
+                    continue
+
+                self.stdout.write(
+                    f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
+                    f"{session_data['End Time']}...")
 
                 session = Sessions.objects.create(
                     user=user,
@@ -202,7 +201,7 @@ class Command(BaseCommand):
                     try:
                         subproject = SubProjects.objects.get(user=user, name=subproject_name, parent_project=project)
                     except SubProjects.DoesNotExist:
-                        raise CommandError(f'Sub-project not found: {subproject_name}')
+                        raise CommandError(f'Subproject not found: {subproject_name}')
                     session.subprojects.add(subproject)
 
                 session.save()
@@ -211,6 +210,13 @@ class Command(BaseCommand):
             project.audit_total_time()
             for subproject in project.subprojects.all():
                 subproject.audit_total_time()
+
+            sessions = Sessions.objects.filter(project=project)
+            for session in sessions:
+                if earliest_start is None or session.start_time < earliest_start:
+                    earliest_start = session.start_time
+                if latest_end is None or session.end_time > latest_end:
+                    latest_end = session.end_time
 
             # Update project and subproject dates if merging
             if merge and earliest_start and latest_end:
