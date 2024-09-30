@@ -83,17 +83,20 @@
                             </td>
                             <td class="text-red">
                                 <div class="project-name-slider">
-                                    <span class="project-name">
-                                        {{ session.project.name }}
+                                    <span class="text-red" id="project-name">
+                                        <a class="plain-link" href="{% url 'update_project' session.project.name %}">
+                                            {{ session.project.name }}
+                                        </a>
                                     </span>
                                 </div>
                             </td>
                             <td>
-                                [
                                 {% for subproject in session.subprojects.all %}
-                                    '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                    <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                        ['<span class="text-blue">{{ subproject.name }}</span>']
+                                    </a>
+                                    {% if not forloop.last %}, {% endif %}
                                 {% endfor %}
-                                ]
                             </td>
 
                             <td>
