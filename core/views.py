@@ -341,7 +341,7 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, queryset=None):
         project = get_object_or_404(Projects, name=self.kwargs['project_name'], user=self.request.user)
-        # project.audit_total_time()
+        project.audit_total_time()
         return project
 
     def get_context_data(self, **kwargs):

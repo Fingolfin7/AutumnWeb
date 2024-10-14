@@ -25,7 +25,7 @@ def set_old_duration(sender, instance, **kwargs):
         return
 
     if instance.pk:
-        instance.pre_save_duration = Sessions.objects.get(pk=instance.pk).duration
+        instance.pre_save_duration = Sessions.objects.get(pk=instance.pk, user=instance.user).duration
     else:
         instance.pre_save_duration = 0.0  # handle a new instance
 
@@ -41,7 +41,7 @@ def update_project_info(sender, instance, created, **kwargs):
     with transaction.atomic():
         update_value = instance.duration - instance.pre_save_duration
 
-        instance = Sessions.objects.prefetch_related('subprojects').get(pk=instance.pk)
+        instance = Sessions.objects.prefetch_related('subprojects').get(pk=instance.pk, user=instance.user)
 
         # update the project and subprojects total times
         if abs(update_value) >= 1e-9:  # check if the update value is not too small
