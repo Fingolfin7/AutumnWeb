@@ -1,5 +1,3 @@
-from lib2to3.pgen2.tokenize import group
-
 from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, render, redirect, reverse
@@ -341,7 +339,7 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, queryset=None):
         project = get_object_or_404(Projects, name=self.kwargs['project_name'], user=self.request.user)
-        project.audit_total_time()
+        # project.audit_total_time()
         return project
 
     def get_context_data(self, **kwargs):
@@ -367,7 +365,7 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, queryset=None):
         subproject = super().get_object(queryset)
-        subproject.audit_total_time()
+        # subproject.audit_total_time()
         return subproject
 
     def get_context_data(self, **kwargs):
