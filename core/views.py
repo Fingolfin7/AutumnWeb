@@ -367,7 +367,7 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, queryset=None):
         subproject = super().get_object(queryset)
-        # subproject.audit_total_time()
+        subproject.audit_total_time()
         return subproject
 
     def get_context_data(self, **kwargs):
