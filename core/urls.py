@@ -18,6 +18,7 @@ urlpatterns = [
     path('sessions/', SessionsListView.as_view(), name='sessions'),
     path('update_session/<int:session_id>/', update_session, name='update_session'),
 
+    path('delete_session/<int:session_id>/', DeleteSessionView.as_view(), name='delete_session'),
     path('charts/', ChartsView, name='charts'),
 
     # api paths

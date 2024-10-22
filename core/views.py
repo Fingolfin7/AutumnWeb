@@ -475,6 +475,25 @@ class SessionsListView(LoginRequiredMixin, ListView):
         return filter_sessions_by_params(self.request, sessions)
 
 
+class DeleteSessionView(LoginRequiredMixin, DeleteView):
+    model = Sessions
+    template_name = 'core/delete_session.html'
+    context_object_name = 'session'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Delete Session'
+        return context
+
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(Sessions, pk=self.kwargs['session_id'], user=self.request.user)
+
+    def get_success_url(self):
+        messages.success(self.request, "Session deleted successfully")
+        return reverse('sessions')  # redirect to the sessions page
+
+
 # api endpoints to create, list, and delete projects, subprojects, and sessions
 @login_required
 @api_view(['POST'])

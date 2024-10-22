@@ -88,10 +88,10 @@
                             <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
                                 {% if forloop.first %}[{% endif %}
                                 '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                                {% if forloop.last %}] ->{% endif %}
+                                {% if forloop.last %}] {% endif %}
                             </a>
                         {% endfor %}
-                        {% if not session.subprojects.all %}->{% endif %}
+                        {% if session.note|length > 0 %}->{% endif %}
                     </span>
 
                     {% if session.note %}
@@ -106,7 +106,7 @@
                         <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
                             <i class="fa fa-pen"></i>
                         </button>
-                        <button class="primary-button">
+                        <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'">
                             <i class="fa fa-trash"></i>
                         </button>
                     </span>
