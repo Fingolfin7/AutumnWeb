@@ -3,7 +3,7 @@ from core.forms import *
 from core.utils import *
 from django.contrib import messages
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import StreamingHttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 from rest_framework.response import Response
@@ -214,146 +214,189 @@ def ChartsView(request):
     return render(request, 'core/charts.html', context)
 
 
+def stream_response(message):
+    return f"data: {json.dumps({'message': message})}\n\n"
+
+
 def import_view(request):
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES)
         if form.is_valid():
-            file = form.cleaned_data['file']
-            force = form.cleaned_data['force']
-            merge = form.cleaned_data['merge']
-            tolerance = form.cleaned_data['tolerance']
-            verbose = form.cleaned_data['verbose']
+            def event_stream():
+                file = form.cleaned_data['file']
+                force = form.cleaned_data['force']
+                merge = form.cleaned_data['merge']
+                tolerance = form.cleaned_data['tolerance']
+                verbose = form.cleaned_data['verbose']
+                user = request.user
+                skipped = []
 
-            user = request.user
-
-            skipped = []
-
-            file_content = file.read()
-
-            try:
-                data = json_decompress(file_content)
-            except RuntimeError:
                 try:
-                    data = json.load(file_content)
-                except json.JSONDecodeError:
-                    return HttpResponse('Invalid JSON file', status=400)
-
-            for project_name, project_data in data.items():
-                project = Projects.objects.filter(name=project_name).first()
-
-                if project:
-                    if force:
-                        Projects.objects.filter(name=project_name).delete()
-                        project = None
-                    elif merge:
-                        if verbose:
-                            print(f"Merging new sessions and subprojects into '{project_name}'...")
-                    else:
-                        skipped.append(project_name)
-                        continue
-
-                if not project:
-                    if verbose:
-                        print(f"Importing '{project_name}'...")
-                    project = Projects.objects.create(
-                        user=user,
-                        name=project_name,
-                        start_date=timezone.make_aware(datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
-                        last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
-                        total_time=0.0,
-                        status=project_data['Status'],
-                    )
-                    project.save()
-
-                for subproject_name, subproject_time in project_data['Sub Projects'].items():
-                    subproject_name_lower = subproject_name.lower()
-                    subproject, created = SubProjects.objects.get_or_create(
-                        user=user,
-                        name=subproject_name_lower,
-                        parent_project=project,
-                        defaults={
-                            'start_date': project.start_date,
-                            'last_updated': project.last_updated,
-                            'total_time': 0.0,
-                        }
-                    )
-                    if created and verbose:
-                        print(f"Created new subproject '{subproject_name}' under project '{project_name}'.")
-
-                for session_data in project_data['Session History']:
-                    start_time = timezone.make_aware(
-                        datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}", '%m-%d-%Y %H:%M:%S')
-                    )
-                    end_time = timezone.make_aware(
-                        datetime.strptime(f"{session_data['Date']} {session_data['End Time']}", '%m-%d-%Y %H:%M:%S')
-                    )
-
-                    subproject_names = [name.lower() for name in session_data['Sub-Projects']]
-                    note = session_data['Note']
-
-                    if end_time < start_time:
-                        start_time -= timedelta(days=1)
-
-                    if session_exists(user, project, start_time, end_time, subproject_names,
-                                      time_tolerance=timedelta(minutes=tolerance)):
-                        continue
-
-                    if verbose:
-                        print(f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
-                              f"{session_data['End Time']}...")
-
-                    session = Sessions.objects.create(
-                        user=user,
-                        project=project,
-                        start_time=start_time,
-                        end_time=end_time,
-                        is_active=False,
-                        note=note,
-                    )
-
-                    for subproject_name in subproject_names:
+                    file_content = file.read()
+                    try:
+                        data = json_decompress(file_content)
+                    except RuntimeError:
                         try:
-                            subproject = SubProjects.objects.get(user=user, name=subproject_name, parent_project=project)
-                        except SubProjects.DoesNotExist:
-                            return HttpResponse(f'Subproject not found: {subproject_name}', status=404)
-                        session.subprojects.add(subproject)
+                            data = json.load(file_content)
+                        except json.JSONDecodeError:
+                            yield stream_response("Error: Invalid JSON file")
+                            return
 
-                    session.save()
+                    total_projects = len(data.items())
+                    for idx, (project_name, project_data) in enumerate(data.items(), 1):
+                        yield stream_response(f"Processing project {idx}/{total_projects}: {project_name}")
 
-                project.audit_total_time()
-                for subproject in project.subprojects.all():
-                    subproject.audit_total_time()
+                        project = Projects.objects.filter(name=project_name).first()
 
-                sessions = Sessions.objects.filter(project=project)
-                earliest_start, latest_end = sessions_get_earliest_latest(sessions)
+                        if project:
+                            if force:
+                                yield stream_response(
+                                    f"Force option enabled - deleting existing project '{project_name}'")
+                                Projects.objects.filter(name=project_name).delete()
+                                project = None
+                            elif merge:
+                                if verbose:
+                                    yield stream_response(
+                                        f"Merging new sessions and subprojects into '{project_name}'...")
+                            else:
+                                skipped.append(project_name)
+                                yield stream_response(f"Skipping existing project: {project_name}")
+                                continue
 
-                if merge and earliest_start and latest_end:
-                    project.start_date = earliest_start
-                    project.last_updated = latest_end
-                    project.save()
+                        if not project:
+                            if verbose:
+                                yield stream_response(f"Importing project '{project_name}'...")
+                            project = Projects.objects.create(
+                                user=user,
+                                name=project_name,
+                                start_date=timezone.make_aware(
+                                    datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                                last_updated=timezone.make_aware(
+                                    datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
+                                total_time=0.0,
+                                status=project_data['Status'],
+                            )
+                            project.save()
 
-                    for subproject in project.subprojects.all():
-                        earliest_start, latest_end = sessions_get_earliest_latest(subproject.sessions.all())
-                        subproject.start_date = earliest_start if earliest_start else project.start_date
-                        subproject.last_updated = latest_end if latest_end else project.last_updated
-                        subproject.save()
+                        # Process subprojects
+                        total_subprojects = len(project_data['Sub Projects'])
+                        yield stream_response(f"Processing {total_subprojects} subprojects for {project_name}")
 
-                if not merge:
-                    mismatch = abs(project.total_time - project_data['Total Time'])
-                    if mismatch > tolerance:
-                        tally = project.total_time
-                        project.delete()
-                        return HttpResponse(f"Total time mismatch for project '{project_name}': "
-                                            f"expected {project_data['Total Time']}, got {tally}. "
-                                            f"Mismatch: {mismatch}", status=400)
+                        for subproject_name, subproject_time in project_data['Sub Projects'].items():
+                            subproject_name_lower = subproject_name.lower()
+                            subproject, created = SubProjects.objects.get_or_create(
+                                user=user,
+                                name=subproject_name_lower,
+                                parent_project=project,
+                                defaults={
+                                    'start_date': project.start_date,
+                                    'last_updated': project.last_updated,
+                                    'total_time': 0.0,
+                                }
+                            )
+                            if created and verbose:
+                                yield stream_response(
+                                    f"Created new subproject '{subproject_name}' under project '{project_name}'")
 
-            if verbose:
-                print('Data imported successfully!')
+                        # Process sessions
+                        total_sessions = len(project_data['Session History'])
+                        yield stream_response(f"Processing {total_sessions} sessions for {project_name}")
 
-            if len(skipped) > 0:
-                return HttpResponse(f'Skipped the following projects as they already exist in the database: {", ".join(skipped)}', status=200)
+                        for session_idx, session_data in enumerate(project_data['Session History'], 1):
+                            if verbose:
+                                yield stream_response(f"Processing session {session_idx}/{total_sessions}")
 
-            return HttpResponse('Data imported successfully!', status=200)
+                            start_time = timezone.make_aware(
+                                datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}",
+                                                  '%m-%d-%Y %H:%M:%S')
+                            )
+                            end_time = timezone.make_aware(
+                                datetime.strptime(f"{session_data['Date']} {session_data['End Time']}",
+                                                  '%m-%d-%Y %H:%M:%S')
+                            )
+
+                            subproject_names = [name.lower() for name in session_data['Sub-Projects']]
+                            note = session_data['Note']
+
+                            if end_time < start_time:
+                                start_time -= timedelta(days=1)
+
+                            if session_exists(user, project, start_time, end_time, subproject_names,
+                                              time_tolerance=timedelta(minutes=tolerance)):
+                                continue
+
+                            if verbose:
+                                yield stream_response(
+                                    f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
+                                    f"{session_data['End Time']}...")
+
+                            session = Sessions.objects.create(
+                                user=user,
+                                project=project,
+                                start_time=start_time,
+                                end_time=end_time,
+                                is_active=False,
+                                note=note,
+                            )
+
+                            for subproject_name in subproject_names:
+                                try:
+                                    subproject = SubProjects.objects.get(user=user, name=subproject_name,
+                                                                         parent_project=project)
+                                except SubProjects.DoesNotExist:
+                                    yield stream_response(f"Error: Subproject not found: {subproject_name}")
+                                    return
+
+                                session.subprojects.add(subproject)
+
+                            session.save()
+
+                        project.audit_total_time()
+                        for subproject in project.subprojects.all():
+                            subproject.audit_total_time()
+
+                        sessions = Sessions.objects.filter(project=project)
+                        earliest_start, latest_end = sessions_get_earliest_latest(sessions)
+
+                        if merge and earliest_start and latest_end:
+                            project.start_date = earliest_start
+                            project.last_updated = latest_end
+                            project.save()
+
+                            for subproject in project.subprojects.all():
+                                earliest_start, latest_end = sessions_get_earliest_latest(subproject.sessions.all())
+                                subproject.start_date = earliest_start if earliest_start else project.start_date
+                                subproject.last_updated = latest_end if latest_end else project.last_updated
+                                subproject.save()
+
+                        if not merge:
+                            mismatch = abs(project.total_time - project_data['Total Time'])
+                            if mismatch > tolerance:
+                                tally = project.total_time
+                                project.delete()
+                                yield stream_response(f"Error: Total time mismatch for project '{project_name}': "
+                                                      f"expected {project_data['Total Time']}, got {tally}. "
+                                                      f"Mismatch: {mismatch}")
+                                return
+
+                    if len(skipped) > 0:
+                        yield stream_response(f"Import completed with skipped projects: {', '.join(skipped)}")
+                    else:
+                        yield stream_response("Import completed successfully!")
+
+                except Exception as e:
+                    yield stream_response(f"Error: {str(e)}")
+
+            response = StreamingHttpResponse(
+                event_stream(),
+                content_type='text/event-stream'
+            )
+            response['Cache-Control'] = 'no-cache'
+            response['X-Accel-Buffering'] = 'no'
+            return response
+        else:
+            messages.error(request, "Invalid form data. Please check your inputs.")
+
     else:
         form = UploadFileForm()
 

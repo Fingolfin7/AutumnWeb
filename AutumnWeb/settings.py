@@ -69,6 +69,10 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'AutumnWeb.urls'
 
+# Add these settings
+CSRF_COOKIE_SAMESITE = 'Strict'
+CSRF_COOKIE_HTTPONLY = False  # Required for AJAX requests
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

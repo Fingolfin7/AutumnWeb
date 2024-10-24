@@ -3,10 +3,56 @@
 
 {% block head_includes %}
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="{% static 'core/js/stream_server_responses.js' %}"></script>
 {% endblock %}
 
 {% block content %}
-    <form method="post" class="flex-row" enctype="multipart/form-data">
+    <style>
+        #progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            margin: 10px 0;
+            display: none;
+        }
+
+        #progress-bar .progress {
+            width: 0;
+            height: 100%;
+            background-color: #4CAF50;
+            border-radius: 4px;
+            transition: width 0.3s ease-in-out;
+        }
+
+        #output-text {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+            font-family: monospace;
+            display: none;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 3px 5px;
+        }
+
+        .log-entry.error {
+            color: #d32f2f;
+            background-color: #ffebee;
+        }
+
+        .log-entry.success {
+            color: #388e3c;
+            background-color: #e8f5e9;
+        }
+    </style>
+
+    <form method="post" class="flex-row" enctype="multipart/form-data" id="stream-form">
         {% csrf_token %}
 
         <section id="import_options" class=" card stacked half-width">
@@ -66,10 +112,9 @@
             <h2><u>Output</u></h2>
 
             <div id="progress-bar">
+                <div class="progress"></div>
             </div>
-
-            <div id="output-text">
-            </div>
+            <div id="output-text"></div>
         </section>
     </form>
 
