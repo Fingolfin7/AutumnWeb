@@ -1,20 +1,19 @@
+import json
+from core.forms import *
+from core.utils import *
 from django.contrib import messages
 from django.db import transaction
-from django.shortcuts import get_object_or_404, render, redirect, reverse
+from django.http import HttpResponse
 from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
 from datetime import datetime, timedelta
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from core.forms import (CreateProjectForm, CreateSubProjectForm, UpdateProjectForm,
-                        UpdateSubProjectForm, SearchProjectForm, UpdateSessionForm)
-from core.utils import (parse_date_or_datetime, in_window, filter_by_projects,
-                        tally_project_durations, filter_sessions_by_params)
-from core.models import Projects, SubProjects, Sessions, status_choices
-from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
+from rest_framework.response import Response
+from rest_framework.decorators import api_view
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import get_object_or_404, render, redirect, reverse
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from core.models import Projects, SubProjects, Sessions, status_choices
+from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
 
 
 @login_required
@@ -213,6 +212,152 @@ def ChartsView(request):
         'search_form': search_form
     }
     return render(request, 'core/charts.html', context)
+
+
+def import_view(request):
+    if request.method == 'POST':
+        form = UploadFileForm(request.POST, request.FILES)
+        if form.is_valid():
+            file = form.cleaned_data['file']
+            force = form.cleaned_data['force']
+            merge = form.cleaned_data['merge']
+            tolerance = form.cleaned_data['tolerance']
+            verbose = form.cleaned_data['verbose']
+
+            user = request.user
+
+            skipped = []
+
+            file_content = file.read()
+
+            try:
+                data = json_decompress(file_content)
+            except RuntimeError:
+                try:
+                    data = json.load(file_content)
+                except json.JSONDecodeError:
+                    return HttpResponse('Invalid JSON file', status=400)
+
+            for project_name, project_data in data.items():
+                project = Projects.objects.filter(name=project_name).first()
+
+                if project:
+                    if force:
+                        Projects.objects.filter(name=project_name).delete()
+                        project = None
+                    elif merge:
+                        if verbose:
+                            print(f"Merging new sessions and subprojects into '{project_name}'...")
+                    else:
+                        skipped.append(project_name)
+                        continue
+
+                if not project:
+                    if verbose:
+                        print(f"Importing '{project_name}'...")
+                    project = Projects.objects.create(
+                        user=user,
+                        name=project_name,
+                        start_date=timezone.make_aware(datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                        last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
+                        total_time=0.0,
+                        status=project_data['Status'],
+                    )
+                    project.save()
+
+                for subproject_name, subproject_time in project_data['Sub Projects'].items():
+                    subproject_name_lower = subproject_name.lower()
+                    subproject, created = SubProjects.objects.get_or_create(
+                        user=user,
+                        name=subproject_name_lower,
+                        parent_project=project,
+                        defaults={
+                            'start_date': project.start_date,
+                            'last_updated': project.last_updated,
+                            'total_time': 0.0,
+                        }
+                    )
+                    if created and verbose:
+                        print(f"Created new subproject '{subproject_name}' under project '{project_name}'.")
+
+                for session_data in project_data['Session History']:
+                    start_time = timezone.make_aware(
+                        datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}", '%m-%d-%Y %H:%M:%S')
+                    )
+                    end_time = timezone.make_aware(
+                        datetime.strptime(f"{session_data['Date']} {session_data['End Time']}", '%m-%d-%Y %H:%M:%S')
+                    )
+
+                    subproject_names = [name.lower() for name in session_data['Sub-Projects']]
+                    note = session_data['Note']
+
+                    if end_time < start_time:
+                        start_time -= timedelta(days=1)
+
+                    if session_exists(user, project, start_time, end_time, subproject_names,
+                                      time_tolerance=timedelta(minutes=tolerance)):
+                        continue
+
+                    if verbose:
+                        print(f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
+                              f"{session_data['End Time']}...")
+
+                    session = Sessions.objects.create(
+                        user=user,
+                        project=project,
+                        start_time=start_time,
+                        end_time=end_time,
+                        is_active=False,
+                        note=note,
+                    )
+
+                    for subproject_name in subproject_names:
+                        try:
+                            subproject = SubProjects.objects.get(user=user, name=subproject_name, parent_project=project)
+                        except SubProjects.DoesNotExist:
+                            return HttpResponse(f'Subproject not found: {subproject_name}', status=404)
+                        session.subprojects.add(subproject)
+
+                    session.save()
+
+                project.audit_total_time()
+                for subproject in project.subprojects.all():
+                    subproject.audit_total_time()
+
+                sessions = Sessions.objects.filter(project=project)
+                earliest_start, latest_end = sessions_get_earliest_latest(sessions)
+
+                if merge and earliest_start and latest_end:
+                    project.start_date = earliest_start
+                    project.last_updated = latest_end
+                    project.save()
+
+                    for subproject in project.subprojects.all():
+                        earliest_start, latest_end = sessions_get_earliest_latest(subproject.sessions.all())
+                        subproject.start_date = earliest_start if earliest_start else project.start_date
+                        subproject.last_updated = latest_end if latest_end else project.last_updated
+                        subproject.save()
+
+                if not merge:
+                    mismatch = abs(project.total_time - project_data['Total Time'])
+                    if mismatch > tolerance:
+                        tally = project.total_time
+                        project.delete()
+                        return HttpResponse(f"Total time mismatch for project '{project_name}': "
+                                            f"expected {project_data['Total Time']}, got {tally}. "
+                                            f"Mismatch: {mismatch}", status=400)
+
+            if verbose:
+                print('Data imported successfully!')
+
+            if len(skipped) > 0:
+                return HttpResponse(f'Skipped the following projects as they already exist in the database: {", ".join(skipped)}', status=200)
+
+            return HttpResponse('Data imported successfully!', status=200)
+    else:
+        form = UploadFileForm()
+
+    return render(request, 'core/import.html', {'form': form})
 
 
 class TimerListView(LoginRequiredMixin, ListView):

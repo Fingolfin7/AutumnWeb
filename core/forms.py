@@ -1,3 +1,5 @@
+from email.policy import default
+
 from django import forms
 from .models import *
 
@@ -83,4 +85,21 @@ class UpdateSessionForm(forms.ModelForm):
         fields = ['start_time', 'end_time', 'note']
         widgets = {
             'note': forms.Textarea(attrs={'placeholder': 'Note', 'class': 'half-width', 'required': False}),
+        }
+
+
+class UploadFileForm(forms.Form):
+    file = forms.FileField()
+    force = forms.BooleanField(required=False, initial=False)
+    merge = forms.BooleanField(required=False, initial=True)
+    tolerance = forms.FloatField(initial=0.5)
+    verbose = forms.BooleanField(required=False)
+
+    class Meta:
+        fields = ['file', 'force', 'merge', 'tolerance', 'verbose']
+        widgets = {
+            'file': forms.FileInput(attrs={'accept': '.json'}),
+            'merge': forms.CheckboxInput(attrs={'placeholder': 'Merge'}),
+            'tolerance': forms.NumberInput(attrs={'step': 1}),
+            'verbose': forms.CheckboxInput(attrs={'placeholder': 'Verbose'}),
         }

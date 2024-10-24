@@ -1,6 +1,10 @@
+import json
+import zlib
+import base64
 from django.utils import timezone
 from collections import defaultdict
 from django.db.models import QuerySet
+from django.db.models import Min, Max
 from datetime import datetime, timedelta
 from core.models import Sessions, Projects, SubProjects
 
@@ -137,3 +141,82 @@ def tally_project_durations(sessions) -> list[dict]:
 
 
     return [{'name': name, 'total_time': total.total_seconds()/60} for name, total in project_durations.items()]
+
+
+def json_decompress(content: dict | str | bytes) -> dict:
+    ZIPJSON_KEY = 'base64(zip(o))'
+
+    # convert binary content to string
+    if isinstance(content, bytes):
+        content = content.decode('utf-8')
+
+    if isinstance(content, str):
+        try:
+            content = json.loads(content)
+        except Exception:
+            raise RuntimeError("Could not interpret the contents")
+
+    try:
+        assert (content[ZIPJSON_KEY])
+        assert (set(content.keys()) == {ZIPJSON_KEY})
+    except Exception:
+        return content
+
+    try:
+        content = zlib.decompress(base64.b64decode(content[ZIPJSON_KEY]))
+    except RuntimeError:
+        raise RuntimeError("Could not decode/unzip the contents")
+
+    try:
+        content = json.loads(content)
+    except RuntimeError:
+        raise RuntimeError("Could interpret the unzipped contents")
+
+    return content
+
+
+def session_exists(user, project, start_time, end_time, subproject_names, time_tolerance=timedelta(minutes=2)) -> bool:
+    """
+    Check if a session already exists in the database based on start and end time (with tolerance),
+    subprojects, and session notes.
+
+    :param user: User instance the session belongs to
+    :param project: Project instance the session belongs to
+    :param start_time: Start time of the session
+    :param end_time: End time of the session
+    :param subproject_names: List of subproject names for the session
+    :param time_tolerance: Allowed time difference between existing session and new session
+    :return: True if a matching session exists, False otherwise
+    """
+    # Ensure subproject names are case-insensitive during comparison
+    subproject_names_lower = {name.lower() for name in subproject_names}
+
+    # If end_time is earlier than start_time, adjust start_time (the days probably switched over at midnight)
+    if end_time < start_time:
+        start_time -= timedelta(days=1)
+
+    matching_sessions = Sessions.objects.filter(
+        user=user,
+        project=project,
+        start_time__range=(start_time - time_tolerance, start_time + time_tolerance),
+        end_time__range=(end_time - time_tolerance, end_time + time_tolerance)
+        # note=note # commented out to allow for note differences (e.g. typos and edits might occur)
+    )
+
+    for session in matching_sessions:
+        session_subproject_names = {name.lower() for name in session.subprojects.values_list('name', flat=True)}
+        if subproject_names_lower == session_subproject_names:
+            return True
+
+    return False
+
+
+def sessions_get_earliest_latest(sessions) -> tuple[datetime, datetime]:
+    """
+    Get the earliest start time and latest end time from a queryset of sessions.
+
+    :param sessions: Queryset of session instances
+    :return: Tuple of earliest start time and latest end time
+    """
+    aggregated_times = sessions.aggregate(earliest_start=Min('start_time'), latest_end=Max('end_time'))
+    return aggregated_times['earliest_start'], aggregated_times['latest_end']

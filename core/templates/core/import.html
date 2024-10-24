@@ -1,0 +1,76 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+{% endblock %}
+
+{% block content %}
+    <form method="post" class="flex-row" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <section id="import_options" class=" card stacked half-width">
+            <span>
+                <label for="{{ form.file.id_for_label }}" class="custom-file-upload" >
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    Upload JSON File
+                    {{ form.file }}
+                </label>
+                {{ form.file.errors }}
+            </span>
+
+            <label>
+                {{ form.force.label_tag }}
+                <label class="switch">
+                    {{ form.force }}
+                    <span class="slider round"></span>
+                </label>
+                {{ form.force.errors }}
+            </label>
+
+            <span>
+                {{ form.merge.label_tag }}
+                <label class="switch">
+                    {{ form.merge }}
+                    <span class="slider round"></span>
+                </label>
+                {{ form.merge.errors }}
+            </span>
+
+            <span>
+                {{ form.verbose.label_tag }}
+                <label class="switch">
+                    {{ form.verbose }}
+                    <span class="slider round"></span>
+                </label>
+                {{ form.verbose.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.tolerance.label_tag }}
+                {{ form.tolerance }}
+                {{ form.tolerance.errors }}
+            </span>
+
+            <br/>
+
+            <div class="button-row">
+                <button type="submit" class="primary-button">
+                     <i class="fa fa-file-import"></i>
+                    Import
+                </button>
+            </div>
+        </section>
+
+        <section class="card stacked full-width" id="output">
+            <h2><u>Output</u></h2>
+
+            <div id="progress-bar">
+            </div>
+
+            <div id="output-text">
+            </div>
+        </section>
+    </form>
+
+{% endblock %}
