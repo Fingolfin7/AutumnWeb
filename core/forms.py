@@ -1,7 +1,7 @@
 from email.policy import default
 
 from django import forms
-from .models import *
+from .models import Projects, SubProjects, Sessions
 
 
 class SearchProjectForm(forms.Form):
@@ -88,7 +88,7 @@ class UpdateSessionForm(forms.ModelForm):
         }
 
 
-class UploadFileForm(forms.Form):
+class ImportJSONForm(forms.Form):
     file = forms.FileField()
     force = forms.BooleanField(required=False, initial=False)
     merge = forms.BooleanField(required=False, initial=True)
