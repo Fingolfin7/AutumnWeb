@@ -19,7 +19,7 @@ User._meta.get_field('email')._unique = True  # make email field unique
 # model to track the projects that a user is working on
 class Projects(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
     total_time = models.FloatField(default=0.0)
