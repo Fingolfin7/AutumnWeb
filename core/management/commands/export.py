@@ -56,8 +56,8 @@ class Command(BaseCommand):
             # For each project, collect its details
             project.audit_total_time()  # Ensure the total time is up-to-date
             project_name = project.name
-            start_date = timezone.make_aware(project.start_date)
-            last_updated = timezone.make_aware(project.last_updated)
+            start_date = timezone.localtime(project.start_date)
+            last_updated = timezone.localtime(project.last_updated)
             project_obj = {
                 'Start Date': start_date.strftime('%m-%d-%Y'),
                 'Last Updated': last_updated.strftime('%m-%d-%Y'),
@@ -77,8 +77,8 @@ class Command(BaseCommand):
                 if autumn_compatible:
                     project_obj['Sub Projects'][subproject_name] = subproject.total_time
                 else:
-                    start_date = timezone.make_aware(subproject.start_date)
-                    last_updated = timezone.make_aware(subproject.last_updated)
+                    start_date = timezone.localtime(subproject.start_date)
+                    last_updated = timezone.localtime(subproject.last_updated)
                     subproject_obj = {
                         'Start Date': start_date.strftime('%m-%d-%Y'),
                         'Last Updated': last_updated.strftime('%m-%d-%Y'),
@@ -89,9 +89,9 @@ class Command(BaseCommand):
 
             # Fetch project-level sessions
             project_sessions = project.sessions.all()
-            for session in project_sessions:
-                start_time = timezone.make_aware(session.start_time)
-                end_time = timezone.make_aware(session.end_time)
+            for session in reversed(project_sessions):  # oldest to newest
+                start_time = timezone.localtime(session.start_time)
+                end_time = timezone.localtime(session.end_time)
                 project_obj['Session History'].append({
                     'Date': end_time.strftime('%m-%d-%Y'),
                     'Start Time': start_time.strftime('%H:%M:%S'),
