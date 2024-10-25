@@ -95,7 +95,7 @@ class Command(BaseCommand):
                     'Note': session.note,
                 })
 
-            project_data.append({project_name: project_obj})
+            project_data[project_name] = project_obj
 
         # Write the project data to a JSON file
         with open(filepath, 'w') as json_writer:
