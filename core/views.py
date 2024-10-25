@@ -1,6 +1,4 @@
-import json
 import os
-
 from AutumnWeb import settings
 from core.forms import *
 from core.utils import *
