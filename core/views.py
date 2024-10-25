@@ -697,7 +697,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
         # if start and end dates are empty set the start date to the beginning of the year
         start_date = self.request.GET.get('start_date')
         if not start_date:
-            start_date = timezone.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+            start_date = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             # update the request object with the start date
             self.request.GET = self.request.GET.copy()
             self.request.GET['start_date'] = start_date.strftime("%Y-%m-%d")

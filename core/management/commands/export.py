@@ -50,7 +50,7 @@ class Command(BaseCommand):
 
         autumn_compatible = options['autumn_compatible']
 
-        project_data = []
+        project_data = {}
 
         for project in projects:
             # For each project, collect its details

@@ -37,7 +37,9 @@ $(document).ready(function(){
     let selectType = $("#chart_type");
     let draw = $("#draw");
 
-    $("#start_date").val(new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]);
+    // set the default start date to the start of this month
+    let current_date = new Date();
+    $("#start_date").val(new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0]);
     $("#end_date").val(new Date().toISOString().split('T')[0]);
 
     render(selectType.val());
