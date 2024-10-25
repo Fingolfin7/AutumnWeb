@@ -88,7 +88,7 @@ class Command(BaseCommand):
                     project_obj['Sub Projects'][subproject_name] = subproject_obj
 
             # Fetch related sessions
-            project_sessions = project.sessions.all()
+            project_sessions = project.sessions.filter(is_active=False).all()
             for session in reversed(project_sessions):  # oldest to newest
                 start_time = timezone.localtime(session.start_time)
                 end_time = timezone.localtime(session.end_time)
