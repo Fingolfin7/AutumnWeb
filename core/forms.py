@@ -90,16 +90,35 @@ class UpdateSessionForm(forms.ModelForm):
 
 class ImportJSONForm(forms.Form):
     file = forms.FileField()
+    autumn_import = forms.BooleanField(required=False, initial=False)
     force = forms.BooleanField(required=False, initial=False)
     merge = forms.BooleanField(required=False, initial=True)
     tolerance = forms.FloatField(initial=0.5)
     verbose = forms.BooleanField(required=False)
 
     class Meta:
-        fields = ['file', 'force', 'merge', 'tolerance', 'verbose']
+        fields = ['file', 'autumn_import', 'force', 'merge', 'tolerance', 'verbose']
         widgets = {
             'file': forms.FileInput(attrs={'accept': '.json'}),
-            'merge': forms.CheckboxInput(attrs={'placeholder': 'Merge'}),
-            'tolerance': forms.NumberInput(attrs={'step': 1}),
-            'verbose': forms.CheckboxInput(attrs={'placeholder': 'Verbose'}),
+            'tolerance': forms.NumberInput(attrs={'step': 1})
         }
+
+
+class ExportJSONForm(forms.Form):
+    project_name = forms.CharField(required=False, widget=forms.TextInput(
+        attrs={
+            'placeholder': 'Projects (leave blank to export all)',
+            'id': 'project-search',
+            'data-ajax_url': '/api/search_projects/',
+            'class': 'half-width',
+            'autocomplete': 'off'
+        })
+    )
+    output_file = forms.CharField(required=False, widget=forms.TextInput(
+        attrs={
+            'placeholder': 'Filename (leave blank to use default)',
+            'class': 'half-width'
+        })
+    )
+    autumn_compatible = forms.BooleanField(required=False, initial=True)
+    compress = forms.BooleanField(required=False, initial=False)

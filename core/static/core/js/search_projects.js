@@ -2,7 +2,6 @@ $(document).ready(function() {
     let search = $('#project-search');
 
     search.on('keyup',function() {
-
         let ajax_url = $(this).attr("data-ajax_url");
         let value = $(this).val().trim();
 
@@ -32,8 +31,5 @@ $(document).ready(function() {
     search.on('focus', function() {
         $(this).trigger('keyup');
     });
-
-
-
 
 });

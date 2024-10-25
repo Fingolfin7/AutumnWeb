@@ -87,7 +87,7 @@ class Command(BaseCommand):
                     }
                     project_obj['Sub Projects'][subproject_name] = subproject_obj
 
-            # Fetch project-level sessions
+            # Fetch related sessions
             project_sessions = project.sessions.all()
             for session in reversed(project_sessions):  # oldest to newest
                 start_time = timezone.localtime(session.start_time)

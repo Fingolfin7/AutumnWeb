@@ -17,6 +17,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('username', type=str, help='Username of the user to import the data for')
         parser.add_argument('filepath', type=str, help='Path to an Autumn project json file')
+        parser.add_argument('--autumn_import', action='store_true', help='Import data in Autumn (CLI version) format')
         parser.add_argument('--force', action='store_true', help='Force import even if projects already exist')
         parser.add_argument('--merge', action='store_true',
                             help='Merge sessions and subprojects into existing projects')
@@ -81,17 +82,29 @@ class Command(BaseCommand):
             # Import or merge subprojects
             for subproject_name, subproject_time in project_data['Sub Projects'].items():
                 subproject_name_lower = subproject_name.lower()  # Ensure case-insensitive handling
-                subproject, created = SubProjects.objects.get_or_create(
-                    user=user,
-                    name=subproject_name_lower,  # Always use lowercase when saving
-                    parent_project=project,
-                    defaults={
-                        'start_date': project.start_date,
-                        'last_updated': project.last_updated,
-                        'total_time': 0.0,
-                    },
-                    description=project_data['Description'] if 'Description' in project_data else '',
-                )
+                if options['autumn_import']:
+                    subproject, created = SubProjects.objects.get_or_create(
+                        user=user,
+                        name=subproject_name_lower,
+                        parent_project=project,
+                        defaults={
+                            'start_date': project.start_date,
+                            'last_updated': project.last_updated,
+                            'total_time': 0.0,
+                            'description': '',
+                        }
+                    )
+                else:
+                    subproject, created = SubProjects.objects.get_or_create(
+                        user=user,
+                        name=subproject_name_lower,
+                        parent_project=project,
+                        start_date=timezone.make_aware(
+                            datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                        last_updated=timezone.make_aware(
+                            datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
+                        description=project_data['Description'],
+                    )
                 if created and verbose:
                     self.stdout.write(f"Created new subproject '{subproject_name}' under project '{project_name}'.")
 

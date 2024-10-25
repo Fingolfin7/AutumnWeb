@@ -1,10 +1,11 @@
 import os
+import tempfile
 from AutumnWeb import settings
 from core.forms import *
 from core.utils import *
 from django.contrib import messages
 from django.db import transaction
-from django.http import StreamingHttpResponse, JsonResponse
+from django.http import StreamingHttpResponse, JsonResponse, FileResponse, HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 from rest_framework.response import Response
@@ -220,6 +221,7 @@ def stream_response(message):
     return f"data: {json.dumps({'message': message})}\n\n"
 
 
+@login_required
 def import_view(request):
     # clear session data
     request.session.delete('file_path')
@@ -260,12 +262,14 @@ def import_view(request):
 
     return render(request, 'core/import.html', context)
 
+
 @csrf_exempt
 def import_stream(request):
 
     def event_stream():
         # get data from session
         file_path = request.session.get('file_path')
+        autumn_import = request.session.get('import_data').get('autumn_import')
         force = request.session.get('import_data').get('force')
         merge = request.session.get('import_data').get('merge')
         tolerance = request.session.get('import_data').get('tolerance')
@@ -334,16 +338,30 @@ def import_stream(request):
 
                 for subproject_name, subproject_time in project_data['Sub Projects'].items():
                     subproject_name_lower = subproject_name.lower()
-                    subproject, created = SubProjects.objects.get_or_create(
-                        user=user,
-                        name=subproject_name_lower,
-                        parent_project=project,
-                        defaults={
-                            'start_date': project.start_date,
-                            'last_updated': project.last_updated,
-                            'total_time': 0.0,
-                        }
-                    )
+                    if autumn_import:
+                        subproject, created = SubProjects.objects.get_or_create(
+                            user=user,
+                            name=subproject_name_lower,
+                            parent_project=project,
+                            defaults={
+                                'start_date': project.start_date,
+                                'last_updated': project.last_updated,
+                                'total_time': 0.0,
+                                'description': '',
+                            }
+                        )
+                    else:
+                        subproject, created = SubProjects.objects.get_or_create(
+                            user=user,
+                            name=subproject_name_lower,
+                            parent_project=project,
+                            start_date=timezone.make_aware(
+                                    datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                            last_updated=timezone.make_aware(
+                                    datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
+                            description=project_data['Description'],
+                        )
+
                     if created and verbose:
                         yield stream_response(
                             f"Created new subproject '{subproject_name}' under project '{project_name}'")
@@ -444,6 +462,104 @@ def import_stream(request):
     response['Cache-Control'] = 'no-cache'
     response['X-Accel-Buffering'] = 'no'
     return response
+
+
+def export_view(request):
+    if request.method == "POST":
+        form = ExportJSONForm(request.POST)
+        if form.is_valid():
+            project_name = form.cleaned_data['project_name']
+            output_file = form.cleaned_data['output_file']
+            compress = form.cleaned_data['compress']
+            autumn_compatible = form.cleaned_data['autumn_compatible']
+
+            # Fetch the user
+            user = request.user
+
+            # Fetch all projects
+            if project_name:
+                projects = Projects.objects.filter(name=project_name, user=user).prefetch_related('subprojects',
+                                                                                                  'sessions').all()
+            else:
+                projects = Projects.objects.filter(user=user).prefetch_related('subprojects', 'sessions').all()
+
+
+            if not output_file:  # If no output file is specified, generate a default filename
+                if project_name:
+                    output_file = f"{project_name}.json"
+                else:
+                    output_file = f"projects.json"
+
+            if not output_file.endswith('.json'):
+                output_file += '.json'
+
+            export_dict = {}
+
+            for project in projects:
+                project.audit_total_time()  # Ensure the total time is up-to-date
+                project_name = project.name
+                start_date = timezone.localtime(project.start_date)
+                last_updated = timezone.localtime(project.last_updated)
+                project_obj = {
+                    'Start Date': start_date.strftime('%m-%d-%Y'),
+                    'Last Updated': last_updated.strftime('%m-%d-%Y'),
+                    'Total Time': project.total_time,
+                    'Status': project.status,
+                    'Description': project.description if project.description else '',
+                    'Sub Projects': {},
+                    'Session History': [],
+                }
+
+                # Fetch related subprojects
+                subprojects = project.subprojects.all()
+                for subproject in subprojects:
+                    subproject.audit_total_time()
+                    subproject_name = subproject.name
+
+                    if autumn_compatible:
+                        project_obj['Sub Projects'][subproject_name] = subproject.total_time
+                    else:
+                        start_date = timezone.localtime(subproject.start_date)
+                        last_updated = timezone.localtime(subproject.last_updated)
+                        subproject_obj = {
+                            'Start Date': start_date.strftime('%m-%d-%Y'),
+                            'Last Updated': last_updated.strftime('%m-%d-%Y'),
+                            'Total Time': subproject.total_time,
+                            'Description': subproject.description if subproject.description else '',
+                        }
+                        project_obj['Sub Projects'][subproject_name] = subproject_obj
+
+                # Fetch related sessions
+                project_sessions = project.sessions.all()
+                for session in reversed(project_sessions):  # oldest to newest
+                    start_time = timezone.localtime(session.start_time)
+                    end_time = timezone.localtime(session.end_time)
+                    project_obj['Session History'].append({
+                        'Date': end_time.strftime('%m-%d-%Y'),
+                        'Start Time': start_time.strftime('%H:%M:%S'),
+                        'End Time': end_time.strftime('%H:%M:%S'),
+                        'Sub-Projects': [subproject.name for subproject in session.subprojects.all()],
+                        'Duration': session.duration,
+                        'Note': session.note,
+                    })
+
+                export_dict[project_name] = project_obj
+
+            contents = json.dumps(json_compress(export_dict)) if compress else json.dumps(export_dict, indent=4)
+            response = HttpResponse(contents, content_type='application/json')
+            response['Content-Disposition'] = f'attachment; filename="{output_file}"'
+            return response
+        else:
+            messages.error(request, "Invalid form data. Please check your inputs.")
+    else:
+        form = ExportJSONForm()
+
+    context = {
+        'title': 'Export Data',
+        'form': form
+    }
+
+    return render(request, 'core/export.html', context)
 
 
 class TimerListView(LoginRequiredMixin, ListView):
@@ -682,11 +798,8 @@ class SessionsListView(LoginRequiredMixin, ListView):
 
         context['grouped_sessions'] = grouped_sessions
 
-        year_start = timezone.now().replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0).strftime(
-            "%Y-%m-%d")
-
         # Check if any search-related query parameters are present. we only want to display the message on a search
-        if (self.request.GET.get('project_name') or (self.request.GET.get('start_date') != year_start)
+        if (self.request.GET.get('project_name') or self.request.GET.get('start_date')
                 or self.request.GET.get('end_date') or self.request.GET.get('note_snippet')):
             messages.success(self.request, f"Found {len(self.get_queryset())} results")
 
@@ -694,14 +807,6 @@ class SessionsListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
-        # if start and end dates are empty set the start date to the beginning of the year
-        start_date = self.request.GET.get('start_date')
-        if not start_date:
-            start_date = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            # update the request object with the start date
-            self.request.GET = self.request.GET.copy()
-            self.request.GET['start_date'] = start_date.strftime("%Y-%m-%d")
-
         return filter_sessions_by_params(self.request, sessions)
 
 

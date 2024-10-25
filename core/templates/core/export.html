@@ -1,0 +1,58 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    <script src="{% static 'core/js/search_projects.js' %}" type="text/javascript"></script>
+{% endblock %}
+
+{% block content %}
+    <section id="export_options">
+        <form method="POST" class="card stacked" enctype="multipart/form-data" action="{% url 'export' %}">
+            {% csrf_token %}
+            <div id="search_projects">
+                <span class="label-input">
+                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
+                    {{ form.project_name }}
+                    {{ form.project_name.errors }}
+                </span>
+                <span id="project-search-results"></span>
+            </div>
+
+            <span class="label-input">
+                {{ form.output_file.label_tag }}
+                {{ form.output_file }}
+                {{ form.output_file.errors }}
+            </span>
+
+            <label>
+                Autumn (CLI version) compatible
+                <label class="switch">
+                    {{ form.autumn_compatible }}
+                    <span class="slider round"></span>
+                </label>
+                {{ form.autumn_compatible.errors }}
+            </label>
+
+            <label>
+                {{ form.compress.label_tag }}
+                <label class="switch">
+                    {{ form.compress }}
+                    <span class="slider round"></span>
+                </label>
+                {{ form.compress.errors }}
+            </label>
+
+            <span>
+                <button type="submit" class="primary-button">
+                    <i class="fa fa-file-export"></i>
+                    Export Projects
+                </button>
+            </span>
+        </form>
+    </section>
+
+{% endblock %}
