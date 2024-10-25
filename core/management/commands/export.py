@@ -56,9 +56,11 @@ class Command(BaseCommand):
             # For each project, collect its details
             project.audit_total_time()  # Ensure the total time is up-to-date
             project_name = project.name
+            start_date = timezone.make_aware(project.start_date)
+            last_updated = timezone.make_aware(project.last_updated)
             project_obj = {
-                'Start Date': project.start_date.strftime('%m-%d-%Y'),
-                'Last Updated': project.last_updated.strftime('%m-%d-%Y'),
+                'Start Date': start_date.strftime('%m-%d-%Y'),
+                'Last Updated': last_updated.strftime('%m-%d-%Y'),
                 'Total Time': project.total_time,
                 'Status': project.status,
                 'Description': project.description if project.description else '',
@@ -75,9 +77,11 @@ class Command(BaseCommand):
                 if autumn_compatible:
                     project_obj['Sub Projects'][subproject_name] = subproject.total_time
                 else:
+                    start_date = timezone.make_aware(subproject.start_date)
+                    last_updated = timezone.make_aware(subproject.last_updated)
                     subproject_obj = {
-                        'Start Date': subproject.start_date.strftime('%m-%d-%Y'),
-                        'Last Updated': subproject.last_updated.strftime('%m-%d-%Y'),
+                        'Start Date': start_date.strftime('%m-%d-%Y'),
+                        'Last Updated': last_updated.strftime('%m-%d-%Y'),
                         'Total Time': subproject.total_time,
                         'Description': subproject.description if subproject.description else '',
                     }
@@ -86,10 +90,12 @@ class Command(BaseCommand):
             # Fetch project-level sessions
             project_sessions = project.sessions.all()
             for session in project_sessions:
+                start_time = timezone.make_aware(session.start_time)
+                end_time = timezone.make_aware(session.end_time)
                 project_obj['Session History'].append({
-                    'Date': session.end_time.strftime('%m-%d-%Y'),
-                    'Start Time': session.start_time.strftime('%H:%M:%S'),
-                    'End Time': session.end_time.strftime('%H:%M:%S'),
+                    'Date': end_time.strftime('%m-%d-%Y'),
+                    'Start Time': start_time.strftime('%H:%M:%S'),
+                    'End Time': end_time.strftime('%H:%M:%S'),
                     'Sub-Projects': [subproject.name for subproject in session.subprojects.all()],
                     'Duration': session.duration,
                     'Note': session.note,
