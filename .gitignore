@@ -146,6 +146,7 @@ cython_debug/
 .sqlite3
 *.sqlite3
 /media/
+/Exports/
 /Logs/
 /.vscode
 db.rar

@@ -74,6 +74,7 @@ class Command(BaseCommand):
                     last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
                     total_time=0.0,
                     status=project_data['Status'],
+                    description=project_data['Description'] if 'Description' in project_data else '',
                 )
                 project.save()
 
@@ -88,7 +89,8 @@ class Command(BaseCommand):
                         'start_date': project.start_date,
                         'last_updated': project.last_updated,
                         'total_time': 0.0,
-                    }
+                    },
+                    description=project_data['Description'] if 'Description' in project_data else '',
                 )
                 if created and verbose:
                     self.stdout.write(f"Created new subproject '{subproject_name}' under project '{project_name}'.")

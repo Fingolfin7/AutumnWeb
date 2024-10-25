@@ -143,38 +143,6 @@ def tally_project_durations(sessions) -> list[dict]:
     return [{'name': name, 'total_time': total.total_seconds()/60} for name, total in project_durations.items()]
 
 
-def json_decompress(content: dict | str | bytes) -> dict:
-    ZIPJSON_KEY = 'base64(zip(o))'
-
-    # convert binary content to string
-    if isinstance(content, bytes):
-        content = content.decode('utf-8')
-
-    if isinstance(content, str):
-        try:
-            content = json.loads(content)
-        except Exception:
-            raise RuntimeError("Could not interpret the contents")
-
-    try:
-        assert (content[ZIPJSON_KEY])
-        assert (set(content.keys()) == {ZIPJSON_KEY})
-    except Exception:
-        return content
-
-    try:
-        content = zlib.decompress(base64.b64decode(content[ZIPJSON_KEY]))
-    except RuntimeError:
-        raise RuntimeError("Could not decode/unzip the contents")
-
-    try:
-        content = json.loads(content)
-    except RuntimeError:
-        raise RuntimeError("Could interpret the unzipped contents")
-
-    return content
-
-
 def session_exists(user, project, start_time, end_time, subproject_names, time_tolerance=timedelta(minutes=2)) -> bool:
     """
     Check if a session already exists in the database based on start and end time (with tolerance),
@@ -220,3 +188,48 @@ def sessions_get_earliest_latest(sessions) -> tuple[datetime, datetime]:
     """
     aggregated_times = sessions.aggregate(earliest_start=Min('start_time'), latest_end=Max('end_time'))
     return aggregated_times['earliest_start'], aggregated_times['latest_end']
+
+
+def json_compress(j):
+    ZIPJSON_KEY = 'base64(zip(o))'
+    j = {
+        ZIPJSON_KEY: base64.b64encode(
+            zlib.compress(
+                json.dumps(j).encode('utf-8')
+            )
+        ).decode('ascii')
+    }
+
+    return j
+
+
+def json_decompress(content: dict | str | bytes) -> dict:
+    ZIPJSON_KEY = 'base64(zip(o))'
+
+    # convert binary content to string
+    if isinstance(content, bytes):
+        content = content.decode('utf-8')
+
+    if isinstance(content, str):
+        try:
+            content = json.loads(content)
+        except Exception:
+            raise RuntimeError("Could not interpret the contents")
+
+    try:
+        assert (content[ZIPJSON_KEY])
+        assert (set(content.keys()) == {ZIPJSON_KEY})
+    except Exception:
+        return content
+
+    try:
+        content = zlib.decompress(base64.b64decode(content[ZIPJSON_KEY]))
+    except RuntimeError:
+        raise RuntimeError("Could not decode/unzip the contents")
+
+    try:
+        content = json.loads(content)
+    except RuntimeError:
+        raise RuntimeError("Could interpret the unzipped contents")
+
+    return content
