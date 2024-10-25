@@ -31,7 +31,7 @@ class Projects(models.Model):
         ordering = ['name']
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.user.username})"
 
     @property
     def get_start(self):
@@ -64,7 +64,7 @@ class SubProjects(models.Model):
         verbose_name_plural = 'SubProjects'
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.parent_project.name}) ({self.user.username})"
 
     @property
     def get_start(self):
@@ -105,7 +105,7 @@ class Sessions(models.Model):
 
     def __str__(self):
         sub_list = [sub.name for sub in self.subprojects.all()]
-        return f"{self.project.name} {sub_list} - {self.start_time}"
+        return f"{self.project.name} {sub_list} - {self.start_time} ({self.user.username})"
 
     @property
     def get_start(self):

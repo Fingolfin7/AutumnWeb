@@ -53,11 +53,11 @@ class Command(BaseCommand):
             raise CommandError(f'Invalid JSON file: {filepath}')
 
         for project_name, project_data in data.items():
-            project = Projects.objects.filter(name=project_name).first()
+            project = Projects.objects.filter(name=project_name, user=user).first()
 
             if project:
                 if options['force']:
-                    Projects.objects.filter(name=project_name).delete()
+                    Projects.objects.filter(name=project_name, user=user).delete()
                     project = None  # to ensure a fresh creation
                 elif merge:
                     self.stdout.write(self.style.NOTICE(f"Merging new sessions and subprojects into '{project_name}'..."))
@@ -145,7 +145,7 @@ class Command(BaseCommand):
             for subproject in project.subprojects.all():
                 subproject.audit_total_time()
 
-            sessions = Sessions.objects.filter(project=project)
+            sessions = Sessions.objects.filter(project=project, user=user)
             earliest_start, latest_end = sessions_get_earliest_latest(sessions)
 
 
