@@ -1,11 +1,10 @@
 import os
-import tempfile
 from AutumnWeb import settings
 from core.forms import *
 from core.utils import *
 from django.contrib import messages
 from django.db import transaction
-from django.http import StreamingHttpResponse, JsonResponse, FileResponse, HttpResponse
+from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta
 from rest_framework.response import Response
@@ -17,14 +16,6 @@ from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from core.models import Projects, SubProjects, Sessions, status_choices
 from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
-
-
-@login_required
-def home(request):
-    context = {
-        'timers': Sessions.objects.filter(is_active=True)[:3]
-    }
-    return render(request, 'core/home.html', context)
 
 
 @login_required

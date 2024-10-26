@@ -6,6 +6,7 @@ from django.core.management.base import BaseCommand, CommandError
 from core.models import Projects, SubProjects, Sessions
 from core.utils import json_decompress, session_exists, sessions_get_earliest_latest
 
+
 # usage:  python manage.py import 'username' project_file.json --force/--merge --tolerance 0.5
 # e.g.: python manage.py import kuda "C:\Users\User\Documents\Programming\Python\Autumn\Source\projects.json"
 # --merge --tolerance 2
@@ -61,7 +62,8 @@ class Command(BaseCommand):
                     Projects.objects.filter(name=project_name, user=user).delete()
                     project = None  # to ensure a fresh creation
                 elif merge:
-                    self.stdout.write(self.style.NOTICE(f"Merging new sessions and subprojects into '{project_name}'..."))
+                    self.stdout.write(
+                        self.style.NOTICE(f"Merging new sessions and subprojects into '{project_name}'..."))
                 else:
                     skipped.append(project_name)
                     continue
@@ -87,7 +89,7 @@ class Command(BaseCommand):
                         user=user,
                         name=subproject_name_lower,
                         parent_project=project,
-                        defaults={ # these values aren't used in the search. But they are added to new instances
+                        defaults={  # these values aren't used in the search. But they are added to new instances
                             'start_date': project.start_date,
                             'last_updated': project.last_updated,
                             'total_time': 0.0,
@@ -99,7 +101,7 @@ class Command(BaseCommand):
                         user=user,
                         name=subproject_name_lower,
                         parent_project=project,
-                        defaults={ # these values aren't used in the search. But they are added to new instances
+                        defaults={  # these values aren't used in the search. But they are added to new instances
                             "start_date": timezone.make_aware(
                                 datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
                             "last_updated": timezone.make_aware(
@@ -162,7 +164,6 @@ class Command(BaseCommand):
 
             sessions = Sessions.objects.filter(project=project, user=user)
             earliest_start, latest_end = sessions_get_earliest_latest(sessions)
-
 
             # Update project and subproject dates if merging
             if merge and earliest_start and latest_end:
