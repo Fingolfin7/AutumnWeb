@@ -327,6 +327,7 @@ def import_stream(request):
                             datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
                         total_time=0.0,
                         status=project_data['Status'],
+                        description=project_data['Description'] if 'Description' in project_data else '',
                     )
                     project.save()
 
