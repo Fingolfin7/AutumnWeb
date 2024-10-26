@@ -631,11 +631,13 @@ class CreateProjectView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Create Project'
-
         return context
 
     def form_valid(self, form):
         form.instance.user = self.request.user  # set the user field of the project to the current user
+        if Projects.objects.filter(user=self.request.user, name=form.instance.name).exists():
+            form.add_error('name', 'You already have a project with this name.')
+            return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Project created successfully")
         return redirect('projects')
@@ -661,14 +663,21 @@ class CreateSubProjectView(LoginRequiredMixin, CreateView):
         return context
 
     def form_valid(self, form):
-        form.instance.user = self.request.user
+        form.instance.user = self.request.user  # set the user field of the subproject to the current user
         form.save()
         messages.success(self.request, "Subproject created successfully")
         return redirect('projects')
 
     def form_invalid(self, form):
-        messages.error(self.request, "An error occurred while creating the subproject")
-        return redirect('create_subproject')
+        # add an error for the name field if the user already has a subproject with the same name under the same project
+        if SubProjects.objects.filter(
+                user=self.request.user,
+                name=form.instance.name,
+                parent_project=form.instance.parent_project
+        ).exists():
+            form.add_error('name', 'You already have a subproject with this name under the selected project.')
+        return super().form_invalid(form)
+
 
 
 class UpdateProjectView(LoginRequiredMixin, UpdateView):
@@ -692,6 +701,9 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+        if Projects.objects.filter(user=self.request.user, name=form.instance.name).exclude(pk=self.object.pk).exists():
+            form.add_error('name', 'You already have a project with this name.')
+            return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Project updated successfully")
         return redirect('update_project', project_name=self.kwargs['project_name'])
@@ -717,6 +729,13 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+        if SubProjects.objects.filter(
+                user=self.request.user,
+                name=form.instance.name,
+                parent_project=form.instance.parent_project
+        ).exclude(pk=self.object.pk).exists():
+            form.add_error('name', 'You already have a subproject with this name under the selected project.')
+            return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Subproject updated successfully")
         return redirect('update_subproject', pk=self.kwargs['pk'])

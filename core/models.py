@@ -29,6 +29,7 @@ class Projects(models.Model):
     class Meta:
         verbose_name_plural = 'Projects'
         ordering = ['name']
+        unique_together = ('user', 'name')
 
     def __str__(self):
         return f"{self.name} ({self.user.username})"
@@ -62,6 +63,7 @@ class SubProjects(models.Model):
 
     class Meta:
         verbose_name_plural = 'SubProjects'
+        unique_together = ('name', 'parent_project')
 
     def __str__(self):
         return f"{self.name} ({self.parent_project.name}) ({self.user.username})"
