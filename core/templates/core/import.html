@@ -75,6 +75,15 @@
             </span>
 
             <label>
+                {{ form.autumn_import.label_tag }}
+                <label class="switch">
+                    {{ form.autumn_import }}
+                    <span class="slider round"></span>
+                </label>
+                {{ form.autumn_import.errors }}
+            </label>
+
+            <label>
                 {{ form.force.label_tag }}
                 <label class="switch">
                     {{ form.force }}

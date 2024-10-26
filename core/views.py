@@ -343,7 +343,7 @@ def import_stream(request):
                             user=user,
                             name=subproject_name_lower,
                             parent_project=project,
-                            defaults={
+                            defaults={ # these values aren't used in the search. But they are added to new instances
                                 'start_date': project.start_date,
                                 'last_updated': project.last_updated,
                                 'total_time': 0.0,
@@ -355,11 +355,13 @@ def import_stream(request):
                             user=user,
                             name=subproject_name_lower,
                             parent_project=project,
-                            start_date=timezone.make_aware(
+                            defaults={  # these values aren't used in the search. But they are added to new instances
+                                "start_date": timezone.make_aware(
                                     datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
-                            last_updated=timezone.make_aware(
+                                "last_updated": timezone.make_aware(
                                     datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
-                            description=project_data['Description'],
+                                "description": project_data['Description'],
+                            }
                         )
 
                     if created and verbose:

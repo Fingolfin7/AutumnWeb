@@ -87,7 +87,7 @@ class Command(BaseCommand):
                         user=user,
                         name=subproject_name_lower,
                         parent_project=project,
-                        defaults={
+                        defaults={ # these values aren't used in the search. But they are added to new instances
                             'start_date': project.start_date,
                             'last_updated': project.last_updated,
                             'total_time': 0.0,
@@ -99,11 +99,13 @@ class Command(BaseCommand):
                         user=user,
                         name=subproject_name_lower,
                         parent_project=project,
-                        start_date=timezone.make_aware(
-                            datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
-                        last_updated=timezone.make_aware(
-                            datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
-                        description=project_data['Description'],
+                        defaults={ # these values aren't used in the search. But they are added to new instances
+                            "start_date": timezone.make_aware(
+                                datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                            "last_updated": timezone.make_aware(
+                                datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
+                            "description": project_data['Description'],
+                        }
                     )
                 if created and verbose:
                     self.stdout.write(f"Created new subproject '{subproject_name}' under project '{project_name}'.")
