@@ -23,14 +23,18 @@
                             [{{ forloop.counter0 }}]: Started
                         </td>
                         <td class="text-red">
+                            <a class="plain-link" href="{% url 'update_project' timer.project.name %}">
                             {{ timer.project.name }}
+                        </a>
                         </td>
                         <td >
-                            [
-                            {% for subproject in timer.subprojects.all %}
+                          {% for subproject in timer.subprojects.all %}
+                            <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                {% if forloop.first %}[{% endif %}
                                 '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                            {% endfor %}
-                            ]
+                                {% if forloop.last %}]{% endif %}
+                            </a>
+                        {% endfor %}
                         </td>
                         <td>
                             <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
