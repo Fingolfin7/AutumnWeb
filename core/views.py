@@ -1,4 +1,5 @@
 import os
+import pytz
 from AutumnWeb import settings
 from core.forms import *
 from core.utils import *
@@ -67,6 +68,23 @@ def start_timer(request):
     return render(request, 'core/start_timer.html', context)
 
 
+def remove_ambiguous_time_error(time_value):
+    try:
+        return timezone.make_aware(datetime.strptime(time_value, "%Y-%m-%d %H:%M:%S"),
+                                   timezone.get_current_timezone(),
+                                   is_dst=True)
+    except pytz.AmbiguousTimeError:
+        return timezone.make_aware(datetime.strptime(time_value, "%Y-%m-%d %H:%M:%S"),
+                                   timezone.get_current_timezone(),
+                                   is_dst=False)
+
+
+def fix_ambiguous_time(form, field_name, raw_time):
+    for error in form.errors.get(field_name, []):
+        if 'ambiguous' in error:
+            return remove_ambiguous_time_error(raw_time)
+    return None  # Return None if no changes were made
+
 @login_required
 @transaction.atomic
 def update_session(request, session_id: int):
@@ -78,7 +96,29 @@ def update_session(request, session_id: int):
 
     if request.method == "POST":
         form = UpdateSessionForm(request.POST, instance=current_session)
-        if form.is_valid():
+        valid = form.is_valid()
+
+        if not valid: # correct ambiguous time errors that occur on daylights saving time changes
+            # Extract start and end times from POST data
+            start_time_raw = request.POST.get('start_time')
+            end_time_raw = request.POST.get('end_time')
+
+            request.POST = request.POST.copy()  # make the POST data mutable
+
+            # Attempt to fix ambiguous times
+            fixed_start_time = fix_ambiguous_time(form, 'start_time', start_time_raw)
+            fixed_end_time = fix_ambiguous_time(form, 'end_time', end_time_raw)
+
+            if fixed_start_time:
+                request.POST['start_time'] = fixed_start_time
+            if fixed_end_time:
+                request.POST['end_time'] = fixed_end_time
+
+            # recreate the form with the updated POST data and try again
+            form = UpdateSessionForm(request.POST, instance=current_session)
+            valid = form.is_valid()
+
+        if valid:
             try:
                 project_name = form.cleaned_data['project_name']
                 subproject_names = request.POST.getlist('subprojects')
