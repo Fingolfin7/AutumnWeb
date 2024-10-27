@@ -1,6 +1,7 @@
 {% extends 'core/base.html' %}
 {% load static %}
 {% load time_formats %}
+{% load markdown_render %}
 {% load param_replace %}
 
 {% block head_includes %}
@@ -97,7 +98,7 @@
                     {% if session.note %}
                         <div class="session-note-slider">
                             <span class="text-yellow session-note" id="note-{{ session.id }}">
-                                {{ session.note }}
+                                {{ session.note | markdown | safe }} <!-- safe is used to render html -->
                             </span>
                         </div>
                     {% endif %}

@@ -5,3 +5,4 @@ crispy-bootstrap4
 lxml
 Pillow
 concurrent-log-handler
+markdown
