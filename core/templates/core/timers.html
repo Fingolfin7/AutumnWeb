@@ -27,7 +27,7 @@
                             {{ timer.project.name }}
                         </a>
                         </td>
-                        <td >
+                        <td>
                           {% for subproject in timer.subprojects.all %}
                             <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
                                 {% if forloop.first %}[{% endif %}

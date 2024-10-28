@@ -357,9 +357,11 @@ def import_stream(request):
                         last_updated=timezone.make_aware(
                             datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
                         total_time=0.0,
-                        status=project_data['Status'],
                         description=project_data['Description'] if 'Description' in project_data else '',
                     )
+
+                    if 'Status' in project_data:  # handle old versions from before the status field was added
+                        project.status = status_choices[project_data['Status']]
                     project.save()
 
                 # Process subprojects
