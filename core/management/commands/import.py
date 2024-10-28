@@ -108,7 +108,7 @@ class Command(BaseCommand):
                                 datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
                             "last_updated": timezone.make_aware(
                                 datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
-                            "description": project_data['Description'],
+                            "description": project_data['Description'] if 'Description' in project_data else '',
                         }
                     )
                 if created and verbose:
