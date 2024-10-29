@@ -6,3 +6,4 @@ lxml
 Pillow
 concurrent-log-handler
 markdown
+inflect

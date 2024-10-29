@@ -9,6 +9,7 @@ $(document).ready(function(){
             'bar': bar_graph,
             'scatter': scatter_graph,
             'calendar': calendar_graph,
+            'wordcloud': wordcloud,
         }
 
         // get filter values (default to start of the current year and current date)
@@ -25,7 +26,7 @@ $(document).ready(function(){
         get_project_data(type, start_date, end_date, project_name).then(data => {
             if (data.length > 0) {
                 // console.log('data:', data);
-                chart_types[type](data, canvas);
+                type !== 'wordcloud' ? chart_types[type](data, canvas) : chart_types[type](data, canvas, "#chart");
             } else {
                 console.warn('No data available for the selected filters.');
             }
@@ -55,10 +56,14 @@ function get_project_data(type, start_date="", end_date="", project_name=""){
     // by default get the data from all the projects for all time
     let url = ""
 
-    let requires_session_data = ['scatter', 'calendar', 'heatmap', 'scatter heatmap'];
+    let requires_session_tallies = ['scatter', 'calendar', 'heatmap', 'scatter heatmap'];
+    let requires_raw_sessions = ['wordcloud'];
 
-    if (jQuery.inArray(type, requires_session_data) > -1){
+    if (jQuery.inArray(type, requires_session_tallies) > -1){
         url = $('#sessions_link').val();
+    }
+    else if (jQuery.inArray(type, requires_raw_sessions) > -1){
+        url = $('#raw_sessions_link').val();
     }
     else{
         url = $("#projects_link").val();
@@ -468,4 +473,82 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
     });
 }
 
+
+function wordcloud(data, ctx, canvasId) {
+    // List of common filler words to exclude
+    const stopWords = new Set([
+        "the", "and", "is", "in", "at", "of", "a", "an", "to", "for", "with",
+        "on", "by", "it", "this", "that", "from", "as", "be", "are", "was",
+        "were", "has", "have", "had", "but", "or", "not", "which", "we", "you",
+        "they", "he", "she", "it", "i", "me", "my", "mine", "your", "yours",
+        "about", "if", "so", "then", "there", "here", "where", "when", "how",
+        "can", "will", "would", "could", "should", "may", "might", "must",
+        "just",
+    ]);
+
+    // Extract words from all session notes
+    let notesText = data.map(item => item.note || "").join(" ");
+    let canvasElement = $(canvasId)[0];
+
+    // Remove Markdown formatting using regex
+    const cleanText = notesText
+        .replace(/(\*{1,2}|_{1,2}|~{1,2})/g, '') // Remove bold/italic/strikethrough
+        .replace(/#{1,6}\s/g, '') // Remove headers
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim(); // Trim leading/trailing whitespace
+
+    // Count word frequencies, filtering out stop words
+    const wordCounts = {};
+    cleanText.toLowerCase().replace(/\b\w+\b/g, word => {
+        if (!stopWords.has(word) && isNaN(word) && word.length > 2) {
+            wordCounts[word] = (wordCounts[word] || 0) + 1;
+        }
+    });
+
+    // Convert to an array format suitable for wordcloud2.js and limit top N words
+    const wordArray = Object.entries(wordCounts)
+        .sort((a, b) => b[1] - a[1]) // Sort by frequency
+        .slice(0, 100) // Keep top 100 words only
+        .map(([text, weight]) => [text, weight]);
+
+    console.log('wordArray:', wordArray);
+
+    //store the width and height of the canvas element from the previous chart
+    const container = $('#canvas_container');
+    let prev_width = container.clientWidth || window.innerWidth * 0.8; // 80% of viewport width
+    let prev_height = container.clientHeight || window.innerHeight * 0.6; // 60% of viewport height
+
+    console.log('prev_width:', prev_width, 'prev_height:', prev_height);
+
+
+    // Destroy existing chart if it exists
+    let existingChart = Chart.getChart(ctx);
+    if (existingChart) {
+        existingChart.destroy();
+    }
+
+    //resize the canvas element to the previous width and height
+    canvasElement.width = prev_width;
+    canvasElement.height = prev_height
+
+    // Initialize the word cloud
+    // set dynamic size by calculating the grid size based on the word array length and canvas width
+    let dynamicSize = wordArray.length > 50 ? 8 : 16;
+    // set dynamic weight factor based on size of word array frequency
+    let largestFrequency = wordArray[0][1]; // get the largest frequency because they are sorted largest to smallest
+    let dynamicWeightFactor = dynamicSize * 30 / largestFrequency
+
+    WordCloud(canvasElement, {
+        list: wordArray,
+        gridSize: Math.round(dynamicSize * canvasElement.width / 1024),
+        weightFactor: dynamicWeightFactor,
+        fontFamily: 'Times, serif',
+        color: function() {
+            return 'hsl(' + 360 * Math.random() + ', 100%, 70%)';
+        },
+        rotateRatio: 0.5,
+        rotationSteps: 2,
+        backgroundColor: '#f0f0f0'
+    });
+}
 

@@ -1,8 +1,11 @@
 import os
+import re
+
 import pytz
 from AutumnWeb import settings
 from core.forms import *
 from core.utils import *
+from core.wordhandler import WordHandler
 from django.contrib import messages
 from django.db import transaction
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
@@ -924,6 +927,34 @@ def tally_by_sessions(request):
     sessions = filter_sessions_by_params(request, sessions)
     project_durations = tally_project_durations(sessions)
     return Response(project_durations)
+
+@login_required
+@api_view(['GET'])
+def wordcloud_notes(request):
+    handler = WordHandler()
+    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = filter_sessions_by_params(request, sessions)
+    notes_text = " ".join([session.note for session in sessions if session.note])
+
+    # Remove markdown formatting and otherwise clean up the text
+    cleaned = re.sub(r'(\*{1,2}|_{1,2}|~{1,2})', '', notes_text)
+    cleaned = re.sub(r'#{1,6}\s', '', cleaned)
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+    cleaned = cleaned.strip()
+
+    # build list with frequency of each word
+    seen_dict = {}
+    for word in handler.process_list(cleaned.split()):
+        if word in seen_dict:
+            seen_dict[word] += 1
+        else:
+            seen_dict[word] = 1
+
+    # sort the dictionary by frequency
+    sorted_dict = dict(sorted(seen_dict.items(), key=lambda item: item[1], reverse=True))
+    print(sorted_dict)
+    return Response(sorted_dict)
+
 
 
 @login_required
