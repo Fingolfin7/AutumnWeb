@@ -5,7 +5,9 @@ This application allows users to manage projects and subprojects, track time spe
 and visualize tracked data over a given period. It includes features such as session history viewing, 
 word cloud generation from session notes, and dynamic charting for data visualization.
 
-I developed a web based version of the original CLI version to allow users to track their time and projects from anywhere.
+I developed a web based version of the original CLI version to allow users to track their time and projects from anywhere. 
+You can import the data from the CLI version and continue tracking projects and time on the web version. 
+Data is stored in a SQLite database and can be exported to in JSON format for backup purposes or for importing into the CLI version.
 
 I have deployed the application on PythonAnywhere. You can test it out [here](http://fingolfin7.pythonanywhere.com/).
 
