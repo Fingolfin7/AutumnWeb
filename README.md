@@ -54,8 +54,6 @@ To set up the project locally, follow these steps:
 # Additional Information
 
 - **JavaScript Libraries:** The project uses Chart.js for dynamic charting and wordcloud2.js for generating word clouds.
-- **IDE:** The project is developed using PyCharm 2024.2.4.
-- **Operating System:** The project is developed on Windows.
 
 # Pages and Screenshots
 
