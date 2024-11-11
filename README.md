@@ -50,7 +50,6 @@ To set up the project locally, follow these steps:
 8. **Create a superuser:**
     To access the admin panel, create a superuser by running.
     The admin panel can be accessed at `http://127/0.0.1:8000/admin`.
-    ```sh
 
 # Additional Information
 
