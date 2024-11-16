@@ -579,7 +579,7 @@ def export_view(request):
                         'End Time': end_time.strftime('%H:%M:%S'),
                         'Sub-Projects': [subproject.name for subproject in session.subprojects.all()],
                         'Duration': session.duration,
-                        'Note': session.note,
+                        'Note': session.note if session.note else "",
                     })
 
                 export_dict[project_name] = project_obj
