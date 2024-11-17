@@ -98,7 +98,7 @@ class Command(BaseCommand):
                     'End Time': end_time.strftime('%H:%M:%S'),
                     'Sub-Projects': [subproject.name for subproject in session.subprojects.all()],
                     'Duration': session.duration,
-                    'Note': session.note,
+                    'Note': session.note if session.note else "",
                 })
 
             project_data[project_name] = project_obj
