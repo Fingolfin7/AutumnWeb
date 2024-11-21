@@ -79,8 +79,15 @@ class Command(BaseCommand):
                     description=project_data['Description'] if 'Description' in project_data else '',
                 )
 
-                if 'Status' in project_data:  # handle the really old versions from before the status field was added
-                    project.status = status_choices[project_data['Status']]
+                if 'Status' in project_data:  # handle old versions from before the status field was added
+                    # Find the status tuple that matches the project_data['Status']
+                    status_tuple = next(
+                        (status for status in status_choices if status[0] == project_data['Status']), None)
+
+                    if status_tuple:
+                        project.status = status_tuple[0]
+                    else:
+                        raise ValueError(f"Invalid status: {project_data['Status']}")
                 project.save()
 
             # Import or merge subprojects
