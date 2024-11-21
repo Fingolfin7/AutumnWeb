@@ -724,7 +724,6 @@ class CreateSubProjectView(LoginRequiredMixin, CreateView):
         return super().form_invalid(form)
 
 
-
 class UpdateProjectView(LoginRequiredMixin, UpdateView):
     model = Projects
     form_class = UpdateProjectForm

@@ -6,6 +6,7 @@ import logging
 
 logger = logging.getLogger('models')
 
+
 status_choices = (
     ('active', 'Active'),
     ('paused', 'Paused'),
@@ -42,14 +43,18 @@ class Projects(models.Model):
     def get_end(self):
         return datetime.combine(self.last_updated, time())
 
-    def audit_total_time(self):
+    def audit_total_time(self, log=True):
         # Using select_related to fetch related projects in one query
-        logging.info("Auditing total time for project: %s", self.name)
-        logging.info("Total Time before audit: %s", self.total_time)
-        self.total_time = sum(session.duration for session in self.sessions.all() if
-                              session.duration is not None)
+        if log:
+            logger.info(f"Auditing total time for project: {self.name}")
+            logger.info(f"Total Time before audit: {self.total_time}")
+
+        self.total_time = sum(session.duration for session in self.sessions.all() if session.duration is not None)
         self.save()
-        logging.info("Total Time after audit: %s", self.total_time)
+
+        if log:
+            logger.info(f"Total Time after audit: {self.total_time}\n")
+
 
 
 class SubProjects(models.Model):
@@ -76,12 +81,16 @@ class SubProjects(models.Model):
     def get_end(self):
         return datetime.combine(self.last_updated, time())
 
-    def audit_total_time(self):
-        logging.info("Auditing total time for subproject: %s", self.name)
-        logging.info("Total Time before audit: %s", self.total_time)
+    def audit_total_time(self, log=True):
+        if log:
+            logger.info(f"Auditing total time for subproject: {self.name}")
+            logger.info(f"Total Time before audit: {self.total_time}")
+
         self.total_time = sum(session.duration for session in self.sessions.all() if session.duration is not None)
         self.save()
-        logging.info("Total Time after audit: %s", self.total_time)
+
+        if log:
+            logger.info(f"Total Time after audit: {self.total_time}\n")
 
     # when a subproject is deleted, remove it from all its sessions
     def delete(self, *args, **kwargs):
@@ -104,6 +113,11 @@ class Sessions(models.Model):
     class Meta:
         verbose_name_plural = 'Sessions'
         ordering = ['-end_time']
+
+        indexes = [
+            models.Index(fields=['is_active', 'end_time']),  # Optimizes queries that filter active/completed sessions
+            models.Index(fields=['user', 'project']),  # Optimizes lookups by user and project
+        ]
 
     def __str__(self):
         sub_list = [sub.name for sub in self.subprojects.all()]

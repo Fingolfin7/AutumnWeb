@@ -138,11 +138,16 @@ LOGGING = {
         },
     },
     'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
         'signals': {
             'level': 'INFO',
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOG_DIR, 'signals.log'),
-            'maxBytes': 5 * 1024 * 1024,  # Rotate when the file reaches 5MB
+            'maxBytes': 0.5 * 1024 * 1024,  # Rotate when the file reaches half a megabyte
             'backupCount': 5,
             'formatter': 'simple',
         },
@@ -150,7 +155,7 @@ LOGGING = {
             'level': 'INFO',
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
             'filename': os.path.join(LOG_DIR, 'models.log'),
-            'maxBytes': 5 * 1024 * 1024,  # Rotate when the file reaches 5MB
+            'maxBytes': 0.5 * 1024 * 1024,  # Rotate when the file reaches half a megabyte
             'backupCount': 5,
             'formatter': 'simple',
         },
@@ -163,6 +168,11 @@ LOGGING = {
         },
         'models': {
             'handlers': ['models'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,
         },

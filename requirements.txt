@@ -5,5 +5,6 @@ crispy-bootstrap4
 lxml
 Pillow
 concurrent-log-handler
+apscheduler
 markdown
 inflect
