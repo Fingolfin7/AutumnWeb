@@ -24,7 +24,7 @@ class CoreConfig(AppConfig):
                 logger.info("Running audits on all projects and subprojects")
                 projects = Projects.objects.all()
                 for project in projects:
-                    project.audit_total_time(log=False)
+                    project.audit_total_time(log=True)
                     for subproject in SubProjects.objects.filter(parent_project=project):
                         subproject.audit_total_time(log=False)
                 logger.info("Finished audits on projects and subprojects")
