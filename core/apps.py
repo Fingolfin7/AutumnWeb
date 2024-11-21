@@ -5,7 +5,6 @@ from django.conf import settings
 import logging
 import os
 
-# log to screen
 logger = logging.getLogger('models')
 
 
