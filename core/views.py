@@ -364,7 +364,14 @@ def import_stream(request):
                     )
 
                     if 'Status' in project_data:  # handle old versions from before the status field was added
-                        project.status = status_choices[project_data['Status']]
+                        # Find the status tuple that matches the project_data['Status']
+                        status_tuple = next(
+                            (status for status in status_choices if status[0] == project_data['Status']), None)
+
+                        if status_tuple:
+                            project.status = status_tuple[0]
+                        else:
+                            raise ValueError(f"Invalid status: {project_data['Status']}")
                     project.save()
 
                 # Process subprojects
