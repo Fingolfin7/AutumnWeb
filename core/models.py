@@ -139,7 +139,7 @@ class Sessions(models.Model):
         """
         if self.end_time is None and not self.is_active:
             return None
-        elif self.is_active:
+        elif self.is_active and not self.end_time:
             return (timezone.make_aware(datetime.now()) - self.start_time).total_seconds() / 60.0
         else:
             return (self.end_time - self.start_time).total_seconds() / 60.0

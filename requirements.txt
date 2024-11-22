@@ -8,3 +8,4 @@ concurrent-log-handler
 apscheduler
 markdown
 inflect
+django-environ

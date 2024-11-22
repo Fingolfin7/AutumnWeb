@@ -13,8 +13,9 @@ class CoreConfig(AppConfig):
     name = 'core'
 
     def ready(self):
-        if os.environ.get('RUN_MAIN') == 'true': # run the ready method (and therefore the scheduler) only once
-            import core.signals
+        import core.signals  # make sure signals are imported and therefore run
+
+        if os.environ.get('RUN_MAIN') == 'true' and settings.RUN_AUDIT_SCHEDULER:
             from core.models import Projects, SubProjects, Sessions
             scheduler = BackgroundScheduler(timezone=settings.TIME_ZONE)
 
@@ -29,7 +30,7 @@ class CoreConfig(AppConfig):
                 logger.info("Finished audits on projects and subprojects")
 
             # run every hour
-            scheduler.add_job(periodic_audits, 'interval', hours=1,
+            scheduler.add_job(periodic_audits, 'interval', hours=settings.AUDIT_PERIOD,
                               id='periodic_audits',
                               misfire_grace_time=60,
                               # if the job is missed within a 60-second window, it will still run
@@ -38,3 +39,4 @@ class CoreConfig(AppConfig):
                               next_run_time=datetime.now())
 
             scheduler.start()
+            logger.info("Audit scheduler started")
