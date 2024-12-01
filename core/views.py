@@ -1,6 +1,7 @@
 import os
 import re
-
+import plotly.express as px
+import calendar
 import pytz
 from AutumnWeb import settings
 from core.forms import *
@@ -249,6 +250,77 @@ def ChartsView(request):
         'search_form': search_form
     }
     return render(request, 'core/charts.html', context)
+
+
+def plotly_calendar(request):
+
+    if request.method == "GET":
+        search_form = SearchProjectForm(request.GET)
+
+        if not search_form.is_valid():
+            context = {
+                'title': 'Plotly Calendar',
+                'search_form': search_form
+            }
+            return render(request, 'core/plotly.html', context)
+
+        project_name = search_form.cleaned_data.get('project_name', None)
+        start_date = request.GET.get('start_date') if 'start_date' in request.GET else ''
+        end_date = request.GET.get('end_date') if 'end_date' in request.GET else ''
+
+        sessions = Sessions.objects.filter(user=request.user)
+
+        if project_name:
+            sessions = filter_by_projects(sessions, name=project_name)
+
+        start_date = datetime.now().replace(month=1, day=1) if start_date == '' else start_date
+        end_date = datetime.now() if end_date == '' else end_date
+
+        sessions = in_window(sessions, start_date, end_date)
+        daterange = date_range(start_date, end_date)
+        tallies = [[] for _ in range(7)]
+        dates = [[] for _ in range(7)]
+
+        for date in daterange:
+            day_number = date.weekday()
+            sessions_on_date = in_window(sessions, date, date)
+            tallies[day_number].append(tally_sessions(sessions_on_date)/60) # convert to hours
+            dates[day_number].append(date)
+
+        # Ensure all sublists in tallies and dates have the same length
+        max_length = max(max(len(day) for day in tallies), max(len(day) for day in dates))
+
+        for day in tallies:
+            while len(day) < max_length:
+                day.append(0)
+
+        for day in dates:
+            while len(day) < max_length:
+                day.append(None)
+
+        days = list(calendar.day_name)
+
+        fig = px.imshow(tallies,
+                        color_continuous_scale='greens',
+                        x=dates[-1],
+                        y=days,
+                        )
+        # set github contributions colour scheme
+        fig.update_layout(plot_bgcolor='white')
+        fig.update_traces({'xgap': 5, 'ygap': 5})
+        chart = fig.to_html()
+
+        search_form = SearchProjectForm(
+            initial={
+                'project_name': request.GET.get('project_name'),
+                'start_date': request.GET.get('start_date'),
+                'end_date': request.GET.get('end_date'),
+            }
+        )
+
+        context = {'chart': chart, 'search_form': search_form}
+
+        return render(request, 'core/plotly.html', context)
 
 
 def stream_response(message):
@@ -872,7 +944,6 @@ class SessionsListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
         return filter_sessions_by_params(self.request, sessions)
-
 
 class DeleteSessionView(LoginRequiredMixin, DeleteView):
     model = Sessions

@@ -19,6 +19,7 @@ urlpatterns = [
     path('update_session/<int:session_id>/', update_session, name='update_session'),
     path('delete_session/<int:session_id>/', DeleteSessionView.as_view(), name='delete_session'),
     path('charts/', ChartsView, name='charts'),
+    path('plotly/calendar/', plotly_calendar, name='plotly_calendar'),
     path('export/', export_view, name='export'),
     path('import/', import_view, name='import'),
     path('import/stream/', import_stream, name='import_stream'),

@@ -19,7 +19,25 @@ def parse_date_or_datetime(date_str):
     raise ValueError(f"Date string '{date_str}' is not in a recognized format")
 
 
-def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str = None) -> list:
+def date_range(start_date: datetime|str, end_date: datetime|str) -> list[datetime]:
+    """
+    Generate a range of dates between the start and end dates (inclusive)
+    :param start_date: string or datetime object representing the start date. format: %m-%d-%Y or %m-%d-%Y %H:%M:%S
+    :param end_date: string or datetime object representing the end date. format: %m-%d-%Y or %m-%d-%Y %H:%M:%S
+    :return: list of datetime objects representing the range of dates
+    """
+    if isinstance(start_date, str):
+        start_date = parse_date_or_datetime(start_date)
+    if isinstance(end_date, str):
+        end_date = parse_date_or_datetime(end_date)
+
+    if end_date < start_date:
+        raise ValueError("End date must be later than start date")
+
+    return [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+
+
+def in_window(data: QuerySet|list, start: datetime | str = None, end: datetime | str = None) -> list:
     """
     Return a list of items in the data set that fall within the given window. Use this only when you need to
     filter items by the get_start and get_end properties of the items since those cant be used in a filter
@@ -141,6 +159,21 @@ def tally_project_durations(sessions) -> list[dict]:
 
 
     return [{'name': name, 'total_time': total.total_seconds()/60} for name, total in project_durations.items()]
+
+
+def tally_sessions(sessions) -> float:
+    """
+    Tally the total duration of all sessions in the given list. The duration is returned in minutes.
+    :param sessions: iterable of sessions
+    :return: total duration of all sessions
+    """
+    if not sessions:
+        return 0.0
+
+    total = timedelta()
+    for session in sessions:
+        total += session.end_time - session.start_time
+    return total.total_seconds() / 60
 
 
 def session_exists(user, project, start_time, end_time, subproject_names, time_tolerance=timedelta(minutes=2)) -> bool:

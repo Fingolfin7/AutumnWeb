@@ -1,0 +1,64 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+{% load param_replace %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+
+    <script src="{% static 'core/js/search_projects.js' %}" type="text/javascript"></script>
+{% endblock %}
+
+{% block content %}
+    <section id="search_options">
+        <form method="get" id="search_form" class="card flex-row" enctype="multipart/form-data">
+            <div id="search_projects">
+                <span class="label-input">
+                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
+                    {{ search_form.project_name }}
+                    {{ search_form.project.errors }}
+                </span>
+                <span id="project-search-results"></span>
+            </div>
+
+            <span class="label-input" id="filter_start">
+                <label for="start_date"><i class="fa fa-calendar"></i> Start Date</label>
+                {{ search_form.start_date }}
+                {{ search_form.start_date.errors }}
+            </span>
+
+            <span class="label-input" id="filter_end">
+                <label for="end_date"><i class="fa fa-calendar"></i> End Date</label>
+                {{ search_form.end_date }}
+                {{ search_form.end_date.errors }}
+            </span>
+
+{#             <span class="label-input">#}
+{#                <label for="chart_type"><i class="fa fa-chart-bar"></i>Type</label>#}
+{#                <select id="chart_type" name="chart_type">#}
+{#                    <option value="pie">Pie</option>#}
+{#                    <option value="bar">Bar</option>#}
+{#                    <option value="scatter">Scatter</option>#}
+{#                    <option value="calendar">Calendar</option>#}
+{#                    <option value="wordcloud">Wordcloud</option>#}
+{#                </select>#}
+{#            </span>#}
+
+            <span>
+                <button type="submit" class="primary-button" id="draw">
+                    <i class="fa fa-chart-line"></i>
+                    Draw
+                </button>
+            </span>
+        </form>
+    </section>
+
+    <section id="chart_section" class="card">
+
+        <!-- display the graph using chart js -->
+          {{ chart | safe }}
+    </section>
+{% endblock %}
