@@ -17,28 +17,6 @@ def set_session_is_active(sender, instance, **kwargs):
     instance.is_active = not bool(instance.end_time)
 
 
-@receiver(pre_save, sender=Sessions)
-def set_old_duration(sender, instance, **kwargs):
-    """Store the previous duration before save for accurate updates."""
-    if not instance.end_time or instance.is_active:
-        return
-
-    try:
-        if instance.pk:
-            old_instance = Sessions.objects.select_related('project').get(
-                pk=instance.pk,
-                user=instance.user
-            )
-            instance.pre_save_duration = old_instance.duration or 0.0
-        else:
-            instance.pre_save_duration = 0.0
-    except Sessions.DoesNotExist:
-        instance.pre_save_duration = 0.0
-
-    if instance.id:
-        logger.info(f"Setting old duration for session {instance.id} to {instance.pre_save_duration}\n")
-
-
 @receiver(post_save, sender=Sessions)
 def update_project_info(sender, instance, created, **kwargs):
     """Update project and subproject times after session changes."""
@@ -52,28 +30,25 @@ def update_project_info(sender, instance, created, **kwargs):
             'subprojects'
         ).get(pk=instance.pk)
 
-        current_duration = instance.duration or 0.0
-        update_value = current_duration - instance.pre_save_duration
+        update_value = instance.duration or 0.0
 
-        if abs(update_value) >= 1e-9:
+        logger.info(f"Updating session {instance.id}")
+        logger.info(f"Project: {instance.project}")
+        if len(instance.subprojects.all()) > 0:
+            logger.info(f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
+        logger.info(f"Update value: {update_value}")
+        logger.info(f"Previous total: {instance.project.total_time}")
 
-            logger.info(f"Updating session {instance.id}")
-            logger.info(f"Project: {instance.project}")
-            if len(instance.subprojects.all()) > 0:
-                logger.info(f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
-            logger.info(f"Update value: {update_value}")
-            logger.info(f"Previous total: {instance.project.total_time}")
+        # Update project
+        instance.project.total_time = max(0, instance.project.total_time + update_value)
+        instance.project.save()
 
-            # Update project
-            instance.project.total_time = max(0, instance.project.total_time + update_value)
-            instance.project.save()
+        # Update subprojects
+        for sub_project in instance.subprojects.all():
+            sub_project.total_time = max(0, sub_project.total_time + update_value)
+            sub_project.save()
 
-            # Update subprojects
-            for sub_project in instance.subprojects.all():
-                sub_project.total_time = max(0, sub_project.total_time + update_value)
-                sub_project.save()
-
-            logger.info(f"New project total: {instance.project.total_time}\n")
+        logger.info(f"New project total: {instance.project.total_time}\n")
 
         # Update last_updated timestamps
         if instance.end_time > instance.project.last_updated:
@@ -99,7 +74,7 @@ def update_time_on_delete(sender, instance, **kwargs):
             'subprojects'
         ).get(pk=instance.pk)
 
-        update_value = -(instance.duration or 0.0)
+        update_value = -instance.duration or 0.0
 
         logger.info(f"Deleting session {instance.id}")
         logger.info(f"Project: {instance.project}")
