@@ -150,7 +150,6 @@ def update_session(request, session_id: int):
                 new_session.subprojects.add(*subprojects)
                 # no need to call save() since add() saves the m2m relationship
 
-
                 # Delete the current session
                 current_session.delete()
 
@@ -633,7 +632,7 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Projects'
+        context['title'] = 'Autumn'
 
         context['search_form'] = SearchProjectForm(
             initial={
