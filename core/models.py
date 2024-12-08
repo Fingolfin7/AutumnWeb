@@ -139,8 +139,6 @@ class Sessions(models.Model):
         if self.end_time is None and not self.is_active:
             return None
         elif self.is_active and not self.end_time:
-            logger.info(f"Session {self.id} is still active, using datetime.now() to calculate duration")
             return (timezone.make_aware(datetime.now()) - self.start_time).total_seconds() / 60.0
         else:
-            logger.info(f"Session {self.id} is complete, using end_time to calculate duration")
             return (self.end_time - self.start_time).total_seconds() / 60.0
