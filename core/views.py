@@ -147,8 +147,8 @@ def update_session(request, session_id: int):
                     is_active=False
                 )
 
-                new_session.subprojects.set(*subprojects)
-                # no need to call save() since add() and set() saves the m2m relationship
+                new_session.subprojects.add(*subprojects)
+                # no need to call save() since add() saves the m2m relationship
 
 
                 # Delete the current session
