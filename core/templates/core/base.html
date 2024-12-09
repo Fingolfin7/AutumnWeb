@@ -33,12 +33,10 @@
                         <input type="checkbox" id="theme-switch">
                         <span class="slider round"></span>
                     </label>
-                    <div class="profile">
-                        <a href="{% url 'profile' %}" class="plain-link">
-                            <b>{{ user.username }}</b>
-                        </a>
+                    <a href="{% url 'profile' %}" class="plain-link flex-row thirds-width align-center">
+                        <b>{{ user.username }}</b>
                         <img class="profile-pic" src="{{ user.profile.image.url }}" alt="profile picture">
-                    </div>
+                    </a>
                 </div>
             </div>
 
