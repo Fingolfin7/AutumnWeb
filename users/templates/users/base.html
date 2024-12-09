@@ -18,14 +18,15 @@
         {% block head_includes %}
         {% endblock %}
 
-        <link rel="shortcut icon" href="{% static 'core/images/autumn_maple_leaf.avif' %}" type="image/avif">
+        <link rel="shortcut icon" href="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" type="image/png">
     </head>
     <body>
         <div class="container">
             <div class="ribbon"> <!-- ribbon at the top of the page -->
-                <h1 class="main-title">
-                    <a href="{% url 'home' %}" class="plain-link">Autumn</a>
-                </h1>
+                <a href="{% url 'home' %}" class="plain-link flex-row thirds-width align-center">
+                    <img src="{% static 'core/images/clear_autumn_leaf_transparent_slanted.png' %}" class="ribbon-logo">
+                    <h1 class="main-title">Autumn</h1>
+                </a>
                 <div class="ribbon-buttons">
                     <i class="fas fa-bars burger-menu" id="burger-menu"></i> <!-- Added burger menu icon -->
                     <label class="switch">
