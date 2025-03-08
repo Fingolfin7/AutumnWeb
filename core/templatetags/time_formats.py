@@ -49,25 +49,20 @@ def min_formatter(td: timedelta | float | int):
 @register.filter
 def duration_formatter(td: timedelta | float | int):
     """
-    Converts timedelta objects into formatted time strings showing durations. E.g. 1 day 2 hours 28 minutes 56 seconds
-    :param td: timedelta objects
-    :return: string formatted to days, hours, minutes and seconds.
+    Converts timedelta objects into formatted time strings like "1d 2h 30m" or "45m 30s"
     """
     if isinstance(td, (float, int)):
         td = timedelta(minutes=td)
 
     days = td.days
-    d_total = str(td).split(".")[0]  # this gives "d days, HH:MM:SS" or just "HH:MM:SS"
+    hours, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
 
-    if "days" in d_total or "day" in d_total:  # handle cases with days
-        time_part = d_total.split(", ")[1]  # extract HH:MM:SS part
-        d_total = datetime.strptime(time_part, "%H:%M:%S")
-        return f"{days}d {d_total.strftime('%Hh %Mm %Ss')}"
-    else:  # handle cases without days
-        d_total = datetime.strptime(d_total, "%H:%M:%S")
-        if d_total.hour > 0:
-            return d_total.strftime("%Hh %Mm")
-        return d_total.strftime("%Mm %Ss")
+    if days > 0:
+        return f"{days:02d}d {hours:02d}h {minutes:02d}m"
+    if hours > 0:
+        return f"{hours:02d}h {minutes:02d}m"
+    return f"{minutes:02d}m {seconds:02d}s"
 
 
 @register.filter
