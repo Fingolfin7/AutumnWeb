@@ -3,8 +3,8 @@
 {% load time_formats %}
 
 {% block head_includes %}
-    <script src="{% static 'core/js/dynamic_timers.js' %}v?={{ static_version.dynamic_timers.js }}" type="text/javascript"></script>
-    <script src="{% static 'core/js/session_sliders.js' %}v?={{ static_version.session_sliders.js }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers.js }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/session_sliders.js' %}?v={{ static_version.session_sliders.js }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
