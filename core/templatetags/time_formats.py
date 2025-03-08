@@ -56,12 +56,17 @@ def duration_formatter(td: timedelta | float | int):
     if isinstance(td, (float, int)):
         td = timedelta(minutes=td)
 
-    d_total = str(td).split(".")[0]
-    d_total = datetime.strptime(d_total, "%H:%M:%S")
+    days = td.days
+    d_total = str(td).split(".")[0]  # this gives "d days, HH:MM:SS" or just "HH:MM:SS"
 
-    if d_total.hour > 0:
-        return d_total.strftime("%Hh %Mm")
-    else:
+    if "days" in d_total or "day" in d_total:  # handle cases with days
+        time_part = d_total.split(", ")[1]  # extract HH:MM:SS part
+        d_total = datetime.strptime(time_part, "%H:%M:%S")
+        return f"{days}d {d_total.strftime('%Hh %Mm %Ss')}"
+    else:  # handle cases without days
+        d_total = datetime.strptime(d_total, "%H:%M:%S")
+        if d_total.hour > 0:
+            return d_total.strftime("%Hh %Mm")
         return d_total.strftime("%Mm %Ss")
 
 
