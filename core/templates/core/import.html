@@ -2,7 +2,7 @@
 {% load static %}
 
 {% block head_includes %}
-    <script src="{% static 'core/js/stream_server_responses.js' %}"></script>
+    <script src="{% static 'core/js/stream_server_responses.js' %}v?={{ static_version.stream_server_responses.js }}"></script>
 {% endblock %}
 
 {% block content %}
