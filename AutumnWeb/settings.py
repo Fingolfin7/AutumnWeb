@@ -200,6 +200,12 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static')
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
+# Static Versioning
+STATIC_VERSION_CACHE_TIMEOUT = {
+    'debug': 300,     # 5 minutes
+    'production': 3600  # 1 hour
+}
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
