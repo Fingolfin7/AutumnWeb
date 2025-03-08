@@ -118,5 +118,5 @@ class ExportJSONForm(forms.Form):
             'class': 'half-width'
         })
     )
-    autumn_compatible = forms.BooleanField(required=False, initial=True)
+    autumn_compatible = forms.BooleanField(required=False, initial=False)
     compress = forms.BooleanField(required=False, initial=False)
