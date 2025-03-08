@@ -10,7 +10,7 @@ $(document).ready(function () {
         let container = element.parent();
         let containerWidth = container.width();
         let textWidth = element.width();
-        let duration = (textWidth / 250) * 10; // Adjust the speed as needed
+        let duration = (textWidth / 25); // Adjust the speed as needed
 
         function animateText() {
             element.css({ left: containerWidth / 2 });

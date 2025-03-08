@@ -2,9 +2,9 @@ $(document).ready(function() {
 
     function updateDurations() {
         $('.card').each(function() {
-            let startTime = new Date($(this).data('start-time'));
-            let now = new Date();
-            let elapsedTime = now - startTime;
+            let startTime = new Date($(this).data('start-time')).toLocaleString();
+            let now = new Date().toLocaleString();
+            let elapsedTime = new Date(now) - new Date(startTime);
             let formattedDuration = formatTime(elapsedTime);
 
             $(this).find('.timer-duration').text(formattedDuration);
