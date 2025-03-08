@@ -2,6 +2,7 @@ from datetime import timedelta, time, datetime
 
 from django import template
 from django.utils import timezone
+from django.utils.html import format_html
 
 register = template.Library()
 
@@ -88,14 +89,15 @@ def date_formatter(date: datetime | str):
 def time_formatter(date: datetime):
     """
     Converts datetime objects into formatted time strings. E.g. 12:30
+    Outputs both UTC ISO time as data attribute and server time as fallback
     :param date: datetime objects
-    :return: string formatted to hour and minutes.
+    :return: HTML span with UTC time data attribute
     """
     if timezone.is_naive(date):
         date = timezone.make_aware(date)
-    else:
-        date = date.astimezone(timezone.get_default_timezone())
-    return date.strftime("%H:%M:%S")
+    utc_time = date.astimezone(timezone.utc).isoformat()
+    server_time = date.astimezone(timezone.get_default_timezone()).strftime("%H:%M:%S")
+    return format_html('<span data-utc-time="{}">{}</span>', utc_time, server_time)
 
 
 @register.filter

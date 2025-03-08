@@ -48,7 +48,7 @@ $(document).ready(function() {
 
 
     function fillSubprojects(project_name) {
-        let url = $("#list_subs").attr("data-ajax_url");;
+        let url = $("#list_subs").attr("data-ajax_url");
         if (project_name !== "") {
             $('#pick-subprojects').show('slow');
             $('#select-all-block').show('slow');

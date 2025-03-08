@@ -1,23 +1,34 @@
-document.addEventListener('DOMContentLoaded', (event) => {
-    const toggleSwitch = document.querySelector('#theme-switch');
+$(document).ready(function() {
+    const toggleSwitch = $('#theme-switch');
     const currentTheme = localStorage.getItem('theme') || 'light';
-    const burgerMenu = document.getElementById('burger-menu');
-    const container = document.querySelector('.container');
+    const burgerMenu = $('#burger-menu');
+    const container = $('.container');
+    const body = $('body');
 
-    document.body.classList.add(currentTheme + '-mode');
+    body.addClass(currentTheme + '-mode');
+    toggleSwitch.prop('checked', currentTheme === 'dark');
 
-    toggleSwitch.addEventListener('change', function() {
+    toggleSwitch.on('change', function() {
         let theme = 'light';
-        if (this.checked) {
+        if ($(this).prop('checked')) {
             theme = 'dark';
         }
-        document.body.classList.toggle('light-mode', theme === 'light');
-        document.body.classList.toggle('dark-mode', theme === 'dark');
+        body.toggleClass('light-mode', theme === 'light');
+        body.toggleClass('dark-mode', theme === 'dark');
         localStorage.setItem('theme', theme);
     });
 
-    burgerMenu.addEventListener('click', () => {
-        container.classList.toggle('show-sidebar');
+    burgerMenu.on('click', function() {
+        container.toggleClass('show-sidebar');
+    });
 
+    // change all the times to user's local/client time
+    $('[data-utc-time]').each(function() {
+        const utcTime = $(this).data('utcTime');
+        $(this).text(new Date(utcTime).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        }));
     });
 });
