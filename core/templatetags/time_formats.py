@@ -101,6 +101,18 @@ def time_formatter(date: datetime):
 
 
 @register.filter
+def utc_time_formatter(date: datetime):
+    """
+    Converts datetime objects into formatted UTC ISO time strings.
+    :param date: datetime objects
+    :return: string formatted to UTC time.
+    """
+    if timezone.is_naive(date):
+        date = timezone.make_aware(date)
+    return date.astimezone(timezone.utc).isoformat()
+
+
+@register.filter
 def day_date_formatter(date: datetime| str):
     """
     Converts datetime objects into formatted date strings. E.g. Saturday 12 June 2021
