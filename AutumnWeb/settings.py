@@ -31,6 +31,10 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
+# Gemini API Key
+GEMINI_API_KEY = env('GEMINI_API_KEY')
+
+
 ALLOWED_HOSTS = ["*"]
 
 # Application definition
@@ -38,6 +42,7 @@ ALLOWED_HOSTS = ["*"]
 INSTALLED_APPS = [
     'core.apps.CoreConfig',
     'users.apps.UsersConfig',
+    'llm_insights.apps.LlmInsightsConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'rest_framework',
@@ -202,7 +207,7 @@ MEDIA_URL = '/media/'
 
 # Static Versioning
 STATIC_VERSION_CACHE_TIMEOUT = {
-    'debug': 300,     # 5 minutes
+    'debug': 0,     # always refresh in debug mode
     'production': 3600  # 1 hour
 }
 

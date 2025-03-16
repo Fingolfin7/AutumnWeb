@@ -1,0 +1,92 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+{% load markdown_render %}
+{% load param_replace %}
+
+{% block head_includes %}
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects.js }}" type="text/javascript"></script>
+{% endblock %}
+
+{% block content %}
+    <section id="search_options">
+        <form method="get" id="search_form" class="card flex-row" enctype="multipart/form-data">
+            <div id="search_projects">
+                <span class="label-input">
+                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
+                    {{ search_form.project_name }}
+                    {{ search_form.project_name.errors }}
+                </span>
+                <span id="project-search-results"></span>
+            </div>
+
+            <span class="label-input" id="filter_start">
+                <label for="start_date"><i class="fa fa-calendar"></i> Start Date</label>
+                {{ search_form.start_date }}
+                {{ search_form.start_date.errors }}
+            </span>
+
+            <span class="label-input" id="filter_end">
+                <label for="end_date"><i class="fa fa-calendar"></i> End Date</label>
+                {{ search_form.end_date }}
+                {{ search_form.end_date.errors }}
+            </span>
+
+            <span class="label-input">
+                <label for="note_snippet"><i class="fa fa-sticky-note"></i> Note</label>
+                {{ search_form.note_snippet }}
+                {{ search_form.note_snippet.errors }}
+            </span>
+
+            <span>
+                <button type="submit" class="primary-button" id="search_button">
+                    <i class="fa fa-filter"></i>
+                    Filter Sessions
+                </button>
+            </span>
+        </form>
+    </section>
+
+    <section id="sessions-list">
+        {% if not sessions %}
+            <div class="full-width centered-pic">
+                <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}"
+                 alt="No sessions found">
+            </div>
+        {% else %}
+            <h2 class="text-center">Sessions Selected for Analysis</h2>
+            <br>
+            <div class="card">
+                <h3>Selected Sessions: {{ sessions.count }}</h3>
+                <p>Date Range: 
+                    <span class="text-cyan">{{ sessions.last.start_time }}</span> to
+                    <span class="text-cyan">{{ sessions.first.end_time }}</span>
+                </p>
+
+                <br><br>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <textarea name="prompt" id="prompt" rows="3" class="full-width"
+                                  placeholder="Analysis Prompt (optional). Add specific questions or focus areas for the analysis..."></textarea>
+                    <button type="submit" class="primary-button">
+                        <i class="fa fa-chart-bar"></i>
+                        Generate Insights
+                    </button>
+                </form>
+            </div>
+            
+            {% if insights %}
+                <div class="card">
+                    <h3 class="text-center">AI Analysis Results</h3>
+                    <div class="session-note">
+                        {{ insights|linebreaks|urlize }}
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
+    </section>
+{% endblock %}
