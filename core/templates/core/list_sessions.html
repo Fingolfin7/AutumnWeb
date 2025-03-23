@@ -97,7 +97,7 @@
                     {% if session.note %}
                         <div class="session-note-slider">
                             <span class="text-yellow session-note" id="note-{{ session.id }}">
-                                {{ session.note | markdown | safe }} <!-- safe is used to render html -->
+                                {{ session.note | markdown | safe | urlize }} <!-- safe is used to render html -->
                             </span>
                         </div>
                     {% endif %}

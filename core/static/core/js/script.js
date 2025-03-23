@@ -13,8 +13,12 @@ $(document).ready(function() {
         if ($(this).prop('checked')) {
             theme = 'dark';
         }
-        body.toggleClass('light-mode', theme === 'light');
-        body.toggleClass('dark-mode', theme === 'dark');
+        
+        // Remove both classes first
+        body.removeClass('light-mode dark-mode');
+        // Add the appropriate class
+        body.addClass(theme + '-mode');
+        
         localStorage.setItem('theme', theme);
     });
 
@@ -31,4 +35,10 @@ $(document).ready(function() {
             second: '2-digit'
         }));
     });
+    
+    // Scroll chat to bottom when page loads
+    const conversationContainer = document.getElementById('conversation-container');
+    if (conversationContainer) {
+        conversationContainer.scrollTop = conversationContainer.scrollHeight;
+    }
 });

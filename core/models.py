@@ -49,7 +49,8 @@ class Projects(models.Model):
             logger.info(f"Auditing total time for project: {self.name}")
             logger.info(f"Total Time before audit: {self.total_time}")
 
-        self.total_time = sum(session.duration for session in self.sessions.all() if session.duration is not None)
+        self.total_time = sum(
+            session.duration for session in self.sessions.filter(is_active=False) if session.duration is not None)
         self.save()
 
         if log:
@@ -86,7 +87,8 @@ class SubProjects(models.Model):
             logger.info(f"Auditing total time for subproject: {self.name}")
             logger.info(f"Total Time before audit: {self.total_time}")
 
-        self.total_time = sum(session.duration for session in self.sessions.all() if session.duration is not None)
+        self.total_time = sum(
+            session.duration for session in self.sessions.filter(is_active=False) if session.duration is not None)
         self.save()
 
         if log:

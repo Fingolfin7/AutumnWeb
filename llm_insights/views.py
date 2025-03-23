@@ -1,58 +1,98 @@
-from datetime import datetime, timedelta
-
-from django.contrib.admin.templatetags.admin_list import search_form
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.utils import timezone
-
-from core.models import Sessions, Projects, SubProjects
+from django.contrib import messages
+from core.models import Sessions
 from core.forms import SearchProjectForm
-from core.utils import filter_by_projects, in_window, parse_date_or_datetime, filter_sessions_by_params
+from core.utils import filter_sessions_by_params
 import json
-from google import genai
-from AutumnWeb import settings
+from .llm_handlers import get_llm_handler
 
 
-def perform_llm_analysis(sessions, user_prompt=""):
-    # Prepare session data in a format suitable for LLM
-    session_data = []
+def prep_session_data(sessions):
+    projects_data = {}
+
+
     for session in sessions:
-        session_data.append({
-            'project': session.project.name,
-            'subprojects': [sp.name for sp in session.subprojects.all()],
-            'date': session.end_time.strftime('%Y-%m-%d'),
-            'start_time': session.start_time.strftime('%H:%M:%S'),
-            'end_time': session.end_time.strftime('%H:%M:%S'),
-            'duration_minutes': session.duration,
-            'note': session.note or ""
-        })
+        project_name = session.project.name
 
-    # Basic prompt with user's custom prompt
-    base_prompt = f"""
-    You are an expert project and time tracking analyst. Your job is to analyze projects, sessions, 
-    and session logs to provide insights based on the data provided.
-    
-    The user's name is {sessions[0].user.username} and this application is known as "Autumn".
-    
-    If possible please quote the session notes and dates/times for any insights you provide.
-    
-    User Prompt: {user_prompt}
+        # Initialize project entry if it doesn't exist
+        if project_name not in projects_data:
+            projects_data[project_name] = {
+                "Total Time": 0,
 
-    Sessions data:
-    {json.dumps(session_data, indent=2)}
-    """
+                "Status": session.project.status if hasattr(session.project, 'status') else "",
+                "Description": session.project.description if hasattr(session.project, 'description') else "",
+                "Sub Projects": {},
+                "Session History": []
+            }
 
-    # call gemini API
-    try:
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        # Add session duration to total
+        projects_data[project_name]["Total Time"] += session.duration
 
-        response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=base_prompt)
+        # Track subprojects
+        subprojects = [sp.name for sp in session.subprojects.all()]
+        for subproject in subprojects:
+            if subproject not in projects_data[project_name]["Sub Projects"]:
+                projects_data[project_name]["Sub Projects"][subproject] = 0
+            projects_data[project_name]["Sub Projects"][subproject] += session.duration
 
-        return response.text
-    except Exception as e:
-        return f"Error performing analysis: {str(e)}"
+        # Add session to history
+        session_entry = {
+            "Date": session.end_time.strftime('%m-%d-%Y'),
+            "Start Time": session.start_time.strftime('%H:%M:%S'),
+            "End Time": session.end_time.strftime('%H:%M:%S'),
+            "Sub-Projects": subprojects,
+            "Duration": session.duration,
+            "Note": session.note or ""
+        }
+        projects_data[project_name]["Session History"].append(session_entry)
+
+    return json.dumps(projects_data, indent=2)
+
+
+def perform_llm_analysis(sessions, user_prompt="", conversation_history=None, sessions_updated=False):
+    # Get the appropriate LLM handler (configurable from settings in the future)
+    llm_handler = get_llm_handler(provider="gemini")
+
+    # Initialize conversation if it's first message
+    if conversation_history is None or not conversation_history:
+        # Prepare session data in a format suitable for LLM
+        session_data = prep_session_data(sessions)
+        print(f"Session data prepared: {session_data}")
+
+        system_prompt = f"""
+        You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
+        and session logs to provide insights based on the data provided.
+
+        The user's name is {sessions[0].user.username} and this application is known as "Autumn".
+
+        If possible please quote the session notes and dates/times for any insights you provide.
+
+        Sessions data:
+        {session_data}
+        """
+        conversation_history = llm_handler.initialize_chat(system_prompt)
+    else:
+        # Load saved conversation
+        llm_handler.load_conversation(conversation_history)
+
+        # If sessions were updated, update the session data
+        if sessions_updated:
+            # Prepare session data in a format suitable for LLM
+            session_data = prep_session_data(sessions)
+            print(f"Session data prepared: {session_data}")
+
+            llm_handler.update_session_data(session_data)
+            conversation_history = llm_handler.get_conversation_history()
+
+    # Send user message if provided
+    if user_prompt:
+        assistant_response = llm_handler.send_message(user_prompt)
+        conversation_history = llm_handler.get_conversation_history()
+        return assistant_response, conversation_history
+
+    return None, conversation_history
+
 
 @login_required
 def insights_view(request):
@@ -60,10 +100,32 @@ def insights_view(request):
     sessions = filter_sessions_by_params(request, sessions)
 
     insights = None
+    conversation_history = request.session.get('conversation_history', None)
+
+    # Set flag if sessions were just filtered
+    sessions_updated = bool(request.GET and any(request.GET.values()))
+    if sessions_updated:
+        messages.success(request, "Session selection updated. The AI has been informed about the new data.")
 
     if sessions and request.method == "POST":
-        # User has submitted sessions for analysis
-        insights = perform_llm_analysis(sessions, request.POST.get('prompt', ''))
+        # User has submitted a message for the conversation
+        user_prompt = request.POST.get('prompt', '')
+
+        if 'reset_conversation' in request.POST:
+            # User requested to reset the conversation
+            conversation_history = None
+            request.session['conversation_history'] = None
+            sessions_updated = False
+        else:
+            # Continue the conversation
+            insights, conversation_history = perform_llm_analysis(
+                sessions,
+                user_prompt,
+                conversation_history,
+                sessions_updated=sessions_updated
+            )
+            # Save conversation to session
+            request.session['conversation_history'] = conversation_history
 
     context = {
         'title': 'Session Analysis',
@@ -76,7 +138,9 @@ def insights_view(request):
             }
         ),
         'sessions': sessions,
-        'insights': insights
+        'insights': insights,
+        'conversation_history': conversation_history,
+        'sessions_updated': sessions_updated
     }
 
     return render(request, 'llm_insights/insights.html', context)

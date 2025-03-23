@@ -1,10 +1,28 @@
-.dodgerblue{ background-color: dodgerblue !important; color: white;}
-.dark-red{background-color: rgb(199, 0, 57) !important; color: white;}
-.blue-grey{ background-color: rgb(115, 147, 179) !important; color: white;}
-.cobalt-blue{ background-color: rgb(0, 71, 171) !important; color: white;}
-.forestgreen{ background-color: rgb(34, 139, 34) !important; color: white;}
-.ferngreen{ background-color: rgb(79, 121, 66) !important; color: white;}
-.kellygreen{ background-color: rgb(76, 187, 23) !important; color: white;}
-.lincolngreen{ background-color: rgb(71, 135, 120) !important; color: white;}
-.cadmium-red{ background-color: rgb(210, 43, 43) !important; color: white;}
-.transparent-white{background-color: rgba(255, 255, 255, 0.2) !important;}
+:root {
+  /* Background colors */
+  --color-dodgerblue: dodgerblue;
+  --color-dark-red: rgb(199, 0, 57);
+  --color-blue-grey: rgb(115, 147, 179);
+  --color-cobalt-blue: rgb(0, 71, 171);
+  --color-forestgreen: rgb(34, 139, 34);
+  --color-ferngreen: rgb(79, 121, 66);
+  --color-kellygreen: rgb(76, 187, 23);
+  --color-lincolngreen: rgb(71, 135, 120);
+  --color-cadmium-red: rgb(210, 43, 43);
+  --color-transparent-white: rgba(255, 255, 255, 0.2);
+
+  /* Text color */
+  --color-text-light: white;
+}
+
+/* Using the variables */
+.dodgerblue { background-color: var(--color-dodgerblue) !important; color: var(--color-text-light); }
+.dark-red { background-color: var(--color-dark-red) !important; color: var(--color-text-light); }
+.blue-grey { background-color: var(--color-blue-grey) !important; color: var(--color-text-light); }
+.cobalt-blue { background-color: var(--color-cobalt-blue) !important; color: var(--color-text-light); }
+.forestgreen { background-color: var(--color-forestgreen) !important; color: var(--color-text-light); }
+.ferngreen { background-color: var(--color-ferngreen) !important; color: var(--color-text-light); }
+.kellygreen { background-color: var(--color-kellygreen) !important; color: var(--color-text-light); }
+.lincolngreen { background-color: var(--color-lincolngreen) !important; color: var(--color-text-light); }
+.cadmium-red { background-color: var(--color-cadmium-red) !important; color: var(--color-text-light); }
+.transparent-white { background-color: var(--color-transparent-white) !important; }

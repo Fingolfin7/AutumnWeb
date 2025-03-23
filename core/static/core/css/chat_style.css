@@ -1,0 +1,66 @@
+@import url('style.css'); /* Import variables from style.css */
+@import url('colours.css');
+
+
+.conversation-container {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    padding: 10px;
+    border-radius: 5px;
+    transition: background-color 0.3s, border-color 0.3s;
+}
+
+.dark-mode .conversation-container {
+    border: 1px solid #555;
+    background-color: transparent;
+}
+
+.light-mode .conversation-container {
+    border: 1px solid #ccc;
+    background-color: transparent;
+}
+
+.user-message, .assistant-message {
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 10px;
+    max-width: 80%;
+    transition: background-color 0.3s;
+}
+
+.dark-mode .user-message {
+    background-color: var(--color-ferngreen);
+    color: var(--dark-text);
+    margin-left: auto;
+    text-align: right;
+}
+
+.dark-mode .assistant-message {
+    background-color: var(--color-forestgreen);
+    color: var(--dark-text);
+    margin-right: auto;
+}
+
+.light-mode .user-message {
+    background-color: var(--color-dodgerblue);
+    color: var(--light-text);
+    margin-left: auto;
+    text-align: right;
+}
+
+.light-mode .assistant-message {
+    background-color: var(--color-blue-grey);
+    color: var(--light-text);
+    margin-right: auto;
+}
+
+.message-content {
+    word-wrap: break-word;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
