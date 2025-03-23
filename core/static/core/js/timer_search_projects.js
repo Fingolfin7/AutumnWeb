@@ -77,7 +77,6 @@ $(document).ready(function() {
                     select: function(event, ui) {
                         // Call fillSubprojects when a project is selected
                         fillSubprojects(ui.item.value);
-                        updateCreateSubprojectsLink(ui.item.value);
                     }
                 });
             }
