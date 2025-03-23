@@ -2,9 +2,10 @@ $(document).ready(function () {
     $('.session-note').each(function () {
         addSlider($(this));
     });
-    $('.project-name').each(function (){
-        addSlider($(this));
-    });
+    // $('.project-name-slider').each(function (){
+    //     addSlider($(this));
+    //     console.log($(this));
+    // });
 
     function addSlider(element) {
         let container = element.parent();
@@ -14,13 +15,17 @@ $(document).ready(function () {
 
         function animateText() {
             element.css({ left: containerWidth / 2 });
-           element.animate({ left: -textWidth }, duration * 1000, 'linear', function () {
+            element.animate({ left: -textWidth }, duration * 1000, 'linear', function () {
                 animateText();
             });
         }
 
+
+
         if (textWidth > containerWidth) {
             animateText();
+            console.log(textWidth);
+            console.log(containerWidth);
         }
     }
 });

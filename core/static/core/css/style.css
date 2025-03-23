@@ -415,10 +415,6 @@ input:checked + .slider:before {
     position: relative;
 }
 
-.project-name-slider {
-    max-width: 10rem; /* Adjust width as needed */
-}
-
 .session-note, .project-name {
     display: inline-block;
     white-space: nowrap;
