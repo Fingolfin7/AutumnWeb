@@ -58,7 +58,6 @@ def perform_llm_analysis(sessions, user_prompt="", conversation_history=None, se
     if conversation_history is None or not conversation_history:
         # Prepare session data in a format suitable for LLM
         session_data = prep_session_data(sessions)
-        print(f"Session data prepared: {session_data}")
 
         system_prompt = f"""
         You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
@@ -80,7 +79,6 @@ def perform_llm_analysis(sessions, user_prompt="", conversation_history=None, se
         if sessions_updated:
             # Prepare session data in a format suitable for LLM
             session_data = prep_session_data(sessions)
-            print(f"Session data prepared: {session_data}")
 
             llm_handler.update_session_data(session_data)
             conversation_history = llm_handler.get_conversation_history()
