@@ -1,5 +1,7 @@
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
+from django.views.generic import View
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.cache import cache
 from django.contrib import messages
 from core.models import Sessions
 from core.forms import SearchProjectForm
@@ -50,36 +52,14 @@ def prep_session_data(sessions):
     return json.dumps(projects_data, indent=2)
 
 
-def perform_llm_analysis(sessions, user_prompt="", conversation_history=None, sessions_updated=False):
-    # Get the appropriate LLM handler (configurable from settings in the future)
-    llm_handler = get_llm_handler(provider="gemini")
-
-    # Initialize conversation if it's first message
+def perform_llm_analysis(llm_handler, sessions, user_prompt="", username="", conversation_history=None, sessions_updated=False):
     if conversation_history is None or not conversation_history:
-        # Prepare session data in a format suitable for LLM
         session_data = prep_session_data(sessions)
-
-        system_prompt = f"""
-        You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
-        and session logs to provide insights based on the data provided.
-
-        The user's name is {sessions[0].user.username} and this application is known as "Autumn".
-
-        If possible please quote the session notes and dates/times for any insights you provide.
-
-        Sessions data:
-        {session_data}
-        """
-        conversation_history = llm_handler.initialize_chat(system_prompt)
+        _, conversation_history = llm_handler.initialize_chat(username, session_data)
     else:
-        # Load saved conversation
-        llm_handler.load_conversation(conversation_history)
-
         # If sessions were updated, update the session data
         if sessions_updated:
-            # Prepare session data in a format suitable for LLM
             session_data = prep_session_data(sessions)
-
             llm_handler.update_session_data(session_data)
             conversation_history = llm_handler.get_conversation_history()
 
@@ -92,53 +72,84 @@ def perform_llm_analysis(sessions, user_prompt="", conversation_history=None, se
     return None, conversation_history
 
 
-@login_required
-def insights_view(request):
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
-    sessions = filter_sessions_by_params(request, sessions)
+class InsightsView(LoginRequiredMixin, View):
+    def get(self, request):
+        sessions = Sessions.objects.filter(is_active=False, user=request.user)
+        sessions = filter_sessions_by_params(request, sessions)
 
-    insights = None
-    conversation_history = request.session.get('conversation_history', None)
+        # Set flag if sessions were just filtered
+        sessions_updated = bool(request.GET and any(request.GET.values()))
+        if sessions_updated:
+            messages.success(request, "Session selection updated. The AI has been informed about the new data.")
 
-    # Set flag if sessions were just filtered
-    sessions_updated = bool(request.GET and any(request.GET.values()))
-    if sessions_updated:
-        messages.success(request, "Session selection updated. The AI has been informed about the new data.")
+        context = {
+            'title': 'Session Analysis',
+            'search_form': SearchProjectForm(
+                initial={
+                    'project_name': request.GET.get('project_name'),
+                    'start_date': request.GET.get('start_date'),
+                    'end_date': request.GET.get('end_date'),
+                    'note_snippet': request.GET.get('note_snippet'),
+                }
+            ),
+            'sessions': sessions,
+            'conversation_history': request.session.get('conversation_history', None),
+            'sessions_updated': sessions_updated
+        }
 
-    if sessions and request.method == "POST":
-        # User has submitted a message for the conversation
-        user_prompt = request.POST.get('prompt', '')
+        return render(request, 'llm_insights/insights.html', context)
+
+    def post(self, request):
+        sessions = Sessions.objects.filter(is_active=False, user=request.user)
+        sessions = filter_sessions_by_params(request, sessions)
+        sessions_updated = False
+        conversation_history = request.session.get('conversation_history', None)
+
+        # Get cached handler or create new one
+        handler_key = f"llm_handler_{request.user.id}"
+        handler = cache.get(handler_key)
+
+        if not handler:
+            handler = get_llm_handler(provider="gemini")
+            cache.set(handler_key, handler, 3600)  # Cache for 1 hour
+
+        print(handler.chat.get_history())
 
         if 'reset_conversation' in request.POST:
-            # User requested to reset the conversation
+            # Reset conversation
             conversation_history = None
             request.session['conversation_history'] = None
-            sessions_updated = False
+            cache.delete(handler_key)  # Clear the cached handler
         else:
-            # Continue the conversation
+            user_prompt = request.POST.get('prompt', '')
+
+            # Process the conversation
             insights, conversation_history = perform_llm_analysis(
-                sessions,
-                user_prompt,
-                conversation_history,
+                llm_handler=handler,
+                sessions=sessions,
+                user_prompt=user_prompt,
+                username=request.user.username,
+                conversation_history=conversation_history,
                 sessions_updated=sessions_updated
             )
-            # Save conversation to session
+
+            # Update cache and session
+            cache.set(handler_key, handler, 3600)
             request.session['conversation_history'] = conversation_history
 
-    context = {
-        'title': 'Session Analysis',
-        'search_form': SearchProjectForm(
-            initial={
-                'project_name': request.GET.get('project_name'),
-                'start_date': request.GET.get('start_date'),
-                'end_date': request.GET.get('end_date'),
-                'note_snippet': request.GET.get('note_snippet'),
-            }
-        ),
-        'sessions': sessions,
-        'insights': insights,
-        'conversation_history': conversation_history,
-        'sessions_updated': sessions_updated
-    }
+        context = {
+            'title': 'Session Analysis',
+            'search_form': SearchProjectForm(
+                initial={
+                    'project_name': request.GET.get('project_name'),
+                    'start_date': request.GET.get('start_date'),
+                    'end_date': request.GET.get('end_date'),
+                    'note_snippet': request.GET.get('note_snippet'),
+                }
+            ),
+            'sessions': sessions,
+            'conversation_history': conversation_history,
+            'sessions_updated': sessions_updated
+        }
 
-    return render(request, 'llm_insights/insights.html', context)
+        return render(request, 'llm_insights/insights.html', context)

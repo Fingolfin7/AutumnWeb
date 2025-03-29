@@ -96,13 +96,13 @@
                                 {% if message.role == 'user' %}
                                     <div class="user-message">
                                         <div class="message-content">
-                                            {{ message.content|markdown|safe|linebreaks|urlize }}
+                                            {{ message.content|markdown|safe|linebreaks }}
                                         </div>
                                     </div>
                                 {% elif message.role == 'assistant' %}
                                     <div class="assistant-message">
                                         <div class="message-content">
-                                            {{ message.content|markdown|safe|linebreaks|urlize }}
+                                            {{ message.content|markdown|safe|linebreaks }}
                                         </div>
                                     </div>
                                 {% endif %}
