@@ -33,8 +33,8 @@ class InsightsView(LoginRequiredMixin, View):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
         sessions = filter_sessions_by_params(request, sessions)
 
-        # Set flag if sessions were just filtered
-        sessions_updated = bool(request.GET and any(request.GET.values()))
+        # Set flag if the filter button was pressed
+        sessions_updated = 'filter' in request.GET
         request.session["sessions_updated"] = sessions_updated
         if sessions_updated:
             messages.success(request, "Session selection updated. The AI has been informed about the new data.")
