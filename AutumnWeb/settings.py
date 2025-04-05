@@ -74,6 +74,13 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache', # was running into issues with PickleCache due to thread locking
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
 ROOT_URLCONF = 'AutumnWeb.urls'
 
 TEMPLATES = [
