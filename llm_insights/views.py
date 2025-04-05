@@ -69,7 +69,7 @@ class InsightsView(LoginRequiredMixin, View):
         # Retrieve selected model from form with default
         selected_model = request.POST.get("model", "gemini-2.0-flash")
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
-        handler = IN_MEM_CACHE[handler_key]
+        handler =  IN_MEM_CACHE[handler_key] if handler_key in IN_MEM_CACHE else None
 
         if not handler:
             handler = get_llm_handler(model=selected_model)
