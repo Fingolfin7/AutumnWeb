@@ -143,52 +143,33 @@ class GeminiHandler(BaseLLMHandler):
 
     def send_message(self, message):
         """Send a message to the LLM and return the response"""
-        if len(self.conversation_history) == 0:
-            # send system prompt along with user message
-            initial_prompt = self.system_prompt_template.format(
-                username=self.username,
-                user_prompt=message,
-                session_data=self.session_data
-            )
-            response = self.chat.send_message(initial_prompt)
-            self.conversation_history.append({"role": "system", "content": initial_prompt})
-            self.conversation_history.append({"role": "user", "content": message}) # for display purposes, only show what the user sent
-        else:
-            self.conversation_history.append({"role": "user", "content": message})
-            response = self.chat.send_message(message)
+        try:
+            if len(self.conversation_history) == 0:
+                # send system prompt along with user message
+                initial_prompt = self.system_prompt_template.format(
+                    username=self.username,
+                    user_prompt=message,
+                    session_data=self.session_data
+                )
+                response = self.chat.send_message(initial_prompt)
+                self.conversation_history.append({"role": "system", "content": initial_prompt})
+                self.conversation_history.append(
+                    {"role": "user", "content": message})  # for display purposes, only show what the user sent
+            else:
+                self.conversation_history.append({"role": "user", "content": message})
+                response = self.chat.send_message(message)
 
-        # Extract response text
-        assistant_response = response.text
+            # Extract response text
+            assistant_response = response.text
 
-        # Add assistant response to our conversation history
-        self.conversation_history.append({"role": "assistant", "content": assistant_response})
+            # Add assistant response to our conversation history
+            self.conversation_history.append({"role": "assistant", "content": assistant_response})
 
-        return assistant_response
-        # try:
-        #     if len(self.conversation_history) == 0:
-        #         # send system prompt along with user message
-        #         initial_prompt = self.system_prompt_template(
-        #             username = self.username,
-        #             user_prompt = message,
-        #             session_data = self.session_data
-        #         )
-        #     # Add user message to our conversation history
-        #     self.conversation_history.append({"role": "user", "content": message})
-        #
-        #     # Send message to Gemini
-        #     response = self.chat.send_message(message)
-        #
-        #     # Extract response text
-        #     assistant_response = response.text
-        #
-        #     # Add assistant response to our conversation history
-        #     self.conversation_history.append({"role": "assistant", "content": assistant_response})
-        #
-        #     return assistant_response
-        # except Exception as e:
-        #     error_msg = f"Error communicating with Gemini: {str(e)}"
-        #     self.conversation_history.append({"role": "assistant", "content": error_msg})
-        #     return error_msg
+            return assistant_response
+        except Exception as e:
+            error_msg = f"Error communicating with Gemini: {str(e)}"
+            self.conversation_history.append({"role": "assistant", "content": error_msg})
+            return error_msg
 
     def get_conversation_history(self):
         """Return standardized conversation history"""

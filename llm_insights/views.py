@@ -6,7 +6,6 @@ from django.contrib import messages
 from core.models import Sessions
 from core.forms import SearchProjectForm
 from core.utils import filter_sessions_by_params
-import json
 from .llm_handlers import get_llm_handler
 
 
