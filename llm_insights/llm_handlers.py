@@ -85,6 +85,7 @@ class GeminiHandler(BaseLLMHandler):
         The user's name is {username} and this application is known as "Autumn".
 
         If possible please quote the session notes and dates/times for any insights you provide.
+        All time and duration values are in minutes.
         
         When formating text and links please use markdown formatting.
         
@@ -97,7 +98,11 @@ class GeminiHandler(BaseLLMHandler):
 
         self.update_session_data_template = """
         {username} has updated their session data. 
-        Please refer to the new session data for the remainder of the conversation.
+        Refer to the new session data for the remainder of the conversation.
+        If possible please quote the session notes and dates/times for any insights you provide.
+        All time and duration values are in minutes.
+        
+        When formating text and links please use markdown formatting.
         
         Here is {username}'s prompt:
         {user_prompt}
@@ -191,9 +196,12 @@ class GeminiHandler(BaseLLMHandler):
 
 
 # Factory function to get the appropriate handler
-def get_llm_handler(provider="gemini", model=""):
-    if provider.lower() == "gemini":
+def get_llm_handler(model=""):
+    gemini_models = ["gemini-2.0-flash", "gemini-2.0",
+                     "gemini-2.0-flash-lite", "gemini-2.5-pro-exp-03-25",
+                     "gemini-2.0-flash-thinking-exp-01-21"]
+    if model.lower() in gemini_models:
         return GeminiHandler(model=model)
     # Add more handlers here as needed
     else:
-        raise ValueError(f"Unsupported LLM provider: {provider}")
+        raise ValueError(f"Unsupported model provider: {model}")

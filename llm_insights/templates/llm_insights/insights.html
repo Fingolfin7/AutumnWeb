@@ -76,9 +76,11 @@
             <div class="card">
                 <h3>Selected Sessions: {{ sessions.count }}</h3>
                 <p>Date Range: 
-                    <span class="text-cyan">{{ sessions.last.start_time }}</span> to
-                    <span class="text-cyan">{{ sessions.first.end_time }}</span>
+                    <span class="text-cyan">{{ sessions.last.start_time|day_date_formatter }}</span> to
+                    <span class="text-cyan">{{ sessions.first.end_time|day_date_formatter }}</span>
                 </p>
+
+                <br>
 
                 <form method="post" class="chat-form">
                     {% csrf_token %}
@@ -88,7 +90,18 @@
                             <i class="fa fa-redo"></i>
                             Reset Conversation
                         </button>
+
+                        <span class="label-input">
+                            <label for="model">Model</label>
+                            <select id="model" name="model">
+                                <option value="gemini-2.0-flash" {% if selected_model == "gemini-2.0-flash" %}selected{% endif %}>Gemini 2.0 Flash</option>
+                                <option value="gemini-2.0-flash-lite" {% if selected_model == "gemini-2.0-flash-lite" %}selected{% endif %}>Gemini 2.0 Flash-Lite</option>
+                                <option value="gemini-2.5-pro-exp-03-25" {% if selected_model == "gemini-2.5-pro-exp-03-25" %}selected{% endif %}>Gemini 2.5 Pro Experimental</option>
+                                <option value="gemini-2.0-flash-thinking-exp-01-21" {% if selected_model == "gemini-2.0-flash-thinking-exp-01-21" %}selected{% endif %}>Gemini 2.0 Flash Thinking</option>
+                            </select>
+                        </span>
                     </div>
+
 
                     <div id="conversation-container" class="conversation-container">
                         {% if conversation_history %}

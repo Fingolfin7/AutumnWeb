@@ -52,7 +52,8 @@ class InsightsView(LoginRequiredMixin, View):
             ),
             'sessions': sessions,
             'conversation_history': request.session.get('conversation_history', None),
-            'sessions_updated': sessions_updated
+            'sessions_updated': sessions_updated,
+            'selected_model': request.GET.get('model', "gemini-2.0-flash")
         }
 
         return render(request, 'llm_insights/insights.html', context)
@@ -63,15 +64,14 @@ class InsightsView(LoginRequiredMixin, View):
         sessions_updated = request.session.get("sessions_updated", False)
         conversation_history = request.session.get('conversation_history', None)
 
-        # Get cached handler or create new one
-        handler_key = f"llm_handler_{request.user.id}"
+        # Retrieve selected model from form with default
+        selected_model = request.POST.get("model", "gemini-2.0-flash")
+        handler_key = f"llm_handler_{request.user.id}_{selected_model}"
         handler = cache.get(handler_key)
 
         if not handler:
-            handler = get_llm_handler(provider="gemini")
+            handler = get_llm_handler(model=selected_model)
             cache.set(handler_key, handler, 3600)  # Cache for 1 hour
-
-        print(handler.chat.get_history())
 
         if 'reset_conversation' in request.POST:
             # Reset conversation
@@ -110,7 +110,8 @@ class InsightsView(LoginRequiredMixin, View):
             ),
             'sessions': sessions,
             'conversation_history': conversation_history,
-            'sessions_updated': sessions_updated
+            'sessions_updated': sessions_updated,
+            'selected_model': selected_model,
         }
 
         return render(request, 'llm_insights/insights.html', context)
