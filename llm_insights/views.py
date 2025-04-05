@@ -9,6 +9,9 @@ from core.utils import filter_sessions_by_params
 from .llm_handlers import get_llm_handler
 
 
+IN_MEM_CACHE = {}
+
+
 def perform_llm_analysis(llm_handler, sessions, user_prompt="", username="", conversation_history=None, sessions_updated=False):
     if conversation_history is None or not conversation_history:
         llm_handler.initialize_chat(username, sessions)
@@ -66,18 +69,18 @@ class InsightsView(LoginRequiredMixin, View):
         # Retrieve selected model from form with default
         selected_model = request.POST.get("model", "gemini-2.0-flash")
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
-        handler = cache.get(handler_key)
+        handler = IN_MEM_CACHE[handler_key]
 
         if not handler:
             handler = get_llm_handler(model=selected_model)
-            cache.set(handler_key, handler, 3600)  # Cache for 1 hour
+            IN_MEM_CACHE[handler_key] = handler
 
         if 'reset_conversation' in request.POST:
             # Reset conversation
             conversation_history = None
             request.session['conversation_history'] = None
             request.session['sessions_updated'] = False
-            cache.delete(handler_key)  # Clear the cached handler
+            IN_MEM_CACHE.pop(handler_key)
         else:
             user_prompt = request.POST.get('prompt', '')
 
@@ -93,7 +96,6 @@ class InsightsView(LoginRequiredMixin, View):
 
             # Update cache and session
             sessions_updated = False
-            cache.set(handler_key, handler, 3600)
             request.session['conversation_history'] = conversation_history
             request.session['sessions_updated'] = sessions_updated
 
