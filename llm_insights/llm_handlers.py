@@ -178,10 +178,7 @@ class GeminiHandler(BaseLLMHandler):
 
 # Factory function to get the appropriate handler
 def get_llm_handler(model=""):
-    gemini_models = ["gemini-2.0-flash", "gemini-2.0",
-                     "gemini-2.0-flash-lite", "gemini-2.5-pro-exp-03-25",
-                     "gemini-2.0-flash-thinking-exp-01-21"]
-    if model.lower() in gemini_models:
+    if "gemini" in model.lower():
         return GeminiHandler(model=model)
     # Add more handlers here as needed
     else:
