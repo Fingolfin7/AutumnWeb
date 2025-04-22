@@ -32,7 +32,8 @@ $(document).ready(function() {
         $(this).text(new Date(utcTime).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit',
-            second: '2-digit'
+            second: '2-digit',
+            hour12: false // Force 24-hour format
         }));
     });
     

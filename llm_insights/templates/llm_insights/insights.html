@@ -21,6 +21,12 @@
             if (!$('#end_date').val()) {
                 $('#end_date').val(new Date().toISOString().split('T')[0]);
             }
+
+            // Update hidden field when model dropdown changes
+            $('#model').on('change', function() {
+                $('#model_filter').val($(this).val());
+            });
+
         });
     </script>
 {% endblock %}
@@ -54,6 +60,8 @@
                 {{ search_form.note_snippet }}
                 {{ search_form.note_snippet.errors }}
             </span>
+
+            <input type="hidden" name="model" id="model_filter" value="{{ selected_model }}">
 
             <span>
                 <button type="submit" class="primary-button" id="search_button" name="filter" value="true">

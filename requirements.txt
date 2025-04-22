@@ -10,3 +10,4 @@ markdown
 inflect
 django-environ
 google-genai
+pytz
