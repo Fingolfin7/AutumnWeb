@@ -48,7 +48,7 @@ class Profile(models.Model):
 
         for frame in ImageSequence.Iterator(img):
             # Resize the frame
-            frame = frame.resize((frame_width, frame_height), Image.ANTIALIAS)
+            frame = frame.resize((frame_width, frame_height))
 
             # Extract and store the frame duration and disposal method
             durations.append(frame.info.get("duration", 100))  # Default duration is 100 ms
