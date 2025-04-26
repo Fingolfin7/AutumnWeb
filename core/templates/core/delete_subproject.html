@@ -12,7 +12,11 @@
 
         <h3>
             Are you sure you want to delete this subproject of
-            <span class="text-red">{{ session.project.name }}</span>?
+           <span class="text-red" id="project-name">
+                <a class="plain-link" href="{% url 'update_project' subproject.parent_project.id %}">
+                    {{ subproject.parent_project.name }}
+                </a>
+            </span>?
         </h3>
 
         <div class="card" id="subproject-{{ subproject.id }}">

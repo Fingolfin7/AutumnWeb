@@ -72,16 +72,7 @@ def date_formatter(date: datetime | str):
     :param date: datetime objects
     :return: string formatted to day month year.
     """
-    if isinstance(date, str):
-        try:
-            date = datetime.strptime(date, "%m-%d-%Y")
-        except ValueError:
-            date = datetime.strptime(date, "%Y-%m-%d")
-
-    if timezone.is_naive(date):
-        date = timezone.make_aware(date)
-    else:
-        date = date.astimezone(timezone.get_default_timezone())
+    date = make_timezone_datetime(date)
     return date.strftime("%d %B %Y")
 
 
@@ -119,15 +110,19 @@ def day_date_formatter(date: datetime| str):
     :param date: datetime objects
     :return: string formatted to day month year.
     """
+    date = make_timezone_datetime(date)
+    return date.strftime("%A %d %b %Y")
+
+
+def make_timezone_datetime(date):
     if isinstance(date, str):
 
         try:
             date = datetime.strptime(date, "%m-%d-%Y")
         except ValueError:
             date = datetime.strptime(date, "%Y-%m-%d")
-
     if timezone.is_naive(date):
         date = timezone.make_aware(date)
     else:
         date = date.astimezone(timezone.get_default_timezone())
-    return date.strftime("%A %d %b %Y")
+    return date

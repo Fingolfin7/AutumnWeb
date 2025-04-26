@@ -25,6 +25,7 @@
             // Update hidden field when model dropdown changes
             $('#model').on('change', function() {
                 $('#model_filter').val($(this).val());
+                $('form.chat-form').submit();
             });
 
         });

@@ -23,7 +23,7 @@
             {{ session.duration|duration_formatter }}
 
             <span class="text-red project-name-slider" id="project-name">
-                <a class="plain-link" href="{% url 'update_project' session.project.name %}">
+                <a class="plain-link" href="{% url 'update_project' session.project.id %}">
                     {{ session.project.name }}
                 </a>
             </span>

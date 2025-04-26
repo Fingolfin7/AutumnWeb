@@ -30,7 +30,7 @@
                 </button>
 
                 <button type="button" class="primary-button"
-                onclick="window.location.href = '{% url 'delete_project' project.name %}' ">
+                onclick="window.location.href = '{% url 'delete_project' project.id %}' ">
                     <i class="fa fa-trash"></i>
                     Delete Project
                 </button>
@@ -68,7 +68,7 @@
     <br><br>
 
     <button type="button" id="create-subproject-button" class="primary-button"
-            onclick="window.location.href= '{% url 'create_subproject' project.name %}'">
+            onclick="window.location.href= '{% url 'create_subproject' project.id %}'">
         <i class="fa fa-plus"></i>
         Create Subproject
     </button>

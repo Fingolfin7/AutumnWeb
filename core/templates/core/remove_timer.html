@@ -16,7 +16,10 @@
                 <table class="timer-row">
                     <tr>
                         <td class="text-red">
-                            {{ timer.project.name }}
+                            <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
+                                {{ timer.project.name }}
+                            </a>
+
                         </td>
                         <td>
                             [

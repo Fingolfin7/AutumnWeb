@@ -1,6 +1,5 @@
 import os
 import re
-
 import pytz
 from AutumnWeb import settings
 from core.forms import *
@@ -190,7 +189,7 @@ def stop_timer(request, session_id: int):
         timer.is_active = False
         timer.end_time = timezone.now()
 
-        if request.POST['session_note']:
+        if 'session_note' in request.POST:
             timer.note = request.POST['session_note']
 
         timer.save()
@@ -738,11 +737,6 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
     template_name = 'core/update_project.html'
     context_object_name = 'project'
 
-    def get_object(self, queryset=None):
-        project = get_object_or_404(Projects, name=self.kwargs['project_name'], user=self.request.user)
-        # project.audit_total_time()
-        return project
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Update Project'
@@ -758,7 +752,7 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
             return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Project updated successfully")
-        return redirect('update_project', project_name=self.kwargs['project_name'])
+        return redirect('update_project', pk=self.kwargs['pk'])
 
 
 class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
@@ -797,9 +791,6 @@ class DeleteProjectView(LoginRequiredMixin, DeleteView):
     model = Projects
     template_name = 'core/delete_project.html'
     context_object_name = 'project'
-
-    def get_object(self, queryset=None):
-        return get_object_or_404(Projects, name=self.kwargs['project_name'], user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

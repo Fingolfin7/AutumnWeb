@@ -68,7 +68,7 @@ def prep_session_data(sessions):
 class GeminiHandler(BaseLLMHandler):
     """Handler for Google's Gemini API"""
 
-    def __init__(self, model="gemini-2.0-flash"):
+    def __init__(self, model="gemini-2.0-pro-exp-02-05"):
         self.api_key = settings.GEMINI_API_KEY
         self.client = genai.Client(api_key=self.api_key)
         self.chat = self.client.chats.create(model=model)

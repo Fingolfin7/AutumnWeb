@@ -1,7 +1,7 @@
 from django.shortcuts import render
 from django.views.generic import View
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.cache import cache
+from datetime import datetime, timedelta
 from django.contrib import messages
 from core.models import Sessions
 from core.forms import SearchProjectForm
@@ -36,6 +36,15 @@ class InsightsView(LoginRequiredMixin, View):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
         sessions = filter_sessions_by_params(request, sessions)
 
+        # Retrieve conversation history from session
+        conv_histories = request.session.get('conversation_history', {})
+        if not isinstance(conv_histories, dict):
+            conv_histories = {}
+
+        # Load conversation history for the selected model
+        selected_model = request.GET.get('model', "gemini-2.0-pro-exp-02-05")
+        conversation_history = conv_histories.get(selected_model)
+
         # Set flag if the filter button was pressed
         sessions_updated = 'filter' in request.GET
         request.session["sessions_updated"] = sessions_updated
@@ -53,9 +62,9 @@ class InsightsView(LoginRequiredMixin, View):
                 }
             ),
             'sessions': sessions,
-            'conversation_history': request.session.get('conversation_history', None),
+            'conversation_history': conversation_history,
             'sessions_updated': sessions_updated,
-            'selected_model': request.GET.get('model', "gemini-2.0-flash")
+            'selected_model': selected_model
         }
 
         return render(request, 'llm_insights/insights.html', context)
@@ -64,23 +73,39 @@ class InsightsView(LoginRequiredMixin, View):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
         sessions = filter_sessions_by_params(request, sessions)
         sessions_updated = request.session.get("sessions_updated", False)
-        conversation_history = request.session.get('conversation_history', None)
+
+        conv_histories = request.session.get('conversation_history', {})
+        if not isinstance(conv_histories, dict):
+            conv_histories = {}
 
         # Retrieve selected model from form with default
-        selected_model = request.POST.get("model", "gemini-2.0-flash")
+        selected_model = request.POST.get("model", "gemini-2.0-pro-exp-02-05")
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
+        conversation_history = conv_histories.get(selected_model)
 
-        # Check if the handler is already in memory
-        if handler_key in IN_MEM_CACHE:
-            handler = IN_MEM_CACHE[handler_key]
+        # Check if the handler is in memory and not expired
+        handler_entry = IN_MEM_CACHE.get(handler_key)
+        if handler_entry:
+            handler, timestamp = handler_entry
+            if datetime.now() - timestamp > timedelta(hours=1):
+                IN_MEM_CACHE.pop(handler_key)
+                handler = None
+                # when handler expires also reset conversation history
+                conversation_history = None
+                conv_histories[selected_model] = None
+                request.session['conversation_history'] = conv_histories
         else:
+            handler = None
+
+        if not handler:
             handler = get_llm_handler(model=selected_model)
-            IN_MEM_CACHE[handler_key] = handler  # Cache the handler in memory
+            IN_MEM_CACHE[handler_key] = (handler, datetime.now())
 
         if 'reset_conversation' in request.POST:
-            # Reset conversation
+            # Reset conversation for the selected model
             conversation_history = None
-            request.session['conversation_history'] = None
+            conv_histories[selected_model] = None
+            request.session['conversation_history'] = conv_histories
             request.session['sessions_updated'] = False
             IN_MEM_CACHE.pop(handler_key)
         else:
@@ -98,7 +123,8 @@ class InsightsView(LoginRequiredMixin, View):
 
             # Update cache and session
             sessions_updated = False
-            request.session['conversation_history'] = conversation_history
+            conv_histories[selected_model] = conversation_history
+            request.session['conversation_history'] = conv_histories
             request.session['sessions_updated'] = sessions_updated
 
         context = {

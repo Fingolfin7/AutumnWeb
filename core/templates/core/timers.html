@@ -22,9 +22,9 @@
                             [{{ forloop.counter0 }}]: Started
                         </td>
                         <td class="text-red">
-                            <a class="plain-link" href="{% url 'update_project' timer.project.name %}">
-                            {{ timer.project.name }}
-                        </a>
+                            <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
+                                {{ timer.project.name }}
+                            </a>
                         </td>
                         <td>
                           {% for subproject in timer.subprojects.all %}

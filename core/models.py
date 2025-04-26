@@ -124,6 +124,7 @@ class Sessions(models.Model):
         sub_list = [sub.name for sub in self.subprojects.all()]
         return f"{self.project.name} {sub_list} - {self.start_time} ({self.user.username})"
 
+
     @property
     def get_start(self):
         return self.start_time
@@ -141,6 +142,7 @@ class Sessions(models.Model):
         if self.end_time is None and not self.is_active:
             return None
         elif self.is_active and not self.end_time:
-            return (timezone.make_aware(datetime.now()) - self.start_time).total_seconds() / 60.0
+            return round((timezone.make_aware(datetime.now()) - self.start_time).total_seconds() / 60.0, 4)
         else:
-            return (self.end_time - self.start_time).total_seconds() / 60.0
+            return round((self.end_time - self.start_time).total_seconds() / 60.0, 4)
+
