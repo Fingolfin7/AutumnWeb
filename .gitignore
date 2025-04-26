@@ -145,7 +145,8 @@ cython_debug/
 /static
 .sqlite3
 *.sqlite3
-/media/
+/media/profile_pics/
+/media/temp/
 /Exports/
 /Logs/
 /.vscode
