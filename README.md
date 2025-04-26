@@ -46,11 +46,7 @@ To set up the project locally, follow these steps:
 6. **Access the application:**
     Open your web browser and navigate to `http://127.0.0.1:8000/`.
 
-7. **Adjust the default timezone:**
-    The default timezone is set to `Europe/Prague`.
-    To change these settings, update the `TIME_ZONE` in the  `settings.py` file.
-
-8. **Create a superuser:**
+7. **Create a superuser:**
     To access the admin panel, create a superuser by running.
     The admin panel can be accessed at `http://127/0.0.1:8000/admin`.
 
