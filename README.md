@@ -3,7 +3,8 @@
 Web-based time and project tracking software based on [Autumn](https://github.com/Fingolfin7/Autumn). 
 This application allows users to manage projects and subprojects, track time spent on various tasks, 
 and visualize tracked data over a given period. It includes features such as session history viewing, 
-word cloud generation from session notes, and dynamic charting for data visualization.
+word cloud generation from session notes, and dynamic charting for data visualization. And recently, a 
+new Ïnsights" page where you can provide a subset of your session data to an LLM model and ask question about it!
 
 I developed a web based version of the original CLI version to allow users to track their time and projects from anywhere. 
 You can import the data from the CLI version and continue tracking projects and time on the web version. 
@@ -60,16 +61,28 @@ To set up the project locally, follow these steps:
 # Pages and Screenshots
 
 ## Projects Page
-![Screenshot_11-11-2024_3356_fingolfin7 pythonanywhere com](https://github.com/user-attachments/assets/eadf27ca-96aa-4790-b922-994b6e0353e4)
+(Dark Mode)
+![image](https://github.com/user-attachments/assets/dc04d27d-8665-4cab-af84-9c72ede1cd57)
 
-### Manage Projects and Subprojects
-![Screenshot_11-11-2024_33449_fingolfin7 pythonanywhere com](https://github.com/user-attachments/assets/14a5672e-7104-4ddb-9862-e74e013ad498)
-
-### Timers Page
-![Screenshot_11-11-2024_33621_fingolfin7 pythonanywhere com](https://github.com/user-attachments/assets/e5d371c4-f535-4492-be09-e796bdd00595)
+(Light Mode)
+![image](https://github.com/user-attachments/assets/d8e30b80-44f1-48ae-b5cf-5b5726e3ffe4)
 
 ## View Sessions History
-![Screenshot_11-11-2024_33744_fingolfin7 pythonanywhere com](https://github.com/user-attachments/assets/26d6d230-a296-4196-8416-5975cd2e4e01)
+![image](https://github.com/user-attachments/assets/ef04676e-363c-4c71-b305-99870eeb0f7a)
+
+
+### Manage Projects and Subprojects
+
+![image](https://github.com/user-attachments/assets/3aa4e01f-d66f-42d3-ad9a-0b7ff5495805)
+
+
+### Timers Page
+![image](https://github.com/user-attachments/assets/ed9a3e5f-ad4d-48d5-9a90-cd38548dea7f)
+
+## Insights Page (AI page)
+
+![image](https://github.com/user-attachments/assets/b9b7bc73-b61b-4a7c-abb7-c78dfb7c2818)
+
 
 ## Visualize Tracked Data Over a give period
 ![charts](https://github.com/user-attachments/assets/23cc10d5-e5f1-421d-a1cb-8b45521d45fc)
