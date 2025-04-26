@@ -34,6 +34,6 @@ jobs:
 
       - name: Run Django tests
         env:
-          DJANGO_SETTINGS_MODULE: autumn.settings
+          DJANGO_SETTINGS_MODULE: AutumnWeb.settings
         run: |
           python manage.py test
