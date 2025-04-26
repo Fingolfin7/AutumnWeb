@@ -27,7 +27,7 @@ class Profile(models.Model):
             img_height = img.size[1] if img.size[1] < 450 else 450
 
             output_size = (img_width, img_height)
-            img.thumbnail(output_size, Image.ANTIALIAS)
+            img.thumbnail(output_size)
             img.save(self.image.path)
 
 
