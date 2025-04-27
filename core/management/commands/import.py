@@ -112,10 +112,13 @@ class Command(BaseCommand):
                         parent_project=project,
                         defaults={  # these values aren't used in the search. But they are added to new instances
                             "start_date": timezone.make_aware(
-                                datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                                datetime.strptime(project_data['Sub Projects'][subproject_name]['Start Date'],
+                                                  '%m-%d-%Y')),
                             "last_updated": timezone.make_aware(
-                                datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
-                            "description": project_data['Description'] if 'Description' in project_data else '',
+                                datetime.strptime(project_data['Sub Projects'][subproject_name]['Last Updated'],
+                                                  '%m-%d-%Y')),
+                            "description": project_data['Sub Projects'][subproject_name]['Description']
+                            if 'Description' in project_data['Sub Projects'][subproject_name] else '',
                         }
                     )
                 if created and verbose:

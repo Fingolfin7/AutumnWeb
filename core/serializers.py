@@ -5,7 +5,16 @@ from core.models import *
 class SubProjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubProjects
-        fields = '__all__'
+        fields = (
+            'id',
+            'user',
+            'name',
+            'description',
+            'total_time',
+            'parent_project',
+            'start_date',
+            'last_updated'
+        )
 
 
 class ProjectSerializer(serializers.ModelSerializer):
@@ -13,13 +22,33 @@ class ProjectSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Projects
-        fields = '__all__'
+        fields =(
+            'id',
+            'user',
+            'name',
+            'description',
+            'total_time',
+            'start_date',
+            'last_updated',
+            'subprojects'
+        )
 
 
 class SessionSerializer(serializers.ModelSerializer):
-    project = ProjectSerializer(read_only=True)
-    subprojects = SubProjectSerializer(many=True, read_only=True)
-
     class Meta:
         model = Sessions
-        fields = '__all__'
+        fields = (
+            'id',
+            'user',
+            'project_name',
+            'project_id',
+            'subprojects',
+            'start_time',
+            'end_time',
+            'note',
+            'is_active'
+        )
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        rep['subproject_names'] = [sp.name for sp in instance.subprojects.all()]
+        return rep
