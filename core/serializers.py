@@ -40,7 +40,7 @@ class SessionSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'user',
-            'project_name',
+            'project',
             'project_id',
             'subprojects',
             'start_time',
@@ -50,5 +50,6 @@ class SessionSerializer(serializers.ModelSerializer):
         )
     def to_representation(self, instance):
         rep = super().to_representation(instance)
-        rep['subproject_names'] = [sp.name for sp in instance.subprojects.all()]
+        rep['project'] = instance.project.name
+        rep['subprojects'] = [sp.name for sp in instance.subprojects.all()]
         return rep
