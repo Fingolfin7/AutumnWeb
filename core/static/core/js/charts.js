@@ -227,7 +227,7 @@ function scatter_graph(data, ctx) {
         return {
             x: endTime,
             y: duration,
-            projectName: item.project.name
+            projectName: item.project
         };
     });
 
