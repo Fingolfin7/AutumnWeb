@@ -49,7 +49,7 @@ class InsightsView(LoginRequiredMixin, View):
         sessions_updated = 'filter' in request.GET
         request.session["sessions_updated"] = sessions_updated
         if sessions_updated:
-            messages.success(request, "Session selection updated. The AI has been informed about the new data.")
+            messages.success(request, "Session selection updated.")
 
         context = {
             'title': 'Session Analysis',
@@ -84,22 +84,11 @@ class InsightsView(LoginRequiredMixin, View):
         conversation_history = conv_histories.get(selected_model)
 
         # Check if the handler is in memory and not expired
-        handler_entry = IN_MEM_CACHE.get(handler_key)
-        if handler_entry:
-            handler, timestamp = handler_entry
-            if datetime.now() - timestamp > timedelta(hours=1):
-                IN_MEM_CACHE.pop(handler_key)
-                handler = None
-                # when handler expires also reset conversation history
-                conversation_history = None
-                conv_histories[selected_model] = None
-                request.session['conversation_history'] = conv_histories
-        else:
-            handler = None
+        handler = IN_MEM_CACHE.get(handler_key)
 
         if not handler:
             handler = get_llm_handler(model=selected_model)
-            IN_MEM_CACHE[handler_key] = (handler, datetime.now())
+            IN_MEM_CACHE[handler_key] = handler
 
         if 'reset_conversation' in request.POST:
             # Reset conversation for the selected model

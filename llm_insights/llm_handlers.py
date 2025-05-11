@@ -137,6 +137,7 @@ class GeminiHandler(BaseLLMHandler):
 
         # Add message to conversation history
         self.conversation_history.append({"role": "system", "content": update_session_data_prompt})
+        self.conversation_history.append({"role": "user", "content": user_prompt}) # display user message
         self.conversation_history.append({"role": "assistant", "content": assistant_response})
 
         return assistant_response
