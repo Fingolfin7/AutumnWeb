@@ -200,58 +200,76 @@ def sessions_get_earliest_latest(sessions) -> tuple[datetime, datetime]:
 
 
 def build_project_json_from_sessions(sessions, autumn_compatible=False):
+    """
+    Build the nested export‐JSON given a flat iterable of Session instances.
+    Only subprojects that actually appear in those sessions are emitted.
+    """
     projects_data = {}
-    project_instances = {}
+    # 1) bucket sessions by project name
+    sessions_by_project = defaultdict(list)
+    for sess in reversed(sessions):
+        sessions_by_project[sess.project.name].append(sess)
 
-    for session in reversed(sessions): # reversed to put oldest sessions first
-        project_name = session.project.name
-        if project_name not in projects_data:
-            projects_data[project_name] = {
-                "Start Date": "",
-                "Last Updated": "",
-                "Total Time": 0,
-                "Status": session.project.status if hasattr(session.project, 'status') else "",
-                "Description": session.project.description if hasattr(session.project, 'description') else "",
-                "Sub Projects": {},
-                "Session History": []
-            }
-            # save a reference to the project instance
-            project_instances[project_name] = session.project
+    for project_name, sess_list in sessions_by_project.items():
+        # grab the project instance for metadata
+        project_obj = sess_list[0].project
 
-        projects_data[project_name]["Total Time"] += session.duration
+        # build the session history list and tally total time
+        history = []
+        total_proj_minutes = 0
+        for s in sess_list:
+            total_proj_minutes += s.duration
+            history.append({
+                "Date":       timezone.localtime(s.end_time).strftime("%m-%d-%Y"),
+                "Start Time": timezone.localtime(s.start_time).strftime("%H:%M:%S"),
+                "End Time":   timezone.localtime(s.end_time).strftime("%H:%M:%S"),
+                "Sub-Projects": [sp.name for sp in s.subprojects.all()],
+                "Duration":   s.duration,
+                "Note":       s.note or ""
+            })
 
-        session_entry = {
-            "Date": session.end_time.strftime('%m-%d-%Y'),
-            "Start Time": session.start_time.strftime('%H:%M:%S'),
-            "End Time": session.end_time.strftime('%H:%M:%S'),
-            "Sub-Projects": [sp.name for sp in session.subprojects.all()],
-            "Duration": session.duration,
-            "Note": session.note or ""
-        }
-        projects_data[project_name]["Session History"].append(session_entry)
+        # determine project start / last dates from history
+        start_date = history[0]["Date"] if history else ""
+        last_date  = history[-1]["Date"] if history else ""
 
-    # Update subprojects using the provided logic from the actual project instance
-    for project_name, project_obj in project_instances.items():
-        # Reset subprojects data to replace the aggregated values
-        projects_data[project_name]["Sub Projects"] = {}
-        for sub in project_obj.subprojects.all():
-            sub.audit_total_time()
+        # 2) aggregate subprojects from those same sessions
+        sub_sessions = defaultdict(list)
+        for s in sess_list:
+            for sp in s.subprojects.all():
+                sub_sessions[sp.name].append((s, sp))
+
+        subprojects_data = {}
+        for sub_name, sess_and_sp in sub_sessions.items():
+            # sess_and_sp is a list of (session, subproject_instance) tuples
+            # sort by session end_time
+            sess_and_sp.sort(key=lambda pair: pair[0].end_time)
+
+            # total time = sum of durations of sessions in which this subproject appears
+            total_sub_minutes = sum(s.duration for s, _ in sess_and_sp)
+
             if autumn_compatible:
-                projects_data[project_name]["Sub Projects"][sub.name] = sub.total_time
+                subprojects_data[sub_name] = total_sub_minutes
             else:
-                projects_data[project_name]["Sub Projects"][sub.name] = {
-                    'Start Date': timezone.localtime(sub.start_date).strftime('%m-%d-%Y'),
-                    'Last Updated': timezone.localtime(sub.last_updated).strftime('%m-%d-%Y'),
-                    'Total Time': sub.total_time,
-                    'Description': sub.description or '',
+                # pick the first .subproject instance for description / dates
+                first_s, first_sp = sess_and_sp[0]
+                last_s, _         = sess_and_sp[-1]
+                subprojects_data[sub_name] = {
+                    "Start Date": timezone.localtime(first_s.end_time).strftime("%m-%d-%Y"),
+                    "Last Updated": timezone.localtime(last_s.end_time).strftime("%m-%d-%Y"),
+                    "Total Time": total_sub_minutes,
+                    "Description": first_sp.description or ""
                 }
 
-    # Set start and last dates from session history (sessions are already sorted)
-    for project in projects_data.values():
-        history = project["Session History"]
-        if history:
-            project["Start Date"] = history[0]["Date"]
-            project["Last Updated"] = history[-1]["Date"]
+        # finally, assemble project‐level object
+        projects_data[project_name] = {
+            "Start Date":  start_date,
+            "Last Updated": last_date,
+            "Total Time":  total_proj_minutes,
+            "Status":      project_obj.status,
+            "Description": project_obj.description or "",
+            "Sub Projects": subprojects_data,
+            "Session History": history
+        }
 
     return projects_data
 
