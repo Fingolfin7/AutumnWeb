@@ -103,20 +103,51 @@ class ImportJSONForm(forms.Form):
 
 
 class ExportJSONForm(forms.Form):
-    project_name = forms.CharField(required=False, widget=forms.TextInput(
-        attrs={
-            'placeholder': 'Projects (leave blank to export all)',
-            'id': 'project-search',
-            'data-ajax_url': '/api/search_projects/',
-            'class': 'half-width',
-            'autocomplete': 'off'
-        })
+    project_name = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Projects (leave blank to export all)',
+                'id': 'project-search',
+                'data-ajax_url': '/api/search_projects/',
+                'class': 'half-width',
+                'autocomplete': 'off',
+            }
+        )
     )
-    output_file = forms.CharField(required=False, widget=forms.TextInput(
-        attrs={
-            'placeholder': 'Filename (leave blank to use default)',
-            'class': 'half-width'
-        })
+
+    start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'half-width',
+                'placeholder': 'Start date (optional)',
+                'id': 'export-start-date',
+            }
+        )
+    )
+
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'half-width',
+                'placeholder': 'End date (optional)',
+                'id': 'export-end-date',
+            }
+        )
+    )
+
+    output_file = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Filename (leave blank to use default)',
+                'class': 'half-width',
+            }
+        )
     )
     autumn_compatible = forms.BooleanField(required=False, initial=False)
     compress = forms.BooleanField(required=False, initial=False)

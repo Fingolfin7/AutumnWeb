@@ -12,6 +12,22 @@
     <section id="export_options">
         <form method="POST" class="card stacked" enctype="multipart/form-data" action="{% url 'export' %}">
             {% csrf_token %}
+            <div class="label-input">
+              <label for="{{ form.start_date.id_for_label }}">
+                <i class="fa fa-calendar"></i> Start Date
+              </label>
+              {{ form.start_date }}
+              {{ form.start_date.errors }}
+            </div>
+
+            <div class="label-input">
+              <label for="{{ form.end_date.id_for_label }}">
+                <i class="fa fa-calendar"></i> End Date
+              </label>
+              {{ form.end_date }}
+              {{ form.end_date.errors }}
+            </div>
+
             <div id="search_projects">
                 <span class="label-input">
                     <label for="project-search"><i class="fa fa-search"></i> Search</label>

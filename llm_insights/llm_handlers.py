@@ -2,6 +2,7 @@ import json
 from abc import ABC, abstractmethod
 from google import genai
 from AutumnWeb import settings
+from core.utils import build_project_json_from_sessions
 
 
 class BaseLLMHandler(ABC):
@@ -25,44 +26,7 @@ class BaseLLMHandler(ABC):
         pass
 
 
-def prep_session_data(sessions):
-    projects_data = {}
 
-    for session in sessions:
-        project_name = session.project.name
-
-        # Initialize project entry if it doesn't exist
-        if project_name not in projects_data:
-            projects_data[project_name] = {
-                "Total Time": 0,
-                "Status": session.project.status if hasattr(session.project, 'status') else "",
-                "Description": session.project.description if hasattr(session.project, 'description') else "",
-                "Sub Projects": {},
-                "Session History": []
-            }
-
-        # Add session duration to total
-        projects_data[project_name]["Total Time"] += session.duration
-
-        # Track subprojects
-        subprojects = [sp.name for sp in session.subprojects.all()]
-        for subproject in subprojects:
-            if subproject not in projects_data[project_name]["Sub Projects"]:
-                projects_data[project_name]["Sub Projects"][subproject] = 0
-            projects_data[project_name]["Sub Projects"][subproject] += session.duration
-
-        # Add session to history
-        session_entry = {
-            "Date": session.end_time.strftime('%m-%d-%Y'),
-            "Start Time": session.start_time.strftime('%H:%M:%S'),
-            "End Time": session.end_time.strftime('%H:%M:%S'),
-            "Sub-Projects": subprojects,
-            "Duration": session.duration,
-            "Note": session.note or ""
-        }
-        projects_data[project_name]["Session History"].append(session_entry)
-
-    return json.dumps(projects_data, indent=2)
 
 
 class GeminiHandler(BaseLLMHandler):
@@ -114,7 +78,7 @@ class GeminiHandler(BaseLLMHandler):
     def initialize_chat(self, username, sessions_data):
         """Initialize a new chat with username and session data"""
         self.username = username
-        self.session_data = prep_session_data(sessions_data)
+        self.session_data = json.dumps(build_project_json_from_sessions(sessions_data, autumn_compatible=True))
 
     def update_session_data(self, sessions_data, user_prompt):
         """Update the session data without adding to chat history"""
@@ -122,7 +86,7 @@ class GeminiHandler(BaseLLMHandler):
             return None
             
         # Update stored session data
-        self.session_data = prep_session_data(sessions_data)
+        self.session_data = json.dumps(build_project_json_from_sessions(sessions_data, autumn_compatible=True))
         
         # Create a new chat with updated system prompt
         update_session_data_prompt = self.update_session_data_template.format(

@@ -10,6 +10,15 @@ from core.models import Sessions, Projects, SubProjects
 
 
 def parse_date_or_datetime(date_str):
+    """"
+    Parse a date or datetime string into a datetime object. Supports the following formats:
+    %m-%d-%Y, %m-%d-%Y %H:%M:%S, %Y-%m-%d, %Y-%m-%d %H:%M:%S
+
+    :param date_str: the date or datetime string to parse
+    :return: a datetime object
+    :raises ValueError: if the date_str is not in a recognized format
+
+    """
     date_formats = ['%m-%d-%Y', '%m-%d-%Y %H:%M:%S', '%Y-%m-%d', '%Y-%m-%d %H:%M:%S']
     for fmt in date_formats:
         try:
@@ -188,6 +197,63 @@ def sessions_get_earliest_latest(sessions) -> tuple[datetime, datetime]:
     """
     aggregated_times = sessions.aggregate(earliest_start=Min('start_time'), latest_end=Max('end_time'))
     return aggregated_times['earliest_start'], aggregated_times['latest_end']
+
+
+def build_project_json_from_sessions(sessions, autumn_compatible=False):
+    projects_data = {}
+    project_instances = {}
+
+    for session in reversed(sessions): # reversed to put oldest sessions first
+        project_name = session.project.name
+        if project_name not in projects_data:
+            projects_data[project_name] = {
+                "Start Date": "",
+                "Last Updated": "",
+                "Total Time": 0,
+                "Status": session.project.status if hasattr(session.project, 'status') else "",
+                "Description": session.project.description if hasattr(session.project, 'description') else "",
+                "Sub Projects": {},
+                "Session History": []
+            }
+            # save a reference to the project instance
+            project_instances[project_name] = session.project
+
+        projects_data[project_name]["Total Time"] += session.duration
+
+        session_entry = {
+            "Date": session.end_time.strftime('%m-%d-%Y'),
+            "Start Time": session.start_time.strftime('%H:%M:%S'),
+            "End Time": session.end_time.strftime('%H:%M:%S'),
+            "Sub-Projects": [sp.name for sp in session.subprojects.all()],
+            "Duration": session.duration,
+            "Note": session.note or ""
+        }
+        projects_data[project_name]["Session History"].append(session_entry)
+
+    # Update subprojects using the provided logic from the actual project instance
+    for project_name, project_obj in project_instances.items():
+        # Reset subprojects data to replace the aggregated values
+        projects_data[project_name]["Sub Projects"] = {}
+        for sub in project_obj.subprojects.all():
+            sub.audit_total_time()
+            if autumn_compatible:
+                projects_data[project_name]["Sub Projects"][sub.name] = sub.total_time
+            else:
+                projects_data[project_name]["Sub Projects"][sub.name] = {
+                    'Start Date': timezone.localtime(sub.start_date).strftime('%m-%d-%Y'),
+                    'Last Updated': timezone.localtime(sub.last_updated).strftime('%m-%d-%Y'),
+                    'Total Time': sub.total_time,
+                    'Description': sub.description or '',
+                }
+
+    # Set start and last dates from session history (sessions are already sorted)
+    for project in projects_data.values():
+        history = project["Session History"]
+        if history:
+            project["Start Date"] = history[0]["Date"]
+            project["Last Updated"] = history[-1]["Date"]
+
+    return projects_data
 
 
 def json_compress(j):
