@@ -260,7 +260,6 @@ def build_project_json_from_sessions(sessions, autumn_compatible=False):
                     "Description": first_sp.description or ""
                 }
 
-        # finally, assemble project‐level object
         projects_data[project_name] = {
             "Start Date":  start_date,
             "Last Updated": last_date,

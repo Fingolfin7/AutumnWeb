@@ -91,14 +91,13 @@ class ImportJSONForm(forms.Form):
     autumn_import = forms.BooleanField(required=False, initial=False)
     force = forms.BooleanField(required=False, initial=False)
     merge = forms.BooleanField(required=False, initial=True)
-    tolerance = forms.FloatField(initial=0.5)
+    tolerance = forms.FloatField(initial=0.5, label='Tolerance (minutes)')
     verbose = forms.BooleanField(required=False)
 
     class Meta:
         fields = ['file', 'autumn_import', 'force', 'merge', 'tolerance', 'verbose']
         widgets = {
             'file': forms.FileInput(attrs={'accept': '.json'}),
-            'tolerance': forms.NumberInput(attrs={'step': 1})
         }
 
 
