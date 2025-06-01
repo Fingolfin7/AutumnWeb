@@ -526,15 +526,11 @@ def export_view(request):
         start_date        = form.cleaned_data['start_date']
         end_date          = form.cleaned_data['end_date']
 
-        user = request.user
-
-
         # default filename
         if not output_file:
             output_file = f"{project_name or 'projects'}.json"
         if not output_file.endswith('.json'):
             output_file += '.json'
-
 
         # prepare date‐filters
         if start_date:

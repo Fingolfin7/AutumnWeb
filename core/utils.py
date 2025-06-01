@@ -124,11 +124,11 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
 
     if start_date:
         start = timezone.make_aware(parse_date_or_datetime(start_date))
-        if end_date:
-            end = timezone.make_aware(parse_date_or_datetime(end_date) + timedelta(days=1))
-            sessions = sessions.filter(start_time__range=[start, end])
-        else:
-            sessions = sessions.filter(start_time__gte=start)
+        sessions = sessions.filter(start_time__gte=start)
+    if end_date:
+        end = timezone.make_aware(parse_date_or_datetime(end_date) + timedelta(days=1))
+        sessions = sessions.filter(start_time__lte=end)
+
 
     # print(len(sessions))
     return sessions
@@ -205,7 +205,7 @@ def build_project_json_from_sessions(sessions, autumn_compatible=False):
     Only subprojects that actually appear in those sessions are emitted.
     """
     projects_data = {}
-    # 1) bucket sessions by project name
+    # bucket sessions by project name
     sessions_by_project = defaultdict(list)
     for sess in reversed(sessions):
         sessions_by_project[sess.project.name].append(sess)
@@ -232,7 +232,7 @@ def build_project_json_from_sessions(sessions, autumn_compatible=False):
         start_date = history[0]["Date"] if history else ""
         last_date  = history[-1]["Date"] if history else ""
 
-        # 2) aggregate subprojects from those same sessions
+        # aggregate subprojects from those same sessions
         sub_sessions = defaultdict(list)
         for s in sess_list:
             for sp in s.subprojects.all():
