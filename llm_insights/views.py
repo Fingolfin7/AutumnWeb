@@ -1,7 +1,6 @@
 from django.shortcuts import render
 from django.views.generic import View
 from django.contrib.auth.mixins import LoginRequiredMixin
-from datetime import datetime, timedelta
 from django.contrib import messages
 from core.models import Sessions
 from core.forms import SearchProjectForm
@@ -36,14 +35,13 @@ class InsightsView(LoginRequiredMixin, View):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
         sessions = filter_sessions_by_params(request, sessions)
 
-        # Retrieve conversation history from session
-        conv_histories = request.session.get('conversation_history', {})
-        if not isinstance(conv_histories, dict):
-            conv_histories = {}
-
         # Load conversation history for the selected model
         selected_model = request.GET.get('model', "gemini-2.0-pro-exp-02-05")
-        conversation_history = conv_histories.get(selected_model)
+
+        handler_key = f"llm_handler_{request.user.id}_{selected_model}"
+        handler = IN_MEM_CACHE.get(handler_key)
+        conversation_history = handler.get_conversation_history() if handler else None
+
 
         # Set flag if the filter button was pressed
         sessions_updated = 'filter' in request.GET
@@ -74,14 +72,9 @@ class InsightsView(LoginRequiredMixin, View):
         sessions = filter_sessions_by_params(request, sessions)
         sessions_updated = request.session.get("sessions_updated", False)
 
-        conv_histories = request.session.get('conversation_history', {})
-        if not isinstance(conv_histories, dict):
-            conv_histories = {}
-
         # Retrieve selected model from form with default
         selected_model = request.POST.get("model", "gemini-2.0-pro-exp-02-05")
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
-        conversation_history = conv_histories.get(selected_model)
 
         # Check if the handler is in memory and not expired
         handler = IN_MEM_CACHE.get(handler_key)
@@ -90,13 +83,15 @@ class InsightsView(LoginRequiredMixin, View):
             handler = get_llm_handler(model=selected_model)
             IN_MEM_CACHE[handler_key] = handler
 
+        handler_key = f"llm_handler_{request.user.id}_{selected_model}"
+        handler = IN_MEM_CACHE.get(handler_key)
+        conversation_history = handler.get_conversation_history() if handler else None
+
         if 'reset_conversation' in request.POST:
             # Reset conversation for the selected model
-            conversation_history = None
-            conv_histories[selected_model] = None
-            request.session['conversation_history'] = conv_histories
             request.session['sessions_updated'] = False
             IN_MEM_CACHE.pop(handler_key)
+            conversation_history =  None
         else:
             user_prompt = request.POST.get('prompt', '')
 
@@ -112,8 +107,6 @@ class InsightsView(LoginRequiredMixin, View):
 
             # Update cache and session
             sessions_updated = False
-            conv_histories[selected_model] = conversation_history
-            request.session['conversation_history'] = conv_histories
             request.session['sessions_updated'] = sessions_updated
 
         context = {
