@@ -316,80 +316,88 @@ function scatter_graph(data, ctx) {
 
 function scatter_subproject_graph(data, ctx) {
   // flatten one point per session‐subproject.
-  const pts = [];
-  data.forEach(s => {
-    const start = new Date(s.start_time);
-    const end   = new Date(s.end_time);
-    const dur   = (end - start) / (1000 * 60 * 60); // hours
-    (s.subprojects || []).forEach(sp => {
-      const name = sp.name || sp;
-      pts.push({
-        x: end,
-        y: dur,
-        projectName: name
-      });
+    const pts = [];
+    data.forEach(s => {
+      const start = new Date(s.start_time);
+      const end   = new Date(s.end_time);
+      const dur   = (end - start) / (1000 * 60 * 60); // hours
+      if ((s.subprojects || []).length) {
+        (s.subprojects).forEach(sp => {
+          const name = sp.name || sp;
+          pts.push({
+            x: end,
+            y: dur,
+            projectName: name
+          });
+        });
+      } else {
+        pts.push({
+          x: end,
+          y: dur,
+          projectName: "no subproject"
+        });
+      }
     });
-  });
 
-  // group by subproject name
-  const grouped = Object.entries(
+    // group by subproject name
+    const grouped = Object.entries(
     pts.reduce((acc, p) => {
       (acc[p.projectName] = acc[p.projectName]||[]).push(p);
       return acc;
     }, {})
-  ).sort((a,b)=>a[0].localeCompare(b[0]));
+    ).sort((a,b)=>a[0].localeCompare(b[0]));
 
-  // pick a color per subproject
-  const colors = {};
-  grouped.forEach(([name], i)=> {
+    // pick a color per subproject
+    const colors = {};
+    grouped.forEach(([name], i)=> {
     colors[name] = generateRandomColor(i, grouped.length);
-  });
+    });
 
-  const datasets = grouped.map(([name, arr])=> ({
-    label: name,
-    data: arr,
-    backgroundColor: colors[name],
-    pointStyle: 'rect',
-    pointRotation: 45,
-    pointHoverRadius: 6
-  }));
+    const datasets = grouped.map(([name, arr])=> ({
+        label: name,
+        data: arr,
+        backgroundColor: colors[name],
+        pointStyle: 'rect',
+        pointRotation: 45,
+        pointHoverRadius: 6
+    }));
 
-  // destroy old
-  const old = Chart.getChart(ctx);
-  if (old) old.destroy();
+    // destroy old
+    const old = Chart.getChart(ctx);
+    if (old) old.destroy();
 
-  // figure out time‐unit as before
-  const allX = pts.map(p=>p.x).sort((a,b)=>a-b);
-  const unit = getChartUnit(allX[allX.length-1], allX[0]);
+    // figure out time‐unit as before
+    const allX = pts.map(p=>p.x).sort((a,b)=>a-b);
+    const unit = getChartUnit(allX[allX.length-1], allX[0]);
 
-  new Chart(ctx, {
-    type: 'scatter',
-    data: { datasets },
-    options: {
-      responsive: true,
-      scales: {
-        x: {
-          type: 'time',
-          time: { unit },
-          title: { display: true, text: 'Date' }
-        },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: 'Duration (hours)' }
-        }
-      },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label(ctx) {
-              const v = ctx.parsed.y.toFixed(2);
-              return `${ctx.dataset.label}: ${v} h`;
+    new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              type: 'time',
+              time: { unit },
+              title: { display: true, text: 'Date' }
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Duration (hours)' }
+            }
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const v = ctx.parsed.y.toFixed(2);
+                  return `${ctx.dataset.label}: ${v} h`;
+                }
+              }
             }
           }
         }
-      }
-    }
-  });
+    });
 }
 
 
