@@ -36,7 +36,7 @@ class InsightsView(LoginRequiredMixin, View):
         sessions = filter_sessions_by_params(request, sessions)
 
         # Load conversation history for the selected model
-        selected_model = request.GET.get('model', "gemini-2.0-pro-exp-02-05")
+        selected_model = request.GET.get('model', "gemini-2.5-flash-preview--05-20") # Default model
 
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
         handler = IN_MEM_CACHE.get(handler_key)
@@ -73,7 +73,7 @@ class InsightsView(LoginRequiredMixin, View):
         sessions_updated = request.session.get("sessions_updated", False)
 
         # Retrieve selected model from form with default
-        selected_model = request.POST.get("model", "gemini-2.0-pro-exp-02-05")
+        selected_model = request.POST.get("model", "gemini-2.5-flash-preview--05-20") # Default model
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
 
         # Check if the handler is in memory and not expired

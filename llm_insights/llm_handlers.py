@@ -1,6 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from google import genai
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
 from AutumnWeb import settings
 from core.utils import build_project_json_from_sessions
 
@@ -32,10 +33,17 @@ class BaseLLMHandler(ABC):
 class GeminiHandler(BaseLLMHandler):
     """Handler for Google's Gemini API"""
 
-    def __init__(self, model="gemini-2.0-pro-exp-02-05"):
+    def __init__(self, model="gemini-2.5-flash-preview--05-20"):
         self.api_key = settings.GEMINI_API_KEY
         self.client = genai.Client(api_key=self.api_key)
-        self.chat = self.client.chats.create(model=model)
+        self.google_search_tool = Tool(
+            google_search=GoogleSearch()
+        )
+        self.chat = self.client.chats.create(model=model,
+                                             config=GenerateContentConfig(
+                                                 tools=[self.google_search_tool],
+                                                 response_modalities=["TEXT"]
+                                             ))
 
         self.username = None
         self.session_data = None
@@ -98,11 +106,21 @@ class GeminiHandler(BaseLLMHandler):
         response = self.chat.send_message(update_session_data_prompt)
 
         assistant_response = response.text
+        sources = []
+        # check for sources from the Google Search tool
+        if response.candidates:
+            if response.candidates[0].grounding_metadata.grounding_chunks:
+                for chunk in response.candidates[0].grounding_metadata.grounding_chunks:
+                    if chunk.web:
+                        sources.append({
+                            "link": chunk.web.uri,
+                            "text": chunk.web.title
+                        })
 
         # Add message to conversation history
         self.conversation_history.append({"role": "system", "content": update_session_data_prompt})
         self.conversation_history.append({"role": "user", "content": user_prompt}) # display user message
-        self.conversation_history.append({"role": "assistant", "content": assistant_response})
+        self.conversation_history.append({"role": "assistant", "content": assistant_response, "sources": sources})
 
         return assistant_response
 
@@ -126,9 +144,19 @@ class GeminiHandler(BaseLLMHandler):
 
             # Extract response text
             assistant_response = response.text
+            sources = []
+            # check for sources from the Google Search tool
+            if response.candidates:
+                if response.candidates[0].grounding_metadata.grounding_chunks:
+                    for chunk in response.candidates[0].grounding_metadata.grounding_chunks:
+                        if chunk.web:
+                            sources.append({
+                                "link": chunk.web.uri,
+                                "title": chunk.web.title
+                            })
 
             # Add assistant response to our conversation history
-            self.conversation_history.append({"role": "assistant", "content": assistant_response})
+            self.conversation_history.append({"role": "assistant", "content": assistant_response, "sources": sources})
 
             return assistant_response
         except Exception as e:
