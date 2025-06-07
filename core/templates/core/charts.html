@@ -67,12 +67,11 @@
     <section id="chart_section" class="card">
 
         <input type="hidden" id="projects_link" value="{% url 'api_tally_by_sessions' %}">
+        <input type="hidden" id="subprojects_tally_link" value="{% url 'api_tally_by_subprojects' %}">
         <input type="hidden" id="subprojects_link" value="{% url 'api_list_subprojects_param' %}">
         <input type="hidden" id="sessions_link" value="{% url 'api_list_sessions' %}">
         <input type="hidden" id="raw_sessions_link" value ="{% url 'api_list_sessions' %}">
         <input type="hidden" id="wordcloud_notes_link" value ="{% url 'api_wordcloud_notes' %}">
-
-
 
         <!-- display the graph using chart js -->
         <div id="canvas_container">

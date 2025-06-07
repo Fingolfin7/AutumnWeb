@@ -882,13 +882,35 @@ def list_projects(request):
 @api_view(['GET'])
 def tally_by_sessions(request):
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
-    project = request.query_params.get('project_name')
-    if project:
-        sessions = filter_by_projects(sessions, name=project)
-
     sessions = filter_sessions_by_params(request, sessions)
     project_durations = tally_project_durations(sessions)
     return Response(project_durations)
+
+
+@login_required
+@api_view(['GET'])
+def tally_by_subprojects(request):
+    """
+    Returns a list of { name: subproject_name, total_time: minutes } for
+    all sessions in the window, grouped by subproject.
+    """
+    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = filter_sessions_by_params(request, sessions)
+
+    # aggregate durations
+    sub_durations = {}
+    for s in sessions:
+        dur = s.duration or 0
+        for sub in s.subprojects.all():
+            sub_durations.setdefault(sub.name, 0)
+            sub_durations[sub.name] += dur
+
+    payload = [
+        { 'name': name, 'total_time': total }
+        for name, total in sub_durations.items()
+    ]
+    return Response(payload)
+
 
 @login_required
 @api_view(['GET'])

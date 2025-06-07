@@ -1,91 +1,135 @@
+// $(document).ready(function(){
+//     function render(type) {
+//         // get the chart canvas, and selected type from the "chart_type" select element
+//         let canvas = $("#chart")[0].getContext('2d');
+//
+//         // make a map of the chart type to the function that will render the chart
+//         let chart_types = {
+//             'pie': pie_chart,
+//             'bar': bar_graph,
+//             'scatter': scatter_graph,
+//             'calendar': calendar_graph,
+//             'wordcloud': wordcloud,
+//         }
+//
+//         // get filter values (default to start of the current year and current date)
+//         let start_date = $('#start_date').val();
+//         let end_date = $('#end_date').val();
+//         let project_name = $('#project-search').val() || "";
+//
+//         console.log('project_name:', project_name, 'start_date:', start_date, 'end_date:', end_date);
+//
+//         // change the date formats to date objects and convert the format to %m-%d-%Y
+//         start_date = start_date ? format_date(new Date(start_date)) : "";
+//         end_date = end_date ? format_date(new Date(end_date)) : "";
+//
+//         get_project_data(type, start_date, end_date, project_name).then(data => {
+//             if (data.length > 0) {
+//                 // console.log('data:', data);
+//                 type !== 'wordcloud' ? chart_types[type](data, canvas) : chart_types[type](data, canvas, "#chart");
+//             } else {
+//                 console.warn('No data available for the selected filters.');
+//             }
+//         }).catch(error => {
+//             console.error('Error fetching project data:', error);
+//         });
+//     }
+//
+//     let selectType = $("#chart_type");
+//     let draw = $("#draw");
+//
+//     // set the default start date to the start of this month
+//     let current_date = new Date();
+//     $("#start_date").val(new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0]);
+//     $("#end_date").val(new Date().toISOString().split('T')[0]);
+//
+//     render(selectType.val());
+//
+//     draw.on('click', function(){
+//         let type = selectType.val();
+//         render(type);
+//     });
+//
+// });
+
 $(document).ready(function(){
-    function render(type) {
-        // get the chart canvas, and selected type from the "chart_type" select element
-        let canvas = $("#chart")[0].getContext('2d');
+    let selectType = $('#chart_type');
+    let draw       = $('#draw');
 
-        // make a map of the chart type to the function that will render the chart
-        let chart_types = {
-            'pie': pie_chart,
-            'bar': bar_graph,
-            'scatter': scatter_graph,
-            'calendar': calendar_graph,
-            'wordcloud': wordcloud,
-        }
-
-        // get filter values (default to start of the current year and current date)
-        let start_date = $('#start_date').val();
-        let end_date = $('#end_date').val();
-        let project_name = $('#project-search').val() || "";
-
-        console.log('project_name:', project_name, 'start_date:', start_date, 'end_date:', end_date);
-
-        // change the date formats to date objects and convert the format to %m-%d-%Y
-        start_date = start_date ? format_date(new Date(start_date)) : "";
-        end_date = end_date ? format_date(new Date(end_date)) : "";
-
-        get_project_data(type, start_date, end_date, project_name).then(data => {
-            if (data.length > 0) {
-                // console.log('data:', data);
-                type !== 'wordcloud' ? chart_types[type](data, canvas) : chart_types[type](data, canvas, "#chart");
-            } else {
-                console.warn('No data available for the selected filters.');
-            }
-        }).catch(error => {
-            console.error('Error fetching project data:', error);
-        });
-    }
-
-    let selectType = $("#chart_type");
-    let draw = $("#draw");
 
     // set the default start date to the start of this month
     let current_date = new Date();
     $("#start_date").val(new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0]);
     $("#end_date").val(new Date().toISOString().split('T')[0]);
 
-    render(selectType.val());
+    function render() {
+        let type         = selectType.val();
+        let canvas = $('#chart')[0].getContext('2d');
 
-    draw.on('click', function(){
-        let type = selectType.val();
-        render(type);
-    });
+        let start_date = $('#start_date').val();
+        let end_date = $('#end_date').val();
 
+        start_date = start_date ? format_date(new Date(start_date)) : "";
+        end_date = end_date ? format_date(new Date(end_date)) : "";
+
+        let project_name = $('#project-search').val().trim();
+
+        get_project_data(type, start_date, end_date, project_name)
+          .then(data => {
+            if (!data.length) {
+              console.warn('No data');
+              return;
+            }
+
+            if (project_name && type === 'scatter'){
+                type = 'scatter_subprojects';
+            }
+
+            // pick the right drawer
+            const chartFns = {
+              pie: pie_chart,
+              bar: bar_graph,
+              scatter: scatter_graph,
+              scatter_subprojects: scatter_subproject_graph,
+              calendar: calendar_graph,
+              wordcloud: wordcloud
+            };
+             type !== 'wordcloud' ? chartFns[type](data, canvas): chartFns[type](data, canvas, "#chart");
+          })
+          .catch(console.error);
+    }
+
+    // initial draw
+    render();
+    draw.on('click', render);
 });
 
 function get_project_data(type, start_date="", end_date="", project_name=""){
     // by default get the data from all the projects for all time
     let url = ""
 
-    let requires_session_tallies = ['scatter', 'calendar', 'heatmap', 'scatter heatmap'];
-    let requires_raw_sessions = ['wordcloud'];
+    const wantSubprojects =
+    project_name &&
+    (type === 'pie' || type === 'bar');
 
-    if (jQuery.inArray(type, requires_session_tallies) > -1){
+    if (wantSubprojects) {
+        url = $('#subprojects_tally_link').val();
+    }
+    else if (['scatter','calendar','heatmap'].includes(type)) {
         url = $('#sessions_link').val();
     }
-    else if (jQuery.inArray(type, requires_raw_sessions) > -1){
+    else if (type==='wordcloud') {
         url = $('#raw_sessions_link').val();
     }
-    else{
-        url = $("#projects_link").val();
+    else {
+        url = $('#projects_link').val();
     }
 
-    if (project_name){
-        url += `?project_name=${project_name}`;
-    }
-
-    if (start_date){
-        if (!url.includes("?")){ // if the project filter is not present
-            url += "?";
-        }
-        else{ // if the project filter is present just append the date filters
-            url += "&";
-        }
-
-        url += `start_date=${start_date}`;
-            if (end_date){
-            url += `&end_date=${end_date}`;
-        }
-    }
+    const params = [];
+    if (project_name)  params.push(`project_name=${project_name}`);
+    if (start_date)    params.push(`start_date=${start_date}`);
+    if (end_date)      params.push(`end_date=${end_date}`);
+    if (params.length) url += '?' + params.join('&');
 
     console.log(url);
 
@@ -322,6 +366,89 @@ function scatter_graph(data, ctx) {
         }
     });
 }
+
+
+function scatter_subproject_graph(data, ctx) {
+  // data is the array of Sessions from list_sessions,
+  // each with a `subprojects` array of { name, … } or name strings.
+  // we’ll flatten one point per session‐subproject.
+  const pts = [];
+  data.forEach(s => {
+    const start = new Date(s.start_time);
+    const end   = new Date(s.end_time);
+    const dur   = (end - start) / (1000 * 60 * 60); // hours
+    (s.subprojects || []).forEach(sp => {
+      // depending on your serializer you may have sp.name or just sp
+      const name = sp.name || sp;
+      pts.push({
+        x: end,
+        y: dur,
+        projectName: name
+      });
+    });
+  });
+
+  // group by subproject name
+  const grouped = Object.entries(
+    pts.reduce((acc, p) => {
+      (acc[p.projectName] = acc[p.projectName]||[]).push(p);
+      return acc;
+    }, {})
+  ).sort((a,b)=>a[0].localeCompare(b[0]));
+
+  // pick a color per subproject
+  const colors = {};
+  grouped.forEach(([name], i)=> {
+    colors[name] = generateRandomColor(i, grouped.length);
+  });
+
+  const datasets = grouped.map(([name, arr])=> ({
+    label: name,
+    data: arr,
+    backgroundColor: colors[name],
+    pointStyle: 'rect',
+    pointRotation: 45,
+    pointHoverRadius: 6
+  }));
+
+  // destroy old
+  const old = Chart.getChart(ctx);
+  if (old) old.destroy();
+
+  // figure out time‐unit as before
+  const allX = pts.map(p=>p.x).sort((a,b)=>a-b);
+  const unit = getChartUnit(allX[allX.length-1], allX[0]);
+
+  new Chart(ctx, {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true,
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit },
+          title: { display: true, text: 'Date' }
+        },
+        y: {
+          beginAtZero: true,
+          title: { display: true, text: 'Duration (hours)' }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label(ctx) {
+              const v = ctx.parsed.y.toFixed(2);
+              return `${ctx.dataset.label}: ${v} h`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
 
 function calendar_graph(data, ctx, title = "Projects Calendar") {
     // Aggregate data by date
