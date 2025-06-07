@@ -882,6 +882,12 @@ def list_projects(request):
 @api_view(['GET'])
 def tally_by_sessions(request):
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
+
+    # forces an exact (though case-insensitive)  match for project names (e.g. "chess" vs "Chess: Road to 2100")
+    project = request.query_params.get('project_name')
+    if project:
+        sessions = sessions.filter(project__name=project)
+
     sessions = filter_sessions_by_params(request, sessions)
     project_durations = tally_project_durations(sessions)
     return Response(project_durations)
@@ -895,6 +901,12 @@ def tally_by_subprojects(request):
     all sessions in the window, grouped by subproject.
     """
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
+
+    #  # forces an exact (though case-insensitive) match for project names (e.g. "chess" vs "Chess: Road to 2100")
+    project = request.query_params.get('project_name')
+    if project:
+        sessions = sessions.filter(project__name__iexact=project)
+
     sessions = filter_sessions_by_params(request, sessions)
 
     # aggregate durations
