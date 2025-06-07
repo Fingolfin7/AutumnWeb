@@ -913,12 +913,17 @@ def tally_by_subprojects(request):
     sub_durations = {}
     for s in sessions:
         dur = s.duration or 0
-        for sub in s.subprojects.all():
-            sub_durations.setdefault(sub.name, 0)
-            sub_durations[sub.name] += dur
+        subs = list(s.subprojects.all())
+        if subs:
+            for sub in subs:
+                sub_durations.setdefault(sub.name, 0)
+                sub_durations[sub.name] += dur
+        else:
+            sub_durations.setdefault("no subproject", 0)
+            sub_durations["no subproject"] += dur
 
     payload = [
-        { 'name': name, 'total_time': total }
+        {"name": name, "total_time": total}
         for name, total in sub_durations.items()
     ]
     return Response(payload)

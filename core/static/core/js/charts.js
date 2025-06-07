@@ -315,16 +315,13 @@ function scatter_graph(data, ctx) {
 
 
 function scatter_subproject_graph(data, ctx) {
-  // data is the array of Sessions from list_sessions,
-  // each with a `subprojects` array of { name, … } or name strings.
-  // we’ll flatten one point per session‐subproject.
+  // flatten one point per session‐subproject.
   const pts = [];
   data.forEach(s => {
     const start = new Date(s.start_time);
     const end   = new Date(s.end_time);
     const dur   = (end - start) / (1000 * 60 * 60); // hours
     (s.subprojects || []).forEach(sp => {
-      // depending on your serializer you may have sp.name or just sp
       const name = sp.name || sp;
       pts.push({
         x: end,
