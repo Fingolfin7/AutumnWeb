@@ -58,6 +58,7 @@ class GeminiHandler(BaseLLMHandler):
 
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
+        You have access to google search to find more information if needed.
         
         When formating text and links please use markdown formatting.
         
@@ -73,6 +74,7 @@ class GeminiHandler(BaseLLMHandler):
         Refer to the new session data for the remainder of the conversation.
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
+        You have access to google search to find more information if needed.
         
         When formating text and links please use markdown formatting.
         
