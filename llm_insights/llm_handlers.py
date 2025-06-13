@@ -27,9 +27,6 @@ class BaseLLMHandler(ABC):
         pass
 
 
-
-
-
 class GeminiHandler(BaseLLMHandler):
     """Handler for Google's Gemini API"""
 
@@ -116,7 +113,7 @@ class GeminiHandler(BaseLLMHandler):
                     if chunk.web:
                         sources.append({
                             "link": chunk.web.uri,
-                            "text": chunk.web.title
+                            "text": chunk.web.title.strip()
                         })
 
         # Add message to conversation history
@@ -154,7 +151,7 @@ class GeminiHandler(BaseLLMHandler):
                         if chunk.web:
                             sources.append({
                                 "link": chunk.web.uri,
-                                "title": chunk.web.title
+                                "title": chunk.web.title.strip()
                             })
 
             # Add assistant response to our conversation history
