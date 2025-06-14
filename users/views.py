@@ -1,7 +1,7 @@
 from .forms import *
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 
 
@@ -18,6 +18,18 @@ def register(request):
     else:
         form = UserRegisterForm()
     return render(request, 'users/register.html', {'form': form})
+
+
+class CustomLoginView(LoginView):
+    def form_invalid(self, form):
+        response = super().form_invalid(form)
+        messages.error(self.request, 'Invalid username or password.')
+        return response
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        messages.success(self.request, 'Login successful.')
+        return response
 
 
 
