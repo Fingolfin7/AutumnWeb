@@ -48,6 +48,9 @@ To set up the project locally, follow these steps:
 
 7. **Create a superuser:**
     To access the admin panel, create a superuser by running.
+    ```sh
+    python manage.py createsuperuser
+    ```
     The admin panel can be accessed at `http://127/0.0.1:8000/admin`.
 
 # Additional Information
