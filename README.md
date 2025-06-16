@@ -55,7 +55,7 @@ To set up the project locally, follow these steps:
 
 # Additional Information
 
-- **JavaScript Libraries:** The project uses Chart.js for dynamic charting and wordcloud2.js for generating word clouds.
+- **JavaScript Libraries:** The project uses `Chart.js` for dynamic charting and `wordcloud2.js` for generating word clouds.
 
 # Pages and Screenshots
 
