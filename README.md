@@ -80,5 +80,5 @@ To set up the project locally, follow these steps:
 ![image](https://github.com/user-attachments/assets/b9b7bc73-b61b-4a7c-abb7-c78dfb7c2818)
 
 
-## Visualize Tracked Data Over a give period
+## Visualize Tracked Data Over a given period
 ![charts](https://github.com/user-attachments/assets/23cc10d5-e5f1-421d-a1cb-8b45521d45fc)
