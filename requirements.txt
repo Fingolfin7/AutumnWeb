@@ -11,3 +11,4 @@ inflect
 django-environ
 google-genai
 pytz
+django-cleanup

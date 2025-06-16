@@ -26,6 +26,7 @@ from users.forms import UserLoginForm
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
+    path("debug-session/", user_views.debug_session, name="debug_session"),
     path('insights/', include('llm_insights.urls')),
     path('register/', user_views.register, name='register'),
     path('login/', user_views.CustomLoginView.as_view(template_name='users/login.html',

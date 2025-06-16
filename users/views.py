@@ -3,7 +3,14 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 
+def debug_session(request):
+    return JsonResponse({
+        "is_authenticated": request.user.is_authenticated,
+        "user": str(request.user),
+        "backend": request.session.get('_auth_user_backend'),
+    })
 
 # Create your views here.
 def register(request):

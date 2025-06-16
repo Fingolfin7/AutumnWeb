@@ -29,7 +29,7 @@ environ.Env.read_env(overwrite=True)  # force the environment variables to be re
 SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env('DEBUG')
+DEBUG = env.bool('DEBUG', default=False)
 
 # Gemini API Key
 GEMINI_API_KEY = env('GEMINI_API_KEY')
@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_cleanup.apps.CleanupConfig',  # delete old files and images on file field and imagefield update/delete
 ]
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
@@ -64,7 +65,11 @@ REST_FRAMEWORK = {
     ],
 }
 
-AUTHENTICATION_BACKENDS = ['users.auth_backends.EmailOrUsernameModelBackend'] # use email or username to login
+
+AUTHENTICATION_BACKENDS = [
+    'users.auth_backends.EmailOrUsernameModelBackend', # use email or username to login
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -229,5 +234,5 @@ LOGIN_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'
 
 # AUDIT Settings
-RUN_AUDIT_SCHEDULER = env('RUN_AUDIT_SCHEDULER') == 'TRUE'  # convert the string to a boolean
-AUDIT_PERIOD = int(env('AUDIT_PERIOD'))
+RUN_AUDIT_SCHEDULER = env.bool('RUN_AUDIT_SCHEDULER', False) # convert the string to a boolean
+AUDIT_PERIOD = env.int('AUDIT_PERIOD')
