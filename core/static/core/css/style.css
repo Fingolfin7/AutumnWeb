@@ -227,6 +227,19 @@ body.dark-mode .main-link {
     border-radius: 10px;
 }
 
+.centered-card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.middle-card {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
 .bordered-top {
     border-top: 2px solid #ccc;
 }
@@ -404,6 +417,25 @@ input:checked + .slider:before {
 
 .container.show-sidebar .main-body {
     margin-left: 13.75rem; /* Adjust main body margin when sidebar is visible */
+}
+
+/* password toggle icon */
+.password-toggle-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 52%;
+  cursor: pointer;
+}
+
+.password-toggle-icon i {
+  font-size: 0.6rem;
+  transition: color 0.3s ease-in-out;
+  /*margin-bottom: 20px;*/
+}
+
+.password-toggle-icon i:hover {
+  color: var(--accent-color);
 }
 
 /* session note slider */

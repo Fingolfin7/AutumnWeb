@@ -3,9 +3,9 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-    <h2>Register</h2>
-        <form method="post" class="card stacked">
+        <form method="post" class="card stacked centered-card thirds-width">
             {% csrf_token %}
+            <h2>Register</h2>
             <span class="label-input">
                 {{ form.username.errors }}
                 {{ form.username.label_tag }}

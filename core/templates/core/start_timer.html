@@ -10,12 +10,12 @@
 {% endblock %}
 
 {% block content %}
-    <form class="card" method="post" enctype="multipart/form-data">
+    <form class="card three-quarters-width" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <section id="search-projects">
             <span class="label-input">
                 <label for="project-search"><i class="fa fa-search"></i> Search</label>
-                <input type="text" id="project-search" name="project" placeholder="Projects" class="half-width"
+                <input type="text" id="project-search" name="project" placeholder="Projects" class="three-quarters-width"
                        autocomplete="off" data-ajax_url="{% url 'api_search_projects' %}">
             </span>
             <div id="project-search-results"></div>

@@ -3,9 +3,11 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-    <h2>Login</h2>
-        <form method="post" class="card stacked">
+        <form method="post" class="card stacked centered-card thirds-width">
             {% csrf_token %}
+
+            <h2>Login</h2>
+
             <span class="label-input">
                 {{ form.username.errors }}
                 {{ form.username.label_tag }}
@@ -16,22 +18,52 @@
                 {{ form.password.errors }}
                 {{ form.password.label_tag }}
                 {{ form.password }}
+                <span class="password-toggle-icon"><i class="fa fa-eye" id="eye-icon"></i></span>
             </span>
+
+            <script>
+                $(document).ready(function() {
+                    const eye = $("#eye-icon");
+                    const password = $("#password");
+
+                    // Initially hide the eye icon
+                    eye.hide();
+
+                    // Show the eye icon when the password field is focused
+                    password.focus(function() {
+                        eye.show();
+                    });
+
+                    eye.click(function() {
+                        let type = password.attr('type');
+
+                        if (type === 'password') {
+                            password.attr('type', 'text');
+                            $(this).removeClass('fa-eye').addClass('fa-eye-slash');
+                        } else {
+                            password.attr('type', 'password');
+                            $(this).removeClass('fa-eye-slash').addClass('fa-eye');
+                        }
+                    });
+                });
+           </script>
 
             <span>
                 <button type="submit" class="primary-button">
-                    Login
+                    LOGIN
                     <i class="fa fa-check-circle"></i>
                 </button>
-
-                <br> <br>
-
-                <a href="{% url 'register' %}" class="plain-link transparent-button">
-                    <small>
-                        <i>Don't have an account? Register.</i>
-                        <i class="fa fa-sign-up"></i>
-                    </small>
-                </a>
             </span>
+
+            <small>
+                <a href="{% url 'register' %}" class="plain-link">
+                    <i>Register</i>
+                    <i class="fa fa-sign-up"></i>
+                </a>
+{#                |#}
+{#                <a href="{% url 'password_reset' %}" class="plain-link">#}
+{#                    <i>Password Reset</i>#}
+{#                </a>#}
+            </small>
         </form>
 {% endblock %}
