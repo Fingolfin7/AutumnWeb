@@ -17,13 +17,11 @@ def static_version(request):
 
     # Use STATIC_ROOT in production, otherwise look in app's static directory
     base_static = settings.STATIC_ROOT if not settings.DEBUG else os.path.join("core", "static")
-    print("Base static directory:", base_static)
 
     static_dirs = {
         'js': os.path.join(base_static, "core", "js"),
         'css': os.path.join(base_static, "core", "css"),
     }
-    print("Static static directory:", static_dirs)
 
     # Scan each directory
     for dir_path in static_dirs.values():
@@ -41,8 +39,8 @@ def static_version(request):
 
     cache.set(cache_key, version, timeout)
 
-    if settings.DEBUG:
-        print("Static directories: ", static_dirs)
-        print("Static version: ", json.dumps(version, indent=4))
+    # if settings.DEBUG:
+    #     print("Static directories: ", static_dirs)
+    #     print("Static version: ", json.dumps(version, indent=4))
 
     return {'static_version': version}
