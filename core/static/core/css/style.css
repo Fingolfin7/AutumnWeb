@@ -132,8 +132,8 @@ body.dark-mode {
 }
 
 .left-panel {
-    padding: 4% 2% 2% 2%;
-    width: 20%;
+    padding: 4% 0 2% 2%;
+    width: auto;
     position: fixed;
     overflow: auto;
     transition: transform 0.3s ease;
