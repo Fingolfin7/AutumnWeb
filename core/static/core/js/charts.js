@@ -707,7 +707,7 @@ function heatmap_graph(data, ctx) {
         backgroundColor(ctx) {
           const v = ctx.dataset.data[ctx.dataIndex].v;
           const alpha = maxAvg ? v / maxAvg : 0;
-          return `rgba(0,123,255,${alpha})`;
+          return `rgba(0, 128, 0,${alpha})`;
         },
         borderWidth: 0
       }]
@@ -752,7 +752,7 @@ function heatmap_graph(data, ctx) {
             stepSize: 1,
             callback(v) { return `${v}:00`; }
           },
-          title: { display: true, text: 'Hour of Day' },
+          title: { display: true, text: 'Time of Day' },
           grid: { display: false }
         }
       }

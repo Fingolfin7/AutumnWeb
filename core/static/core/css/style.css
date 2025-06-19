@@ -227,6 +227,12 @@ body.dark-mode .main-link {
     border-radius: 10px;
 }
 
+body.dark-mode .card{
+    background-color: var(--card-background-dark);
+    color: var(--dark-text);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
 .centered-card {
     position: absolute;
     top: 50%;
@@ -298,11 +304,7 @@ body.dark-mode .main-link {
 }
 
 
-body.dark-mode .card{
-    background-color: var(--card-background-dark);
-    color: var(--dark-text);
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-}
+
 
 .stacked {
     display: flex;
