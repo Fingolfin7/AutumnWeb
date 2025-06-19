@@ -640,70 +640,76 @@ function wordcloud(data, ctx, canvasId) {
 }
 
 function heatmap_graph(data, ctx) {
-  // parse the picker inputs so we know the date‐range
+  // 1) figure out your picker dates
   const rawStart = $('#start_date').val();
-  const rawEnd = $('#end_date').val();
+  const rawEnd   = $('#end_date').val();
   const startDate = rawStart ? new Date(rawStart) : null;
-  const endDate = rawEnd ? new Date(rawEnd) : null;
+  const endDate   = rawEnd   ? new Date(rawEnd)   : null;
 
-  // We'll bin total minutes into weekday/hour
-  const totals = []; // 7 × 24 array
-  for (let wd = 0; wd < 7; wd++) {
-    totals[wd] = Array(24).fill(0);
-  }
-
-  // accumulate durations
+  // 2) bin total hours by [weekday][hour]
+  const totals = Array.from({ length: 7 }, () => Array(24).fill(0));
   data.forEach(item => {
     const t0 = new Date(item.start_time);
     const t1 = new Date(item.end_time);
     let cur = new Date(t0);
+
+    // split across hour‐boundaries
     while (cur < t1) {
-      // end of this hour block
       const nextHour = new Date(cur);
       nextHour.setHours(cur.getHours() + 1, 0, 0, 0);
       const blockEnd = nextHour < t1 ? nextHour : t1;
-      const durHrs = (blockEnd - cur) / 36e5; // ms → hours
+      const durHrs   = (blockEnd - cur) / 36e5; // ms → hours
 
-      const wd = cur.getDay(), hr = cur.getHours();
-      totals[wd][hr] += durHrs;
-
+      totals[cur.getDay()][cur.getHours()] += durHrs;
       cur = blockEnd;
     }
   });
 
-  // count weekdays in period for averaging
-  const weekdayCounts = (startDate && endDate)
+  // 3) how many of each weekday in the window? (for averaging)
+  const wkCounts = (startDate && endDate)
     ? countWeekdays(startDate, endDate)
     : Array(7).fill(1);
 
-  // build Chart.js matrix data
+  // 4) build a flat matrix for Chart.js
   let maxAvg = 0;
   const matrixData = [];
   for (let wd = 0; wd < 7; wd++) {
     for (let hr = 0; hr < 24; hr++) {
-      const avg = totals[wd][hr] / (weekdayCounts[wd] || 1);
+      const avg = totals[wd][hr] / (wkCounts[wd] || 1);
       maxAvg = Math.max(maxAvg, avg);
-      matrixData.push({ x: hr, y: wd, v: avg });
+      matrixData.push({ x: wd, y: hr, v: avg });
     }
   }
 
-  // destroy old chart
+  // 5) destroy existing chart
   const old = Chart.getChart(ctx);
   if (old) old.destroy();
 
+  // 6) draw!
   new Chart(ctx, {
     type: 'matrix',
     data: {
       datasets: [{
-        label: 'Avg hours',
+        label: 'Average hrs/day',
         data: matrixData,
-        backgroundColor(c) {
-          const v = c.dataset.data[c.dataIndex].v;
-          // use a blue heat‐scale
-          const alpha = maxAvg ? v / maxAvg : 0;
-          return `rgba(0,  123, 255, ${alpha})`;
+        width(ctx) {
+          const c = ctx.chart;
+          const area = c.chartArea;
+          const full = area ? (area.right - area.left) : c.width;
+          return full / 7 - 1;
         },
-        borderWidth: 1
+        height(ctx) {
+          const c = ctx.chart;
+          const area = c.chartArea;
+          const full = area ? (area.bottom - area.top) : c.height;
+          return full / 24 - 1;
+        },
+        backgroundColor(ctx) {
+          const v = ctx.dataset.data[ctx.dataIndex].v;
+          const alpha = maxAvg ? v / maxAvg : 0;
+          return `rgba(0,123,255,${alpha})`;
+        },
+        borderWidth: 0
       }]
     },
     options: {
@@ -711,15 +717,15 @@ function heatmap_graph(data, ctx) {
       plugins: {
         title: {
           display: true,
-          text: 'Hourly Activity Heatmap'
+          text: 'Weekly Hourly Heatmap'
         },
         tooltip: {
           callbacks: {
             title() { return ''; },
             label(ctx) {
-              const { x: hr, y: wd, v } = ctx.dataset.data[ctx.dataIndex];
+              const { x: wd, y: hr, v } = ctx.dataset.data[ctx.dataIndex];
               const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-              return `${days[wd]} ${hr}:00 – ${ (v||0).toFixed(2) } h (avg)`;
+              return `${days[wd]} ${hr}:00 → ${(v||0).toFixed(2)} h avg`;
             }
           }
         },
@@ -729,21 +735,24 @@ function heatmap_graph(data, ctx) {
         x: {
           type: 'linear',
           min: 0,
-          max: 23,
-          ticks: { stepSize: 1, callback: v => `${v}:00` },
-          title: { display: true, text: 'Hour of Day' },
+          max: 6,
+          ticks: {
+            stepSize: 1,
+            callback(v) { return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][v]; }
+          },
+          title: { display: true, text: 'Weekday' },
           grid: { display: false }
         },
         y: {
           type: 'linear',
           min: 0,
-          max: 6,
+          max: 23,
+          reverse: true,
           ticks: {
             stepSize: 1,
-            callback: v => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][v]
+            callback(v) { return `${v}:00`; }
           },
-          title: { display: true, text: 'Weekday' },
-          reverse: true,
+          title: { display: true, text: 'Hour of Day' },
           grid: { display: false }
         }
       }
