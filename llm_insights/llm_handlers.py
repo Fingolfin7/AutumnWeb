@@ -30,7 +30,7 @@ class BaseLLMHandler(ABC):
 class GeminiHandler(BaseLLMHandler):
     """Handler for Google's Gemini API"""
 
-    def __init__(self, model="gemini-2.5-flash-preview--05-20"):
+    def __init__(self, model="gemini-2.5-flash-preview-05-20"):
         self.api_key = settings.GEMINI_API_KEY
         self.client = genai.Client(api_key=self.api_key)
         self.google_search_tool = Tool(
