@@ -38,7 +38,8 @@ $(document).ready(function(){
               scatter: scatter_graph,
               scatter_subprojects: scatter_subproject_graph,
               calendar: calendar_graph,
-              wordcloud: wordcloud
+              wordcloud: wordcloud,
+              heatmap: heatmap_graph
             };
              type !== 'wordcloud' ? chartFns[type](data, canvas): chartFns[type](data, canvas, "#chart");
           })
@@ -132,6 +133,17 @@ function format_date(date){
 
     //format date
     return `${month}-${day}-${year}`;
+}
+
+// heatmap helper count how many times each weekday occurs in the [start, end] range
+function countWeekdays(startDate, endDate) {
+  const counts = Array(7).fill(0);
+  const d = new Date(startDate);
+  while (d <= endDate) {
+    counts[d.getDay()] += 1;
+    d.setDate(d.getDate() + 1);
+  }
+  return counts;
 }
 
 function pie_chart(data, ctx) {
@@ -313,7 +325,6 @@ function scatter_graph(data, ctx) {
     });
 }
 
-
 function scatter_subproject_graph(data, ctx) {
   // flatten one point per session‐subproject.
     const pts = [];
@@ -399,7 +410,6 @@ function scatter_subproject_graph(data, ctx) {
         }
     });
 }
-
 
 function calendar_graph(data, ctx, title = "Projects Calendar") {
     // Aggregate data by date
@@ -551,7 +561,6 @@ function calendar_graph(data, ctx, title = "Projects Calendar") {
     });
 }
 
-
 function wordcloud(data, ctx, canvasId) {
     // List of common filler words to exclude
     const stopWords = new Set([
@@ -630,3 +639,114 @@ function wordcloud(data, ctx, canvasId) {
     });
 }
 
+function heatmap_graph(data, ctx) {
+  // parse the picker inputs so we know the date‐range
+  const rawStart = $('#start_date').val();
+  const rawEnd = $('#end_date').val();
+  const startDate = rawStart ? new Date(rawStart) : null;
+  const endDate = rawEnd ? new Date(rawEnd) : null;
+
+  // We'll bin total minutes into weekday/hour
+  const totals = []; // 7 × 24 array
+  for (let wd = 0; wd < 7; wd++) {
+    totals[wd] = Array(24).fill(0);
+  }
+
+  // accumulate durations
+  data.forEach(item => {
+    const t0 = new Date(item.start_time);
+    const t1 = new Date(item.end_time);
+    let cur = new Date(t0);
+    while (cur < t1) {
+      // end of this hour block
+      const nextHour = new Date(cur);
+      nextHour.setHours(cur.getHours() + 1, 0, 0, 0);
+      const blockEnd = nextHour < t1 ? nextHour : t1;
+      const durHrs = (blockEnd - cur) / 36e5; // ms → hours
+
+      const wd = cur.getDay(), hr = cur.getHours();
+      totals[wd][hr] += durHrs;
+
+      cur = blockEnd;
+    }
+  });
+
+  // count weekdays in period for averaging
+  const weekdayCounts = (startDate && endDate)
+    ? countWeekdays(startDate, endDate)
+    : Array(7).fill(1);
+
+  // build Chart.js matrix data
+  let maxAvg = 0;
+  const matrixData = [];
+  for (let wd = 0; wd < 7; wd++) {
+    for (let hr = 0; hr < 24; hr++) {
+      const avg = totals[wd][hr] / (weekdayCounts[wd] || 1);
+      maxAvg = Math.max(maxAvg, avg);
+      matrixData.push({ x: hr, y: wd, v: avg });
+    }
+  }
+
+  // destroy old chart
+  const old = Chart.getChart(ctx);
+  if (old) old.destroy();
+
+  new Chart(ctx, {
+    type: 'matrix',
+    data: {
+      datasets: [{
+        label: 'Avg hours',
+        data: matrixData,
+        backgroundColor(c) {
+          const v = c.dataset.data[c.dataIndex].v;
+          // use a blue heat‐scale
+          const alpha = maxAvg ? v / maxAvg : 0;
+          return `rgba(0,  123, 255, ${alpha})`;
+        },
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'Hourly Activity Heatmap'
+        },
+        tooltip: {
+          callbacks: {
+            title() { return ''; },
+            label(ctx) {
+              const { x: hr, y: wd, v } = ctx.dataset.data[ctx.dataIndex];
+              const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+              return `${days[wd]} ${hr}:00 – ${ (v||0).toFixed(2) } h (avg)`;
+            }
+          }
+        },
+        legend: { display: false }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          min: 0,
+          max: 23,
+          ticks: { stepSize: 1, callback: v => `${v}:00` },
+          title: { display: true, text: 'Hour of Day' },
+          grid: { display: false }
+        },
+        y: {
+          type: 'linear',
+          min: 0,
+          max: 6,
+          ticks: {
+            stepSize: 1,
+            callback: v => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][v]
+          },
+          title: { display: true, text: 'Weekday' },
+          reverse: true,
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
