@@ -640,43 +640,40 @@ function wordcloud(data, ctx, canvasId) {
 }
 
 function heatmap_graph(data, ctx) {
-  // 1) figure out your picker dates
-  const rawStart = $('#start_date').val();
-  const rawEnd   = $('#end_date').val();
-  const startDate = rawStart ? new Date(rawStart) : null;
-  const endDate   = rawEnd   ? new Date(rawEnd)   : null;
-
-  // 2) bin total hours by [weekday][hour]
+    // 1) Prepare storage
   const totals = Array.from({ length: 7 }, () => Array(24).fill(0));
+  const counts = Array.from({ length: 7 }, () => Array(24).fill(0));
+
+  // 2) Bin each session into hour‐blocks
   data.forEach(item => {
     const t0 = new Date(item.start_time);
     const t1 = new Date(item.end_time);
     let cur = new Date(t0);
 
-    // split across hour‐boundaries
     while (cur < t1) {
       const nextHour = new Date(cur);
       nextHour.setHours(cur.getHours() + 1, 0, 0, 0);
       const blockEnd = nextHour < t1 ? nextHour : t1;
-      const durHrs   = (blockEnd - cur) / 36e5; // ms → hours
+      const durHrs   = (blockEnd - cur) / 36e5; // ms→hours
 
-      totals[cur.getDay()][cur.getHours()] += durHrs;
+      const wd = cur.getDay();    // 0=Sun…6=Sat
+      const hr = cur.getHours();  // 0…23
+
+      totals[wd][hr] += durHrs;
+      counts[wd][hr] += 1;
+
       cur = blockEnd;
     }
   });
 
-  // 3) how many of each weekday in the window? (for averaging)
-  const wkCounts = (startDate && endDate)
-    ? countWeekdays(startDate, endDate)
-    : Array(7).fill(1);
-
-  // 4) build a flat matrix for Chart.js
+  // 3) Build matrix data and find max average
   let maxAvg = 0;
   const matrixData = [];
   for (let wd = 0; wd < 7; wd++) {
     for (let hr = 0; hr < 24; hr++) {
-      const avg = totals[wd][hr] / (wkCounts[wd] || 1);
-      maxAvg = Math.max(maxAvg, avg);
+      const cnt = counts[wd][hr];
+      const avg = cnt > 0 ? totals[wd][hr] / cnt : 0;
+      if (avg > maxAvg) maxAvg = avg;
       matrixData.push({ x: wd, y: hr, v: avg });
     }
   }
@@ -690,7 +687,7 @@ function heatmap_graph(data, ctx) {
     type: 'matrix',
     data: {
       datasets: [{
-        label: 'Average hrs/day',
+        label: 'Avg session length (hrs)',
         data: matrixData,
         width(ctx) {
           const c = ctx.chart;
