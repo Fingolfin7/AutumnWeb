@@ -12,17 +12,46 @@
   --color-transparent-white: rgba(255, 255, 255, 0.2);
 
   /* Text color */
-  --color-text-light: white;
+  --color-text-light: #c0c0c0; /* Silver/Light Gray */
 }
 
-/* Using the variables */
-.dodgerblue { background-color: var(--color-dodgerblue) !important; color: var(--color-text-light); }
-.dark-red { background-color: var(--color-dark-red) !important; color: var(--color-text-light); }
-.blue-grey { background-color: var(--color-blue-grey) !important; color: var(--color-text-light); }
-.cobalt-blue { background-color: var(--color-cobalt-blue) !important; color: var(--color-text-light); }
-.forestgreen { background-color: var(--color-forestgreen) !important; color: var(--color-text-light); }
-.ferngreen { background-color: var(--color-ferngreen) !important; color: var(--color-text-light); }
-.kellygreen { background-color: var(--color-kellygreen) !important; color: var(--color-text-light); }
-.lincolngreen { background-color: var(--color-lincolngreen) !important; color: var(--color-text-light); }
-.cadmium-red { background-color: var(--color-cadmium-red) !important; color: var(--color-text-light); }
-.transparent-white { background-color: var(--color-transparent-white) !important; }
+/* Using the variables (This section can be kept for compatibility or removed if unused) */
+.dodgerblue {
+  background-color: var(--color-dodgerblue) !important;
+  color: var(--dark-background);
+}
+.dark-red {
+  background-color: var(--color-dark-red) !important;
+  color: var(--dark-background);
+}
+.blue-grey {
+  background-color: var(--color-blue-grey) !important;
+  color: var(--light-text);
+}
+.cobalt-blue {
+  background-color: var(--color-cobalt-blue) !important;
+  color: var(--color-text-light);
+}
+.forestgreen {
+  background-color: var(--color-forestgreen) !important;
+  color: var(--color-text-light);
+}
+.ferngreen {
+  background-color: var(--color-ferngreen) !important;
+  color: var(--color-text-light);
+}
+.kellygreen {
+  background-color: var(--color-kellygreen) !important;
+  color: var(--dark-background);
+}
+.lincolngreen {
+  background-color: var(--color-lincolngreen) !important;
+  color: var(--dark-background);
+}
+.cadmium-red {
+  background-color: var(--color-cadmium-red) !important;
+  color: var(--color-text-light);
+}
+.transparent-white {
+  background-color: var(--color-transparent-white) !important;
+}
