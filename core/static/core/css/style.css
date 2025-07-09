@@ -21,11 +21,13 @@
   /* Backgrounds & Borders */
   --light-background: #f3f4f6; /* (Light mode remains for toggle functionality) */
   --dark-background: #121212; /* A deep, pure black background */
+  --img-mix-background: rgba(0, 0, 0, 0.63);
   --card-background-light: #ffffff;
   --card-background-dark: #1e1e1e; /* A slightly off-black for cards, like a terminal window */
   --border-dark: #333333; /* A subtle border */
   --border-light: #d1d5db;
   --section-border-width: 1px;
+  --card-bg-dark-alpha: rgba(30, 30, 30, 0.6); /* A semi-transparent dark background for cards in dark mode */
 
   /* Text Colors */
   --light-text: #121212;
@@ -66,6 +68,11 @@
   color: var(--main-yellow);
 }
 
+body{
+  background-size: contain;
+  background-blend-mode: multiply;
+}
+
 body.light-mode {
   background-color: var(--light-background);
   color: var(--light-text);
@@ -74,6 +81,10 @@ body.light-mode {
 body.dark-mode {
   background-color: var(--dark-background);
   color: var(--dark-text);
+}
+
+body.dark-mode.bg-active {
+  background-color: var(--img-mix-background);
 }
 
 .container {
@@ -207,10 +218,6 @@ body.dark-mode .main-link {
   padding: 2%;
 }
 
-.body {
-  padding: 2%;
-}
-
 .card {
   background-color: var(--card-background-light);
   padding: 2%;
@@ -224,6 +231,10 @@ body.dark-mode .card {
   color: var(--dark-text);
   box-shadow: none;
   border: 1px solid var(--border-dark);
+}
+
+body.dark-mode.bg-active .card {
+  background-color: var(--card-bg-dark-alpha); /*  #1e1e1e but with alpha */
 }
 
 .centered-card {

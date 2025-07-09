@@ -43,21 +43,28 @@ class CustomLoginView(LoginView):
 @login_required
 def profile(request):
     if request.method == 'POST':
-        user_form = UserUpdateForm(request.POST, instance=request.user)
-        profile_form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user.profile)
-        if user_form.is_valid() and profile_form.is_valid():
-            messages.success(request, 'Profile updated successfully.')
-            user_form.save()
-            profile_form.save()
+        u_form = UserUpdateForm(request.POST, instance=request.user)
+        p_form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user.profile)
+
+        if u_form.is_valid() and p_form.is_valid():
+            u_form.save()
+
+            # Handle background image removal
+            if p_form.cleaned_data.get('remove_background_image'):
+                profile = request.user.profile
+                if profile.background_image:
+                    profile.background_image.delete(save=False) # Delete file
+                profile.background_image = None
+
+            p_form.save()
+            messages.success(request, f'Profile updated successfully.')
             return redirect('profile')
-        else:
-            messages.error(request, 'Error updating profile. Please try again.')
     else:
-        user_form = UserUpdateForm(instance=request.user)
-        profile_form = ProfileUpdateForm(instance=request.user.profile)
+        u_form = UserUpdateForm(instance=request.user)
+        p_form = ProfileUpdateForm(instance=request.user.profile)
 
     context = {
-        'user_form': user_form,
-        'profile_form': profile_form
+        'user_form': u_form,
+        'profile_form': p_form
     }
     return render(request, 'users/profile.html', context)

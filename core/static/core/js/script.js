@@ -4,8 +4,17 @@ $(document).ready(function() {
     const burgerMenu = $('#burger-menu');
     const container = $('.container');
     const body = $('body');
+    const bgUrl = body.data('bg-url');
 
     body.addClass(currentTheme + '-mode');
+
+    // Set background image if dark mode is active
+    if (currentTheme === 'dark' && bgUrl) {
+        body.css('background-image', "url('" + bgUrl + "')").addClass('bg-active');
+    } else {
+        body.css('background-image', '').removeClass('bg-active');
+    }
+
     toggleSwitch.prop('checked', currentTheme === 'dark');
 
     toggleSwitch.on('change', function() {
@@ -18,6 +27,13 @@ $(document).ready(function() {
         body.removeClass('light-mode dark-mode');
         // Add the appropriate class
         body.addClass(theme + '-mode');
+
+        // Set background image if dark mode is active
+        if (theme === 'dark' && bgUrl) {
+            body.css('background-image', "url('" + bgUrl + "')").addClass('bg-active');
+        } else {
+            body.css('background-image', '').removeClass('bg-active');
+        }
         
         localStorage.setItem('theme', theme);
     });

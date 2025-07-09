@@ -17,6 +17,7 @@
                     Upload Image
                     {{ profile_form.image }}
                 </label>
+                {{ profile_form.image.errors }}
                 <script>
                     // Add the selected file name to the label so that the user can preview it
                     $('#id_image').on('change',function(){
@@ -54,6 +55,21 @@
                 {{ user_form.email.label_tag }}
                 {{ user_form.email }}
             </span>
+
+
+            <span class="label-input">
+                <label for="{{ profile_form.background_image.id_for_label }}"><i class="fas fa-cloud-upload-alt"></i> Upload Background Image</label>
+                {{ profile_form.background_image }}
+            </span>
+
+            {% if user.profile.background_image %}
+                <p>Current background:</p>
+                <img src="{{ user.profile.background_image.url }}" alt="Current background" style="max-width: 100px; max-height: 100px;">
+                <div class="flex-row align-center">
+                    {{ profile_form.remove_background_image }}
+                    {{ profile_form.remove_background_image.label_tag }}
+                </div>
+            {% endif %}
 
             <span>
                 <button type="submit" id="update-profile" class="primary-button">

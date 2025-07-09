@@ -34,7 +34,11 @@
 
         <link rel="shortcut icon" href="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" type="image/png">
     </head>
+    {% if user.is_authenticated and user.profile.background_image %}
+    <body data-bg-url="{{ user.profile.background_image.url }}">
+    {% else %}
     <body>
+    {% endif %}
         <div class="container">
             <div class="ribbon"> <!-- ribbon at the top of the page -->
                 <a href="{% url 'home' %}" class="plain-link flex-row thirds-width align-center">
