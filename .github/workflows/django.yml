@@ -32,6 +32,12 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE_CONTENTS }}" > AutumnWeb/.env
 
+      - name: Make migrations (optional)
+        run: python manage.py makemigrations --noinput
+        
+      - name: Apply migrations
+        run: python manage.py migrate --noinput    
+
       - name: Run Django tests
         env:
           DJANGO_SETTINGS_MODULE: AutumnWeb.settings
