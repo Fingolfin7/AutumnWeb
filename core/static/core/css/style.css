@@ -1,4 +1,13 @@
-/* No font import needed, we'll use system monospace fonts */
+@font-face {
+  font-family: 'Consolas';
+  src: url(https://fonts.cdnfonts.com/s/15025/Consolas.woff2) format('woff2'),
+       url(https://fonts.cdnfonts.com/s/15025/Consolas.woff)  format('woff'),
+       url(https://fonts.cdnfonts.com/s/15025/Consolas.ttf)   format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 
 * {
   margin: 0;
@@ -69,7 +78,9 @@
 }
 
 body{
-  background-size: contain;
+  background-repeat: no-repeat;
+  /*background-position: center;*/
+  background-size: cover;
   background-blend-mode: multiply;
 }
 
