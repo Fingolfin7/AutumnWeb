@@ -150,4 +150,5 @@ cython_debug/
 /Exports/
 /Logs/
 /.vscode
-db.rar
+*.rar
+/media/background_pics
