@@ -1,11 +1,7 @@
-@font-face {
-  font-family: 'Consolas';
-  src: url(https://fonts.cdnfonts.com/s/15025/Consolas.woff2) format('woff2'),
-       url(https://fonts.cdnfonts.com/s/15025/Consolas.woff)  format('woff'),
-       url(https://fonts.cdnfonts.com/s/15025/Consolas.ttf)   format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap');
+
+* {
+  font-family: 'Fira Code', Consolas, 'Courier New', monospace;
 }
 
 
@@ -13,8 +9,7 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  /* Use a classic monospace font for the terminal look */
-  font-family: Consolas, "Courier New", monospace;
+  font-family: Consolas, "Fira Code", "Courier New", monospace;
 }
 
 :root {
