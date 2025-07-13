@@ -1,15 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap');
 
 * {
-  font-family: 'Fira Code', Consolas, 'Courier New', monospace;
-}
-
-
-* {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: Consolas, "Fira Code", "Courier New", monospace;
+  font-family: 'Fira Code', Consolas, 'Courier New', monospace;
+}
+
+/* NEW: never let any element make the viewport wider than the device */
+html, body {
+  max-width: 100%;
+  min-height: 100%;
+  /*overflow-x: hidden;*/
 }
 
 :root {
@@ -292,6 +294,14 @@ body.dark-mode.bg-active .card {
   display: flex;
   gap: 1rem;
 }
+
+#search_form {
+  /* inherits .card + .flex-row from template */
+  flex-wrap: wrap;        /* let items wrap when needed              */
+  gap: 1rem;              /* keep the original spacing               */
+  width: 100%;            /* never exceed viewport                   */
+}
+
 
 .align-center {
   align-items: center;
