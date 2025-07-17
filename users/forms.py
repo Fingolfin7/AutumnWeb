@@ -37,9 +37,10 @@ class UserUpdateForm(forms.ModelForm):
 
 class ProfileUpdateForm(forms.ModelForm):
     image = forms.ImageField(widget=forms.FileInput(), required=False)
+    use_bing_background = forms.BooleanField(required=False, label='Use Bing Wallpaper as Background')
     background_image = forms.ImageField(label='Background Image', required=False, widget=forms.FileInput())
     remove_background_image = forms.BooleanField(required=False, label='Remove current background image')
 
     class Meta:
         model = Profile
-        fields = ['image', 'background_image']
+        fields = ['image', 'use_bing_background', 'background_image', 'remove_background_image']

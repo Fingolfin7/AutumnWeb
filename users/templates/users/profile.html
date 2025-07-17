@@ -56,9 +56,21 @@
                 {{ user_form.email }}
             </span>
 
+            <label>
+                {{ profile_form.use_bing_background.label_tag }}
+                <label class="switch">
+                    {{ profile_form.use_bing_background }}
+                    <span class="slider round"></span>
+                </label>
+                {{ profile_form.use_bing_background.errors }}
+            </label>
+
+            <br>
 
             <span class="label-input">
-                <label for="{{ profile_form.background_image.id_for_label }}"><i class="fas fa-cloud-upload-alt"></i> Upload Background Image</label>
+                <label for="{{ profile_form.background_image.id_for_label }}">
+                    <i class="fas fa-cloud-upload-alt"></i> Upload Background Image
+                </label>
                 {{ profile_form.background_image }}
             </span>
 
@@ -66,8 +78,9 @@
                 <p>Current background:</p>
                 <img src="{{ user.profile.background_image.url }}" alt="Current background" style="max-width: 100px; max-height: 100px;">
                 <div class="flex-row align-center">
-                    {{ profile_form.remove_background_image }}
+                    {{ profile_form.remove_background_image.errors }}
                     {{ profile_form.remove_background_image.label_tag }}
+                    {{ profile_form.remove_background_image }}
                 </div>
             {% endif %}
 

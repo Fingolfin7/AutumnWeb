@@ -14,6 +14,7 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     image = models.ImageField(default='default.jpg', upload_to='profile_pics')
     background_image = models.ImageField(upload_to='background_pics', null=True, blank=True)
+    use_bing_background = models.BooleanField(default=False)  # new setting
 
     def __str__(self):
         return f"{self.user.username} Profile"
