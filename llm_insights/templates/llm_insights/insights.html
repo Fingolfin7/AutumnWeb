@@ -106,12 +106,11 @@
                         <span class="label-input">
                             <label for="model">Model</label>
                             <select id="model" name="model">
-                                <option value="gemini-2.5-flash-preview-05-20" {% if selected_model == "gemini-2.5-flash-preview-05-20" %}selected{% endif %}>Gemini 2.5 Flash</option>
-                                <option value="gemini-2.0-flash-thinking-exp-01-21" {% if selected_model == "gemini-2.0-flash-thinking-exp-01-21" %}selected{% endif %}>Gemini 2.0 Flash Thinking</option>
+                                <option value="gemini-2.5-flash" {% if selected_model == "gemini-2.5-flash" %}selected{% endif %}>Gemini 2.5 Flash</option>
+                                <option value="gemini-2.5-pro" {% if selected_model == "gemini-2.5-pro" %}selected{% endif %}>Gemini 2.5 Pro</option>
                                 <!--
                                 <option value="gemini-2.0-flash-preview-image-generation" {% if selected_model == "gemini-2.0-flash-preview-image-generation" %}selected{% endif %}>Gemini 2.0 Flash Preview Image Generatio</option>
                                 -->
-                                <option value="gemini-2.0-flash" {% if selected_model == "gemini-2.0-flash" %}selected{% endif %}>Gemini 2.0 Flash</option>
                             </select>
                         </span>
                     </div>
