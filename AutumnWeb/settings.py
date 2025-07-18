@@ -163,6 +163,14 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
+        'main': {
+            'level': 'INFO',
+            'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
+            'filename': os.path.join(LOG_DIR, 'main.log'),
+            'maxBytes': 0.5 * 1024 * 1024,  # Rotate when the file reaches half a megabyte
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
         'signals': {
             'level': 'INFO',
             'class': 'concurrent_log_handler.ConcurrentRotatingFileHandler',
@@ -181,6 +189,11 @@ LOGGING = {
         },
     },
     'loggers': {
+        'main': {
+            'handlers': ['main'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'signals': {
             'handlers': ['signals'],
             'level': 'INFO',

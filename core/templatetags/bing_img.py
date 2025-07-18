@@ -5,7 +5,7 @@ from django import template
 from django.utils import timezone
 
 register = template.Library()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('main')
 
 _cached_url = None # would have used the inbuilt cache, but it doesn't work with pythonanywhere
 _expiry = timezone.now() - timedelta(days=1)
@@ -28,9 +28,9 @@ def bing_background():
         data = resp.json().get('images', [])[0]
         _cached_url = f"https://www.bing.com{data['url']}"
 
-        _expiry = (now + timedelta(hours=4)) # update cache every 4 hours (6 times a day)
+        _expiry = (now + timedelta(hours=1)) # update cache every hour
 
-        logger.info('Fetched new Bing background image URL:', _cached_url)
+        logger.info('Fetched new Bing background image URL: %s', _cached_url)
         return _cached_url
 
     except Exception as e:

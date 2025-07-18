@@ -126,20 +126,13 @@ def update_time_on_delete(sender, instance, **kwargs):
         return
 
     with transaction.atomic():
-        # Reload instance to ensure we have latest data
+        # Reload instance to ensure we have the latest data
         instance.refresh_from_db()
         instance = Sessions.objects.select_related('project').prefetch_related(
             'subprojects'
         ).get(pk=instance.pk)
 
         update_value = -instance.duration or 0.0
-
-        logger.info(f"Deleting session {instance.id}")
-        logger.info(f"Project: {instance.project}")
-        if len(instance.subprojects.all()) > 0:
-            logger.info(f"Subprojects: {[subproject.name for subproject in instance.subprojects.all()]}")
-        logger.info(f"Update value: {update_value}")
-        logger.info(f"Previous total: {instance.project.total_time}")
 
         # Update project
         instance.project.total_time = max(0, instance.project.total_time + update_value)
@@ -149,5 +142,3 @@ def update_time_on_delete(sender, instance, **kwargs):
         for sub_project in instance.subprojects.all():
             sub_project.total_time = max(0, sub_project.total_time + update_value)
             sub_project.save()
-
-        logger.info(f"New project total: {instance.project.total_time}\n")
