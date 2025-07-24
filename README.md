@@ -99,10 +99,4 @@ Access the app at `http://127.0.0.1:8000/`
 
 ---
 
-## License
-
-This project is open-source. See `LICENSE` for details.
-
----
-
 > Built with care. Use it if it's useful to you.
