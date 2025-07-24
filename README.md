@@ -1,93 +1,108 @@
-# Description
+## Autumn
 
-Web-based time and project tracking software based on [Autumn](https://github.com/Fingolfin7/Autumn). 
-This application allows users to manage projects and subprojects, track time spent on various tasks, 
-and visualize tracked data over a given period. It includes features such as session history viewing, 
-word cloud generation from session notes, and dynamic charting for data visualization. And recently, a 
-new Ïnsights" page where you can provide a subset of your session data to an LLM model and ask question about it!
+A minimalist, web-based time and project tracking tool.
 
-I developed a web based version of the original CLI version to allow users to track their time and projects from anywhere. 
-You can import the data from the CLI version and continue tracking projects and time on the web version. 
-Data is stored in a SQLite database and can be exported to in JSON format for backup purposes or for importing into the CLI version.
+**Autumn** is a Django application that lets you track how you spend your time across projects and subprojects, view your session history, and visualize your data through charts, heatmaps, and word clouds. It also includes an optional LLM-powered "Insights" feature, where you can ask questions about your session data using natural language.
 
-I have deployed the application on PythonAnywhere. You can test it out [here](http://fingolfin7.pythonanywhere.com/).
+This project builds on the original [Autumn CLI](https://github.com/Fingolfin7/Autumn), offering a browser-accessible alternative with the same core structure and import/export compatibility.
 
-# Setup
+You can try it out [here](http://fingolfin7.pythonanywhere.com/).
 
-To set up the project locally, follow these steps:
+---
 
-1. **Clone the repository:**
-    ```sh
-    git clone https://github.com/Fingolfin7/AutumnWeb.git
-    cd AutumnWeb
-    ```
+### Features
 
-2. **Create and activate a virtual environment:**
-    ```sh
-    python -m venv venv
-    source venv/bin/activate  # On Windows use `venv\Scripts\activate`
-    ```
+* Track time spent on projects and subprojects
+* Start and stop timers directly in the browser
+* Browse and search session history
+* Visualize data with charts, scatter plots, and heatmaps (via Chart.js)
+* Generate word clouds from session notes
+* Export and import data in JSON format (compatible with the old CLI version)
+* Ask natural language questions about your data with LLM integration (optional)
+* Light and dark themes, with optional Bing daily wallpaper
 
-3. **Install the required dependencies:**
-    ```sh
-    pip install -r requirements.txt
-    ```
+---
 
-4. **Apply migrations:**
-    ```sh
-    python manage.py migrate
-    ```
+### Try It
 
-5. **Run the development server:**
-    ```sh
-    python manage.py runserver
-    ```
+A demo is available here:
+👉 [http://fingolfin7.pythonanywhere.com/](http://fingolfin7.pythonanywhere.com/)
 
-6. **Access the application:**
-    Open your web browser and navigate to `http://127.0.0.1:8000/`.
+User this demo account to explore the features:
+- **Username**: `finrod` 
+- or **Email**: `finrod.felagund@houseoffinwe.ea`
+- **Password**: `autumnweb`
 
-7. **Create a superuser:**
-    To access the admin panel, create a superuser by running.
-    ```sh
-    python manage.py createsuperuser
-    ```
-    The admin panel can be accessed at `http://127/0.0.1:8000/admin`.
+The instance is running on a free PythonAnywhere account — load times may vary.
 
-# Additional Information
+---
 
-- **JavaScript Libraries:** The project uses `Chart.js` for dynamic charting and `wordcloud2.js` for generating word clouds.
+### Local Setup
 
-# Pages and Screenshots
+To run the project locally:
 
-## Projects Page
-(Dark Mode, with bing background images on. Changes everyday with the bing image of the day)
-<img width="1885" height="916" alt="image" src="https://github.com/user-attachments/assets/ea91c1d7-4ed5-4891-ab57-36daa2fdde27" />
+```bash
+git clone https://github.com/Fingolfin7/AutumnWeb.git
+cd AutumnWeb
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
 
-(Dark Mode, no background image)
-<img width="1906" height="908" alt="image" src="https://github.com/user-attachments/assets/9d0f9211-f7c8-4359-91c8-90de571d4c29" />
+Optional:
 
+```bash
+python manage.py createsuperuser  # For admin access
+```
 
+Access the app at `http://127.0.0.1:8000/`
 
-(Light Mode)
-<img width="1891" height="920" alt="image" src="https://github.com/user-attachments/assets/a2c24c0f-ca49-447c-9072-83066797e766" />
+---
 
+### Screenshots
 
-## View Sessions History
-<img width="1910" height="910" alt="image" src="https://github.com/user-attachments/assets/f79a7097-0f2a-40d5-9190-a71b0bafe65e" />
+**Projects Page (Dark mode + Bing wallpaper)**
+![Projects](https://github.com/user-attachments/assets/ea91c1d7-4ed5-4891-ab57-36daa2fdde27)
 
+**Projects Page (Dark mode, no background)**
+![Projects](https://github.com/user-attachments/assets/9d0f9211-f7c8-4359-91c8-90de571d4c29)
 
-### Timers Page
-<img width="1755" height="848" alt="image" src="https://github.com/user-attachments/assets/2933c467-15cd-4191-befa-5bea096229f3" />
+**Projects Page (Light mode)**
+![Projects](https://github.com/user-attachments/assets/a2c24c0f-ca49-447c-9072-83066797e766)
 
+**Session History**
+![Sessions](https://github.com/user-attachments/assets/f79a7097-0f2a-40d5-9190-a71b0bafe65e)
 
-## Insights Page (AI page, load sessions with search as context.)
+**Timers**
+![Timers](https://github.com/user-attachments/assets/2933c467-15cd-4191-befa-5bea096229f3)
 
-<img width="1755" height="1131" alt="image" src="https://github.com/user-attachments/assets/a6ae39f0-e972-418a-9989-f3b62c2cd4dd" />
+**Insights (LLM chat)**
+![Insights](https://github.com/user-attachments/assets/a6ae39f0-e972-418a-9989-f3b62c2cd4dd)
 
+**Charts and Heatmaps**
+![Charts](https://github.com/user-attachments/assets/382046ca-7a65-46d9-851f-6185738ce2fb)
 
+**Profile Page and Background Settings**
+![Profile]()
 
-## Visualize Tracked Data Over a given period
-![Auutumn Chart Options](https://github.com/user-attachments/assets/382046ca-7a65-46d9-851f-6185738ce2fb)
+---
 
-*Made the gif with [this](https://github.com/Fingolfin7/GIF-Maker)
+### Tech Stack
 
+* **Backend**: Django, Django REST Framework, SQLite
+* **Frontend**: HTML/CSS/JS, Chart.js, wordcloud2.js
+* **LLM**: Gemini API integration with in-memory handlers (chat history is local and ephemeral)
+* **Import/Export**: JSON-based, compatible with Autumn CLI
+* **No analytics or tracking**
+
+---
+
+## License
+
+This project is open-source. See `LICENSE` for details.
+
+---
+
+> Built with care. Use it if it's useful to you.
