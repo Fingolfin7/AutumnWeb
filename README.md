@@ -1,4 +1,4 @@
-## Autumn
+## 🍁 Autumn 
 
 A minimalist, web-based time and project tracking tool.
 
