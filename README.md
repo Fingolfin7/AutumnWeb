@@ -85,7 +85,7 @@ Access the app at `http://127.0.0.1:8000/`
 ![Charts](https://github.com/user-attachments/assets/382046ca-7a65-46d9-851f-6185738ce2fb)
 
 **Profile Page and Background Settings**
-![Profile]()
+![Profile](https://github.com/user-attachments/assets/2409abdc-847a-4fbd-ac51-ba996174226d)
 
 ---
 
