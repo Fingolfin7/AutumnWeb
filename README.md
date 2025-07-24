@@ -6,21 +6,6 @@ A minimalist, web-based time and project tracking tool.
 
 This project builds on the original [Autumn CLI](https://github.com/Fingolfin7/Autumn), offering a browser-accessible alternative with the same core structure and import/export compatibility.
 
-You can try it out [here](http://fingolfin7.pythonanywhere.com/).
-
----
-
-### Features
-
-* Track time spent on projects and subprojects
-* Start and stop timers directly in the browser
-* Browse and search session history
-* Visualize data with charts, scatter plots, and heatmaps (via Chart.js)
-* Generate word clouds from session notes
-* Export and import data in JSON format (compatible with the old CLI version)
-* Ask natural language questions about your data with LLM integration (optional)
-* Light and dark themes, with optional Bing daily wallpaper
-
 ---
 
 ### Try It
@@ -34,30 +19,6 @@ User this demo account to explore the features:
 - **Password**: `autumnweb`
 
 The instance is running on a free PythonAnywhere account — load times may vary.
-
----
-
-### Local Setup
-
-To run the project locally:
-
-```bash
-git clone https://github.com/Fingolfin7/AutumnWeb.git
-cd AutumnWeb
-python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
-```
-
-Optional:
-
-```bash
-python manage.py createsuperuser  # For admin access
-```
-
-Access the app at `http://127.0.0.1:8000/`
 
 ---
 
@@ -87,6 +48,43 @@ Access the app at `http://127.0.0.1:8000/`
 **Profile Page and Background Settings**
 ![Profile](https://github.com/user-attachments/assets/2409abdc-847a-4fbd-ac51-ba996174226d)
 *GIf Made with [this](https://github.com/Fingolfin7/GIF-Maker)
+
+---
+
+### Features
+
+* Track time spent on projects and subprojects
+* Start and stop timers directly in the browser
+* Browse and search session history
+* Visualize data with charts, scatter plots, and heatmaps (via Chart.js)
+* Generate word clouds from session notes
+* Export and import data in JSON format (compatible with the old CLI version)
+* Ask natural language questions about your data with LLM integration (optional)
+* Light and dark themes, with optional Bing daily wallpaper
+
+---
+
+### Local Setup
+
+To run the project locally:
+
+```bash
+git clone https://github.com/Fingolfin7/AutumnWeb.git
+cd AutumnWeb
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+Optional:
+
+```bash
+python manage.py createsuperuser  # For admin access
+```
+
+Access the app at `http://127.0.0.1:8000/`
 
 ---
 
