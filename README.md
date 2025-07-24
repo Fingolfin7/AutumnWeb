@@ -60,28 +60,34 @@ To set up the project locally, follow these steps:
 # Pages and Screenshots
 
 ## Projects Page
-(Dark Mode)
-![image](https://github.com/user-attachments/assets/dc04d27d-8665-4cab-af84-9c72ede1cd57)
+(Dark Mode, with bing background images on. Changes everyday with the bing image of the day)
+<img width="1885" height="916" alt="image" src="https://github.com/user-attachments/assets/ea91c1d7-4ed5-4891-ab57-36daa2fdde27" />
+
+(Dark Mode, no background image)
+<img width="1906" height="908" alt="image" src="https://github.com/user-attachments/assets/9d0f9211-f7c8-4359-91c8-90de571d4c29" />
+
+
 
 (Light Mode)
-![image](https://github.com/user-attachments/assets/d8e30b80-44f1-48ae-b5cf-5b5726e3ffe4)
+<img width="1891" height="920" alt="image" src="https://github.com/user-attachments/assets/a2c24c0f-ca49-447c-9072-83066797e766" />
+
 
 ## View Sessions History
-![image](https://github.com/user-attachments/assets/ef04676e-363c-4c71-b305-99870eeb0f7a)
-
-
-### Manage Projects and Subprojects
-
-![image](https://github.com/user-attachments/assets/3aa4e01f-d66f-42d3-ad9a-0b7ff5495805)
+<img width="1910" height="910" alt="image" src="https://github.com/user-attachments/assets/f79a7097-0f2a-40d5-9190-a71b0bafe65e" />
 
 
 ### Timers Page
-![image](https://github.com/user-attachments/assets/ed9a3e5f-ad4d-48d5-9a90-cd38548dea7f)
+<img width="1755" height="848" alt="image" src="https://github.com/user-attachments/assets/2933c467-15cd-4191-befa-5bea096229f3" />
 
-## Insights Page (AI page)
 
-![image](https://github.com/user-attachments/assets/b9b7bc73-b61b-4a7c-abb7-c78dfb7c2818)
+## Insights Page (AI page, load sessions with search as context.)
+
+<img width="1755" height="1131" alt="image" src="https://github.com/user-attachments/assets/a6ae39f0-e972-418a-9989-f3b62c2cd4dd" />
+
 
 
 ## Visualize Tracked Data Over a given period
-![charts](https://github.com/user-attachments/assets/23cc10d5-e5f1-421d-a1cb-8b45521d45fc)
+![Auutumn Chart Options](https://github.com/user-attachments/assets/382046ca-7a65-46d9-851f-6185738ce2fb)
+
+*Made the gif with [this](https://github.com/Fingolfin7/GIF-Maker)
+
