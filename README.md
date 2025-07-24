@@ -86,6 +86,7 @@ Access the app at `http://127.0.0.1:8000/`
 
 **Profile Page and Background Settings**
 ![Profile](https://github.com/user-attachments/assets/2409abdc-847a-4fbd-ac51-ba996174226d)
+*GIf Made with [this](https://github.com/Fingolfin7/GIF-Maker)
 
 ---
 
