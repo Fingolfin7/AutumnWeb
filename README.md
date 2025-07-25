@@ -44,10 +44,11 @@ The instance is running on a free PythonAnywhere account — load times may vary
 
 **Charts and Heatmaps**
 ![Charts](https://github.com/user-attachments/assets/382046ca-7a65-46d9-851f-6185738ce2fb)
+*Gif Made with [this](https://github.com/Fingolfin7/GIF-Maker)
 
 **Profile Page and Background Settings**
 ![Profile](https://github.com/user-attachments/assets/2409abdc-847a-4fbd-ac51-ba996174226d)
-*GIf Made with [this](https://github.com/Fingolfin7/GIF-Maker)
+
 
 ---
 
