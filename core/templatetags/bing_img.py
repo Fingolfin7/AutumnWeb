@@ -21,7 +21,7 @@ def bing_background():
     try:
         resp = requests.get(
             'https://www.bing.com/HPImageArchive.aspx',
-            params={'format': 'js', 'idx': 0, 'n': 1, 'mkt': 'en-US'},
+            params={'format': 'js', 'idx': 0, 'n': 1, 'mkt': 'en-GB'},
             timeout=5
         )
         resp.raise_for_status()
