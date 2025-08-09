@@ -4,53 +4,6 @@ $(document).ready(function() {
 
     let search = $('#project-search');
 
-    // Start the hourglass animation
-    animateHourglass();
-
-    // Function to animate the hourglass icon
-    function animateHourglass() {
-        const hourglassIcon = $('#start-timer i.fa');
-        const states = ['fa-hourglass-end', 'fa-hourglass-half', 'fa-hourglass-start'];
-        let currentState = 0;
-
-        // Add a CSS class for rotation
-        $('<style>')
-            .prop('type', 'text/css')
-            .html(`
-                .rotate-hourglass {
-                    transition: transform 1s ease-in-out;
-                    transform: rotate(180deg);
-                }
-                .reset-rotation {
-                    transition: none;
-                    transform: rotate(0deg);
-                }
-            `)
-            .appendTo('head');
-
-        setInterval(function() {
-            // Remove all possible hourglass states
-            hourglassIcon.removeClass('fa-hourglass-end fa-hourglass-half fa-hourglass-start');
-
-            // Add the next state
-            hourglassIcon.addClass(states[currentState]);
-
-            if (currentState === 2) {
-                hourglassIcon.addClass('rotate-hourglass');
-
-                // Reset rotation after the animation completes
-                setTimeout(function() {
-                    hourglassIcon.removeClass('rotate-hourglass').addClass('reset-rotation');
-                    setTimeout(function() {
-                        hourglassIcon.removeClass('reset-rotation');
-                    }, 50);
-                }, 1950); // 50ms before the next state change
-            }
-
-            // Move to the next state, or back to the beginning
-            currentState = (currentState + 1) % states.length;
-        }, 2000); // Change state every 2 seconds
-    }
 
     search.on('keyup',function() {
 

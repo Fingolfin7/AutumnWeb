@@ -3,10 +3,35 @@
 {% load time_formats %}
 
 {% block head_includes %}
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
     <script src="{% static 'core/js/timer_search_projects.js' %}?v={{ static_version.timer_search_projects }}" type="text/javascript"></script>
+
+    <style>
+       .hourglass-icon::before {
+            font-family: "Font Awesome 5 Free";
+            font-weight: 900; /* solid style */
+            display: inline-block;
+            font-size: 1em; /* match text size */
+            content: "\f251"; /* initial icon (hourglass-start) */
+            animation:
+                hourglass-flip 4s ease-in-out infinite,
+                hourglass-cycle 4s steps(1) infinite;
+        }
+
+        @keyframes hourglass-cycle {
+            0%   { content: "\f251"; } /* fa-hourglass-start */
+            33%  { content: "\f252"; } /* fa-hourglass-half */
+            66%  { content: "\f253"; } /* fa-hourglass-end */
+            100% { content: "\f251"; }
+        }
+
+        @keyframes hourglass-flip {
+            0%, 70%   { transform: rotate(0deg); }
+            80%, 100% { transform: rotate(180deg); }
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
@@ -27,7 +52,6 @@
             <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_list_subprojects_param' %}">
 
             <div class="grid-rows">
- 
                 <span id="select-all-block">
                     <a class="plain-link" id="get_subs_list"><h3>Subprojects</h3></a>
                     <br>
@@ -41,13 +65,12 @@
             <div class="grid-rows" id="subproject_options">
                 <!-- subprojects will be added here -->
             </div>
-
         </section>
 
         <br>
 
         <button type="submit" id="start-timer" class="timer-button">
-            <i class="fa fa-hourglass-end"></i>
+            <span class="hourglass-icon"></span>
             Start Timer
         </button>
     </form>
