@@ -2,6 +2,7 @@ from datetime import datetime, time
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 import logging
 
 logger = logging.getLogger('models')
@@ -124,6 +125,13 @@ class Sessions(models.Model):
         sub_list = [sub.name for sub in self.subprojects.all()]
         return f"{self.project.name} {sub_list} - {self.start_time} ({self.user.username})"
 
+    def clean(self):
+        """
+        Ensure end_time is not earlier than start_time.
+        """
+        super().clean()
+        if self.start_time and self.end_time and self.end_time < self.start_time:
+            raise ValidationError({"end_time": "End time cannot be earlier than start time."})
 
     @property
     def get_start(self):

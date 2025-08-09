@@ -85,6 +85,16 @@ class UpdateSessionForm(forms.ModelForm):
             'note': forms.Textarea(attrs={'placeholder': 'Note', 'class': 'half-width', 'required': False}),
         }
 
+    def clean(self):
+        cleaned_data = super().clean()
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+
+        if start_time and end_time and end_time < start_time:
+            self.add_error('end_time', "End time cannot be earlier than start time.")
+
+        return cleaned_data
+
 
 class ImportJSONForm(forms.Form):
     file = forms.FileField()

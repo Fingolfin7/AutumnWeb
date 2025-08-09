@@ -51,6 +51,7 @@ def start_timer(request):
             for subproject in subprojects:
                 session.subprojects.add(subproject)
 
+            session.full_clean()
             session.save()
             messages.success(request, "Started timer")
             return redirect('timers')
@@ -146,6 +147,7 @@ def update_session(request, session_id: int):
                     is_active=False
                 )
 
+                new_session.full_clean()
                 new_session.subprojects.add(*subprojects)
                 # no need to call save() since add() saves the m2m relationship, .set() works too but it replaces
                 # the existing relationships with the new ones.
@@ -462,6 +464,7 @@ def import_stream(request):
                                                   f"will not be added to session.")
                             continue
 
+                    session.full_clean()       
                     session.save()
 
                 yield stream_response(f"\n\n")
@@ -1054,6 +1057,7 @@ def start_session(request):
     for subproject in subprojects:
         session.subprojects.add(subproject)
 
+    session.full_clean()
     session.save()
 
     return Response(status=201)
@@ -1085,6 +1089,7 @@ def end_session(request):
     if 'note' in request.data:
         session.note = request.data['note']
 
+    session.full_clean()
     session.save()
 
     return Response(status=200)
@@ -1114,6 +1119,7 @@ def log_session(request):
     for subproject in subprojects:
         session.subprojects.add(subproject)
 
+    session.full_clean()
     session.save()
 
     return Response(status=201)
