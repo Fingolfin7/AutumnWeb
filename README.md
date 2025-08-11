@@ -92,8 +92,8 @@ Access the app at `http://127.0.0.1:8000/`
 ### Tech Stack
 
 * **Backend**: Django, Django REST Framework, SQLite
-* **Frontend**: HTML/CSS/JS, Chart.js, wordcloud2.js
-* **LLM**: Gemini API integration with in-memory handlers (chat history is local and ephemeral)
+* **Frontend**: HTML/CSS/JS (jQuery), Chart.js, wordcloud2.js
+* **LLM**: Gemini API integration with in-memory handlers
 * **Import/Export**: JSON-based, compatible with Autumn CLI
 * **No analytics or tracking**
 
