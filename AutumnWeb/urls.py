@@ -19,13 +19,18 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include, reverse_lazy
 from django.contrib.auth import views as auth_views
+from rest_framework.authtoken.views import obtain_auth_token
 from users import views as user_views
 from users.forms import UserLoginForm
+
+
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
+    path('get-auth-token/', obtain_auth_token, name='get-auth-token'),
+    path('check-auth-token/<token>/', user_views.check_auth_token, name='check-auth-token'),
     path("debug-session/", user_views.debug_session, name="debug_session"),
     path('insights/', include('llm_insights.urls')),
     path('register/', user_views.register, name='register'),

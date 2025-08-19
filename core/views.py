@@ -11,7 +11,8 @@ from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta, time
 from rest_framework.response import Response
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.decorators.csrf import csrf_exempt
@@ -862,8 +863,9 @@ def create_project(request):
     return Response(serializer.errors)
 
 
-@login_required
+
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def list_projects(request):
     if 'start_date' in request.query_params and 'end_date' in request.query_params:
         start = request.query_params['start_date']
@@ -881,8 +883,8 @@ def list_projects(request):
     return Response(serializer.data)
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def tally_by_sessions(request):
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
 
@@ -896,8 +898,8 @@ def tally_by_sessions(request):
     return Response(project_durations)
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def tally_by_subprojects(request):
     """
     Returns a list of { name: subproject_name, total_time: minutes } for
@@ -932,8 +934,8 @@ def tally_by_subprojects(request):
     return Response(payload)
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def wordcloud_notes(request):
     handler = WordHandler()
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
@@ -961,8 +963,8 @@ def wordcloud_notes(request):
 
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def search_projects(request):
     search_term = request.query_params['search_term']
     if 'status' in request.query_params:
@@ -974,24 +976,25 @@ def search_projects(request):
     return Response(serializer.data)
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def get_project(request, project_name):
     project = get_object_or_404(Projects, name=project_name, user=request.user)
     serializer = ProjectSerializer(project)
     return Response(serializer.data)
 
 
-@login_required
+
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
 def delete_project(request, project_name):
     project = get_object_or_404(Projects, name=project_name, user=request.user)
     project.delete()
     return Response(status=204)
 
 
-@login_required
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def create_subproject(request):
     # check if the parent project exists
     if not Projects.objects.filter(name=request.data['parent_project'], user=request.user).exists():
@@ -1006,8 +1009,8 @@ def create_subproject(request):
     return Response(serializer.errors)
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def list_subprojects(request, **kwargs):
     project_name = request.query_params['project_name'] if 'project_name' in request.query_params else kwargs[
         'project_name']
@@ -1016,8 +1019,8 @@ def list_subprojects(request, **kwargs):
     return Response(serializer.data)
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def search_subprojects(request):
     parent_project = request.query_params['project_name']
     search_term = request.query_params['search_term']
@@ -1029,8 +1032,8 @@ def search_subprojects(request):
     return Response(serializer.data)
 
 
-@login_required
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
 def delete_subproject(request, project_name, subproject_name):
     subproject = get_object_or_404(SubProjects, name=subproject_name, parent_project__name=project_name,
                                    user=request.user)
@@ -1038,8 +1041,8 @@ def delete_subproject(request, project_name, subproject_name):
     return Response(status=204)  # status 204 means no content, i.e. the subproject was deleted successfully
 
 
-@login_required
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def start_session(request):
     project = Projects.objects.filter(name=request.data['project'], user=request.user).first()
     all_subprojects = SubProjects.objects.filter(parent_project__name=project)
@@ -1063,8 +1066,8 @@ def start_session(request):
     return Response(status=201)
 
 
-@login_required
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def restart_session(request):
     session = get_object_or_404(Sessions, pk=request.data['session_id'], user=request.user)
     session.start_time = timezone.now()
@@ -1074,8 +1077,8 @@ def restart_session(request):
     return Response(status=200)
 
 
-@login_required
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def end_session(request):
     """
     End an active session and update the associated project and subproject time tallies
@@ -1095,8 +1098,8 @@ def end_session(request):
     return Response(status=200)
 
 
-@login_required
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def log_session(request):
     project = get_object_or_404(Projects, name=request.data['project'], user=request.user)
     subprojects = [get_object_or_404(SubProjects, name=subproject_name, parent_project=project)
@@ -1125,16 +1128,15 @@ def log_session(request):
     return Response(status=201)
 
 
-@login_required
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
 def delete_session(request, session_id):
     session = get_object_or_404(Sessions, pk=session_id)
     session.delete()
     return Response(status=204)
 
-
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def list_sessions(request):
     """
     List all the saved (i.e. not active) sessions
@@ -1146,8 +1148,8 @@ def list_sessions(request):
     return Response(serializer.data)
 
 
-@login_required
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def list_active_sessions(request):
     """
     List all active sessions

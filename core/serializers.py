@@ -26,6 +26,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             'id',
             'user',
             'name',
+            'status',
             'description',
             'total_time',
             'start_date',
