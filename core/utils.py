@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from core.models import Sessions, Projects, SubProjects
 
 
+
 def parse_date_or_datetime(date_str):
     """"
     Parse a date or datetime string into a datetime object. Supports the following formats:
