@@ -98,7 +98,7 @@ def profile(request):
         p_form = ProfileUpdateForm(instance=request.user.profile,
                                    initial={
                                       'automatic_background': request.user.profile.automatic_background,
-                                      'background_choice': 'bing' if request.user.profile.use_bing_background else 'nasa' if request.user.profile.use_nasa_apod_background else '',
+                                      'background_choice': 'bing' if request.user.profile.bing_background else 'nasa' if request.user.profile.nasa_apod_background else '',
                                   })
 
     context = {
