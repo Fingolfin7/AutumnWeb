@@ -3,6 +3,7 @@ from datetime import timedelta
 import requests
 from django import template
 from django.utils import timezone
+from AutumnWeb.settings import NASA_API_KEY
 
 register = template.Library()
 logger = logging.getLogger('main')
@@ -14,8 +15,6 @@ _bing_expiry = timezone.now() - timedelta(days=1)
 # NASA cache
 _cached_nasa_url = None
 _nasa_expiry = timezone.now() - timedelta(days=1)
-
-NASA_API_KEY = "DEMO_KEY"  # Nasa allows demo key usage for low calls
 
 
 @register.simple_tag

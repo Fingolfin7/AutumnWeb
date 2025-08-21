@@ -2,7 +2,7 @@ import json
 from abc import ABC, abstractmethod
 from google import genai
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
-from AutumnWeb import settings
+from AutumnWeb.settings import GEMINI_API_KEY
 from core.utils import build_project_json_from_sessions
 
 
@@ -31,7 +31,7 @@ class GeminiHandler(BaseLLMHandler):
     """Handler for Google's Gemini API"""
 
     def __init__(self, model="gemini-2.5-flash"):
-        self.api_key = settings.GEMINI_API_KEY
+        self.api_key = GEMINI_API_KEY
         self.client = genai.Client(api_key=self.api_key)
         self.google_search_tool = Tool(
             google_search=GoogleSearch()
