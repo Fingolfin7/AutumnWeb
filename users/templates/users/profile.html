@@ -57,32 +57,74 @@
             </span>
 
             <label>
-                {{ profile_form.use_bing_background.label_tag }}
+                {{ profile_form.automatic_background.label_tag }}
                 <label class="switch">
-                    {{ profile_form.use_bing_background }}
+                    {{ profile_form.automatic_background }}
                     <span class="slider round"></span>
                 </label>
-                {{ profile_form.use_bing_background.errors }}
+                {{ profile_form.automatic_background.errors }}
             </label>
 
-            <br>
+            <div id="automatic_background_options" style="display: none;">
+                <h4>Background Source:</h4>
+                {% for radio in profile_form.background_choice %}
+                    <div class="radio-option">
+                        {{ radio.tag }}
+                        <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                    </div>
+                {% endfor %}
+                {{ profile_form.background_choice.errors }}
+            </div>
 
-            <span class="label-input">
+            <span class="label-input uploaded_backgrounds">
                 <label for="{{ profile_form.background_image.id_for_label }}">
                     <i class="fas fa-cloud-upload-alt"></i> Upload Background Image
                 </label>
                 {{ profile_form.background_image }}
             </span>
 
-            {% if user.profile.background_image %}
-                <p>Current background:</p>
-                <img src="{{ user.profile.background_image.url }}" alt="Current background" style="max-width: 100px; max-height: 100px;">
-                <div class="flex-row align-center">
-                    {{ profile_form.remove_background_image.errors }}
-                    {{ profile_form.remove_background_image.label_tag }}
-                    {{ profile_form.remove_background_image }}
-                </div>
-            {% endif %}
+            <span class="uploaded_backgrounds">
+                 {% if user.profile.background_image %}
+                    <p>Current background:</p>
+
+                    <br>
+
+                    <img src="{{ user.profile.background_image.url }}" alt="Current background" style="max-width: 100px; max-height: 100px;">
+
+                    <br>
+
+                    <label>
+                        {{ profile_form.remove_background_image.label_tag }}
+                        <label class="switch">
+                            {{ profile_form.remove_background_image }}
+                            <span class="slider round"></span>
+                        </label>
+                        {{ profile_form.remove_background_image.errors }}
+                    </label>
+                {% endif %}
+            </span>
+
+
+            <script>
+                $(document).ready(function() {
+                    // Check initial state
+                    if ($('#id_automatic_background').is(':checked')) {
+                        $('#automatic_background_options').show();
+                        $('.uploaded_backgrounds').hide();
+                    }
+
+                    // Toggle visibility when automatic background checkbox changes
+                    $('#id_automatic_background').change(function() {
+                        if ($(this).is(':checked')) {
+                            $('#automatic_background_options').show();
+                            $('.uploaded_backgrounds').hide();
+                        } else {
+                            $('#automatic_background_options').hide();
+                            $('.uploaded_backgrounds').show();
+                        }
+                    });
+                });
+            </script>
 
             <span>
                 <button type="submit" id="update-profile" class="primary-button">

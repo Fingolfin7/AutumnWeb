@@ -14,7 +14,9 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     image = models.ImageField(default='default.jpg', upload_to='profile_pics')
     background_image = models.ImageField(upload_to='background_pics', null=True, blank=True)
-    use_bing_background = models.BooleanField(default=False)  # new setting
+    automatic_background = models.BooleanField(default=False)  # Automatically set background image
+    bing_background = models.BooleanField(default=False)  # Use Bing's daily image (if automatic_background is True)
+    nasa_apod_background = models.BooleanField(default=False)  # Use NASA's Astronomy Picture of the Day (if automatic_background is True)
 
     def __str__(self):
         return f"{self.user.username} Profile"

@@ -68,6 +68,21 @@ def profile(request):
         if u_form.is_valid() and p_form.is_valid():
             u_form.save()
 
+            # handle automatic background image setting
+            if p_form.cleaned_data.get('automatic_background'):
+                profile = request.user.profile
+                background_choice = p_form.cleaned_data.get('background_choice')
+
+                if background_choice == 'bing':
+                    profile.bing_background = True
+                    profile.nasa_apod_background = False
+                elif background_choice == 'nasa':
+                    profile.bing_background = False
+                    profile.nasa_apod_background = True
+                else:
+                    profile.bing_background = False
+                    profile.nasa_apod_background = False
+
             # Handle background image removal
             if p_form.cleaned_data.get('remove_background_image'):
                 profile = request.user.profile
@@ -80,10 +95,14 @@ def profile(request):
             return redirect('profile')
     else:
         u_form = UserUpdateForm(instance=request.user)
-        p_form = ProfileUpdateForm(instance=request.user.profile)
+        p_form = ProfileUpdateForm(instance=request.user.profile,
+                                   initial={
+                                      'automatic_background': request.user.profile.automatic_background,
+                                      'background_choice': 'bing' if request.user.profile.use_bing_background else 'nasa' if request.user.profile.use_nasa_apod_background else '',
+                                  })
 
     context = {
         'user_form': u_form,
-        'profile_form': p_form
+        'profile_form': p_form,
     }
     return render(request, 'users/profile.html', context)

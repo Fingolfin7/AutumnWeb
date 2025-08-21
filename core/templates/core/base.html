@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% load static %}
-{% load bing_img %}
+{% load background_images %}
 <html lang="en">
     <head>
         {% if title %}
@@ -36,10 +36,12 @@
         <link rel="shortcut icon" href="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" type="image/png">
     </head>
     {% if user.is_authenticated %}
-        {% if user.profile.background_image and not user.profile.use_bing_background %}
+        {% if user.profile.background_image and not user.profile.automatic_background %}
             <body data-bg-url="{{ user.profile.background_image.url }}">
-        {% elif user.profile.use_bing_background %}
-            <body data-bg-url="{% bing_background %}"> <!-- going to pat myself on the back for this one, this is brilliant -->
+        {% elif user.profile.automatic_background and user.profile.bing_background %}
+            <body data-bg-url="{% bing_background %}">
+        {% elif user.profile.automatic_background and user.profile.nasa_apod_background %}
+            <body data-bg-url="{% nasa_apod_background %}">
         {% else %}
             <body>
         {% endif %}
