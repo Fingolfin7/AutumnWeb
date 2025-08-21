@@ -13,7 +13,7 @@ This project builds on the original [Autumn CLI](https://github.com/Fingolfin7/A
 A demo is available here:
 👉 [http://fingolfin7.pythonanywhere.com/](http://fingolfin7.pythonanywhere.com/)
 
-User this demo account to explore the features:
+Use this demo account to explore the features:
 - **Username**: `finrod` 
 - or **Email**: `finrod.felagund@houseoffinwe.ea`
 - **Password**: `autumnweb`
