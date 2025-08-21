@@ -96,8 +96,10 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
 
 
 def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet:
-    # Determine the correct query parameters attribute
-    query_params = getattr(request, 'query_params', request.GET)
+    # Determine the correct query parameters attribute safely
+    query_params = getattr(request, "query_params", None)
+    if query_params is None:
+        query_params = getattr(request, "GET", {})
 
     project_name = query_params.get('project_name')
     subproject_name = query_params.get('subproject')

@@ -555,64 +555,168 @@ def project_delete_body(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def search_sessions(request):
+    """
+    Search sessions by any of: project, subproject, start_date, end_date,
+    note_snippet. At least one of those must be provided.
+    Optional:
+      - active=true|false (default false -> saved sessions)
+      - order (default: '-end_time' for saved, '-start_time' for active)
+      - limit, offset
+      - compact=true|false (default true)
+    Returns compact by default: {"count", "sessions":[{id,p,subs,start,end,dur}]}
+    """
+    compact = _compact(request)
+    qp = request.query_params
+
+    # Require at least one primary search field
+    if not any(
+        qp.get(k)
+        for k in (
+            "project",
+            "project_name",
+            "subproject",
+            "start_date",
+            "end_date",
+            "note_snippet",
+        )
+    ):
+        return _err(
+            "Provide at least one of: project|subproject|start_date|"
+            "end_date|note_snippet"
+        )
+
+    active = _bool(qp.get("active"), False)
+    order = qp.get("order") or ("-start_time" if active else "-end_time")
+    limit = qp.get("limit")
+    offset = qp.get("offset")
+
+    # Normalize alias: project -> project_name for the filter helper
+    qp2 = qp.copy()
+    if qp2.get("project") and not qp2.get("project_name"):
+        qp2["project_name"] = qp2["project"]
+
+    sessions = Sessions.objects.filter(user=request.user)
+    sessions = sessions.filter(is_active=True) if active else sessions.filter(
+        is_active=False
+    )
+
+    # Shim request so filter_sessions_by_params sees the normalized params
+    shim = type("Req", (), {"query_params": qp2})()
+    sessions = filter_sessions_by_params(shim, sessions)
+
+    try:
+        sessions = sessions.order_by(order)
+    except Exception:
+        sessions = sessions.order_by("-end_time")
+
+    # lightweight paging
+    try:
+        if offset is not None:
+            sessions = sessions[int(offset) :]
+        if limit is not None:
+            sessions = sessions[: int(limit)]
+    except Exception:
+        pass
+
+    if compact:
+        payload = [
+            {
+                "id": s.id,
+                "p": s.project.name,
+                "subs": [sp.name for sp in s.subprojects.all()],
+                "start": s.start_time.isoformat(),
+                "end": s.end_time.isoformat() if s.end_time else None,
+                "dur": s.duration,  # minutes
+            }
+            for s in sessions
+        ]
+        return Response({"count": len(payload), "sessions": payload})
+    else:
+        payload = [
+            {
+                "id": s.id,
+                "project": s.project.name,
+                "subprojects": [sp.name for sp in s.subprojects.all()],
+                "start_time": s.start_time.isoformat(),
+                "end_time": s.end_time.isoformat() if s.end_time else None,
+                "duration_minutes": s.duration,
+                "note": s.note or "",
+                "is_active": s.is_active,
+            }
+            for s in sessions
+        ]
+        return Response({"count": len(payload), "sessions": payload})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def log_activity(request):
-  """
-  Show activity logs for the week or a given time period.
-  Query:
-    - period=week|month|day|all
-    - start_date?, end_date?
-    - project_name?, subproject?, note_snippet?
-    - compact?
-  """
-  compact = _compact(request)
-  qp = request.query_params
-  period = (qp.get("period") or "").lower()
+    """
+    Show activity logs. Supports:
+      - period=week|month|day|all
+      - start_date?, end_date?
+      - project or project_name
+      - subproject
+      - note_snippet
+      - compact?
+    Defaults to period=week if no start/end/period filters provided by client.
+    """
+    compact = _compact(request)
+    qp = request.query_params
+    period = (qp.get("period") or "").lower()
 
-  sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = Sessions.objects.filter(is_active=False, user=request.user)
 
-  # Date window
-  if period in ("day", "week", "month") and not (qp.get("start_date") or qp.get("end_date")):
-    now = timezone.localtime(_now())
-    if period == "day":
-      start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    elif period == "week":
-      start = (now - timedelta(days=now.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
-      )
-    else:  # month
-      start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    sessions = sessions.filter(end_time__gte=start)
-  elif period not in ("all", "") or qp.get("start_date") or qp.get("end_date"):
-    # Use generic filter util
-    sessions = filter_sessions_by_params(request, sessions)
+    # Default period window if no explicit start/end
+    if period in ("day", "week", "month") and not (
+        qp.get("start_date") or qp.get("end_date")
+    ):
+        now = timezone.localtime(_now())
+        if period == "day":
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == "week":
+            start = (now - timedelta(days=now.weekday())).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+        else:
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        sessions = sessions.filter(end_time__gte=start)
 
-  # Serialize
-  if compact:
-    logs = [
-      {
-        "id": s.id,
-        "p": s.project.name,
-        "subs": [sp.name for sp in s.subprojects.all()],
-        "start": s.start_time.isoformat(),
-        "end": s.end_time.isoformat() if s.end_time else None,
-        "dur": s.duration,
-      }
-      for s in sessions.order_by("-end_time")
-    ]
-  else:
-    logs = [
-      {
-        "id": s.id,
-        "project": s.project.name,
-        "subprojects": [sp.name for sp in s.subprojects.all()],
-        "start_time": s.start_time.isoformat(),
-        "end_time": s.end_time.isoformat() if s.end_time else None,
-        "duration_minutes": s.duration,
-        "note": s.note or "",
-      }
-      for s in sessions.order_by("-end_time")
-    ]
-  return Response({"count": len(logs), "logs": logs})
+    # Normalize alias: project -> project_name for the filter helper
+    qp2 = qp.copy()
+    if qp2.get("project") and not qp2.get("project_name"):
+        qp2["project_name"] = qp2["project"]
+
+    shim = type("Req", (), {"query_params": qp2})()
+    sessions = filter_sessions_by_params(shim, sessions).order_by("-end_time")
+
+    if compact:
+        logs = [
+            {
+                "id": s.id,
+                "p": s.project.name,
+                "subs": [sp.name for sp in s.subprojects.all()],
+                "start": s.start_time.isoformat(),
+                "end": s.end_time.isoformat() if s.end_time else None,
+                "dur": s.duration,  # minutes
+            }
+            for s in sessions
+        ]
+    else:
+        logs = [
+            {
+                "id": s.id,
+                "project": s.project.name,
+                "subprojects": [sp.name for sp in s.subprojects.all()],
+                "start_time": s.start_time.isoformat(),
+                "end_time": s.end_time.isoformat() if s.end_time else None,
+                "duration_minutes": s.duration,
+                "note": s.note or "",
+            }
+            for s in sessions
+        ]
+    return Response({"count": len(logs), "logs": logs})
 
 
 @api_view(["POST"])

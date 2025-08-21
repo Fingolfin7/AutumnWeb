@@ -35,6 +35,7 @@ from core.api import (
   rename_entity,
   project_delete_body,
   log_activity,
+  search_sessions,
   mark_project,
   # existing (migrated)
   create_project,
@@ -107,6 +108,7 @@ urlpatterns = [
     path('api/restart_session/', restart_session, name='api_restart_session'),
     path('api/end_session/', end_session, name='api_end_session'),
     path('api/log_session/', log_session, name='api_log_session'),
+    path("api/sessions/search/", search_sessions, name="api_sessions_search"),
     path('api/delete_session/<int:session_id>/', delete_session,
          name='api_delete_session'),
     path('api/list_sessions/', list_sessions, name='api_list_sessions'),
