@@ -14,7 +14,7 @@ A demo is available here:
 👉 [http://fingolfin7.pythonanywhere.com/](http://fingolfin7.pythonanywhere.com/)
 
 Use this demo account to explore the features:
-- **Username**: `finrod` 
+- **Username**: `Finrod` 
 - or **Email**: `finrod.felagund@houseoffinwe.ea`
 - **Password**: `autumnweb`
 
