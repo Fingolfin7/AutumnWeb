@@ -1,25 +1,20 @@
 import os
-import re
 import pytz
 from AutumnWeb import settings
 from core.forms import *
 from core.utils import *
-from core.wordhandler import WordHandler
 from django.contrib import messages
 from django.db import transaction
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta, time
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from core.models import Projects, SubProjects, Sessions, status_choices
-from core.serializers import ProjectSerializer, SubProjectSerializer, SessionSerializer
+
 
 
 @login_required
@@ -264,7 +259,7 @@ def import_view(request):
     request.session.delete('file_path')
     request.session.delete('import_data')
 
-    if request.POST:
+    if request.method == "POST":
         form = ImportJSONForm(request.POST, request.FILES)
         if form.is_valid():
             uploaded_file = request.FILES.get('file')
