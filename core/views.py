@@ -987,3 +987,94 @@ def merge_projects(request):
     }
     
     return render(request, 'core/merge_projects.html', context)
+
+
+@login_required
+@transaction.atomic
+def merge_subprojects(request, project_id):
+    """
+    View to merge two subprojects into one new subproject.
+    Moves all sessions from both subprojects to the new merged subproject.
+    """
+    parent_project = get_object_or_404(Projects, id=project_id, user=request.user)
+    
+    if request.method == "POST":
+        form = MergeSubProjectsForm(request.POST)
+        if form.is_valid():
+            try:
+                subproject1_name = form.cleaned_data['subproject1']
+                subproject2_name = form.cleaned_data['subproject2']
+                new_subproject_name = form.cleaned_data['new_subproject_name']
+                
+                # Get the subprojects to merge (must belong to the same parent project)
+                subproject1 = get_object_or_404(SubProjects, name=subproject1_name, parent_project=parent_project, user=request.user)
+                subproject2 = get_object_or_404(SubProjects, name=subproject2_name, parent_project=parent_project, user=request.user)
+                
+                # Check if new subproject name already exists in the same project
+                if SubProjects.objects.filter(user=request.user, name=new_subproject_name, parent_project=parent_project).exists():
+                    form.add_error('new_subproject_name', 'You already have a subproject with this name in this project.')
+                    return render(request, 'core/merge_subprojects.html', {
+                        'title': 'Merge Subprojects',
+                        'form': form,
+                        'parent_project': parent_project
+                    })
+                
+                # Create merged description
+                merged_description = f"Merged from '{subproject1.name}' and '{subproject2.name}'\n\n"
+                
+                if subproject1.description:
+                    merged_description += f"--- {subproject1.name} Description ---\n{subproject1.description}\n\n"
+                
+                if subproject2.description:
+                    merged_description += f"--- {subproject2.name} Description ---\n{subproject2.description}\n\n"
+                
+                # Remove trailing newlines
+                merged_description = merged_description.strip()
+                
+                # Create the new merged subproject
+                merged_subproject = SubProjects.objects.create(
+                    user=request.user,
+                    name=new_subproject_name,
+                    parent_project=parent_project,
+                    start_date=min(subproject1.start_date, subproject2.start_date),
+                    last_updated=max(subproject1.last_updated, subproject2.last_updated),
+                    total_time=0.0,  # Will be calculated by audit function
+                    description=merged_description
+                )
+                
+                # Move all sessions from both subprojects to the merged subproject
+                subproject1_sessions = subproject1.sessions.all()
+                subproject2_sessions = subproject2.sessions.all()
+                
+                for session in subproject1_sessions:
+                    session.subprojects.remove(subproject1)
+                    session.subprojects.add(merged_subproject)
+                
+                for session in subproject2_sessions:
+                    session.subprojects.remove(subproject2)
+                    session.subprojects.add(merged_subproject)
+                
+                # Audit total time for the merged subproject
+                merged_subproject.audit_total_time(log=False)
+                
+                # Delete the original subprojects
+                subproject1.delete()
+                subproject2.delete()
+                
+                messages.success(request, f"Successfully merged '{subproject1_name}' and '{subproject2_name}' into '{new_subproject_name}'")
+                return redirect('update_project', pk=project_id)
+                
+            except Exception as e:
+                messages.error(request, f"An error occurred while merging subprojects: {e}")
+        else:
+            messages.error(request, "Invalid form data. Please check your inputs.")
+    else:
+        form = MergeSubProjectsForm()
+    
+    context = {
+        'title': 'Merge Subprojects',
+        'form': form,
+        'parent_project': parent_project
+    }
+    
+    return render(request, 'core/merge_subprojects.html', context)

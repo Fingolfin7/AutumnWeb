@@ -72,6 +72,12 @@
         <i class="fa fa-plus"></i>
         Create Subproject
     </button>
+    
+    <button type="button" id="merge-subprojects-button" class="secondary-button"
+            onclick="window.location.href= '{% url 'merge_subprojects' project.id %}'">
+        <i class="fa fa-code-branch"></i>
+        Merge Subprojects
+    </button>
 
     <br><br>
 

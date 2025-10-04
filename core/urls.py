@@ -21,6 +21,7 @@ from core.views import (
   import_stream,
   export_view,
   merge_projects,
+  merge_subprojects,
 )
 from core.api import (
   # new compact endpoints
@@ -87,6 +88,7 @@ urlpatterns = [
     path('import/', import_view, name='import'),
     path('import/stream/', import_stream, name='import_stream'),
     path('merge_projects/', merge_projects, name='merge_projects'),
+    path('merge_subprojects/<int:project_id>/', merge_subprojects, name='merge_subprojects'),
 
     # migrated API
     path('api/create_project/', create_project, name='api_create_project'),

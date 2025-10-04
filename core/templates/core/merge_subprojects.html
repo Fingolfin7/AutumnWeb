@@ -1,0 +1,54 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+    <div class="card">
+        <h2>Merge Subprojects</h2>
+        <p>Select two subprojects from <strong>{{ parent_project.name }}</strong> to merge into a new subproject. All sessions from both subprojects will be moved to the new merged subproject.</p>
+        
+        <form method="post">
+            {% csrf_token %}
+
+            <span class="label-input">
+                <label for="{{ form.subproject1.id_for_label }}">First Subproject:</label>
+                {{ form.subproject1 }}
+                {{ form.subproject1.errors }}
+            </span>
+
+            <br><br>
+
+            <span class="label-input">
+                <label for="{{ form.subproject2.id_for_label }}">Second Subproject:</label>
+                {{ form.subproject2 }}
+                {{ form.subproject2.errors }}
+            </span>
+
+            <br><br>
+
+            <span class="label-input">
+                <label for="{{ form.new_subproject_name.id_for_label }}">New Subproject Name:</label>
+                {{ form.new_subproject_name }}
+                {{ form.new_subproject_name.errors }}
+            </span>
+
+            <br><br>
+
+            {% if form.non_field_errors %}
+                <div class="error-message">
+                    {{ form.non_field_errors }}
+                </div>
+                <br>
+            {% endif %}
+
+            <button type="submit" class="primary-button">
+                <i class="fa fa-code-branch"></i>
+                Merge Subprojects
+            </button>
+            
+            <a href="{% url 'update_project' parent_project.id %}" class="secondary-button">
+                <i class="fa fa-arrow-left"></i>
+                Cancel
+            </a>
+        </form>
+    </div>
+{% endblock %}
