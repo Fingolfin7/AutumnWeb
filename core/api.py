@@ -28,6 +28,7 @@ from .utils import (
   session_exists,
   sessions_get_earliest_latest,
 )
+from django.db import transaction
 
 # -----------------------
 # Helpers
@@ -987,3 +988,237 @@ def list_active_sessions(request):
 def in_window(data, start=None, end=None):
   from .utils import in_window as _inw
   return _inw(data, start, end)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def merge_projects_api(request):
+    """
+    API endpoint to merge two projects into one new project.
+    Moves all sessions and subprojects from both projects to the new merged project.
+    """
+    project1_name = request.data.get('project1')
+    project2_name = request.data.get('project2')
+    new_project_name = request.data.get('new_project_name')
+    
+    if not all([project1_name, project2_name, new_project_name]):
+        return Response(
+            {'error': 'project1, project2, and new_project_name are required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    if project1_name == project2_name:
+        return Response(
+            {'error': 'Cannot merge a project with itself'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Get the projects to merge
+        project1 = get_object_or_404(Projects, name=project1_name, user=request.user)
+        project2 = get_object_or_404(Projects, name=project2_name, user=request.user)
+        
+        # Check if new project name already exists
+        if Projects.objects.filter(user=request.user, name=new_project_name).exists():
+            return Response(
+                {'error': f'Project with name "{new_project_name}" already exists'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create merged description
+        merged_description = f"Merged from '{project1.name}' and '{project2.name}'\n\n"
+        
+        if project1.description:
+            merged_description += f"--- {project1.name} Description ---\n{project1.description}\n\n"
+        
+        if project2.description:
+            merged_description += f"--- {project2.name} Description ---\n{project2.description}\n\n"
+        
+        # Remove trailing newlines
+        merged_description = merged_description.strip()
+        
+        # Create the new merged project
+        merged_project = Projects.objects.create(
+            user=request.user,
+            name=new_project_name,
+            start_date=min(project1.start_date, project2.start_date),
+            last_updated=max(project1.last_updated, project2.last_updated),
+            total_time=0.0,  # Will be calculated by audit function
+            status='active',  # Default to active
+            description=merged_description
+        )
+        
+        # Move all sessions from both projects to the merged project
+        project1_sessions = project1.sessions.all()
+        project2_sessions = project2.sessions.all()
+        
+        for session in project1_sessions:
+            session.project = merged_project
+            session.save()
+
+        for session in project2_sessions:
+            session.project = merged_project
+            session.save()
+        
+        # Move all subprojects from both projects to the merged project
+        # Handle potential name conflicts by renaming duplicates
+        project1_subprojects = list(project1.subprojects.all())
+        project2_subprojects = list(project2.subprojects.all())
+        
+        # Get existing subproject names in the merged project
+        existing_subproject_names = set()
+        
+        # First, move all subprojects from project1
+        for subproject in project1_subprojects:
+            original_name = subproject.name
+            new_name = original_name
+            
+            # If name conflict exists, append project name to make it unique
+            if new_name in existing_subproject_names:
+                new_name = f"{original_name} ({project1.name})"
+                counter = 1
+                while new_name in existing_subproject_names:
+                    new_name = f"{original_name} ({project1.name}) {counter}"
+                    counter += 1
+            
+            subproject.name = new_name
+            subproject.parent_project = merged_project
+            subproject.save()
+            existing_subproject_names.add(new_name)
+        
+        # Then, move all subprojects from project2
+        for subproject in project2_subprojects:
+            original_name = subproject.name
+            new_name = original_name
+            
+            # If name conflict exists, append project name to make it unique
+            if new_name in existing_subproject_names:
+                new_name = f"{original_name} ({project2.name})"
+                counter = 1
+                while new_name in existing_subproject_names:
+                    new_name = f"{original_name} ({project2.name}) {counter}"
+                    counter += 1
+            
+            subproject.name = new_name
+            subproject.parent_project = merged_project
+            subproject.save()
+            existing_subproject_names.add(new_name)
+        
+        # Audit total time for the merged project and all its subprojects
+        merged_project.audit_total_time(log=False)
+        for subproject in merged_project.subprojects.all():
+            subproject.audit_total_time(log=False)
+        
+        # Delete the original projects
+        project1.delete()
+        project2.delete()
+        
+        # Serialize and return the merged project
+        serializer = ProjectSerializer(merged_project)
+        return Response({
+            'message': f'Successfully merged "{project1_name}" and "{project2_name}" into "{new_project_name}"',
+            'project': serializer.data
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'An error occurred while merging projects: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def merge_subprojects_api(request):
+    """
+    API endpoint to merge two subprojects into one new subproject.
+    Moves all sessions from both subprojects to the new merged subproject.
+    """
+    subproject1_name = request.data.get('subproject1')
+    subproject2_name = request.data.get('subproject2')
+    new_subproject_name = request.data.get('new_subproject_name')
+    project_id = request.data.get('project_id')
+    
+    if not all([subproject1_name, subproject2_name, new_subproject_name, project_id]):
+        return Response(
+            {'error': 'subproject1, subproject2, new_subproject_name, and project_id are required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    if subproject1_name == subproject2_name:
+        return Response(
+            {'error': 'Cannot merge a subproject with itself'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    try:
+        # Get the parent project
+        parent_project = get_object_or_404(Projects, id=project_id, user=request.user)
+        
+        # Get the subprojects to merge (must belong to the same parent project)
+        subproject1 = get_object_or_404(SubProjects, name=subproject1_name, parent_project=parent_project, user=request.user)
+        subproject2 = get_object_or_404(SubProjects, name=subproject2_name, parent_project=parent_project, user=request.user)
+        
+        # Check if new subproject name already exists in the same project
+        if SubProjects.objects.filter(user=request.user, name=new_subproject_name, parent_project=parent_project).exists():
+            return Response(
+                {'error': f'Subproject with name "{new_subproject_name}" already exists in this project'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create merged description
+        merged_description = f"Merged from '{subproject1.name}' and '{subproject2.name}'\n\n"
+        
+        if subproject1.description:
+            merged_description += f"--- {subproject1.name} Description ---\n{subproject1.description}\n\n"
+        
+        if subproject2.description:
+            merged_description += f"--- {subproject2.name} Description ---\n{subproject2.description}\n\n"
+        
+        # Remove trailing newlines
+        merged_description = merged_description.strip()
+        
+        # Create the new merged subproject
+        merged_subproject = SubProjects.objects.create(
+            user=request.user,
+            name=new_subproject_name,
+            parent_project=parent_project,
+            start_date=min(subproject1.start_date, subproject2.start_date),
+            last_updated=max(subproject1.last_updated, subproject2.last_updated),
+            total_time=0.0,  # Will be calculated by audit function
+            description=merged_description
+        )
+        
+        # Move all sessions from both subprojects to the merged subproject
+        subproject1_sessions = subproject1.sessions.all()
+        subproject2_sessions = subproject2.sessions.all()
+        
+        for session in subproject1_sessions:
+            session.subprojects.remove(subproject1)
+            session.subprojects.add(merged_subproject)
+        
+        for session in subproject2_sessions:
+            session.subprojects.remove(subproject2)
+            session.subprojects.add(merged_subproject)
+        
+        # Audit total time for the merged subproject
+        merged_subproject.audit_total_time(log=False)
+        
+        # Delete the original subprojects
+        subproject1.delete()
+        subproject2.delete()
+        
+        # Serialize and return the merged subproject
+        serializer = SubProjectSerializer(merged_subproject)
+        return Response({
+            'message': f'Successfully merged "{subproject1_name}" and "{subproject2_name}" into "{new_subproject_name}"',
+            'subproject': serializer.data
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'An error occurred while merging subprojects: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

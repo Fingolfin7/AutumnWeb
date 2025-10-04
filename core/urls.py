@@ -59,6 +59,8 @@ from core.api import (
   delete_session,
   list_sessions,
   list_active_sessions,
+  merge_projects_api,
+  merge_subprojects_api,
 )
 
 urlpatterns = [
@@ -119,6 +121,8 @@ urlpatterns = [
     path('api/list_active_sessions/', list_active_sessions,
          name='api_list_active_sessions'),
     path('api/wordcloud_notes/', wordcloud_notes, name='api_wordcloud_notes'),
+    path('api/merge_projects/', merge_projects_api, name='api_merge_projects'),
+    path('api/merge_subprojects/', merge_subprojects_api, name='api_merge_subprojects'),
 
     # new compact endpoints for MCP/LLMs
     path('api/timer/start/', timer_start, name='api_timer_start'),

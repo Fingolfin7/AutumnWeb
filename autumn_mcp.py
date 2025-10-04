@@ -394,5 +394,83 @@ def search_projects(search_term: str):
     )
 
 
+@mcp.tool(
+    description="Merge two projects into one new project. "
+    "All sessions and subprojects from both projects will be moved to the new merged project. "
+    "Subprojects with duplicate names will be automatically renamed to avoid conflicts."
+)
+def merge_projects(
+    project1: str,
+    project2: str, 
+    new_project_name: str
+):
+    """Merge two projects into one new project.
+    
+    Args:
+        project1: Name of the first project to merge
+        project2: Name of the second project to merge  
+        new_project_name: Name for the new merged project
+        
+    Returns:
+        The merged project data with a success message
+        
+    Note:
+        - Both projects must exist and belong to the authenticated user
+        - The new project name must be unique
+        - All sessions and subprojects will be moved to the new project
+        - Subprojects with duplicate names will be renamed with project suffixes
+        - Total time will be recalculated automatically
+    """
+    return autumn_request(
+        "POST", 
+        "/api/merge_projects/", 
+        json={
+            "project1": project1,
+            "project2": project2,
+            "new_project_name": new_project_name
+        }
+    )
+
+
+@mcp.tool(
+    description="Merge two subprojects into one new subproject. "
+    "All sessions from both subprojects will be moved to the new merged subproject. "
+    "Both subprojects must belong to the same parent project."
+)
+def merge_subprojects(
+    subproject1: str,
+    subproject2: str,
+    new_subproject_name: str,
+    project_id: int
+):
+    """Merge two subprojects into one new subproject.
+    
+    Args:
+        subproject1: Name of the first subproject to merge
+        subproject2: Name of the second subproject to merge
+        new_subproject_name: Name for the new merged subproject
+        project_id: ID of the parent project containing both subprojects
+        
+    Returns:
+        The merged subproject data with a success message
+        
+    Note:
+        - Both subprojects must exist and belong to the same parent project
+        - The new subproject name must be unique within the parent project
+        - All sessions will be moved to the new subproject
+        - Total time will be recalculated automatically
+    """
+    return autumn_request(
+        "POST", 
+        "/api/merge_subprojects/", 
+        json={
+            "subproject1": subproject1,
+            "subproject2": subproject2,
+            "new_subproject_name": new_subproject_name,
+            "project_id": project_id
+        }
+    )
+
+
 if __name__ == "__main__":
     mcp.run()
