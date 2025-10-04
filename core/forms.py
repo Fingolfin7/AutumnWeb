@@ -160,3 +160,53 @@ class ExportJSONForm(forms.Form):
     )
     autumn_compatible = forms.BooleanField(required=False, initial=False)
     compress = forms.BooleanField(required=False, initial=False)
+
+
+class MergeProjectsForm(forms.Form):
+    project1 = forms.CharField(
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Select first project',
+                'id': 'project1-search',
+                'data-ajax_url': '/api/search_projects/',
+                'class': 'half-width',
+                'autocomplete': 'off',
+            }
+        )
+    )
+    
+    project2 = forms.CharField(
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Select second project',
+                'id': 'project2-search',
+                'data-ajax_url': '/api/search_projects/',
+                'class': 'half-width',
+                'autocomplete': 'off',
+            }
+        )
+    )
+    
+    new_project_name = forms.CharField(
+        required=True,
+        max_length=255,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Enter name for merged project',
+                'class': 'half-width',
+            }
+        )
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        project1_name = cleaned_data.get('project1')
+        project2_name = cleaned_data.get('project2')
+        new_name = cleaned_data.get('new_project_name')
+        
+        if project1_name and project2_name and project1_name == project2_name:
+            raise forms.ValidationError("Cannot merge a project with itself.")
+            
+        return cleaned_data
