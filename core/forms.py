@@ -160,3 +160,103 @@ class ExportJSONForm(forms.Form):
     )
     autumn_compatible = forms.BooleanField(required=False, initial=False)
     compress = forms.BooleanField(required=False, initial=False)
+
+
+class MergeProjectsForm(forms.Form):
+    project1 = forms.CharField(
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Select first project',
+                'id': 'project1-search',
+                'data-ajax_url': '/api/search_projects/',
+                'class': 'half-width',
+                'autocomplete': 'off',
+            }
+        )
+    )
+    
+    project2 = forms.CharField(
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Select second project',
+                'id': 'project2-search',
+                'data-ajax_url': '/api/search_projects/',
+                'class': 'half-width',
+                'autocomplete': 'off',
+            }
+        )
+    )
+    
+    new_project_name = forms.CharField(
+        required=True,
+        max_length=255,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Enter name for merged project',
+                'class': 'half-width',
+            }
+        )
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        project1_name = cleaned_data.get('project1')
+        project2_name = cleaned_data.get('project2')
+        new_name = cleaned_data.get('new_project_name')
+        
+        if project1_name and project2_name and project1_name == project2_name:
+            raise forms.ValidationError("Cannot merge a project with itself.")
+            
+        return cleaned_data
+
+
+class MergeSubProjectsForm(forms.Form):
+    subproject1 = forms.CharField(
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Select first subproject',
+                'id': 'subproject1-search',
+                'data-ajax_url': '/api/search_subprojects/',
+                'class': 'half-width',
+                'autocomplete': 'off',
+            }
+        )
+    )
+    
+    subproject2 = forms.CharField(
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Select second subproject',
+                'id': 'subproject2-search',
+                'data-ajax_url': '/api/search_subprojects/',
+                'class': 'half-width',
+                'autocomplete': 'off',
+            }
+        )
+    )
+    
+    new_subproject_name = forms.CharField(
+        required=True,
+        max_length=255,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Enter name for merged subproject',
+                'class': 'half-width',
+            }
+        )
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        subproject1_name = cleaned_data.get('subproject1')
+        subproject2_name = cleaned_data.get('subproject2')
+        new_name = cleaned_data.get('new_subproject_name')
+        
+        if subproject1_name and subproject2_name and subproject1_name == subproject2_name:
+            raise forms.ValidationError("Cannot merge a subproject with itself.")
+            
+        return cleaned_data

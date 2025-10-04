@@ -20,6 +20,8 @@ from core.views import (
   import_view,
   import_stream,
   export_view,
+  merge_projects,
+  merge_subprojects,
 )
 from core.api import (
   # new compact endpoints
@@ -57,6 +59,8 @@ from core.api import (
   delete_session,
   list_sessions,
   list_active_sessions,
+  merge_projects_api,
+  merge_subprojects_api,
 )
 
 urlpatterns = [
@@ -85,6 +89,8 @@ urlpatterns = [
     path('export/', export_view, name='export'),
     path('import/', import_view, name='import'),
     path('import/stream/', import_stream, name='import_stream'),
+    path('merge_projects/', merge_projects, name='merge_projects'),
+    path('merge_subprojects/<int:project_id>/', merge_subprojects, name='merge_subprojects'),
 
     # migrated API
     path('api/create_project/', create_project, name='api_create_project'),
@@ -115,6 +121,8 @@ urlpatterns = [
     path('api/list_active_sessions/', list_active_sessions,
          name='api_list_active_sessions'),
     path('api/wordcloud_notes/', wordcloud_notes, name='api_wordcloud_notes'),
+    path('api/merge_projects/', merge_projects_api, name='api_merge_projects'),
+    path('api/merge_subprojects/', merge_subprojects_api, name='api_merge_subprojects'),
 
     # new compact endpoints for MCP/LLMs
     path('api/timer/start/', timer_start, name='api_timer_start'),
