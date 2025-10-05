@@ -73,11 +73,13 @@
         Create Subproject
     </button>
     
-    <button type="button" id="merge-subprojects-button" class="secondary-button"
+    {% if subprojects %}
+        <button type="button" id="merge-subprojects-button" class="secondary-button"
             onclick="window.location.href= '{% url 'merge_subprojects' project.id %}'">
-        <i class="fa fa-code-branch"></i>
-        Merge Subprojects
-    </button>
+            <i class="fa fa-code-branch"></i>
+            Merge Subprojects
+        </button>
+    {% endif %}
 
     <br><br>
 
