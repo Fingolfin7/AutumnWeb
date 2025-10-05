@@ -4,8 +4,9 @@
 {% block content %}
     <div class="card">
         <h2>Merge Subprojects</h2>
-        <p>Select two subprojects from <strong>{{ parent_project.name }}</strong> to merge into a new subproject. All sessions from both subprojects will be moved to the new merged subproject.</p>
-        
+
+        <br>
+
         <form method="post">
             {% csrf_token %}
 
@@ -40,15 +41,17 @@
                 <br>
             {% endif %}
 
-            <button type="submit" class="primary-button">
-                <i class="fa fa-code-branch"></i>
-                Merge Subprojects
-            </button>
-            
-            <a href="{% url 'update_project' parent_project.id %}" class="secondary-button">
-                <i class="fa fa-arrow-left"></i>
-                Cancel
-            </a>
+            <div class="button-row">
+                <button type="button" class="secondary-button" onclick="window.location.href='{% url 'update_project' parent_project.id %}'">
+                     <i class="fa fa-arrow-left"></i>
+                    Back
+                </button>
+
+                <button type="submit" class="primary-button">
+                    <i class="fa fa-code-branch"></i>
+                    Merge Subprojects
+                </button>
+            </div>
         </form>
     </div>
 {% endblock %}

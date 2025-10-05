@@ -4,7 +4,8 @@
 {% block content %}
     <div class="card">
         <h2>Merge Projects</h2>
-        <p>Select two projects to merge into a new project. All sessions and subprojects from both projects will be moved to the new merged project.</p>
+
+        <br>
         
         <form method="post">
             {% csrf_token %}
@@ -40,15 +41,17 @@
                 <br>
             {% endif %}
 
-            <button type="submit" class="primary-button">
-                <i class="fa fa-code-branch"></i>
-                Merge Projects
-            </button>
-            
-            <a href="{% url 'projects' %}" class="secondary-button">
-                <i class="fa fa-arrow-left"></i>
-                Cancel
-            </a>
+            <div class="button-row">
+                <button type="button" class="secondary-button" onclick="window.location.href='{% url 'projects' %}'">
+                     <i class="fa fa-arrow-left"></i>
+                    Back
+                </button>
+
+                <button type="submit" class="primary-button">
+                    <i class="fa fa-code-branch"></i>
+                    Merge Projects
+                </button>
+            </div>
         </form>
     </div>
 {% endblock %}

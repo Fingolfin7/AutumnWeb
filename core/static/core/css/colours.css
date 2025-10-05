@@ -22,7 +22,7 @@
 }
 .dark-red {
   background-color: var(--color-dark-red) !important;
-  color: var(--dark-background);
+  color: var(--color-text-light);
 }
 .blue-grey {
   background-color: var(--color-blue-grey) !important;
