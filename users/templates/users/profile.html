@@ -2,6 +2,7 @@
 {% load time_formats %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load background_images %}
 
 {% block content %}
     <form method="post" enctype="multipart/form-data">
@@ -111,6 +112,7 @@
                     if ($('#id_automatic_background').is(':checked')) {
                         $('#automatic_background_options').show();
                         $('.uploaded_backgrounds').hide();
+                        $('.background-context').show();
                     }
 
                     // Toggle visibility when automatic background checkbox changes
@@ -118,9 +120,11 @@
                         if ($(this).is(':checked')) {
                             $('#automatic_background_options').show();
                             $('.uploaded_backgrounds').hide();
+                            $('.background-context').show();
                         } else {
                             $('#automatic_background_options').hide();
                             $('.uploaded_backgrounds').show();
+                            $('.background-context').hide();
                         }
                     });
                 });
@@ -135,5 +139,21 @@
         </section>
     </form>
 
-
+    <!-- Background image context card -->
+    {% if user.profile.automatic_background %}
+        <section class="card stacked background-context">
+            <h2>About Background</h2>
+            {% if user.profile.bing_background %}
+                <h3>{% bing_background_title %}</h3>
+                <p>{% bing_background_description %}</p>
+            {% elif user.profile.nasa_apod_background %}
+                <h3>{% nasa_apod_title %}</h3>
+                <p>{% nasa_apod_explanation %}</p>
+            {% else %}
+                <p>No automatic background source selected.</p>
+            {% endif %}
+        </section>
+    {% else %}
+        <section class="card stacked background-context" style="display:none;"></section>
+    {% endif %}
 {% endblock %}
