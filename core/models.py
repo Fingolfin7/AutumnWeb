@@ -12,6 +12,7 @@ status_choices = (
     ('active', 'Active'),
     ('paused', 'Paused'),
     ('complete', 'Complete'),
+    ('archived', 'Archived')
 )
 
 
