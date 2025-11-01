@@ -27,7 +27,7 @@ html, body {
   /* Backgrounds & Borders */
   --light-background: #f3f4f6; /* (Light mode remains for toggle functionality) */
   --dark-background: #121212; /* A deep, pure black background */
-  --img-mix-background: rgba(0, 0, 0, 0.63);
+  --img-mix-background: rgba(0, 0, 0, 0.55);
   --card-background-light: #ffffff;
   --card-background-dark: #1e1e1e; /* A slightly off-black for cards, like a terminal window */
   --border-dark: #333333; /* A subtle border */
@@ -568,7 +568,16 @@ label > input[type="file"] {
 
 
 /* Responsive Styles */
-@media (max-width: 768px) {
+@media (max-width: 1200px) {
+    .left-panel {
+        width: 13rem;
+    }
+    .main-body {
+        margin-left: 13rem;
+    }
+}
+
+@media (max-width: 975px) {
     * {
         font-size: 8px;
     }
@@ -589,6 +598,7 @@ label > input[type="file"] {
 
     .main-body {
         margin-left: 0;
+        padding-left: 2%;
     }
 
     #burger-menu {
