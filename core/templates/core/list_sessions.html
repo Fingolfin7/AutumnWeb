@@ -69,6 +69,9 @@
                     ({{ data.total_duration|duration_formatter }})
                 </span>
             </h3>
+
+            <br>
+
             {% for session in data.sessions %}
                 <div class="card" id="session-{{ session.id }}">
                     <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
