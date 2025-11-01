@@ -146,7 +146,7 @@ body.dark-mode.bg-active {
 }
 
 .left-panel {
-  padding: 4% 0 2% 2%;
+  padding: 2% 0 2% 1%;
   width: auto;
   position: fixed;
   overflow: auto;
@@ -160,7 +160,7 @@ body.dark-mode.bg-active {
   margin-bottom: 1%;
   align-items: center;
   position: relative;
-  height: 3.7rem;
+  height: 4rem;
 }
 
 #canvas_container {
@@ -223,7 +223,7 @@ body.dark-mode .main-link {
 
 .main-body {
   margin-left: 16%;
-  padding: 2%;
+  padding: 0 2% 2% 0;
 }
 
 .card {
