@@ -12,3 +12,4 @@ django-environ
 google-genai
 pytz
 django-cleanup
+python-toon

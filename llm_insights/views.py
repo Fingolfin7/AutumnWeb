@@ -59,6 +59,7 @@ class InsightsView(LoginRequiredMixin, View):
                     'note_snippet': request.GET.get('note_snippet'),
                 }
             ),
+            'prompt': request.GET.get('prompt'),
             'sessions': sessions,
             'conversation_history': conversation_history,
             'sessions_updated': sessions_updated,
