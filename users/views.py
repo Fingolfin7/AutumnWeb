@@ -5,7 +5,13 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 from rest_framework.authtoken.models import Token
 from rest_framework.decorators import api_view
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse, FileResponse
+import logging
+import mimetypes
+import os
+import requests
+
+logger = logging.getLogger('main')
 
 def debug_session(request):
     return JsonResponse({
@@ -106,3 +112,58 @@ def profile(request):
         'profile_form': p_form,
     }
     return render(request, 'users/profile.html', context)
+
+@login_required
+def download_background(request):
+    """Force download of the user's current background image (automatic or manual)."""
+    profile = request.user.profile
+
+    # Automatic background sources
+    if profile.automatic_background:
+        from core.templatetags.background_images import (
+            bing_background,
+            nasa_apod_background,
+            bing_background_title,
+            nasa_apod_title,
+        )
+        if profile.bing_background:
+            url = bing_background()
+            title = bing_background_title() or 'bing_daily'
+        elif profile.nasa_apod_background:
+            url = nasa_apod_background()
+            title = nasa_apod_title() or 'nasa_apod'
+        else:
+            messages.error(request, 'No automatic background source selected.')
+            return redirect('profile')
+
+        if not url:
+            messages.error(request, 'No automatic background image available right now.')
+            return redirect('profile')
+
+        try:
+            resp = requests.get(url, timeout=10)
+            resp.raise_for_status()
+            content_type = resp.headers.get('Content-Type') or mimetypes.guess_type(url)[0] or 'application/octet-stream'
+            ext = mimetypes.guess_extension(content_type) or '.jpg'
+            filename = f"{title}{ext}".replace(' ', '_')
+            response = HttpResponse(resp.content, content_type=content_type)
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as e:
+            logger.error('Failed to fetch automatic background for download: %s', e)
+            messages.error(request, 'Failed to download automatic background image.')
+            return redirect('profile')
+
+    # Manual uploaded background
+    if profile.background_image:
+        try:
+            file_field = profile.background_image
+            filename = os.path.basename(file_field.name)
+            return FileResponse(file_field.open('rb'), as_attachment=True, filename=filename)
+        except Exception as e:
+            logger.error('Failed to open manual background for download: %s', e)
+            messages.error(request, 'Failed to download background image.')
+            return redirect('profile')
+
+    messages.error(request, 'No background image to download.')
+    return redirect('profile')

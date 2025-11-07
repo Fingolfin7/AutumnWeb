@@ -38,6 +38,7 @@ urlpatterns = [
                                                  authentication_form=UserLoginForm), name='login'),
     path('logout/', auth_views.LogoutView.as_view(template_name='users/logout.html'), name='logout'),
     path('profile/', user_views.profile, name='profile'),
+    path('profile/download-background/', user_views.download_background, name='download_background'),
 
     path('password-reset/', auth_views.PasswordResetView.as_view(template_name='users/password_reset.html',
                                                                      html_email_template_name='users/Email Password Reset Template.html',

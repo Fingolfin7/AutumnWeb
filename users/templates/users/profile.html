@@ -102,7 +102,14 @@
                         </label>
                         {{ profile_form.remove_background_image.errors }}
                     </label>
-                {% endif %}
+
+                    <!-- Download manually uploaded background image -->
+                    <p>
+                        <button type="button" class="secondary-button" title="Download current background image" aria-label="Download current background image" onclick="window.location.href='{% url 'download_background' %}'">
+                            <i class="fas fa-download"></i> Download Background
+                        </button>
+                    </p>
+                 {% endif %}
             </span>
 
 
@@ -144,11 +151,27 @@
         <section class="card stacked background-context">
             <h2>About Background</h2>
             {% if user.profile.bing_background %}
+                {% bing_background as bing_url %}
                 <h3>{% bing_background_title %}</h3>
                 <p>{% bing_background_description %}</p>
+                {% if bing_url %}
+                    <p>
+                        <button type="button" class="secondary-button" title="Download Bing daily image" aria-label="Download Bing daily image" onclick="window.location.href='{% url 'download_background' %}'">
+                            <i class="fas fa-download"></i> Download Background
+                        </button>
+                    </p>
+                {% endif %}
             {% elif user.profile.nasa_apod_background %}
+                {% nasa_apod_background as nasa_url %}
                 <h3>{% nasa_apod_title %}</h3>
                 <p>{% nasa_apod_explanation %}</p>
+                {% if nasa_url %}
+                    <p>
+                        <button type="button" class="secondary-button" title="Download NASA APOD image" aria-label="Download NASA APOD image" onclick="window.location.href='{% url 'download_background' %}'">
+                            <i class="fas fa-download"></i> Download Background
+                        </button>
+                    </p>
+                {% endif %}
             {% else %}
                 <p>No automatic background source selected.</p>
             {% endif %}
