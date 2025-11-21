@@ -6,6 +6,7 @@ from core.models import Sessions
 from core.forms import SearchProjectForm
 from core.utils import filter_sessions_by_params
 from .llm_handlers import get_llm_handler
+import json
 
 
 IN_MEM_CACHE = {}
@@ -31,24 +32,65 @@ def perform_llm_analysis(llm_handler, sessions, user_prompt="", username="", con
 
 
 class InsightsView(LoginRequiredMixin, View):
+    def _provider_models(self, user):
+        profile = getattr(user, 'profile', None)
+        provider_models = {
+            'gemini': [
+                ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
+                ('gemini-2.5-pro', 'Gemini 2.5 Pro'),
+                ('gemini-3-pro-preview', 'Gemini 3 Pro Preview'),
+            ]
+        }
+        if profile and profile.openai_api_key_enc:
+            provider_models['openai'] = [
+                ('gpt-5-mini', 'GPT-5 Mini'),
+                ('gpt-5.1', 'GPT-5.1'),
+                ('gpt-5.1-thinking', 'GPT-5.1 Thinking'),
+            ]
+        if profile and profile.claude_api_key_enc:
+            provider_models['claude'] = [
+                ('claude-haiku-4.5', 'Claude Haiku 4.5'),
+                ('claude-sonnet-4', 'Claude Sonnet 4'),
+                ('claude-sonnet-4-reasoning', 'Claude Sonnet 4 Reasoning'),
+            ]
+        return provider_models
+
+    def _build_api_keys(self, user):
+        profile = getattr(user, 'profile', None)
+        if not profile:
+            return {}
+        return {
+            'gemini': profile.get_api_key('gemini'),
+            'openai': profile.get_api_key('openai'),
+            'claude': profile.get_api_key('claude'),
+        }
+
+    def _validate_selection(self, provider_models, provider, model):
+        if provider not in provider_models:
+            provider = next(iter(provider_models.keys()))
+        valid_models = provider_models[provider]
+        model_values = [m[0] for m in valid_models]
+        if model not in model_values:
+            model = valid_models[0][0]
+        return provider, model
+
     def get(self, request):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
         sessions = filter_sessions_by_params(request, sessions)
-
-        # Load conversation history for the selected model
-        selected_model = request.GET.get('model', "gemini-2.5-flash-preview-05-20") # Default model
-
+        provider_models = self._provider_models(request.user)
+        selected_provider = request.GET.get('provider', next(iter(provider_models.keys())))
+        selected_model = request.GET.get('model')
+        selected_provider, selected_model = self._validate_selection(provider_models, selected_provider, selected_model)
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
         handler = IN_MEM_CACHE.get(handler_key)
         conversation_history = handler.get_conversation_history() if handler else None
-
-
-        # Set flag if the filter button was pressed
+        usage_stats = handler.get_usage_stats() if handler else {"prompt": 0, "response": 0, "total": 0}
         sessions_updated = 'filter' in request.GET
         request.session["sessions_updated"] = sessions_updated
         if sessions_updated:
             messages.success(request, "Session selection updated.")
-
+        provider_models_json = json.dumps({p: [{'value': v, 'label': l} for v, l in lst] for p, lst in provider_models.items()})
+        providers = list(provider_models.keys())
         context = {
             'title': 'Session Analysis',
             'search_form': SearchProjectForm(
@@ -63,40 +105,36 @@ class InsightsView(LoginRequiredMixin, View):
             'sessions': sessions,
             'conversation_history': conversation_history,
             'sessions_updated': sessions_updated,
-            'selected_model': selected_model
+            'selected_model': selected_model,
+            'selected_provider': selected_provider,
+            'usage_stats': usage_stats,
+            'provider_models_json': provider_models_json,
+            'providers': providers,
         }
-
         return render(request, 'llm_insights/insights.html', context)
 
     def post(self, request):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
         sessions = filter_sessions_by_params(request, sessions)
         sessions_updated = request.session.get("sessions_updated", False)
-
-        # Retrieve selected model from form with default
-        selected_model = request.POST.get("model", "gemini-2.5-flash-preview-05-20") # Default model
+        provider_models = self._provider_models(request.user)
+        selected_provider = request.POST.get("provider", next(iter(provider_models.keys())))
+        selected_model = request.POST.get("model")
+        selected_provider, selected_model = self._validate_selection(provider_models, selected_provider, selected_model)
         handler_key = f"llm_handler_{request.user.id}_{selected_model}"
-
-        # Check if the handler is in memory and not expired
         handler = IN_MEM_CACHE.get(handler_key)
-
         if not handler:
-            handler = get_llm_handler(model=selected_model)
+            api_keys = self._build_api_keys(request.user)
+            handler = get_llm_handler(model=selected_model, api_keys=api_keys)
             IN_MEM_CACHE[handler_key] = handler
-
-        handler_key = f"llm_handler_{request.user.id}_{selected_model}"
         handler = IN_MEM_CACHE.get(handler_key)
         conversation_history = handler.get_conversation_history() if handler else None
-
         if 'reset_conversation' in request.POST:
-            # Reset conversation for the selected model
             request.session['sessions_updated'] = False
-            IN_MEM_CACHE.pop(handler_key)
-            conversation_history =  None
+            IN_MEM_CACHE.pop(handler_key, None)
+            conversation_history = None
         else:
             user_prompt = request.POST.get('prompt', '')
-
-            # Process the conversation
             insights, conversation_history = perform_llm_analysis(
                 llm_handler=handler,
                 sessions=sessions,
@@ -105,11 +143,11 @@ class InsightsView(LoginRequiredMixin, View):
                 conversation_history=conversation_history,
                 sessions_updated=sessions_updated
             )
-
-            # Update cache and session
             sessions_updated = False
             request.session['sessions_updated'] = sessions_updated
-
+        usage_stats = handler.get_usage_stats() if handler else {"prompt": 0, "response": 0, "total": 0}
+        provider_models_json = json.dumps({p: [{'value': v, 'label': l} for v, l in lst] for p, lst in provider_models.items()})
+        providers = list(provider_models.keys())
         context = {
             'title': 'Session Analysis',
             'search_form': SearchProjectForm(
@@ -124,6 +162,10 @@ class InsightsView(LoginRequiredMixin, View):
             'conversation_history': conversation_history,
             'sessions_updated': sessions_updated,
             'selected_model': selected_model,
+            'selected_provider': selected_provider,
+            'usage_stats': usage_stats,
+            'provider_models_json': provider_models_json,
+            'providers': providers,
         }
 
         return render(request, 'llm_insights/insights.html', context)

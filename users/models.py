@@ -4,10 +4,25 @@ from django.contrib.auth.models import User
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from io import BytesIO
 from PIL import Image, ImageSequence
+from cryptography.fernet import Fernet
+from django.conf import settings
 
 
 # make the email field for the user model unique
 User._meta.get_field('email')._unique = True
+
+# Helper to get a stable fernet key (derive from SECRET_KEY)
+_DEF_FERNET = None
+
+def get_fernet():
+    global _DEF_FERNET
+    if _DEF_FERNET is None:
+        # Derive a 32-byte base64 urlsafe key from SECRET_KEY deterministically
+        import hashlib, base64
+        digest = hashlib.sha256(settings.SECRET_KEY.encode()).digest()
+        key = base64.urlsafe_b64encode(digest)
+        _DEF_FERNET = Fernet(key)
+    return _DEF_FERNET
 
 # Create your models here.
 class Profile(models.Model):
@@ -17,9 +32,47 @@ class Profile(models.Model):
     automatic_background = models.BooleanField(default=False)  # Automatically set background image
     bing_background = models.BooleanField(default=False)  # Use Bing's daily image (if automatic_background is True)
     nasa_apod_background = models.BooleanField(default=False)  # Use NASA's Astronomy Picture of the Day (if automatic_background is True)
+    # Encrypted API key fields (nullable)
+    gemini_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
+    openai_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
+    claude_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
 
     def __str__(self):
         return f"{self.user.username} Profile"
+
+    # Encryption / Decryption helpers
+    def set_api_key(self, provider: str, raw_key: str | None):
+        field_map = {
+            'gemini': 'gemini_api_key_enc',
+            'openai': 'openai_api_key_enc',
+            'claude': 'claude_api_key_enc',
+        }
+        fname = field_map.get(provider.lower())
+        if not fname:
+            raise ValueError('Unsupported provider')
+        if not raw_key:
+            setattr(self, fname, None)
+        else:
+            f = get_fernet()
+            setattr(self, fname, f.encrypt(raw_key.encode()))
+
+    def get_api_key(self, provider: str) -> str | None:
+        field_map = {
+            'gemini': 'gemini_api_key_enc',
+            'openai': 'openai_api_key_enc',
+            'claude': 'claude_api_key_enc',
+        }
+        fname = field_map.get(provider.lower())
+        if not fname:
+            return None
+        data = getattr(self, fname)
+        if not data:
+            return None
+        f = get_fernet()
+        try:
+            return f.decrypt(data).decode()
+        except Exception:
+            return None
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

@@ -73,12 +73,10 @@ def profile(request):
 
         if u_form.is_valid() and p_form.is_valid():
             u_form.save()
-
+            profile = request.user.profile
             # handle automatic background image setting
             if p_form.cleaned_data.get('automatic_background'):
-                profile = request.user.profile
                 background_choice = p_form.cleaned_data.get('background_choice')
-
                 if background_choice == 'bing':
                     profile.bing_background = True
                     profile.nasa_apod_background = False
@@ -88,14 +86,25 @@ def profile(request):
                 else:
                     profile.bing_background = False
                     profile.nasa_apod_background = False
-
             # Handle background image removal
             if p_form.cleaned_data.get('remove_background_image'):
-                profile = request.user.profile
                 if profile.background_image:
-                    profile.background_image.delete(save=False) # Delete file
+                    profile.background_image.delete(save=False)
                 profile.background_image = None
-
+            # Handle API keys store/clear
+            if p_form.cleaned_data.get('clear_gemini_api_key'):
+                profile.set_api_key('gemini', None)
+            elif p_form.cleaned_data.get('gemini_api_key'):
+                profile.set_api_key('gemini', p_form.cleaned_data.get('gemini_api_key').strip())
+            if p_form.cleaned_data.get('clear_openai_api_key'):
+                profile.set_api_key('openai', None)
+            elif p_form.cleaned_data.get('openai_api_key'):
+                profile.set_api_key('openai', p_form.cleaned_data.get('openai_api_key').strip())
+            if p_form.cleaned_data.get('clear_claude_api_key'):
+                profile.set_api_key('claude', None)
+            elif p_form.cleaned_data.get('claude_api_key'):
+                profile.set_api_key('claude', p_form.cleaned_data.get('claude_api_key').strip())
+            profile.save()
             p_form.save()
             messages.success(request, f'Profile updated successfully.')
             return redirect('profile')
@@ -105,11 +114,18 @@ def profile(request):
                                    initial={
                                       'automatic_background': request.user.profile.automatic_background,
                                       'background_choice': 'bing' if request.user.profile.bing_background else 'nasa' if request.user.profile.nasa_apod_background else '',
-                                  })
-
+                                   })
+    # Provide masked info about which keys are set
+    profile = request.user.profile
+    have_keys = {
+        'gemini': bool(profile.gemini_api_key_enc),
+        'openai': bool(profile.openai_api_key_enc),
+        'claude': bool(profile.claude_api_key_enc),
+    }
     context = {
         'user_form': u_form,
         'profile_form': p_form,
+        'have_keys': have_keys,
     }
     return render(request, 'users/profile.html', context)
 

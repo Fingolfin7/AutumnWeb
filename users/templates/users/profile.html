@@ -137,6 +137,120 @@
                 });
             </script>
 
+            <!-- API Keys Section -->
+            <hr>
+            <h3>Private LLM API Keys</h3>
+            <p class="small">Your keys are encrypted at rest. Leave fields blank to keep existing values. Use the clear switches to remove stored keys.</p>
+            <div class="api-keys-grid">
+                <div class="api-key-item">
+                    <div class="api-key-header">
+                        <label class="api-key-label">Gemini Key Status:</label>
+                        <span class="api-key-status">{% if have_keys.gemini %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
+                    </div>
+                    <div class="api-key-input-wrapper">
+                        {{ profile_form.gemini_api_key }}
+                    </div>
+                    <div class="api-key-clear-wrapper">
+                        <label class="switch">
+                            {{ profile_form.clear_gemini_api_key }}
+                            <span class="slider round"></span>
+                        </label>
+                        <small class="api-key-clear-label">Clear Gemini Key</small>
+                    </div>
+                    {{ profile_form.gemini_api_key.errors }}
+                </div>
+                <div class="api-key-item">
+                    <div class="api-key-header">
+                        <label class="api-key-label">OpenAI Key Status:</label>
+                        <span class="api-key-status">{% if have_keys.openai %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
+                    </div>
+                    <div class="api-key-input-wrapper">
+                        {{ profile_form.openai_api_key }}
+                    </div>
+                    <div class="api-key-clear-wrapper">
+                        <label class="switch">
+                            {{ profile_form.clear_openai_api_key }}
+                            <span class="slider round"></span>
+                        </label>
+                        <small class="api-key-clear-label">Clear OpenAI Key</small>
+                    </div>
+                    {{ profile_form.openai_api_key.errors }}
+                </div>
+                <div class="api-key-item">
+                    <div class="api-key-header">
+                        <label class="api-key-label">Claude Key Status:</label>
+                        <span class="api-key-status">{% if have_keys.claude %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
+                    </div>
+                    <div class="api-key-input-wrapper">
+                        {{ profile_form.claude_api_key }}
+                    </div>
+                    <div class="api-key-clear-wrapper">
+                        <label class="switch">
+                            {{ profile_form.clear_claude_api_key }}
+                            <span class="slider round"></span>
+                        </label>
+                        <small class="api-key-clear-label">Clear Claude Key</small>
+                    </div>
+                    {{ profile_form.claude_api_key.errors }}
+                </div>
+            </div>
+            <style>
+                .api-keys-grid {
+                    display: grid;
+                    gap: 1.5rem;
+                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                    margin-top: 1rem;
+                }
+                .api-key-item {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                    padding: 1rem;
+                    border: 1px solid var(--border-dark);
+                    border-radius: 4px;
+                    background-color: var(--card-background-dark);
+                }
+                .api-key-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 0.25rem;
+                }
+                .api-key-label {
+                    font-weight: 500;
+                    margin: 0;
+                }
+                .api-key-status {
+                    font-weight: 600;
+                }
+                .api-key-input-wrapper {
+                    width: 100%;
+                }
+                .api-key-input-wrapper input[type=password] {
+                    width: 100%;
+                    padding: 0.5rem;
+                    border: 1px solid var(--border-dark);
+                    border-radius: 4px;
+                    background-color: var(--dark-background);
+                    color: var(--dark-text);
+                }
+                .api-key-clear-wrapper {
+                    display: flex;
+                    align-items: center;
+                    gap: 0.5rem;
+                    margin-top: 0.25rem;
+                }
+                .api-key-clear-label {
+                    margin: 0;
+                    font-size: 0.9em;
+                }
+                .api-key-item .errorlist {
+                    margin-top: 0.5rem;
+                    color: var(--main-red);
+                    font-size: 0.85em;
+                }
+            </style>
+
             <span>
                 <button type="submit" id="update-profile" class="primary-button">
                     <i class="fa fa-check-circle"></i>

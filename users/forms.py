@@ -52,6 +52,23 @@ class ProfileUpdateForm(forms.ModelForm):
     background_image = forms.ImageField(label='Background Image', required=False, widget=forms.FileInput())
     remove_background_image = forms.BooleanField(required=False, label='Remove current background image')
 
+    # New API key fields (write-only)
+    gemini_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'Gemini API Key', 'autocomplete': 'new-password'}))
+    openai_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'OpenAI API Key', 'autocomplete': 'new-password'}))
+    claude_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'Claude API Key', 'autocomplete': 'new-password'}))
+    clear_gemini_api_key = forms.BooleanField(required=False, label='Clear Gemini Key')
+    clear_openai_api_key = forms.BooleanField(required=False, label='Clear OpenAI Key')
+    clear_claude_api_key = forms.BooleanField(required=False, label='Clear Claude Key')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Explicitly set API key fields to empty to prevent any autopopulation
+        self.fields['gemini_api_key'].initial = ''
+        self.fields['openai_api_key'].initial = ''
+        self.fields['claude_api_key'].initial = ''
+
     class Meta:
         model = Profile
-        fields = ['image', 'automatic_background','background_image', 'remove_background_image']
+        fields = ['image', 'automatic_background','background_image', 'remove_background_image',
+                  'gemini_api_key', 'openai_api_key', 'claude_api_key',
+                  'clear_gemini_api_key', 'clear_openai_api_key', 'clear_claude_api_key']

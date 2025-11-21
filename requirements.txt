@@ -13,3 +13,6 @@ google-genai
 pytz
 django-cleanup
 python-toon
+cryptography
+openai
+anthropic
