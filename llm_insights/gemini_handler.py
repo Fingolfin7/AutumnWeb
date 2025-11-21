@@ -169,6 +169,29 @@ class GeminiHandler(BaseLLMHandler):
         })
         return final_message
 
+    def _extract_sources(self, response):
+        """Safely extract grounding web sources from a Gemini response.
+        Returns a list of dicts with keys: link, title.
+        Handles cases where candidates, grounding_metadata or grounding_chunks are missing/None.
+        """
+        sources = []
+        candidates = getattr(response, "candidates", None)
+        if not candidates:
+            return sources
+        first = candidates[0]
+        grounding_metadata = getattr(first, "grounding_metadata", None)
+        if not grounding_metadata:
+            return sources
+        grounding_chunks = getattr(grounding_metadata, "grounding_chunks", None)
+        if not grounding_chunks:
+            return sources
+        for chunk in grounding_chunks:
+            web = getattr(chunk, "web", None)
+            if web and getattr(web, "uri", None):
+                title = (getattr(web, "title", "") or "").strip()
+                sources.append({"link": web.uri, "title": title})
+        return sources
+
     def update_session_data(self, sessions_data, user_prompt):
         """Update the session data without adding to chat history"""
         try:
@@ -190,13 +213,8 @@ class GeminiHandler(BaseLLMHandler):
             return self._handle_error(e, original_message=update_session_data_prompt, allow_fallback=True)
 
         assistant_response = response.text
-        sources = []
-        # check for sources from the Google Search tool
-        if response.candidates:
-            if response.candidates[0].grounding_metadata.grounding_chunks:
-                for chunk in response.candidates[0].grounding_metadata.grounding_chunks:
-                    if chunk.web:
-                        sources.append({"link": chunk.web.uri, "text": chunk.web.title.strip()})
+        # Safely extract sources (defensive against missing grounding metadata)
+        sources = self._extract_sources(response)
 
         # Add message to conversation history
         self.conversation_history.append({"role": "system", "content": update_session_data_prompt})
@@ -233,13 +251,8 @@ class GeminiHandler(BaseLLMHandler):
 
             # Extract response text
             assistant_response = response.text
-            sources = []
-            # check for sources from the Google Search tool
-            if response.candidates:
-                if response.candidates[0].grounding_metadata.grounding_chunks:
-                    for chunk in response.candidates[0].grounding_metadata.grounding_chunks:
-                        if chunk.web:
-                            sources.append({"link": chunk.web.uri, "title": chunk.web.title.strip()})
+            # Safely extract sources (defensive against missing grounding metadata)
+            sources = self._extract_sources(response)
 
             # Add assistant response to our conversation history
             self.conversation_history.append({"role": "assistant", "content": assistant_response, "sources": sources, "model": self.model})
@@ -255,4 +268,3 @@ class GeminiHandler(BaseLLMHandler):
     def get_conversation_history(self):
         """Return standardized conversation history"""
         return self.conversation_history
-
