@@ -21,6 +21,7 @@ class OpenAIHandler(BaseLLMHandler):
 
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
+        You have access to web search to find more information if needed.
         
         When formating text and links please use markdown formatting.
         
@@ -35,6 +36,7 @@ class OpenAIHandler(BaseLLMHandler):
         Refer to the new session data for the remainder of the conversation.
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
+        You have access to web search to find more information if needed.
         
         When formating text and links please use markdown formatting.
         
@@ -84,15 +86,42 @@ class OpenAIHandler(BaseLLMHandler):
         msgs.append({"role": "user", "content": message})
         
         resp = None
+        sources = []
         try:
-            resp = self.client.chat.completions.create(model=self.model, messages=msgs)
-            text = resp.choices[0].message.content
+            # Enable web search by default using Responses API
+            resp = self.client.responses.create(
+                model=self.model,
+                input=msgs,
+                tools=[{"type": "web_search"}]
+            )
+            # Extract text from Responses API
+            text = resp.output_text if hasattr(resp, 'output_text') else (
+                resp.output[0].content[0].text.value if hasattr(resp, 'output') and resp.output 
+                else str(resp)
+            )
+            
+            # Extract sources from web search if available
+            # Responses API may include citations in the output
+            if hasattr(resp, 'output') and resp.output:
+                for output_item in resp.output:
+                    if hasattr(output_item, 'citations') and output_item.citations:
+                        for citation in output_item.citations:
+                            if hasattr(citation, 'url'):
+                                sources.append({"link": citation.url, "title": getattr(citation, 'title', citation.url)})
+                    # Also check for web search results in tool calls
+                    if hasattr(output_item, 'tool_calls') and output_item.tool_calls:
+                        for tool_call in output_item.tool_calls:
+                            if hasattr(tool_call, 'type') and tool_call.type == "web_search":
+                                if hasattr(tool_call, 'results'):
+                                    for result in tool_call.results:
+                                        if hasattr(result, 'url'):
+                                            sources.append({"link": result.url, "title": getattr(result, 'title', result.url)})
         except Exception as e:
             text = f"OpenAI error: {e}"
         
         # Store user message and assistant response in conversation history
         self.conversation_history.append({"role": "user", "content": message})
-        self.conversation_history.append({"role": "assistant", "content": text, "model": self.model})
+        self.conversation_history.append({"role": "assistant", "content": text, "sources": sources, "model": self.model})
         
         if resp:
             self._update_usage(resp)

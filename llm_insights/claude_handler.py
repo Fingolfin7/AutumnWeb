@@ -21,6 +21,7 @@ class ClaudeHandler(BaseLLMHandler):
 
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
+        You have access to web search to find more information if needed.
         
         When formating text and links please use markdown formatting.
         
@@ -35,6 +36,7 @@ class ClaudeHandler(BaseLLMHandler):
         Refer to the new session data for the remainder of the conversation.
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
+        You have access to web search to find more information if needed.
         
         When formating text and links please use markdown formatting.
         
@@ -99,9 +101,23 @@ class ClaudeHandler(BaseLLMHandler):
             msgs.append({"role": "user", "content": message})
         
         resp = None
+        sources = []
         try:
-            resp = self.client.messages.create(model=self.model, messages=msgs, max_tokens=1024)
+            # Enable web search by default
+            resp = self.client.messages.create(
+                model=self.model,
+                messages=msgs,
+                max_tokens=1024,
+                web_search={"enabled": True}
+            )
             text = resp.content[0].text if resp.content else "(No content)"
+            
+            # Extract sources from web search if available
+            # Claude may include citations in the response metadata
+            if hasattr(resp, 'citations') and resp.citations:
+                for citation in resp.citations:
+                    if hasattr(citation, 'url'):
+                        sources.append({"link": citation.url, "title": getattr(citation, 'title', citation.url)})
         except Exception as e:
             text = f"Claude error: {e}"
             resp = None
@@ -110,7 +126,7 @@ class ClaudeHandler(BaseLLMHandler):
         # User message already stored if first message, otherwise store it now
         if len(self.conversation_history) > 1:  # Not the first message
             self.conversation_history.append({"role": "user", "content": message})
-        self.conversation_history.append({"role": "assistant", "content": text, "model": self.model})
+        self.conversation_history.append({"role": "assistant", "content": text, "sources": sources, "model": self.model})
         
         if resp:
             self._update_usage(resp)
