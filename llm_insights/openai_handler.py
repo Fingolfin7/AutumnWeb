@@ -60,6 +60,58 @@ class OpenAIHandler(BaseLLMHandler):
             self.usage_stats['total'] += tt
     def get_usage_stats(self):
         return self.usage_stats
+    
+    def _extract_sources(self, resp):
+        """Extract sources from OpenAI Responses API response"""
+        sources = []
+        
+        # 1) Inline citations from the assistant message
+        for item in getattr(resp, "output", []) or []:
+            if getattr(item, "type", None) != "message":
+                continue
+            for part in getattr(item, "content", []) or []:
+                annotations = getattr(part, "annotations", []) or []
+                for ann in annotations:
+                    if getattr(ann, "type", None) == "url_citation":
+                        url = getattr(ann, "url", None)
+                        title = getattr(ann, "title", None) or url
+                        if url:
+                            sources.append({
+                                "link": url,
+                                "title": title,
+                                "kind": "citation",
+                            })
+        
+        # 2) Full source list from web_search_call.action.sources (if included)
+        for item in getattr(resp, "output", []) or []:
+            if getattr(item, "type", None) != "web_search_call":
+                continue
+            action = getattr(item, "action", None)
+            if not action:
+                continue
+            for src in getattr(action, "sources", []) or []:
+                url = getattr(src, "url", None)
+                title = getattr(src, "title", None) or url
+                provider = getattr(src, "provider", None)
+                if url:
+                    sources.append({
+                        "link": url,
+                        "title": title,
+                        "provider": provider,
+                        "kind": "source",
+                    })
+        
+        # De-duplicate by URL while preserving order
+        seen = set()
+        unique_sources = []
+        for s in sources:
+            if s["link"] in seen:
+                continue
+            seen.add(s["link"])
+            unique_sources.append(s)
+        
+        return unique_sources
+    
     def update_session_data(self, sessions_data, user_prompt):
         self.session_data = encode(build_project_json_from_sessions(sessions_data, autumn_compatible=True))
         prompt = self.update_session_data_template.format(username=self.username, user_prompt=user_prompt, session_data=self.session_data)
@@ -89,10 +141,12 @@ class OpenAIHandler(BaseLLMHandler):
         sources = []
         try:
             # Enable web search by default using Responses API
+            # Include sources in the response
             resp = self.client.responses.create(
                 model=self.model,
                 input=msgs,
-                tools=[{"type": "web_search"}]
+                tools=[{"type": "web_search"}],
+                include=["web_search_call.action.sources"]
             )
             # Extract text from Responses API
             text = resp.output_text if hasattr(resp, 'output_text') else (
@@ -100,22 +154,8 @@ class OpenAIHandler(BaseLLMHandler):
                 else str(resp)
             )
             
-            # Extract sources from web search if available
-            # Responses API may include citations in the output
-            if hasattr(resp, 'output') and resp.output:
-                for output_item in resp.output:
-                    if hasattr(output_item, 'citations') and output_item.citations:
-                        for citation in output_item.citations:
-                            if hasattr(citation, 'url'):
-                                sources.append({"link": citation.url, "title": getattr(citation, 'title', citation.url)})
-                    # Also check for web search results in tool calls
-                    if hasattr(output_item, 'tool_calls') and output_item.tool_calls:
-                        for tool_call in output_item.tool_calls:
-                            if hasattr(tool_call, 'type') and tool_call.type == "web_search":
-                                if hasattr(tool_call, 'results'):
-                                    for result in tool_call.results:
-                                        if hasattr(result, 'url'):
-                                            sources.append({"link": result.url, "title": getattr(result, 'title', result.url)})
+            # Extract sources using proper extraction method
+            sources = self._extract_sources(resp)
         except Exception as e:
             text = f"OpenAI error: {e}"
         
