@@ -45,7 +45,7 @@ class InsightsView(LoginRequiredMixin, View):
             provider_models['openai'] = [
                 ('gpt-5-mini', 'GPT-5 Mini'),
                 ('gpt-5.1', 'GPT-5.1'),
-                ('gpt-5.1-thinking', 'GPT-5.1 Thinking'),
+                ('gpt-5.2', 'GPT-5.2'),
             ]
         if profile and profile.claude_api_key_enc:
             provider_models['claude'] = [
