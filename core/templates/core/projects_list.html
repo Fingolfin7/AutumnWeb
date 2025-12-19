@@ -46,7 +46,7 @@
   <div class="tag-options">
     {% for cb in search_form.tags %}
       <label class="tag-option">
-        {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+        {{ cb }} <span class="tag-label">{{ cb.choice_label }}</span>
       </label>
     {% endfor %}
   </div>
@@ -87,10 +87,10 @@
 
     <section id="projects-list" class="stacked">
 
-        {% if not grouped_projects %}
-             <div class="full-width centered-pic">
+        {% if not has_projects %}
+            <div class="full-width centered-pic">
                 <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}"
-                 alt="No sessions found">
+                     alt="No projects found">
             </div>
         {% endif %}
 
@@ -177,7 +177,7 @@
         $(document).ready(function() {
             collapse_section('Paused');
             collapse_section('Complete');
-            collapse_section('Archived');l
+            collapse_section('Archived');
         });
     </script>
 {% endblock %}

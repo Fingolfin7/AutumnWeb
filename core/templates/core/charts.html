@@ -27,7 +27,7 @@
                 <span class="label-input">
                     <label for="project-search"><i class="fa fa-search"></i> Search</label>
                     {{ search_form.project_name }}
-                    {{ search_form.project.errors }}
+                    {{ search_form.project_name.errors }}
                 </span>
                 <span id="project-search-results"></span>
             </div>
@@ -53,17 +53,21 @@
             <span class="label-input">
                 <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
                 <details class="tag-dropdown">
-                    <summary>Select tags</summary>
+                    <summary class="tag-summary">Select tags</summary>
                     <div class="tag-options">
-                        {{ search_form.tags }}
-                        {{ search_form.tags.errors }}
+                        {% for cb in search_form.tags %}
+                            <label class="tag-option">
+                                {{ cb }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
                     </div>
                 </details>
+                {{ search_form.tags.errors }}
             </span>
 
              <span class="label-input">
                 <label for="chart_type"><i class="fa fa-chart-bar"></i>Type</label>
-                <select id="chart_type" name="chart_type">
+                <select id="chart_type" name="chart_type" data-selected="{{ request.GET.chart_type|default:'pie' }}">
                     <option value="pie">Pie</option>
                     <option value="bar">Bar</option>
                     <option value="scatter">Scatter</option>
@@ -90,6 +94,19 @@
         <input type="hidden" id="sessions_link" value="{% url 'api_list_sessions' %}">
         <input type="hidden" id="raw_sessions_link" value ="{% url 'api_list_sessions' %}">
         <input type="hidden" id="wordcloud_notes_link" value ="{% url 'api_wordcloud_notes' %}">
+
+        <!-- Shown while charts are loading / rendering (covers only this card) -->
+        <div id="chart-loading" class="loading-overlay" aria-live="polite" aria-busy="false" style="display:none;">
+            <div class="loading-card">
+                <div class="loading-spinner" aria-hidden="true"></div>
+                <div class="loading-text">Loading chart…</div>
+            </div>
+        </div>
+
+        <!-- Empty state shown when the API returns no data -->
+        <div id="chart-empty" class="full-width centered-pic" style="display:none;">
+            <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}" alt="No data found">
+        </div>
 
         <!-- display the graph using chart js -->
         <div id="canvas_container">

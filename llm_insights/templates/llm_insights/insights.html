@@ -98,12 +98,16 @@
             <span class="label-input">
                 <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
                 <details class="tag-dropdown">
-                    <summary>Select tags</summary>
+                    <summary class="tag-summary">Select tags</summary>
                     <div class="tag-options">
-                        {{ search_form.tags }}
-                        {{ search_form.tags.errors }}
+                        {% for cb in search_form.tags %}
+                            <label class="tag-option">
+                                {{ cb }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
                     </div>
                 </details>
+                {{ search_form.tags.errors }}
             </span>
 
             <span class="label-input">
@@ -203,8 +207,10 @@
                         {% endif %}
                     </div>
 
-                    <textarea name="prompt" id="prompt" rows="1" class="full-width"
-                              placeholder="Ask a question about your sessions...">{% if prompt %}{{ prompt }}{% endif %}</textarea>
+                    <span class="label-input full-width">
+                        <textarea name="prompt" id="prompt" rows="1" class="full-width"
+                                  placeholder="Ask a question about your sessions...">{% if prompt %}{{ prompt }}{% endif %}</textarea>
+                    </span>
 
                     <div class="button-group">
                         <button type="submit" class="primary-button">

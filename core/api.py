@@ -790,7 +790,7 @@ def tally_by_sessions(request):
   sessions = Sessions.objects.filter(is_active=False, user=request.user)
   project = request.query_params.get("project_name")
   if project:
-    sessions = sessions.filter(project__name=project)
+    sessions = sessions.filter(project__name__iexact=project)
   sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
   sessions = filter_sessions_by_params(request, sessions)
   project_durations = tally_project_durations(sessions)

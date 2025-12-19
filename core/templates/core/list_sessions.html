@@ -36,7 +36,7 @@
                 {{ search_form.end_date.errors }}
             </span>
 
-            <span class="label-input">
+            <span class="label-input" id="context-filter">
                 <label for="context-filter"><i class="fa fa-layer-group"></i> Context</label>
                 {{ search_form.context }}
                 {{ search_form.context.errors }}
@@ -45,12 +45,16 @@
             <span class="label-input">
                 <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
                 <details class="tag-dropdown">
-                    <summary>Select tags</summary>
+                    <summary class="tag-summary">Select tags</summary>
                     <div class="tag-options">
-                        {{ search_form.tags }}
-                        {{ search_form.tags.errors }}
+                        {% for cb in search_form.tags %}
+                            <label class="tag-option">
+                                {{ cb }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
                     </div>
                 </details>
+                {{ search_form.tags.errors }}
             </span>
 
             <span class="label-input">

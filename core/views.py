@@ -251,6 +251,9 @@ def remove_timer(request, session_id: int):
 
 @login_required
 def ChartsView(request):
+    # Preserve multi-select tags across reloads (?tags=1&tags=2)
+    selected_tags = request.GET.getlist('tags')
+
     search_form = SearchProjectForm(
         initial={
             'project_name': request.GET.get('project_name'),
@@ -258,6 +261,7 @@ def ChartsView(request):
             'end_date': request.GET.get('end_date'),
             'chart_type': request.GET.get('chart_type'),
             'context': request.GET.get('context') or '',
+            'tags': selected_tags,
         },
         user=request.user,
     )
@@ -650,11 +654,16 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
         ungrouped_projects = context['object_list']
 
+        # One reliable empty check for the whole page
+        context['has_projects'] = ungrouped_projects.exists()
+
         # group by project status (active, paused, complete) from the status_choices tuple
         grouped_projects = []
         for status, displayName in status_choices:  # db_Status is how the status is stored in the database
-            grouped_projects.append({'status': displayName,
-                                     'projects': ungrouped_projects.filter(status=status).order_by('-last_updated')})
+            grouped_projects.append({
+                'status': displayName,
+                'projects': ungrouped_projects.filter(status=status).order_by('-last_updated'),
+            })
 
         context['grouped_projects'] = grouped_projects
 
@@ -859,6 +868,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
                 'end_date': self.request.GET.get('end_date'),
                 'note_snippet': self.request.GET.get('note_snippet'),
                 'context': self.request.GET.get('context') or '',
+                'tags': self.request.GET.getlist('tags'),
             },
             user=self.request.user,
         )

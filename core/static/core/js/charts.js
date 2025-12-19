@@ -2,15 +2,61 @@ $(document).ready(function(){
     let selectType = $('#chart_type');
     let draw       = $('#draw');
 
+    // Loading overlay helpers
+    const $loading = $('#chart-loading');
+    const $empty = $('#chart-empty');
+    const $canvasContainer = $('#canvas_container');
 
-    // set the default start date to the start of this month
+    function showLoading(message = 'Loading chart…') {
+        if (!$loading.length) return;
+        $loading.find('.loading-text').text(message);
+        $loading.attr('aria-busy', 'true').show();
+    }
+
+    function hideLoading() {
+        if (!$loading.length) return;
+        $loading.attr('aria-busy', 'false').hide();
+    }
+
+    function showEmpty() {
+        if ($empty.length) $empty.show();
+        if ($canvasContainer.length) $canvasContainer.hide();
+    }
+
+    function hideEmpty() {
+        if ($empty.length) $empty.hide();
+        if ($canvasContainer.length) $canvasContainer.show();
+    }
+
+    function clearChart(ctx) {
+        try {
+            const existing = Chart.getChart(ctx);
+            if (existing) existing.destroy();
+        } catch (e) {
+            // ignore
+        }
+    }
+
+    // Persist chart type from server-rendered data attribute (querystring)
+    const preselectedType = selectType.data('selected');
+    if (preselectedType) {
+        selectType.val(preselectedType);
+    }
+
+    // set the default start date to the start of this month (only if empty)
     let current_date = new Date();
-    $("#start_date").val(new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0]);
-    $("#end_date").val(new Date().toISOString().split('T')[0]);
+    if (!$('#start_date').val()) {
+        $('#start_date').val(new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0]);
+    }
+    if (!$('#end_date').val()) {
+        $('#end_date').val(new Date().toISOString().split('T')[0]);
+    }
 
     function render() {
-        let type         = selectType.val();
-        let canvas = $('#chart')[0].getContext('2d');
+        showLoading('Loading chart…');
+
+        let type = selectType.val();
+        let canvasCtx = $('#chart')[0].getContext('2d');
 
         let start_date = $('#start_date').val();
         let end_date = $('#end_date').val();
@@ -18,20 +64,39 @@ $(document).ready(function(){
         start_date = start_date ? format_date(new Date(start_date)) : "";
         end_date = end_date ? format_date(new Date(end_date)) : "";
 
-        let project_name = $('#project-search').val().trim();
+        // project name is optional
+        let project_name = ($('#project-search').val() || '').trim();
 
-        get_project_data(type, start_date, end_date, project_name)
+        // Context: '' means "All Contexts" in the form choices, so don't send it.
+        let context_id = String($('#context-filter').val() || '').trim();
+        if (!context_id) context_id = '';
+
+        // Tags: be robust across different template renderings.
+        // We prefer inputs inside #tag-filter, but fall back to any checked input with name="tags".
+        let $tagInputs = $('#tag-filter input[type="checkbox"]:checked');
+        if (!$tagInputs.length) {
+            $tagInputs = $('input[type="checkbox"][name="tags"]:checked');
+        }
+        const tag_ids = $tagInputs
+            .map(function(){ return String($(this).val()); })
+            .get()
+            .filter(v => v && v !== 'on');
+
+        get_project_data(type, start_date, end_date, project_name, context_id, tag_ids)
           .then(data => {
-            if (!data.length) {
-              console.warn('No data');
+            // If the API returns nothing, clear the old chart and show empty state
+            if (!data || !data.length) {
+              clearChart(canvasCtx);
+              showEmpty();
               return;
             }
+
+            hideEmpty();
 
             if (project_name && type === 'scatter'){
                 type = 'scatter_subprojects';
             }
 
-            // pick the right drawer
             const chartFns = {
               pie: pie_chart,
               bar: bar_graph,
@@ -41,9 +106,17 @@ $(document).ready(function(){
               wordcloud: wordcloud,
               heatmap: heatmap_graph
             };
-             type !== 'wordcloud' ? chartFns[type](data, canvas): chartFns[type](data, canvas, "#chart");
+            type !== 'wordcloud' ? chartFns[type](data, canvasCtx): chartFns[type](data, canvasCtx, "#chart");
           })
-          .catch(console.error);
+          .catch(err => {
+              console.error(err);
+              // On error, clear old chart and show empty state so it's obvious something changed
+              try { clearChart(canvasCtx); } catch(e) {}
+              showEmpty();
+          })
+          .finally(() => {
+              requestAnimationFrame(() => hideLoading());
+          });
     }
 
     // initial draw
@@ -51,13 +124,12 @@ $(document).ready(function(){
     draw.on('click', render);
 });
 
-function get_project_data(type, start_date="", end_date="", project_name=""){
-    // by default get the data from all the projects for all time
-    let url = ""
+function get_project_data(type, start_date="", end_date="", project_name="", context_id = "", tag_ids = []){
+    let url = "";
 
     const wantSubprojects =
-    project_name &&
-    (type === 'pie' || type === 'bar');
+      project_name &&
+      (type === 'pie' || type === 'bar');
 
     if (wantSubprojects) {
         url = $('#subprojects_tally_link').val();
@@ -72,11 +144,18 @@ function get_project_data(type, start_date="", end_date="", project_name=""){
         url = $('#projects_link').val();
     }
 
-    const params = [];
-    if (project_name)  params.push(`project_name=${project_name}`);
-    if (start_date)    params.push(`start_date=${start_date}`);
-    if (end_date)      params.push(`end_date=${end_date}`);
-    if (params.length) url += '?' + params.join('&');
+    // Build query string safely (supports repeated tags=1&tags=2)
+    const qs = new URLSearchParams();
+    if (project_name) qs.set('project_name', project_name);
+    if (start_date) qs.set('start_date', start_date);
+    if (end_date) qs.set('end_date', end_date);
+    if (context_id) qs.set('context', context_id);
+    if (Array.isArray(tag_ids) && tag_ids.length) {
+        tag_ids.forEach(t => qs.append('tags', t));
+    }
+
+    const query = qs.toString();
+    if (query) url += '?' + query;
 
     console.log(url);
 
@@ -86,7 +165,6 @@ function get_project_data(type, start_date="", end_date="", project_name=""){
             type: 'GET',
             dataType: 'json',
             success: function(data) {
-
                 resolve(data);
             },
             error: function(error) {
@@ -640,7 +718,7 @@ function wordcloud(data, ctx, canvasId) {
 }
 
 function heatmap_graph(data, ctx) {
-    // 1) Prepare storage
+    // 1) Prepare storage: 7 days * 24 hours
   const totals = Array.from({ length: 7 }, () => Array(24).fill(0));
   const counts = Array.from({ length: 7 }, () => Array(24).fill(0));
 
