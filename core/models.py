@@ -106,6 +106,20 @@ class Projects(models.Model):
         if log:
             logger.info(f"Total Time after audit: {self.total_time}\n")
 
+    def save(self, *args, **kwargs):
+        """Ensure projects always have a context.
+
+        If none is provided, assign the per-user 'General' context.
+        This makes behavior consistent for imports/legacy data and any code path that bypasses forms.
+        """
+        if self.context_id is None and self.user_id is not None:
+            general, _ = Context.objects.get_or_create(
+                user=self.user,
+                name='General',
+                defaults={'description': 'Default context'},
+            )
+            self.context = general
+        super().save(*args, **kwargs)
 
 
 class SubProjects(models.Model):
@@ -202,4 +216,3 @@ class Sessions(models.Model):
             return round((timezone.make_aware(datetime.now()) - self.start_time).total_seconds() / 60.0, 4)
         else:
             return round((self.end_time - self.start_time).total_seconds() / 60.0, 4)
-

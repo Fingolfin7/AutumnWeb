@@ -99,6 +99,11 @@ class CreateProjectForm(forms.ModelForm):
             self.fields['context'].queryset = Context.objects.filter(user=user).order_by('name')
             self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
 
+            # Default to the user's "General" context (created by migration 0030 for existing data)
+            general = Context.objects.filter(user=user, name='General').first()
+            if general is not None and not self.initial.get('context'):
+                self.initial['context'] = general
+
 
 class CreateSubProjectForm(forms.ModelForm):
     class Meta:
