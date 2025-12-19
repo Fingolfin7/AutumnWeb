@@ -1,52 +1,53 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&display=swap");
 
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: 'Fira Code', Consolas, 'Courier New', monospace;
+  font-family: "Fira Code", Consolas, "Courier New", monospace;
 }
 
 /* NEW: never let any element make the viewport wider than the device */
-html, body {
+html,
+body {
   max-width: 100%;
   min-height: 100%;
-  /*overflow-x: hidden;*/
+  /* overflow-x: hidden; */
 }
 
 :root {
   /* --- NEW TERMINAL PALETTE (Mapped to original variable names) --- */
   --primary-color: #1e1e1e; /* The terminal background color for the ribbon */
-  --accent-color: #00c851; /* Bright green for primary actions, like a command prompt */
+  --accent-color: #00c851; /* Bright green for primary actions */
   --accent-hover: #008000;
   --secondary-accent-color: #00bfff; /* Bright blue for secondary actions */
-  --brand-orange: #f97300; /* Keep the original orange for specific highlights */
+  --brand-orange: #f97300; /* Keep the original orange for highlights */
   --ribbon-bg: #f97300; /* The original brand orange */
-  --ribbon-text: #ffffff; /* White text for high contrast on orange */
+  --ribbon-text: #ffffff; /* White text for contrast on orange */
 
   /* Backgrounds & Borders */
-  --light-background: #f3f4f6; /* (Light mode remains for toggle functionality) */
-  --dark-background: #121212; /* A deep, pure black background */
+  --light-background: #f3f4f6;
+  --dark-background: #121212;
   --img-mix-background: rgba(0, 0, 0, 0.55);
   --card-background-light: #ffffff;
-  --card-background-dark: #1e1e1e; /* A slightly off-black for cards, like a terminal window */
-  --border-dark: #333333; /* A subtle border */
+  --card-background-dark: #1e1e1e;
+  --border-dark: #333333;
   --border-light: #d1d5db;
   --section-border-width: 1px;
-  --card-bg-dark-alpha: rgba(30, 30, 30, 0.6); /* A semi-transparent dark background for cards in dark mode */
+  --card-bg-dark-alpha: rgba(30, 30, 30, 0.6);
 
   /* Text Colors */
   --light-text: #121212;
-  --dark-text: #c0c0c0; /* Classic silver/light-gray text */
+  --dark-text: #c0c0c0;
 
-  /* Semantic Colors (Classic terminal syntax colors) */
-  --main-green: #00ff00; /* Prompt Green */
-  --main-red: #ff4136; /* Error Red */
+  /* Semantic Colors */
+  --main-green: #00ff00;
+  --main-red: #ff4136;
   --main-cyan: #0891b2;
-  --main-blue: #0074d9; /* A different shade of blue */
-  --main-yellow: #eab308; /* Warning Yellow */
-  --main-magenta: #f012be; /* Magenta */
-  --main-muted: #5f8787; /* Dimmer gray for muted text */
+  --main-blue: #0074d9;
+  --main-yellow: #eab308;
+  --main-magenta: #f012be;
+  --main-muted: #5f8787;
 }
 
 .text-primary {
@@ -74,7 +75,7 @@ html, body {
   color: var(--main-yellow);
 }
 
-body{
+body {
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -242,7 +243,7 @@ body.dark-mode .card {
 }
 
 body.dark-mode.bg-active .card {
-  background-color: var(--card-bg-dark-alpha); /*  #1e1e1e but with alpha */
+  background-color: var(--card-bg-dark-alpha);
 }
 
 .centered-card {
@@ -296,12 +297,26 @@ body.dark-mode.bg-active .card {
 }
 
 #search_form {
-  /* inherits .card + .flex-row from template */
-  flex-wrap: wrap;        /* let items wrap when needed              */
-  gap: 1rem;              /* keep the original spacing               */
-  width: 100%;            /* never exceed viewport                   */
+  flex-wrap: wrap;
+  gap: 1rem;
+  width: 100%;
+  position: relative;
+  overflow: visible;
+  z-index: 51;
 }
 
+/* Make sure the filter bar can let the dropdown spill out */
+#options {
+  position: relative;
+  overflow: visible;
+  z-index: 50;
+}
+
+/* If the section below overlaps, force it under the dropdown */
+#projects-list {
+  position: relative;
+  z-index: 1;
+}
 
 .align-center {
   align-items: center;
@@ -311,7 +326,7 @@ body.dark-mode.bg-active .card {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   justify-content: space-between;
-  gap: 1rem; /* This adds some space between the grid items */
+  gap: 1rem;
 }
 
 .grid-rows > * {
@@ -326,7 +341,6 @@ body.dark-mode.bg-active .card {
 .stacked {
   display: flex;
   flex-direction: column;
-  /*align-items: flex-start;*/
   gap: 1.5rem;
 }
 
@@ -346,14 +360,17 @@ body.dark-mode.bg-active .card {
 
 .session > *,
 .spaced > * {
-  margin-right: 0.7rem
+  margin-right: 0.7rem;
 }
 
 .label-input {
   position: relative;
 }
 
-.label-input label {
+/* IMPORTANT FIX:
+   Only style the "field label" you place directly under .label-input,
+   not nested labels (like tag checkbox labels). */
+.label-input > label {
   position: absolute;
   top: -0.8rem;
   left: 0;
@@ -365,10 +382,9 @@ body.dark-mode.bg-active .card {
   border-radius: 0 0 2px 0;
 }
 
-body.dark-mode .label-input label {
+body.dark-mode .label-input > label {
   background-color: var(--card-background-dark);
 }
-
 
 .label-input input,
 textarea,
@@ -385,6 +401,106 @@ select {
   font-size: 0.7rem;
   color: #ff7f00;
 }
+
+/* -----------------------------
+   TAG DROPDOWN (checkbox menu)
+   Requires template rendering tags as checkboxes.
+------------------------------ */
+.tag-dropdown {
+  position: relative;
+  display: inline-block;
+  min-width: 14rem;
+}
+
+.tag-dropdown > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.tag-dropdown > summary::-webkit-details-marker {
+  display: none;
+}
+
+.tag-summary {
+  display: block;
+  padding: 0.8rem 2rem 0.6rem 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: var(--card-background-light);
+  color: var(--light-text);
+  user-select: none;
+  position: relative;
+}
+
+body.dark-mode .tag-summary {
+  background: var(--card-background-dark);
+  color: var(--dark-text);
+  border-color: var(--border-dark);
+}
+
+.tag-summary::after {
+  content: "▾";
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.85;
+}
+
+.tag-dropdown[open] .tag-summary::after {
+  content: "▴";
+}
+
+.tag-options {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+
+  background: var(--card-background-light);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+
+  padding: 0.35rem;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+body.dark-mode .tag-options {
+  background: var(--card-background-dark);
+  border-color: var(--border-dark);
+}
+
+/* Each checkbox row */
+.tag-options .tag-option {
+  position: static; /* override any positioning expectations */
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.tag-options .tag-option:hover {
+  background: rgba(0, 200, 81, 0.12);
+}
+
+.tag-options .tag-option input[type="checkbox"] {
+  accent-color: var(--accent-color);
+  cursor: pointer;
+}
+
+.tag-options .tag-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ----------------------------- */
 
 .switch {
   position: relative;
@@ -408,7 +524,7 @@ select {
   right: 0;
   bottom: 0;
   background-color: #ccc;
-  transition: .4s;
+  transition: 0.4s;
   border-radius: 34px;
 }
 
@@ -420,7 +536,7 @@ select {
   left: 3px;
   bottom: 3px;
   background-color: white;
-  transition: .4s;
+  transition: 0.4s;
   border-radius: 50%;
 }
 
@@ -432,13 +548,12 @@ input:checked + .slider:before {
   transform: translateX(14px);
 }
 
-
 #burger-menu {
-  display: none; /* Hide burger menu by default */
+  display: none;
 }
 
 .container.show-sidebar .main-body {
-  margin-left: 13.75rem; /* Adjust main body margin when sidebar is visible */
+  margin-left: 13.75rem;
 }
 
 /* password toggle icon */
@@ -453,7 +568,6 @@ input:checked + .slider:before {
 .password-toggle-icon i {
   font-size: 0.6rem;
   transition: color 0.3s ease-in-out;
-  /*margin-bottom: 20px;*/
 }
 
 .password-toggle-icon i:hover {
@@ -463,7 +577,7 @@ input:checked + .slider:before {
 /* session note slider */
 .session-note-slider,
 .project-name-slider {
-  max-width: 50%; /* Adjust width as needed */
+  max-width: 50%;
   overflow: hidden;
   white-space: nowrap;
   display: inline-flex;
@@ -477,8 +591,7 @@ input:checked + .slider:before {
   position: relative;
 }
 
-/*file upload button*/
-
+/* file upload button */
 .custom-file-upload {
   display: inline-block;
   padding: 6px 12px;
@@ -498,7 +611,6 @@ input:checked + .slider:before {
   background-color: var(--primary-color);
 }
 
-
 .round-upload {
   width: auto;
   border-radius: 100%;
@@ -509,110 +621,106 @@ label > input[type="file"] {
   display: none;
 }
 
-
-
 @keyframes slideText {
-    0% {
-        transform: translateX(100%);
-    }
-    100% {
-        transform: translateX(-100%);
-    }
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
 }
 
-/* http://docs.jquery.com/UI/Autocomplete#theming*/
+/* http://docs.jquery.com/UI/Autocomplete#theming */
 .ui-autocomplete {
-    color: var(--light-text);
-    position: absolute;
-    cursor: pointer;
-    border-radius: 0.25rem;
-    font-family: inherit;
-    background-color: var(--light-background);
+  color: var(--light-text);
+  position: absolute;
+  cursor: pointer;
+  border-radius: 0.25rem;
+  font-family: inherit;
+  background-color: var(--light-background);
 }
 
 /* workarounds */
 .ui-menu {
-    list-style:none;
-    padding: 2px;
-    margin: 0;
-    display:block;
-    float: left;
+  list-style: none;
+  padding: 2px;
+  margin: 0;
+  display: block;
+  float: left;
 }
 .ui-menu .ui-menu {
-    margin-top: -3px;
+  margin-top: -3px;
 }
 .ui-menu .ui-menu-item {
-    margin:0;
-    padding: 0;
-    zoom: 1;
-    border-bottom: var(--section-border-width) solid var(--dark-background);
-    border-radius: 0.25rem;
-    float: left;
-    clear: left;
-    width: 100%;
+  margin: 0;
+  padding: 0;
+  zoom: 1;
+  border-bottom: var(--section-border-width) solid var(--dark-background);
+  border-radius: 0.25rem;
+  float: left;
+  clear: left;
+  width: 100%;
 }
 
 .ui-menu .ui-menu-item a {
-    text-decoration:none;
-    display:block;
-    padding:0.25rem;
-    zoom:1;
+  text-decoration: none;
+  display: block;
+  padding: 0.25rem;
+  zoom: 1;
 }
 .ui-menu .ui-menu-item a.ui-state-hover,
 .ui-menu .ui-menu-item a.ui-state-active {
-    background-color: var(--accent-color);
-    color: var(--light-background);
-    font-weight: normal;
-    margin: -1px;
+  background-color: var(--accent-color);
+  color: var(--light-background);
+  font-weight: normal;
+  margin: -1px;
 }
-
 
 /* Responsive Styles */
 @media (max-width: 1200px) {
-    .left-panel {
-        width: 13rem;
-    }
-    .main-body {
-        margin-left: 13rem;
-    }
+  .left-panel {
+    width: 13rem;
+  }
+  .main-body {
+    margin-left: 13rem;
+  }
 }
 
 @media (max-width: 975px) {
-    * {
-        font-size: 8px;
-    }
-    .left-panel {
-        display: none;
-        transition: transform 0.3s ease-in-out;
-        width: auto;
-        padding: 1%;
-    }
+  * {
+    font-size: 8px;
+  }
+  .left-panel {
+    display: none;
+    transition: transform 0.3s ease-in-out;
+    width: auto;
+    padding: 1%;
+  }
 
-    .lookup-window {
-        display: flex;
-        flex-direction: column;
-    }
-    .lookup-window > * {
-        margin: 1rem 0;
-    }
+  .lookup-window {
+    display: flex;
+    flex-direction: column;
+  }
+  .lookup-window > * {
+    margin: 1rem 0;
+  }
 
-    .main-body {
-        margin-left: 0;
-        padding-left: 2%;
-    }
+  .main-body {
+    margin-left: 0;
+    padding-left: 2%;
+  }
 
-    #burger-menu {
-        display: block;
-        cursor: pointer;
-        color: var(--light-background);
-    }
+  #burger-menu {
+    display: block;
+    cursor: pointer;
+    color: var(--light-background);
+  }
 
-    .container.show-sidebar .left-panel {
-        display: block; /* Show the sidebar when toggled */
-    }
+  .container.show-sidebar .left-panel {
+    display: block;
+  }
 
-    /* Hide main body when sidebar is visible */
-    .container.show-sidebar .main-body {
-        display: none;
-    }
+  .container.show-sidebar .main-body {
+    display: none;
+  }
 }

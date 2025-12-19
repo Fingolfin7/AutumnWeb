@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
@@ -26,12 +26,16 @@ class Command(BaseCommand):
         except User.DoesNotExist:
             raise CommandError(f"User '{options['username']}' does not exist")
 
-        # Fetch all projects
-        if options['project']:
-            projects = Projects.objects.filter(name=options['project'], user=user).prefetch_related('subprojects',
-                                                                                                    'sessions').all()
+        # Build base queryset with related data to avoid N+1 queries
+        base_qs = Projects.objects.filter(user=user).select_related("context").prefetch_related(
+            "tags",
+            "subprojects",
+            "sessions",
+        )
+        if options["project"]:
+            projects = base_qs.filter(name=options["project"])
         else:
-            projects = Projects.objects.filter(user=user).prefetch_related('subprojects', 'sessions').all()
+            projects = base_qs
 
         if options['output_file']:
             filepath = os.path.join(settings.BASE_DIR, "Exports", options['output_file'])
@@ -67,6 +71,10 @@ class Command(BaseCommand):
                 'Sub Projects': {},
                 'Session History': [],
             }
+
+            if not autumn_compatible:
+                project_obj["Context"] = project.context.name if project.context else ""
+                project_obj["Tags"] = [t.name for t in project.tags.all()]
 
             # Fetch related subprojects
             subprojects = project.subprojects.all()

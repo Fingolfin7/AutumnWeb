@@ -1,37 +1,103 @@
 from django import forms
-from .models import Projects, SubProjects, Sessions
+from .models import Projects, SubProjects, Sessions, Context, Tag
 
 
 class SearchProjectForm(forms.Form):
-    project_name = forms.CharField(required=False, widget=forms.TextInput(
-        attrs={
-            'placeholder': 'Projects',
-            'id': 'project-search',
-            'data-ajax_url': '/api/search_projects/',
-            'autocomplete': 'off'
-        })
+    project_name = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Projects',
+                'id': 'project-search',
+                'data-ajax_url': '/api/search_projects/',
+                'autocomplete': 'off',
+            }
+        ),
     )
 
-    start_date = forms.DateField(required=False,
-                                 widget=forms.DateInput(attrs={'type': 'date', 'placeholder': 'Start Date',
-                                                               'id': 'start_date'}))
+    start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'placeholder': 'Start Date',
+                'id': 'start_date',
+            }
+        ),
+    )
 
-    end_date = forms.DateField(required=False, widget=forms.DateInput(attrs={'type': 'date','placeholder': 'End Date',
-                                                                             'id': 'end_date'}))
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'placeholder': 'End Date',
+                'id': 'end_date',
+            }
+        ),
+    )
 
-    note_snippet = forms.CharField(required=False, widget=forms.TextInput(attrs={'placeholder': 'Note Snippet',
-                                                                                 'id': 'note_snippet'}))
+    note_snippet = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Note Snippet',
+                'id': 'note_snippet',
+            }
+        ),
+    )
+
+    context = forms.ChoiceField(
+        required=False,
+        choices=[],
+        widget=forms.Select(
+            attrs={
+                'id': 'context-filter',
+            }
+        ),
+    )
+
+    tags = forms.ModelMultipleChoiceField(
+        required=False,
+        queryset=Tag.objects.none(),
+        widget=forms.CheckboxSelectMultiple(
+            attrs={
+                'id': 'tag-filter',
+            }
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        # Populate context choices per user
+        choices = [('', 'All Contexts')]
+        if user is not None:
+            user_contexts = Context.objects.filter(user=user).order_by('name')
+            choices += [(str(ctx.id), ctx.name) for ctx in user_contexts]
+            self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
+        self.fields['context'].choices = choices
 
 
 
 class CreateProjectForm(forms.ModelForm):
     class Meta:
         model = Projects
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'context', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Project Name', 'class': 'half-width'}),
             'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width', 'required': False}),
+            'context': forms.Select(attrs={'class': 'half-width'}),
+            'tags': forms.CheckboxSelectMultiple(),  # ✅ updated
         }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user is not None:
+            self.fields['context'].queryset = Context.objects.filter(user=user).order_by('name')
+            self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
 
 
 class CreateSubProjectForm(forms.ModelForm):
@@ -48,14 +114,21 @@ class CreateSubProjectForm(forms.ModelForm):
 class UpdateProjectForm(forms.ModelForm):
     class Meta:
         model = Projects
-        fields = ['name', 'description', 'status']
+        fields = ['name', 'description', 'status', 'context', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Project Name', 'class': 'half-width'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width',
-                                                 'required': False}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width', 'required': False}),
             'status': forms.Select(attrs={'placeholder': 'Status', 'class': 'half-width'}),
+            'context': forms.Select(attrs={'class': 'half-width'}),
+            'tags': forms.CheckboxSelectMultiple(),  # ✅ updated
         }
 
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user is not None:
+            self.fields['context'].queryset = Context.objects.filter(user=user).order_by('name')
+            self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
 
 class UpdateSubProjectForm(forms.ModelForm):
     class Meta:
@@ -260,3 +333,23 @@ class MergeSubProjectsForm(forms.Form):
             raise forms.ValidationError("Cannot merge a subproject with itself.")
             
         return cleaned_data
+
+
+class ContextForm(forms.ModelForm):
+    class Meta:
+        model = Context
+        fields = ['name', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Context Name', 'class': 'half-width'}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width', 'required': False}),
+        }
+
+
+class TagForm(forms.ModelForm):
+    class Meta:
+        model = Tag
+        fields = ['name', 'color']
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Tag Name', 'class': 'half-width'}),
+            'color': forms.TextInput(attrs={'placeholder': 'Optional color (e.g. #ff0000 or label)', 'class': 'half-width'}),
+        }

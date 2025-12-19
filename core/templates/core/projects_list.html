@@ -33,6 +33,27 @@
                 {{ search_form.end_date.errors }}
             </span>
 
+            <span class="label-input">
+                <label for="context-filter"><i class="fa fa-layer-group"></i> Context</label>
+                {{ search_form.context }}
+                {{ search_form.context.errors }}
+            </span>
+
+            <span class="label-input">
+                <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
+                <details class="tag-dropdown">
+  <summary class="tag-summary">Select tags</summary>
+  <div class="tag-options">
+    {% for cb in search_form.tags %}
+      <label class="tag-option">
+        {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+      </label>
+    {% endfor %}
+  </div>
+</details>
+                {{ search_form.tags.errors }}
+            </span>
+
             <span>
                 <button type="submit" class="primary-button" id="search_button">
                     <i class="fa fa-search"></i>
@@ -49,6 +70,16 @@
         <button id="merge-projects" class="secondary-button" onclick="window.location.href='{% url 'merge_projects' %}'">
             <i class="fa fa-code-branch"></i>
             Merge Projects
+        </button>
+
+        <button id="manage-contexts" class="secondary-button" onclick="window.location.href='{% url 'contexts' %}'">
+            <i class="fa fa-layer-group"></i>
+            Manage Contexts
+        </button>
+
+        <button id="manage-tags" class="secondary-button" onclick="window.location.href='{% url 'tags' %}'">
+            <i class="fa fa-tags"></i>
+            Manage Tags
         </button>
     </section>
 
@@ -97,6 +128,18 @@
                                         {{ project.total_time|min_formatter }}
                                     </td>
                                 </tr>
+                                {% with tags=project.tags.all %}
+                                    {% if tags %}
+                                        <tr>
+                                            <td class="text-cyan">
+                                                #:
+                                                {% for tag in tags %}
+                                                    {{ tag.name }}{% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endwith %}
                                 <tr>
                                     <td>
                                         <span class="text-cyan">{{ project.start_date|date_formatter }}</span>
@@ -134,7 +177,7 @@
         $(document).ready(function() {
             collapse_section('Paused');
             collapse_section('Complete');
-            collapse_section('Archived');
+            collapse_section('Archived');l
         });
     </script>
 {% endblock %}

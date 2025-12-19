@@ -106,6 +106,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'core.context_processors.static_version',  # Custom context processor for static versioning
+                'core.context_processors.active_context',  # Inject active context + user contexts
             ],
         },
     },

@@ -4,7 +4,12 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from core.models import Projects, SubProjects, Sessions, status_choices
-from core.utils import json_decompress, session_exists, sessions_get_earliest_latest
+from core.utils import (
+    json_decompress,
+    session_exists,
+    sessions_get_earliest_latest,
+    apply_context_and_tags_to_project,
+)
 
 
 # usage:  python manage.py import 'username' project_file.json --force/--merge --tolerance 0.5
@@ -89,6 +94,17 @@ class Command(BaseCommand):
                     else:
                         raise ValueError(f"Invalid status: {project_data['Status']}")
                 project.save()
+
+                # Apply context/tags (merge-aware, backwards compatible)
+                apply_context_and_tags_to_project(
+                    user=user,
+                    project=project,
+                    project_data=project_data,
+                    merge=bool(merge and Projects.objects.filter(
+                        name=project_name,
+                        user=user,
+                    ).exists()),
+                )
 
             # Import or merge subprojects
             for subproject_name, subproject_time in project_data['Sub Projects'].items():

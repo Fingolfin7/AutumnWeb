@@ -19,6 +19,42 @@ status_choices = (
 User._meta.get_field('email')._unique = True  # make email field unique
 
 
+class Context(models.Model):
+    """
+    Hard scope for projects (e.g. Work, Personal, Study).
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='contexts')
+    name = models.CharField(max_length=100)
+    description = models.TextField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Context'
+        verbose_name_plural = 'Contexts'
+        unique_together = ('user', 'name')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+
+
+class Tag(models.Model):
+    """
+    Soft descriptor for projects (many-to-many).
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tags')
+    name = models.CharField(max_length=100)
+    color = models.CharField(max_length=20, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Tag'
+        verbose_name_plural = 'Tags'
+        unique_together = ('user', 'name')
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.user.username})"
+
+
 # model to track the projects that a user is working on
 class Projects(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
@@ -28,6 +64,18 @@ class Projects(models.Model):
     total_time = models.FloatField(default=0.0)
     status = models.CharField(max_length=25, choices=status_choices, default='active')
     description = models.TextField(null=True, blank=True)
+    context = models.ForeignKey(
+        Context,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='projects'
+    )
+    tags = models.ManyToManyField(
+        Tag,
+        blank=True,
+        related_name='projects'
+    )
 
     class Meta:
         verbose_name_plural = 'Projects'

@@ -43,6 +43,26 @@
             </span>
 
             <span>
+                Project Context:
+                {% if subproject.parent_project.context %}
+                    <span class="badge text-cyan">{{ subproject.parent_project.context.name }}</span>
+                {% else %}
+                    <span class="text-cyan">None</span>
+                {% endif %}
+            </span>
+
+            <span>
+                Project Tags:
+                {% if subproject.parent_project.tags.all %}
+                    {% for tag in subproject.parent_project.tags.all %}
+                        <span class="badge text-blue">{{ tag.name }}</span>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-cyan">None</span>
+                {% endif %}
+            </span>
+
+            <span>
                 Total time:
                 <span class="text-green" >{{ subproject.total_time|min_formatter }}</span>
             </span>

@@ -23,6 +23,28 @@
                 {{ form.description.errors }}
             </span>
 
+            <span class="label-input">
+                {{ form.context.label_tag }}
+                {{ form.context }}
+                {{ form.context.errors }}
+            </span>
+
+        <span class="label-input">
+          {{ form.tags.label_tag }}
+          <details class="tag-dropdown">
+            <summary class="tag-summary">Select tags</summary>
+            <div class="tag-options">
+              {% for cb in form.tags %}
+                <label class="tag-option">
+                  {{ cb.tag }}
+                  <span class="tag-label">{{ cb.choice_label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </details>
+          {{ form.tags.errors }}
+        </span>
+
             <span>
                 <button type="submit" id="update-project" class="primary-button">
                     <i class="fa fa-check-circle"></i>
@@ -130,6 +152,31 @@
     </section>
 
 
+<script>
+  // auto-close when clicking outside
+  document.addEventListener("click", (e) => {
+    document.querySelectorAll("details.tag-dropdown[open]").forEach((d) => {
+      if (!d.contains(e.target)) d.removeAttribute("open");
+    });
+  });
 
+  // optional: update "Select tags" summary with count
+  const dropdowns = document.querySelectorAll(".tag-dropdown");
+  dropdowns.forEach((dropdown) => {
+    const summary = dropdown.querySelector(".tag-summary");
+    const checkboxes = dropdown.querySelectorAll("input[type='checkbox']");
+
+    checkboxes.forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const count = dropdown.querySelectorAll("input[type='checkbox']:checked").length;
+        summary.textContent = count ? `Select tags (${count})` : "Select tags";
+      });
+
+      // initialize state on load
+      const count = dropdown.querySelectorAll("input[type='checkbox']:checked").length;
+      if (count) summary.textContent = `Select tags (${count})`;
+    });
+  });
+</script>
 
 {% endblock %}

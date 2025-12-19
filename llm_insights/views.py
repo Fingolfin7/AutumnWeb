@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from core.models import Sessions
 from core.forms import SearchProjectForm
-from core.utils import filter_sessions_by_params
+from core.utils import filter_sessions_by_params, filter_by_active_context
 from .llm_handlers import get_llm_handler
 import json
 
@@ -76,6 +76,8 @@ class InsightsView(LoginRequiredMixin, View):
 
     def get(self, request):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
+        # Allow ?context= to scope sessions for insights as well
+        sessions = filter_by_active_context(sessions, request, override_context_id=request.GET.get('context'))
         sessions = filter_sessions_by_params(request, sessions)
         provider_models = self._provider_models(request.user)
         selected_provider = request.GET.get('provider', next(iter(provider_models.keys())))
@@ -99,7 +101,9 @@ class InsightsView(LoginRequiredMixin, View):
                     'start_date': request.GET.get('start_date'),
                     'end_date': request.GET.get('end_date'),
                     'note_snippet': request.GET.get('note_snippet'),
-                }
+                    'context': request.GET.get('context') or '',
+                },
+                user=request.user,
             ),
             'prompt': request.GET.get('prompt'),
             'sessions': sessions,
@@ -115,6 +119,7 @@ class InsightsView(LoginRequiredMixin, View):
 
     def post(self, request):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
+        sessions = filter_by_active_context(sessions, request, override_context_id=request.POST.get('context'))
         sessions = filter_sessions_by_params(request, sessions)
         sessions_updated = request.session.get("sessions_updated", False)
         provider_models = self._provider_models(request.user)
@@ -156,7 +161,9 @@ class InsightsView(LoginRequiredMixin, View):
                     'start_date': request.GET.get('start_date'),
                     'end_date': request.GET.get('end_date'),
                     'note_snippet': request.GET.get('note_snippet'),
-                }
+                    'context': request.GET.get('context') or '',
+                },
+                user=request.user,
             ),
             'sessions': sessions,
             'conversation_history': conversation_history,

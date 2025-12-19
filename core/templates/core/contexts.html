@@ -1,0 +1,44 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+    <section class="card">
+        <h2>Contexts</h2>
+        <form method="post" class="stacked">
+            {% csrf_token %}
+            <div class="label-input">
+                <label for="id_name">Name</label>
+                {{ form.name }}
+                {{ form.name.errors }}
+            </div>
+            <div class="label-input">
+                <label for="id_description">Description</label>
+                {{ form.description }}
+                {{ form.description.errors }}
+            </div>
+            <button type="submit" class="primary-button">
+                <i class="fa fa-plus"></i> Create Context
+            </button>
+        </form>
+    </section>
+
+    <section id="contexts-list" class="stacked">
+        <h3>Existing Contexts</h3>
+        {% if not contexts %}
+            <p>No contexts yet. Use the form above to create one.</p>
+        {% else %}
+            <ul>
+                {% for ctx in contexts %}
+                    <li>
+                        <strong>{{ ctx.name }}</strong>
+                        {% if ctx.description %}
+                            — {{ ctx.description }}
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+{% endblock %}
+
+

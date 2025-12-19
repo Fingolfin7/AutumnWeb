@@ -21,6 +21,24 @@
             {{ form.description.errors }}
         </span>
 
+        <br><br>
+
+        <span class="label-input">
+            <strong>Project Context & Tags</strong><br>
+            {% if form.instance.parent_project or form.initial.parent_project %}
+                {% with project=form.instance.parent_project|default:form.initial.parent_project %}
+                    {% if project.context %}
+                        <span class="badge text-cyan">Context: {{ project.context.name }}</span>
+                    {% endif %}
+                    {% if project.tags.all %}
+                        {% for tag in project.tags.all %}
+                            <span class="badge text-blue">{{ tag.name }}</span>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
+        </span>
+
         <br> <br>
 
         <button type="submit" id="create-subproject" class="primary-button">

@@ -3,6 +3,7 @@ import pytz
 from AutumnWeb import settings
 from core.forms import *
 from core.utils import *
+from core.models import Context, Tag
 from django.contrib import messages
 from django.db import transaction
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
@@ -68,14 +69,24 @@ def start_timer(request):
 
 
 def remove_ambiguous_time_error(time_value):
+    # Create naive datetime from string
+    naive_dt = datetime.strptime(time_value, "%Y-%m-%d %H:%M:%S")
+    tz = timezone.get_current_timezone()
+
+    # If tz has a pytz-style `localize` (pytz timezone), use it to control is_dst.
     try:
-        return timezone.make_aware(datetime.strptime(time_value, "%Y-%m-%d %H:%M:%S"),
-                                   timezone.get_current_timezone(),
-                                   is_dst=True)
+        if hasattr(tz, 'localize'):
+            return tz.localize(naive_dt, is_dst=True)
     except pytz.AmbiguousTimeError:
-        return timezone.make_aware(datetime.strptime(time_value, "%Y-%m-%d %H:%M:%S"),
-                                   timezone.get_current_timezone(),
-                                   is_dst=False)
+        if hasattr(tz, 'localize'):
+            return tz.localize(naive_dt, is_dst=False)
+
+    # Fallback: let Django create an aware datetime (best-effort; may raise for ambiguous times)
+    try:
+        return timezone.make_aware(naive_dt, tz)
+    except pytz.AmbiguousTimeError:
+        # As a final fallback, try without specifying is_dst (some tz implementations won't raise here)
+        return timezone.make_aware(naive_dt, tz)
 
 
 def fix_ambiguous_time(form, field_name, raw_time):
@@ -96,31 +107,38 @@ def update_session(request, session_id: int):
     if request.method == "POST":
         form = UpdateSessionForm(request.POST, instance=current_session)
         valid = form.is_valid()
+        post_data = None
 
         if not valid: # correct ambiguous time errors that occur on daylights saving time changes
             # Extract start and end times from POST data
             start_time_raw = request.POST.get('start_time')
             end_time_raw = request.POST.get('end_time')
 
-            request.POST = request.POST.copy()  # make the POST data mutable
+            # Make a local mutable copy of POST to avoid mutating the request object (and satisfy type checkers)
+            post = request.POST.copy()
+            post_data = post  # keep a reference for later use when reading subprojects
 
             # Attempt to fix ambiguous times
             fixed_start_time = fix_ambiguous_time(form, 'start_time', start_time_raw)
             fixed_end_time = fix_ambiguous_time(form, 'end_time', end_time_raw)
 
             if fixed_start_time:
-                request.POST['start_time'] = fixed_start_time
+                post['start_time'] = fixed_start_time
             if fixed_end_time:
-                request.POST['end_time'] = fixed_end_time
+                post['end_time'] = fixed_end_time
 
             # recreate the form with the updated POST data and try again
-            form = UpdateSessionForm(request.POST, instance=current_session)
+            form = UpdateSessionForm(post, instance=current_session)
             valid = form.is_valid()
 
         if valid:
             try:
                 project_name = form.cleaned_data['project_name']
-                subproject_names = request.POST.getlist('subprojects')
+                # Prefer local mutable POST data if we created it earlier; otherwise fall back to request.POST.
+                if post_data is not None:
+                    subproject_names = post_data.getlist('subprojects')  # type: ignore[name-defined]
+                else:
+                    subproject_names = request.POST.getlist('subprojects')
 
                 project = get_object_or_404(Projects, name=project_name, user=request.user)
 
@@ -239,7 +257,9 @@ def ChartsView(request):
             'start_date': request.GET.get('start_date'),
             'end_date': request.GET.get('end_date'),
             'chart_type': request.GET.get('chart_type'),
-        }
+            'context': request.GET.get('context') or '',
+        },
+        user=request.user,
     )
 
     context = {
@@ -301,18 +321,19 @@ def import_stream(request):
     def event_stream():
         # get data from session
         file_path = request.session.get('file_path')
-        autumn_import = request.session.get('import_data').get('autumn_import')
-        force = request.session.get('import_data').get('force')
-        merge = request.session.get('import_data').get('merge')
-        tolerance = request.session.get('import_data').get('tolerance')
-        verbose = request.session.get('import_data').get('verbose')
+        import_data = request.session.get('import_data') or {}
+        autumn_import = import_data.get('autumn_import')
+        force = import_data.get('force')
+        merge = import_data.get('merge')
+        tolerance = import_data.get('tolerance')
+        verbose = import_data.get('verbose')
 
         user = request.user
         skipped = []
 
         # clear session data
-        request.session.delete('file_path')
-        request.session.delete('import_data')
+        request.session.pop('file_path', None)
+        request.session.pop('import_data', None)
 
         try:
             with open(file_path) as f:
@@ -338,7 +359,8 @@ def import_stream(request):
                     if force:
                         yield stream_response(
                             f"Force option enabled - deleting existing project '{project_name}'")
-                        Projects.objects.filter(name=project_name).delete()
+                        # Only delete projects belonging to the current user to avoid removing other users' projects
+                        Projects.objects.filter(name=project_name, user=user).delete()
                         project = None
                     elif merge:
                         if verbose:
@@ -371,6 +393,17 @@ def import_stream(request):
                         else:
                             raise ValueError(f"Invalid status: {project_data['Status']}")
                     project.save()
+
+                # Apply context/tags (backwards compatible)
+                apply_context_and_tags_to_project(
+                    user=user,
+                    project=project,
+                    project_data=project_data,
+                    merge=bool(merge and Projects.objects.filter(
+                        name=project_name,
+                        user=user,
+                    ).exists()),
+                )
 
                 # Process subprojects
                 total_subprojects = len(project_data['Sub Projects'])
@@ -531,7 +564,9 @@ def export_view(request):
         if not output_file.endswith('.json'):
             output_file += '.json'
 
-        # prepare date‐filters
+        # prepare date-filters
+        start_dt = None
+        end_dt = None
         if start_date:
             # include all times on start_date
             start_dt = datetime.combine(start_date, time.min)
@@ -551,7 +586,10 @@ def export_view(request):
             qs = qs.filter(end_time__lte=end_dt)
 
         # Avoid N+1 when later reading .project and .subprojects
-        qs = qs.select_related('project').prefetch_related('subprojects')
+        qs = qs.select_related('project', 'project__context').prefetch_related(
+            'subprojects',
+            'project__tags',
+        )
 
         # build export dict
         export_dict = build_project_json_from_sessions(qs, autumn_compatible)
@@ -584,7 +622,9 @@ class TimerListView(LoginRequiredMixin, ListView):
         return context
 
     def get_queryset(self):
-        return Sessions.objects.filter(is_active=True, user=self.request.user)
+        qs = Sessions.objects.filter(is_active=True, user=self.request.user)
+        # Respect active context (timers only for projects in the active context)
+        return filter_by_active_context(qs, self.request)
 
 
 class ProjectsListView(LoginRequiredMixin, ListView):
@@ -602,7 +642,10 @@ class ProjectsListView(LoginRequiredMixin, ListView):
                 'project_name': self.request.GET.get('project_name'),
                 'start_date': self.request.GET.get('start_date'),
                 'end_date': self.request.GET.get('end_date'),
-            }
+                'context': self.request.GET.get('context') or '',
+                'tags': self.request.GET.getlist('tags'),
+            },
+            user=self.request.user,
         )
 
         ungrouped_projects = context['object_list']
@@ -619,9 +662,15 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         projects = Projects.objects.filter(user=self.request.user)
+
+        # Allow explicit ?context= to override global active context
+        override_context_id = self.request.GET.get('context')
+        projects = filter_by_active_context(projects, self.request, override_context_id=override_context_id)
+
         search_name = self.request.GET.get('project_name')
         start_date = self.request.GET.get('start_date')
         end_date = self.request.GET.get('end_date')
+        tag_ids = self.request.GET.getlist('tags')
 
         if search_name:
             projects = filter_by_projects(projects, name=search_name)
@@ -633,6 +682,9 @@ class ProjectsListView(LoginRequiredMixin, ListView):
                 projects = projects.filter(start_date__range=[start, end])
             else:
                 projects = projects.filter(start_date__gte=start)
+
+        if tag_ids:
+            projects = projects.filter(tags__id__in=tag_ids).distinct()
 
         return projects
 
@@ -647,6 +699,11 @@ class CreateProjectView(LoginRequiredMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Create Project'
         return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         form.instance.user = self.request.user  # set the user field of the project to the current user
@@ -708,6 +765,11 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
         context['average_session_duration'] = self.object.total_time / context['session_count'] \
             if context['session_count'] > 0 else 0
         return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         if Projects.objects.filter(user=self.request.user, name=form.instance.name).exclude(pk=self.object.pk).exists():
@@ -795,8 +857,10 @@ class SessionsListView(LoginRequiredMixin, ListView):
                 'project_name': self.request.GET.get('project_name'),
                 'start_date': self.request.GET.get('start_date'),
                 'end_date': self.request.GET.get('end_date'),
-                'note_snippet': self.request.GET.get('note_snippet')
-            }
+                'note_snippet': self.request.GET.get('note_snippet'),
+                'context': self.request.GET.get('context') or '',
+            },
+            user=self.request.user,
         )
 
         paginated_sessions = context['object_list']
@@ -826,6 +890,11 @@ class SessionsListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
+
+        # Allow explicit ?context= to override the global active context
+        override_context_id = self.request.GET.get('context')
+        sessions = filter_by_active_context(sessions, self.request, override_context_id=override_context_id)
+
         return filter_sessions_by_params(self.request, sessions)
 
 
@@ -1078,3 +1147,86 @@ def merge_subprojects(request, project_id):
     }
     
     return render(request, 'core/merge_subprojects.html', context)
+
+
+@login_required
+def set_active_context(request):
+    """
+    Update the active context in the session based on a dropdown selection.
+    """
+    if request.method == "POST":
+        context_id = request.POST.get("context_id") or "all"
+        # Validate context_id when not 'all'
+        if context_id != "all":
+            try:
+                Context.objects.get(id=int(context_id), user=request.user)
+            except (Context.DoesNotExist, ValueError, TypeError):
+                context_id = "all"
+        set_active_context(request, context_id)
+        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse('home')
+        return redirect(next_url)
+
+    # Fallback GET handler – treat like resetting to All
+    set_active_context(request, "all")
+    return redirect('home')
+
+
+@login_required
+def manage_contexts(request):
+    """
+    Simple page to create and list contexts for the current user.
+    """
+    if request.method == "POST":
+        form = ContextForm(request.POST)
+        if form.is_valid():
+            ctx = form.save(commit=False)
+            ctx.user = request.user
+            # Enforce per-user uniqueness gracefully
+            if Context.objects.filter(user=request.user, name=ctx.name).exists():
+                form.add_error('name', 'You already have a context with this name.')
+            else:
+                ctx.save()
+                messages.success(request, "Context created successfully")
+                return redirect('contexts')
+    else:
+        form = ContextForm()
+
+    contexts = Context.objects.filter(user=request.user).order_by('name')
+
+    context = {
+        'title': 'Contexts',
+        'form': form,
+        'contexts': contexts,
+    }
+
+    return render(request, 'core/contexts.html', context)
+
+
+@login_required
+def manage_tags(request):
+    """
+    Simple page to create and list tags for the current user.
+    """
+    if request.method == "POST":
+        form = TagForm(request.POST)
+        if form.is_valid():
+            tag = form.save(commit=False)
+            tag.user = request.user
+            if Tag.objects.filter(user=request.user, name=tag.name).exists():
+                form.add_error('name', 'You already have a tag with this name.')
+            else:
+                tag.save()
+                messages.success(request, "Tag created successfully")
+                return redirect('tags')
+    else:
+        form = TagForm()
+
+    tags = Tag.objects.filter(user=request.user).order_by('name')
+
+    context = {
+        'title': 'Tags',
+        'form': form,
+        'tags': tags,
+    }
+
+    return render(request, 'core/tags.html', context)

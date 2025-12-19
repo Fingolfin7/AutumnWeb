@@ -22,7 +22,10 @@ from core.views import (
   export_view,
   merge_projects,
   merge_subprojects,
-)
+  set_active_context,
+  manage_contexts,
+  manage_tags,
+ )
 from core.api import (
   # new compact endpoints
   timer_start,
@@ -91,6 +94,9 @@ urlpatterns = [
     path('import/stream/', import_stream, name='import_stream'),
     path('merge_projects/', merge_projects, name='merge_projects'),
     path('merge_subprojects/<int:project_id>/', merge_subprojects, name='merge_subprojects'),
+    path('contexts/', manage_contexts, name='contexts'),
+    path('tags/', manage_tags, name='tags'),
+    path('set-context/', set_active_context, name='set_active_context'),
 
     # migrated API
     path('api/create_project/', create_project, name='api_create_project'),

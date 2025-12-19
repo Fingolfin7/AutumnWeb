@@ -27,6 +27,7 @@ from .utils import (
   tally_project_durations,
   session_exists,
   sessions_get_earliest_latest,
+  filter_by_active_context,
 )
 from django.db import transaction
 
@@ -409,9 +410,12 @@ def projects_list_grouped(request):
 
   if start or end:
     projects_qs = Projects.objects.filter(user=request.user)
+    projects_qs = filter_by_active_context(projects_qs, request, override_context_id=qp.get("context"))
     projects = in_window(projects_qs, start, end)
   else:
-    projects = list(Projects.objects.filter(user=request.user))
+    projects_qs = Projects.objects.filter(user=request.user)
+    projects_qs = filter_by_active_context(projects_qs, request, override_context_id=qp.get("context"))
+    projects = list(projects_qs)
 
   return Response(_serialize_project_grouped(projects, compact))
 
@@ -453,6 +457,8 @@ def totals(request):
 
   sessions = Sessions.objects.filter(is_active=False, user=request.user)
   sessions = sessions.filter(project__name__iexact=project_name)
+  # Allow context override via query param for totals as well
+  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
   sessions = filter_sessions_by_params(request, sessions)
 
   # Project total
@@ -760,17 +766,20 @@ def list_projects(request):
     start = qp["start_date"]
     end = qp["end_date"]
     projects_qs = Projects.objects.filter(user=request.user)
+    projects_qs = filter_by_active_context(projects_qs, request, override_context_id=qp.get("context"))
     projects = in_window(projects_qs, start, end)
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
   elif "start_date" in qp:
     start = qp["start_date"]
     projects_qs = Projects.objects.filter(user=request.user)
+    projects_qs = filter_by_active_context(projects_qs, request, override_context_id=qp.get("context"))
     projects = in_window(projects_qs, start)
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
 
   projects = Projects.objects.filter(user=request.user)
+  projects = filter_by_active_context(projects, request, override_context_id=qp.get("context"))
   serializer = ProjectSerializer(projects, many=True)
   return Response(serializer.data)
 
@@ -782,6 +791,7 @@ def tally_by_sessions(request):
   project = request.query_params.get("project_name")
   if project:
     sessions = sessions.filter(project__name=project)
+  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
   sessions = filter_sessions_by_params(request, sessions)
   project_durations = tally_project_durations(sessions)
   return Response(project_durations)
@@ -794,6 +804,7 @@ def tally_by_subprojects(request):
   project = request.query_params.get("project_name")
   if project:
     sessions = sessions.filter(project__name__iexact=project)
+  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
   sessions = filter_sessions_by_params(request, sessions)
 
   sub_durations = {}
@@ -819,6 +830,7 @@ def wordcloud_notes(request):
 
   handler = WordHandler()
   sessions = Sessions.objects.filter(is_active=False, user=request.user)
+  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
   sessions = filter_sessions_by_params(request, sessions)
   notes_text = " ".join([s.note for s in sessions if s.note])
 
@@ -970,6 +982,7 @@ def delete_session(request, session_id):
 @permission_classes([IsAuthenticated])
 def list_sessions(request):
   sessions = Sessions.objects.filter(is_active=False, user=request.user)
+  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
   sessions = filter_sessions_by_params(request, sessions)
   serializer = SessionSerializer(sessions, many=True)
   # to_representation already compacts project/subprojects as names

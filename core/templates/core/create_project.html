@@ -18,6 +18,22 @@
             {{ form.description.errors }}
         </span>
 
+        <br><br>
+
+        <span class="label-input">
+            {{ form.context.label_tag }}
+            {{ form.context }}
+            {{ form.context.errors }}
+        </span>
+
+        <br><br>
+
+        <span class="label-input">
+            {{ form.tags.label_tag }}
+            {{ form.tags }}
+            {{ form.tags.errors }}
+        </span>
+
         <br> <br>
 
         <button type="submit" id="create-project" class="primary-button">

@@ -6,8 +6,12 @@ from collections import defaultdict
 from django.db.models import QuerySet
 from django.db.models import Min, Max
 from datetime import datetime, timedelta
-from core.models import Sessions, Projects, SubProjects
+from django.http import HttpRequest
+from core.models import Sessions, Projects, SubProjects, Context, Tag
 
+
+
+ACTIVE_CONTEXT_SESSION_KEY = "active_context_id"
 
 
 def parse_date_or_datetime(date_str):
@@ -95,6 +99,71 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
         return data
 
 
+def get_active_context(request: HttpRequest, override_context_id: str | None = None) -> tuple[Context | None, str]:
+    """
+    Resolve the active context for this request.
+
+    Returns (context_or_none, mode) where mode is 'all' or 'single'.
+    If override_context_id is provided (e.g. from an explicit query param),
+    it takes precedence over the session-stored value.
+    """
+    context_id = override_context_id
+
+    if context_id is None:
+        # Fall back to session
+        context_id = request.session.get(ACTIVE_CONTEXT_SESSION_KEY)
+
+    if not context_id or str(context_id).lower() == "all":
+        return None, "all"
+
+    try:
+        context = Context.objects.get(id=int(context_id), user=request.user)
+        return context, "single"
+    except (Context.DoesNotExist, ValueError, TypeError):
+        # Invalid/missing context id – treat as All
+        return None, "all"
+
+
+def set_active_context(request: HttpRequest, context_id: str | None) -> None:
+    """
+    Persist the active context selection into the session.
+    Use 'all' or None to represent the All Contexts state.
+    """
+    if not context_id or str(context_id).lower() == "all":
+        request.session[ACTIVE_CONTEXT_SESSION_KEY] = "all"
+    else:
+        request.session[ACTIVE_CONTEXT_SESSION_KEY] = str(context_id)
+
+
+def filter_by_active_context(
+    data: QuerySet[Projects | SubProjects | Sessions],
+    request: HttpRequest,
+    override_context_id: str | None = None,
+) -> QuerySet:
+    """
+    Apply the active context filter to the given queryset.
+
+    If the resolved mode is 'all', the queryset is returned unchanged.
+    Otherwise, it is filtered so that only rows belonging to the active
+    Context are included.
+    """
+    context, mode = get_active_context(request, override_context_id=override_context_id)
+
+    if mode == "all" or context is None or not len(data):
+        return data
+
+    item = data[0]
+
+    if isinstance(item, Projects):
+        return data.filter(context=context)
+    if isinstance(item, SubProjects):
+        return data.filter(parent_project__context=context)
+    if isinstance(item, Sessions):
+        return data.filter(project__context=context)
+
+    return data
+
+
 def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet:
     # Determine the correct query parameters attribute safely
     query_params = getattr(request, "query_params", None)
@@ -118,6 +187,18 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
         sessions = filter_by_projects(sessions, names=project_names)
         if subproject_names:
             sessions = sessions.filter(subprojects__name__in=subproject_names)
+
+    # Apply optional tag filtering (tags provided as IDs)
+    tag_ids: list[str] = []
+    if hasattr(query_params, "getlist"):
+        tag_ids = query_params.getlist('tags')
+    else:
+        tags_param = query_params.get('tags')
+        if tags_param:
+            tag_ids = [t for t in tags_param.split(',') if t]
+
+    if tag_ids:
+        sessions = sessions.filter(project__tags__id__in=tag_ids).distinct()
 
     if 'note_snippet' in query_params:
         sessions = sessions.filter(note__icontains=query_params['note_snippet'])
@@ -202,6 +283,94 @@ def sessions_get_earliest_latest(sessions) -> tuple[datetime, datetime]:
     return aggregated_times['earliest_start'], aggregated_times['latest_end']
 
 
+def _normalize_tags_payload(tags_payload) -> list[dict]:
+    """
+    Accepts:
+      - ["tag1", "tag2"]
+      - [{"name": "tag1", "color": "#fff"}, ...]
+      - "tag1, tag2"
+    Returns a list of dicts: [{"name": "...", "color": ...}, ...]
+    """
+    if not tags_payload:
+        return []
+
+    if isinstance(tags_payload, str):
+        parts = [p.strip() for p in tags_payload.split(",")]
+        return [{"name": p, "color": None} for p in parts if p]
+
+    if isinstance(tags_payload, list):
+        normalized = []
+        for item in tags_payload:
+            if isinstance(item, str):
+                name = item.strip()
+                if name:
+                    normalized.append({"name": name, "color": None})
+            elif isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+                if name:
+                    normalized.append(
+                        {"name": name, "color": item.get("color")}
+                    )
+        return normalized
+
+    return []
+
+
+def apply_context_and_tags_to_project(
+    *,
+    user,
+    project: Projects,
+    project_data: dict,
+    merge: bool,
+) -> None:
+    """
+    Apply Context + Tags to a project (backwards compatible).
+
+    merge=False: treat incoming data as authoritative (set/clear)
+    merge=True:  do not overwrite existing context; union tags
+    """
+    # Context (only act if the key exists in the import)
+    if "Context" in project_data:
+        context_name = (project_data.get("Context") or "").strip()
+
+        if context_name:
+            ctx, _ = Context.objects.get_or_create(
+                user=user,
+                name=context_name,
+            )
+        else:
+            ctx = None
+
+        if not merge:
+            project.context = ctx
+            project.save(update_fields=["context"])
+        else:
+            # merge behavior: only set if project currently has no context
+            if project.context_id is None and ctx is not None:
+                project.context = ctx
+                project.save(update_fields=["context"])
+
+    # Tags (only act if the key exists in the import)
+    if "Tags" in project_data:
+        tags_payload = project_data.get("Tags")
+        normalized = _normalize_tags_payload(tags_payload)
+
+        tag_objs = []
+        for t in normalized:
+            tag, created = Tag.objects.get_or_create(
+                user=user,
+                name=t["name"],
+                defaults={"color": t.get("color")},
+            )
+            # If you want to update color on existing tags, do it here.
+            tag_objs.append(tag)
+
+        if not merge:
+            project.tags.set(tag_objs)  # authoritative (can clear)
+        else:
+            project.tags.add(*tag_objs)  # union
+
+
 def build_project_json_from_sessions(sessions, autumn_compatible=False):
     """
     Build the nested export‐JSON given a flat iterable of Session instances.
@@ -269,6 +438,17 @@ def build_project_json_from_sessions(sessions, autumn_compatible=False):
             "Total Time":  total_proj_minutes,
             "Status":      project_obj.status,
             "Description": project_obj.description or "",
+            # Keep CLI compatibility: only emit these when not autumn_compatible
+            **(
+                {}
+                if autumn_compatible
+                else {
+                    "Context": project_obj.context.name
+                    if project_obj.context
+                    else "",
+                    "Tags": [t.name for t in project_obj.tags.all()],
+                }
+            ),
             "Sub Projects": subprojects_data,
             "Session History": history
         }

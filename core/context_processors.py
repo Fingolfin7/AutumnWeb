@@ -3,6 +3,8 @@ import os
 import json
 from django.conf import settings
 from django.core.cache import cache
+from core.utils import get_active_context
+from core.models import Context
 
 
 def static_version(request):
@@ -44,3 +46,20 @@ def static_version(request):
     #     print("Static version: ", json.dumps(version, indent=4))
 
     return {'static_version': version}
+
+
+def active_context(request):
+    """
+    Inject the user's contexts and currently active context into all templates.
+    """
+    if not request.user.is_authenticated:
+        return {}
+
+    context_obj, mode = get_active_context(request)
+    user_contexts = Context.objects.filter(user=request.user).order_by('name')
+
+    return {
+        'active_context': context_obj,
+        'active_context_mode': mode,
+        'user_contexts': user_contexts,
+    }

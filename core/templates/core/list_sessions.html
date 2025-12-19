@@ -37,6 +37,23 @@
             </span>
 
             <span class="label-input">
+                <label for="context-filter"><i class="fa fa-layer-group"></i> Context</label>
+                {{ search_form.context }}
+                {{ search_form.context.errors }}
+            </span>
+
+            <span class="label-input">
+                <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
+                <details class="tag-dropdown">
+                    <summary>Select tags</summary>
+                    <div class="tag-options">
+                        {{ search_form.tags }}
+                        {{ search_form.tags.errors }}
+                    </div>
+                </details>
+            </span>
+
+            <span class="label-input">
                 <label for="note_snippet"><i class="fa fa-sticky-note"></i> Note</label>
                 {{ search_form.note_snippet }}
                 {{ search_form.note_snippet.errors }}
