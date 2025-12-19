@@ -75,7 +75,21 @@ class SearchProjectForm(forms.Form):
         choices = [('', 'All Contexts')]
         if user is not None:
             user_contexts = Context.objects.filter(user=user).order_by('name')
-            choices += [(str(ctx.id), ctx.name) for ctx in user_contexts]
+
+            # Pin "General" directly under "All Contexts" when present.
+            general_ctx = None
+            remaining_contexts = []
+            for ctx in user_contexts:
+                if ctx.name == 'General' and general_ctx is None:
+                    general_ctx = ctx
+                else:
+                    remaining_contexts.append(ctx)
+
+            if general_ctx is not None:
+                choices.append((str(general_ctx.id), general_ctx.name))
+
+            choices += [(str(ctx.id), ctx.name) for ctx in remaining_contexts]
+
             self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
         self.fields['context'].choices = choices
 
