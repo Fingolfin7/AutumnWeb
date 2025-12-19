@@ -23,10 +23,9 @@ def ensure_general_context_for_orphaned_projects(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0030_assign_default_contexts'),
+        ('core', '0029_context_tag_models'),
     ]
 
     operations = [
         migrations.RunPython(ensure_general_context_for_orphaned_projects, migrations.RunPython.noop),
     ]
-
