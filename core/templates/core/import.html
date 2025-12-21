@@ -73,6 +73,25 @@
                 {{ form.file.errors }}
             </span>
 
+            <hr/>
+
+            <h3>Import Destination</h3>
+
+            <span class="label-input">
+                {{ form.import_context.label_tag }}
+                {{ form.import_context }}
+                {{ form.import_context.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.import_context_new.label_tag }}
+                {{ form.import_context_new }}
+                <small>{{ form.import_context_new.help_text }}</small>
+                {{ form.import_context_new.errors }}
+            </span>
+
+            <hr/>
+
             <label>
                 {{ form.autumn_import.label_tag }}
                 <label class="switch">

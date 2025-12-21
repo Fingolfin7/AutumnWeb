@@ -285,7 +285,7 @@ def import_view(request):
     request.session.delete('import_data')
 
     if request.method == "POST":
-        form = ImportJSONForm(request.POST, request.FILES)
+        form = ImportJSONForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             uploaded_file = request.FILES.get('file')
 
@@ -307,10 +307,18 @@ def import_view(request):
             form_data = form.cleaned_data.copy()
             form_data.pop('file', None)  # Remove the file from cleaned_data
 
+            # ModelChoiceField isn't JSON/session friendly; store just the id.
+            ctx = form_data.get('import_context')
+            form_data['import_context_id'] = ctx.id if ctx else None
+            form_data.pop('import_context', None)
+
             request.session['import_data'] = form_data
             return JsonResponse({'message': 'Form submitted successfully.'}, status=200)
+
+        # Return form errors so the streaming JS can surface them as a notification.
+        return JsonResponse({'errors': form.errors}, status=400)
     else:
-        form = ImportJSONForm()
+        form = ImportJSONForm(user=request.user)
 
     context = {
         'title': 'Import Data',
@@ -333,8 +341,20 @@ def import_stream(request):
         tolerance = import_data.get('tolerance')
         verbose = import_data.get('verbose')
 
+        import_context_id = import_data.get('import_context_id')
+        import_context_new = (import_data.get('import_context_new') or '').strip()
+
         user = request.user
         skipped = []
+
+        import_into_context = None
+        if import_context_new:
+            import_into_context, _ = Context.objects.get_or_create(user=user, name=import_context_new)
+        elif import_context_id:
+            try:
+                import_into_context = Context.objects.get(user=user, id=int(import_context_id))
+            except (Context.DoesNotExist, ValueError, TypeError):
+                import_into_context = None
 
         # clear session data
         request.session.pop('file_path', None)
@@ -386,6 +406,7 @@ def import_stream(request):
                             datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
                         total_time=0.0,
                         description=project_data['Description'] if 'Description' in project_data else '',
+                        context=import_into_context,
                     )
 
                     if 'Status' in project_data:  # handle old versions from before the status field was added
@@ -400,15 +421,27 @@ def import_stream(request):
                     project.save()
 
                 # Apply context/tags (backwards compatible)
+                # If importing into a context, don't let the file override it.
+                if import_into_context is not None:
+                    sanitized_project_data = dict(project_data)
+                    sanitized_project_data.pop('Context', None)
+                else:
+                    sanitized_project_data = project_data
+
                 apply_context_and_tags_to_project(
                     user=user,
                     project=project,
-                    project_data=project_data,
+                    project_data=sanitized_project_data,
                     merge=bool(merge and Projects.objects.filter(
                         name=project_name,
                         user=user,
                     ).exists()),
                 )
+
+                # Existing project + merge: optionally force it under the chosen context
+                if merge and project is not None and import_into_context is not None:
+                    project.context = import_into_context
+                    project.save(update_fields=['context'])
 
                 # Process subprojects
                 total_subprojects = len(project_data['Sub Projects'])

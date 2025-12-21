@@ -196,11 +196,55 @@ class ImportJSONForm(forms.Form):
     tolerance = forms.FloatField(initial=0.5, label='Tolerance (minutes)')
     verbose = forms.BooleanField(required=False)
 
+    import_context = forms.ModelChoiceField(
+        required=False,
+        queryset=Context.objects.none(),
+        empty_label='(Use file context / default)',
+        label='Import under context',
+    )
+    import_context_new = forms.CharField(
+        required=False,
+        label='Or create context',
+        help_text='Optional. If provided, a new context will be created (or reused) and used for all imported projects.',
+        widget=forms.TextInput(attrs={'placeholder': 'New context name'}),
+    )
+
     class Meta:
-        fields = ['file', 'autumn_import', 'force', 'merge', 'tolerance', 'verbose']
+        fields = [
+            'file',
+            'autumn_import',
+            'force',
+            'merge',
+            'tolerance',
+            'verbose',
+            'import_context',
+            'import_context_new',
+        ]
         widgets = {
             'file': forms.FileInput(attrs={'accept': '.json'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user is not None:
+            self.fields['import_context'].queryset = Context.objects.filter(user=user).order_by('name')
+
+    def clean(self):
+        cleaned = super().clean()
+        new_name = (cleaned.get('import_context_new') or '').strip()
+        if new_name:
+            cleaned['import_context_new'] = new_name
+
+        # If both are provided, keep behavior deterministic and tell the user.
+        if cleaned.get('import_context') is not None and cleaned.get('import_context_new'):
+            # New context name wins (matches import_stream precedence)
+            self.add_error(
+                'import_context',
+                'Ignored because “Or create context” is filled. Clear it to use the dropdown context instead.',
+            )
+
+        return cleaned
 
 
 class ExportJSONForm(forms.Form):

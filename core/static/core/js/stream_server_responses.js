@@ -15,14 +15,23 @@ $(document).ready(function() {
         outputText.innerHTML = '';
 
         // set the filename for the title in the output section
-        outputSection.querySelector('#output-title').textContent = formData.get('file').name;
+        const fileObj = formData.get('file');
+        outputSection.querySelector('#output-title').textContent = (fileObj && fileObj.name) ? fileObj.name : '';
+
+        function appendErrorLine(message) {
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry error';
+            logEntry.textContent = message;
+            outputText.appendChild(logEntry);
+            outputText.scrollTop = outputText.scrollHeight;
+        }
 
         // Send the form data using fetch
         fetch(window.location.pathname, {
             method: 'POST',
             body: formData,  // Send form data, including file to the non-streaming endpoint (for POST request)
         })
-        .then(response => {
+        .then(async (response) => {
             if (response.ok) {
                 // Once the form is successfully submitted, open the EventSource
                 // eventSource is a GET only request, so we need to send the file data in the initial POST request
@@ -65,25 +74,33 @@ $(document).ready(function() {
                 };
 
                 // Handle errors with the EventSource
-                eventSource.onerror = function(error) {
-                    const logEntry = document.createElement('div');
-                    logEntry.className = 'log-entry error';
-                    logEntry.textContent = 'Error: Connection lost. Please try again.';
-                    outputText.appendChild(logEntry);
+                eventSource.onerror = function() {
+                    appendErrorLine('Error: Connection lost. Please try again.');
                     eventSource.close();
                 };
+                return;
+            }
+
+            // Non-200: try to show useful validation errors
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (e) {
+                // ignore
+            }
+
+            if (payload && payload.errors) {
+                appendErrorLine('Error: Please fix the following form issues:');
+                Object.keys(payload.errors).forEach((field) => {
+                    const msgs = payload.errors[field];
+                    (msgs || []).forEach((m) => appendErrorLine(`${field}: ${m}`));
+                });
             } else {
-                const logEntry = document.createElement('div');
-                logEntry.className = 'log-entry error';
-                logEntry.textContent = 'Error: Failed to upload form data.';
-                outputText.appendChild(logEntry);
+                appendErrorLine('Error: Failed to upload form data.');
             }
         })
         .catch(error => {
-            const logEntry = document.createElement('div');
-            logEntry.className = 'log-entry error';
-            logEntry.textContent = 'Error uploading file: ' + error.message;
-            outputText.appendChild(logEntry);
+            appendErrorLine('Error uploading file: ' + error.message);
         });
     }
 

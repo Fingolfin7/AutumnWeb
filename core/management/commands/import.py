@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
-from core.models import Projects, SubProjects, Sessions, status_choices
+from core.models import Projects, SubProjects, Sessions, status_choices, Context
 from core.utils import (
     json_decompress,
     session_exists,
@@ -31,6 +31,20 @@ class Command(BaseCommand):
                                                                          'due to rounding errors '
                                                                          '(default 0.5)')
         parser.add_argument('--verbose', action='store_true', help='Print verbose output')
+        parser.add_argument(
+            '--context',
+            type=str,
+            default=None,
+            help=(
+                'Import all projects under this context name (overrides any Context field inside the file). '
+                'If the context does not exist, import will fail unless --create-context is provided.'
+            ),
+        )
+        parser.add_argument(
+            '--create-context',
+            action='store_true',
+            help='If used with --context, create the context if it does not already exist.',
+        )
 
     def handle(self, *args, **options):
         filepath = options['filepath']
@@ -43,6 +57,19 @@ class Command(BaseCommand):
             user = User.objects.get(username=options['username'])
         except User.DoesNotExist:
             raise CommandError(f'User not found: {options["username"]}')
+
+        import_into_context_name = (options.get('context') or '').strip() or None
+        create_context = bool(options.get('create_context'))
+        import_into_context = None
+        if import_into_context_name:
+            import_into_context = Context.objects.filter(user=user, name=import_into_context_name).first()
+            if not import_into_context and create_context:
+                import_into_context = Context.objects.create(user=user, name=import_into_context_name)
+            if not import_into_context:
+                raise CommandError(
+                    f"Context not found: '{import_into_context_name}'. "
+                    f"Create it first or pass --create-context."
+                )
 
         self.stdout.write(f'Reading data from {filepath}...')
         skipped = []
@@ -82,6 +109,7 @@ class Command(BaseCommand):
                     last_updated=timezone.make_aware(datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
                     total_time=0.0,
                     description=project_data['Description'] if 'Description' in project_data else '',
+                    context=import_into_context,
                 )
 
                 if 'Status' in project_data:  # handle old versions from before the status field was added
@@ -96,15 +124,28 @@ class Command(BaseCommand):
                 project.save()
 
                 # Apply context/tags (merge-aware, backwards compatible)
+                # If importing into a context, don't let the file override it.
+                if import_into_context is not None:
+                    sanitized_project_data = dict(project_data)
+                    sanitized_project_data.pop('Context', None)
+                else:
+                    sanitized_project_data = project_data
+
                 apply_context_and_tags_to_project(
                     user=user,
                     project=project,
-                    project_data=project_data,
+                    project_data=sanitized_project_data,
                     merge=bool(merge and Projects.objects.filter(
                         name=project_name,
                         user=user,
                     ).exists()),
                 )
+
+            else:
+                # Existing project + merge: optionally force it under the chosen context
+                if merge and import_into_context is not None:
+                    project.context = import_into_context
+                    project.save(update_fields=['context'])
 
             # Import or merge subprojects
             for subproject_name, subproject_time in project_data['Sub Projects'].items():

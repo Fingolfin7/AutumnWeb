@@ -4,7 +4,12 @@ from django.utils import timezone
 from core.models import Projects, SubProjects, Sessions
 from django.contrib.auth.models import User
 from datetime import timedelta
-
+from django.core.management import call_command
+from django.conf import settings
+import io
+import json
+import os
+from core.models import Context
 
 
 class UpdateSessionTests(TestCase):
@@ -558,3 +563,175 @@ class MergeSubProjectsAPITests(TestCase):
         self.assertIn('already exists', data['error'])
 
 
+class ImportIntoContextCLITests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='importuser', password='password')
+
+    def _write_temp_import_json(self, payload: dict) -> str:
+        temp_dir = os.path.join(settings.MEDIA_ROOT, 'temp_tests')
+        os.makedirs(temp_dir, exist_ok=True)
+        path = os.path.join(temp_dir, 'import_cli_test.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f)
+        return path
+
+    def test_cli_import_into_new_context_overrides_file_context(self):
+        payload = {
+            'Project One': {
+                'Start Date': '01-01-2024',
+                'Last Updated': '01-02-2024',
+                'Total Time': 0.0,
+                'Description': '',
+                'Status': 'active',
+                'Context': 'FileContext',
+                'Tags': [],
+                'Sub Projects': {},
+                'Session History': [],
+            },
+            'Project Two': {
+                'Start Date': '02-01-2024',
+                'Last Updated': '02-02-2024',
+                'Total Time': 0.0,
+                'Description': '',
+                'Status': 'active',
+                'Context': 'FileContext',
+                'Tags': [],
+                'Sub Projects': {},
+                'Session History': [],
+            },
+        }
+        path = self._write_temp_import_json(payload)
+
+        out = io.StringIO()
+        call_command(
+            'import',
+            self.user.username,
+            path,
+            '--context',
+            'ImportedCtx',
+            '--create-context',
+            stdout=out,
+        )
+
+        imported_ctx = Context.objects.get(user=self.user, name='ImportedCtx')
+        self.assertEqual(Projects.objects.filter(user=self.user, context=imported_ctx).count(), 2)
+
+        # Ensure file context didn't get created/used
+        self.assertFalse(Context.objects.filter(user=self.user, name='FileContext').exists())
+
+
+class ImportIntoContextUITests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='importui', password='password')
+        self.client.login(username='importui', password='password')
+
+    def _make_upload_file(self, payload: dict, name: str = 'import_ui_test.json'):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return SimpleUploadedFile(
+            name,
+            json.dumps(payload).encode('utf-8'),
+            content_type='application/json',
+        )
+
+    def _consume_event_stream(self, response) -> str:
+        chunks = []
+        for chunk in response.streaming_content:
+            if isinstance(chunk, bytes):
+                chunk = chunk.decode('utf-8', errors='ignore')
+            chunks.append(chunk)
+        return ''.join(chunks)
+
+    def test_ui_import_under_existing_context(self):
+        # pre-create a destination context
+        dest_ctx = Context.objects.create(user=self.user, name='DestCtx')
+
+        payload = {
+            'UI Project': {
+                'Start Date': '03-01-2024',
+                'Last Updated': '03-02-2024',
+                'Total Time': 0.0,
+                'Description': '',
+                'Status': 'active',
+                'Context': 'FileContext',
+                'Tags': [],
+                'Sub Projects': {},
+                'Session History': [],
+            }
+        }
+
+        resp = self.client.post(
+            reverse('import'),
+            data={
+                'file': self._make_upload_file(payload),
+                'merge': 'on',
+                'tolerance': '0.5',
+                'import_context': str(dest_ctx.id),
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+
+        # start streaming import
+        stream_resp = self.client.get(reverse('import_stream'))
+        self.assertEqual(stream_resp.status_code, 200)
+        stream_text = self._consume_event_stream(stream_resp)
+        self.assertIn('Import completed successfully', stream_text)
+
+        proj = Projects.objects.get(user=self.user, name='UI Project')
+        self.assertEqual(proj.context_id, dest_ctx.id)
+        self.assertFalse(Context.objects.filter(user=self.user, name='FileContext').exists())
+
+    def test_ui_import_new_context_wins_over_dropdown_and_shows_notification(self):
+        dropdown_ctx = Context.objects.create(user=self.user, name='DropdownCtx')
+
+        payload = {
+            'UI Project 2': {
+                'Start Date': '04-01-2024',
+                'Last Updated': '04-02-2024',
+                'Total Time': 0.0,
+                'Description': '',
+                'Status': 'active',
+                'Context': 'FileContext',
+                'Tags': [],
+                'Sub Projects': {},
+                'Session History': [],
+            }
+        }
+
+        # Provide BOTH: dropdown + new context name -> new name wins
+        resp = self.client.post(
+            reverse('import'),
+            data={
+                'file': self._make_upload_file(payload),
+                'merge': 'on',
+                'tolerance': '0.5',
+                'import_context': str(dropdown_ctx.id),
+                'import_context_new': 'NewCtxWins',
+            },
+        )
+
+        # The form warns via a field error (surfaced as JSON)
+        self.assertEqual(resp.status_code, 400)
+        body = resp.json()
+        self.assertIn('errors', body)
+        self.assertIn('import_context', body['errors'])
+
+        # Now submit with only new context to proceed
+        resp2 = self.client.post(
+            reverse('import'),
+            data={
+                'file': self._make_upload_file(payload, name='import_ui_test2.json'),
+                'merge': 'on',
+                'tolerance': '0.5',
+                'import_context_new': 'NewCtxWins',
+            },
+        )
+        self.assertEqual(resp2.status_code, 200)
+
+        stream_resp = self.client.get(reverse('import_stream'))
+        self.assertEqual(stream_resp.status_code, 200)
+        stream_text = self._consume_event_stream(stream_resp)
+        self.assertIn('Import completed successfully', stream_text)
+
+        new_ctx = Context.objects.get(user=self.user, name='NewCtxWins')
+        proj = Projects.objects.get(user=self.user, name='UI Project 2')
+        self.assertEqual(proj.context_id, new_ctx.id)
