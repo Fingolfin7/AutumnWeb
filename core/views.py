@@ -1265,6 +1265,14 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
         agg = projects_qs.aggregate(total_time=Sum('total_time'))
         total_time = agg.get('total_time') or 0
 
+        # Per-status counts
+        sidebar_status_counts = {
+            'active': projects_qs.filter(status='active').count(),
+            'paused': projects_qs.filter(status='paused').count(),
+            'complete': projects_qs.filter(status='complete').count(),
+            'archived': projects_qs.filter(status='archived').count(),
+        }
+
         sessions_qs = Sessions.objects.filter(user=self.request.user, project__in=projects_qs, is_active=False)
         session_count = sessions_qs.count()
         average_session_duration = (total_time / session_count) if session_count > 0 else 0
@@ -1273,6 +1281,7 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
             'sidebar_total_projects': total_projects,
             'sidebar_total_time': total_time,
             'sidebar_average_session_duration': average_session_duration,
+            'sidebar_status_counts': sidebar_status_counts,
         })
         return ctx
 
@@ -1327,6 +1336,14 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
         total_projects = projects_qs.count()
         total_time = (projects_qs.aggregate(total_time=Sum('total_time')).get('total_time') or 0)
 
+        # Per-status counts
+        sidebar_status_counts = {
+            'active': projects_qs.filter(status='active').count(),
+            'paused': projects_qs.filter(status='paused').count(),
+            'complete': projects_qs.filter(status='complete').count(),
+            'archived': projects_qs.filter(status='archived').count(),
+        }
+
         sessions_qs = Sessions.objects.filter(user=self.request.user, project__in=projects_qs, is_active=False)
         session_count = sessions_qs.count()
         average_session_duration = (total_time / session_count) if session_count > 0 else 0
@@ -1336,6 +1353,7 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
             'sidebar_total_projects': total_projects,
             'sidebar_total_time': total_time,
             'sidebar_average_session_duration': average_session_duration,
+            'sidebar_status_counts': sidebar_status_counts,
         })
         return ctx
 

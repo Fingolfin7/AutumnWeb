@@ -114,6 +114,38 @@ def day_date_formatter(date: datetime| str):
     return date.strftime("%A %d %b %Y")
 
 
+@register.filter
+def project_status_counts_formatter(counts: dict | None) -> str:
+    """Format a project status counts dict into a compact parenthesized string.
+
+    Expected keys: active, paused, complete, archived.
+    Outputs nothing if all counts are missing/zero.
+
+    Example: "(2 active, 1 paused, 0 complete, 0 archived)" -> "(2 active, 1 paused)".
+    """
+    if not counts:
+        return ""
+
+    parts: list[str] = []
+    for key, label in (
+        ('active', 'active'),
+        ('paused', 'paused'),
+        ('complete', 'complete'),
+        ('archived', 'archived'),
+    ):
+        try:
+            val = int(counts.get(key) or 0)
+        except (TypeError, ValueError):
+            val = 0
+        if val:
+            parts.append(f"{val} {label}")
+
+    if not parts:
+        return ""
+
+    return f"({', '.join(parts)})"
+
+
 def make_timezone_datetime(date):
     if isinstance(date, str):
 
