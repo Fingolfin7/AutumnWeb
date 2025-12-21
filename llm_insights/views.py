@@ -36,14 +36,15 @@ class InsightsView(LoginRequiredMixin, View):
         profile = getattr(user, 'profile', None)
         provider_models = {
             'gemini': [
-                ('gemini-2.5-flash', 'Gemini 2.5 Flash'),
-                ('gemini-2.5-pro', 'Gemini 2.5 Pro'),
+                #('gemini-2.5-pro', 'Gemini 2.5 pro'),
+                ('gemini-3-flash-preview', 'Gemini 3 Flash'),
                 ('gemini-3-pro-preview', 'Gemini 3 Pro Preview'),
             ]
         }
         if profile and profile.openai_api_key_enc:
             provider_models['openai'] = [
                 ('gpt-5-mini', 'GPT-5 Mini'),
+                ('gpt-5', 'GPT-5'),
                 ('gpt-5.1', 'GPT-5.1'),
                 ('gpt-5.2', 'GPT-5.2'),
             ]
