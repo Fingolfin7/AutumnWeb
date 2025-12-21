@@ -124,7 +124,9 @@
                                             <td>
                                                 <i class="fa fa-tags" style="font-size: 0.8rem"></i>
                                                 {% for tag in tags %}
-                                                    <span {% if tag.color %} style="color: {{ tag.color }}" {% else %} class="text-cyan" {% endif %}>{{ tag.name }}{% if not forloop.last %}, {% endif %}</span>
+                                                    <a href="{% url 'update_tag' tag.id %}" class="plain-link" {% if tag.color %} style="color: {{ tag.color }}" {% endif %}>
+                                                        {{ tag.name }}{% if not forloop.last %}, {% endif %}
+                                                    </a>
                                                 {% endfor %}
                                             </td>
                                         </tr>
