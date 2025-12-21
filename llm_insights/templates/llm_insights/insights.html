@@ -38,9 +38,16 @@
 
             // initial populate
             repopulateModels('{{ selected_provider }}','{{ selected_model }}');
+            // keep GET filter hidden fields in sync
+            $('#provider_filter').val($('#provider').val());
+            $('#model_filter').val($('#model').val() || '{{ selected_model }}');
+
             $('#provider').on('change', function(){
                 const newProvider = $(this).val();
                 repopulateModels(newProvider,null);
+                $('#provider_filter').val(newProvider);
+                $('#model_filter').val($('#model').val());
+
                 // Update URL with provider change
                 let prompt = $('#prompt').val();
                 let params = new URLSearchParams(window.location.search);
@@ -54,6 +61,8 @@
                 let provider = $('#provider').val();
                 let selected = $(this).val();
                 $('#model_filter').val(selected);
+                $('#provider_filter').val(provider);
+
                 let prompt = $('#prompt').val();
                 let params = new URLSearchParams(window.location.search);
                 params.set('provider', provider);
@@ -116,6 +125,7 @@
                 {{ search_form.note_snippet.errors }}
             </span>
 
+            <input type="hidden" name="provider" id="provider_filter" value="{{ selected_provider }}">
             <input type="hidden" name="model" id="model_filter" value="{{ selected_model }}">
 
             <span>

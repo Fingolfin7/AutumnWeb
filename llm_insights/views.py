@@ -121,7 +121,7 @@ class InsightsView(LoginRequiredMixin, View):
 
     def post(self, request):
         sessions = Sessions.objects.filter(is_active=False, user=request.user)
-        sessions = filter_by_active_context(sessions, request, override_context_id=request.POST.get('context'))
+        sessions = filter_by_active_context(sessions, request, override_context_id=request.GET.get('context'))
         sessions = filter_sessions_by_params(request, sessions)
         sessions_updated = request.session.get("sessions_updated", False)
         provider_models = self._provider_models(request.user)
