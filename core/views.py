@@ -6,6 +6,7 @@ from core.utils import *
 from core.models import Context, Tag
 from django.contrib import messages
 from django.db import transaction
+from django.db.models import Sum
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.utils import timezone
 from datetime import datetime, timedelta, time
@@ -1254,6 +1255,25 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['title'] = 'Update Context'
+
+        # Sidebar stats for this context
+        projects_qs = Projects.objects.filter(user=self.request.user, context=self.object)
+        # Respect any globally selected active context (if it's a different context, this becomes empty)
+        projects_qs = filter_by_active_context(projects_qs, self.request)
+
+        total_projects = projects_qs.count()
+        agg = projects_qs.aggregate(total_time=Sum('total_time'))
+        total_time = agg.get('total_time') or 0
+
+        sessions_qs = Sessions.objects.filter(user=self.request.user, project__in=projects_qs, is_active=False)
+        session_count = sessions_qs.count()
+        average_session_duration = (total_time / session_count) if session_count > 0 else 0
+
+        ctx.update({
+            'sidebar_total_projects': total_projects,
+            'sidebar_total_time': total_time,
+            'sidebar_average_session_duration': average_session_duration,
+        })
         return ctx
 
     def form_valid(self, form):
@@ -1295,6 +1315,28 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['title'] = 'Update Tag'
+
+        # Allow explicit ?context= to override the global active context for the sidebar stats.
+        # (Used by the context dropdown on this page.)
+        override_context_id = self.request.GET.get('context')
+
+        # Sidebar stats for this tag
+        projects_qs = Projects.objects.filter(user=self.request.user, tags=self.object).distinct()
+        projects_qs = filter_by_active_context(projects_qs, self.request, override_context_id=override_context_id)
+
+        total_projects = projects_qs.count()
+        total_time = (projects_qs.aggregate(total_time=Sum('total_time')).get('total_time') or 0)
+
+        sessions_qs = Sessions.objects.filter(user=self.request.user, project__in=projects_qs, is_active=False)
+        session_count = sessions_qs.count()
+        average_session_duration = (total_time / session_count) if session_count > 0 else 0
+
+        ctx.update({
+            'override_context_id': override_context_id or '',
+            'sidebar_total_projects': total_projects,
+            'sidebar_total_time': total_time,
+            'sidebar_average_session_duration': average_session_duration,
+        })
         return ctx
 
     def form_valid(self, form):
