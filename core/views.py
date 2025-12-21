@@ -734,8 +734,7 @@ class CreateSubProjectView(LoginRequiredMixin, CreateView):
         if 'pk' in self.kwargs:
             initial['parent_project'] = Projects.objects.get(pk=self.kwargs.get('pk'), user=self.request.user)
         elif 'project_name' in self.kwargs:
-            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'),
-                                                             user=self.request.user)
+            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'), user=self.request.user)
         return initial
 
     def get_context_data(self, **kwargs):
@@ -1240,3 +1239,86 @@ def manage_tags(request):
     }
 
     return render(request, 'core/tags.html', context)
+
+
+# New views to update/delete Context and Tag
+class UpdateContextView(LoginRequiredMixin, UpdateView):
+    model = Context
+    form_class = ContextForm
+    template_name = 'core/update_context.html'
+    context_object_name = 'context_obj'
+
+    def get_queryset(self):
+        return Context.objects.filter(user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = 'Update Context'
+        return ctx
+
+    def form_valid(self, form):
+        if Context.objects.filter(user=self.request.user, name=form.instance.name).exclude(pk=self.object.pk).exists():
+            form.add_error('name', 'You already have a context with this name.')
+            return self.form_invalid(form)
+        form.save()
+        messages.success(self.request, "Context updated successfully")
+        return redirect('contexts')
+
+
+class DeleteContextView(LoginRequiredMixin, DeleteView):
+    model = Context
+    template_name = 'core/delete_context.html'
+    context_object_name = 'context_obj'
+
+    def get_queryset(self):
+        return Context.objects.filter(user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Delete Context'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, "Context deleted successfully")
+        return reverse('contexts')
+
+
+class UpdateTagView(LoginRequiredMixin, UpdateView):
+    model = Tag
+    form_class = TagForm
+    template_name = 'core/update_tag.html'
+    context_object_name = 'tag'
+
+    def get_queryset(self):
+        return Tag.objects.filter(user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = 'Update Tag'
+        return ctx
+
+    def form_valid(self, form):
+        if Tag.objects.filter(user=self.request.user, name=form.instance.name).exclude(pk=self.object.pk).exists():
+            form.add_error('name', 'You already have a tag with this name.')
+            return self.form_invalid(form)
+        form.save()
+        messages.success(self.request, "Tag updated successfully")
+        return redirect('tags')
+
+
+class DeleteTagView(LoginRequiredMixin, DeleteView):
+    model = Tag
+    template_name = 'core/delete_tag.html'
+    context_object_name = 'tag'
+
+    def get_queryset(self):
+        return Tag.objects.filter(user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Delete Tag'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, "Tag deleted successfully")
+        return reverse('tags')

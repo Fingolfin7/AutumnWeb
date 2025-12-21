@@ -1,0 +1,40 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+    <form class="card stacked half-width" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <h2>Update Context</h2>
+
+        <div class="label-input">
+            {{ form.name.label_tag }}
+            {{ form.name }}
+            {{ form.name.errors }}
+        </div>
+
+        <div class="label-input">
+            {{ form.description.label_tag }}
+            {{ form.description }}
+            {{ form.description.errors }}
+        </div>
+
+        <div class="button-row">
+            <button type="submit" class="primary-button">
+                <i class="fa fa-check-circle"></i>
+                Update Context
+            </button>
+
+            <button type="button" class="primary-button dark-red" onclick="window.location.href='{% url 'delete_context' context_obj.id %}'">
+                <i class="fa fa-trash"></i>
+                Delete Context
+            </button>
+        </div>
+        <div class="button-row">
+            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'contexts' %}'">
+                <i class="fa fa-arrow-left"></i>
+                Back
+            </button>
+        </div>
+    </form>
+{% endblock %}
+

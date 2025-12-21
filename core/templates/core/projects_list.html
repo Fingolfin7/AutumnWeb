@@ -131,10 +131,10 @@
                                 {% with tags=project.tags.all %}
                                     {% if tags %}
                                         <tr>
-                                            <td class="text-cyan">
-                                                #:
+                                            <td>
+                                                <i class="fa fa-tags" style="font-size: 0.8rem"></i>
                                                 {% for tag in tags %}
-                                                    {{ tag.name }}{% if not forloop.last %}, {% endif %}
+                                                    <span {% if tag.color %} style="color: {{ tag.color }}" {% else %} class="text-cyan" {% endif %}>{{ tag.name }}{% if not forloop.last %}, {% endif %}</span>
                                                 {% endfor %}
                                             </td>
                                         </tr>

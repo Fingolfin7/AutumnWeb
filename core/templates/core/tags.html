@@ -4,42 +4,46 @@
 {% block content %}
     <section class="card">
         <h2>Tags</h2>
-        <form method="post" class="stacked">
+        <br>
+        <form method="post">
             {% csrf_token %}
-            <div class="label-input">
-                <label for="id_name">Name</label>
-                {{ form.name }}
-                {{ form.name.errors }}
+            <div class="stacked">
+                <div class="label-input">
+                    <label for="id_name">Name</label>
+                    {{ form.name }}
+                    {{ form.name.errors }}
+                </div>
+                <div class="label-input">
+                    <label for="id_color">Color</label>
+                    {{ form.color }}
+                    {{ form.color.errors }}
+                </div>
             </div>
-            <div class="label-input">
-                <label for="id_color">Color</label>
-                {{ form.color }}
-                {{ form.color.errors }}
-            </div>
-            <button type="submit" class="primary-button">
+            <br>
+            <button type="submit" class="primary-button" style="width: auto !important;">
                 <i class="fa fa-plus"></i>
                 Create Tag
             </button>
         </form>
     </section>
 
-    <section id="tags-list" class="stacked">
+    <section id="tags-list" class="card stacked">
         <h3>Existing Tags</h3>
         {% if not tags %}
             <p>No tags yet. Use the form above to create one.</p>
         {% else %}
-            <ul>
+            <ul class="stacked">
                 {% for tag in tags %}
                     <li>
-                        <strong>{{ tag.name }}</strong>
-                        {% if tag.color %}
-                            — <span class="text-cyan">{{ tag.color }}</span>
-                        {% endif %}
+                        <a {% if tag.color %} style="color: {{ tag.color }}"{% endif %}
+                                class="plain-link" href="{% url 'update_tag' tag.id %}">{{ tag.name }}</a>
+                        -
+                        {% with project_count=tag.projects.count %}
+                          {{ project_count }} {% if project_count == 1 or project_count == 0 %}project{% else %}projects{% endif %}
+                        {% endwith %}
                     </li>
                 {% endfor %}
             </ul>
         {% endif %}
     </section>
 {% endblock %}
-
-

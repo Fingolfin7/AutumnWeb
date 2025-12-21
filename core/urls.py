@@ -25,6 +25,10 @@ from core.views import (
   set_active_context,
   manage_contexts,
   manage_tags,
+  UpdateContextView,
+  DeleteContextView,
+  UpdateTagView,
+  DeleteTagView,
  )
 from core.api import (
   # new compact endpoints
@@ -97,6 +101,12 @@ urlpatterns = [
     path('contexts/', manage_contexts, name='contexts'),
     path('tags/', manage_tags, name='tags'),
     path('set-context/', set_active_context, name='set_active_context'),
+
+    # context/tag update/delete
+    path('update_context/<int:pk>/', UpdateContextView.as_view(), name='update_context'),
+    path('delete_context/<int:pk>/', DeleteContextView.as_view(), name='delete_context'),
+    path('update_tag/<int:pk>/', UpdateTagView.as_view(), name='update_tag'),
+    path('delete_tag/<int:pk>/', DeleteTagView.as_view(), name='delete_tag'),
 
     # migrated API
     path('api/create_project/', create_project, name='api_create_project'),

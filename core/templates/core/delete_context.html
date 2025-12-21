@@ -1,0 +1,46 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <h3>Are you sure you want to delete this context?</h3>
+
+        <div class="card" id="context-{{ context_obj.id }}">
+            <table>
+                <tr>
+                    <td class="text-red">
+                        <h3>{{ context_obj.name }}</h3>
+                    </td>
+                </tr>
+                {% if context_obj.description %}
+                <tr>
+                    <td>
+                        <p>{{ context_obj.description }}</p>
+                    </td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td>
+                        {% with project_count=context_obj.projects.count %}
+                            Used by {{ project_count }} {% if project_count == 1 %}project{% else %}projects{% endif %}.
+                        {% endwith %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="button-row">
+            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'contexts' %}'">
+                 <i class="fa fa-arrow-left"></i>
+                Back
+            </button>
+            <button type="submit" class="primary-button dark-red">
+                <i class="fa fa-trash"></i>
+                Delete
+            </button>
+        </div>
+    </form>
+{% endblock %}
+
