@@ -5,7 +5,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from AutumnWeb import settings
-from core.models import Projects
+from core.models import Projects, Context, Tag
 from core.utils import json_compress
 
 
@@ -18,6 +18,16 @@ class Command(BaseCommand):
         parser.add_argument('--project', type=str, help='Project name to export')
         parser.add_argument('--compress', action='store_true', help='Compress the output JSON file')
         parser.add_argument('--autumn_compatible', action='store_true', help='Print verbose output')
+        parser.add_argument(
+            '--context',
+            type=str,
+            help='Filter to a single context (id or exact name). Example: --context 3 or --context "General"',
+        )
+        parser.add_argument(
+            '--tags',
+            nargs='*',
+            help='Filter to projects that have ANY of the provided tags (ids or exact names). Example: --tags 1 2 or --tags "Work" "Python"',
+        )
 
     def handle(self, *args, **options):
         # Fetch the user
@@ -32,6 +42,50 @@ class Command(BaseCommand):
             "subprojects",
             "sessions",
         )
+
+        # Optional filters (match export page behavior)
+        context_val = options.get('context')
+        if context_val:
+            context_val = str(context_val).strip()
+            ctx = None
+            if context_val.isdigit():
+                ctx = Context.objects.filter(user=user, id=int(context_val)).first()
+            else:
+                ctx = Context.objects.filter(user=user, name=context_val).first()
+
+            if ctx is None:
+                raise CommandError(f"Context not found for user '{user.username}': {context_val}")
+            base_qs = base_qs.filter(context=ctx)
+
+        tag_vals = options.get('tags') or []
+        tag_ids = []
+        tag_names = []
+        for t in tag_vals:
+            if t is None:
+                continue
+            s = str(t).strip()
+            if not s:
+                continue
+            if s.isdigit():
+                tag_ids.append(int(s))
+            else:
+                tag_names.append(s)
+
+        if tag_ids or tag_names:
+            tags_qs = Tag.objects.filter(user=user)
+            resolved = list(tags_qs.filter(id__in=tag_ids))
+            if tag_names:
+                resolved += list(tags_qs.filter(name__in=tag_names))
+
+            resolved_ids = sorted(set(t.id for t in resolved))
+            if not resolved_ids:
+                raise CommandError(
+                    "No matching tags found for the provided --tags values. "
+                    "Expected tag ids or exact tag names."
+                )
+
+            base_qs = base_qs.filter(tags__id__in=resolved_ids).distinct()
+
         if options["project"]:
             projects = base_qs.filter(name=options["project"])
         else:

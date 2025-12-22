@@ -583,7 +583,7 @@ def import_stream(request):
 
 def export_view(request):
     if request.method == "POST":
-        form = ExportJSONForm(request.POST)
+        form = ExportJSONForm(request.POST, user=request.user)
         if not form.is_valid():
             messages.error(request, "Invalid form data. Please check your inputs.")
             return render(request, 'core/export.html', {'title': 'Export Data', 'form': form})
@@ -595,6 +595,8 @@ def export_view(request):
         autumn_compatible = form.cleaned_data['autumn_compatible']
         start_date        = form.cleaned_data['start_date']
         end_date          = form.cleaned_data['end_date']
+        context_id        = form.cleaned_data.get('context')
+        tag_objs          = form.cleaned_data.get('tags')
 
         # default filename
         if not output_file:
@@ -623,6 +625,18 @@ def export_view(request):
         if end_date:
             qs = qs.filter(end_time__lte=end_dt)
 
+        # New: context + tags filters
+        if context_id:
+            try:
+                qs = qs.filter(project__context__id=int(context_id))
+            except (TypeError, ValueError):
+                pass
+
+        if tag_objs:
+            tag_ids = [t.id for t in tag_objs]
+            if tag_ids:
+                qs = qs.filter(project__tags__id__in=tag_ids).distinct()
+
         # Avoid N+1 when later reading .project and .subprojects
         qs = qs.select_related('project', 'project__context').prefetch_related(
             'subprojects',
@@ -639,11 +653,11 @@ def export_view(request):
             else json.dumps(export_dict, indent=4)
         )
         response = HttpResponse(contents, content_type='application/json')
-        response['Content-Disposition'] = f'attachment; filename="{output_file}"'
+        response['Content-Disposition'] = f'attachment; filename=\"{output_file}\"'
         return response
 
     # GET
-    form = ExportJSONForm()
+    form = ExportJSONForm(user=request.user)
     return render(request, 'core/export.html', {'title': 'Export Data', 'form': form})
 
 

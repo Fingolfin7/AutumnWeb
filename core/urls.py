@@ -46,6 +46,7 @@ from core.api import (
   log_activity,
   search_sessions,
   mark_project,
+  export_json_api,
   # existing (migrated)
   create_project,
   list_projects,
@@ -155,4 +156,5 @@ urlpatterns = [
     path('api/project/delete/', project_delete_body, name='api_project_delete_body'),
     path('api/log/', log_activity, name='api_log'),
     path('api/mark/', mark_project, name='api_mark_project'),
+    path('api/export/', export_json_api, name='api_export_json'),
 ]

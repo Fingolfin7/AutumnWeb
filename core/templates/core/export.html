@@ -28,6 +28,31 @@
               {{ form.end_date.errors }}
             </div>
 
+            <div class="label-input">
+              <label for="{{ form.context.id_for_label }}">
+                <i class="fa fa-layer-group"></i> Context
+              </label>
+              {{ form.context }}
+              {{ form.context.errors }}
+            </div>
+
+            <div class="label-input">
+              <span>
+                <i class="fa fa-tags"></i> Tags
+              </span>
+              <details class="tag-dropdown">
+                <summary class="tag-summary">Select tags</summary>
+                <div class="tag-options">
+                  {% for cb in form.tags %}
+                    <label class="tag-option">
+                      {{ cb }} <span class="tag-label">{{ cb.choice_label }}</span>
+                    </label>
+                  {% endfor %}
+                </div>
+              </details>
+              {{ form.tags.errors }}
+            </div>
+
             <div id="search_projects">
                 <span class="label-input">
                     <label for="project-search"><i class="fa fa-search"></i> Search</label>

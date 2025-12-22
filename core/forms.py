@@ -1,5 +1,6 @@
 from django import forms
 from .models import Projects, SubProjects, Sessions, Context, Tag
+from typing import cast
 
 
 class SearchProjectForm(forms.Form):
@@ -90,7 +91,7 @@ class SearchProjectForm(forms.Form):
 
             choices += [(str(ctx.id), ctx.name) for ctx in remaining_contexts]
 
-            self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
+            cast(forms.ModelMultipleChoiceField, self.fields['tags']).queryset = Tag.objects.filter(user=user).order_by('name')
         self.fields['context'].choices = choices
 
 
@@ -228,7 +229,7 @@ class ImportJSONForm(forms.Form):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         if user is not None:
-            self.fields['import_context'].queryset = Context.objects.filter(user=user).order_by('name')
+            cast(forms.ModelChoiceField, self.fields['import_context']).queryset = Context.objects.filter(user=user).order_by('name')
 
     def clean(self):
         cleaned = super().clean()
@@ -259,6 +260,29 @@ class ExportJSONForm(forms.Form):
                 'autocomplete': 'off',
             }
         )
+    )
+
+    # New: optional export filters
+    context = forms.ChoiceField(
+        required=False,
+        choices=[],
+        widget=forms.Select(
+            attrs={
+                'id': 'export-context-filter',
+                'class': 'half-width',
+            }
+        ),
+    )
+
+    tags = forms.ModelMultipleChoiceField(
+        required=False,
+        queryset=Tag.objects.none(),
+        widget=forms.CheckboxSelectMultiple(
+            attrs={
+                # Match manage-projects/search form so styling + any shared JS works the same.
+                'id': 'tag-filter',
+            }
+        ),
     )
 
     start_date = forms.DateField(
@@ -296,6 +320,33 @@ class ExportJSONForm(forms.Form):
     )
     autumn_compatible = forms.BooleanField(required=False, initial=False)
     compress = forms.BooleanField(required=False, initial=False)
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        # Populate context choices per user
+        choices = [('', 'All Contexts')]
+        if user is not None:
+            user_contexts = Context.objects.filter(user=user).order_by('name')
+
+            # Pin "General" directly under "All Contexts" when present.
+            general_ctx = None
+            remaining_contexts = []
+            for ctx in user_contexts:
+                if ctx.name == 'General' and general_ctx is None:
+                    general_ctx = ctx
+                else:
+                    remaining_contexts.append(ctx)
+
+            if general_ctx is not None:
+                choices.append((str(general_ctx.id), general_ctx.name))
+
+            choices += [(str(ctx.id), ctx.name) for ctx in remaining_contexts]
+
+            cast(forms.ModelMultipleChoiceField, self.fields['tags']).queryset = Tag.objects.filter(user=user).order_by('name')
+
+        self.fields['context'].choices = choices
 
 
 class MergeProjectsForm(forms.Form):

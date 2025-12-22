@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import os
 import re
-from datetime import datetime, timedelta
+import json
+from datetime import datetime, timedelta, time
 from collections import defaultdict
 
 from django.shortcuts import get_object_or_404
@@ -15,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Projects, SubProjects, Sessions, status_choices
+from .models import Projects, SubProjects, Sessions, status_choices, Tag
 from .serializers import (
   ProjectSerializer,
   SubProjectSerializer,
@@ -28,6 +29,8 @@ from .utils import (
   session_exists,
   sessions_get_earliest_latest,
   filter_by_active_context,
+  build_project_json_from_sessions,
+  json_compress,
 )
 from django.db import transaction
 
@@ -1235,3 +1238,110 @@ def merge_subprojects_api(request):
             {'error': f'An error occurred while merging subprojects: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAuthenticated])
+def export_json_api(request):
+  """Export sessions/projects as JSON (API form of the export page).
+
+  Accepts filters via either query params (GET) or JSON body (POST):
+    - project_name: str (icontains)
+    - start_date: YYYY-MM-DD (inclusive)
+    - end_date:   YYYY-MM-DD (inclusive)
+    - context: context id
+    - tags: list of tag ids (or comma-separated string)
+    - compress: bool (wrap with json_compress)
+    - autumn_compatible: bool (CLI compatibility format)
+
+  Returns JSON data (not a file download).
+  """
+  compact = _compact(request)
+
+  # Read from query params for GET, body for POST (but allow either in both)
+  qp = getattr(request, "query_params", request.GET)
+  data = {}
+  try:
+    if hasattr(request, "data") and isinstance(request.data, dict):
+      data = request.data
+  except Exception:
+    data = {}
+
+  def _get(key, default=None):
+    if key in data and data.get(key) not in (None, ""):
+      return data.get(key)
+    return qp.get(key, default)
+
+  project_name = (_get("project_name") or _get("project") or "").strip()
+  start_date_s = (_get("start_date") or "").strip()
+  end_date_s = (_get("end_date") or "").strip()
+  context_id = _get("context")
+  tag_ids_raw = _get("tags") or _get("tag_ids")
+
+  compress = _bool(_get("compress"), False)
+  autumn_compatible = _bool(_get("autumn_compatible"), False)
+
+  # Parse dates (date-only, inclusive like export_view)
+  start_dt = None
+  end_dt = None
+  if start_date_s:
+    try:
+      d = parse_date_or_datetime(start_date_s)
+      if isinstance(d, datetime):
+        d = d.date()
+      start_dt = timezone.make_aware(datetime.combine(d, time.min))
+    except Exception:
+      return _err("Invalid start_date; expected YYYY-MM-DD")
+
+  if end_date_s:
+    try:
+      d = parse_date_or_datetime(end_date_s)
+      if isinstance(d, datetime):
+        d = d.date()
+      end_dt = timezone.make_aware(datetime.combine(d, time.max))
+    except Exception:
+      return _err("Invalid end_date; expected YYYY-MM-DD")
+
+  qs = Sessions.objects.filter(is_active=False, user=request.user)
+
+  if project_name:
+    qs = qs.filter(project__name__icontains=project_name)
+  if start_dt is not None:
+    qs = qs.filter(end_time__gte=start_dt)
+  if end_dt is not None:
+    qs = qs.filter(end_time__lte=end_dt)
+
+  if context_id:
+    try:
+      qs = qs.filter(project__context__id=int(context_id))
+    except (TypeError, ValueError):
+      # ignore invalid context
+      pass
+
+  tag_ids = _coerce_list(tag_ids_raw)
+  # Allow comma-separated string, or repeated query params like ?tags=1&tags=2
+  if isinstance(tag_ids_raw, str):
+    tag_ids = _coerce_list(tag_ids_raw)
+
+  # If query params had repeated tags=, _get() only returns first; handle manually.
+  if not tag_ids and hasattr(qp, "getlist"):
+    tag_ids = qp.getlist("tags")
+
+  try:
+    tag_ids = [int(t) for t in tag_ids if str(t).strip()]
+  except ValueError:
+    tag_ids = []
+
+  if tag_ids:
+    qs = qs.filter(project__tags__id__in=tag_ids).distinct()
+
+  qs = qs.select_related('project', 'project__context').prefetch_related(
+    'subprojects',
+    'project__tags',
+  )
+
+  export_dict = build_project_json_from_sessions(qs, autumn_compatible)
+  payload = json_compress(export_dict) if compress else export_dict
+
+  # API should return JSON object (not string)
+  return Response(payload, status=status.HTTP_200_OK)
