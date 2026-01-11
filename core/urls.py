@@ -68,6 +68,8 @@ from core.api import (
   list_active_sessions,
   merge_projects_api,
   merge_subprojects_api,
+  contexts_list,
+  tags_list,
 )
 
 urlpatterns = [
@@ -155,4 +157,8 @@ urlpatterns = [
     path('api/log/', log_activity, name='api_log'),
     path('api/mark/', mark_project, name='api_mark_project'),
     path('api/export/', export_json_api, name='api_export_json'),
+
+    # discovery endpoints (contexts/tags)
+    path('api/contexts/', contexts_list, name='api_contexts_list'),
+    path('api/tags/', tags_list, name='api_tags_list'),
 ]

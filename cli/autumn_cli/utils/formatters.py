@@ -303,3 +303,42 @@ def format_totals_table(totals_data: Dict) -> str:
         rows.append([f"  └─ {name}", format_duration_minutes(minutes)])
 
     return tabulate(rows, headers=headers, tablefmt="grid")
+
+
+def contexts_table(contexts: List[Dict[str, Any]], show_description: bool = False) -> Table:
+    """Render a table of contexts."""
+    table = Table(show_header=True, header_style="autumn.title", padding=(0, 1))
+    table.add_column("ID", style="autumn.id", no_wrap=True, justify="right")
+    table.add_column("Name", style="autumn.project", no_wrap=True)
+    if show_description:
+        table.add_column("Description", style="autumn.description", overflow="fold")
+
+    for c in contexts:
+        cid = c.get("id")
+        name = c.get("name", "")
+        if show_description:
+            table.add_row(str(cid) if cid is not None else "-", name, c.get("description", "") or "")
+        else:
+            table.add_row(str(cid) if cid is not None else "-", name)
+
+    return table
+
+
+def tags_table(tags: List[Dict[str, Any]], show_color: bool = False) -> Table:
+    """Render a table of tags."""
+    table = Table(show_header=True, header_style="autumn.title", padding=(0, 1))
+    table.add_column("ID", style="autumn.id", no_wrap=True, justify="right")
+    table.add_column("Name", style="autumn.note", no_wrap=True)
+    if show_color:
+        table.add_column("Color", style="autumn.muted", no_wrap=True)
+
+    for t in tags:
+        tid = t.get("id")
+        name = t.get("name", "")
+        if show_color:
+            table.add_row(str(tid) if tid is not None else "-", name, t.get("color", "") or "")
+        else:
+            table.add_row(str(tid) if tid is not None else "-", name)
+
+    return table
+

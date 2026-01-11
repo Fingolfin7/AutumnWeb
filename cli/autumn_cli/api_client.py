@@ -290,3 +290,13 @@ class APIClient:
         if tags:
             params["tags"] = ",".join(tags)
         return self._request("GET", "/api/list_sessions/", params=params)
+
+    def list_contexts(self, compact: bool = True) -> Dict:
+        """List available contexts for the authenticated user."""
+        params = {"compact": str(compact).lower()}
+        return self._request("GET", "/api/contexts/", params=params)
+
+    def list_tags(self, compact: bool = True) -> Dict:
+        """List available tags for the authenticated user."""
+        params = {"compact": str(compact).lower()}
+        return self._request("GET", "/api/tags/", params=params)

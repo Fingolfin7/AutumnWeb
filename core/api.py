@@ -1397,3 +1397,52 @@ def export_json_api(request):
 
   # API should return JSON object (not string)
   return Response(payload, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def contexts_list(request):
+  """List contexts for the authenticated user.
+
+  Query params:
+    - compact=true|false (default true)
+
+  Returns (compact):
+    {"count": int, "contexts": [{"id": int, "name": str}]}
+  Returns (full):
+    {"count": int, "contexts": [{"id", "name", "description"}]}
+  """
+  compact = _compact(request)
+  qs = request.user.contexts.all().order_by("name")
+
+  if compact:
+    payload = [{"id": c.id, "name": c.name} for c in qs]
+  else:
+    payload = [{"id": c.id, "name": c.name, "description": c.description or ""} for c in qs]
+
+  return Response({"count": len(payload), "contexts": payload})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def tags_list(request):
+  """List tags for the authenticated user.
+
+  Query params:
+    - compact=true|false (default true)
+
+  Returns (compact):
+    {"count": int, "tags": [{"id": int, "name": str}]}
+  Returns (full):
+    {"count": int, "tags": [{"id", "name", "color"}]}
+  """
+  compact = _compact(request)
+  qs = request.user.tags.all().order_by("name")
+
+  if compact:
+    payload = [{"id": t.id, "name": t.name} for t in qs]
+  else:
+    payload = [{"id": t.id, "name": t.name, "color": t.color or ""} for t in qs]
+
+  return Response({"count": len(payload), "tags": payload})
+

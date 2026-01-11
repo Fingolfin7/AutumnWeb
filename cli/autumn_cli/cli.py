@@ -8,6 +8,7 @@ from .commands.timer import start, stop, restart, delete, status as timer_status
 from .commands.sessions import log, track
 from .commands.projects import projects_list, new_project
 from .commands.charts import chart
+from .commands.meta import context, tag
 
 
 @click.group()
@@ -115,6 +116,10 @@ cli.add_command(new_project, name="new")
 
 # Chart command
 cli.add_command(chart, name="chart")
+
+# Metadata discovery
+cli.add_command(context, name="context")
+cli.add_command(tag, name="tag")
 
 
 def main():
