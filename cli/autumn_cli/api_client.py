@@ -181,7 +181,7 @@ class APIClient:
     
     def list_projects_grouped(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
         """List projects grouped by status."""
-        params = {}
+        params = {"compact": "false"}  # Request full project metadata
         if start_date:
             params["start_date"] = start_date
         if end_date:

@@ -184,31 +184,84 @@ def format_sessions_table(sessions: List[Dict], compact: bool = True) -> str:
 
 
 def format_projects_table(projects_data: Dict) -> str:
-    """Format projects grouped data as a table."""
-    # Keep existing tabulate formatting for now (projects output change wasn't requested).
-    from tabulate import tabulate
-
+    """Format projects grouped data as a Rich table with full metadata."""
     projects = projects_data.get("projects", {})
 
     if not any(projects.values()):
         return "No projects found."
 
-    headers = ["Status", "Projects"]
-    rows = []
+    # Create a table per status group
+    output_parts = []
 
-    for status in ["active", "paused", "complete"]:
-        proj_list = projects.get(status, [])
-        if isinstance(proj_list[0], str) if proj_list else False:
-            # Compact format
-            proj_str = ", ".join(proj_list) if proj_list else "-"
-            rows.append([status.capitalize(), proj_str])
-        else:
-            # Full format
-            proj_names = [p.get("name", "") for p in proj_list]
-            proj_str = ", ".join(proj_names) if proj_names else "-"
-            rows.append([status.capitalize(), proj_str])
+    status_order = ["active", "paused", "complete", "archived"]
+    status_styles = {
+        "active": "autumn.status.active",
+        "paused": "autumn.status.paused",
+        "complete": "autumn.status.complete",
+        "archived": "autumn.status.archived",
+    }
 
-    return tabulate(rows, headers=headers, tablefmt="grid")
+    for status_key in status_order:
+        proj_list = projects.get(status_key, [])
+        if not proj_list:
+            continue
+
+        table = Table(
+            show_header=True,
+            header_style="autumn.title",
+            show_lines=False,
+            expand=False,
+            title=f"[{status_styles.get(status_key, 'autumn.title')}]{status_key.upper()}[/]",
+            title_justify="left",
+            padding=(0, 1),
+        )
+
+        table.add_column("Project", style="autumn.project", no_wrap=True)
+        table.add_column("Total", style="autumn.time", justify="right", no_wrap=True)
+        table.add_column("Sessions", style="autumn.muted", justify="right", no_wrap=True)
+        table.add_column("Avg", style="autumn.time", justify="right", no_wrap=True)
+        table.add_column("Started", style="autumn.muted", no_wrap=True)
+        table.add_column("Last Active", style="autumn.time", no_wrap=True)
+        table.add_column("Description", style="autumn.description", overflow="fold", max_width=30)
+
+        for proj in proj_list:
+            if isinstance(proj, str):
+                # Compact format - just project name
+                table.add_row(proj, "-", "-", "-", "-", "-", "-")
+            else:
+                # Full format with metadata
+                name = proj.get("name", "")
+                total_time = proj.get("total_time", 0)
+                session_count = proj.get("session_count", 0)
+                avg_session = proj.get("avg_session_duration", 0)
+                start_date = proj.get("start_date", "")
+                last_updated = proj.get("last_updated", "")
+                description = proj.get("description", "") or ""
+
+                # Format the total time
+                total_str = format_duration_minutes(float(total_time)) if total_time else "0m"
+
+                # Format session count
+                sessions_str = str(session_count) if session_count else "0"
+
+                # Format average session duration
+                avg_str = format_duration_minutes(float(avg_session)) if avg_session else "-"
+
+                # Format dates
+                start_str = format_date(start_date) if start_date else "-"
+                last_str = format_date(last_updated) if last_updated else "-"
+
+                # Truncate description if needed
+                desc_display = description[:60] + "..." if len(description) > 60 else description
+
+                table.add_row(name, total_str, sessions_str, avg_str, start_str, last_str, desc_display)
+
+        with console.capture() as capture:
+            console.print(table)
+            console.print()  # Add spacing between tables
+        output_parts.append(capture.get())
+
+    return "".join(output_parts).rstrip()
 
 
 def format_totals_table(totals_data: Dict) -> str:

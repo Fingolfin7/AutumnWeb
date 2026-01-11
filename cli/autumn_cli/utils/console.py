@@ -30,6 +30,12 @@ THEME = Theme(
         "autumn.note": "yellow",
         "autumn.time": "color(34)",
         "autumn.id": "dim",
+        # Project status colors
+        "autumn.status.active": "bold bright_green",
+        "autumn.status.paused": "bold yellow",
+        "autumn.status.complete": "bold bright_blue",
+        "autumn.status.archived": "dim",
+        "autumn.description": "italic dim",
     }
 )
 

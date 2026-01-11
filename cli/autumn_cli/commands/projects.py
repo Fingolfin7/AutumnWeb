@@ -4,10 +4,11 @@ import click
 from typing import Optional
 from ..api_client import APIClient, APIError
 from ..utils.formatters import format_projects_table
+from ..utils.console import console
 
 
 @click.command()
-@click.option("--status", type=click.Choice(["active", "paused", "complete"]), help="Filter by status")
+@click.option("--status", type=click.Choice(["active", "paused", "complete", "archived"]), help="Filter by status")
 @click.option("--start-date", help="Start date (YYYY-MM-DD)")
 @click.option("--end-date", help="End date (YYYY-MM-DD)")
 def projects_list(status: Optional[str], start_date: Optional[str], end_date: Optional[str]):
@@ -24,12 +25,16 @@ def projects_list(status: Optional[str], start_date: Optional[str], end_date: Op
             filtered_projects = {status: projects_data.get(status, [])}
             result["projects"] = filtered_projects
         
-        click.echo(f"Total projects: {summary.get('total', 0)}")
-        click.echo(f"  Active: {summary.get('active', 0)}")
-        click.echo(f"  Paused: {summary.get('paused', 0)}")
-        click.echo(f"  Complete: {summary.get('complete', 0)}\n")
-        
-        click.echo(format_projects_table(result))
+        # Display colored summary
+        console.print("[bold]Projects Summary[/]")
+        console.print(f"  [autumn.status.active]Active:[/]   {summary.get('active', 0)}")
+        console.print(f"  [autumn.status.paused]Paused:[/]   {summary.get('paused', 0)}")
+        console.print(f"  [autumn.status.complete]Complete:[/] {summary.get('complete', 0)}")
+        console.print(f"  [autumn.status.archived]Archived:[/] {summary.get('archived', 0)}")
+        console.print(f"  [bold]Total:[/]    {summary.get('total', 0)}")
+        console.print()
+
+        console.print(format_projects_table(result))
     except APIError as e:
         click.echo(f"Error: {e}", err=True)
         raise click.Abort()
