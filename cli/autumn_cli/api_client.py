@@ -37,7 +37,8 @@ class APIClient:
     ) -> Dict[str, Any]:
         """Make HTTP request to API."""
         url = f"{self.base_url}{endpoint}"
-        
+
+        response = None
         try:
             response = requests.request(
                 method=method,
@@ -50,13 +51,15 @@ class APIClient:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.HTTPError as e:
-            if response.status_code == 401:
+            if response is not None and response.status_code == 401:
                 raise APIError("Authentication failed. Check your API key.")
             try:
-                error_data = response.json()
+                error_data = response.json() if response is not None else {}
                 error_msg = error_data.get("error", str(e))
                 raise APIError(f"API error: {error_msg}")
-            except:
+            except APIError:
+                raise
+            except Exception:
                 raise APIError(f"API error: {e}")
         except requests.exceptions.RequestException as e:
             raise APIError(f"Network error: {e}")
@@ -116,6 +119,8 @@ class APIClient:
         project: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        context: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> Dict:
         """Get activity logs."""
         params = {"compact": "false"}
@@ -127,6 +132,10 @@ class APIClient:
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
+        if context:
+            params["context"] = context
+        if tags:
+            params["tags"] = ",".join(tags)
         return self._request("GET", "/api/log/", params=params)
     
     def search_sessions(
@@ -138,6 +147,8 @@ class APIClient:
         active: Optional[bool] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
+        context: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> Dict:
         """Search sessions."""
         params = {}
@@ -155,6 +166,10 @@ class APIClient:
             params["limit"] = limit
         if offset:
             params["offset"] = offset
+        if context:
+            params["context"] = context
+        if tags:
+            params["tags"] = ",".join(tags)
         return self._request("GET", "/api/sessions/search/", params=params)
     
     def track_session(
@@ -179,13 +194,23 @@ class APIClient:
     
     # Project endpoints
     
-    def list_projects_grouped(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
+    def list_projects_grouped(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        context: Optional[str] = None,
+        tags: Optional[List[str]] = None,
+    ) -> Dict:
         """List projects grouped by status."""
         params = {"compact": "false"}  # Request full project metadata
         if start_date:
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
+        if context:
+            params["context"] = context
+        if tags:
+            params["tags"] = ",".join(tags)
         return self._request("GET", "/api/projects/grouped/", params=params)
     
     def create_project(self, name: str, description: Optional[str] = None) -> Dict:
@@ -207,6 +232,8 @@ class APIClient:
         project_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        context: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> List[Dict]:
         """Get project totals (for charts)."""
         params = {}
@@ -216,6 +243,10 @@ class APIClient:
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
+        if context:
+            params["context"] = context
+        if tags:
+            params["tags"] = ",".join(tags)
         return self._request("GET", "/api/tally_by_sessons/", params=params)  # Note: typo in API endpoint
     
     def tally_by_subprojects(
@@ -223,6 +254,8 @@ class APIClient:
         project_name: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        context: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> List[Dict]:
         """Get subproject totals (for charts)."""
         params = {"project_name": project_name}
@@ -230,13 +263,19 @@ class APIClient:
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
+        if context:
+            params["context"] = context
+        if tags:
+            params["tags"] = ",".join(tags)
         return self._request("GET", "/api/tally_by_subprojects/", params=params)
-    
+
     def list_sessions(
         self,
         project_name: Optional[str] = None,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        context: Optional[str] = None,
+        tags: Optional[List[str]] = None,
     ) -> List[Dict]:
         """List sessions (for charts)."""
         params = {}
@@ -246,4 +285,8 @@ class APIClient:
             params["start_date"] = start_date
         if end_date:
             params["end_date"] = end_date
+        if context:
+            params["context"] = context
+        if tags:
+            params["tags"] = ",".join(tags)
         return self._request("GET", "/api/list_sessions/", params=params)

@@ -183,15 +183,16 @@ def format_sessions_table(sessions: List[Dict], compact: bool = True) -> str:
     return capture.get()
 
 
-def format_projects_table(projects_data: Dict) -> str:
-    """Format projects grouped data as a Rich table with full metadata."""
+def projects_tables(projects_data: Dict) -> List[Table]:
+    """Create Rich tables for projects grouped by status.
+
+    Returns a list of Table objects that can be printed directly.
+    """
     projects = projects_data.get("projects", {})
+    tables = []
 
     if not any(projects.values()):
-        return "No projects found."
-
-    # Create a table per status group
-    output_parts = []
+        return tables
 
     status_order = ["active", "paused", "complete", "archived"]
     status_styles = {
@@ -222,12 +223,13 @@ def format_projects_table(projects_data: Dict) -> str:
         table.add_column("Avg", style="autumn.time", justify="right", no_wrap=True)
         table.add_column("Started", style="autumn.muted", no_wrap=True)
         table.add_column("Last Active", style="autumn.time", no_wrap=True)
-        table.add_column("Description", style="autumn.description", overflow="fold", max_width=30)
+        table.add_column("Context", style="autumn.subproject", no_wrap=True)
+        table.add_column("Tags", style="autumn.note", overflow="fold", max_width=20)
 
         for proj in proj_list:
             if isinstance(proj, str):
                 # Compact format - just project name
-                table.add_row(proj, "-", "-", "-", "-", "-", "-")
+                table.add_row(proj, "-", "-", "-", "-", "-", "-", "-")
             else:
                 # Full format with metadata
                 name = proj.get("name", "")
@@ -236,7 +238,8 @@ def format_projects_table(projects_data: Dict) -> str:
                 avg_session = proj.get("avg_session_duration", 0)
                 start_date = proj.get("start_date", "")
                 last_updated = proj.get("last_updated", "")
-                description = proj.get("description", "") or ""
+                context = proj.get("context", "") or ""
+                tags = proj.get("tags", []) or []
 
                 # Format the total time
                 total_str = format_duration_minutes(float(total_time)) if total_time else "0m"
@@ -251,14 +254,30 @@ def format_projects_table(projects_data: Dict) -> str:
                 start_str = format_date(start_date) if start_date else "-"
                 last_str = format_date(last_updated) if last_updated else "-"
 
-                # Truncate description if needed
-                desc_display = description[:60] + "..." if len(description) > 60 else description
+                # Format tags
+                tags_str = ", ".join(tags) if tags else "-"
 
-                table.add_row(name, total_str, sessions_str, avg_str, start_str, last_str, desc_display)
+                table.add_row(name, total_str, sessions_str, avg_str, start_str, last_str, context or "-", tags_str)
 
+        tables.append(table)
+
+    return tables
+
+
+def format_projects_table(projects_data: Dict) -> str:
+    """Format projects grouped data as a string (backwards compatible).
+
+    For direct Rich console output, use projects_tables() instead.
+    """
+    tables = projects_tables(projects_data)
+    if not tables:
+        return "No projects found."
+
+    output_parts = []
+    for table in tables:
         with console.capture() as capture:
             console.print(table)
-            console.print()  # Add spacing between tables
+            console.print()
         output_parts.append(capture.get())
 
     return "".join(output_parts).rstrip()

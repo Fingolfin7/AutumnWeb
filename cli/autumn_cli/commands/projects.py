@@ -3,20 +3,33 @@
 import click
 from typing import Optional
 from ..api_client import APIClient, APIError
-from ..utils.formatters import format_projects_table
+from ..utils.formatters import projects_tables
 from ..utils.console import console
 
 
 @click.command()
 @click.option("--status", type=click.Choice(["active", "paused", "complete", "archived"]), help="Filter by status")
+@click.option("--context", "-c", help="Filter by context name")
+@click.option("--tag", "-t", multiple=True, help="Filter by tag (can be used multiple times)")
 @click.option("--start-date", help="Start date (YYYY-MM-DD)")
 @click.option("--end-date", help="End date (YYYY-MM-DD)")
-def projects_list(status: Optional[str], start_date: Optional[str], end_date: Optional[str]):
+def projects_list(
+    status: Optional[str],
+    context: Optional[str],
+    tag: tuple,
+    start_date: Optional[str],
+    end_date: Optional[str],
+):
     """List projects grouped by status."""
     try:
         client = APIClient()
-        result = client.list_projects_grouped(start_date, end_date)
-        
+        result = client.list_projects_grouped(
+            start_date=start_date,
+            end_date=end_date,
+            context=context,
+            tags=list(tag) if tag else None,
+        )
+
         projects_data = result.get("projects", {})
         summary = result.get("summary", {})
         
@@ -34,9 +47,15 @@ def projects_list(status: Optional[str], start_date: Optional[str], end_date: Op
         console.print(f"  [bold]Total:[/]    {summary.get('total', 0)}")
         console.print()
 
-        console.print(format_projects_table(result))
+        tables = projects_tables(result)
+        if not tables:
+            console.print("[dim]No projects found.[/]")
+        else:
+            for table in tables:
+                console.print(table)
+                console.print()
     except APIError as e:
-        click.echo(f"Error: {e}", err=True)
+        console.print(f"[autumn.err]Error:[/] {e}")
         raise click.Abort()
 
 

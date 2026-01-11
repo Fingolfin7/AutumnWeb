@@ -22,12 +22,16 @@ from ..utils.log_render import render_sessions_list
     help="Time period (default: week)",
 )
 @click.option("--project", help="Filter by project name")
+@click.option("--context", "-c", help="Filter by context (name or id)")
+@click.option("--tag", "-t", multiple=True, help="Filter by tag (repeatable)")
 @click.option("--start-date", help="Start date (YYYY-MM-DD)")
 @click.option("--end-date", help="End date (YYYY-MM-DD)")
 def log(
     ctx: click.Context,
     period: Optional[str],
     project: Optional[str],
+    context: Optional[str],
+    tag: tuple,
     start_date: Optional[str],
     end_date: Optional[str],
 ):
@@ -65,6 +69,8 @@ def log(
                     project=project,
                     start_date=calculated_start_date,
                     end_date=calculated_end_date,
+                    context=context,
+                    tags=list(tag) if tag else None,
                 )
             else:
                 result = client.log_activity(
@@ -72,6 +78,8 @@ def log(
                     project=project,
                     start_date=start_date,
                     end_date=end_date,
+                    context=context,
+                    tags=list(tag) if tag else None,
                 )
 
             logs = result.get("logs", [])
@@ -86,6 +94,8 @@ def log(
 
 @log.command("search")
 @click.option("--project", help="Filter by project name")
+@click.option("--context", "-c", help="Filter by context (name or id)")
+@click.option("--tag", "-t", multiple=True, help="Filter by tag (repeatable)")
 @click.option("--start-date", help="Start date (YYYY-MM-DD)")
 @click.option("--end-date", help="End date (YYYY-MM-DD)")
 @click.option("--note-snippet", help="Search for text in notes")
@@ -94,6 +104,8 @@ def log(
 @click.option("--offset", type=int, help="Offset for pagination")
 def log_search(
     project: Optional[str],
+    context: Optional[str],
+    tag: tuple,
     start_date: Optional[str],
     end_date: Optional[str],
     note_snippet: Optional[str],
@@ -112,6 +124,8 @@ def log_search(
             active=active,
             limit=limit,
             offset=offset,
+            context=context,
+            tags=list(tag) if tag else None,
         )
 
         sessions_list = result.get("sessions", [])

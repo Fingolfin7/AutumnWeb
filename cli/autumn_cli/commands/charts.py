@@ -23,6 +23,8 @@ from ..utils.charts import (
     help="Chart type (default: pie)",
 )
 @click.option("--project", "-p", help="Project name (shows subprojects if specified for pie/bar)")
+@click.option("--context", "-c", help="Filter by context (name or id)")
+@click.option("--tag", "-g", multiple=True, help="Filter by tag (repeatable)")
 @click.option(
     "--period",
     "-pd",
@@ -39,6 +41,8 @@ from ..utils.charts import (
 def chart(
     type: str,
     project: Optional[str],
+    context: Optional[str],
+    tag: tuple,
     period: Optional[str],
     start_date: Optional[str],
     end_date: Optional[str],
@@ -68,11 +72,23 @@ def chart(
             # Use tally endpoints for pie/bar
             if project:
                 # Show subprojects for specific project
-                data = client.tally_by_subprojects(project, start_date, end_date)
+                data = client.tally_by_subprojects(
+                    project,
+                    start_date,
+                    end_date,
+                    context=context,
+                    tags=list(tag) if tag else None,
+                )
                 title = f"Time Distribution: {project} (Subprojects)" if type == "pie" else f"Time Totals: {project} (Subprojects)"
             else:
                 # Show all projects
-                data = client.tally_by_sessions(project_name=None, start_date=start_date, end_date=end_date)
+                data = client.tally_by_sessions(
+                    project_name=None,
+                    start_date=start_date,
+                    end_date=end_date,
+                    context=context,
+                    tags=list(tag) if tag else None,
+                )
                 title = "Time Distribution: All Projects" if type == "pie" else "Time Totals: All Projects"
             
             if type == "pie":
@@ -82,8 +98,14 @@ def chart(
         
         elif type in ("scatter", "calendar", "heatmap", "wordcloud"):
             # Use list_sessions for scatter/calendar/heatmap/wordcloud
-            sessions = client.list_sessions(project_name=project, start_date=start_date, end_date=end_date)
-            
+            sessions = client.list_sessions(
+                project_name=project,
+                start_date=start_date,
+                end_date=end_date,
+                context=context,
+                tags=list(tag) if tag else None,
+            )
+
             if type == "scatter":
                 title = f"Session Duration Over Time"
                 if project:

@@ -137,6 +137,8 @@ def _serialize_project_grouped(projects, compact=True):
           "start_date": p.start_date.isoformat(),
           "last_updated": p.last_updated.isoformat(),
           "description": p.description or "",
+          "context": p.context.name if p.context else None,
+          "tags": [t.name for t in p.tags.all()],
         }
       )
 
@@ -420,20 +422,22 @@ def track_session(request):
 def projects_list_grouped(request):
   """
   List all projects grouped by status.
-  Query: start_date?, end_date?, compact?
+  Query: start_date?, end_date?, compact?, context?, tags?
   """
   compact = _compact(request)
   qp = request.query_params
   start = qp.get("start_date")
   end = qp.get("end_date")
 
+  projects_qs = Projects.objects.filter(user=request.user)
+  projects_qs = filter_by_active_context(
+    projects_qs, request, override_context_id=qp.get("context")
+  )
+  projects_qs = _apply_tag_filters(qp, projects_qs, kind="projects", user=request.user)
+
   if start or end:
-    projects_qs = Projects.objects.filter(user=request.user)
-    projects_qs = filter_by_active_context(projects_qs, request, override_context_id=qp.get("context"))
     projects = in_window(projects_qs, start, end)
   else:
-    projects_qs = Projects.objects.filter(user=request.user)
-    projects_qs = filter_by_active_context(projects_qs, request, override_context_id=qp.get("context"))
     projects = list(projects_qs)
 
   return Response(_serialize_project_grouped(projects, compact))
@@ -467,7 +471,7 @@ def subprojects_list(request):
 def totals(request):
   """
   Show total time spent on a project and its subprojects.
-  Query: project (required), start_date?, end_date?, compact?
+  Query: project (required), start_date?, end_date?, compact?, context?, tags?
   """
   compact = _compact(request)
   project_name = request.query_params.get("project")
@@ -476,8 +480,10 @@ def totals(request):
 
   sessions = Sessions.objects.filter(is_active=False, user=request.user)
   sessions = sessions.filter(project__name__iexact=project_name)
-  # Allow context override via query param for totals as well
-  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
+  sessions = filter_by_active_context(
+    sessions, request, override_context_id=request.query_params.get("context")
+  )
+  sessions = _apply_tag_filters(request.query_params, sessions, kind="sessions", user=request.user)
   sessions = filter_sessions_by_params(request, sessions)
 
   # Project total
@@ -627,6 +633,11 @@ def search_sessions(request):
         is_active=False
     )
 
+    # context filter (consistent with other endpoints)
+    sessions = filter_by_active_context(sessions, request, override_context_id=qp.get("context"))
+    # tag filter
+    sessions = _apply_tag_filters(qp, sessions, kind="sessions", user=request.user)
+
     # Shim request so filter_sessions_by_params sees the normalized params
     shim = type("Req", (), {"query_params": qp2})()
     sessions = filter_sessions_by_params(shim, sessions)
@@ -685,6 +696,8 @@ def log_activity(request):
       - project or project_name
       - subproject
       - note_snippet
+      - context?
+      - tags?
       - compact?
     Defaults to period=week if no start/end/period filters provided by client.
     """
@@ -693,6 +706,8 @@ def log_activity(request):
     period = (qp.get("period") or "").lower()
 
     sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = filter_by_active_context(sessions, request, override_context_id=qp.get("context"))
+    sessions = _apply_tag_filters(qp, sessions, kind="sessions", user=request.user)
 
     # Default period window if no explicit start/end
     if period in ("day", "week", "month") and not (
@@ -810,7 +825,10 @@ def tally_by_sessions(request):
   project = request.query_params.get("project_name")
   if project:
     sessions = sessions.filter(project__name__iexact=project)
-  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
+  sessions = filter_by_active_context(
+    sessions, request, override_context_id=request.query_params.get("context")
+  )
+  sessions = _apply_tag_filters(request.query_params, sessions, kind="sessions", user=request.user)
   sessions = filter_sessions_by_params(request, sessions)
   project_durations = tally_project_durations(sessions)
   return Response(project_durations)
@@ -823,7 +841,10 @@ def tally_by_subprojects(request):
   project = request.query_params.get("project_name")
   if project:
     sessions = sessions.filter(project__name__iexact=project)
-  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
+  sessions = filter_by_active_context(
+    sessions, request, override_context_id=request.query_params.get("context")
+  )
+  sessions = _apply_tag_filters(request.query_params, sessions, kind="sessions", user=request.user)
   sessions = filter_sessions_by_params(request, sessions)
 
   sub_durations = {}
@@ -978,7 +999,10 @@ def delete_session(request, session_id):
 @permission_classes([IsAuthenticated])
 def list_sessions(request):
   sessions = Sessions.objects.filter(is_active=False, user=request.user)
-  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
+  sessions = filter_by_active_context(
+    sessions, request, override_context_id=request.query_params.get("context")
+  )
+  sessions = _apply_tag_filters(request.query_params, sessions, kind="sessions", user=request.user)
   sessions = filter_sessions_by_params(request, sessions)
   serializer = SessionSerializer(sessions, many=True)
   # to_representation already compacts project/subprojects as names
@@ -997,6 +1021,41 @@ def list_active_sessions(request):
 def in_window(data, start=None, end=None):
   from .utils import in_window as _inw
   return _inw(data, start, end)
+
+
+def _apply_tag_filters(qp, qs, *, kind: str, user=None):
+  """Apply tag filtering from query params.
+
+  Query param: tags="a,b" or tags=["a","b"]
+
+  kind:
+    - "projects": expects Projects queryset
+    - "sessions": expects Sessions queryset (filters via project__tags)
+  """
+  try:
+    tags = _coerce_list(qp.get("tags"))
+  except Exception:
+    tags = []
+
+  if not tags:
+    return qs
+
+  # Ensure tags belong to the same user (avoid leaking tag names across users)
+  # This also normalizes case by using iexact matches if needed.
+  if user is not None:
+    tags = list(
+      Tag.objects.filter(user=user, name__in=tags).values_list("name", flat=True)
+    )
+
+  if not tags:
+    return qs
+
+  if kind == "projects":
+    return qs.filter(tags__name__in=tags).distinct()
+  if kind == "sessions":
+    return qs.filter(project__tags__name__in=tags).distinct()
+
+  return qs
 
 
 @api_view(['POST'])
