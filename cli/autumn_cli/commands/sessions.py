@@ -42,8 +42,9 @@ def log(
         try:
             client = APIClient()
 
-            contexts_payload = client.list_contexts(compact=True).get("contexts", [])
-            tags_payload = client.list_tags(compact=True).get("tags", [])
+            meta = client.get_discovery_meta(ttl_seconds=300, refresh=False)
+            contexts_payload = meta.get("contexts", [])
+            tags_payload = meta.get("tags", [])
 
             ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
             tag_resolved, _tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)
@@ -127,8 +128,9 @@ def log_search(
     try:
         client = APIClient()
 
-        contexts_payload = client.list_contexts(compact=True).get("contexts", [])
-        tags_payload = client.list_tags(compact=True).get("tags", [])
+        meta = client.get_discovery_meta(ttl_seconds=300, refresh=False)
+        contexts_payload = meta.get("contexts", [])
+        tags_payload = meta.get("tags", [])
 
         ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
         tag_resolved, _tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)

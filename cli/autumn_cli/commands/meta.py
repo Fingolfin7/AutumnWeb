@@ -7,6 +7,7 @@ import click
 from ..api_client import APIClient, APIError
 from ..utils.console import console
 from ..utils.formatters import contexts_table, tags_table
+from ..utils.meta_cache import clear_cached_snapshot
 
 
 @click.group()
@@ -63,3 +64,16 @@ def tag_list(json_out: bool, full: bool) -> None:
     except APIError as e:
         console.print(f"[autumn.err]Error:[/] {e}")
         raise click.Abort()
+
+
+@click.group()
+def meta() -> None:
+    """Metadata cache commands."""
+
+
+@meta.command("refresh")
+def meta_refresh() -> None:
+    """Refresh cached contexts/tags (forces a re-fetch on next command)."""
+    clear_cached_snapshot()
+    console.print("[autumn.ok]Metadata cache cleared.[/] Next command will re-fetch contexts/tags.")
+

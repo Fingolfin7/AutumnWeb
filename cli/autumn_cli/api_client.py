@@ -64,6 +64,59 @@ class APIClient:
         except requests.exceptions.RequestException as e:
             raise APIError(f"Network error: {e}")
     
+    def get_token_with_password(self, username_or_email: str, password: str) -> str:
+        """Fetch an auth token using username/email + password.
+
+        Uses DRF's built-in token endpoint at /get-auth-token/.
+        """
+        url = f"{self.base_url}/get-auth-token/"
+        resp = requests.post(
+            url,
+            json={"username": username_or_email, "password": password},
+            headers={"Accept": "application/json"},
+            timeout=30,
+        )
+        if resp.status_code >= 400:
+            try:
+                data = resp.json()
+                detail = data.get("detail") or data.get("error") or str(data)
+            except Exception:
+                detail = resp.text
+            raise APIError(f"Login failed: {detail}")
+
+        data = resp.json()
+        token = data.get("token")
+        if not token:
+            raise APIError("Login failed: server did not return a token")
+        return token
+
+    def get_me(self) -> Dict[str, Any]:
+        """Get the authenticated user's identity."""
+        return self._request("GET", "/api/me/")
+
+    def get_cached_me(self, *, ttl_seconds: int = 3600, refresh: bool = False) -> Dict[str, Any]:
+        """Get cached /api/me response for greetings."""
+        from .utils.user_cache import load_cached_user, save_cached_user
+
+        if not refresh:
+            snap = load_cached_user(ttl_seconds=ttl_seconds)
+            if snap is not None:
+                return {"user": snap.user, "cached": True}
+
+        me = self.get_me()
+        user = {
+            "id": me.get("id"),
+            "username": me.get("username"),
+            "email": me.get("email"),
+            "first_name": me.get("first_name", ""),
+            "last_name": me.get("last_name", ""),
+        }
+        try:
+            save_cached_user(user)
+        except Exception:
+            pass
+        return {"user": user, "cached": False}
+
     # Timer endpoints
     
     def start_timer(self, project: str, subprojects: Optional[List[str]] = None, note: Optional[str] = None) -> Dict:
@@ -300,3 +353,27 @@ class APIClient:
         """List available tags for the authenticated user."""
         params = {"compact": str(compact).lower()}
         return self._request("GET", "/api/tags/", params=params)
+
+    def get_discovery_meta(self, *, ttl_seconds: int = 300, refresh: bool = False) -> Dict[str, Any]:
+        """Get cached discovery metadata: contexts + tags.
+
+        Returns: {"contexts": [...], "tags": [...], "cached": bool}
+
+        This reduces repeated calls for commands that need to resolve filters.
+        """
+        from .utils.meta_cache import load_cached_snapshot, save_cached_snapshot
+
+        if not refresh:
+            snap = load_cached_snapshot(ttl_seconds=ttl_seconds)
+            if snap is not None:
+                return {"contexts": snap.contexts, "tags": snap.tags, "cached": True}
+
+        contexts = self.list_contexts(compact=True).get("contexts", [])
+        tags = self.list_tags(compact=True).get("tags", [])
+
+        try:
+            save_cached_snapshot(contexts, tags)
+        except Exception:
+            pass
+
+        return {"contexts": contexts, "tags": tags, "cached": False}

@@ -2,20 +2,34 @@
 
 import click
 import requests
-from .config import get_api_key, get_base_url, set_api_key, set_base_url, load_config
+from .config import get_api_key, get_base_url, set_api_key, set_base_url, load_config, save_config
 from .api_client import APIClient, APIError
 from .commands.timer import start, stop, restart, delete, status as timer_status
 from .commands.sessions import log, track
 from .commands.projects import projects_list, new_project
 from .commands.charts import chart
 from .commands.meta import context, tag
+from .commands.meta import meta
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0")
-def cli():
+@click.pass_context
+def cli(ctx: click.Context):
     """Autumn CLI - Command-line interface for AutumnWeb."""
-    pass
+    if ctx.invoked_subcommand is None:
+        # Lightweight greeting. If not authenticated, just show help.
+        try:
+            client = APIClient()
+            me = client.get_cached_me(ttl_seconds=3600, refresh=False).get("user", {})
+            name = (me.get("first_name") or me.get("username") or "there").strip() or "there"
+            base_url = get_base_url()
+            click.echo(f"Hi {name}! You're connected to {base_url}.")
+            click.echo("Run `autumn --help` to see commands.")
+        except Exception:
+            # Not configured or unavailable
+            click.echo("Autumn CLI")
+            click.echo("Run `autumn auth setup` (API key) or `autumn auth login` (password) to get started.")
 
 
 @cli.group()
@@ -98,6 +112,59 @@ def status():
             click.echo("  Connection: ✗ Failed")
 
 
+@auth.command()
+@click.option("--username", help="Username or email")
+@click.option("--password", help="Password (will prompt if omitted)")
+@click.option("--base-url", help="AutumnWeb base URL")
+def login(username: str, password: str, base_url: str):
+    """Login with username/email + password and store the API token."""
+    from .utils.meta_cache import clear_cached_snapshot
+    from .utils.user_cache import clear_cached_user
+
+    if not username:
+        username = click.prompt("Username or email", hide_input=False)
+    if not base_url:
+        base_url = click.prompt("Base URL", default=get_base_url())
+    if not password:
+        password = click.prompt("Password", hide_input=True)
+
+    # Use a temporary client (no api key required) just for token retrieval
+    temp = APIClient(api_key="dummy", base_url=base_url)
+    token = temp.get_token_with_password(username, password)
+
+    set_base_url(base_url)
+    set_api_key(token)
+
+    # Clear caches so they reload as the new user
+    clear_cached_snapshot()
+    clear_cached_user()
+
+    # Validate by calling /api/me
+    try:
+        client = APIClient()
+        me = client.get_cached_me(ttl_seconds=0, refresh=True).get("user", {})
+        click.echo(f"✓ Logged in as {me.get('username') or username}.")
+    except Exception:
+        click.echo("✓ Logged in.")
+
+
+@auth.command()
+def logout():
+    """Logout by clearing the stored API token and cached user metadata."""
+    from .utils.meta_cache import clear_cached_snapshot
+    from .utils.user_cache import clear_cached_user
+
+    config = load_config()
+    if "api_key" in config:
+        config.pop("api_key", None)
+        save_config(config)
+
+    clear_cached_snapshot()
+    clear_cached_user()
+
+    click.echo("Logged out. Run `autumn auth login` to sign in again.")
+
+
 # Register commands directly (flat structure)
 # Timer commands
 cli.add_command(start, name="start")
@@ -120,6 +187,7 @@ cli.add_command(chart, name="chart")
 # Metadata discovery
 cli.add_command(context, name="context")
 cli.add_command(tag, name="tag")
+cli.add_command(meta, name="meta")
 
 
 def main():

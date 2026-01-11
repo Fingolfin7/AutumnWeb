@@ -63,9 +63,9 @@ def chart(
     try:
         client = APIClient()
 
-        # Resolve context/tags (case-insensitive) to IDs where possible
-        contexts_payload = client.list_contexts(compact=True).get("contexts", [])
-        tags_payload = client.list_tags(compact=True).get("tags", [])
+        meta = client.get_discovery_meta(ttl_seconds=300, refresh=False)
+        contexts_payload = meta.get("contexts", [])
+        tags_payload = meta.get("tags", [])
 
         ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
         if ctx_res.warning:

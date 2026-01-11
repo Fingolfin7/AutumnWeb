@@ -70,6 +70,7 @@ from core.api import (
   merge_subprojects_api,
   contexts_list,
   tags_list,
+  me,
 )
 
 urlpatterns = [
@@ -161,4 +162,5 @@ urlpatterns = [
     # discovery endpoints (contexts/tags)
     path('api/contexts/', contexts_list, name='api_contexts_list'),
     path('api/tags/', tags_list, name='api_tags_list'),
+    path('api/me/', me, name='api_me'),
 ]
