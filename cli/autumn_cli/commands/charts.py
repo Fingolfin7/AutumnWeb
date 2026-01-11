@@ -12,6 +12,7 @@ from ..utils.charts import (
     render_calendar_chart,
     render_wordcloud_chart,
 )
+from ..utils.resolvers import resolve_context_param, resolve_tag_params
 
 
 @click.command()
@@ -61,13 +62,22 @@ def chart(
 
     try:
         client = APIClient()
-        
-        if save:
-            save_path = Path(save)
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-        else:
-            save_path = None
-        
+
+        # Resolve context/tags (case-insensitive) to IDs where possible
+        contexts_payload = client.list_contexts(compact=True).get("contexts", [])
+        tags_payload = client.list_tags(compact=True).get("tags", [])
+
+        ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
+        if ctx_res.warning:
+            click.echo(f"Warning: {ctx_res.warning}", err=True)
+
+        tag_resolved, tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)
+        for w in tag_warnings:
+            click.echo(f"Warning: {w}", err=True)
+
+        resolved_context = ctx_res.value
+        resolved_tags = tag_resolved or None
+
         if type in ("pie", "bar"):
             # Use tally endpoints for pie/bar
             if project:
@@ -76,8 +86,8 @@ def chart(
                     project,
                     start_date,
                     end_date,
-                    context=context,
-                    tags=list(tag) if tag else None,
+                    context=resolved_context,
+                    tags=resolved_tags,
                 )
                 title = f"Time Distribution: {project} (Subprojects)" if type == "pie" else f"Time Totals: {project} (Subprojects)"
             else:
@@ -86,8 +96,8 @@ def chart(
                     project_name=None,
                     start_date=start_date,
                     end_date=end_date,
-                    context=context,
-                    tags=list(tag) if tag else None,
+                    context=resolved_context,
+                    tags=resolved_tags,
                 )
                 title = "Time Distribution: All Projects" if type == "pie" else "Time Totals: All Projects"
             
@@ -102,8 +112,8 @@ def chart(
                 project_name=project,
                 start_date=start_date,
                 end_date=end_date,
-                context=context,
-                tags=list(tag) if tag else None,
+                context=resolved_context,
+                tags=resolved_tags,
             )
 
             if type == "scatter":

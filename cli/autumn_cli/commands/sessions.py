@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, date
 from ..api_client import APIClient, APIError
 from ..utils.console import console
 from ..utils.log_render import render_sessions_list
+from ..utils.resolvers import resolve_context_param, resolve_tag_params
 
 
 @click.group(invoke_without_command=True)
@@ -41,6 +42,15 @@ def log(
         try:
             client = APIClient()
 
+            contexts_payload = client.list_contexts(compact=True).get("contexts", [])
+            tags_payload = client.list_tags(compact=True).get("tags", [])
+
+            ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
+            tag_resolved, _tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)
+
+            resolved_context = ctx_res.value
+            resolved_tags = tag_resolved or None
+
             normalized_period = period.lower() if period else "week"
             calculated_start_date = start_date
             calculated_end_date = end_date
@@ -69,8 +79,8 @@ def log(
                     project=project,
                     start_date=calculated_start_date,
                     end_date=calculated_end_date,
-                    context=context,
-                    tags=list(tag) if tag else None,
+                    context=resolved_context,
+                    tags=resolved_tags,
                 )
             else:
                 result = client.log_activity(
@@ -78,8 +88,8 @@ def log(
                     project=project,
                     start_date=start_date,
                     end_date=end_date,
-                    context=context,
-                    tags=list(tag) if tag else None,
+                    context=resolved_context,
+                    tags=resolved_tags,
                 )
 
             logs = result.get("logs", [])
@@ -116,6 +126,16 @@ def log_search(
     """Search sessions with filters."""
     try:
         client = APIClient()
+
+        contexts_payload = client.list_contexts(compact=True).get("contexts", [])
+        tags_payload = client.list_tags(compact=True).get("tags", [])
+
+        ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
+        tag_resolved, _tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)
+
+        resolved_context = ctx_res.value
+        resolved_tags = tag_resolved or None
+
         result = client.search_sessions(
             project=project,
             start_date=start_date,
@@ -124,8 +144,8 @@ def log_search(
             active=active,
             limit=limit,
             offset=offset,
-            context=context,
-            tags=list(tag) if tag else None,
+            context=resolved_context,
+            tags=resolved_tags,
         )
 
         sessions_list = result.get("sessions", [])

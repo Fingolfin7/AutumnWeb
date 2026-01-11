@@ -5,6 +5,7 @@ from typing import Optional
 from ..api_client import APIClient, APIError
 from ..utils.formatters import projects_tables
 from ..utils.console import console
+from ..utils.resolvers import resolve_context_param, resolve_tag_params
 
 
 @click.command()
@@ -23,11 +24,18 @@ def projects_list(
     """List projects grouped by status."""
     try:
         client = APIClient()
+
+        contexts_payload = client.list_contexts(compact=True).get("contexts", [])
+        tags_payload = client.list_tags(compact=True).get("tags", [])
+
+        ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
+        tag_resolved, _tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)
+
         result = client.list_projects_grouped(
             start_date=start_date,
             end_date=end_date,
-            context=context,
-            tags=list(tag) if tag else None,
+            context=ctx_res.value,
+            tags=tag_resolved or None,
         )
 
         projects_data = result.get("projects", {})
