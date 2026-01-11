@@ -106,6 +106,11 @@ def get_active_context(request: HttpRequest, override_context_id: str | None = N
     Returns (context_or_none, mode) where mode is 'all' or 'single'.
     If override_context_id is provided (e.g. from an explicit query param),
     it takes precedence over the session-stored value.
+
+    override_context_id may be either:
+      - a numeric context id
+      - a context name (case-insensitive)
+      - 'all'
     """
     context_id = override_context_id
 
@@ -116,11 +121,18 @@ def get_active_context(request: HttpRequest, override_context_id: str | None = N
     if not context_id or str(context_id).lower() == "all":
         return None, "all"
 
+    # Try ID first, then name.
     try:
         context = Context.objects.get(id=int(context_id), user=request.user)
         return context, "single"
     except (Context.DoesNotExist, ValueError, TypeError):
-        # Invalid/missing context id – treat as All
+        pass
+
+    try:
+        context = Context.objects.get(name__iexact=str(context_id).strip(), user=request.user)
+        return context, "single"
+    except (Context.DoesNotExist, ValueError, TypeError):
+        # Invalid/missing context  treat as All
         return None, "all"
 
 
@@ -188,17 +200,34 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
         if subproject_names:
             sessions = sessions.filter(subprojects__name__in=subproject_names)
 
-    # Apply optional tag filtering (tags provided as IDs)
-    tag_ids: list[str] = []
+    # Apply optional tag filtering.
+    # Accept both:
+    #   - tag IDs (legacy / web forms)
+    #   - tag names (CLI)
+    tag_vals: list[str] = []
     if hasattr(query_params, "getlist"):
-        tag_ids = query_params.getlist('tags')
+        tag_vals = query_params.getlist('tags')
     else:
         tags_param = query_params.get('tags')
         if tags_param:
-            tag_ids = [t for t in tags_param.split(',') if t]
+            tag_vals = [t for t in tags_param.split(',') if t]
 
-    if tag_ids:
-        sessions = sessions.filter(project__tags__id__in=tag_ids).distinct()
+    if tag_vals:
+        tag_vals = [str(t).strip() for t in tag_vals if str(t).strip()]
+        tag_ids: list[int] = []
+        tag_names: list[str] = []
+        for v in tag_vals:
+            try:
+                tag_ids.append(int(v))
+            except (TypeError, ValueError):
+                tag_names.append(v)
+
+        if tag_ids:
+            sessions = sessions.filter(project__tags__id__in=tag_ids)
+        if tag_names:
+            sessions = sessions.filter(project__tags__name__in=tag_names)
+
+        sessions = sessions.distinct()
 
     if 'note_snippet' in query_params:
         sessions = sessions.filter(note__icontains=query_params['note_snippet'])
