@@ -10,6 +10,7 @@ import io
 import json
 import os
 from core.models import Context
+from rest_framework.authtoken.models import Token
 
 
 class UpdateSessionTests(TestCase):
@@ -735,3 +736,27 @@ class ImportIntoContextUITests(TestCase):
         new_ctx = Context.objects.get(user=self.user, name='NewCtxWins')
         proj = Projects.objects.get(user=self.user, name='UI Project 2')
         self.assertEqual(proj.context_id, new_ctx.id)
+
+
+class ProjectsGroupedApiTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='testuser', password='password')
+        self.client.login(username='testuser', password='password')
+        # DRF token auth for API endpoints
+        self.token = Token.objects.create(user=self.user)
+
+    def test_projects_grouped_includes_archived_and_returns_200(self):
+        Projects.objects.create(user=self.user, name='Active Project', status='active')
+        Projects.objects.create(user=self.user, name='Archived Project', status='archived')
+
+        url = reverse('api_projects_grouped')
+        response = self.client.get(url, HTTP_AUTHORIZATION=f'Token {self.token.key}')
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+
+        self.assertIn('projects', payload)
+        self.assertIn('archived', payload['projects'])
+        self.assertIn('Archived Project', payload['projects']['archived'])
+        self.assertIn('summary', payload)
+        self.assertEqual(payload['summary']['archived'], 1)

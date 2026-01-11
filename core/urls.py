@@ -52,7 +52,6 @@ from core.api import (
   list_projects,
   tally_by_sessions,
   tally_by_subprojects,
-  wordcloud_notes,
   search_projects,
   get_project,
   delete_project,
@@ -137,7 +136,6 @@ urlpatterns = [
     path('api/list_sessions/', list_sessions, name='api_list_sessions'),
     path('api/list_active_sessions/', list_active_sessions,
          name='api_list_active_sessions'),
-    path('api/wordcloud_notes/', wordcloud_notes, name='api_wordcloud_notes'),
     path('api/merge_projects/', merge_projects_api, name='api_merge_projects'),
     path('api/merge_subprojects/', merge_subprojects_api, name='api_merge_subprojects'),
 

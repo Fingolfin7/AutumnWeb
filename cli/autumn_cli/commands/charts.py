@@ -1,0 +1,112 @@
+"""Chart commands for Autumn CLI."""
+
+import click
+from typing import Optional
+from pathlib import Path
+from ..api_client import APIClient, APIError
+from ..utils.charts import (
+    render_pie_chart, 
+    render_bar_chart, 
+    render_scatter_chart, 
+    render_heatmap,
+    render_calendar_chart,
+    render_wordcloud_chart,
+)
+
+
+@click.command()
+@click.option(
+    "--type",
+    "-t",
+    type=click.Choice(["pie", "bar", "scatter", "calendar", "wordcloud", "heatmap"], case_sensitive=False),
+    default="pie",
+    help="Chart type (default: pie)",
+)
+@click.option("--project", "-p", help="Project name (shows subprojects if specified for pie/bar)")
+@click.option(
+    "--period",
+    "-pd",
+    type=click.Choice(
+        ["day", "week", "fortnight", "month", "lunar cycle", "quarter", "year", "all"],
+        case_sensitive=False,
+    ),
+    default=None,
+    help="Time period (same options as 'log')",
+)
+@click.option("--start-date", help="Start date (YYYY-MM-DD)")
+@click.option("--end-date", help="End date (YYYY-MM-DD)")
+@click.option("--save", type=click.Path(), help="Save chart to file instead of displaying")
+def chart(
+    type: str,
+    project: Optional[str],
+    period: Optional[str],
+    start_date: Optional[str],
+    end_date: Optional[str],
+    save: Optional[str],
+):
+    """Render charts. Default type is pie. Also accepts: bar, scatter, calendar, wordcloud, heatmap."""
+    type = type.lower()  # Normalize case
+
+    # Derive start/end from period if not explicitly supplied
+    if (not start_date or not end_date) and period and period.lower() != "all":
+        from ..utils.periods import period_to_dates
+
+        derived_start, derived_end = period_to_dates(period)
+        start_date = start_date or derived_start
+        end_date = end_date or derived_end
+
+    try:
+        client = APIClient()
+        
+        if save:
+            save_path = Path(save)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            save_path = None
+        
+        if type in ("pie", "bar"):
+            # Use tally endpoints for pie/bar
+            if project:
+                # Show subprojects for specific project
+                data = client.tally_by_subprojects(project, start_date, end_date)
+                title = f"Time Distribution: {project} (Subprojects)" if type == "pie" else f"Time Totals: {project} (Subprojects)"
+            else:
+                # Show all projects
+                data = client.tally_by_sessions(project_name=None, start_date=start_date, end_date=end_date)
+                title = "Time Distribution: All Projects" if type == "pie" else "Time Totals: All Projects"
+            
+            if type == "pie":
+                render_pie_chart(data, title=title, save_path=save_path)
+            else:  # bar
+                render_bar_chart(data, title=title, save_path=save_path)
+        
+        elif type in ("scatter", "calendar", "heatmap", "wordcloud"):
+            # Use list_sessions for scatter/calendar/heatmap/wordcloud
+            sessions = client.list_sessions(project_name=project, start_date=start_date, end_date=end_date)
+            
+            if type == "scatter":
+                title = f"Session Duration Over Time"
+                if project:
+                    title += f" - {project}"
+                render_scatter_chart(sessions, title=title, save_path=save_path)
+            
+            elif type == "calendar":
+                title = "Projects Calendar"
+                if project:
+                    title += f" - {project}"
+                render_calendar_chart(sessions, title=title, save_path=save_path)
+            
+            elif type == "heatmap":
+                title = "Activity Heatmap"
+                if project:
+                    title += f" - {project}"
+                render_heatmap(sessions, title=title, save_path=save_path)
+            
+            elif type == "wordcloud":
+                title = "Session Notes Wordcloud"
+                if project:
+                    title += f" - {project}"
+                render_wordcloud_chart(sessions, title=title, save_path=save_path)
+    except APIError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()

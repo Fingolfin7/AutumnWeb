@@ -109,12 +109,19 @@ def _serialize_session(sess: Sessions, compact=True):
   }
 
 def _serialize_project_grouped(projects, compact=True):
-  groups = {"active": [], "paused": [], "complete": []}
+  # Be tolerant of unexpected/legacy status values.
+  # Older data can include 'archived' (and potentially others), so don't assume
+  # only active/paused/complete exists.
+  groups = {"active": [], "paused": [], "complete": [], "archived": []}
   for p in projects:
+    key = getattr(p, "status", None) or "active"
+    if key not in groups:
+      groups[key] = []
+
     if compact:
-      groups[p.status].append(p.name)
+      groups[key].append(p.name)
     else:
-      groups[p.status].append(
+      groups[key].append(
         {
           "id": p.id,
           "name": p.name,
@@ -125,10 +132,12 @@ def _serialize_project_grouped(projects, compact=True):
           "description": p.description or "",
         }
       )
+
   summary = {
-    "active": len(groups["active"]),
-    "paused": len(groups["paused"]),
-    "complete": len(groups["complete"]),
+    "active": len(groups.get("active", [])),
+    "paused": len(groups.get("paused", [])),
+    "complete": len(groups.get("complete", [])),
+    "archived": len(groups.get("archived", [])),
     "total": len(projects),
   }
   return {"summary": summary, "projects": groups}
@@ -824,29 +833,6 @@ def tally_by_subprojects(request):
 
   payload = [{"name": n, "total_time": t} for n, t in sub_durations.items()]
   return Response(payload)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def wordcloud_notes(request):
-  from .wordhandler import WordHandler
-
-  handler = WordHandler()
-  sessions = Sessions.objects.filter(is_active=False, user=request.user)
-  sessions = filter_by_active_context(sessions, request, override_context_id=request.query_params.get("context"))
-  sessions = filter_sessions_by_params(request, sessions)
-  notes_text = " ".join([s.note for s in sessions if s.note])
-
-  cleaned = re.sub(r"(\*{1,2}|_{1,2}|~{1,2})", "", notes_text)
-  cleaned = re.sub(r"#{1,6}\s", "", cleaned)
-  cleaned = re.sub(r"\s+", " ", cleaned).strip()
-
-  seen = defaultdict(int)
-  for w in handler.process_list(cleaned.split()):
-    seen[w] += 1
-
-  sorted_dict = dict(sorted(seen.items(), key=lambda kv: kv[1], reverse=True))
-  return Response(sorted_dict)
 
 
 @api_view(["GET"])
