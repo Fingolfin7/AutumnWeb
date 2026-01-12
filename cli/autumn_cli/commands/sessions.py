@@ -27,6 +27,7 @@ from ..utils.resolvers import resolve_context_param, resolve_tag_params
 @click.option("--tag", "-t", multiple=True, help="Filter by tag (repeatable)")
 @click.option("--start-date", help="Start date (YYYY-MM-DD)")
 @click.option("--end-date", help="End date (YYYY-MM-DD)")
+@click.option("--pick", is_flag=True, help="Interactively pick project/context/tags if not provided")
 def log(
     ctx: click.Context,
     period: Optional[str],
@@ -35,6 +36,7 @@ def log(
     tag: tuple,
     start_date: Optional[str],
     end_date: Optional[str],
+    pick: bool,
 ):
     """Show activity logs (saved sessions). Use 'log search' for advanced search."""
     # If a subcommand was invoked, don't run this command
@@ -46,52 +48,85 @@ def log(
             contexts_payload = meta.get("contexts", [])
             tags_payload = meta.get("tags", [])
 
+            if pick:
+                from ..utils.pickers import pick_from_names
+
+                if not project:
+                    grouped = client.list_projects_grouped()
+                    all_projects = []
+                    for bucket in (grouped.get("projects") or {}).values():
+                        for p in bucket or []:
+                            name = p.get("name") or p.get("project")
+                            if name:
+                                all_projects.append(name)
+                    all_projects = sorted(set(all_projects))
+                    chosen = pick_from_names(label="project", names=all_projects)
+                    project = chosen or project
+
+                if not context:
+                    ctx_names = [c.get("name") for c in contexts_payload if c.get("name")]
+                    chosen = pick_from_names(label="context", names=sorted(ctx_names))
+                    context = chosen or context
+
+                if not tag:
+                    tag_names = [t.get("name") for t in tags_payload if t.get("name")]
+                    chosen = pick_from_names(label="tag", names=sorted(tag_names))
+                    tag = tuple([chosen]) if chosen else tag
+
             ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
             tag_resolved, _tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)
 
             resolved_context = ctx_res.value
             resolved_tags = tag_resolved or None
 
+            # Normalize period to a consistent trailing window.
+            # Server interprets period=week as "since Monday"; we want "last 7 days".
             normalized_period = period.lower() if period else "week"
-            calculated_start_date = start_date
-            calculated_end_date = end_date
 
-            if not start_date and not end_date and normalized_period not in (
-                "day",
-                "week",
-                "month",
-                "all",
-            ):
-                today = date.today()
-                if normalized_period == "fortnight":
-                    calculated_start_date = (today - timedelta(days=14)).strftime("%Y-%m-%d")
-                elif normalized_period == "lunar cycle":
-                    calculated_start_date = (today - timedelta(days=30)).strftime("%Y-%m-%d")
-                elif normalized_period == "quarter":
-                    quarter_start_month = ((today.month - 1) // 3) * 3 + 1
-                    calculated_start_date = today.replace(month=quarter_start_month, day=1).strftime(
-                        "%Y-%m-%d"
-                    )
-                elif normalized_period == "year":
-                    calculated_start_date = today.replace(month=1, day=1).strftime("%Y-%m-%d")
+            # For standard server-supported periods, prefer passing `period` directly
+            # (unless the user provided explicit start/end).
+            server_periods = {"day", "week", "month", "all"}
 
+            if not start_date and not end_date and normalized_period in server_periods:
                 result = client.log_activity(
-                    period=None,
+                    period=normalized_period,
                     project=project,
-                    start_date=calculated_start_date,
-                    end_date=calculated_end_date,
+                    start_date=None,
+                    end_date=None,
                     context=resolved_context,
                     tags=resolved_tags,
                 )
             else:
-                result = client.log_activity(
-                    period=period,
-                    project=project,
-                    start_date=start_date,
-                    end_date=end_date,
-                    context=resolved_context,
-                    tags=resolved_tags,
-                )
+                # For custom periods (fortnight/lunar cycle/quarter/year) or explicit dates,
+                # calculate a concrete date window.
+                calculated_start_date = start_date
+                calculated_end_date = end_date
+
+                if not start_date and not end_date and normalized_period != "all":
+                    from ..utils.periods import period_to_dates
+
+                    derived_start, derived_end = period_to_dates(normalized_period)
+                    calculated_start_date = derived_start
+                    calculated_end_date = derived_end
+
+                if normalized_period == "all" and not (calculated_start_date or calculated_end_date):
+                    result = client.log_activity(
+                        period="all",
+                        project=project,
+                        start_date=None,
+                        end_date=None,
+                        context=resolved_context,
+                        tags=resolved_tags,
+                    )
+                else:
+                    result = client.log_activity(
+                        period=None,
+                        project=project,
+                        start_date=calculated_start_date,
+                        end_date=calculated_end_date,
+                        context=resolved_context,
+                        tags=resolved_tags,
+                    )
 
             logs = result.get("logs", [])
             count = result.get("count", len(logs))
@@ -113,6 +148,7 @@ def log(
 @click.option("--active/--no-active", default=False, help="Include active sessions")
 @click.option("--limit", type=int, help="Limit number of results")
 @click.option("--offset", type=int, help="Offset for pagination")
+@click.option("--pick", is_flag=True, help="Interactively pick project/context/tags if not provided")
 def log_search(
     project: Optional[str],
     context: Optional[str],
@@ -123,6 +159,7 @@ def log_search(
     active: bool,
     limit: Optional[int],
     offset: Optional[int],
+    pick: bool,
 ):
     """Search sessions with filters."""
     try:
@@ -131,6 +168,31 @@ def log_search(
         meta = client.get_discovery_meta(ttl_seconds=300, refresh=False)
         contexts_payload = meta.get("contexts", [])
         tags_payload = meta.get("tags", [])
+
+        if pick:
+            from ..utils.pickers import pick_from_names
+
+            if not project:
+                grouped = client.list_projects_grouped()
+                all_projects = []
+                for bucket in (grouped.get("projects") or {}).values():
+                    for p in bucket or []:
+                        name = p.get("name") or p.get("project")
+                        if name:
+                            all_projects.append(name)
+                all_projects = sorted(set(all_projects))
+                chosen = pick_from_names(label="project", names=all_projects)
+                project = chosen or project
+
+            if not context:
+                ctx_names = [c.get("name") for c in contexts_payload if c.get("name")]
+                chosen = pick_from_names(label="context", names=sorted(ctx_names))
+                context = chosen or context
+
+            if not tag:
+                tag_names = [t.get("name") for t in tags_payload if t.get("name")]
+                chosen = pick_from_names(label="tag", names=sorted(tag_names))
+                tag = tuple([chosen]) if chosen else tag
 
         ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
         tag_resolved, _tag_warnings = resolve_tag_params(tags=list(tag) if tag else None, known_tags=tags_payload)

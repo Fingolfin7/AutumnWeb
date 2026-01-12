@@ -39,6 +39,7 @@ from ..utils.resolvers import resolve_context_param, resolve_tag_params
 @click.option("--start-date", help="Start date (YYYY-MM-DD)")
 @click.option("--end-date", help="End date (YYYY-MM-DD)")
 @click.option("--save", type=click.Path(), help="Save chart to file instead of displaying")
+@click.option("--pick", is_flag=True, help="Interactively pick project/context/tags if not provided")
 def chart(
     type: str,
     project: Optional[str],
@@ -48,6 +49,7 @@ def chart(
     start_date: Optional[str],
     end_date: Optional[str],
     save: Optional[str],
+    pick: bool,
 ):
     """Render charts. Default type is pie. Also accepts: bar, scatter, calendar, wordcloud, heatmap."""
     type = type.lower()  # Normalize case
@@ -72,6 +74,32 @@ def chart(
         meta = client.get_discovery_meta(ttl_seconds=300, refresh=False)
         contexts_payload = meta.get("contexts", [])
         tags_payload = meta.get("tags", [])
+
+        if pick:
+            from ..utils.pickers import pick_from_names, normalize_repeatable
+
+            if not project:
+                # Pick project from grouped endpoint
+                grouped = client.list_projects_grouped()
+                all_projects = []
+                for bucket in (grouped.get("projects") or {}).values():
+                    for p in bucket or []:
+                        name = p.get("name") or p.get("project")
+                        if name:
+                            all_projects.append(name)
+                all_projects = sorted(set(all_projects))
+                chosen = pick_from_names(label="project", names=all_projects)
+                project = chosen or project
+
+            if not context:
+                ctx_names = [c.get("name") for c in contexts_payload if c.get("name")]
+                chosen = pick_from_names(label="context", names=sorted(ctx_names))
+                context = chosen or context
+
+            if not tag:
+                tag_names = [t.get("name") for t in tags_payload if t.get("name")]
+                chosen = pick_from_names(label="tag", names=sorted(tag_names))
+                tag = tuple([chosen]) if chosen else tag
 
         ctx_res = resolve_context_param(context=context, contexts=contexts_payload)
         if ctx_res.warning:

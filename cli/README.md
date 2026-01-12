@@ -105,6 +105,7 @@ A quick overview of the most-used commands:
 | Timers | `autumn status` | Show active timers | `--project`, `--session-id` |
 | Timers | `autumn stop` | Stop timer | `--project`, `--session-id`, `--note` |
 | Timers | `autumn restart` | Restart timer | `--project`, `--session-id` |
+| Timers | `autumn resume` | Resume last worked-on project | `--stop-current` |
 | Timers | `autumn delete` | Delete timer without saving | `--session-id` |
 | Logs | `autumn log` | List sessions (saved) | `--period`, `--project`, `--context`, `--tag`, `--start-date`, `--end-date` |
 | Logs | `autumn log search` | Search sessions | `--note-snippet`, `--context`, `--tag`, `--limit`, `--offset` |
@@ -113,9 +114,9 @@ A quick overview of the most-used commands:
 | Meta | `autumn context list` | List contexts | `--full`, `--json` |
 | Meta | `autumn tag list` | List tags | `--full`, `--json` |
 | Meta | `autumn meta refresh` | Clear cached contexts/tags + greeting activity cache | — |
-| Config | `autumn config show` | Show `config.yaml` (redacted) | `--raw`, `--json` |
-| Config | `autumn config set` | Set config values (dotted path) | `--type` |
-| Config | `autumn config greeting set` | Tune greeting weights | `--activity-weight`, `--moon-cameo-weight` |
+| Convenience | `autumn open` | Open the web app in your browser | `--path` |
+| Aliases | `autumn p` | Alias for `autumn projects` | same options as `projects` |
+| Aliases | `autumn ls` | Alias for `autumn log` | same options as `log` |
 
 ### Timer Commands
 
@@ -142,6 +143,12 @@ Restart a timer:
 autumn restart
 autumn restart --project "My Project"
 autumn restart --session-id 123
+```
+
+Resume a project:
+```bash
+autumn resume
+autumn resume --stop-current
 ```
 
 Delete a timer:

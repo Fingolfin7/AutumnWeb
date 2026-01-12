@@ -23,6 +23,8 @@ from .commands.charts import chart
 from .commands.meta import context, tag
 from .commands.meta import meta
 from .commands.config_cmd import config
+from .commands.open_cmd import open_cmd
+from .commands.resume_cmd import resume
 
 
 @click.group(invoke_without_command=True)
@@ -208,10 +210,12 @@ cli.add_command(delete, name="delete")
 
 # Session commands
 cli.add_command(log, name="log")
+cli.add_command(log, name="ls")
 cli.add_command(track, name="track")
 
 # Project commands
 cli.add_command(projects_list, name="projects")
+cli.add_command(projects_list, name="p")
 cli.add_command(new_project, name="new")
 
 # Chart command
@@ -224,6 +228,10 @@ cli.add_command(meta, name="meta")
 
 # Config commands
 cli.add_command(config, name="config")
+
+# Convenience commands
+cli.add_command(open_cmd, name="open")
+cli.add_command(resume, name="resume")
 
 
 def main():
