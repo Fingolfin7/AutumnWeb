@@ -14,7 +14,12 @@ from ..utils.console import console
     default=False,
     help="If a timer is currently active, stop it before resuming.",
 )
-def resume(stop_current: bool) -> None:
+@click.option(
+    "--with-subprojects/--no-with-subprojects",
+    default=False,
+    help="Also resume the last session's subprojects (if any).",
+)
+def resume(stop_current: bool, with_subprojects: bool) -> None:
     """Start a new timer for the most recently worked-on project."""
     try:
         client = APIClient()
@@ -41,7 +46,14 @@ def resume(stop_current: bool) -> None:
         if not project:
             raise APIError("Could not determine last project.")
 
-        started = client.start_timer(project)
+        subprojects = None
+        if with_subprojects:
+            subprojects = s0.get("subs") or s0.get("subprojects") or None
+            # normalize empty list
+            if subprojects == []:
+                subprojects = None
+
+        started = client.start_timer(project, subprojects=subprojects)
         if started.get("ok"):
             sess = started.get("session", {})
             console.print(f"[autumn.ok]Resumed[/] [autumn.project]{project}[/] (Session ID: {sess.get('id')})")

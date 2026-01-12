@@ -9,17 +9,24 @@ from .console import console
 
 
 def format_duration_minutes(minutes: float) -> str:
-    """Format duration in minutes to human-readable string."""
+    """Format duration in minutes to human-readable string.
+
+    Uses second-level accuracy (Mm Ss / Hh Mm Ss).
+    """
     if minutes is None:
         return "N/A"
 
-    hours = int(minutes // 60)
-    mins = int(minutes % 60)
+    try:
+        total_seconds = int(round(float(minutes) * 60))
+    except Exception:
+        total_seconds = 0
+
+    hours, rem = divmod(total_seconds, 3600)
+    mins, secs = divmod(rem, 60)
 
     if hours > 0:
-        return f"{hours}h {mins}m"
-    else:
-        return f"{mins}m"
+        return f"{hours}h {mins:02d}m {secs:02d}s"
+    return f"{mins}m {secs:02d}s"
 
 
 def format_duration_hours(hours: float) -> str:
