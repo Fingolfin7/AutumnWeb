@@ -717,9 +717,8 @@ def log_activity(request):
         if period == "day":
             start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         elif period == "week":
-            start = (now - timedelta(days=now.weekday())).replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
+            # Trailing 7-day window (inclusive) rather than "since Monday"
+            start = (now - timedelta(days=7)).replace(hour=0, minute=0, second=0, microsecond=0)
         else:
             start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         sessions = sessions.filter(end_time__gte=start)
