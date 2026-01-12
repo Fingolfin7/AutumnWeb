@@ -2,14 +2,15 @@ from datetime import timedelta
 
 from django.test import TestCase
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
-from users.models import CustomUser
 from core.models import Projects, Sessions
 
 
 class LogPeriodSemanticsTests(TestCase):
     def setUp(self):
-        self.user = CustomUser.objects.create_user(username="u", password="p")
+        User = get_user_model()
+        self.user = User.objects.create_user(username="u", password="p")
         self.project = Projects.objects.create(user=self.user, name="P")
 
     def _create_session_ended(self, minutes_ago: int):
@@ -42,4 +43,3 @@ class LogPeriodSemanticsTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         payload = resp.json()
         self.assertEqual(payload.get("count", 0), 0)
-
