@@ -117,6 +117,126 @@ class APIClient:
             pass
         return {"user": user, "cached": False}
 
+    def get_recent_activity_snippet(
+        self,
+        *,
+        ttl_seconds: int = 600,
+        refresh: bool = False,
+        lookback_days: int = 14,
+        max_sessions: int = 50,
+    ) -> Dict[str, Any]:
+        """Get a small recent-activity summary for greetings.
+
+        Returns a dict like:
+          {
+            "last_project": str|None,
+            "last_end": iso str|None,
+            "today_project": str|None,  # last from today if any
+            "longest_project": str|None,
+            "longest_minutes": float|None,
+            "most_frequent_project": str|None,  # most sessions in lookback
+            "streak_days": int,  # consecutive days with sessions
+          }
+
+        Cached to avoid frequent API calls.
+        """
+        from .utils.recent_activity_cache import load_cached_activity, save_cached_activity
+
+        if not refresh:
+            snap = load_cached_activity(ttl_seconds=ttl_seconds)
+            if snap is not None:
+                return {**snap.info, "cached": True}
+
+        # Pull recent sessions (saved) via search endpoint.
+        from datetime import date, timedelta
+        from collections import Counter
+
+        start_date = (date.today() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        result = self.search_sessions(
+            start_date=start_date,
+            end_date=None,
+            active=False,
+            limit=max_sessions,
+            offset=0,
+        )
+        sessions = result.get("sessions", [])
+
+        last_project = None
+        last_end = None
+        today_project = None
+        longest_project = None
+        longest_minutes = None
+        project_counts = Counter()
+        session_dates = set()
+
+        today_str = date.today().strftime("%Y-%m-%d")
+
+        for s in sessions:
+            p = s.get("p") or s.get("project")
+            end = s.get("end") or s.get("end_time")
+            dur = s.get("dur") or s.get("duration_minutes")
+
+            if p:
+                project_counts[p] += 1
+
+            # Track session dates for streak
+            if end:
+                try:
+                    end_date_only = end.split("T")[0]
+                    session_dates.add(end_date_only)
+                except Exception:
+                    pass
+
+            # Overall last
+            if last_end is None and end:
+                last_end = end
+                last_project = p
+
+            # Today's last
+            if today_project is None and end and end.startswith(today_str):
+                today_project = p
+
+            # Longest
+            try:
+                dur_f = float(dur) if dur is not None else None
+            except Exception:
+                dur_f = None
+
+            if dur_f is not None and (longest_minutes is None or dur_f > longest_minutes):
+                longest_minutes = dur_f
+                longest_project = p
+
+        # Most frequent project
+        most_frequent_project = project_counts.most_common(1)[0][0] if project_counts else None
+
+        # Calculate streak (consecutive days up to today)
+        streak_days = 0
+        check_date = date.today()
+        while True:
+            check_str = check_date.strftime("%Y-%m-%d")
+            if check_str in session_dates:
+                streak_days += 1
+                check_date -= timedelta(days=1)
+            else:
+                break
+
+        info = {
+            "last_project": last_project,
+            "last_end": last_end,
+            "today_project": today_project,
+            "longest_project": longest_project,
+            "longest_minutes": longest_minutes,
+            "most_frequent_project": most_frequent_project,
+            "streak_days": streak_days,
+        }
+
+        try:
+            save_cached_activity(info)
+        except Exception:
+            pass
+
+        return {**info, "cached": False}
+
     # Timer endpoints
     
     def start_timer(self, project: str, subprojects: Optional[List[str]] = None, note: Optional[str] = None) -> Dict:

@@ -63,6 +63,12 @@ def chart(
     try:
         client = APIClient()
 
+        if save:
+            save_path = Path(save)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+        else:
+            save_path = None
+
         meta = client.get_discovery_meta(ttl_seconds=300, refresh=False)
         contexts_payload = meta.get("contexts", [])
         tags_payload = meta.get("tags", [])

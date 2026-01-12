@@ -8,6 +8,7 @@ from ..api_client import APIClient, APIError
 from ..utils.console import console
 from ..utils.formatters import contexts_table, tags_table
 from ..utils.meta_cache import clear_cached_snapshot
+from ..utils.recent_activity_cache import clear_cached_activity
 
 
 @click.group()
@@ -75,5 +76,5 @@ def meta() -> None:
 def meta_refresh() -> None:
     """Refresh cached contexts/tags (forces a re-fetch on next command)."""
     clear_cached_snapshot()
-    console.print("[autumn.ok]Metadata cache cleared.[/] Next command will re-fetch contexts/tags.")
-
+    clear_cached_activity()
+    console.print("[autumn.ok]Metadata cache cleared.[/] Next command will re-fetch contexts/tags and recent activity.")

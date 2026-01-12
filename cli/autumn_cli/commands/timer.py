@@ -94,7 +94,10 @@ def status(session_id: Optional[int], project: Optional[str]):
 @click.option("--session-id", "-i", type=int, help="Specific session ID to restart")
 @click.option("--project", "-p", help="Project name to restart timer for")
 def restart(session_id: Optional[int], project: Optional[str]):
-    """Restart a timer (reset start time to now)."""
+    """Restart a timer (reset start time to now).
+
+    If you have multiple active timers, target one with --session-id or --project.
+    """
     try:
         client = APIClient()
         result = client.restart_timer(session_id, project)

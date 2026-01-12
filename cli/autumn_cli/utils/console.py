@@ -36,6 +36,7 @@ THEME = Theme(
         "autumn.status.complete": "bold bright_blue",
         "autumn.status.archived": "dim",
         "autumn.description": "italic dim",
+        "autumn.user": "bold color(208)",  # autumn-orange
     }
 )
 

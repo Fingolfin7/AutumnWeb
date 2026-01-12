@@ -1,8 +1,20 @@
 """Main CLI entry point for Autumn CLI."""
 
 import click
-import requests
-from .config import get_api_key, get_base_url, set_api_key, set_base_url, load_config, save_config
+from datetime import datetime
+
+from .utils.console import console
+from .utils.greetings import build_greeting
+from .config import (
+    get_api_key,
+    get_base_url,
+    set_api_key,
+    set_base_url,
+    load_config,
+    save_config,
+    get_greeting_activity_weight,
+    get_greeting_moon_cameo_weight,
+)
 from .api_client import APIClient, APIError
 from .commands.timer import start, stop, restart, delete, status as timer_status
 from .commands.sessions import log, track
@@ -10,6 +22,7 @@ from .commands.projects import projects_list, new_project
 from .commands.charts import chart
 from .commands.meta import context, tag
 from .commands.meta import meta
+from .commands.config_cmd import config
 
 
 @click.group(invoke_without_command=True)
@@ -18,16 +31,36 @@ from .commands.meta import meta
 def cli(ctx: click.Context):
     """Autumn CLI - Command-line interface for AutumnWeb."""
     if ctx.invoked_subcommand is None:
-        # Lightweight greeting. If not authenticated, just show help.
         try:
             client = APIClient()
             me = client.get_cached_me(ttl_seconds=3600, refresh=False).get("user", {})
-            name = (me.get("first_name") or me.get("username") or "there").strip() or "there"
+            username = (me.get("username") or "there").strip() or "there"
             base_url = get_base_url()
-            click.echo(f"Hi {name}! You're connected to {base_url}.")
-            click.echo("Run `autumn --help` to see commands.")
+
+            # Get recent activity (best-effort, cached)
+            activity = None
+            try:
+                activity = client.get_recent_activity_snippet(ttl_seconds=600, refresh=False)
+            except Exception:
+                pass
+
+            # Build contextual greeting (one line)
+            g = build_greeting(
+                datetime.now(),
+                activity=activity,
+                activity_weight=get_greeting_activity_weight(),
+                moon_cameo_weight=get_greeting_moon_cameo_weight(),
+            )
+
+            # Print greeting with username inserted (styled)
+            greeting_line = g.line.format(username=f"[autumn.user]{username}[/]")
+            console.print(greeting_line)
+
+            # Print connection info
+            console.print(f"You're connected to [autumn.time]{base_url}[/].")
+
+
         except Exception:
-            # Not configured or unavailable
             click.echo("Autumn CLI")
             click.echo("Run `autumn auth setup` (API key) or `autumn auth login` (password) to get started.")
 
@@ -188,6 +221,9 @@ cli.add_command(chart, name="chart")
 cli.add_command(context, name="context")
 cli.add_command(tag, name="tag")
 cli.add_command(meta, name="meta")
+
+# Config commands
+cli.add_command(config, name="config")
 
 
 def main():

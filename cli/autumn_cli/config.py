@@ -3,11 +3,15 @@
 import os
 import yaml
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 
 CONFIG_DIR = Path.home() / ".autumn"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
+
+
+DEFAULT_GREETING_ACTIVITY_WEIGHT = 0.35
+DEFAULT_GREETING_MOON_CAMEO_WEIGHT = 0.15
 
 
 def ensure_config_dir():
@@ -73,3 +77,68 @@ def set_base_url(base_url: str):
     config = load_config()
     config["base_url"] = base_url.rstrip("/")
     save_config(config)
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def get_greeting_activity_weight() -> float:
+    """How often greetings prefer activity-based lines (0.0-1.0)."""
+    config = load_config()
+    try:
+        return _clamp01(config.get("greeting_activity_weight", DEFAULT_GREETING_ACTIVITY_WEIGHT))
+    except Exception:
+        return DEFAULT_GREETING_ACTIVITY_WEIGHT
+
+
+def set_greeting_activity_weight(value: float) -> float:
+    config = load_config()
+    v = _clamp01(value)
+    config["greeting_activity_weight"] = v
+    save_config(config)
+    return v
+
+
+def get_greeting_moon_cameo_weight() -> float:
+    """How often non-full/new moon phases can appear as a cameo (0.0-1.0)."""
+    config = load_config()
+    try:
+        return _clamp01(config.get("greeting_moon_cameo_weight", DEFAULT_GREETING_MOON_CAMEO_WEIGHT))
+    except Exception:
+        return DEFAULT_GREETING_MOON_CAMEO_WEIGHT
+
+
+def set_greeting_moon_cameo_weight(value: float) -> float:
+    config = load_config()
+    v = _clamp01(value)
+    config["greeting_moon_cameo_weight"] = v
+    save_config(config)
+    return v
+
+
+def get_config_value(key: str, default: Any = None) -> Any:
+    """Get a config value by dotted path, e.g. 'meta_cache.fetched_at'.
+
+    Returns default if key is missing.
+    """
+    cfg = load_config() or {}
+    cur: Any = cfg
+    for part in str(key).split("."):
+        if not isinstance(cur, dict) or part not in cur:
+            return default
+        cur = cur[part]
+    return cur
+
+
+def set_config_value(key: str, value: Any) -> None:
+    """Set a config value by dotted path, creating intermediate dicts."""
+    cfg = load_config() or {}
+    parts = str(key).split(".")
+    cur: Any = cfg
+    for part in parts[:-1]:
+        if part not in cur or not isinstance(cur.get(part), dict):
+            cur[part] = {}
+        cur = cur[part]
+    cur[parts[-1]] = value
+    save_config(cfg)

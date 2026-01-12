@@ -1,6 +1,6 @@
 # Autumn CLI
 
-Command-line interface for AutumnWeb - time tracking and project management from your terminal.
+Command-line interface for AutumnWeb — time tracking and project management from your terminal.
 
 ## Installation
 
@@ -32,51 +32,90 @@ uv pip install -e ./cli
 
 ## Getting Started
 
-### 1. Get Your API Key
+### 1) Authenticate
 
-First, you need to obtain an API token from your AutumnWeb instance:
+Autumn CLI supports two authentication flows:
 
-1. Log into your AutumnWeb account in a browser
-2. Navigate to `/get-auth-token/` (e.g., `http://localhost:8000/get-auth-token/`)
-3. Enter your username and password
-4. Copy the returned token
-
-Alternatively, you can create a token programmatically or through the Django admin.
-
-### 2. Configure the CLI
-
-Run the setup command to configure your API key and base URL:
+#### Option A: API token (existing)
 
 ```bash
 autumn auth setup
 ```
 
-You'll be prompted for:
-- **API Key**: Your AutumnWeb API token (you can paste it in)
-- **Base URL**: The base URL of your AutumnWeb instance (default: `http://localhost:8000`, you can paste it in)
+You’ll be prompted for:
+- **API Key**: Your AutumnWeb API token
+- **Base URL**: Your AutumnWeb instance URL (default: `http://localhost:8000`)
 
-You can also provide them as command-line options:
+You can also provide them as options:
+
 ```bash
 autumn auth setup --api-key "your-token-here" --base-url "http://localhost:8000"
 ```
 
-The configuration is saved to `~/.autumn/config.yaml`.
+#### Option B: Username/email + password (new)
 
-You can also set these via environment variables:
-- `AUTUMN_API_KEY`: Your API token
-- `AUTUMN_API_BASE`: Base URL (e.g., `http://localhost:8000`)
+This will request a token from the server and save it to your config file:
 
-Environment variables take precedence over the config file.
+```bash
+autumn auth login
+```
 
-### 3. Verify Configuration
+Options:
+- `--username` (or email)
+- `--password` (will prompt if omitted)
+- `--base-url`
 
-Test your configuration:
+#### Switch accounts / logout
+
+```bash
+autumn auth logout
+autumn auth login
+```
+
+### 2) Verify configuration
 
 ```bash
 autumn auth verify
+autumn auth status
+```
+
+### 3) Say hi
+
+Running `autumn` with no subcommands prints:
+- A short, dynamic greeting (time-of-day / moon phase / seasonal vibes, sometimes recent activity)
+- The base URL you’re currently connected to
+
+```bash
+autumn
 ```
 
 ## Usage
+
+## Command Reference
+
+A quick overview of the most-used commands:
+
+| Area | Command | What it does | Common options |
+|---|---|---|---|
+| Greeting | `autumn` | Show a short greeting + connection info | (see greeting knobs via `autumn config greeting show`) |
+| Auth | `autumn auth setup` | Save API token + base URL | `--api-key`, `--base-url` |
+| Auth | `autumn auth login` | Login with username/email + password and store token | `--username`, `--password`, `--base-url` |
+| Auth | `autumn auth logout` | Clear stored API token | — |
+| Timers | `autumn start <project>` | Start a timer | `--subprojects`, `--note` |
+| Timers | `autumn status` | Show active timers | `--project`, `--session-id` |
+| Timers | `autumn stop` | Stop timer | `--project`, `--session-id`, `--note` |
+| Timers | `autumn restart` | Restart timer | `--project`, `--session-id` |
+| Timers | `autumn delete` | Delete timer without saving | `--session-id` |
+| Logs | `autumn log` | List sessions (saved) | `--period`, `--project`, `--context`, `--tag`, `--start-date`, `--end-date` |
+| Logs | `autumn log search` | Search sessions | `--note-snippet`, `--context`, `--tag`, `--limit`, `--offset` |
+| Projects | `autumn projects` | List projects grouped by status | `--status`, `--context`, `--tag` |
+| Charts | `autumn chart` | Render charts | `--type`, `--project`, `--context`, `--tag`, `--period/-pd`, `--save` |
+| Meta | `autumn context list` | List contexts | `--full`, `--json` |
+| Meta | `autumn tag list` | List tags | `--full`, `--json` |
+| Meta | `autumn meta refresh` | Clear cached contexts/tags + greeting activity cache | — |
+| Config | `autumn config show` | Show `config.yaml` (redacted) | `--raw`, `--json` |
+| Config | `autumn config set` | Set config values (dotted path) | `--type` |
+| Config | `autumn config greeting set` | Tune greeting weights | `--activity-weight`, `--moon-cameo-weight` |
 
 ### Timer Commands
 
@@ -101,6 +140,8 @@ autumn stop --project "My Project" --note "Finished for today"
 Restart a timer:
 ```bash
 autumn restart
+autumn restart --project "My Project"
+autumn restart --session-id 123
 ```
 
 Delete a timer:
@@ -108,18 +149,17 @@ Delete a timer:
 autumn delete --session-id 123
 ```
 
-### Session Commands
+### Sessions / Logs
 
-View activity logs:
+Show activity logs (saved sessions):
 ```bash
-autumn log  # Default: last week
+autumn log                   # Default: last week
 autumn log --period month
-autumn log --period fortnight  # 2 weeks
-autumn log --period "lunar cycle"  # ~29.5 days
-autumn log --period quarter  # 3 months
-autumn log --period year
-autumn log --period all  # All time
-autumn log --project "My Project" --start-date 2024-01-01
+```
+
+You can filter logs by context and tags:
+```bash
+autumn log --context General --tag Code --tag "Error Handling"
 ```
 
 Search sessions:
@@ -127,6 +167,7 @@ Search sessions:
 autumn log search --project "My Project"
 autumn log search --start-date 2024-01-01 --end-date 2024-01-31
 autumn log search --note-snippet "meeting"
+autumn log search --context General --tag Code
 ```
 
 Track a completed session manually:
@@ -134,12 +175,18 @@ Track a completed session manually:
 autumn track "My Project" --start "2024-01-15 09:00:00" --end "2024-01-15 11:30:00" --note "Morning work session"
 ```
 
-### Project Commands
+### Projects
 
-List projects:
+List projects (grouped by status, including archived):
 ```bash
 autumn projects
-autumn projects --status active
+```
+
+Filter by status/context/tags:
+```bash
+autumn projects --status archived
+autumn projects --context General
+autumn projects --tag Code --tag "Backend"
 ```
 
 Create a project:
@@ -147,11 +194,12 @@ Create a project:
 autumn new "New Project" --description "Project description"
 ```
 
-### Chart Commands
+### Charts
 
-All charts can be displayed interactively or saved to a file using the `--save` option.
+All charts can be displayed interactively or saved to a file using `--save`.
+Charts also support `--context` and repeatable `--tag` filtering.
 
-The chart command accepts a `--type` option with the following types:
+Chart types:
 - `pie` (default) - Project/subproject time distribution
 - `bar` - Horizontal bar chart of project/subproject totals
 - `scatter` - Session durations over time
@@ -163,125 +211,111 @@ Examples:
 ```bash
 # Pie chart (default)
 autumn chart
-autumn chart --project "My Project"  # Shows subprojects
+
+# Filtered chart
+autumn chart --context General --tag Code -pd month
 
 # Bar chart
 autumn chart --type bar
-autumn chart --type bar --project "My Project"
-
-# Scatter plot
-autumn chart --type scatter
-autumn chart --type scatter --project "My Project"
-
-# Calendar (GitHub contribution style)
-autumn chart --type calendar
-autumn chart --type calendar --start-date 2024-01-01 --end-date 2024-01-31
-
-# Wordcloud
-autumn chart --type wordcloud
-autumn chart --type wordcloud --project "My Project"
-
-# Heatmap
-autumn chart --type heatmap
-autumn chart --type heatmap --project "My Project"
 
 # Save to file
 autumn chart --type pie --save chart.png
-autumn chart --type bar --save totals.png
 ```
+
+### Contexts & Tags
+
+List contexts:
+```bash
+autumn context list
+autumn context list --full
+```
+
+List tags:
+```bash
+autumn tag list
+autumn tag list --full
+```
+
+Refresh cached metadata (contexts/tags + greeting activity cache):
+```bash
+autumn meta refresh
+```
+
+## Configuration
+
+Configuration is stored in `~/.autumn/config.yaml`.
+
+Common keys:
+```yaml
+api_key: your_api_token_here
+base_url: https://your-instance
+
+# Greeting knobs
+# How often the greeting references recent activity (0..1)
+greeting_activity_weight: 0.35
+
+# How often non-full/new moon phases can show up in the greeting (0..1)
+greeting_moon_cameo_weight: 0.15
+```
+
+### Config commands (new)
+
+Show config (redacts API key by default):
+```bash
+autumn config show
+```
+
+Get/set values by dotted path:
+```bash
+autumn config get base_url
+autumn config set base_url https://example.com
+
+autumn config set greeting_activity_weight 0.15 --type float
+```
+
+Greeting convenience commands:
+```bash
+autumn config greeting show
+autumn config greeting set --activity-weight 0.2 --moon-cameo-weight 0.05
+```
+
+Environment variables:
+- `AUTUMN_API_KEY`: overrides `api_key`
+- `AUTUMN_API_BASE`: overrides `base_url`
 
 ## Features
 
 - ✅ **Timer Management**: Start, stop, restart, and manage timers
-- ✅ **Session Logs**: View and search your time tracking sessions (includes session notes in the output)
-- ✅ **Project Management**: List and create projects
-- ✅ **Charts & Visualization**: Generate beautiful charts with matplotlib/seaborn
-  - Pie charts
-  - Bar charts
-  - Scatter plots
-  - Calendar heatmaps (GitHub contribution style)
-  - Word clouds
-  - Activity heatmaps
-- ✅ **Bidirectional Sync**: Changes in CLI sync with web app and vice versa
-- ✅ **Text Tables**: Clean, formatted output for logs and search results (with colored status highlights)
-
-## Configuration
-
-Configuration is stored in `~/.autumn/config.yaml`:
-
-```yaml
-api_key: your_api_token_here
-base_url: http://localhost:8000
-```
-
-You can also use environment variables:
-- `AUTUMN_API_KEY`: Your API token
-- `AUTUMN_API_BASE`: Base URL
+- ✅ **Session Logs + Search**: View and search sessions, including notes
+- ✅ **Projects (Grouped + Robust)**: Colored grouped tables with metadata; includes archived
+- ✅ **Contexts + Tags**: Discover via CLI and use for filtering (projects/logs/charts/search)
+- ✅ **Charts & Visualization**: Generate charts (pie/bar/scatter/calendar/wordcloud/heatmap)
+- ✅ **Dynamic Greeting**: Fun “alive” greeting when running `autumn` with no args
+- ✅ **Config Editor**: View/edit `config.yaml` from the CLI
 
 ## API Endpoints
 
-The CLI communicates with your AutumnWeb instance using the REST API. All endpoints require authentication via the `Authorization: Token <api_key>` header.
+The CLI communicates with your AutumnWeb instance using the REST API.
 
 Key endpoints used:
-- `/api/timer/*` - Timer management
-- `/api/log/` - Activity logs
-- `/api/sessions/search/` - Session search
-- `/api/track/` - Manual session tracking
-- `/api/projects/grouped/` - Project listings
-- `/api/tally_by_sessons/` - Project totals (for charts)
-- `/api/tally_by_subprojects/` - Subproject totals (for charts)
-- `/api/list_sessions/` - Session lists (for charts)
-
-## Requirements
-
-- Python 3.8+
-- AutumnWeb instance running and accessible
-- Valid API token from your AutumnWeb account
+- `/get-auth-token/` - create token via username/password
+- `/api/me/` - user identity for greeting
+- `/api/timer/*` - timer management
+- `/api/log/` - activity logs
+- `/api/sessions/search/` - session search
+- `/api/track/` - manual session tracking
+- `/api/projects/grouped/` - project listings (grouped)
+- `/api/contexts/`, `/api/tags/` - metadata discovery
+- `/api/tally_by_sessons/`, `/api/tally_by_subprojects/`, `/api/list_sessions/` - charts
 
 ## Troubleshooting
 
-### Authentication Errors
+### Authentication errors
 
-If you get authentication errors:
-1. Verify your API key: `autumn auth status`
-2. Check that your API key is valid in the web app
-3. Ensure the base URL is correct and accessible
+- `autumn auth status`
+- `autumn auth verify`
+- Make sure `base_url` is correct and reachable
 
-### Connection Errors
+### Charts don’t display
 
-If you can't connect:
-1. Verify the base URL is correct
-2. Check that your AutumnWeb instance is running
-3. Ensure there are no firewall/network issues
-
-### Chart Display Issues
-
-If charts don't display:
-- Make sure you have a display available (X11 on Linux, or running in a GUI environment)
-- Use `--save` to save charts to files instead
-- Check that matplotlib backend is configured correctly for your system
-
-### Wordcloud Chart
-
-The wordcloud chart requires the `wordcloud` library. If you get an error, install it:
-```bash
-pip install wordcloud
-```
-
-## Development
-
-To develop or modify the CLI:
-
-```bash
-cd cli
-pip install -e ".[dev]"  # If you add dev dependencies
-```
-
-Run tests (when implemented):
-```bash
-pytest tests/
-```
-
-## License
-
-Same as AutumnWeb project.
+- Use `--save` to render to a file
