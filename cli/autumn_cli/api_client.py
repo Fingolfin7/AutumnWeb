@@ -62,8 +62,27 @@ class APIClient:
             except Exception:
                 raise APIError(f"API error: {e}")
         except requests.exceptions.RequestException as e:
-            raise APIError(f"Network error: {e}")
-    
+            # Keep network errors readable; urllib3 can be very verbose.
+            host = None
+            try:
+                from urllib.parse import urlparse
+
+                host = urlparse(url).hostname
+            except Exception:
+                host = None
+
+            msg = str(e)
+            # Common Windows DNS failure: getaddrinfo failed
+            if "getaddrinfo failed" in msg or "NameResolutionError" in msg:
+                hint = "DNS lookup failed"
+            else:
+                hint = "Network error"
+
+            host_part = f" (host={host})" if host else ""
+            raise APIError(
+                f"{hint}{host_part}. Check your internet connection and base_url (autumn auth status). Details: {msg}"
+            )
+
     def get_token_with_password(self, username_or_email: str, password: str) -> str:
         """Fetch an auth token using username/email + password.
 
