@@ -106,14 +106,11 @@ class InsightsView(View):
 
             # evaluate counts/dates
             session_count = qs.count()
-            # Use aggregate to avoid loading all objects just for dates
             from django.db.models import Min, Max
 
             aggr = qs.aggregate(first=Min("start_time"), last=Max("end_time"))
 
-            # Since we need the sessions list for the handler/template anyway:
             sessions = list(qs)
-
             provider_models = self._provider_models(user)
 
             search_form = SearchProjectForm(
@@ -219,7 +216,6 @@ class InsightsView(View):
             aggr = qs.aggregate(first=Min("start_time"), last=Max("end_time"))
 
             sessions = list(qs)
-
             sessions_updated = request.session.get("sessions_updated", False)
             provider_models = self._provider_models(user)
             api_keys = self._build_api_keys(user)
