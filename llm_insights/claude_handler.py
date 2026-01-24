@@ -67,6 +67,9 @@ class ClaudeHandler(BaseLLMHandler):
     def get_usage_stats(self):
         return self.usage_stats
 
+    def set_conversation_history(self, history: list):
+        self.conversation_history = history
+
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
@@ -167,6 +170,14 @@ class ClaudeHandler(BaseLLMHandler):
                 "content": text,
                 "sources": sources,
                 "model": self.model,
+                "usage": {
+                    "prompt": getattr(resp.usage, "input_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                    "response": getattr(resp.usage, "output_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                },
             }
         )
 

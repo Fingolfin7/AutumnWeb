@@ -68,6 +68,9 @@ class OpenAIHandler(BaseLLMHandler):
     def get_usage_stats(self):
         return self.usage_stats
 
+    def set_conversation_history(self, history: list):
+        self.conversation_history = history
+
     def _extract_sources(self, resp):
         """Extract sources from OpenAI Responses API response"""
         sources = []
@@ -196,6 +199,14 @@ class OpenAIHandler(BaseLLMHandler):
                 "content": text,
                 "sources": sources,
                 "model": self.model,
+                "usage": {
+                    "prompt": getattr(resp.usage, "prompt_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                    "response": getattr(resp.usage, "completion_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                },
             }
         )
 

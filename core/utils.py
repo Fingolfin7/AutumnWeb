@@ -192,13 +192,20 @@ def filter_by_active_context(
     return data
 
 
-def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet:
+def filter_sessions_by_params(
+    request, sessions: QuerySet[Sessions], params_override=None
+) -> QuerySet:
     # Determine the correct query parameters attribute safely
-    query_params = getattr(request, "query_params", None)
-    if query_params is None:
-        query_params = getattr(request, "GET", {})
+    # If params_override is provided, use it. Otherwise fall back to request.GET
+    if params_override is not None:
+        query_params = params_override
+    else:
+        query_params = getattr(request, "query_params", None)
+        if query_params is None:
+            query_params = getattr(request, "GET", {})
 
     project_name = query_params.get("project_name")
+
     subproject_name = query_params.get("subproject")
     project_names = query_params.get("projects")
     if project_names:
@@ -225,7 +232,9 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
         tag_vals = query_params.getlist("tags")
     else:
         tags_param = query_params.get("tags")
-        if tags_param:
+        if isinstance(tags_param, list):
+            tag_vals = tags_param
+        elif tags_param:
             tag_vals = [t for t in tags_param.split(",") if t]
 
     if tag_vals:

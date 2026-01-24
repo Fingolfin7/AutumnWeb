@@ -58,15 +58,25 @@ class GeminiHandler(BaseLLMHandler):
         {session_data}
         """
 
-    async def _create_chat(self, model):
+    async def _create_chat(self, model, history=None):
         """Helper to (re)create a chat for a given model."""
+        gemini_history = []
+        if history:
+            for m in history:
+                role = "user" if m["role"] in ["user", "system"] else "model"
+                gemini_history.append({"role": role, "parts": [{"text": m["content"]}]})
+
         self.chat = self.client.aio.chats.create(
             model=model,
+            history=gemini_history,
             config=GenerateContentConfig(
                 tools=[self.google_search_tool], response_modalities=["TEXT"]
             ),
         )
         self.model = model
+
+    def set_conversation_history(self, history: list):
+        self.conversation_history = history
 
     def _update_usage(self, response):
         """Internal helper to extract and accumulate token usage metadata if available."""
@@ -255,6 +265,16 @@ class GeminiHandler(BaseLLMHandler):
                 "content": assistant_response,
                 "sources": sources,
                 "model": self.model,
+                "usage": {
+                    "prompt": getattr(response.usage_metadata, "prompt_token_count", 0)
+                    if response.usage_metadata
+                    else 0,
+                    "response": getattr(
+                        response.usage_metadata, "candidates_token_count", 0
+                    )
+                    if response.usage_metadata
+                    else 0,
+                },
             }
         )
 
@@ -310,6 +330,18 @@ class GeminiHandler(BaseLLMHandler):
                     "content": assistant_response,
                     "sources": sources,
                     "model": self.model,
+                    "usage": {
+                        "prompt": getattr(
+                            response.usage_metadata, "prompt_token_count", 0
+                        )
+                        if response.usage_metadata
+                        else 0,
+                        "response": getattr(
+                            response.usage_metadata, "candidates_token_count", 0
+                        )
+                        if response.usage_metadata
+                        else 0,
+                    },
                 }
             )
 

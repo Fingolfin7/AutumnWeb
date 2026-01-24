@@ -25,7 +25,62 @@
                 modelSelect.val(entries[0].value);
             }
         }
+
+        function copyToClipboard(text, btn) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="fa fa-check"></i>';
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                }, 2000);
+            });
+        }
+
+        function copyFullChat() {
+            const messages = [];
+            $('.conversation-container > div').each(function() {
+                let sender = 'User';
+                if ($(this).hasClass('user-message')) {
+                    sender = '{{ username|default:"User" }}';
+                } else if ($(this).hasClass('assistant-message')) {
+                    const model = $(this).data('model') || '{{ selected_model|default:"LLM" }}';
+                    sender = `Autumn (${model})`;
+                }
+                const content = $(this).find('.message-content').text().trim();
+                if (content) {
+                    messages.push(`[${sender}]\n${content}`);
+                }
+            });
+            const fullText = messages.join('\n\n---\n\n');
+            navigator.clipboard.writeText(fullText).then(() => {
+                const btn = $('#copy-full-chat-btn');
+                const originalText = btn.html();
+                btn.html('<i class="fa fa-check"></i> Copied!');
+                setTimeout(() => btn.html(originalText), 2000);
+            });
+        }
+
+        function toggleSidebar() {
+            const sidebar = $('.chat-sidebar');
+            sidebar.toggleClass('collapsed');
+            const isCollapsed = sidebar.hasClass('collapsed');
+            localStorage.setItem('chatSidebarCollapsed', isCollapsed);
+            
+            // Update icon
+            const icon = $('#toggle-sidebar-btn i');
+            if (isCollapsed) {
+                icon.removeClass('fa-chevron-left').addClass('fa-chevron-right');
+            } else {
+                icon.removeClass('fa-chevron-right').addClass('fa-chevron-left');
+            }
+        }
+
         $(document).ready(function(){
+            // Restore sidebar state
+            if (localStorage.getItem('chatSidebarCollapsed') === 'true') {
+                toggleSidebar();
+            }
+
             // Set the default start date to the start of the current month
             let current_date = new Date();
             // Only set default dates if they aren't already set (from a previous search)
@@ -47,29 +102,18 @@
                 repopulateModels(newProvider,null);
                 $('#provider_filter').val(newProvider);
                 $('#model_filter').val($('#model').val());
-
-                // Update URL with provider change
-                let prompt = $('#prompt').val();
-                let params = new URLSearchParams(window.location.search);
-                params.set('provider', newProvider);
-                const firstModel = (PROVIDER_MODELS[newProvider]||[])[0];
-                if (firstModel){ params.set('model', firstModel.value); }
-                if (prompt) params.set('prompt', prompt);
-                window.location.search = params.toString();
             });
+            
             $('#model').on('change', function() {
-                let provider = $('#provider').val();
                 let selected = $(this).val();
                 $('#model_filter').val(selected);
-                $('#provider_filter').val(provider);
-
-                let prompt = $('#prompt').val();
-                let params = new URLSearchParams(window.location.search);
-                params.set('provider', provider);
-                params.set('model', selected);
-                if (prompt) params.set('prompt', prompt);
-                window.location.search = params.toString();
             });
+
+            // Scroll conversation to bottom
+            const container = document.getElementById('conversation-container');
+            if (container) {
+                container.scrollTop = container.scrollHeight;
+            }
         });
     </script>
 {% endblock %}
@@ -137,41 +181,64 @@
         </form>
     </section>
 
-    <section id="sessions-list">
-        {% if not sessions %}
-            <div class="full-width centered-pic">
-                <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}"
-                 alt="No sessions found">
+    <div class="chat-layout card">
+        <aside class="chat-sidebar">
+            <a href="{% url 'insights' %}" class="primary-button new-chat-btn">
+                <i class="fa fa-plus"></i> New Chat
+            </a>
+            <div class="chat-list">
+                {% for chat in recent_chats %}
+                    <div class="chat-item-container {% if chat.id == chat_id %}active{% endif %}">
+                        <a href="{% url 'insights_detail' chat.id %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
+                            <span class="chat-title" title="{{ chat.title }}">{{ chat.title }}</span>
+                        </a>
+                        <a href="{% url 'delete_chat' chat.id %}" class="delete-chat-btn" onclick="return confirm('Delete this chat?')">
+                            <i class="fa fa-trash"></i>
+                        </a>
+                    </div>
+                {% empty %}
+                    <p class="text-muted text-center">No recent chats.</p>
+                {% endfor %}
             </div>
-        {% else %}
-            <h2 class="text-center">Sessions Selected for Analysis</h2>
-            <br>
-            <div class="card">
-                <h3>Selected Sessions: {{ session_count }}
-                    <small style="font-weight:normal; font-size:0.7em; margin-left:0.5rem;" title="Approximate token usage for this conversation">
-                        Tokens (prompt/response/total): {{ usage_stats.prompt }}/{{ usage_stats.response }}/{{ usage_stats.total }}
-                    </small>
-                </h3>
-                {% if session_count > 0 %}
-                <p>Date Range:
-                    <span class="text-cyan">{{ earliest_date|day_date_formatter }}</span> to
-                    <span class="text-cyan">{{ latest_date|day_date_formatter }}</span>
-                </p>
-                {% else %}
-                <p class="text-muted">No sessions in selected range.</p>
-                {% endif %}
+        </aside>
 
-                <br>
+        <main class="chat-main">
+            <div style="margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+                <button type="button" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                    <i class="fa fa-chevron-left"></i>
+                </button>
+            </div>
+            {% if not sessions and not conversation_history %}
+                <div class="empty-state-container">
+                    <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}" alt="No sessions found">
+                    <p class="text-muted">Filter some sessions to start a conversation!</p>
+                </div>
+            {% else %}
+                <div class="chat-header">
+                    <div>
+                        <h3>{% if session_count > 0 %}Selected Sessions: {{ session_count }}{% else %}Conversation History{% endif %}
+                            <small style="font-weight:normal; font-size:0.7em; margin-left:0.5rem;" title="Approximate token usage for this conversation">
+                                Tokens: {{ usage_stats.prompt|default:0 }}/{{ usage_stats.response|default:0 }}
+                            </small>
+                        </h3>
+                        {% if session_count > 0 %}
+                        <p class="text-muted">Date Range:
+                            <span class="text-cyan">{{ earliest_date|day_date_formatter }}</span> to
+                            <span class="text-cyan">{{ latest_date|day_date_formatter }}</span>
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% if conversation_history %}
+                    <button type="button" id="copy-full-chat-btn" class="copy-full-chat-btn" onclick="copyFullChat()">
+                        <i class="fa fa-copy"></i> Copy Full Chat
+                    </button>
+                    {% endif %}
+                </div>
 
-                <form method="post" class="chat-form">
+                <form method="post" class="chat-form" style="display: flex; flex-direction: column; flex: 1;">
                     {% csrf_token %}
 
-                    <div class="button-group">
-                        <button type="submit" name="reset_conversation" class="secondary-button">
-                            <i class="fa fa-redo"></i>
-                            Reset Conversation
-                        </button>
-
+                    <div class="button-group" style="margin-bottom: 15px;">
                         <span class="label-input">
                             <label for="provider">Provider</label>
                             <select id="provider" name="provider">
@@ -187,7 +254,6 @@
                         </span>
                     </div>
 
-
                     <div id="conversation-container" class="conversation-container">
                         {% if conversation_history %}
                             {% for message in conversation_history %}
@@ -198,7 +264,11 @@
                                         </div>
                                     </div>
                                 {% elif message.role == 'assistant' %}
-                                    <div class="assistant-message">
+                                    <div class="assistant-message" data-model="{{ message.model|default:selected_model }}">
+                                        <button type="button" class="copy-btn" title="Copy message" 
+                                                onclick="copyToClipboard(`{{ message.content|escapejs }}`, this)">
+                                            <i class="fa fa-copy"></i>
+                                        </button>
                                         <div class="message-content">
                                             {{ message.content|markdown|safe|linebreaks }}
                                         </div>
@@ -207,7 +277,6 @@
                                             <small class="assistant-sources">
                                                 <strong>Sources:</strong>
                                                 {% for source in message.sources %}
-                                                    <! -- use markdown_render to render source links -->
                                                     <a href="{{source.link}}" class="plain-link" target="_blank" rel="noopener noreferrer">
                                                         {{source.title|default:forloop.counter|cut:" "}}
                                                         {% if not forloop.last %},{% endif %}
@@ -218,22 +287,26 @@
                                     </div>
                                 {% endif %}
                             {% endfor %}
+                        {% else %}
+                            <div class="empty-state-container" style="opacity: 0.5;">
+                                <i class="fa fa-comments fa-3x"></i>
+                                <p>Start a new conversation about the selected sessions.</p>
+                            </div>
                         {% endif %}
                     </div>
 
                     <span class="label-input full-width">
-                        <textarea name="prompt" id="prompt" rows="1" class="full-width"
-                                  placeholder="Ask a question about your sessions...">{% if prompt %}{{ prompt }}{% endif %}</textarea>
+                        <textarea name="prompt" id="prompt" rows="2" class="full-width"
+                                  placeholder="Ask a question about your sessions..."></textarea>
                     </span>
 
                     <div class="button-group">
                         <button type="submit" class="primary-button">
-                            <i class="fa fa-paper-plane"></i>
-                            Send
+                            <i class="fa fa-paper-plane"></i> Send
                         </button>
                     </div>
                 </form>
-            </div>
-        {% endif %}
-    </section>
+            {% endif %}
+        </main>
+    </div>
 {% endblock %}
