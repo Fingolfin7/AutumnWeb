@@ -81,7 +81,6 @@
 
 .chat-sidebar {
   flex: 0 0 260px;
-  max-height: 600px;
   overflow-y: auto;
   border-right: 1px solid var(--border-dark);
   padding: 15px;
@@ -252,4 +251,5 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  text-decoration: none !important;
 }
