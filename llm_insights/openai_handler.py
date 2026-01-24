@@ -1,5 +1,5 @@
 from toon import encode
-from openai import OpenAI
+from openai import AsyncOpenAI
 from core.utils import build_project_json_from_sessions
 from .base_handler import BaseLLMHandler
 
@@ -8,7 +8,9 @@ class OpenAIHandler(BaseLLMHandler):
     def __init__(self, model="gpt-5-mini", api_key: str | None = None):
         self.model = model
         self.api_key = api_key
-        self.client = OpenAI(api_key=api_key) if api_key else OpenAI()  # falls back to env var OPENAI_API_KEY
+        self.client = (
+            AsyncOpenAI(api_key=api_key) if api_key else AsyncOpenAI()
+        )  # falls back to env var OPENAI_API_KEY
         self.username = None
         self.session_data = None
         self.conversation_history = []
@@ -46,25 +48,30 @@ class OpenAIHandler(BaseLLMHandler):
         New sessions data:
         {session_data}
         """
+
     def initialize_chat(self, username, sessions_data):
         self.username = username
-        self.session_data = encode(build_project_json_from_sessions(sessions_data, autumn_compatible=True))
+        self.session_data = encode(
+            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+        )
+
     def _update_usage(self, response):
-        usage = getattr(response, 'usage', None)
+        usage = getattr(response, "usage", None)
         if usage:
-            pt = getattr(usage, 'prompt_tokens', 0)
-            ct = getattr(usage, 'completion_tokens', 0)
-            tt = getattr(usage, 'total_tokens', pt+ct)
-            self.usage_stats['prompt'] += pt
-            self.usage_stats['response'] += ct
-            self.usage_stats['total'] += tt
+            pt = getattr(usage, "prompt_tokens", 0)
+            ct = getattr(usage, "completion_tokens", 0)
+            tt = getattr(usage, "total_tokens", pt + ct)
+            self.usage_stats["prompt"] += pt
+            self.usage_stats["response"] += ct
+            self.usage_stats["total"] += tt
+
     def get_usage_stats(self):
         return self.usage_stats
-    
+
     def _extract_sources(self, resp):
         """Extract sources from OpenAI Responses API response"""
         sources = []
-        
+
         # 1) Inline citations from the assistant message
         for item in getattr(resp, "output", []) or []:
             if getattr(item, "type", None) != "message":
@@ -76,12 +83,14 @@ class OpenAIHandler(BaseLLMHandler):
                         url = getattr(ann, "url", None)
                         title = getattr(ann, "title", None) or url
                         if url:
-                            sources.append({
-                                "link": url,
-                                "title": title,
-                                "kind": "citation",
-                            })
-        
+                            sources.append(
+                                {
+                                    "link": url,
+                                    "title": title,
+                                    "kind": "citation",
+                                }
+                            )
+
         # 2) Full source list from web_search_call.action.sources (if included)
         for item in getattr(resp, "output", []) or []:
             if getattr(item, "type", None) != "web_search_call":
@@ -94,13 +103,15 @@ class OpenAIHandler(BaseLLMHandler):
                 title = getattr(src, "title", None) or url
                 provider = getattr(src, "provider", None)
                 if url:
-                    sources.append({
-                        "link": url,
-                        "title": title,
-                        "provider": provider,
-                        "kind": "source",
-                    })
-        
+                    sources.append(
+                        {
+                            "link": url,
+                            "title": title,
+                            "provider": provider,
+                            "kind": "source",
+                        }
+                    )
+
         # De-duplicate by URL while preserving order
         seen = set()
         unique_sources = []
@@ -109,63 +120,88 @@ class OpenAIHandler(BaseLLMHandler):
                 continue
             seen.add(s["link"])
             unique_sources.append(s)
-        
+
         return unique_sources
-    
-    def update_session_data(self, sessions_data, user_prompt):
-        self.session_data = encode(build_project_json_from_sessions(sessions_data, autumn_compatible=True))
-        prompt = self.update_session_data_template.format(username=self.username, user_prompt=user_prompt, session_data=self.session_data)
-        return self.send_message(prompt)
-    def send_message(self, message):
+
+    async def update_session_data(self, sessions_data, user_prompt) -> str:
+        self.session_data = encode(
+            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+        )
+        prompt = self.update_session_data_template.format(
+            username=self.username,
+            user_prompt=user_prompt,
+            session_data=self.session_data,
+        )
+        return await self.send_message(prompt)
+
+    async def send_message(self, message) -> str:
         msgs = []
-        
+
         # If this is the first message, create and store system prompt
         if len(self.conversation_history) == 0:
             system_prompt = self.system_prompt_template.format(
                 username=self.username,
                 user_prompt=message,
-                session_data=self.session_data
+                session_data=self.session_data,
             )
             # Store system prompt in conversation history first
-            self.conversation_history.append({"role": "system", "content": system_prompt})
-        
+            self.conversation_history.append(
+                {"role": "system", "content": system_prompt}
+            )
+
         # Rebuild history as OpenAI messages (system+user+assistant)
         for m in self.conversation_history:
-            role = m['role'] if m['role'] in ['user','assistant','system'] else 'user'
-            msgs.append({"role": role, "content": m['content']})
-        
+            role = m["role"] if m["role"] in ["user", "assistant", "system"] else "user"
+            msgs.append({"role": role, "content": m["content"]})
+
         # Add the current user message
         msgs.append({"role": "user", "content": message})
-        
+
         resp = None
         sources = []
         try:
             # Enable web search by default using Responses API
             # Include sources in the response
-            resp = self.client.responses.create(
+            resp = await self.client.responses.create(
                 model=self.model,
                 input=msgs,
                 tools=[{"type": "web_search"}],
-                include=["web_search_call.action.sources"]
+                include=["web_search_call.action.sources"],
             )
             # Extract text from Responses API
-            text = resp.output_text if hasattr(resp, 'output_text') else (
-                resp.output[0].content[0].text.value if hasattr(resp, 'output') and resp.output 
-                else str(resp)
-            )
-            
+            if hasattr(resp, "output_text"):
+                text = resp.output_text
+            else:
+                # Manual extraction if needed
+                text = ""
+                if hasattr(resp, "output") and resp.output:
+                    for o in resp.output:
+                        if o.type == "message":
+                            for c in o.content:
+                                if hasattr(c, "text") and hasattr(c.text, "value"):
+                                    text += c.text.value
+                if not text:
+                    text = str(resp)
+
             # Extract sources using proper extraction method
             sources = self._extract_sources(resp)
         except Exception as e:
             text = f"OpenAI error: {e}"
-        
+
         # Store user message and assistant response in conversation history
         self.conversation_history.append({"role": "user", "content": message})
-        self.conversation_history.append({"role": "assistant", "content": text, "sources": sources, "model": self.model})
-        
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": text,
+                "sources": sources,
+                "model": self.model,
+            }
+        )
+
         if resp:
             self._update_usage(resp)
         return text
-    def get_conversation_history(self):
-        return self.conversation_history
 
+    def get_conversation_history(self) -> list:
+        return self.conversation_history

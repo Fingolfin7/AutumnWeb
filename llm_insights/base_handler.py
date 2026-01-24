@@ -9,15 +9,14 @@ class BaseLLMHandler(ABC):
         pass
 
     @abstractmethod
-    def send_message(self, message):
+    async def send_message(self, message) -> str:
         pass
 
     @abstractmethod
-    def get_conversation_history(self):
+    def get_conversation_history(self) -> list:
         pass
-    
+
     @abstractmethod
-    def update_session_data(self, sessions_data, user_prompt):
+    async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data the LLM is working with"""
         pass
-

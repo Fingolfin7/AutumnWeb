@@ -10,12 +10,11 @@ from django.http import HttpRequest
 from core.models import Sessions, Projects, SubProjects, Context, Tag
 
 
-
 ACTIVE_CONTEXT_SESSION_KEY = "active_context_id"
 
 
 def parse_date_or_datetime(date_str):
-    """"
+    """ "
     Parse a date or datetime string into a datetime object. Supports the following formats:
     %m-%d-%Y, %m-%d-%Y %H:%M:%S, %Y-%m-%d, %Y-%m-%d %H:%M:%S
 
@@ -24,7 +23,7 @@ def parse_date_or_datetime(date_str):
     :raises ValueError: if the date_str is not in a recognized format
 
     """
-    date_formats = ['%m-%d-%Y', '%m-%d-%Y %H:%M:%S', '%Y-%m-%d', '%Y-%m-%d %H:%M:%S']
+    date_formats = ["%m-%d-%Y", "%m-%d-%Y %H:%M:%S", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S"]
     for fmt in date_formats:
         try:
             return datetime.strptime(date_str, fmt)
@@ -33,7 +32,9 @@ def parse_date_or_datetime(date_str):
     raise ValueError(f"Date string '{date_str}' is not in a recognized format")
 
 
-def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str = None) -> list:
+def in_window(
+    data: QuerySet, start: datetime | str = None, end: datetime | str = None
+) -> list:
     """
     Return a list of items in the data set that fall within the given window. Use this only when you need to
     filter items by the get_start and get_end properties of the items since those cant be used in a filter
@@ -51,25 +52,34 @@ def in_window(data: QuerySet, start: datetime | str = None, end: datetime | str 
     if isinstance(end, str):
         end = parse_date_or_datetime(end)
 
-    end = end + timedelta(days=1) if end else None  # add a day to the end date to include all sessions on that day
+    end = (
+        end + timedelta(days=1) if end else None
+    )  # add a day to the end date to include all sessions on that day
 
     # can't use the filter property of a QuerySet because it doesn't support the get_start and get_end properties
     try:
         if end:
-            return [item for item in data if item.get_start >= start and item.get_end <= end]
+            return [
+                item for item in data if item.get_start >= start and item.get_end <= end
+            ]
         else:
             return [item for item in data if item.get_start >= start]
     except TypeError:
         start = timezone.make_aware(start)
         if end:
             end = timezone.make_aware(end)
-            return [item for item in data if item.get_start >= start and item.get_end <= end]
+            return [
+                item for item in data if item.get_start >= start and item.get_end <= end
+            ]
         else:
             return [item for item in data if item.get_start >= start]
 
 
-def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: str = None,
-                       names: list[str] = None) -> QuerySet:
+def filter_by_projects(
+    data: QuerySet[Projects | SubProjects | Sessions],
+    name: str = None,
+    names: list[str] = None,
+) -> QuerySet:
     """
     filter a queryset of data and return a list of items that match the given project name or names
     :param data: a queryset of data
@@ -77,10 +87,12 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
     :param names: if you need to filter for multiple names
     :return: list of items that match the given name or names
     """
-    if len(data) == 0:
+    if not data.exists():
         return data
 
-    item = data[0]  # get the first item in the queryset to determine the type of data
+    item = (
+        data.first()
+    )  # get the first item in the queryset to determine the type of data
     if name:
         if isinstance(item, Projects):
             return data.filter(name__icontains=name)
@@ -99,7 +111,9 @@ def filter_by_projects(data: QuerySet[Projects | SubProjects | Sessions], name: 
         return data
 
 
-def get_active_context(request: HttpRequest, override_context_id: str | None = None) -> tuple[Context | None, str]:
+def get_active_context(
+    request: HttpRequest, override_context_id: str | None = None
+) -> tuple[Context | None, str]:
     """
     Resolve the active context for this request.
 
@@ -129,7 +143,9 @@ def get_active_context(request: HttpRequest, override_context_id: str | None = N
         pass
 
     try:
-        context = Context.objects.get(name__iexact=str(context_id).strip(), user=request.user)
+        context = Context.objects.get(
+            name__iexact=str(context_id).strip(), user=request.user
+        )
         return context, "single"
     except (Context.DoesNotExist, ValueError, TypeError):
         # Invalid/missing context  treat as All
@@ -161,10 +177,10 @@ def filter_by_active_context(
     """
     context, mode = get_active_context(request, override_context_id=override_context_id)
 
-    if mode == "all" or context is None or not len(data):
+    if mode == "all" or context is None or not data.exists():
         return data
 
-    item = data[0]
+    item = data.first()
 
     if isinstance(item, Projects):
         return data.filter(context=context)
@@ -182,14 +198,14 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
     if query_params is None:
         query_params = getattr(request, "GET", {})
 
-    project_name = query_params.get('project_name')
-    subproject_name = query_params.get('subproject')
-    project_names = query_params.get('projects')
+    project_name = query_params.get("project_name")
+    subproject_name = query_params.get("subproject")
+    project_names = query_params.get("projects")
     if project_names:
-        project_names = project_names.split(',')
-    subproject_names = query_params.get('subprojects')
+        project_names = project_names.split(",")
+    subproject_names = query_params.get("subprojects")
     if subproject_names:
-        subproject_names = subproject_names.split(',')
+        subproject_names = subproject_names.split(",")
 
     if project_name:
         sessions = filter_by_projects(sessions, name=project_name)
@@ -206,11 +222,11 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
     #   - tag names (CLI)
     tag_vals: list[str] = []
     if hasattr(query_params, "getlist"):
-        tag_vals = query_params.getlist('tags')
+        tag_vals = query_params.getlist("tags")
     else:
-        tags_param = query_params.get('tags')
+        tags_param = query_params.get("tags")
         if tags_param:
-            tag_vals = [t for t in tags_param.split(',') if t]
+            tag_vals = [t for t in tags_param.split(",") if t]
 
     if tag_vals:
         tag_vals = [str(t).strip() for t in tag_vals if str(t).strip()]
@@ -229,11 +245,11 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
 
         sessions = sessions.distinct()
 
-    if 'note_snippet' in query_params:
-        sessions = sessions.filter(note__icontains=query_params['note_snippet'])
+    if query_params.get("note_snippet"):
+        sessions = sessions.filter(note__icontains=query_params["note_snippet"])
 
-    start_date = query_params.get('start_date')
-    end_date = query_params.get('end_date')
+    start_date = query_params.get("start_date")
+    end_date = query_params.get("end_date")
 
     if start_date:
         start = timezone.make_aware(parse_date_or_datetime(start_date))
@@ -241,7 +257,6 @@ def filter_sessions_by_params(request, sessions: QuerySet[Sessions]) -> QuerySet
     if end_date:
         end = timezone.make_aware(parse_date_or_datetime(end_date) + timedelta(days=1))
         sessions = sessions.filter(start_time__lte=end)
-
 
     # print(len(sessions))
     return sessions
@@ -254,18 +269,29 @@ def tally_project_durations(sessions) -> list[dict]:
     :return: list of tuples containing the project name and its total duration
     """
 
-    project_durations = defaultdict(timedelta)  # avoids the need to check if a key exists before updating it
+    project_durations = defaultdict(
+        timedelta
+    )  # avoids the need to check if a key exists before updating it
 
     for session in sessions:
         project_name = session.project.name
         duration = session.end_time - session.start_time
         project_durations[project_name] += duration
 
+    return [
+        {"name": name, "total_time": total.total_seconds() / 60}
+        for name, total in project_durations.items()
+    ]
 
-    return [{'name': name, 'total_time': total.total_seconds()/60} for name, total in project_durations.items()]
 
-
-def session_exists(user, project, start_time, end_time, subproject_names, time_tolerance=timedelta(minutes=2)) -> bool:
+def session_exists(
+    user,
+    project,
+    start_time,
+    end_time,
+    subproject_names,
+    time_tolerance=timedelta(minutes=2),
+) -> bool:
     """
     Check if a session already exists in the database based on start and end time (with tolerance),
     subprojects, and session notes.
@@ -289,12 +315,14 @@ def session_exists(user, project, start_time, end_time, subproject_names, time_t
         user=user,
         project=project,
         start_time__range=(start_time - time_tolerance, start_time + time_tolerance),
-        end_time__range=(end_time - time_tolerance, end_time + time_tolerance)
+        end_time__range=(end_time - time_tolerance, end_time + time_tolerance),
         # note=note # commented out to allow for note differences (e.g. typos and edits might occur)
     )
 
     for session in matching_sessions:
-        session_subproject_names = {name.lower() for name in session.subprojects.values_list('name', flat=True)}
+        session_subproject_names = {
+            name.lower() for name in session.subprojects.values_list("name", flat=True)
+        }
         if subproject_names_lower == session_subproject_names:
             return True
 
@@ -308,8 +336,10 @@ def sessions_get_earliest_latest(sessions) -> tuple[datetime, datetime]:
     :param sessions: Queryset of session instances
     :return: Tuple of earliest start time and latest end time
     """
-    aggregated_times = sessions.aggregate(earliest_start=Min('start_time'), latest_end=Max('end_time'))
-    return aggregated_times['earliest_start'], aggregated_times['latest_end']
+    aggregated_times = sessions.aggregate(
+        earliest_start=Min("start_time"), latest_end=Max("end_time")
+    )
+    return aggregated_times["earliest_start"], aggregated_times["latest_end"]
 
 
 def _normalize_tags_payload(tags_payload) -> list[dict]:
@@ -337,9 +367,7 @@ def _normalize_tags_payload(tags_payload) -> list[dict]:
             elif isinstance(item, dict):
                 name = str(item.get("name", "")).strip()
                 if name:
-                    normalized.append(
-                        {"name": name, "color": item.get("color")}
-                    )
+                    normalized.append({"name": name, "color": item.get("color")})
         return normalized
 
     return []
@@ -420,18 +448,20 @@ def build_project_json_from_sessions(sessions, autumn_compatible=False):
         total_proj_minutes = 0
         for s in sess_list:
             total_proj_minutes += s.duration
-            history.append({
-                "Date":       timezone.localtime(s.end_time).strftime("%m-%d-%Y"),
-                "Start Time": timezone.localtime(s.start_time).strftime("%H:%M:%S"),
-                "End Time":   timezone.localtime(s.end_time).strftime("%H:%M:%S"),
-                "Sub-Projects": [sp.name for sp in s.subprojects.all()],
-                "Duration":   s.duration,
-                "Note":       s.note or ""
-            })
+            history.append(
+                {
+                    "Date": timezone.localtime(s.end_time).strftime("%m-%d-%Y"),
+                    "Start Time": timezone.localtime(s.start_time).strftime("%H:%M:%S"),
+                    "End Time": timezone.localtime(s.end_time).strftime("%H:%M:%S"),
+                    "Sub-Projects": [sp.name for sp in s.subprojects.all()],
+                    "Duration": s.duration,
+                    "Note": s.note or "",
+                }
+            )
 
         # determine project start / last dates from history
         start_date = history[0]["Date"] if history else ""
-        last_date  = history[-1]["Date"] if history else ""
+        last_date = history[-1]["Date"] if history else ""
 
         # aggregate subprojects from those same sessions
         sub_sessions = defaultdict(list)
@@ -453,57 +483,57 @@ def build_project_json_from_sessions(sessions, autumn_compatible=False):
             else:
                 # pick the first .subproject instance for description / dates
                 first_s, first_sp = sess_and_sp[0]
-                last_s, _         = sess_and_sp[-1]
+                last_s, _ = sess_and_sp[-1]
                 subprojects_data[sub_name] = {
-                    "Start Date": timezone.localtime(first_s.end_time).strftime("%m-%d-%Y"),
-                    "Last Updated": timezone.localtime(last_s.end_time).strftime("%m-%d-%Y"),
+                    "Start Date": timezone.localtime(first_s.end_time).strftime(
+                        "%m-%d-%Y"
+                    ),
+                    "Last Updated": timezone.localtime(last_s.end_time).strftime(
+                        "%m-%d-%Y"
+                    ),
                     "Total Time": total_sub_minutes,
-                    "Description": first_sp.description or ""
+                    "Description": first_sp.description or "",
                 }
 
         projects_data[project_name] = {
-            "Start Date":  start_date,
+            "Start Date": start_date,
             "Last Updated": last_date,
-            "Total Time":  total_proj_minutes,
-            "Status":      project_obj.status,
+            "Total Time": total_proj_minutes,
+            "Status": project_obj.status,
             "Description": project_obj.description or "",
             # Keep CLI compatibility: only emit these when not autumn_compatible
             **(
                 {}
                 if autumn_compatible
                 else {
-                    "Context": project_obj.context.name
-                    if project_obj.context
-                    else "",
+                    "Context": project_obj.context.name if project_obj.context else "",
                     "Tags": [t.name for t in project_obj.tags.all()],
                 }
             ),
             "Sub Projects": subprojects_data,
-            "Session History": history
+            "Session History": history,
         }
 
     return projects_data
 
 
 def json_compress(j):
-    ZIPJSON_KEY = 'base64(zip(o))'
+    ZIPJSON_KEY = "base64(zip(o))"
     j = {
         ZIPJSON_KEY: base64.b64encode(
-            zlib.compress(
-                json.dumps(j).encode('utf-8')
-            )
-        ).decode('ascii')
+            zlib.compress(json.dumps(j).encode("utf-8"))
+        ).decode("ascii")
     }
 
     return j
 
 
 def json_decompress(content: dict | str | bytes) -> dict:
-    ZIPJSON_KEY = 'base64(zip(o))'
+    ZIPJSON_KEY = "base64(zip(o))"
 
     # convert binary content to string
     if isinstance(content, bytes):
-        content = content.decode('utf-8')
+        content = content.decode("utf-8")
 
     if isinstance(content, str):
         try:
@@ -512,8 +542,8 @@ def json_decompress(content: dict | str | bytes) -> dict:
             raise RuntimeError("Could not interpret the contents")
 
     try:
-        assert (content[ZIPJSON_KEY])
-        assert (set(content.keys()) == {ZIPJSON_KEY})
+        assert content[ZIPJSON_KEY]
+        assert set(content.keys()) == {ZIPJSON_KEY}
     except Exception:
         return content
 

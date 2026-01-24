@@ -11,10 +11,10 @@ class GeminiHandler(BaseLLMHandler):
 
     def __init__(self, model="gemini-2.5-flash", api_key: str | None = None):
         self.model = model
-        self.api_key = api_key or GEMINI_API_KEY
+        self.api_key = api_key or str(GEMINI_API_KEY)
         self.client = genai.Client(api_key=self.api_key)
         self.google_search_tool = Tool(google_search=GoogleSearch())
-        self._create_chat(self.model)
+        self.chat = None
 
         self.username = None
         self.session_data = None
@@ -58,14 +58,13 @@ class GeminiHandler(BaseLLMHandler):
         {session_data}
         """
 
-    def _create_chat(self, model):
+    async def _create_chat(self, model):
         """Helper to (re)create a chat for a given model."""
-        self.chat = self.client.chats.create(
+        self.chat = self.client.aio.chats.create(
             model=model,
             config=GenerateContentConfig(
-                tools=[self.google_search_tool],
-                response_modalities=["TEXT"]
-            )
+                tools=[self.google_search_tool], response_modalities=["TEXT"]
+            ),
         )
         self.model = model
 
@@ -76,15 +75,23 @@ class GeminiHandler(BaseLLMHandler):
             # Google response usage metadata fields: prompt_token_count, candidates_token_count, total_token_count
             prompt_tokens = getattr(metadata, "prompt_token_count", 0) or 0
             response_tokens = getattr(metadata, "candidates_token_count", 0) or 0
-            total_tokens = getattr(metadata, "total_token_count", prompt_tokens + response_tokens) or 0
+            total_tokens = (
+                getattr(metadata, "total_token_count", prompt_tokens + response_tokens)
+                or 0
+            )
             self.usage_stats["prompt"] += prompt_tokens
             self.usage_stats["response"] += response_tokens
             self.usage_stats["total"] += total_tokens
         else:
             # Fallback approximation: word count heuristic for total
             # Only approximate incremental tokens for the assistant response
-            last_assistant = self.conversation_history[-1]["content"] if self.conversation_history and self.conversation_history[-1]["role"] == "assistant" else ""
-            approx = len(last_assistant.split())
+            last_assistant = (
+                self.conversation_history[-1]["content"]
+                if self.conversation_history
+                and self.conversation_history[-1]["role"] == "assistant"
+                else ""
+            )
+            approx = len(str(last_assistant).split())
             self.usage_stats["response"] += approx
             self.usage_stats["total"] += approx
 
@@ -95,7 +102,9 @@ class GeminiHandler(BaseLLMHandler):
     def initialize_chat(self, username, sessions_data):
         """Initialize a new chat with username and session data"""
         self.username = username
-        self.session_data = encode(build_project_json_from_sessions(sessions_data, autumn_compatible=True))
+        self.session_data = encode(
+            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+        )
 
     def _parse_error(self, e):
         """Attempt to extract structured data from the Gemini error."""
@@ -110,63 +119,74 @@ class GeminiHandler(BaseLLMHandler):
         }
         # Heuristic: find first JSON object
         import re, json as _json
-        match = re.search(r'(\{"error".*)', raw)
+
+        match = re.search(r"(\{\"error\".*)", raw)
         if match:
             json_part = match.group(1)
             try:
                 data = _json.loads(json_part)
-                err = data.get('error', {})
-                parsed['code'] = err.get('code')
-                parsed['status'] = err.get('status')
-                parsed['message'] = err.get('message', raw)
-                details = err.get('details', [])
+                err = data.get("error", {})
+                parsed["code"] = err.get("code")
+                parsed["status"] = err.get("status")
+                parsed["message"] = err.get("message", raw)
+                details = err.get("details", [])
                 for d in details:
-                    if d.get('@type', '').endswith('RetryInfo'):
+                    if d.get("@type", "").endswith("RetryInfo"):
                         # retryDelay like '48s'
-                        retry = d.get('retryDelay', '0s')
+                        retry = d.get("retryDelay", "0s")
                         try:
-                            parsed['retry_delay_seconds'] = int(retry.replace('s', ''))
-                        except:
+                            parsed["retry_delay_seconds"] = int(retry.replace("s", ""))
+                        except Exception:
                             pass
-                    if d.get('@type', '').endswith('QuotaFailure'):
-                        violations = d.get('violations', [])
+                    if d.get("@type", "").endswith("QuotaFailure"):
+                        violations = d.get("violations", [])
                         for v in violations:
-                            parsed['quota_metrics'].append({
-                                'metric': v.get('quotaMetric'),
-                                'id': v.get('quotaId'),
-                                'dimensions': v.get('quotaDimensions', {})
-                            })
+                            parsed["quota_metrics"].append(
+                                {
+                                    "metric": v.get("quotaMetric"),
+                                    "id": v.get("quotaId"),
+                                    "dimensions": v.get("quotaDimensions", {}),
+                                }
+                            )
             except Exception:
                 pass
         return parsed
 
     def _handle_error(self, e, original_message=None, allow_fallback=True):
         info = self._parse_error(e)
-        is_quota = info['code'] == 429 or (info['status'] == 'RESOURCE_EXHAUSTED')
-        retry_secs = info.get('retry_delay_seconds')
+        is_quota = info["code"] == 429 or (info["status"] == "RESOURCE_EXHAUSTED")
+        retry_secs = info.get("retry_delay_seconds")
         assistant_text = []
 
         if is_quota:
-            assistant_text.append("Rate limit or quota exhausted for model: %s." % self.model)
+            assistant_text.append(
+                "Rate limit or quota exhausted for model: %s." % self.model
+            )
             if retry_secs:
                 assistant_text.append("Suggested retry after ~%s seconds." % retry_secs)
         else:
             assistant_text.append("An error occurred communicating with Gemini.")
 
-        assistant_text.append("Details: %s" % info['message'])
-        if info['quota_metrics']:
+        assistant_text.append("Details: %s" % info["message"])
+        if info["quota_metrics"]:
             assistant_text.append("Quota metrics involved:")
-            for m in info['quota_metrics']:
-                assistant_text.append(" - %s (%s) dims=%s" % (m['metric'], m['id'], m['dimensions']))
-        assistant_text.append("You can monitor usage at https://ai.dev/usage?tab=rate-limit and adjust plan if needed.")
+            for m in info["quota_metrics"]:
+                assistant_text.append(
+                    " - %s (%s) dims=%s" % (m["metric"], m["id"], m["dimensions"])
+                )
+        assistant_text.append(
+            "You can monitor usage at https://ai.dev/usage?tab=rate-limit and adjust plan if needed."
+        )
 
         final_message = "\n".join(assistant_text)
-        self.conversation_history.append({
-            "role": "assistant",
-            "content": final_message,
-            "error": True,
-            "model": self.model
-        })
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": final_message,
+                "error": True,
+                "model": self.model,
+            }
+        )
         return final_message
 
     def _extract_sources(self, response):
@@ -192,62 +212,91 @@ class GeminiHandler(BaseLLMHandler):
                 sources.append({"link": web.uri, "title": title})
         return sources
 
-    def update_session_data(self, sessions_data, user_prompt):
+    async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data without adding to chat history"""
+        update_session_data_prompt = ""
         try:
             if not self.chat:
-                return None
+                await self._create_chat(self.model)
 
             # Update stored session data
-            self.session_data = encode(build_project_json_from_sessions(sessions_data, autumn_compatible=True))
+            self.session_data = encode(
+                build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+            )
 
             # Create a new chat with updated system prompt
             update_session_data_prompt = self.update_session_data_template.format(
                 username=self.username,
                 user_prompt=user_prompt,
-                session_data=self.session_data
+                session_data=self.session_data,
             )
 
-            response = self.chat.send_message(update_session_data_prompt)
+            if self.chat:
+                response = await self.chat.send_message(update_session_data_prompt)
+            else:
+                return "Error: Chat not initialized"
         except Exception as e:
-            return self._handle_error(e, original_message=update_session_data_prompt, allow_fallback=True)
+            return self._handle_error(
+                e, original_message=update_session_data_prompt, allow_fallback=True
+            )
 
         assistant_response = response.text
         # Safely extract sources (defensive against missing grounding metadata)
         sources = self._extract_sources(response)
 
         # Add message to conversation history
-        self.conversation_history.append({"role": "system", "content": update_session_data_prompt})
+        self.conversation_history.append(
+            {"role": "system", "content": update_session_data_prompt}
+        )
         self.conversation_history.append({"role": "user", "content": user_prompt})
-        self.conversation_history.append({"role": "assistant", "content": assistant_response, "sources": sources, "model": self.model})
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": assistant_response,
+                "sources": sources,
+                "model": self.model,
+            }
+        )
 
         # Update usage stats after assistant response appended
         self._update_usage(response)
 
-        return assistant_response
+        return str(assistant_response)
 
-    def send_message(self, message):
+    async def send_message(self, message) -> str:
         """Send a message to the LLM and return the response"""
         try:
+            if not self.chat:
+                await self._create_chat(self.model)
+
+            if not self.chat:
+                return "Error: Chat not initialized"
+
             if len(self.conversation_history) == 0:
                 # send system prompt along with user message
                 initial_prompt = self.system_prompt_template.format(
                     username=self.username,
                     user_prompt=message,
-                    session_data=self.session_data
+                    session_data=self.session_data,
                 )
                 try:
-                    response = self.chat.send_message(initial_prompt)
+                    response = await self.chat.send_message(initial_prompt)
                 except Exception as e:
-                    return self._handle_error(e, original_message=initial_prompt, allow_fallback=True)
-                self.conversation_history.append({"role": "system", "content": initial_prompt})
+                    return self._handle_error(
+                        e, original_message=initial_prompt, allow_fallback=True
+                    )
+                self.conversation_history.append(
+                    {"role": "system", "content": initial_prompt}
+                )
                 self.conversation_history.append({"role": "user", "content": message})
             else:
                 self.conversation_history.append({"role": "user", "content": message})
                 try:
-                    response = self.chat.send_message(message)
+                    response = await self.chat.send_message(message)
                 except Exception as e:
-                    return self._handle_error(e, original_message=message, allow_fallback=True)
+                    return self._handle_error(
+                        e, original_message=message, allow_fallback=True
+                    )
 
             # Extract response text
             assistant_response = response.text
@@ -255,16 +304,23 @@ class GeminiHandler(BaseLLMHandler):
             sources = self._extract_sources(response)
 
             # Add assistant response to our conversation history
-            self.conversation_history.append({"role": "assistant", "content": assistant_response, "sources": sources, "model": self.model})
+            self.conversation_history.append(
+                {
+                    "role": "assistant",
+                    "content": assistant_response,
+                    "sources": sources,
+                    "model": self.model,
+                }
+            )
 
             # Update usage stats
             self._update_usage(response)
 
-            return assistant_response
+            return str(assistant_response)
         except Exception as e:
             # Catch any unexpected formatting/parsing errors
             return self._handle_error(e, original_message=message, allow_fallback=False)
 
-    def get_conversation_history(self):
+    def get_conversation_history(self) -> list:
         """Return standardized conversation history"""
         return self.conversation_history

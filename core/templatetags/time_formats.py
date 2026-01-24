@@ -20,7 +20,7 @@ def min_formatter(td: timedelta | float | int):
     days = td.days
     hrs, remainder = divmod(td.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
-    plural_form = lambda counter: 's'[:counter ^ 1]
+    plural_form = lambda counter: "s"[: counter ^ 1]
 
     if days > 0:
         days_str = f"{days} day{plural_form(days)} "
@@ -73,6 +73,8 @@ def date_formatter(date: datetime | str):
     :return: string formatted to day month year.
     """
     date = make_timezone_datetime(date)
+    if not date or isinstance(date, str):
+        return ""
     return date.strftime("%d %B %Y")
 
 
@@ -84,6 +86,8 @@ def time_formatter(date: datetime):
     :param date: datetime objects
     :return: HTML span with UTC time data attribute
     """
+    if not date:
+        return ""
     if timezone.is_naive(date):
         date = timezone.make_aware(date)
     utc_time = date.astimezone(dt_tz.utc).isoformat()
@@ -98,19 +102,23 @@ def utc_time_formatter(date: datetime):
     :param date: datetime objects
     :return: string formatted to UTC time.
     """
+    if not date:
+        return ""
     if timezone.is_naive(date):
         date = timezone.make_aware(date)
     return date.astimezone(dt_tz.utc).isoformat()
 
 
 @register.filter
-def day_date_formatter(date: datetime| str):
+def day_date_formatter(date: datetime | str):
     """
     Converts datetime objects into formatted date strings. E.g. Saturday 12 June 2021
     :param date: datetime objects
     :return: string formatted to day month year.
     """
     date = make_timezone_datetime(date)
+    if not date or isinstance(date, str):
+        return ""
     return date.strftime("%A %d %b %Y")
 
 
@@ -128,10 +136,10 @@ def project_status_counts_formatter(counts: dict | None) -> str:
 
     parts: list[str] = []
     for key, label in (
-        ('active', 'active'),
-        ('paused', 'paused'),
-        ('complete', 'complete'),
-        ('archived', 'archived'),
+        ("active", "active"),
+        ("paused", "paused"),
+        ("complete", "complete"),
+        ("archived", "archived"),
     ):
         try:
             val = int(counts.get(key) or 0)
@@ -147,12 +155,17 @@ def project_status_counts_formatter(counts: dict | None) -> str:
 
 
 def make_timezone_datetime(date):
+    if not date:
+        return date
     if isinstance(date, str):
-
         try:
             date = datetime.strptime(date, "%m-%d-%Y")
         except ValueError:
             date = datetime.strptime(date, "%Y-%m-%d")
+
+    if not isinstance(date, datetime):
+        return date
+
     if timezone.is_naive(date):
         date = timezone.make_aware(date)
     else:

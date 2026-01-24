@@ -147,15 +147,19 @@
             <h2 class="text-center">Sessions Selected for Analysis</h2>
             <br>
             <div class="card">
-                <h3>Selected Sessions: {{ sessions.count }}
+                <h3>Selected Sessions: {{ session_count }}
                     <small style="font-weight:normal; font-size:0.7em; margin-left:0.5rem;" title="Approximate token usage for this conversation">
                         Tokens (prompt/response/total): {{ usage_stats.prompt }}/{{ usage_stats.response }}/{{ usage_stats.total }}
                     </small>
                 </h3>
+                {% if session_count > 0 %}
                 <p>Date Range:
-                    <span class="text-cyan">{{ sessions.last.start_time|day_date_formatter }}</span> to
-                    <span class="text-cyan">{{ sessions.first.end_time|day_date_formatter }}</span>
+                    <span class="text-cyan">{{ earliest_date|day_date_formatter }}</span> to
+                    <span class="text-cyan">{{ latest_date|day_date_formatter }}</span>
                 </p>
+                {% else %}
+                <p class="text-muted">No sessions in selected range.</p>
+                {% endif %}
 
                 <br>
 
