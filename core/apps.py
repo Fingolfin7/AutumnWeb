@@ -15,12 +15,17 @@ class CoreConfig(AppConfig):
     def ready(self):
         import core.signals  # make sure signals are imported and therefore run
 
-        # Enable WAL mode for SQLite to improve concurrency
-        from django.db import connection
-
-        if connection.vendor == "sqlite":
-            with connection.cursor() as cursor:
-                cursor.execute("PRAGMA journal_mode=WAL;")
+        # NOTE: Temporarily disabled DB-touching initialization.
+        # We previously enabled WAL mode for SQLite here:
+        #   PRAGMA journal_mode=WAL;
+        # Running database PRAGMAs from AppConfig.ready() can interfere with
+        # management commands, migrations, and recovery.
+        # Reintroduce later with a safe guard if needed.
+        #
+        # from django.db import connection
+        # if connection.vendor == "sqlite":
+        #     with connection.cursor() as cursor:
+        #         cursor.execute("PRAGMA journal_mode=WAL;")
 
         if os.environ.get("RUN_MAIN") == "true" and settings.RUN_AUDIT_SCHEDULER:
             from core.models import Projects, SubProjects, Sessions
