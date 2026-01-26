@@ -274,7 +274,10 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static' if not DEBUG else 'staticfiles')
 
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+if DEBUG:
+    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+else:
+    MEDIA_ROOT = env('MEDIA_ROOT', default='/media')
 
 MEDIA_URL = '/media/'
 
