@@ -114,7 +114,7 @@ urlpatterns = [
     # migrated API
     path('api/create_project/', create_project, name='api_create_project'),
     path('api/list_projects/', list_projects, name='api_list_projects'),
-    path('api/tally_by_sessons/', tally_by_sessions, name='api_tally_by_sessions'),
+    path('api/tally_by_sessions/', tally_by_sessions, name='api_tally_by_sessions'),
     path('api/tally_by_subprojects/', tally_by_subprojects,
          name='api_tally_by_subprojects'),
     path('api/search_projects/', search_projects, name='api_search_projects'),

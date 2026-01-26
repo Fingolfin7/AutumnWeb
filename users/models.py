@@ -99,8 +99,7 @@ class Profile(models.Model):
     def image_url(self):
         if self.image and os.path.exists(self.image.path) and hasattr(self.image, 'url'):
             return self.image.url
-        return '/media/default.jpg'
-
+        return f"{settings.MEDIA_URL}default.jpg"
 
     def resize_gif(self, img):
         """
