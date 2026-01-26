@@ -274,7 +274,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static' if not DEBUG else 'staticfiles')
 
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media') if DEBUG else '/media'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 MEDIA_URL = '/media/'
 
 # Static Versioning
