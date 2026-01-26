@@ -121,12 +121,46 @@ WSGI_APPLICATION = 'AutumnWeb.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Prefer a single DATABASE_URL in production, e.g.
+#   postgres://USER:PASSWORD@HOST:5432/DBNAME
+# Fallback to discrete env vars or finally SQLite for local/dev.
+DATABASE_URL = env('DATABASE_URL', default='')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': env.db('DATABASE_URL')
     }
-}
+else:
+    POSTGRES_NAME = env('POSTGRES_DB', default='')
+    POSTGRES_USER = env('POSTGRES_USER', default='')
+    POSTGRES_PASSWORD = env('POSTGRES_PASSWORD', default='')
+    POSTGRES_HOST = env('POSTGRES_HOST', default='')
+    POSTGRES_PORT = env('POSTGRES_PORT', default='5432')
+
+    if POSTGRES_NAME and POSTGRES_USER and POSTGRES_PASSWORD and POSTGRES_HOST:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.postgresql',
+                'NAME': POSTGRES_NAME,
+                'USER': POSTGRES_USER,
+                'PASSWORD': POSTGRES_PASSWORD,
+                'HOST': POSTGRES_HOST,
+                'PORT': POSTGRES_PORT,
+            }
+        }
+    else:
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
+
+# Keep DB connections open a bit (helps in production). Set to 0 to disable.
+CONN_MAX_AGE = env.int('CONN_MAX_AGE', default=60)
+
+# PostgreSQL server-side settings (optional). If you're using pgbouncer, you may want DISABLE_SERVER_SIDE_CURSORS=True
+DISABLE_SERVER_SIDE_CURSORS = env.bool('DISABLE_SERVER_SIDE_CURSORS', default=False)
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators

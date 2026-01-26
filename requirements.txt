@@ -21,3 +21,5 @@ anthropic
 gunicorn
 whitenoise
 
+# PostgreSQL driver (required when using django.db.backends.postgresql)
+psycopg2-binary
