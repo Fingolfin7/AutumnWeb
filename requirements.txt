@@ -16,3 +16,8 @@ python-toon
 cryptography
 openai
 anthropic
+
+# Production (Render)
+gunicorn
+whitenoise
+
