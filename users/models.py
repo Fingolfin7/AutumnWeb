@@ -76,6 +76,10 @@ class Profile(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+        if not os.path.exists(self.image.path):
+            return  # image file does not exist
+
         img = Image.open(self.image)
 
         if img.format == 'GIF':
@@ -89,6 +93,13 @@ class Profile(models.Model):
             output_size = (img_width, img_height)
             img.thumbnail(output_size)
             img.save(self.image.path)
+
+    # create a getter for the user image that returns the default image if no image is set/is missing
+    @property
+    def image_url(self):
+        if self.image and os.path.exists(self.image.path) and hasattr(self.image, 'url'):
+            return self.image.url
+        return '/media/default.jpg'
 
 
     def resize_gif(self, img):
