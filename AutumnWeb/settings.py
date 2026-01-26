@@ -20,10 +20,15 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 env = environ.Env()
-if Path('.env').exists():
-    environ.Env.read_env(overwrite=True) # force the environment variables to be read from the .env file
-elif Path(BASE_DIR / ".env").exists():
-    environ.Env.read_env(BASE_DIR / ".env", overwrite=True)  # for production deployment where .env is in the BASE_DIR
+
+# Load env vars from .env if present (prefer BASE_DIR/.env).
+env_file = BASE_DIR / ".env"
+if env_file.exists():
+    environ.Env.read_env(env_file=str(env_file), overwrite=True)
+else:
+    local_env = Path(".env")
+    if local_env.exists():
+        environ.Env.read_env(env_file=str(local_env), overwrite=True)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
