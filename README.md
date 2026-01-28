@@ -5,7 +5,6 @@ A minimalist, web-based time and project tracking tool.
 **Autumn** is a Django application that lets you track how you spend your time across projects and subprojects, view your session history, and visualize your data through charts, heatmaps, and word clouds. It also includes an optional LLM-powered "Insights" feature, where you can ask questions about your session data using natural language.
 
 This project builds on the original [Autumn CLI](https://github.com/Fingolfin7/Autumn), offering a browser-accessible alternative with the same core structure and import/export compatibility.
-
 ---
 
 ### Try It
