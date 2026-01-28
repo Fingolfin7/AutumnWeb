@@ -99,4 +99,10 @@ Access the app at `http://127.0.0.1:8000/`
 
 ---
 
+### API Docs
+
+See `docs/api.md` for a reference of `/api/*` endpoints (used by the CLI wrapper).
+
+---
+
 > Built with care. Use it if it's useful to you.

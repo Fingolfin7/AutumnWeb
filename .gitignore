@@ -60,6 +60,8 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+db.sqlite3-wal
+db.sqlite3-shm
 
 # Flask stuff:
 instance/
@@ -152,3 +154,10 @@ cython_debug/
 /.vscode
 *.rar
 /media/background_pics
+
+# Local recovery artifacts
+recovered_json_data/
+
+# SQLite sidecar files (WAL mode)
+*-wal
+*-shm
