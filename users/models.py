@@ -70,7 +70,8 @@ class Profile(models.Model):
             return None
         f = get_fernet()
         try:
-            return f.decrypt(data).decode()
+            # Convert to bytes explicitly - PostgreSQL returns memoryview for BinaryField
+            return f.decrypt(bytes(data)).decode()
         except Exception:
             return None
 
