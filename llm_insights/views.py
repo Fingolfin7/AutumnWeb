@@ -101,11 +101,14 @@ class InsightsView(View):
             provider_models["openai"] = [
                 ("gpt-5-mini", "GPT-5 Mini"),
                 ("gpt-5", "GPT-5"),
+                ("gpt-5.1", "GPT-5.1"),
+                ("gpt-5.2", "GPT-5.2"),
             ]
         if profile and profile.claude_api_key_enc:
             provider_models["claude"] = [
                 ("claude-haiku-4.5", "Claude Haiku 4.5"),
-                ("claude-sonnet-4", "Claude Sonnet 4"),
+                ("claude-sonnet-4.5", "Claude Sonnet 4.5"),
+                ("claude-opus-4.5", "Claude Opus 4.5"),
             ]
         return provider_models
 
