@@ -97,11 +97,17 @@ $(document).ready(function(){
                 type = 'scatter_subprojects';
             }
 
+            if (project_name && type === 'line'){
+                type = 'line_subprojects';
+            }
+
             const chartFns = {
               pie: pie_chart,
               bar: bar_graph,
               scatter: scatter_graph,
               scatter_subprojects: scatter_subproject_graph,
+              line: line_graph,
+              line_subprojects: line_subproject_graph,
               calendar: calendar_graph,
               wordcloud: wordcloud,
               heatmap: heatmap_graph
@@ -134,7 +140,7 @@ function get_project_data(type, start_date="", end_date="", project_name="", con
     if (wantSubprojects) {
         url = $('#subprojects_tally_link').val();
     }
-    else if (['scatter','calendar','heatmap'].includes(type)) {
+    else if (['scatter','calendar','heatmap','line'].includes(type)) {
         url = $('#sessions_link').val();
     }
     else if (type==='wordcloud') {
@@ -485,6 +491,188 @@ function scatter_subproject_graph(data, ctx) {
               }
             }
           }
+        }
+    });
+}
+
+function line_graph(data, ctx) {
+    // Aggregate session durations by date and project
+    const dailyTotals = {};
+
+    data.forEach(item => {
+        const startTime = new Date(item.start_time);
+        const endTime = new Date(item.end_time);
+        const duration = (endTime - startTime) / (1000 * 60 * 60); // hours
+        const dateKey = startTime.toISOString().split('T')[0];
+        const projectName = item.project;
+
+        if (!dailyTotals[projectName]) {
+            dailyTotals[projectName] = {};
+        }
+        if (!dailyTotals[projectName][dateKey]) {
+            dailyTotals[projectName][dateKey] = 0;
+        }
+        dailyTotals[projectName][dateKey] += duration;
+    });
+
+    // Get all unique dates and sort them
+    const allDates = [...new Set(
+        Object.values(dailyTotals).flatMap(proj => Object.keys(proj))
+    )].sort();
+
+    // Convert to datasets
+    const projectNames = Object.keys(dailyTotals).sort();
+    const datasets = projectNames.map((projectName, index) => {
+        const color = generateRandomColor(index, projectNames.length);
+        const projectData = dailyTotals[projectName];
+
+        // Create data points for each date
+        const dataPoints = allDates.map(date => ({
+            x: new Date(date),
+            y: projectData[date] || 0
+        })).filter(point => point.y > 0); // Only include days with activity
+
+        return {
+            label: projectName,
+            data: dataPoints,
+            borderColor: color,
+            backgroundColor: color,
+            fill: false,
+            tension: 0.1,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        };
+    });
+
+    // Destroy existing chart
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
+    // Calculate time unit
+    const dates = data.map(item => new Date(item.start_time));
+    const minDate = new Date(Math.min(...dates));
+    const maxDate = new Date(Math.max(...dates));
+    const chartUnit = getChartUnit(maxDate, minDate);
+
+    new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: chartUnit },
+                    title: { display: true, text: 'Date' }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Duration (hours)' }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const v = context.parsed.y.toFixed(2);
+                            return `${context.dataset.label}: ${v} hours`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function line_subproject_graph(data, ctx) {
+    // Aggregate session durations by date and subproject
+    const dailyTotals = {};
+
+    data.forEach(item => {
+        const startTime = new Date(item.start_time);
+        const endTime = new Date(item.end_time);
+        const duration = (endTime - startTime) / (1000 * 60 * 60); // hours
+        const dateKey = startTime.toISOString().split('T')[0];
+
+        const subprojects = (item.subprojects || []).length
+            ? item.subprojects.map(sp => sp.name || sp)
+            : ['no subproject'];
+
+        subprojects.forEach(spName => {
+            if (!dailyTotals[spName]) {
+                dailyTotals[spName] = {};
+            }
+            if (!dailyTotals[spName][dateKey]) {
+                dailyTotals[spName][dateKey] = 0;
+            }
+            dailyTotals[spName][dateKey] += duration;
+        });
+    });
+
+    // Get all unique dates and sort them
+    const allDates = [...new Set(
+        Object.values(dailyTotals).flatMap(sp => Object.keys(sp))
+    )].sort();
+
+    // Convert to datasets
+    const subprojectNames = Object.keys(dailyTotals).sort();
+    const datasets = subprojectNames.map((spName, index) => {
+        const color = generateRandomColor(index, subprojectNames.length);
+        const spData = dailyTotals[spName];
+
+        const dataPoints = allDates.map(date => ({
+            x: new Date(date),
+            y: spData[date] || 0
+        })).filter(point => point.y > 0);
+
+        return {
+            label: spName,
+            data: dataPoints,
+            borderColor: color,
+            backgroundColor: color,
+            fill: false,
+            tension: 0.1,
+            pointRadius: 4,
+            pointHoverRadius: 6
+        };
+    });
+
+    // Destroy existing chart
+    const existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
+    // Calculate time unit
+    const dates = data.map(item => new Date(item.start_time));
+    const minDate = new Date(Math.min(...dates));
+    const maxDate = new Date(Math.max(...dates));
+    const chartUnit = getChartUnit(maxDate, minDate);
+
+    new Chart(ctx, {
+        type: 'line',
+        data: { datasets },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    type: 'time',
+                    time: { unit: chartUnit },
+                    title: { display: true, text: 'Date' }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'Duration (hours)' }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            const v = context.parsed.y.toFixed(2);
+                            return `${context.dataset.label}: ${v} hours`;
+                        }
+                    }
+                }
+            }
         }
     });
 }

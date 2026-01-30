@@ -161,3 +161,4 @@ recovered_json_data/
 # SQLite sidecar files (WAL mode)
 *-wal
 *-shm
+.claude/settings.local.json
