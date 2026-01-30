@@ -16,7 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Projects, SubProjects, Sessions, status_choices, Tag
+from .models import Projects, SubProjects, Sessions, status_choices, Tag, Context
 from .serializers import (
     ProjectSerializer,
     SubProjectSerializer,
@@ -97,6 +97,7 @@ def _serialize_session(sess: Sessions, compact=True):
         d = {
             "id": sess.id,
             "p": sess.project.name,
+            "pid": sess.project.id,
             "subs": [sp.name for sp in sess.subprojects.all()],
             "start": sess.start_time.isoformat(),
             "end": sess.end_time.isoformat() if sess.end_time else None,
@@ -109,6 +110,7 @@ def _serialize_session(sess: Sessions, compact=True):
     return {
         "id": sess.id,
         "project": sess.project.name,
+        "project_id": sess.project.id,
         "subprojects": [sp.name for sp in sess.subprojects.all()],
         "start_time": sess.start_time.isoformat(),
         "end_time": sess.end_time.isoformat() if sess.end_time else None,
@@ -451,10 +453,98 @@ def projects_list_grouped(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def projects_list_flat(request):
+    """
+    List all projects as a flat (ungrouped) list with optional filters.
+
+    Query params:
+      - status: filter by status (active, paused, complete, archived) - optional
+      - context: filter by context id or name - optional
+      - tags: filter by tag names (comma-separated) - optional
+      - search: search by name (icontains) - optional
+      - compact: true/false (default true)
+
+    Returns (compact):
+      {"count": int, "projects": ["Project A", "Project B", ...]}
+    Returns (full):
+      {"count": int, "projects": [{"id", "name", "status", "description",
+                                   "total_minutes", "session_count", "avg_session_minutes",
+                                   "context", "tags"}, ...]}
+    """
+    compact = _compact(request)
+    qp = request.query_params
+
+    projects_qs = Projects.objects.filter(user=request.user)
+
+    # Filter by status
+    status_filter = qp.get("status")
+    if status_filter:
+        projects_qs = projects_qs.filter(status=status_filter.lower())
+
+    # Filter by context (id or name)
+    context_filter = qp.get("context")
+    if context_filter:
+        try:
+            context_id = int(context_filter)
+            projects_qs = projects_qs.filter(context_id=context_id)
+        except (TypeError, ValueError):
+            # Treat as context name
+            projects_qs = projects_qs.filter(context__name__iexact=context_filter)
+
+    # Filter by tags
+    projects_qs = _apply_tag_filters(qp, projects_qs, kind="projects", user=request.user)
+
+    # Search by name
+    search_term = qp.get("search")
+    if search_term:
+        projects_qs = projects_qs.filter(name__icontains=search_term)
+
+    projects_qs = projects_qs.order_by("name")
+
+    if compact:
+        payload = [p.name for p in projects_qs]
+    else:
+        payload = []
+        for p in projects_qs:
+            sessions = p.sessions.filter(is_active=False)
+            session_count = sessions.count()
+            total_minutes = float(p.total_time or 0.0)
+            avg_session_minutes = (
+                round(total_minutes / session_count, 2) if session_count > 0 else 0.0
+            )
+            payload.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "status": p.status,
+                    "description": p.description or "",
+                    "total_minutes": round(total_minutes, 2),
+                    "session_count": session_count,
+                    "avg_session_minutes": avg_session_minutes,
+                    "context": p.context.name if p.context else None,
+                    "tags": [t.name for t in p.tags.all()],
+                }
+            )
+
+    return Response({"count": len(payload), "projects": payload})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def subprojects_list(request):
     """
     List subprojects for a given project.
-    Query: project (required)
+
+    Query params:
+      - project (required): project name
+      - compact: true/false (default true)
+
+    Returns (compact):
+      {"project": str, "subprojects": ["Sub A", "Sub B", ...]}
+    Returns (full):
+      {"project": str, "project_id": int, "subprojects": [
+          {"id", "name", "description", "session_count", "total_minutes"}, ...
+      ]}
     """
     project_name = request.query_params.get("project") or request.query_params.get(
         "project_name"
@@ -462,16 +552,37 @@ def subprojects_list(request):
     if not project_name:
         return _err("Missing 'project'")
 
+    project = Projects.objects.filter(name=project_name, user=request.user).first()
+    if not project:
+        return _err("Project not found", status.HTTP_404_NOT_FOUND)
+
     subprojects = SubProjects.objects.filter(
-        parent_project__name=project_name, user=request.user
-    )
+        parent_project=project, user=request.user
+    ).order_by("name")
+
     compact = _compact(request)
     if compact:
         return Response(
             {"project": project_name, "subprojects": [s.name for s in subprojects]}
         )
-    ser = SubProjectSerializer(subprojects, many=True)
-    return Response(ser.data)
+
+    payload = []
+    for sp in subprojects:
+        session_count = sp.sessions.filter(is_active=False).count()
+        total_minutes = float(sp.total_time or 0.0)
+        payload.append(
+            {
+                "id": sp.id,
+                "name": sp.name,
+                "description": sp.description or "",
+                "session_count": session_count,
+                "total_minutes": round(total_minutes, 2),
+            }
+        )
+
+    return Response(
+        {"project": project_name, "project_id": project.id, "subprojects": payload}
+    )
 
 
 @api_view(["GET"])
@@ -677,6 +788,7 @@ def search_sessions(request):
             {
                 "id": s.id,
                 "p": s.project.name,
+                "pid": s.project.id,
                 "subs": [sp.name for sp in s.subprojects.all()],
                 "start": s.start_time.isoformat(),
                 "end": s.end_time.isoformat() if s.end_time else None,
@@ -690,6 +802,7 @@ def search_sessions(request):
             {
                 "id": s.id,
                 "project": s.project.name,
+                "project_id": s.project.id,
                 "subprojects": [sp.name for sp in s.subprojects.all()],
                 "start_time": s.start_time.isoformat(),
                 "end_time": s.end_time.isoformat() if s.end_time else None,
@@ -756,6 +869,7 @@ def log_activity(request):
             {
                 "id": s.id,
                 "p": s.project.name,
+                "pid": s.project.id,
                 "subs": [sp.name for sp in s.subprojects.all()],
                 "start": s.start_time.isoformat(),
                 "end": s.end_time.isoformat() if s.end_time else None,
@@ -768,6 +882,7 @@ def log_activity(request):
             {
                 "id": s.id,
                 "project": s.project.name,
+                "project_id": s.project.id,
                 "subprojects": [sp.name for sp in s.subprojects.all()],
                 "start_time": s.start_time.isoformat(),
                 "end_time": s.end_time.isoformat() if s.end_time else None,
@@ -1022,6 +1137,125 @@ def delete_session(request, session_id):
     sess = get_object_or_404(Sessions, pk=session_id, user=request.user)
     sess.delete()
     return Response(status=204)
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def edit_session(request, session_id):
+    """
+    Edit an existing session by deleting and recreating it.
+
+    This approach is used because the signal model for time totals relies on
+    session creation/deletion events. Editing in-place would require complex
+    delta calculations.
+
+    JSON body (all optional, only provided fields are updated):
+      - project: str (project name to reassign session to)
+      - subprojects: [str] (list of subproject names)
+      - start: str (ISO timestamp)
+      - end: str (ISO timestamp)
+      - note: str
+
+    Query params:
+      - compact: true/false (default true)
+
+    Returns the new session object (with new ID).
+    """
+    compact = _compact(request)
+    current_session = get_object_or_404(Sessions, pk=session_id, user=request.user)
+
+    # Only allow editing completed sessions
+    if current_session.is_active:
+        return _err("Cannot edit active sessions. Stop the timer first.")
+
+    # Collect current values as defaults
+    project = current_session.project
+    start_time = current_session.start_time
+    end_time = current_session.end_time
+    note = current_session.note
+    current_subs = list(current_session.subprojects.all())
+
+    # Apply updates from request body
+    data = request.data
+
+    # Update project if provided
+    if "project" in data and data["project"]:
+        project = Projects.objects.filter(
+            name=data["project"], user=request.user
+        ).first()
+        if not project:
+            return _err("Project not found", status.HTTP_404_NOT_FOUND)
+
+    # Update start/end times if provided
+    if "start" in data and data["start"]:
+        try:
+            start_time = parse_date_or_datetime(data["start"])
+            if timezone.is_naive(start_time):
+                start_time = timezone.make_aware(start_time)
+        except Exception as e:
+            return _err(f"Invalid start time: {e}")
+
+    if "end" in data and data["end"]:
+        try:
+            end_time = parse_date_or_datetime(data["end"])
+            if timezone.is_naive(end_time):
+                end_time = timezone.make_aware(end_time)
+        except Exception as e:
+            return _err(f"Invalid end time: {e}")
+
+    # Validate times
+    if end_time and start_time and end_time < start_time:
+        return _err("End time cannot be earlier than start time")
+
+    # Update note if provided (allow empty string to clear note)
+    if "note" in data:
+        note = data["note"] if data["note"] else None
+
+    # Resolve subprojects if provided
+    sub_qs = None
+    if "subprojects" in data:
+        subs = _coerce_list(data.get("subprojects"))
+        if subs:
+            sub_qs = SubProjects.objects.filter(
+                parent_project=project, user=request.user, name__in=subs
+            )
+            if sub_qs.count() != len(set([s.lower() for s in subs])):
+                existing = set(sp.name.lower() for sp in sub_qs)
+                missing = [s for s in subs if s.lower() not in existing]
+                return _err(f"Unknown subprojects: {', '.join(missing)}")
+        else:
+            sub_qs = SubProjects.objects.none()
+
+    # Create the new session (using same pattern as track_session to avoid double-counting)
+    new_session = Sessions(
+        user=request.user,
+        project=project,
+        start_time=start_time,
+        end_time=end_time,
+        is_active=False,
+        note=note,
+    )
+    new_session.full_clean()
+    new_session.save()
+
+    # Add subprojects
+    if sub_qs is not None:
+        if sub_qs.exists():
+            new_session.subprojects.add(*list(sub_qs))
+    else:
+        # Keep existing subprojects (filtering to those valid for the new project)
+        valid_subs = [sp for sp in current_subs if sp.parent_project == project]
+        if valid_subs:
+            new_session.subprojects.add(*valid_subs)
+
+    # Delete the old session (triggers pre_delete signal to subtract from totals)
+    current_session.delete()
+
+    return Response(
+        _json_ok({"session": _serialize_session(new_session, compact)}, compact),
+        status=status.HTTP_200_OK,
+    )
 
 
 @api_view(["GET"])
@@ -1474,7 +1708,8 @@ def contexts_list(request):
     Returns (compact):
       {"count": int, "contexts": [{"id": int, "name": str}]}
     Returns (full):
-      {"count": int, "contexts": [{"id", "name", "description"}]}
+      {"count": int, "contexts": [{"id", "name", "description", "project_count",
+                                   "session_count", "total_minutes", "avg_session_minutes"}]}
     """
     compact = _compact(request)
     qs = request.user.contexts.all().order_by("name")
@@ -1482,9 +1717,31 @@ def contexts_list(request):
     if compact:
         payload = [{"id": c.id, "name": c.name} for c in qs]
     else:
-        payload = [
-            {"id": c.id, "name": c.name, "description": c.description or ""} for c in qs
-        ]
+        payload = []
+        for c in qs:
+            project_count = c.projects.count()
+            # Get all completed sessions for projects in this context
+            sessions = Sessions.objects.filter(
+                user=request.user,
+                project__context=c,
+                is_active=False,
+            )
+            session_count = sessions.count()
+            total_minutes = sum(s.duration or 0 for s in sessions)
+            avg_session_minutes = (
+                round(total_minutes / session_count, 2) if session_count > 0 else 0.0
+            )
+            payload.append(
+                {
+                    "id": c.id,
+                    "name": c.name,
+                    "description": c.description or "",
+                    "project_count": project_count,
+                    "session_count": session_count,
+                    "total_minutes": round(total_minutes, 2),
+                    "avg_session_minutes": avg_session_minutes,
+                }
+            )
 
     return Response({"count": len(payload), "contexts": payload})
 
@@ -1500,7 +1757,8 @@ def tags_list(request):
     Returns (compact):
       {"count": int, "tags": [{"id": int, "name": str}]}
     Returns (full):
-      {"count": int, "tags": [{"id", "name", "color"}]}
+      {"count": int, "tags": [{"id", "name", "color", "project_count",
+                              "session_count", "total_minutes", "avg_session_minutes"}]}
     """
     compact = _compact(request)
     qs = request.user.tags.all().order_by("name")
@@ -1508,7 +1766,31 @@ def tags_list(request):
     if compact:
         payload = [{"id": t.id, "name": t.name} for t in qs]
     else:
-        payload = [{"id": t.id, "name": t.name, "color": t.color or ""} for t in qs]
+        payload = []
+        for t in qs:
+            project_count = t.projects.filter(user=request.user).count()
+            # Get all completed sessions for projects with this tag
+            sessions = Sessions.objects.filter(
+                user=request.user,
+                project__tags=t,
+                is_active=False,
+            )
+            session_count = sessions.count()
+            total_minutes = sum(s.duration or 0 for s in sessions)
+            avg_session_minutes = (
+                round(total_minutes / session_count, 2) if session_count > 0 else 0.0
+            )
+            payload.append(
+                {
+                    "id": t.id,
+                    "name": t.name,
+                    "color": t.color or "",
+                    "project_count": project_count,
+                    "session_count": session_count,
+                    "total_minutes": round(total_minutes, 2),
+                    "avg_session_minutes": avg_session_minutes,
+                }
+            )
 
     return Response({"count": len(payload), "tags": payload})
 
@@ -1567,8 +1849,12 @@ def audit(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):
-    """Return info about the authenticated user."""
+    """Return info about the authenticated user.
+
+    Includes active_session_count for status indicators.
+    """
     u = request.user
+    active_session_count = Sessions.objects.filter(user=u, is_active=True).count()
     return Response(
         {
             "ok": True,
@@ -1577,5 +1863,6 @@ def me(request):
             "email": u.email,
             "first_name": getattr(u, "first_name", "") or "",
             "last_name": getattr(u, "last_name", "") or "",
+            "active_session_count": active_session_count,
         }
     )
