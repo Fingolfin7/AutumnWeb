@@ -7,17 +7,25 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
-    {#<script src="https://www.gstatic.com/charts/loader.js"></script>#}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!--chart js-->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- calendar chart plugin -->
+    <!-- Chart.js plugins -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@1.1.1/dist/chartjs-chart-matrix.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.0"></script>
     <!-- wordcloud plugin -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.0/wordcloud2.min.js"></script>
+    <!-- Project search -->
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
-    <script src="{% static 'core/js/charts.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
+    <!-- Modular chart files -->
+    <script src="{% static 'core/js/charts/core.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/charts/basic.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/charts/time.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/charts/trends.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/charts/hierarchy.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/charts/analysis.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/charts/wordcloud.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
@@ -68,13 +76,36 @@
              <span class="label-input">
                 <label for="chart_type"><i class="fa fa-chart-bar"></i>Type</label>
                 <select id="chart_type" name="chart_type" data-selected="{{ request.GET.chart_type|default:'pie' }}">
-                    <option value="pie">Pie</option>
-                    <option value="bar">Bar</option>
-                    <option value="scatter">Scatter</option>
-                    <option value="line">Line</option>
-                    <option value="calendar">Calendar</option>
-                    <option value="wordcloud">Wordcloud</option>
-                    <option value="heatmap">Heatmap</option>
+                    <optgroup label="Basic">
+                        <option value="pie">Pie</option>
+                        <option value="bar">Bar</option>
+                        <option value="scatter">Scatter</option>
+                        <option value="line">Line</option>
+                    </optgroup>
+                    <optgroup label="Time">
+                        <option value="calendar">Calendar</option>
+                        <option value="heatmap">Heatmap</option>
+                    </optgroup>
+                    <optgroup label="Trends">
+                        <option value="stacked_area">Stacked Area</option>
+                        <option value="cumulative">Cumulative</option>
+                    </optgroup>
+                    <optgroup label="Hierarchy">
+                        <option value="treemap">Treemap</option>
+                        <option value="sunburst">Sunburst</option>
+                    </optgroup>
+                    <optgroup label="Summary">
+                        <option value="status">Status</option>
+                        <option value="context">Context</option>
+                    </optgroup>
+                    <optgroup label="Analysis">
+                        <option value="histogram">Session Histogram</option>
+                        <option value="radar">Radar</option>
+                        <option value="bubble">Tag Bubble</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                        <option value="wordcloud">Wordcloud</option>
+                    </optgroup>
                 </select>
             </span>
 
@@ -88,12 +119,18 @@
     </section>
 
     <section id="chart_section" class="card">
-
+        <!-- API endpoint URLs -->
         <input type="hidden" id="projects_link" value="{% url 'api_tally_by_sessions' %}">
         <input type="hidden" id="subprojects_tally_link" value="{% url 'api_tally_by_subprojects' %}">
         <input type="hidden" id="subprojects_link" value="{% url 'api_list_subprojects_param' %}">
         <input type="hidden" id="sessions_link" value="{% url 'api_list_sessions' %}">
-        <input type="hidden" id="raw_sessions_link" value ="{% url 'api_list_sessions' %}">
+        <input type="hidden" id="raw_sessions_link" value="{% url 'api_list_sessions' %}">
+        <!-- New API endpoints for additional charts -->
+        <input type="hidden" id="hierarchy_link" value="{% url 'api_hierarchy' %}">
+        <input type="hidden" id="context_tally_link" value="{% url 'api_tally_by_context' %}">
+        <input type="hidden" id="status_tally_link" value="{% url 'api_tally_by_status' %}">
+        <input type="hidden" id="tags_tally_link" value="{% url 'api_tally_by_tags' %}">
+        <input type="hidden" id="projects_stats_link" value="{% url 'api_projects_with_stats' %}">
 
         <!-- Shown while charts are loading / rendering (covers only this card) -->
         <div id="chart-loading" class="loading-overlay" aria-live="polite" aria-busy="false" style="display:none;">

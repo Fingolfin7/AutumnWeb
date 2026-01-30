@@ -1010,6 +1010,174 @@ def tally_by_subprojects(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+def tally_by_context(request):
+    """Aggregate time by context."""
+    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = filter_sessions_by_params(request, sessions)
+
+    context_durations = {}
+    for s in sessions:
+        dur = s.duration or 0
+        context_name = s.project.context.name if s.project.context else "General"
+        context_durations.setdefault(context_name, 0)
+        context_durations[context_name] += dur
+
+    payload = [{"name": n, "total_time": t} for n, t in context_durations.items()]
+    return Response(payload)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def tally_by_status(request):
+    """Aggregate project count and time by status."""
+    projects = Projects.objects.filter(user=request.user)
+
+    # Apply context filter if provided
+    context_id = request.query_params.get("context")
+    if context_id:
+        projects = projects.filter(context_id=context_id)
+
+    status_data = {}
+    for p in projects:
+        st = p.status
+        if st not in status_data:
+            status_data[st] = {"status": st, "count": 0, "total_time": 0}
+        status_data[st]["count"] += 1
+        status_data[st]["total_time"] += p.total_time or 0
+
+    payload = list(status_data.values())
+    return Response(payload)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def tally_by_tags(request):
+    """Aggregate time by tag."""
+    from django.db.models import Count, Sum
+
+    tags = Tag.objects.filter(user=request.user).annotate(
+        project_count=Count('projects'),
+        total_time=Sum('projects__total_time')
+    ).filter(project_count__gt=0)
+
+    payload = [
+        {
+            "name": t.name,
+            "tag_id": t.id,
+            "total_time": t.total_time or 0,
+            "project_count": t.project_count,
+            "color": t.color or None
+        }
+        for t in tags
+    ]
+    return Response(payload)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def hierarchy_data(request):
+    """Return hierarchical Context -> Project -> SubProject structure with times."""
+    from django.db.models import Sum
+
+    user = request.user
+    contexts = Context.objects.filter(user=user)
+
+    # Apply date filters to sessions for time calculation
+    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = filter_sessions_by_params(request, sessions)
+
+    # Build session duration lookup by project and subproject
+    project_times = {}
+    subproject_times = {}
+    for s in sessions:
+        dur = s.duration or 0
+        pid = s.project_id
+        project_times[pid] = project_times.get(pid, 0) + dur
+        for sub in s.subprojects.all():
+            subproject_times[sub.id] = subproject_times.get(sub.id, 0) + dur
+
+    hierarchy = {
+        "name": "All",
+        "children": []
+    }
+
+    for ctx in contexts:
+        ctx_children = []
+        ctx_projects = Projects.objects.filter(user=user, context=ctx)
+
+        for proj in ctx_projects:
+            proj_time = project_times.get(proj.id, 0)
+            if proj_time == 0:
+                continue  # Skip projects with no time in range
+
+            proj_children = []
+            for sub in proj.subprojects.all():
+                sub_time = subproject_times.get(sub.id, 0)
+                if sub_time > 0:
+                    proj_children.append({
+                        "name": sub.name,
+                        "subproject_id": sub.id,
+                        "total_time": sub_time
+                    })
+
+            ctx_children.append({
+                "name": proj.name,
+                "project_id": proj.id,
+                "total_time": proj_time,
+                "children": proj_children
+            })
+
+        if ctx_children:
+            hierarchy["children"].append({
+                "name": ctx.name,
+                "context_id": ctx.id,
+                "children": ctx_children
+            })
+
+    return Response(hierarchy)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def projects_with_stats(request):
+    """Return projects with additional stats for radar chart."""
+    from django.db.models import Count, Avg
+    from django.utils import timezone
+    from datetime import timedelta
+
+    projects = Projects.objects.filter(user=request.user)
+
+    # Apply context filter if provided
+    context_id = request.query_params.get("context")
+    if context_id:
+        projects = projects.filter(context_id=context_id)
+
+    # Apply tag filters
+    projects = _apply_tag_filters(
+        request.query_params, projects, kind="projects", user=request.user
+    )
+
+    now = timezone.now()
+    payload = []
+    for p in projects:
+        session_count = p.sessions.filter(is_active=False).count()
+        subproject_count = p.subprojects.count()
+        days_since_update = (now - p.last_updated).days if p.last_updated else 999
+
+        payload.append({
+            "name": p.name,
+            "total_time": p.total_time or 0,
+            "session_count": session_count,
+            "subproject_count": subproject_count,
+            "days_since_update": days_since_update,
+            "status": p.status
+        })
+
+    return Response(payload)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def search_projects(request):
     term = request.query_params.get("search_term", "")
     if "status" in request.query_params:
