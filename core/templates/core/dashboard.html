@@ -68,11 +68,87 @@
     </section>
     {% endif %}
 
+    
     <div class="dashboard-grid" style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-        <!-- Left Column: Recent Sessions -->
-        <div class="sessions-column" style="flex: 1.2; min-width: 350px;">
-            <section id="recent-sessions">
-                <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-history text-blue"></i> Recent Sessions</h3>
+        <div class="sidebar-column" style="flex: 1; min-width: 300px;">
+            <section id="commitments" style="margin-bottom: 1.5rem;">
+                <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-bullseye text-cyan"></i> Commitments</h3>
+                {% if commitments_data %}
+                {% for item in commitments_data %}
+                <div class="card" style="background-color: rgba(0, 0, 0, 0.5); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link">
+                            <span class="text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.project.name }}</span>
+                        </a>
+                        <span style="font-size: 0.8em;" class="text-muted">
+                            {{ item.progress.period }}
+                        </span>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 0.4rem;">
+                        <span class="text-accent">Progress</span>
+                        <span class="text-green">{{ item.progress.actual|floatformat:0 }}{% if item.progress.commitment_type == 'time' %}m{% endif %} / {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
+                    </div>
+
+                    <div class="progress-bar-container commitment-progress-container">
+                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%;"></div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+                        <span style="font-size: 0.85em;">
+                            <i class="fas fa-fire {% if item.streak.current_streak > 0 %}text-red{% else %}text-muted{% endif %}"></i>
+                            {{ item.streak.current_streak }} period{{ item.streak.current_streak|pluralize }}
+                        </span>
+                        <div style="display: flex; gap: 0.2rem;">
+                            {% for period in item.streak.periods %}
+                            <span style="width: 1.2rem; height: 1.2rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 2px; font-size: 0.6rem; {% if period.is_current %}background-color: var(--main-yellow); color: var(--dark-background);{% elif period.met %}background-color: var(--main-green); color: var(--dark-background);{% else %}background-color: var(--main-red); color: white;{% endif %}" title="{{ period.actual|floatformat:0 }}/{{ period.target }}">
+                                {% if period.is_current %}<i class="fas fa-hourglass-half"></i>{% elif period.met %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}
+                            </span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <div class="card">
+                    <p class="text-muted" style="font-size: 0.9em;">No active commitments. <a href="{% url 'projects' %}">Add one</a>.</p>
+                </div>
+                {% endif %}
+            </section>
+        </div>
+        <div class="sidebar-column" style="flex: 1; min-width: 300px;">
+            <section id="activity-streak-details">
+                <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-calendar-alt text-green"></i> Activity</h3>
+                <div class="card activity-card">
+                    <div class="activity-range-controls">
+                        <button type="button" class="activity-range-button is-active" data-days="14">2 weeks</button>
+                        <button type="button" class="activity-range-button" data-days="7">Week</button>
+                        <button type="button" class="activity-range-button" data-days="30">Month</button>
+                    </div>
+                    <div class="activity-weekdays">
+                        <span>Mon</span>
+                        <span>Tue</span>
+                        <span>Wed</span>
+                        <span>Thu</span>
+                        <span>Fri</span>
+                        <span>Sat</span>
+                        <span>Sun</span>
+                    </div>
+                    <div class="activity-calendar" data-total-days="{{ daily_streak.recent_days|length }}">
+                        {% for day in daily_streak.recent_days %}
+                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" title="{{ day.date|date:'M d' }}">
+                            {{ day.date|date:'d' }}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <p class="text-muted activity-range-label">Last 14 days activity</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <section id="recent-sessions" style="margin-top: 0.75rem;">
+        <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-history text-blue"></i> Recent Sessions</h3>
                 {% if grouped_sessions %}
                 {% for date, data in grouped_sessions.items %}
                     <div class="date-group" style="margin-bottom: 1rem;">
@@ -143,88 +219,7 @@
                     <p class="text-muted">No sessions yet. <a href="{% url 'start_timer' %}">Start a timer</a> to begin tracking.</p>
                 </div>
                 {% endif %}
-            </section>
-        </div>
-
-        <!-- Right Column: Commitments & Streak -->
-        <div class="sidebar-column" style="flex: 1; min-width: 300px;">
-            <!-- Commitments -->
-            <section id="commitments" style="margin-bottom: 1.5rem;">
-                <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-bullseye text-cyan"></i> Commitments</h3>
-                {% if commitments_data %}
-                {% for item in commitments_data %}
-                <div class="card" style="background-color: rgba(0, 0, 0, 0.5); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link">
-                            <span class="text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.project.name }}</span>
-                        </a>
-                        <span style="font-size: 0.8em;" class="text-muted">
-                            {{ item.progress.period }}
-                        </span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 0.4rem;">
-                        <span class="text-accent">Progress</span>
-                        <span class="text-green">{{ item.progress.actual|floatformat:0 }}{% if item.progress.commitment_type == 'time' %}m{% endif %} / {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
-                    </div>
-
-                    <div class="progress-bar-container commitment-progress-container">
-                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%;"></div>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-                        <span style="font-size: 0.85em;">
-                            <i class="fas fa-fire {% if item.streak.current_streak > 0 %}text-red{% else %}text-muted{% endif %}"></i>
-                            {{ item.streak.current_streak }} period{{ item.streak.current_streak|pluralize }}
-                        </span>
-                        <div style="display: flex; gap: 0.2rem;">
-                            {% for period in item.streak.periods %}
-                            <span style="width: 1.2rem; height: 1.2rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 2px; font-size: 0.6rem; {% if period.is_current %}background-color: var(--main-yellow); color: var(--dark-background);{% elif period.met %}background-color: var(--main-green); color: var(--dark-background);{% else %}background-color: var(--main-red); color: white;{% endif %}" title="{{ period.actual|floatformat:0 }}/{{ period.target }}">
-                                {% if period.is_current %}<i class="fas fa-hourglass-half"></i>{% elif period.met %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}
-                            </span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-                {% else %}
-                <div class="card">
-                    <p class="text-muted" style="font-size: 0.9em;">No active commitments. <a href="{% url 'projects' %}">Add one</a>.</p>
-                </div>
-                {% endif %}
-            </section>
-
-            <!-- Activity Streak Details -->
-            <section id="activity-streak-details">
-                <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-calendar-alt text-green"></i> Activity</h3>
-                <div class="card activity-card">
-                    <div class="activity-range-controls">
-                        <button type="button" class="activity-range-button is-active" data-days="14">2 weeks</button>
-                        <button type="button" class="activity-range-button" data-days="7">Week</button>
-                        <button type="button" class="activity-range-button" data-days="30">Month</button>
-                    </div>
-                    <div class="activity-weekdays">
-                        <span>Mon</span>
-                        <span>Tue</span>
-                        <span>Wed</span>
-                        <span>Thu</span>
-                        <span>Fri</span>
-                        <span>Sat</span>
-                        <span>Sun</span>
-                    </div>
-                    <div class="activity-calendar" data-total-days="{{ daily_streak.recent_days|length }}">
-                        {% for day in daily_streak.recent_days %}
-                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" title="{{ day.date|date:'M d' }}">
-                            {{ day.date|date:'d' }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <p class="text-muted activity-range-label">Last 14 days activity</p>
-                </div>
-            </section>
-
-        </div>
-    </div>
+    </section>
 
     <script type="text/javascript">
         document.addEventListener("DOMContentLoaded", function () {
