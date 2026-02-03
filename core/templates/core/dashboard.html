@@ -16,11 +16,11 @@
         <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
             <div class="card stat-item" style="margin-bottom: 0; padding: 1rem;">
                 <span class="stat-label">Today</span>
-                <span class="stat-value text-green">{{ today_total|min_formatter }}</span>
+                <span class="stat-value text-green">{{ today_total|min_formatter_two }}</span>
             </div>
             <div class="card stat-item" style="margin-bottom: 0; padding: 1rem;">
                 <span class="stat-label">This Week</span>
-                <span class="stat-value text-cyan">{{ week_total|min_formatter }}</span>
+                <span class="stat-value text-cyan">{{ week_total|min_formatter_two }}</span>
             </div>
             <div class="card stat-item" style="margin-bottom: 0; padding: 1rem;">
                 <span class="stat-label">Active Timers</span>
@@ -149,76 +149,81 @@
 
     <section id="recent-sessions" style="margin-top: 0.75rem;">
         <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-history text-blue"></i> Recent Sessions</h3>
-                {% if grouped_sessions %}
-                {% for date, data in grouped_sessions.items %}
-                    <div class="date-group" style="margin-bottom: 1rem;">
-                        <h4 class="dashboard-date-header">
-                            <span><u>{{ date|day_date_formatter }}</u></span>
-                            <span class="text-green dashboard-date-total">({{ data.total_duration|duration_formatter }})</span>
-                        </h4>
+        {% if grouped_sessions %}
+        {% for date, data in grouped_sessions.items %}
+            <h3>
+                <u>{{ date|day_date_formatter }}</u>
+                <span class="text-green">
+                    ({{ data.total_duration|duration_formatter }})
+                </span>
+            </h3>
 
-                        {% for session in data.sessions %}
-                        <div class="card dashboard-session-card" id="session-{{ session.id }}">
-                            <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-                            <span>to</span>
-                            <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
+            <br>
 
-                            <span class="dashboard-session-duration">{{ session.duration|duration_formatter }}</span>
+            {% for session in data.sessions %}
+                <div class="card" id="session-{{ session.id }}">
+                    <div class="session-row">
+                        <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
+                        <span>to</span>
+                        <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
 
-                            <span class="text-red project-name-slider dashboard-project-name">
-                                <a class="plain-link" href="{% url 'update_project' session.project.id %}">
-                                    {{ session.project.name }}
+                        <span class="session-duration">{{ session.duration|duration_formatter }}</span>
+
+                        <span class="text-red project-name-slider" id="project-name">
+                            <a class="plain-link" href="{% url 'update_project' session.project.id %}">
+                                {{ session.project.name }}
+                            </a>
+                        </span>
+
+                        <span class="session-subprojects">
+                            {% for subproject in session.subprojects.all %}
+                                <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                    {% if forloop.first %}[{% endif %}
+                                    '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                    {% if forloop.last %}] {% endif %}
                                 </a>
-                            </span>
+                            {% endfor %}
+                            {% if session.note|length > 0 %}->{% endif %}
+                        </span>
 
-                            {% if session.subprojects.all %}
-                            <span class="dashboard-session-subprojects">
-                                {% for subproject in session.subprojects.all %}
-                                    {% if forloop.first %}[ {% endif %}'<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}{% if forloop.last %} ]{% endif %}
+                        {% if session.note %}
+                        <span class="session-note-slider">
+                            <span class="text-yellow session-note" id="note-{{ session.id }}">
+                                {{ session.note | markdown | safe }}
+                            </span>
+                        </span>
+                        {% endif %}
+
+                        <span class="session-actions">
+                            <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
+                                <i class="fa fa-pen"></i>
+                            </button>
+                            <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                            <form method="post" action="{% url 'start_timer' %}" class="dashboard-restart-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="project" value="{{ session.project.name }}">
+                                {% for sub in session.subprojects.all %}
+                                <input type="hidden" name="subprojects" value="{{ sub.name }}">
                                 {% endfor %}
-                            </span>
-                            {% endif %}
-
-                            {% if session.note %}
-                                <span class="dashboard-session-arrow">-></span>
-                                <div class="session-note-slider">
-                                    <span class="text-yellow session-note">
-                                        {{ session.note|markdown|safe }}
-                                    </span>
-                                </div>
-                            {% endif %}
-
-                            <span class="dashboard-session-actions">
-                                <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'" title="Edit">
-                                    <i class="fa fa-pen"></i>
+                                <button type="submit" class="primary-button" title="Restart">
+                                    <i class="fas fa-redo"></i>
                                 </button>
-                                <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'" title="Delete">
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                                <form method="post" action="{% url 'start_timer' %}" class="dashboard-restart-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="project" value="{{ session.project.name }}">
-                                    {% for sub in session.subprojects.all %}
-                                    <input type="hidden" name="subprojects" value="{{ sub.name }}">
-                                    {% endfor %}
-                                    <button type="submit" class="primary-button" title="Restart">
-                                        <i class="fas fa-redo"></i>
-                                    </button>
-                                </form>
-                            </span>
-                        </div>
-
-                        {% endfor %}
+                            </form>
+                        </span>
                     </div>
-                {% endfor %}
-                <div style="text-align: center; margin-top: 1rem;">
-                    <a href="{% url 'sessions' %}" class="plain-link text-muted" style="font-size: 0.9em;">View all sessions <i class="fas fa-arrow-right"></i></a>
                 </div>
-                {% else %}
-                <div class="card">
-                    <p class="text-muted">No sessions yet. <a href="{% url 'start_timer' %}">Start a timer</a> to begin tracking.</p>
-                </div>
-                {% endif %}
+            {% endfor %}
+        {% endfor %}
+        <div style="text-align: center; margin-top: 1rem;">
+            <a href="{% url 'sessions' %}" class="plain-link text-muted" style="font-size: 0.9em;">View all sessions <i class="fas fa-arrow-right"></i></a>
+        </div>
+        {% else %}
+        <div class="card">
+            <p class="text-muted">No sessions yet. <a href="{% url 'start_timer' %}">Start a timer</a> to begin tracking.</p>
+        </div>
+        {% endif %}
     </section>
 
     <script type="text/javascript">

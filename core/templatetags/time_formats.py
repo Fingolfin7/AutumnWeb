@@ -47,6 +47,36 @@ def min_formatter(td: timedelta | float | int):
 
 
 @register.filter
+def min_formatter_two(td: timedelta | float | int):
+    """
+    Format duration using at most two non-zero units (e.g. "1 day 2 hours", "3 hours 10 minutes").
+    Falls back to "0 seconds" if all units are zero.
+    """
+    if isinstance(td, (float, int)):
+        td = timedelta(minutes=td)
+
+    days = td.days
+    hrs, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    plural_form = lambda counter: "s"[: counter ^ 1]
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days} day{plural_form(days)}")
+    if hrs > 0:
+        parts.append(f"{hrs} hour{plural_form(hrs)}")
+    if minutes > 0:
+        parts.append(f"{minutes} minute{plural_form(minutes)}")
+    if seconds > 0:
+        parts.append(f"{seconds} second{plural_form(seconds)}")
+
+    if not parts:
+        return "0 seconds"
+
+    return " ".join(parts[:2])
+
+
+@register.filter
 def duration_formatter(td: timedelta | float | int):
     """
     Converts timedelta objects into formatted time strings like "1d 2h 30m" or "45m 30s"
