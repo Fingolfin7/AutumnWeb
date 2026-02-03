@@ -95,45 +95,47 @@
 
             {% for session in data.sessions %}
                 <div class="card" id="session-{{ session.id }}">
-                    <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-                    to
-                    <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
+                    <div class="session-row">
+                        <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
+                        <span>to</span>
+                        <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
 
-                    {{ session.duration|duration_formatter }}
+                        <span class="session-duration">{{ session.duration|duration_formatter }}</span>
 
-                    <span class="text-red project-name-slider" id="project-name">
-                        <a class="plain-link" href="{% url 'update_project' session.project.id %}">
-                            {{ session.project.name }}
-                        </a>
-                    </span>
-
-                    <span>
-                        {% for subproject in session.subprojects.all %}
-                            <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                                {% if forloop.first %}[{% endif %}
-                                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                                {% if forloop.last %}] {% endif %}
+                        <span class="text-red project-name-slider" id="project-name">
+                            <a class="plain-link" href="{% url 'update_project' session.project.id %}">
+                                {{ session.project.name }}
                             </a>
-                        {% endfor %}
-                        {% if session.note|length > 0 %}->{% endif %}
-                    </span>
+                        </span>
 
-                    {% if session.note %}
-                        <div class="session-note-slider">
+                        <span class="session-subprojects">
+                            {% for subproject in session.subprojects.all %}
+                                <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                    {% if forloop.first %}[{% endif %}
+                                    '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                    {% if forloop.last %}] {% endif %}
+                                </a>
+                            {% endfor %}
+                            {% if session.note|length > 0 %} ->{% endif %}
+                        </span>
+
+                        {% if session.note %}
+                        <span class="session-note-slider">
                             <span class="text-yellow session-note" id="note-{{ session.id }}">
                                 {{ session.note | markdown | safe }} <!-- safe is used to render html -->
                             </span>
-                        </div>
-                    {% endif %}
+                        </span>
+                        {% endif %}
 
-                    <span>
-                        <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
-                            <i class="fa fa-pen"></i>
-                        </button>
-                        <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'">
-                            <i class="fa fa-trash"></i>
-                        </button>
-                    </span>
+                        <span class="session-actions">
+                            <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
+                                <i class="fa fa-pen"></i>
+                            </button>
+                            <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </span>
+                    </div>
                 </div>
             {% endfor %}
         {% endfor %}

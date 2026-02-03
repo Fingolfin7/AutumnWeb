@@ -38,7 +38,7 @@
                         <td>
                             <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
                         </td>
-                        <td>
+                        <td class="timer-actions">
                             <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
                                 <i class="fas fa-redo-alt"></i>
                             </button>

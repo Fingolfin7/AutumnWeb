@@ -338,6 +338,18 @@ body.dark-mode.bg-active .card {
   border-spacing: 0.5rem 0;
 }
 
+.timer-row {
+  width: 100%;
+}
+
+.timer-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  width: 100%;
+}
+
 .stacked {
   display: flex;
   flex-direction: column;
@@ -601,6 +613,29 @@ input:checked + .slider:before {
   white-space: nowrap;
   position: relative;
 }
+
+.session-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.session-duration {
+  margin: 0 0.3rem;
+}
+
+.session-subprojects {
+  color: inherit;
+}
+
+.session-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin-left: auto;
+}
+
 
 /* file upload button */
 .custom-file-upload {
