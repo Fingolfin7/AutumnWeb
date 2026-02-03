@@ -42,15 +42,25 @@
                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
                     <span class="text-red timer-project" style="font-weight: bold;">{{ timer.project.name }}</span>
                     {% if timer.subprojects.all %}
-                    <span class="text-blue" style="font-size: 0.9em;">
-                        [ {% for sub in timer.subprojects.all %}'{{ sub.name }}'{% if not forloop.last %}, {% endif %}{% endfor %} ]
+                    <span style="font-size: 0.9em;">
+                        {% for sub in timer.subprojects.all %}
+                            {% if forloop.first %}[ {% endif %}'<span class="text-blue">{{ sub.name }}</span>'{% if not forloop.last %}, {% endif %}{% if forloop.last %} ]{% endif %}
+                        {% endfor %}
                     </span>
                     {% endif %}
                     <span class="text-green timer-duration" style="font-family: monospace;">{{ timer.duration|min_formatter }}</span>
                 </div>
-                <a href="{% url 'stop_timer' timer.id %}" class="primary-button" style="margin-left: 1rem; padding: 8px 12px; background-color: var(--main-green); color: var(--dark-background);">
-                    <i class="fas fa-stop"></i>
-                </a>
+                <div class="dashboard-timer-actions" style="display: inline-flex; gap: 0.3rem; margin-left: 1rem;">
+                    <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'" title="Restart">
+                        <i class="fas fa-redo-alt"></i>
+                    </button>
+                    <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'" title="Stop">
+                        <i class="fa fa-stopwatch"></i>
+                    </button>
+                    <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'" title="Remove">
+                        <i class="fa fa-trash"></i>
+                    </button>
+                </div>
             </div>
             {% endfor %}
         </div>
@@ -73,7 +83,7 @@
                         {% for session in data.sessions %}
                         <div class="card dashboard-session-card" id="session-{{ session.id }}">
                             <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-                            <span class="text-muted">to</span>
+                            <span>to</span>
                             <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
 
                             <span class="dashboard-session-duration">{{ session.duration|duration_formatter }}</span>
@@ -93,7 +103,7 @@
                             {% endif %}
 
                             {% if session.note %}
-                                <span class="text-muted dashboard-session-arrow">-></span>
+                                <span class="dashboard-session-arrow">-></span>
                                 <div class="session-note-slider">
                                     <span class="text-yellow session-note">
                                         {{ session.note|markdown|safe }}

@@ -1146,7 +1146,7 @@ body.light-mode .dashboard-date-header {
 
 .dashboard-session-subprojects {
   font-size: 0.85em;
-  color: var(--main-muted);
+  color: inherit;
 }
 
 .dashboard-session-arrow {
