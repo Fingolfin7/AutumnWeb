@@ -5,6 +5,7 @@
 
 {% block head_includes %}
     <script src="{% static 'core/js/session_sliders.js' %}?v={{ static_version.session_sliders }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
@@ -36,7 +37,7 @@
         <h3 style="margin-bottom: 1rem;"><i class="fas fa-play-circle text-yellow"></i> Active Timers</h3>
         <div class="active-timers-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
             {% for timer in active_timers %}
-            <div class="active-timer-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 4px; width: 100%;">
+            <div class="active-timer-item card" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 4px; width: 100%;" data-start-time="{{ timer.start_time|utc_time_formatter }}">
                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
                     <span class="text-red timer-project" style="font-weight: bold;">{{ timer.project.name }}</span>
                     {% if timer.subprojects.all %}
@@ -44,7 +45,7 @@
                         [ {% for sub in timer.subprojects.all %}'{{ sub.name }}'{% if not forloop.last %}, {% endif %}{% endfor %} ]
                     </span>
                     {% endif %}
-                    <span class="text-green timer-elapsed" style="font-family: monospace;">{{ timer.duration|min_formatter }}</span>
+                    <span class="text-green timer-duration" style="font-family: monospace;">{{ timer.duration|min_formatter }}</span>
                 </div>
                 <a href="{% url 'stop_timer' timer.id %}" class="primary-button" style="margin-left: 1rem; padding: 8px 12px; background-color: var(--main-green); color: var(--dark-background);">
                     <i class="fas fa-stop"></i>
@@ -80,7 +81,7 @@
                                     
                                     <span style="margin: 0 0.3rem; font-size: 0.85em;">{{ session.duration|duration_formatter }}</span>
 
-                                    <div class="project-name-slider" style="max-width: 120px; vertical-align: bottom;">
+                                    <div class="project-name-slider" style="max-width: 200px; vertical-align: bottom;">
                                         <a class="plain-link text-red project-name" href="{% url 'update_project' session.project.id %}" style="font-size: 0.9em;">
                                             {{ session.project.name }}
                                         </a>
@@ -162,8 +163,8 @@
                         <span class="text-green">{{ item.progress.actual|floatformat:0 }}{% if item.progress.commitment_type == 'time' %}m{% endif %} / {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
                     </div>
 
-                    <div class="progress-bar-container" style="margin: 0.5rem 0; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);">
-                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%; min-width: 2px; background-color: var(--main-yellow);"></div>
+                    <div class="progress-bar-container" style="margin: 0.5rem 0; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); height: 16px; border-radius: 8px;">
+                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%; height: 100%; border-radius: 8px;"></div>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
