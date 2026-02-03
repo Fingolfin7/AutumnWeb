@@ -745,7 +745,9 @@ def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -
     recent_days = []
     for i in range(days - 1, -1, -1):  # oldest first
         day = today - timedelta(days=i)
-        recent_days.append({"date": day, "active": day in active_dates})
+        recent_days.append(
+            {"date": day, "active": day in active_dates, "weekday": day.weekday()}
+        )
 
     return {"current_streak": current_streak, "recent_days": recent_days}
 

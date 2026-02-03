@@ -139,8 +139,8 @@
                 <div id="activity-body" class="collapsible-body">
                     <div class="card activity-card">
                     <div class="activity-range-controls">
-                        <button type="button" class="activity-range-button is-active" data-days="14">2 weeks</button>
                         <button type="button" class="activity-range-button" data-days="7">Week</button>
+                        <button type="button" class="activity-range-button is-active" data-days="14">2 weeks</button>
                         <button type="button" class="activity-range-button" data-days="30">Month</button>
                     </div>
                     <div class="activity-weekdays">
@@ -154,7 +154,7 @@
                     </div>
                     <div class="activity-calendar" data-total-days="{{ daily_streak.recent_days|length }}">
                         {% for day in daily_streak.recent_days %}
-                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" title="{{ day.date|date:'M d' }}">
+                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" data-weekday="{{ day.weekday }}" title="{{ day.date|date:'M d' }}">
                             {{ day.date|date:'d' }}
                         </div>
                         {% endfor %}
@@ -267,7 +267,13 @@
                 const startIndex = Math.max(0, totalDays - dayCount);
                 days.forEach((day, index) => {
                     day.style.display = index >= startIndex ? "flex" : "none";
+                    day.style.gridColumnStart = "auto";
                 });
+                const firstVisible = days.find((day) => day.style.display !== "none");
+                if (firstVisible) {
+                    const weekday = parseInt(firstVisible.dataset.weekday || "0", 10);
+                    firstVisible.style.gridColumnStart = String(weekday + 1);
+                }
                 label.textContent = `Last ${dayCount} days activity`;
             }
 

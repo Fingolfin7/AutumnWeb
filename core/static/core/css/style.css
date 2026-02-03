@@ -889,6 +889,7 @@ body.dark-mode :where(.label-input) select.select-caret {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  align-items: flex-start;
 }
 
 .commitment-info .progress-bar-container {
