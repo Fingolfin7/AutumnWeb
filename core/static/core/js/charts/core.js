@@ -101,7 +101,7 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
 
     // Map chart types to their data sources
     const sessionBasedCharts = ['scatter', 'calendar', 'heatmap', 'line', 'stacked_area', 'cumulative', 'histogram'];
-    const hierarchyCharts = ['treemap', 'sunburst'];
+    const hierarchyCharts = ['treemap'];
     const contextCharts = ['context'];
     const statusCharts = ['status'];
     const tagCharts = ['bubble'];

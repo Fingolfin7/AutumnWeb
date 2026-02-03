@@ -766,7 +766,7 @@ def search_sessions(request):
     sessions = _apply_tag_filters(qp, sessions, kind="sessions", user=request.user)
 
     # Shim request so filter_sessions_by_params sees the normalized params
-    shim = type("Req", (), {"query_params": qp2})()
+    shim = type("Req", (), {"query_params": qp2, "GET": qp2})()
     sessions = filter_sessions_by_params(shim, sessions)
 
     try:
@@ -861,7 +861,7 @@ def log_activity(request):
     if qp2.get("project") and not qp2.get("project_name"):
         qp2["project_name"] = qp2["project"]
 
-    shim = type("Req", (), {"query_params": qp2})()
+    shim = type("Req", (), {"query_params": qp2, "GET": qp2})()
     sessions = filter_sessions_by_params(shim, sessions).order_by("-end_time")
 
     if compact:
@@ -1030,20 +1030,39 @@ def tally_by_context(request):
 @permission_classes([IsAuthenticated])
 def tally_by_status(request):
     """Aggregate project count and time by status."""
-    projects = Projects.objects.filter(user=request.user)
+    user = request.user
+    projects = Projects.objects.filter(user=user)
 
     # Apply context filter if provided
     context_id = request.query_params.get("context")
     if context_id:
         projects = projects.filter(context_id=context_id)
 
+    # Apply tag filters to projects
+    projects = _apply_tag_filters(
+        request.query_params, projects, kind="projects", user=user
+    )
+
+    # Filter sessions by date range and other params to calculate accurate totals
+    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = filter_sessions_by_params(request, sessions)
+
+    # Build project time lookup from filtered sessions
+    project_times = {}
+    for s in sessions:
+        pid = s.project_id
+        dur = s.duration or 0
+        project_times[pid] = project_times.get(pid, 0) + dur
+
+    # Aggregate by status using filtered session times
     status_data = {}
     for p in projects:
         st = p.status
         if st not in status_data:
             status_data[st] = {"status": st, "count": 0, "total_time": 0}
         status_data[st]["count"] += 1
-        status_data[st]["total_time"] += p.total_time or 0
+        # Use filtered session time instead of stored total
+        status_data[st]["total_time"] += project_times.get(p.id, 0)
 
     payload = list(status_data.values())
     return Response(payload)
@@ -1053,19 +1072,34 @@ def tally_by_status(request):
 @permission_classes([IsAuthenticated])
 def tally_by_tags(request):
     """Aggregate time by tag."""
-    from django.db.models import Count, Sum
+    user = request.user
 
-    tags = Tag.objects.filter(user=request.user).annotate(
-        project_count=Count('projects'),
-        total_time=Sum('projects__total_time')
-    ).filter(project_count__gt=0)
+    # Filter sessions by date range, context, and other params
+    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = filter_sessions_by_params(request, sessions)
+
+    # Build tag stats from filtered sessions
+    tag_stats = {}  # tag_id -> {total_time, project_ids}
+    for s in sessions:
+        dur = s.duration or 0
+        pid = s.project_id
+        # Get tags for this session's project
+        project_tags = s.project.tags.all()
+        for tag in project_tags:
+            if tag.id not in tag_stats:
+                tag_stats[tag.id] = {"total_time": 0, "project_ids": set()}
+            tag_stats[tag.id]["total_time"] += dur
+            tag_stats[tag.id]["project_ids"].add(pid)
+
+    # Get tag objects for the ones that have data
+    tags = Tag.objects.filter(user=user, id__in=tag_stats.keys())
 
     payload = [
         {
             "name": t.name,
             "tag_id": t.id,
-            "total_time": t.total_time or 0,
-            "project_count": t.project_count,
+            "total_time": tag_stats[t.id]["total_time"],
+            "project_count": len(tag_stats[t.id]["project_ids"]),
             "color": t.color or None
         }
         for t in tags
@@ -1141,11 +1175,10 @@ def hierarchy_data(request):
 @permission_classes([IsAuthenticated])
 def projects_with_stats(request):
     """Return projects with additional stats for radar chart."""
-    from django.db.models import Count, Avg
     from django.utils import timezone
-    from datetime import timedelta
 
-    projects = Projects.objects.filter(user=request.user)
+    user = request.user
+    projects = Projects.objects.filter(user=user)
 
     # Apply context filter if provided
     context_id = request.query_params.get("context")
@@ -1154,20 +1187,34 @@ def projects_with_stats(request):
 
     # Apply tag filters
     projects = _apply_tag_filters(
-        request.query_params, projects, kind="projects", user=request.user
+        request.query_params, projects, kind="projects", user=user
     )
+
+    # Filter sessions by date range and other params
+    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = filter_sessions_by_params(request, sessions)
+
+    # Build project stats lookup from filtered sessions
+    project_stats = {}
+    for s in sessions:
+        pid = s.project_id
+        dur = s.duration or 0
+        if pid not in project_stats:
+            project_stats[pid] = {"total_time": 0, "session_count": 0}
+        project_stats[pid]["total_time"] += dur
+        project_stats[pid]["session_count"] += 1
 
     now = timezone.now()
     payload = []
     for p in projects:
-        session_count = p.sessions.filter(is_active=False).count()
+        stats = project_stats.get(p.id, {"total_time": 0, "session_count": 0})
         subproject_count = p.subprojects.count()
         days_since_update = (now - p.last_updated).days if p.last_updated else 999
 
         payload.append({
             "name": p.name,
-            "total_time": p.total_time or 0,
-            "session_count": session_count,
+            "total_time": stats["total_time"],
+            "session_count": stats["session_count"],
             "subproject_count": subproject_count,
             "days_since_update": days_since_update,
             "status": p.status

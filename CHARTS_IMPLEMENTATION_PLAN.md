@@ -9,7 +9,6 @@ Add 8 new chart types to the Autumn time tracking application and refactor the c
 | Chart | Category | Data Source | Purpose |
 |-------|----------|-------------|---------|
 | Treemap | Hierarchy | tally + structure | Context → Project → SubProject breakdown by time |
-| Sunburst | Hierarchy | tally + structure | Same as treemap, concentric ring visualization |
 | Stacked Area | Trends | sessions | Cumulative time trends across projects |
 | Status Donut | Summary | projects | Breakdown by project status |
 | Context Comparison | Summary | tally by context | Compare time across contexts |
@@ -35,7 +34,7 @@ core/static/core/js/
 │   ├── core.js          # Utilities, data fetching, render orchestration
 │   ├── basic.js         # Pie, Bar, Line, Scatter (standard Chart.js)
 │   ├── time.js          # Calendar, Heatmap (matrix-based)
-│   ├── hierarchy.js     # Treemap, Sunburst (hierarchical data)
+│   ├── hierarchy.js     # Treemap (hierarchical data)
 │   ├── trends.js        # Stacked Area, Cumulative Line
 │   ├── analysis.js      # Histogram, Radar, Tag Bubble
 │   └── wordcloud.js     # Wordcloud (uses separate library)
@@ -199,26 +198,8 @@ basic.js, time.js, hierarchy.js, trends.js, analysis.js, wordcloud.js (load in p
 }
 ```
 
-### 4.2 Sunburst
-
-**File:** `charts/hierarchy.js`
-
-**Function:** `sunburst_chart(data, ctx)`
-
-**Features:**
-- D3.js partition layout on canvas
-- Concentric rings: Center = All, Ring 1 = Context, Ring 2 = Project, Ring 3 = SubProject
-- Arc size proportional to time
-- Hover highlights path to root
-- Click to zoom into section
-
-**Implementation Notes:**
-- Use D3 for calculations, render to canvas (not SVG) to match other charts
-- Or render to a separate SVG element overlaid on canvas container
-
 ### Tasks
 - [x] Implement `treemap_chart()` function
-- [x] Implement `sunburst_chart()` function
 - [x] Add to chartFns registry
 - [x] Add dropdown options in charts.html
 - [ ] Test with real data
@@ -412,7 +393,6 @@ basic.js, time.js, hierarchy.js, trends.js, analysis.js, wordcloud.js (load in p
   <!-- New: Hierarchy -->
   <optgroup label="Hierarchy">
     <option value="treemap">Treemap</option>
-    <option value="sunburst">Sunburst</option>
   </optgroup>
 
   <!-- New: Trends -->
@@ -530,8 +510,6 @@ Recommended sequence to minimize dependencies:
 
 ## Notes
 
-- The sunburst chart is the most complex due to D3.js integration with Canvas
-- Consider making sunburst optional/Phase 2 if time constrained
 - Radar chart requires careful normalization to be meaningful
 - Tag bubble chart depends on users actually using tags
 - All new charts should follow existing patterns for consistency

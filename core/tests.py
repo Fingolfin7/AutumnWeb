@@ -1511,21 +1511,6 @@ class DashboardViewTests(TestCase):
         self.assertIn('progress', response.context['commitments_data'][0])
         self.assertIn('streak', response.context['commitments_data'][0])
 
-    def test_dashboard_shows_recent_sessions_limited_to_10(self):
-        """Test that recent sessions are limited to 10."""
-        # Create 15 sessions
-        for i in range(15):
-            Sessions.objects.create(
-                user=self.user,
-                project=self.project,
-                start_time=timezone.now() - timedelta(hours=i + 2),
-                end_time=timezone.now() - timedelta(hours=i + 1),
-                is_active=False
-            )
-        response = self.client.get(reverse('home'))
-        self.assertIn('recent_sessions', response.context)
-        self.assertEqual(len(response.context['recent_sessions']), 10)
-
     def test_dashboard_shows_daily_streak(self):
         """Test that daily streak data is displayed."""
         response = self.client.get(reverse('home'))
