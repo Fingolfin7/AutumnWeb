@@ -16,42 +16,37 @@
     <section id="active-timers">
         {% for timer in timers %}
             <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}">
-                <table class="timer-row">
-                    <tr>
-                        <td>
-                            [{{ forloop.counter0 }}]: Started
-                        </td>
-                        <td class="text-red">
-                            <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
-                                {{ timer.project.name }}
-                            </a>
-                        </td>
-                        <td>
-                          {% for subproject in timer.subprojects.all %}
+                <div class="timer-row-flex">
+                    <span>[{{ forloop.counter0 }}]: Started</span>
+                    <span class="text-red">
+                        <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
+                            {{ timer.project.name }}
+                        </a>
+                    </span>
+                    <span class="timer-subprojects">
+                        {% for subproject in timer.subprojects.all %}
                             <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
                                 {% if forloop.first %}[{% endif %}
                                 '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
                                 {% if forloop.last %}]{% endif %}
                             </a>
                         {% endfor %}
-                        </td>
-                        <td>
-                            <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
-                        </td>
-                        <td class="timer-actions">
-                            <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
-                                <i class="fas fa-redo-alt"></i>
-                            </button>
-                            <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'">
-                                <i class="fa fa-stopwatch"></i>
-                            </button>
-                            <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'">
-                                <i class="fa fa-trash"></i>
-                            </button>
-                        </td>
-
-                    </tr>
-                </table>
+                    </span>
+                    <span>
+                        <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
+                    </span>
+                    <span class="timer-actions">
+                        <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
+                            <i class="fas fa-redo-alt"></i>
+                        </button>
+                        <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'">
+                            <i class="fa fa-stopwatch"></i>
+                        </button>
+                        <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </span>
+                </div>
             </div>
         {% endfor %}
     </section>

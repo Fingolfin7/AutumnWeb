@@ -204,7 +204,12 @@ def filter_sessions_by_params(
     start_date = params.get("start_date")
     end_date = params.get("end_date")
     note_snippet = params.get("note_snippet")
-    tags = params.getlist("tags")
+    if hasattr(params, "getlist"):
+        tags = params.getlist("tags")
+    else:
+        tags = params.get("tags") or []
+        if isinstance(tags, str):
+            tags = [tags]
 
     if project_name:
         sessions = sessions.filter(project__name__icontains=project_name)

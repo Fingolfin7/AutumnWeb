@@ -236,14 +236,14 @@ body.dark-mode .main-link {
 }
 
 body.dark-mode .card {
-  background-color: var(--card-background-dark);
+  background-color: rgba(18, 18, 18, 0.72);
   color: var(--dark-text);
   box-shadow: none;
   border: 1px solid var(--border-dark);
 }
 
 body.dark-mode.bg-active .card {
-  background-color: var(--card-bg-dark-alpha);
+  background-color: rgba(18, 18, 18, 0.72);
 }
 
 .centered-card {
@@ -333,21 +333,19 @@ body.dark-mode.bg-active .card {
   margin: 0.5rem 0;
 }
 
-.timer-row,
 .table-row {
   border-spacing: 0.5rem 0;
 }
 
-.timer-row {
-  width: 100%;
+.timer-row-flex {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.timer-actions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.3rem;
-  width: 100%;
+.timer-subprojects {
+  color: inherit;
 }
 
 .stacked {
@@ -948,6 +946,26 @@ body.light-mode .progress-bar-container-mini {
    DASHBOARD STYLES
 ------------------------------ */
 
+.dashboard-page #quick-stats {
+  margin-bottom: 1rem;
+}
+
+.dashboard-page .card {
+  margin-bottom: 1rem;
+}
+
+.dashboard-page .stat-item {
+  padding: 1.25rem;
+}
+
+.dashboard-page .stat-value {
+  font-size: 1.4rem;
+}
+
+.dashboard-page .date-group {
+  margin-bottom: 0.75rem;
+}
+
 /* Quick Stats Grid */
 .stats-grid {
   display: flex;
@@ -1286,30 +1304,6 @@ body.light-mode .activity-range-button {
   justify-self: center;
 }
 
-.activity-day.is-month-start::before {
-  content: attr(data-month);
-  position: absolute;
-  top: -1.1rem;
-  left: -0.1rem;
-  font-size: 0.55rem;
-  color: var(--main-muted);
-  letter-spacing: 0.04em;
-}
-
-.activity-day.is-month-start::after {
-  content: "";
-  position: absolute;
-  top: -0.45rem;
-  left: 50%;
-  width: 65%;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.18);
-  transform: translateX(-50%);
-}
-
-body.light-mode .activity-day.is-month-start::after {
-  background: rgba(0, 0, 0, 0.15);
-}
 
 .activity-day.is-active {
   background-color: var(--main-green);
