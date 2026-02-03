@@ -799,9 +799,9 @@ body.dark-mode :where(.label-input) select.select-caret {
    PROGRESS BAR (for commitments)
 ------------------------------ */
 .progress-bar-container {
-  height: 14px;
+  height: 16px;
   background: rgba(0, 0, 0, 0.4);
-  border-radius: 7px;
+  border-radius: 8px;
   overflow: hidden;
   margin: 0.75rem 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -809,9 +809,10 @@ body.dark-mode :where(.label-input) select.select-caret {
 
 .progress-bar {
   height: 100%;
-  border-radius: 7px;
+  border-radius: 8px;
   transition: width 0.3s ease;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  background-color: var(--main-yellow); /* Fallback color */
 }
 
 .progress-bar.behind {

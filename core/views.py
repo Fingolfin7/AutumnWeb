@@ -70,12 +70,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         commitments_data.sort(key=lambda x: x["progress"]["percentage"])
         context["commitments_data"] = commitments_data
 
-        # 3. Recent 5 completed sessions
+        # 3. Recent 3 completed sessions
         recent_sessions = (
             Sessions.objects.filter(user=user, is_active=False, end_time__isnull=False)
             .select_related("project")
             .prefetch_related("subprojects")
-            .order_by("-end_time")[:5]
+            .order_by("-end_time")[:3]
         )
         context["recent_sessions"] = recent_sessions
 

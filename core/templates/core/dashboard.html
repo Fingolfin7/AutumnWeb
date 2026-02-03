@@ -34,17 +34,19 @@
     {% if active_timers %}
     <section id="active-timers" class="card" style="border-left: 4px solid var(--main-yellow);">
         <h3 style="margin-bottom: 1rem;"><i class="fas fa-play-circle text-yellow"></i> Active Timers</h3>
-        <div class="active-timers-list">
+        <div class="active-timers-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
             {% for timer in active_timers %}
-            <div class="active-timer-item">
-                <span class="text-red timer-project">{{ timer.project.name }}</span>
-                {% if timer.subprojects.all %}
-                <span class="text-blue">
-                    [ {% for sub in timer.subprojects.all %}'{{ sub.name }}'{% if not forloop.last %}, {% endif %}{% endfor %} ]
-                </span>
-                {% endif %}
-                <span class="text-green timer-elapsed">{{ timer.duration|min_formatter }}</span>
-                <a href="{% url 'stop_timer' timer.id %}" class="primary-button" style="margin-left: 1rem;">
+            <div class="active-timer-item" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 4px; width: 100%;">
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+                    <span class="text-red timer-project" style="font-weight: bold;">{{ timer.project.name }}</span>
+                    {% if timer.subprojects.all %}
+                    <span class="text-blue" style="font-size: 0.9em;">
+                        [ {% for sub in timer.subprojects.all %}'{{ sub.name }}'{% if not forloop.last %}, {% endif %}{% endfor %} ]
+                    </span>
+                    {% endif %}
+                    <span class="text-green timer-elapsed" style="font-family: monospace;">{{ timer.duration|min_formatter }}</span>
+                </div>
+                <a href="{% url 'stop_timer' timer.id %}" class="primary-button" style="margin-left: 1rem; padding: 8px 12px; background-color: var(--main-green); color: var(--dark-background);">
                     <i class="fas fa-stop"></i>
                 </a>
             </div>
@@ -55,37 +57,37 @@
 
     <div class="dashboard-grid" style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
         <!-- Left Column: Recent Sessions -->
-        <div class="sessions-column" style="flex: 2; min-width: 350px;">
+        <div class="sessions-column" style="flex: 1.2; min-width: 350px;">
             <section id="recent-sessions">
                 <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-history text-blue"></i> Recent Sessions</h3>
                 {% if grouped_sessions %}
                 {% for date, data in grouped_sessions.items %}
-                    <div class="date-group" style="margin-bottom: 1.5rem;">
-                        <h4 style="margin-bottom: 0.75rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.25rem;">
+                    <div class="date-group" style="margin-bottom: 1rem;">
+                        <h4 style="margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.25rem; font-size: 0.9em;">
                             <u>{{ date|day_date_formatter }}</u>
-                            <span class="text-green" style="font-size: 0.85em; float: right;">
+                            <span class="text-green" style="font-size: 0.8em; float: right;">
                                 ({{ data.total_duration|duration_formatter }})
                             </span>
                         </h4>
 
                         {% for session in data.sessions %}
-                        <div class="card" id="session-{{ session.id }}" style="margin-bottom: 0.5rem; padding: 0.75rem; position: relative;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem;">
-                                <div style="flex: 1; min-width: 250px;">
-                                    <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-                                    <span class="text-muted">to</span>
-                                    <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
+                        <div class="card" id="session-{{ session.id }}" style="margin-bottom: 0.4rem; padding: 0.6rem; position: relative;">
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.4rem;">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <span class="text-cyan" style="font-size: 0.85em;">{{ session.start_time|time_formatter }}</span>
+                                    <span class="text-muted" style="font-size: 0.8em;">to</span>
+                                    <span class="text-cyan" style="font-size: 0.85em;">{{ session.end_time|time_formatter }}</span>
                                     
-                                    <span style="margin: 0 0.5rem;">{{ session.duration|duration_formatter }}</span>
+                                    <span style="margin: 0 0.3rem; font-size: 0.85em;">{{ session.duration|duration_formatter }}</span>
 
-                                    <div class="project-name-slider" style="max-width: 150px; vertical-align: bottom;">
-                                        <a class="plain-link text-red project-name" href="{% url 'update_project' session.project.id %}">
+                                    <div class="project-name-slider" style="max-width: 120px; vertical-align: bottom;">
+                                        <a class="plain-link text-red project-name" href="{% url 'update_project' session.project.id %}" style="font-size: 0.9em;">
                                             {{ session.project.name }}
                                         </a>
                                     </div>
 
                                     {% if session.subprojects.all %}
-                                    <span class="text-muted">
+                                    <span class="text-muted" style="font-size: 0.8em;">
                                         {% for subproject in session.subprojects.all %}
                                             {% if forloop.first %}[ {% endif %}'<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}{% if forloop.last %} ]{% endif %}
                                         {% endfor %}
@@ -93,12 +95,12 @@
                                     {% endif %}
                                 </div>
 
-                                <div style="display: flex; gap: 0.3rem;">
-                                    <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'" title="Edit" style="padding: 5px 10px;">
-                                        <i class="fa fa-pen" style="font-size: 0.8em;"></i>
+                                <div style="display: flex; gap: 0.2rem;">
+                                    <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'" title="Edit" style="padding: 3px 7px;">
+                                        <i class="fa fa-pen" style="font-size: 0.75em;"></i>
                                     </button>
-                                    <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'" title="Delete" style="padding: 5px 10px;">
-                                        <i class="fa fa-trash" style="font-size: 0.8em;"></i>
+                                    <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'" title="Delete" style="padding: 3px 7px;">
+                                        <i class="fa fa-trash" style="font-size: 0.75em;"></i>
                                     </button>
                                     <form method="post" action="{% url 'start_timer' %}" style="display: inline;">
                                         {% csrf_token %}
@@ -106,18 +108,18 @@
                                         {% for sub in session.subprojects.all %}
                                         <input type="hidden" name="subprojects" value="{{ sub.name }}">
                                         {% endfor %}
-                                        <button type="submit" class="primary-button" title="Restart" style="padding: 5px 10px;">
-                                            <i class="fas fa-redo" style="font-size: 0.8em;"></i>
+                                        <button type="submit" class="primary-button" title="Restart" style="padding: 3px 7px;">
+                                            <i class="fas fa-redo" style="font-size: 0.75em;"></i>
                                         </button>
                                     </form>
                                 </div>
                             </div>
 
                             {% if session.note %}
-                            <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
-                                <span class="text-muted">→</span>
+                            <div style="margin-top: 0.3rem; display: flex; align-items: center; gap: 0.4rem;">
+                                <span class="text-muted" style="font-size: 0.8em;">→</span>
                                 <div class="session-note-slider" style="flex: 1;">
-                                    <div class="session-note text-yellow" style="font-size: 0.85em;">
+                                    <div class="session-note text-yellow" style="font-size: 0.8em;">
                                         {{ session.note|markdown|safe }}
                                     </div>
                                 </div>
@@ -127,8 +129,8 @@
                         {% endfor %}
                     </div>
                 {% endfor %}
-                <div style="text-align: center; margin-top: 1.5rem;">
-                    <a href="{% url 'sessions' %}" class="plain-link text-muted">View all sessions <i class="fas fa-arrow-right"></i></a>
+                <div style="text-align: center; margin-top: 1rem;">
+                    <a href="{% url 'sessions' %}" class="plain-link text-muted" style="font-size: 0.9em;">View all sessions <i class="fas fa-arrow-right"></i></a>
                 </div>
                 {% else %}
                 <div class="card">
@@ -139,13 +141,13 @@
         </div>
 
         <!-- Right Column: Commitments & Streak -->
-        <div class="sidebar-column" style="flex: 1; min-width: 250px;">
+        <div class="sidebar-column" style="flex: 1; min-width: 300px;">
             <!-- Commitments -->
             <section id="commitments" style="margin-bottom: 1.5rem;">
                 <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-bullseye text-cyan"></i> Commitments</h3>
                 {% if commitments_data %}
                 {% for item in commitments_data %}
-                <div class="card" style="background-color: rgba(0, 0, 0, 0.4); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
+                <div class="card" style="background-color: rgba(0, 0, 0, 0.5); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                         <a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link">
                             <span class="text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.project.name }}</span>
@@ -160,8 +162,8 @@
                         <span class="text-green">{{ item.progress.actual|floatformat:0 }}{% if item.progress.commitment_type == 'time' %}m{% endif %} / {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
                     </div>
 
-                    <div class="progress-bar-container" style="margin: 0.5rem 0; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);">
-                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%; min-width: 2px;"></div>
+                    <div class="progress-bar-container" style="margin: 0.5rem 0; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1);">
+                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%; min-width: 2px; background-color: var(--main-yellow);"></div>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
