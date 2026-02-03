@@ -1,0 +1,63 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+
+{% block content %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <h3>Are you sure you want to delete this commitment?</h3>
+
+        <div class="card" id="commitment-{{ commitment.id }}">
+            <table>
+                <tr>
+                    <td class="text-red">
+                        <h3>{{ commitment.project.name }}</h3>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <strong>Type:</strong>
+                        {{ commitment.get_commitment_type_display }}
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <strong>Target:</strong>
+                        {{ commitment.target }}{% if commitment.commitment_type == 'time' %} minutes{% else %} sessions{% endif %}
+                        / {{ commitment.get_period_display }}
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <strong>Current Balance:</strong>
+                        <span class="{% if commitment.balance >= 0 %}text-green{% else %}text-red{% endif %}">
+                            {% if commitment.balance >= 0 %}+{% endif %}{{ commitment.balance }}
+                        </span>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-cyan">Created: {{ commitment.created_at|date:"M d, Y" }}</span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <p class="text-yellow">
+            <i class="fa fa-exclamation-triangle"></i>
+            This will permanently delete the commitment and its banking history.
+        </p>
+
+        <div class="button-row">
+            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'update_project' commitment.project.id %}'">
+                 <i class="fa fa-arrow-left"></i>
+                Back
+            </button>
+            <button type="submit" id="delete-commitment" class="primary-button dark-red">
+                <i class="fa fa-trash"></i>
+                Delete
+            </button>
+        </div>
+    </form>
+{% endblock %}

@@ -795,6 +795,322 @@ body.dark-mode :where(.label-input) select.select-caret {
 
 /* ----------------------------- */
 
+/* -----------------------------
+   PROGRESS BAR (for commitments)
+------------------------------ */
+.progress-bar-container {
+  height: 20px;
+  background: var(--border-dark);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.progress-bar.behind {
+  background: var(--main-red);
+}
+
+.progress-bar.on-track {
+  background: var(--main-yellow);
+}
+
+.progress-bar.complete {
+  background: var(--main-green);
+}
+
+/* Commitment section styling */
+#commitment-section {
+  margin-top: 1rem;
+}
+
+#commitment-section h3 {
+  margin-bottom: 1rem;
+}
+
+.commitment-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.commitment-info .progress-bar-container {
+  max-width: 400px;
+}
+
+/* Mini progress bar for projects list */
+.progress-bar-container-mini {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 0.25rem 0;
+  max-width: 100%;
+}
+
+body.light-mode .progress-bar-container-mini {
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.commitment-mini {
+  padding-top: 0.5rem;
+}
+
+.commitment-label {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--dark-text);
+  font-size: 0.85em;
+}
+
+.commitment-label i {
+  font-size: 0.75em;
+}
+
+/* Help text styling */
+.help-text {
+  display: block;
+  color: var(--main-muted);
+  font-size: 0.85em;
+  margin-top: 0.25rem;
+}
+
+.error-list {
+  color: var(--main-red);
+  margin: 0.5rem 0;
+}
+
+/* ----------------------------- */
+
+/* -----------------------------
+   DASHBOARD STYLES
+------------------------------ */
+
+/* Quick Stats Grid */
+.stats-grid {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  gap: 2rem;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: var(--main-muted);
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+/* Activity Streak Calendar */
+.streak-calendar {
+  display: flex;
+  flex-direction: row;
+  gap: 0.4rem;
+  margin: 1rem 0 0.5rem 0;
+  flex-wrap: nowrap;
+}
+
+.streak-day {
+  width: 1.8rem;
+  height: 1.8rem;
+  min-width: 1.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+.streak-active {
+  background-color: var(--main-green);
+  color: var(--dark-background);
+}
+
+.streak-inactive {
+  background-color: var(--border-dark);
+  color: var(--main-muted);
+}
+
+body.light-mode .streak-inactive {
+  background-color: var(--border-light);
+}
+
+.streak-legend {
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+/* Active Timers List */
+.active-timers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.active-timer-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+  border-radius: 4px;
+}
+
+.timer-project {
+  font-weight: bold;
+}
+
+.timer-elapsed {
+  margin-left: auto;
+}
+
+/* Commitments Section */
+.commitments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.commitment-card {
+  padding: 1rem;
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.15);
+}
+
+body.light-mode .commitment-card {
+  background-color: rgba(0, 0, 0, 0.05);
+  border-color: var(--border-light);
+}
+
+.commitment-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.commitment-project {
+  font-weight: bold;
+}
+
+.commitment-footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* Period Boxes (commitment streak visual) */
+.period-boxes {
+  display: flex;
+  flex-direction: row;
+  gap: 0.3rem;
+}
+
+.period-box {
+  width: 1.4rem;
+  height: 1.4rem;
+  min-width: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 0.6rem;
+}
+
+.period-met {
+  background-color: var(--main-green);
+  color: var(--dark-background);
+}
+
+.period-missed {
+  background-color: var(--main-red);
+  color: white;
+}
+
+.period-current {
+  background-color: var(--main-yellow);
+  color: var(--dark-background);
+}
+
+/* Dashboard Sessions (matching session log style) */
+.dashboard-sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.dashboard-session-item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+body.light-mode .dashboard-session-item {
+  border-bottom-color: var(--border-light);
+}
+
+.dashboard-session-item:last-child {
+  border-bottom: none;
+}
+
+.dashboard-session-item .restart-form {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.dashboard-session-item .primary-button {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.sessions-footer {
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.sessions-footer a:hover {
+  color: var(--brand-orange);
+}
+
+/* ----------------------------- */
+
 /* Responsive Styles */
 @media (max-width: 1200px) {
   .left-panel {

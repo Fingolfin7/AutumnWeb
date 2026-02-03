@@ -1,9 +1,9 @@
-from django.test import TestCase
+from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
-from core.models import Projects, SubProjects, Sessions
+from core.models import Projects, SubProjects, Sessions, Commitment
 from django.contrib.auth.models import User
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.core.management import call_command
 from django.conf import settings
 import io
@@ -11,6 +11,13 @@ import json
 import os
 from core.models import Context
 from rest_framework.authtoken.models import Token
+from core.utils import (
+    get_period_bounds,
+    get_commitment_progress,
+    reconcile_commitment,
+    calculate_daily_activity_streak,
+    calculate_commitment_streak,
+)
 
 
 class UpdateSessionTests(TestCase):
@@ -865,3 +872,875 @@ class TrackApiRegressionTests(TestCase):
         sp2.refresh_from_db()
         self.assertAlmostEqual(sp1.total_time, 9.0, places=2)
         self.assertAlmostEqual(sp2.total_time, 9.0, places=2)
+
+
+# =============================================================================
+# Commitment Feature Tests
+# =============================================================================
+
+
+class CommitmentModelTests(TestCase):
+    """Test the Commitment model."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='commituser',
+            email='commit@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Commitment Test Project',
+            context=self.context
+        )
+
+    def test_create_time_commitment(self):
+        """Test creating a time-based commitment."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        self.assertEqual(commitment.commitment_type, 'time')
+        self.assertEqual(commitment.period, 'weekly')
+        self.assertEqual(commitment.target, 300)
+        self.assertEqual(commitment.balance, 0)
+        self.assertTrue(commitment.active)
+        self.assertTrue(commitment.banking_enabled)
+
+    def test_create_session_commitment(self):
+        """Test creating a session-based commitment."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='sessions',
+            period='daily',
+            target=2
+        )
+        self.assertEqual(commitment.commitment_type, 'sessions')
+        self.assertEqual(commitment.target, 2)
+
+    def test_commitment_str(self):
+        """Test the string representation of a commitment."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        self.assertIn('Commitment Test Project', str(commitment))
+        self.assertIn('300', str(commitment))
+        self.assertIn('weekly', str(commitment))
+
+    def test_one_to_one_constraint(self):
+        """Test that a project can only have one commitment."""
+        Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        with self.assertRaises(Exception):
+            Commitment.objects.create(
+                user=self.user,
+                project=self.project,
+                commitment_type='sessions',
+                period='daily',
+                target=5
+            )
+
+
+class PeriodBoundsTests(TestCase):
+    """Test the get_period_bounds utility function."""
+
+    def test_daily_bounds(self):
+        """Test daily period bounds."""
+        ref_date = timezone.make_aware(datetime(2025, 6, 15, 14, 30))
+        start, end = get_period_bounds('daily', ref_date)
+
+        self.assertEqual(start.date(), datetime(2025, 6, 15).date())
+        self.assertEqual(end.date(), datetime(2025, 6, 16).date())
+
+    def test_weekly_bounds_monday_start(self):
+        """Test that weekly periods start on Monday."""
+        ref_date = timezone.make_aware(datetime(2025, 6, 18, 14, 30))
+        start, end = get_period_bounds('weekly', ref_date)
+
+        self.assertEqual(start.date(), datetime(2025, 6, 16).date())
+        self.assertEqual(end.date(), datetime(2025, 6, 23).date())
+
+    def test_weekly_bounds_on_monday(self):
+        """Test weekly bounds when reference is Monday."""
+        ref_date = timezone.make_aware(datetime(2025, 6, 16, 14, 30))
+        start, end = get_period_bounds('weekly', ref_date)
+
+        self.assertEqual(start.date(), datetime(2025, 6, 16).date())
+        self.assertEqual(end.date(), datetime(2025, 6, 23).date())
+
+    def test_monthly_bounds(self):
+        """Test monthly period bounds."""
+        ref_date = timezone.make_aware(datetime(2025, 6, 15, 14, 30))
+        start, end = get_period_bounds('monthly', ref_date)
+
+        self.assertEqual(start.date(), datetime(2025, 6, 1).date())
+        self.assertEqual(end.date(), datetime(2025, 7, 1).date())
+
+    def test_quarterly_bounds_q2(self):
+        """Test quarterly period bounds for Q2."""
+        ref_date = timezone.make_aware(datetime(2025, 5, 15, 14, 30))
+        start, end = get_period_bounds('quarterly', ref_date)
+
+        self.assertEqual(start.date(), datetime(2025, 4, 1).date())
+        self.assertEqual(end.date(), datetime(2025, 7, 1).date())
+
+    def test_quarterly_bounds_q4(self):
+        """Test quarterly period bounds for Q4."""
+        ref_date = timezone.make_aware(datetime(2025, 11, 15, 14, 30))
+        start, end = get_period_bounds('quarterly', ref_date)
+
+        self.assertEqual(start.date(), datetime(2025, 10, 1).date())
+        self.assertEqual(end.date(), datetime(2026, 1, 1).date())
+
+    def test_yearly_bounds(self):
+        """Test yearly period bounds."""
+        ref_date = timezone.make_aware(datetime(2025, 6, 15, 14, 30))
+        start, end = get_period_bounds('yearly', ref_date)
+
+        self.assertEqual(start.date(), datetime(2025, 1, 1).date())
+        self.assertEqual(end.date(), datetime(2026, 1, 1).date())
+
+    def test_fortnightly_bounds(self):
+        """Test fortnightly period bounds."""
+        ref_date = timezone.make_aware(datetime(2025, 6, 18, 14, 30))
+        start, end = get_period_bounds('fortnightly', ref_date)
+
+        self.assertEqual((end - start).days, 14)
+
+
+class CommitmentProgressTests(TestCase):
+    """Test the get_commitment_progress utility function."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='progressuser',
+            email='progress@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Progress Test Project',
+            context=self.context
+        )
+
+    def test_progress_with_no_sessions(self):
+        """Test progress calculation with no sessions."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        progress = get_commitment_progress(commitment)
+
+        self.assertEqual(progress['actual'], 0)
+        self.assertEqual(progress['target'], 300)
+        self.assertEqual(progress['percentage'], 0)
+        self.assertEqual(progress['status'], 'behind')
+
+    def test_time_based_progress(self):
+        """Test time-based progress calculation."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=100
+        )
+
+        now = timezone.now()
+        period_start, _ = get_period_bounds('weekly', now)
+        session_start = period_start + timedelta(hours=1)
+
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=session_start,
+            end_time=session_start + timedelta(minutes=60),
+            is_active=False
+        )
+
+        progress = get_commitment_progress(commitment)
+
+        self.assertEqual(progress['actual'], 60)
+        self.assertEqual(progress['percentage'], 60.0)
+        self.assertEqual(progress['status'], 'on-track')
+
+    def test_session_based_progress(self):
+        """Test session-based progress calculation."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='sessions',
+            period='weekly',
+            target=5
+        )
+
+        now = timezone.now()
+        period_start, _ = get_period_bounds('weekly', now)
+
+        for i in range(3):
+            session_start = period_start + timedelta(hours=i + 1)
+            Sessions.objects.create(
+                user=self.user,
+                project=self.project,
+                start_time=session_start,
+                end_time=session_start + timedelta(minutes=30),
+                is_active=False
+            )
+
+        progress = get_commitment_progress(commitment)
+
+        self.assertEqual(progress['actual'], 3)
+        self.assertEqual(progress['target'], 5)
+        self.assertEqual(progress['percentage'], 60.0)
+
+    def test_complete_status(self):
+        """Test that 100%+ progress shows complete status."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='sessions',
+            period='weekly',
+            target=2
+        )
+
+        now = timezone.now()
+        period_start, _ = get_period_bounds('weekly', now)
+
+        for i in range(3):
+            session_start = period_start + timedelta(hours=i + 1)
+            Sessions.objects.create(
+                user=self.user,
+                project=self.project,
+                start_time=session_start,
+                end_time=session_start + timedelta(minutes=30),
+                is_active=False
+            )
+
+        progress = get_commitment_progress(commitment)
+
+        self.assertEqual(progress['status'], 'complete')
+        self.assertEqual(progress['percentage'], 100)
+
+
+class ReconciliationTests(TestCase):
+    """Test the reconcile_commitment utility function."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='reconuser',
+            email='recon@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Reconciliation Test Project',
+            context=self.context
+        )
+
+    def test_balance_capping_max(self):
+        """Test that balance is capped at max_balance."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='daily',
+            target=60,
+            max_balance=100,
+            min_balance=-100,
+            banking_enabled=True
+        )
+
+        commitment.balance = 90
+        commitment.save()
+
+        self.assertTrue(commitment.balance <= commitment.max_balance)
+
+    def test_balance_capping_min(self):
+        """Test that balance is capped at min_balance."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='daily',
+            target=60,
+            max_balance=100,
+            min_balance=-100,
+            banking_enabled=True
+        )
+
+        commitment.balance = -90
+        commitment.save()
+
+        self.assertTrue(commitment.balance >= commitment.min_balance)
+
+    def test_skip_reconciliation_when_banking_disabled(self):
+        """Test that balance doesn't change when banking is disabled."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300,
+            banking_enabled=False
+        )
+
+        initial_balance = commitment.balance
+        reconcile_commitment(commitment)
+
+        self.assertEqual(commitment.balance, initial_balance)
+
+
+class CommitmentViewTests(TestCase):
+    """Test the commitment views."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='viewuser',
+            email='view@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='View Test Project',
+            context=self.context
+        )
+        self.client.login(username='viewuser', password='testpass123')
+
+    def test_create_commitment_view_get(self):
+        """Test GET request to create commitment page."""
+        response = self.client.get(
+            reverse('create_commitment', kwargs={'project_pk': self.project.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'core/create_commitment.html')
+
+    def test_create_commitment_view_post(self):
+        """Test POST request to create commitment."""
+        response = self.client.post(
+            reverse('create_commitment', kwargs={'project_pk': self.project.pk}),
+            {
+                'commitment_type': 'time',
+                'period': 'weekly',
+                'target': 300,
+                'banking_enabled': True,
+                'max_balance': 600,
+                'min_balance': -600,
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+
+        commitment = Commitment.objects.get(project=self.project)
+        self.assertEqual(commitment.target, 300)
+        self.assertEqual(commitment.commitment_type, 'time')
+
+    def test_update_commitment_view_get(self):
+        """Test GET request to update commitment page."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        response = self.client.get(
+            reverse('update_commitment', kwargs={'pk': commitment.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'core/update_commitment.html')
+
+    def test_update_commitment_view_post(self):
+        """Test POST request to update commitment."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        response = self.client.post(
+            reverse('update_commitment', kwargs={'pk': commitment.pk}),
+            {
+                'commitment_type': 'time',
+                'period': 'daily',
+                'target': 60,
+                'banking_enabled': True,
+                'max_balance': 600,
+                'min_balance': -600,
+                'active': True,
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+
+        commitment.refresh_from_db()
+        self.assertEqual(commitment.period, 'daily')
+        self.assertEqual(commitment.target, 60)
+
+    def test_delete_commitment_view_get(self):
+        """Test GET request to delete commitment page."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        response = self.client.get(
+            reverse('delete_commitment', kwargs={'pk': commitment.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'core/delete_commitment.html')
+
+    def test_delete_commitment_view_post(self):
+        """Test POST request to delete commitment."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        response = self.client.post(
+            reverse('delete_commitment', kwargs={'pk': commitment.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+
+        self.assertFalse(Commitment.objects.filter(pk=commitment.pk).exists())
+
+    def test_views_require_login(self):
+        """Test that commitment views require login."""
+        self.client.logout()
+
+        response = self.client.get(
+            reverse('create_commitment', kwargs={'project_pk': self.project.pk})
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('login', response.url)
+
+    def test_cannot_access_other_users_commitment(self):
+        """Test that users cannot access other users' commitments."""
+        other_user = User.objects.create_user(
+            username='otherviewuser',
+            email='otherview@example.com',
+            password='otherpass123'
+        )
+        other_context = Context.objects.create(user=other_user, name='General')
+        other_project = Projects.objects.create(
+            user=other_user,
+            name='Other View Project',
+            context=other_context
+        )
+        other_commitment = Commitment.objects.create(
+            user=other_user,
+            project=other_project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+
+        response = self.client.get(
+            reverse('update_commitment', kwargs={'pk': other_commitment.pk})
+        )
+        self.assertEqual(response.status_code, 404)
+
+
+class UpdateProjectViewCommitmentTests(TestCase):
+    """Test that the UpdateProjectView correctly shows commitment info."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='projviewuser',
+            email='projview@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Proj View Test Project',
+            context=self.context
+        )
+        self.client.login(username='projviewuser', password='testpass123')
+
+    def test_project_page_shows_no_commitment(self):
+        """Test project page when no commitment exists."""
+        response = self.client.get(
+            reverse('update_project', kwargs={'pk': self.project.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No commitment set')
+        self.assertContains(response, 'Add Commitment')
+
+    def test_project_page_shows_commitment(self):
+        """Test project page when commitment exists."""
+        Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        response = self.client.get(
+            reverse('update_project', kwargs={'pk': self.project.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '300')
+        self.assertContains(response, 'Edit Commitment')
+
+
+class ProjectsListViewCommitmentTests(TestCase):
+    """Test that the ProjectsListView includes commitment progress."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='listviewuser',
+            email='listview@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='List View Test Project',
+            context=self.context
+        )
+        self.client.login(username='listviewuser', password='testpass123')
+
+    def test_projects_list_includes_commitment_progress(self):
+        """Test that commitment progress is included in context."""
+        Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='sessions',
+            period='weekly',
+            target=5
+        )
+        response = self.client.get(reverse('projects'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('commitment_progress', response.context)
+        self.assertIn(self.project.id, response.context['commitment_progress'])
+
+    def test_projects_list_no_commitment(self):
+        """Test projects list when no commitment exists."""
+        response = self.client.get(reverse('projects'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('commitment_progress', response.context)
+        self.assertEqual(len(response.context['commitment_progress']), 0)
+
+
+# =============================================================================
+# Dashboard Feature Tests
+# =============================================================================
+
+
+class DashboardViewTests(TestCase):
+    """Test the DashboardView."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='dashuser',
+            email='dash@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Dashboard Test Project',
+            context=self.context
+        )
+        self.client.login(username='dashuser', password='testpass123')
+
+    def test_dashboard_loads_successfully(self):
+        """Test that the dashboard page loads."""
+        response = self.client.get(reverse('home'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'core/dashboard.html')
+
+    def test_dashboard_shows_quick_stats(self):
+        """Test that quick stats are in context."""
+        response = self.client.get(reverse('home'))
+        self.assertIn('today_total', response.context)
+        self.assertIn('week_total', response.context)
+        self.assertIn('active_timers_count', response.context)
+
+    def test_dashboard_shows_active_timers_count(self):
+        """Test that active timers count is correct."""
+        # Create an active timer
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=timezone.now() - timedelta(hours=1),
+            is_active=True
+        )
+        response = self.client.get(reverse('home'))
+        self.assertEqual(response.context['active_timers_count'], 1)
+
+    def test_dashboard_shows_commitments_with_progress(self):
+        """Test that commitments with progress are displayed."""
+        Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        response = self.client.get(reverse('home'))
+        self.assertIn('commitments_data', response.context)
+        self.assertEqual(len(response.context['commitments_data']), 1)
+        self.assertIn('progress', response.context['commitments_data'][0])
+        self.assertIn('streak', response.context['commitments_data'][0])
+
+    def test_dashboard_shows_recent_sessions_limited_to_10(self):
+        """Test that recent sessions are limited to 10."""
+        # Create 15 sessions
+        for i in range(15):
+            Sessions.objects.create(
+                user=self.user,
+                project=self.project,
+                start_time=timezone.now() - timedelta(hours=i + 2),
+                end_time=timezone.now() - timedelta(hours=i + 1),
+                is_active=False
+            )
+        response = self.client.get(reverse('home'))
+        self.assertIn('recent_sessions', response.context)
+        self.assertEqual(len(response.context['recent_sessions']), 10)
+
+    def test_dashboard_shows_daily_streak(self):
+        """Test that daily streak data is displayed."""
+        response = self.client.get(reverse('home'))
+        self.assertIn('daily_streak', response.context)
+        self.assertIn('current_streak', response.context['daily_streak'])
+        self.assertIn('recent_days', response.context['daily_streak'])
+
+    def test_dashboard_requires_login(self):
+        """Test that dashboard requires authentication."""
+        self.client.logout()
+        response = self.client.get(reverse('home'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('login', response.url)
+
+
+class DailyStreakTests(TestCase):
+    """Test the calculate_daily_activity_streak function."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='streakuser',
+            email='streak@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Streak Test Project',
+            context=self.context
+        )
+
+    def test_streak_zero_with_no_sessions(self):
+        """Test that streak is 0 with no sessions."""
+        result = calculate_daily_activity_streak(self.user)
+        self.assertEqual(result['current_streak'], 0)
+
+    def test_streak_counts_consecutive_days(self):
+        """Test that streak counts consecutive days correctly."""
+        now = timezone.now()
+        # Create sessions for today and yesterday
+        for i in range(3):
+            day_start = now - timedelta(days=i)
+            Sessions.objects.create(
+                user=self.user,
+                project=self.project,
+                start_time=day_start - timedelta(hours=1),
+                end_time=day_start,
+                is_active=False
+            )
+        result = calculate_daily_activity_streak(self.user)
+        self.assertEqual(result['current_streak'], 3)
+
+    def test_streak_breaks_on_gap_day(self):
+        """Test that streak breaks when there's a gap."""
+        now = timezone.now()
+        # Create session for today
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=now - timedelta(hours=1),
+            end_time=now,
+            is_active=False
+        )
+        # Create session for 2 days ago (skipping yesterday)
+        day_before = now - timedelta(days=2)
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=day_before - timedelta(hours=1),
+            end_time=day_before,
+            is_active=False
+        )
+        result = calculate_daily_activity_streak(self.user)
+        self.assertEqual(result['current_streak'], 1)
+
+    def test_streak_returns_14_days_visual(self):
+        """Test that 14 days are returned for visual display."""
+        result = calculate_daily_activity_streak(self.user)
+        self.assertEqual(len(result['recent_days']), 14)
+
+    def test_streak_starts_from_yesterday_if_no_activity_today(self):
+        """Test that streak calculation starts from yesterday if no activity today."""
+        now = timezone.now()
+        # Create sessions for yesterday and day before
+        for i in range(1, 3):
+            day = now - timedelta(days=i)
+            Sessions.objects.create(
+                user=self.user,
+                project=self.project,
+                start_time=day - timedelta(hours=1),
+                end_time=day,
+                is_active=False
+            )
+        result = calculate_daily_activity_streak(self.user)
+        self.assertEqual(result['current_streak'], 2)
+
+
+class CommitmentStreakTests(TestCase):
+    """Test the calculate_commitment_streak function."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='commitstreakuser',
+            email='commitstreak@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Commitment Streak Test Project',
+            context=self.context
+        )
+
+    def test_commitment_streak_zero_with_no_sessions(self):
+        """Test that commitment streak is 0 with no sessions."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300
+        )
+        result = calculate_commitment_streak(commitment)
+        self.assertEqual(result['current_streak'], 0)
+
+    def test_commitment_streak_counts_consecutive_met_periods(self):
+        """Test that commitment streak counts consecutive met periods."""
+        now = timezone.now()
+
+        # Create commitment with created_at in the past (before the periods we're testing)
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='sessions',
+            period='daily',
+            target=1
+        )
+        # Manually set created_at to 5 days ago so periods aren't skipped
+        Commitment.objects.filter(pk=commitment.pk).update(
+            created_at=now - timedelta(days=5)
+        )
+        commitment.refresh_from_db()
+
+        # Create sessions for yesterday and day before (within their period bounds)
+        for i in range(1, 3):
+            # Get the period bounds for each day
+            day = now - timedelta(days=i)
+            period_start, period_end = get_period_bounds('daily', day)
+            # Create a session in the middle of that period
+            session_time = period_start + timedelta(hours=12)
+            Sessions.objects.create(
+                user=self.user,
+                project=self.project,
+                start_time=session_time - timedelta(hours=1),
+                end_time=session_time,
+                is_active=False
+            )
+
+        result = calculate_commitment_streak(commitment)
+        self.assertGreaterEqual(result['current_streak'], 1)
+
+    def test_commitment_streak_returns_periods_list(self):
+        """Test that commitment streak returns a list of periods."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=60
+        )
+        result = calculate_commitment_streak(commitment, num_periods=8)
+        self.assertIn('periods', result)
+        self.assertLessEqual(len(result['periods']), 8)
+
+    def test_commitment_streak_handles_partial_current_period(self):
+        """Test that current period is marked correctly."""
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=60
+        )
+        result = calculate_commitment_streak(commitment)
+        # Find the current period
+        current_periods = [p for p in result['periods'] if p['is_current']]
+        self.assertEqual(len(current_periods), 1)
+
+
+class ProjectsListStillWorksTests(TestCase):
+    """Test that /projects/ still works after dashboard changes."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username='projlistuser',
+            email='projlist@example.com',
+            password='testpass123'
+        )
+        self.context = Context.objects.create(user=self.user, name='General')
+        self.project = Projects.objects.create(
+            user=self.user,
+            name='Projects List Test Project',
+            context=self.context
+        )
+        self.client.login(username='projlistuser', password='testpass123')
+
+    def test_projects_list_still_accessible(self):
+        """Test that /projects/ URL still works."""
+        response = self.client.get(reverse('projects'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'core/projects_list.html')
+
+    def test_projects_list_shows_projects(self):
+        """Test that projects list shows projects."""
+        response = self.client.get(reverse('projects'))
+        self.assertIn('grouped_projects', response.context)
+        self.assertTrue(response.context['has_projects'])

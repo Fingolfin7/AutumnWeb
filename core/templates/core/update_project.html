@@ -87,6 +87,56 @@
         </section>
     </form>
 
+    <section id="commitment-section" class="card">
+        <h3><i class="fa fa-bullseye"></i> Commitment</h3>
+        {% if commitment %}
+            <div class="commitment-info">
+                <p>
+                    <strong>{{ commitment.target }}{% if commitment.commitment_type == 'time' %} min{% else %} sessions{% endif %}</strong>
+                    / {{ commitment.get_period_display }}
+                    {% if not commitment.active %}<span class="text-yellow">(paused)</span>{% endif %}
+                </p>
+
+                {% if commitment_progress %}
+                    <div class="progress-bar-container">
+                        <div class="progress-bar {{ commitment_progress.status }}" style="width: {{ commitment_progress.percentage }}%"></div>
+                    </div>
+
+                    <p>
+                        <strong>
+                            {{ commitment_progress.actual }}{% if commitment_progress.commitment_type == 'time' %} min{% endif %}
+                        </strong>
+                        /
+                        {{ commitment_progress.target }}{% if commitment_progress.commitment_type == 'time' %} min{% endif %}
+                        ({{ commitment_progress.percentage }}%)
+                    </p>
+
+                    {% if commitment.banking_enabled %}
+                        <p>
+                            <strong>Bank Balance:</strong>
+                            <span class="{% if commitment_progress.balance >= 0 %}text-green{% else %}text-red{% endif %}">
+                                {% if commitment_progress.balance >= 0 %}+{% endif %}{{ commitment_progress.balance }}{% if commitment_progress.commitment_type == 'time' %} min{% endif %}
+                            </span>
+                        </p>
+                    {% endif %}
+                {% endif %}
+
+                <button type="button" class="primary-button"
+                        onclick="window.location.href='{% url 'update_commitment' commitment.id %}'">
+                    <i class="fa fa-pen"></i>
+                    Edit Commitment
+                </button>
+            </div>
+        {% else %}
+            <p>No commitment set for this project.</p>
+            <button type="button" class="primary-button"
+                    onclick="window.location.href='{% url 'create_commitment' project.id %}'">
+                <i class="fa fa-plus"></i>
+                Add Commitment
+            </button>
+        {% endif %}
+    </section>
+
     <br><br>
 
     <button type="button" id="create-subproject-button" class="primary-button"

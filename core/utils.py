@@ -4,9 +4,10 @@ import base64
 from django.utils import timezone
 from collections import defaultdict
 from django.db.models import QuerySet
-from django.db.models import Min, Max
+from django.db.models import Min, Max, Sum, Count
 from datetime import datetime, timedelta
 from django.http import HttpRequest
+from dateutil.relativedelta import relativedelta
 from core.models import Sessions, Projects, SubProjects, Context, Tag
 
 
@@ -567,3 +568,359 @@ def json_decompress(content: dict | str | bytes) -> dict:
         raise RuntimeError("Could interpret the unzipped contents")
 
     return content
+
+
+def get_period_bounds(period: str, reference_date: datetime = None) -> tuple[datetime, datetime]:
+    """
+    Calculate the start and end datetime for a given period.
+
+    :param period: One of 'daily', 'weekly', 'fortnightly', 'monthly', 'quarterly', 'yearly'
+    :param reference_date: The date to calculate bounds for (defaults to now)
+    :return: Tuple of (start, end) as timezone-aware datetimes
+    """
+    if reference_date is None:
+        reference_date = timezone.now()
+
+    # Ensure we're working with timezone-aware datetime
+    if timezone.is_naive(reference_date):
+        reference_date = timezone.make_aware(reference_date)
+
+    # Get the start of the day for reference
+    ref_date = reference_date.date()
+
+    if period == 'daily':
+        start_date = ref_date
+        end_date = ref_date + timedelta(days=1)
+
+    elif period == 'weekly':
+        # Week starts on Monday (weekday() returns 0 for Monday)
+        days_since_monday = ref_date.weekday()
+        start_date = ref_date - timedelta(days=days_since_monday)
+        end_date = start_date + timedelta(days=7)
+
+    elif period == 'fortnightly':
+        # Two-week period starting on Monday
+        # Use ISO week number to determine which fortnight
+        days_since_monday = ref_date.weekday()
+        week_start = ref_date - timedelta(days=days_since_monday)
+        iso_week = week_start.isocalendar()[1]
+        # Odd weeks start a new fortnight
+        if iso_week % 2 == 0:
+            start_date = week_start - timedelta(days=7)
+        else:
+            start_date = week_start
+        end_date = start_date + timedelta(days=14)
+
+    elif period == 'monthly':
+        start_date = ref_date.replace(day=1)
+        # Move to first day of next month
+        end_date = (start_date + relativedelta(months=1))
+
+    elif period == 'quarterly':
+        # Q1: Jan-Mar, Q2: Apr-Jun, Q3: Jul-Sep, Q4: Oct-Dec
+        quarter_month = ((ref_date.month - 1) // 3) * 3 + 1
+        start_date = ref_date.replace(month=quarter_month, day=1)
+        end_date = start_date + relativedelta(months=3)
+
+    elif period == 'yearly':
+        start_date = ref_date.replace(month=1, day=1)
+        end_date = start_date + relativedelta(years=1)
+
+    else:
+        raise ValueError(f"Unknown period: {period}")
+
+    # Convert dates to timezone-aware datetimes at midnight
+    start = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+    end = timezone.make_aware(datetime.combine(end_date, datetime.min.time()))
+
+    return start, end
+
+
+def get_commitment_progress(commitment) -> dict:
+    """
+    Calculate the progress for a commitment in the current period.
+
+    :param commitment: A Commitment instance
+    :return: Dict with actual, target, percentage, balance, status, period_start, period_end
+    """
+    from core.models import Sessions  # Import here to avoid circular import
+
+    period_start, period_end = get_period_bounds(commitment.period)
+
+    # Get completed sessions for this project in the current period
+    sessions = Sessions.objects.filter(
+        project=commitment.project,
+        is_active=False,
+        end_time__gte=period_start,
+        end_time__lt=period_end
+    )
+
+    if commitment.commitment_type == 'time':
+        # Sum durations in minutes
+        total_duration = sum(s.duration or 0 for s in sessions)
+        actual = round(total_duration, 2)
+    else:
+        # Count sessions
+        actual = sessions.count()
+
+    target = commitment.target
+    percentage = min(round((actual / target) * 100, 1), 100) if target > 0 else 0
+
+    # Determine status for progress bar styling
+    if percentage >= 100:
+        status = 'complete'
+    elif percentage >= 50:
+        status = 'on-track'
+    else:
+        status = 'behind'
+
+    # Calculate surplus/deficit for this period (not yet banked)
+    current_surplus = actual - target
+
+    return {
+        'actual': actual,
+        'target': target,
+        'percentage': percentage,
+        'balance': commitment.balance,
+        'current_surplus': round(current_surplus, 2),
+        'status': status,
+        'period_start': period_start,
+        'period_end': period_end,
+        'commitment_type': commitment.commitment_type,
+        'period': commitment.period,
+    }
+
+
+def calculate_daily_activity_streak(user, reference_date=None) -> dict:
+    """
+    Calculate consecutive days with any logged time.
+
+    :param user: User instance
+    :param reference_date: The date to calculate from (defaults to now)
+    :return: Dict with 'current_streak' (int) and 'recent_days' (list of 14 dicts with date and active status)
+    """
+    from core.models import Sessions  # Import here to avoid circular import
+
+    if reference_date is None:
+        reference_date = timezone.now()
+
+    if timezone.is_naive(reference_date):
+        reference_date = timezone.make_aware(reference_date)
+
+    today = reference_date.date()
+
+    # Get all completed session dates for this user
+    sessions = Sessions.objects.filter(
+        user=user,
+        is_active=False,
+        end_time__isnull=False
+    ).values_list('end_time', flat=True)
+
+    # Convert to set of dates (in local timezone)
+    active_dates = set()
+    for end_time in sessions:
+        if end_time:
+            local_date = timezone.localtime(end_time).date()
+            active_dates.add(local_date)
+
+    # Calculate current streak
+    current_streak = 0
+    check_date = today
+
+    # If no activity today, start checking from yesterday
+    if today not in active_dates:
+        check_date = today - timedelta(days=1)
+
+    # Count consecutive days
+    while check_date in active_dates:
+        current_streak += 1
+        check_date -= timedelta(days=1)
+
+    # Generate 14-day history for visual display
+    recent_days = []
+    for i in range(13, -1, -1):  # 14 days, oldest first
+        day = today - timedelta(days=i)
+        recent_days.append({
+            'date': day,
+            'active': day in active_dates
+        })
+
+    return {
+        'current_streak': current_streak,
+        'recent_days': recent_days
+    }
+
+
+def calculate_commitment_streak(commitment, num_periods=8) -> dict:
+    """
+    Calculate consecutive periods where commitment target was met.
+
+    :param commitment: A Commitment instance
+    :param num_periods: Number of periods to return for visual display
+    :return: Dict with 'current_streak' (int) and 'periods' (list of period status dicts)
+    """
+    from core.models import Sessions  # Import here to avoid circular import
+
+    now = timezone.now()
+    periods = []
+    current_streak = 0
+    streak_broken = False
+
+    # Work backwards through periods
+    for i in range(num_periods):
+        if i == 0:
+            # Current period
+            period_start, period_end = get_period_bounds(commitment.period, now)
+            is_current = True
+        else:
+            # Previous periods
+            # Go back by the period duration
+            if commitment.period == 'daily':
+                ref_date = now - timedelta(days=i)
+            elif commitment.period == 'weekly':
+                ref_date = now - timedelta(weeks=i)
+            elif commitment.period == 'fortnightly':
+                ref_date = now - timedelta(weeks=i * 2)
+            elif commitment.period == 'monthly':
+                ref_date = now - relativedelta(months=i)
+            elif commitment.period == 'quarterly':
+                ref_date = now - relativedelta(months=i * 3)
+            elif commitment.period == 'yearly':
+                ref_date = now - relativedelta(years=i)
+            else:
+                ref_date = now - timedelta(weeks=i)
+
+            period_start, period_end = get_period_bounds(commitment.period, ref_date)
+            is_current = False
+
+        # Skip periods before commitment was created
+        if commitment.created_at >= period_end:
+            continue
+
+        # Get sessions for this period
+        sessions = Sessions.objects.filter(
+            project=commitment.project,
+            is_active=False,
+            end_time__gte=period_start,
+            end_time__lt=period_end
+        )
+
+        if commitment.commitment_type == 'time':
+            actual = sum(s.duration or 0 for s in sessions)
+        else:
+            actual = sessions.count()
+
+        target_met = actual >= commitment.target
+
+        periods.append({
+            'period_start': period_start,
+            'period_end': period_end,
+            'actual': actual,
+            'target': commitment.target,
+            'met': target_met,
+            'is_current': is_current
+        })
+
+        # Calculate streak (only count completed periods)
+        if not is_current and not streak_broken:
+            if target_met:
+                current_streak += 1
+            else:
+                streak_broken = True
+
+    # Reverse so oldest is first (for display)
+    periods.reverse()
+
+    return {
+        'current_streak': current_streak,
+        'periods': periods
+    }
+
+
+def reconcile_commitment(commitment, force: bool = False) -> bool:
+    """
+    Update the commitment balance when the period has ended.
+    Called automatically when viewing a project page.
+
+    :param commitment: A Commitment instance
+    :param force: If True, reconcile even if already reconciled for this period
+    :return: True if reconciliation occurred, False otherwise
+    """
+    from core.models import Sessions  # Import here to avoid circular import
+
+    now = timezone.now()
+    period_start, period_end = get_period_bounds(commitment.period)
+
+    # Skip if commitment was created after this period started
+    if commitment.created_at >= period_end:
+        return False
+
+    # Check if we've already reconciled for the previous period
+    if commitment.last_reconciled:
+        # Get the previous period's bounds
+        prev_period_start, prev_period_end = get_period_bounds(
+            commitment.period,
+            period_start - timedelta(days=1)
+        )
+
+        # If we've already reconciled within the current period, skip
+        if commitment.last_reconciled >= period_start and not force:
+            return False
+
+    # Only reconcile past periods, not the current one
+    # We need to find all periods between last_reconciled and now that haven't been processed
+    periods_to_reconcile = []
+
+    if commitment.last_reconciled:
+        check_date = commitment.last_reconciled
+    else:
+        # Start from when commitment was created
+        check_date = commitment.created_at
+
+    # Find all complete periods that need reconciliation
+    while True:
+        check_start, check_end = get_period_bounds(commitment.period, check_date)
+
+        # If this period hasn't ended yet, stop
+        if check_end > now:
+            break
+
+        # If commitment was created during this period, adjust the start
+        effective_start = max(check_start, commitment.created_at)
+
+        # Only add if we haven't reconciled this period yet
+        if not commitment.last_reconciled or check_end > commitment.last_reconciled:
+            periods_to_reconcile.append((effective_start, check_end))
+
+        # Move to next period
+        check_date = check_end + timedelta(seconds=1)
+
+    if not periods_to_reconcile:
+        return False
+
+    # Process each period
+    for p_start, p_end in periods_to_reconcile:
+        sessions = Sessions.objects.filter(
+            project=commitment.project,
+            is_active=False,
+            end_time__gte=p_start,
+            end_time__lt=p_end
+        )
+
+        if commitment.commitment_type == 'time':
+            actual = sum(s.duration or 0 for s in sessions)
+        else:
+            actual = sessions.count()
+
+        surplus = actual - commitment.target
+
+        if commitment.banking_enabled:
+            # Update balance with clamping
+            new_balance = commitment.balance + surplus
+            new_balance = max(commitment.min_balance, min(commitment.max_balance, new_balance))
+            commitment.balance = int(new_balance)
+
+    commitment.last_reconciled = now
+    commitment.save()
+
+    return True

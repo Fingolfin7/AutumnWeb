@@ -1,6 +1,7 @@
 # urls.py
 from django.urls import path
 from core.views import (
+    DashboardView,
     ProjectsListView,
     TimerListView,
     start_timer,
@@ -29,6 +30,9 @@ from core.views import (
     DeleteContextView,
     UpdateTagView,
     DeleteTagView,
+    CreateCommitmentView,
+    UpdateCommitmentView,
+    DeleteCommitmentView,
 )
 from core.api import (
     # new compact endpoints
@@ -83,7 +87,7 @@ from core.api import (
 
 urlpatterns = [
     # pages
-    path("", ProjectsListView.as_view(), name="home"),
+    path("", DashboardView.as_view(), name="home"),
     path("projects/", ProjectsListView.as_view(), name="projects"),
     path("timers/", TimerListView.as_view(), name="timers"),
     path("start_timer/", start_timer, name="start_timer"),
@@ -141,6 +145,22 @@ urlpatterns = [
     ),
     path("update_tag/<int:pk>/", UpdateTagView.as_view(), name="update_tag"),
     path("delete_tag/<int:pk>/", DeleteTagView.as_view(), name="delete_tag"),
+    # commitment management
+    path(
+        "create_commitment/<int:project_pk>/",
+        CreateCommitmentView.as_view(),
+        name="create_commitment",
+    ),
+    path(
+        "update_commitment/<int:pk>/",
+        UpdateCommitmentView.as_view(),
+        name="update_commitment",
+    ),
+    path(
+        "delete_commitment/<int:pk>/",
+        DeleteCommitmentView.as_view(),
+        name="delete_commitment",
+    ),
     # migrated API
     path("api/create_project/", create_project, name="api_create_project"),
     path("api/list_projects/", list_projects, name="api_list_projects"),

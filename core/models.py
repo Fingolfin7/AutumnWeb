@@ -216,3 +216,49 @@ class Sessions(models.Model):
             return round((timezone.make_aware(datetime.now()) - self.start_time).total_seconds() / 60.0, 4)
         else:
             return round((self.end_time - self.start_time).total_seconds() / 60.0, 4)
+
+
+period_choices = (
+    ('daily', 'Daily'),
+    ('weekly', 'Weekly'),
+    ('fortnightly', 'Fortnightly'),
+    ('monthly', 'Monthly'),
+    ('quarterly', 'Quarterly'),
+    ('yearly', 'Yearly'),
+)
+
+commitment_type_choices = (
+    ('time', 'Time-based'),
+    ('sessions', 'Session-based'),
+)
+
+
+class Commitment(models.Model):
+    """
+    Optional commitment tracking for projects.
+    Tracks whether users are meeting their time/session goals with time-banking.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='commitments')
+    project = models.OneToOneField(Projects, on_delete=models.CASCADE, related_name='commitment')
+
+    commitment_type = models.CharField(max_length=10, choices=commitment_type_choices, default='time')
+    period = models.CharField(max_length=15, choices=period_choices, default='weekly')
+    target = models.PositiveIntegerField(help_text='Minutes (time) or count (sessions)')
+
+    # Banking
+    balance = models.IntegerField(default=0)
+    max_balance = models.PositiveIntegerField(default=600, help_text='Maximum balance cap (10 hours default)')
+    min_balance = models.IntegerField(default=-600, help_text='Minimum balance cap (10 hours deficit default)')
+    banking_enabled = models.BooleanField(default=True)
+
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_reconciled = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Commitment'
+        verbose_name_plural = 'Commitments'
+
+    def __str__(self):
+        type_label = 'min' if self.commitment_type == 'time' else 'sessions'
+        return f"{self.project.name}: {self.target} {type_label}/{self.period}"

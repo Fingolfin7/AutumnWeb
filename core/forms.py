@@ -1,5 +1,5 @@
 from django import forms
-from .models import Projects, SubProjects, Sessions, Context, Tag
+from .models import Projects, SubProjects, Sessions, Context, Tag, Commitment
 from typing import cast
 
 
@@ -466,4 +466,63 @@ class TagForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Tag Name', 'class': 'half-width'}),
             'color': forms.TextInput(attrs={'placeholder': 'Optional color (e.g. #ff0000 or label)', 'class': 'half-width'}),
+        }
+
+
+class CommitmentForm(forms.ModelForm):
+    class Meta:
+        model = Commitment
+        fields = ['commitment_type', 'period', 'target', 'banking_enabled', 'max_balance', 'min_balance']
+        widgets = {
+            'commitment_type': forms.Select(attrs={'class': 'half-width'}),
+            'period': forms.Select(attrs={'class': 'half-width'}),
+            'target': forms.NumberInput(attrs={'placeholder': 'Target amount', 'class': 'half-width', 'min': 1}),
+            'max_balance': forms.NumberInput(attrs={'placeholder': 'Max balance cap', 'class': 'half-width', 'min': 0}),
+            'min_balance': forms.NumberInput(attrs={'placeholder': 'Min balance cap', 'class': 'half-width', 'max': 0}),
+            'banking_enabled': forms.CheckboxInput(),
+        }
+        labels = {
+            'commitment_type': 'Commitment Type',
+            'period': 'Period',
+            'target': 'Target',
+            'banking_enabled': 'Enable Time Banking',
+            'max_balance': 'Max Balance (surplus cap)',
+            'min_balance': 'Min Balance (deficit cap)',
+        }
+        help_texts = {
+            'target': 'Minutes for time-based, count for session-based',
+            'max_balance': 'Maximum surplus that can be banked (in minutes or sessions)',
+            'min_balance': 'Maximum deficit allowed (negative value)',
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        self.project = kwargs.pop('project', None)
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        min_balance = cleaned_data.get('min_balance')
+        max_balance = cleaned_data.get('max_balance')
+
+        if min_balance is not None and max_balance is not None:
+            if min_balance > max_balance:
+                raise forms.ValidationError("Min balance cannot be greater than max balance.")
+
+        if min_balance is not None and min_balance > 0:
+            raise forms.ValidationError("Min balance must be zero or negative.")
+
+        return cleaned_data
+
+
+class UpdateCommitmentForm(CommitmentForm):
+    class Meta(CommitmentForm.Meta):
+        fields = ['commitment_type', 'period', 'target', 'banking_enabled', 'max_balance', 'min_balance', 'active']
+        widgets = {
+            **CommitmentForm.Meta.widgets,
+            'active': forms.CheckboxInput(),
+        }
+        labels = {
+            **CommitmentForm.Meta.labels,
+            'active': 'Active',
         }

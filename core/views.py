@@ -14,9 +14,97 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404, render, redirect, reverse
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from core.models import Projects, SubProjects, Sessions, status_choices
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView
+from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 
+
+class DashboardView(LoginRequiredMixin, TemplateView):
+    template_name = 'core/dashboard.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Dashboard'
+        user = self.request.user
+
+        # Import streak functions
+        from core.utils import (
+            calculate_daily_activity_streak,
+            calculate_commitment_streak,
+            get_commitment_progress,
+            reconcile_commitment,
+            filter_by_active_context,
+        )
+
+        # 1. Daily activity streak
+        context['daily_streak'] = calculate_daily_activity_streak(user)
+
+        # 2. Get all active commitments with progress and streak data
+        commitments_data = []
+        commitments = Commitment.objects.filter(
+            user=user,
+            active=True
+        ).select_related('project')
+
+        for commitment in commitments:
+            # Reconcile past periods
+            reconcile_commitment(commitment)
+            # Get current progress
+            progress = get_commitment_progress(commitment)
+            # Get commitment streak
+            streak = calculate_commitment_streak(commitment)
+
+            commitments_data.append({
+                'commitment': commitment,
+                'progress': progress,
+                'streak': streak,
+            })
+
+        # Sort by urgency: lowest percentage first (most behind)
+        commitments_data.sort(key=lambda x: x['progress']['percentage'])
+        context['commitments_data'] = commitments_data
+
+        # 3. Recent 10 completed sessions
+        recent_sessions = Sessions.objects.filter(
+            user=user,
+            is_active=False,
+            end_time__isnull=False
+        ).select_related('project').prefetch_related('subprojects').order_by('-end_time')[:10]
+        context['recent_sessions'] = recent_sessions
+
+        # 4. Quick stats
+        now = timezone.now()
+        today_start = timezone.make_aware(
+            datetime.combine(now.date(), time.min)
+        )
+        week_start = today_start - timedelta(days=now.weekday())
+
+        # Today's total time
+        today_sessions = Sessions.objects.filter(
+            user=user,
+            is_active=False,
+            end_time__gte=today_start
+        )
+        today_total = sum(s.duration or 0 for s in today_sessions)
+        context['today_total'] = today_total
+
+        # This week's total time
+        week_sessions = Sessions.objects.filter(
+            user=user,
+            is_active=False,
+            end_time__gte=week_start
+        )
+        week_total = sum(s.duration or 0 for s in week_sessions)
+        context['week_total'] = week_total
+
+        # Active timers count
+        active_timers = Sessions.objects.filter(user=user, is_active=True)
+        active_timers = filter_by_active_context(active_timers, self.request)
+        context['active_timers_count'] = active_timers.count()
+
+        # 5. Active timers (up to 5)
+        context['active_timers'] = active_timers[:5]
+
+        return context
 
 
 @login_required
@@ -705,6 +793,20 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         # One reliable empty check for the whole page
         context['has_projects'] = ungrouped_projects.exists()
 
+        # Build commitment progress data for all projects with active commitments
+        commitment_progress = {}
+        for project in ungrouped_projects:
+            try:
+                commitment = project.commitment
+                if commitment and commitment.active:
+                    # Reconcile past periods
+                    reconcile_commitment(commitment)
+                    # Get current progress
+                    commitment_progress[project.id] = get_commitment_progress(commitment)
+            except Commitment.DoesNotExist:
+                pass
+        context['commitment_progress'] = commitment_progress
+
         # group by project status (active, paused, complete) from the status_choices tuple
         grouped_projects = []
         for status, displayName in status_choices:  # db_Status is how the status is stored in the database
@@ -820,6 +922,20 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
         context['session_count'] = self.object.sessions.count()  # get the number of sessions related to the project
         context['average_session_duration'] = self.object.total_time / context['session_count'] \
             if context['session_count'] > 0 else 0
+
+        # Add commitment data if exists
+        try:
+            commitment = self.object.commitment
+            if commitment and commitment.active:
+                # Reconcile any past periods
+                reconcile_commitment(commitment)
+                # Get current progress
+                context['commitment'] = commitment
+                context['commitment_progress'] = get_commitment_progress(commitment)
+        except Commitment.DoesNotExist:
+            context['commitment'] = None
+            context['commitment_progress'] = None
+
         return context
 
     def get_form_kwargs(self):
@@ -1429,3 +1545,82 @@ class DeleteTagView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         messages.success(self.request, "Tag deleted successfully")
         return reverse('tags')
+
+
+class CreateCommitmentView(LoginRequiredMixin, CreateView):
+    model = Commitment
+    form_class = CommitmentForm
+    template_name = 'core/create_commitment.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Add Commitment'
+        context['project'] = get_object_or_404(Projects, pk=self.kwargs['project_pk'], user=self.request.user)
+        return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['project'] = get_object_or_404(Projects, pk=self.kwargs['project_pk'], user=self.request.user)
+        return kwargs
+
+    def form_valid(self, form):
+        project = get_object_or_404(Projects, pk=self.kwargs['project_pk'], user=self.request.user)
+
+        # Check if commitment already exists
+        if hasattr(project, 'commitment'):
+            messages.error(self.request, "This project already has a commitment.")
+            return redirect('update_project', pk=project.pk)
+
+        form.instance.user = self.request.user
+        form.instance.project = project
+        form.save()
+        messages.success(self.request, "Commitment added successfully")
+        return redirect('update_project', pk=project.pk)
+
+
+class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
+    model = Commitment
+    form_class = UpdateCommitmentForm
+    template_name = 'core/update_commitment.html'
+    context_object_name = 'commitment'
+
+    def get_queryset(self):
+        return Commitment.objects.filter(user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Update Commitment'
+        # Reconcile and get progress
+        reconcile_commitment(self.object)
+        context['progress'] = get_commitment_progress(self.object)
+        return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['project'] = self.object.project
+        return kwargs
+
+    def form_valid(self, form):
+        form.save()
+        messages.success(self.request, "Commitment updated successfully")
+        return redirect('update_project', pk=self.object.project.pk)
+
+
+class DeleteCommitmentView(LoginRequiredMixin, DeleteView):
+    model = Commitment
+    template_name = 'core/delete_commitment.html'
+    context_object_name = 'commitment'
+
+    def get_queryset(self):
+        return Commitment.objects.filter(user=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Delete Commitment'
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, "Commitment deleted successfully")
+        return reverse('update_project', kwargs={'pk': self.object.project.pk})

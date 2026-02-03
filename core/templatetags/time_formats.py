@@ -171,3 +171,14 @@ def make_timezone_datetime(date):
     else:
         date = date.astimezone(timezone.get_default_timezone())
     return date
+
+
+@register.filter
+def get_item(dictionary, key):
+    """
+    Access dictionary item by key in templates.
+    Usage: {{ mydict|get_item:key }}
+    """
+    if dictionary is None:
+        return None
+    return dictionary.get(key)

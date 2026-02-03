@@ -1,0 +1,144 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load time_formats %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+    <h2>Update Commitment for {{ commitment.project.name }}</h2>
+
+    <form class="flex-row" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <section id="input-fields" class="card stacked half-width">
+            <span class="label-input">
+                {{ form.commitment_type.label_tag }}
+                {{ form.commitment_type }}
+                {{ form.commitment_type.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.period.label_tag }}
+                {{ form.period }}
+                {{ form.period.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.target.label_tag }}
+                {{ form.target }}
+                <small class="help-text">{{ form.target.help_text }}</small>
+                {{ form.target.errors }}
+            </span>
+
+            <hr>
+
+            <h4>Time Banking Options</h4>
+
+            <span class="label-input">
+                <label for="{{ form.banking_enabled.id_for_label }}">
+                    {{ form.banking_enabled }}
+                    Enable Time Banking
+                </label>
+                {{ form.banking_enabled.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.max_balance.label_tag }}
+                {{ form.max_balance }}
+                {{ form.max_balance.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.min_balance.label_tag }}
+                {{ form.min_balance }}
+                {{ form.min_balance.errors }}
+            </span>
+
+            <hr>
+
+            <span class="label-input">
+                <label for="{{ form.active.id_for_label }}">
+                    {{ form.active }}
+                    Active
+                </label>
+                <small class="help-text">Uncheck to pause tracking without deleting</small>
+                {{ form.active.errors }}
+            </span>
+
+            {% if form.non_field_errors %}
+                <div class="error-list">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <span>
+                <button type="submit" class="primary-button">
+                    <i class="fa fa-check-circle"></i>
+                    Update Commitment
+                </button>
+
+                <button type="button" class="primary-button dark-red"
+                onclick="window.location.href = '{% url 'delete_commitment' commitment.id %}' ">
+                    <i class="fa fa-trash"></i>
+                    Delete
+                </button>
+
+                <button type="button" class="secondary-button"
+                onclick="window.location.href = '{% url 'update_project' commitment.project.id %}' ">
+                    <i class="fa fa-arrow-left"></i>
+                    Back
+                </button>
+            </span>
+        </section>
+
+        <section id="progress-info" class="card stacked half-width space-around">
+            <h4><i class="fa fa-chart-line"></i> Current Progress</h4>
+
+            <div class="progress-bar-container">
+                <div class="progress-bar {{ progress.status }}" style="width: {{ progress.percentage }}%"></div>
+            </div>
+
+            <p>
+                <strong>
+                    {{ progress.actual }}{% if progress.commitment_type == 'time' %} min{% endif %}
+                </strong>
+                /
+                {{ progress.target }}{% if progress.commitment_type == 'time' %} min{% endif %}
+                ({{ progress.percentage }}%)
+            </p>
+
+            <p>
+                <strong>Period:</strong> {{ progress.period|title }}
+                <br>
+                <small class="text-muted">
+                    {{ progress.period_start|date:"M d" }} - {{ progress.period_end|date:"M d, Y" }}
+                </small>
+            </p>
+
+            {% if commitment.banking_enabled %}
+                <hr>
+                <h4><i class="fa fa-piggy-bank"></i> Time Bank</h4>
+                <p>
+                    <strong>Balance:</strong>
+                    <span class="{% if progress.balance >= 0 %}text-green{% else %}text-red{% endif %}">
+                        {% if progress.balance >= 0 %}+{% endif %}{{ progress.balance }}{% if progress.commitment_type == 'time' %} min{% endif %}
+                    </span>
+                </p>
+                <p>
+                    <strong>This Period:</strong>
+                    <span class="{% if progress.current_surplus >= 0 %}text-green{% else %}text-red{% endif %}">
+                        {% if progress.current_surplus >= 0 %}+{% endif %}{{ progress.current_surplus }}{% if progress.commitment_type == 'time' %} min{% endif %}
+                    </span>
+                    <small>(not yet banked)</small>
+                </p>
+            {% endif %}
+
+            <p>
+                <small class="text-muted">
+                    Created: {{ commitment.created_at|date:"M d, Y" }}
+                    {% if commitment.last_reconciled %}
+                        <br>Last reconciled: {{ commitment.last_reconciled|date:"M d, Y H:i" }}
+                    {% endif %}
+                </small>
+            </p>
+        </section>
+    </form>
+{% endblock %}
