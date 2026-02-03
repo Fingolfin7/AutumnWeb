@@ -966,6 +966,48 @@ body.light-mode .progress-bar-container-mini {
   margin-bottom: 0.75rem;
 }
 
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--border-dark);
+  margin-bottom: 1rem;
+}
+
+body.light-mode .section-header {
+  border-bottom-color: var(--border-light);
+}
+
+.section-header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.collapse-toggle {
+  background: transparent;
+  border: 1px solid var(--border-dark);
+  color: var(--dark-text);
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+body.light-mode .collapse-toggle {
+  border-color: var(--border-light);
+  color: var(--light-text);
+}
+
+.collapsible-body.is-collapsed {
+  display: none;
+}
+
 /* Quick Stats Grid */
 .stats-grid {
   display: flex;

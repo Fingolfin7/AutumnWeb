@@ -36,8 +36,13 @@
     <!-- Active Timers (if any) -->
     {% if active_timers %}
     <section id="active-timers" class="card" style="border-left: 4px solid var(--main-yellow);">
-        <h3 style="margin-bottom: 1rem;"><i class="fas fa-play-circle text-yellow"></i> Active Timers</h3>
-        <div class="active-timers-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+        <h2 class="section-header collapsible-header" data-target="active-timers-body">
+            <span><i class="fas fa-play-circle text-yellow"></i> <u>Active Timers</u></span>
+            <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="active-timers-body">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </h2>
+        <div id="active-timers-body" class="collapsible-body active-timers-list">
             {% for timer in active_timers %}
             <div class="active-timer-item card" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 4px; width: 100%;" data-start-time="{{ timer.start_time|utc_time_formatter }}">
                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
@@ -72,7 +77,13 @@
     <div class="dashboard-grid" style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
         <div class="sidebar-column" style="flex: 1; min-width: 300px;">
             <section id="commitments" style="margin-bottom: 1.5rem;">
-                <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-bullseye text-cyan"></i> Commitments</h3>
+                <h2 class="section-header collapsible-header" data-target="commitments-body">
+                    <span><i class="fas fa-bullseye text-cyan"></i> <u>Commitments</u></span>
+                    <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="commitments-body">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </h2>
+                <div id="commitments-body" class="collapsible-body">
                 {% if commitments_data %}
                 {% for item in commitments_data %}
                 <div class="card" style="background-color: rgba(0, 0, 0, 0.5); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
@@ -114,12 +125,19 @@
                     <p class="text-muted" style="font-size: 0.9em;">No active commitments. <a href="{% url 'projects' %}">Add one</a>.</p>
                 </div>
                 {% endif %}
+                </div>
             </section>
         </div>
         <div class="sidebar-column" style="flex: 1; min-width: 300px;">
             <section id="activity-streak-details">
-                <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-calendar-alt text-green"></i> Activity</h3>
-                <div class="card activity-card">
+                <h2 class="section-header collapsible-header" data-target="activity-body">
+                    <span><i class="fas fa-calendar-alt text-green"></i> <u>Activity</u></span>
+                    <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="activity-body">
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </h2>
+                <div id="activity-body" class="collapsible-body">
+                    <div class="card activity-card">
                     <div class="activity-range-controls">
                         <button type="button" class="activity-range-button is-active" data-days="14">2 weeks</button>
                         <button type="button" class="activity-range-button" data-days="7">Week</button>
@@ -142,13 +160,20 @@
                         {% endfor %}
                     </div>
                     <p class="text-muted activity-range-label">Last 14 days activity</p>
+                    </div>
                 </div>
             </section>
         </div>
     </div>
 
     <section id="recent-sessions" style="margin-top: 0.75rem;">
-        <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-history text-blue"></i> Recent Sessions</h3>
+        <h2 class="section-header collapsible-header" data-target="recent-sessions-body">
+            <span><i class="fas fa-history text-blue"></i> <u>Recent Sessions</u></span>
+            <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="recent-sessions-body">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </h2>
+        <div id="recent-sessions-body" class="collapsible-body">
         {% if grouped_sessions %}
         {% for date, data in grouped_sessions.items %}
             <h3>
@@ -224,6 +249,7 @@
             <p class="text-muted">No sessions yet. <a href="{% url 'start_timer' %}">Start a timer</a> to begin tracking.</p>
         </div>
         {% endif %}
+        </div>
     </section>
 
     <script type="text/javascript">
@@ -255,6 +281,32 @@
             });
 
             setRange(14);
+        });
+    </script>
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            const headers = document.querySelectorAll(".collapsible-header");
+            headers.forEach((header) => {
+                const targetId = header.getAttribute("data-target");
+                const body = targetId ? document.getElementById(targetId) : null;
+                const button = header.querySelector(".collapse-toggle");
+                if (!body || !button) {
+                    return;
+                }
+
+                header.addEventListener("click", (event) => {
+                    if (event.target.closest("a")) {
+                        return;
+                    }
+                    const isCollapsed = body.classList.toggle("is-collapsed");
+                    button.setAttribute("aria-expanded", String(!isCollapsed));
+                    const icon = button.querySelector("i");
+                    if (icon) {
+                        icon.classList.toggle("fa-chevron-down", !isCollapsed);
+                        icon.classList.toggle("fa-chevron-right", isCollapsed);
+                    }
+                });
+            });
         });
     </script>
 </div>

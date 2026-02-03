@@ -29,7 +29,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = "Dashboard"
+        context["title"] = "Autumn"
         user = self.request.user
 
         # Import streak functions
@@ -861,7 +861,7 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = "Autumn"
+        context["title"] = "Projects"
 
         context["search_form"] = SearchProjectForm(
             initial={
