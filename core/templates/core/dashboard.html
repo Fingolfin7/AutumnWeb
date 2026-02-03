@@ -203,7 +203,7 @@
                     </div>
                     <div class="activity-calendar" data-total-days="{{ daily_streak.recent_days|length }}">
                         {% for day in daily_streak.recent_days %}
-                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" title="{{ day.date|date:'M d' }}">
+                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}{% if day.date|date:'d' == '01' %} is-month-start{% endif %}" data-index="{{ forloop.counter0 }}" data-month="{{ day.date|date:'M' }}" title="{{ day.date|date:'M d' }}">
                             {{ day.date|date:'d' }}
                         </div>
                         {% endfor %}

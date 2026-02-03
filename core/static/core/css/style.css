@@ -1191,15 +1191,16 @@ body.light-mode .dashboard-date-header {
 
 .activity-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, 1.7rem);
-  column-gap: 0.45rem;
+  grid-template-columns: repeat(7, 1fr);
+  column-gap: 0.75rem;
   row-gap: 0.35rem;
   margin-bottom: 0.35rem;
   color: var(--main-muted);
   font-size: 0.6rem;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  justify-content: flex-start;
+  justify-content: space-between;
+  justify-items: center;
 }
 
 .activity-weekdays span {
@@ -1229,21 +1230,50 @@ body.light-mode .activity-range-button {
 
 .activity-calendar {
   display: grid;
-  grid-template-columns: repeat(7, 1.7rem);
-  column-gap: 0.45rem;
-  row-gap: 0.45rem;
-  justify-content: flex-start;
+  grid-template-columns: repeat(7, 1fr);
+  column-gap: 0.75rem;
+  row-gap: 0.6rem;
+  justify-content: space-between;
   margin-bottom: 0.8rem;
+  width: 100%;
 }
 
 .activity-day {
-  width: 1.7rem;
-  height: 1.7rem;
+  width: 100%;
+  max-width: 2.1rem;
+  aspect-ratio: 1 / 1;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 3px;
   font-size: 0.6rem;
+  position: relative;
+  justify-self: center;
+}
+
+.activity-day.is-month-start::before {
+  content: attr(data-month);
+  position: absolute;
+  top: -1.1rem;
+  left: -0.1rem;
+  font-size: 0.55rem;
+  color: var(--main-muted);
+  letter-spacing: 0.04em;
+}
+
+.activity-day.is-month-start::after {
+  content: "";
+  position: absolute;
+  top: -0.45rem;
+  left: 50%;
+  width: 65%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.18);
+  transform: translateX(-50%);
+}
+
+body.light-mode .activity-day.is-month-start::after {
+  background: rgba(0, 0, 0, 0.15);
 }
 
 .activity-day.is-active {
