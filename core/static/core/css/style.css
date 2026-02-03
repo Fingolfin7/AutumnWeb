@@ -799,30 +799,46 @@ body.dark-mode :where(.label-input) select.select-caret {
    PROGRESS BAR (for commitments)
 ------------------------------ */
 .progress-bar-container {
-  height: 20px;
-  background: var(--border-dark);
-  border-radius: 10px;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 7px;
   overflow: hidden;
-  margin: 0.5rem 0;
+  margin: 0.75rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .progress-bar {
   height: 100%;
-  border-radius: 10px;
+  border-radius: 7px;
   transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .progress-bar.behind {
   background: var(--main-red);
+  box-shadow: 0 0 5px var(--main-red);
+}
+
+.progress-bar.warning {
+  background: #f97316; /* orange-500 */
+  box-shadow: 0 0 5px #f97316;
 }
 
 .progress-bar.on-track {
   background: var(--main-yellow);
+  box-shadow: 0 0 5px var(--main-yellow);
+}
+
+.progress-bar.approaching {
+  background: #84cc16; /* lime-500 */
+  box-shadow: 0 0 5px #84cc16;
 }
 
 .progress-bar.complete {
   background: var(--main-green);
+  box-shadow: 0 0 5px var(--main-green);
 }
+
 
 /* Commitment section styling */
 #commitment-section {

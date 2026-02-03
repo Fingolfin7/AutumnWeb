@@ -198,78 +198,71 @@ def filter_sessions_by_params(
 ) -> QuerySet:
     # Determine the correct query parameters attribute safely
     # If params_override is provided, use it. Otherwise fall back to request.GET
-    if params_override is not None:
-        query_params = params_override
-    else:
-        query_params = getattr(request, "query_params", None)
-        if query_params is None:
-            query_params = getattr(request, "GET", {})
+    params = params_override if params_override is not None else request.GET
 
-    project_name = query_params.get("project_name")
-
-    subproject_name = query_params.get("subproject")
-    project_names = query_params.get("projects")
-    if project_names:
-        project_names = project_names.split(",")
-    subproject_names = query_params.get("subprojects")
-    if subproject_names:
-        subproject_names = subproject_names.split(",")
+    project_name = params.get("project_name")
+    start_date = params.get("start_date")
+    end_date = params.get("end_date")
+    note_snippet = params.get("note_snippet")
+    tags = params.getlist("tags")
 
     if project_name:
-        sessions = filter_by_projects(sessions, name=project_name)
-        if subproject_name:
-            sessions = sessions.filter(subprojects__name__icontains=subproject_name)
-    elif project_names:
-        sessions = filter_by_projects(sessions, names=project_names)
-        if subproject_names:
-            sessions = sessions.filter(subprojects__name__in=subproject_names)
-
-    # Apply optional tag filtering.
-    # Accept both:
-    #   - tag IDs (legacy / web forms)
-    #   - tag names (CLI)
-    tag_vals: list[str] = []
-    if hasattr(query_params, "getlist"):
-        tag_vals = query_params.getlist("tags")
-    else:
-        tags_param = query_params.get("tags")
-        if isinstance(tags_param, list):
-            tag_vals = tags_param
-        elif tags_param:
-            tag_vals = [t for t in tags_param.split(",") if t]
-
-    if tag_vals:
-        tag_vals = [str(t).strip() for t in tag_vals if str(t).strip()]
-        tag_ids: list[int] = []
-        tag_names: list[str] = []
-        for v in tag_vals:
-            try:
-                tag_ids.append(int(v))
-            except (TypeError, ValueError):
-                tag_names.append(v)
-
-        if tag_ids:
-            sessions = sessions.filter(project__tags__id__in=tag_ids)
-        if tag_names:
-            sessions = sessions.filter(project__tags__name__in=tag_names)
-
-        sessions = sessions.distinct()
-
-    if query_params.get("note_snippet"):
-        sessions = sessions.filter(note__icontains=query_params["note_snippet"])
-
-    start_date = query_params.get("start_date")
-    end_date = query_params.get("end_date")
+        sessions = sessions.filter(project__name__icontains=project_name)
 
     if start_date:
-        start = timezone.make_aware(parse_date_or_datetime(start_date))
-        sessions = sessions.filter(start_time__gte=start)
-    if end_date:
-        end = timezone.make_aware(parse_date_or_datetime(end_date) + timedelta(days=1))
-        sessions = sessions.filter(start_time__lte=end)
+        try:
+            start_dt = parse_date_or_datetime(start_date)
+            sessions = sessions.filter(end_time__gte=timezone.make_aware(start_dt))
+        except (ValueError, TypeError):
+            pass
 
-    # print(len(sessions))
+    if end_date:
+        try:
+            end_dt = parse_date_or_datetime(end_date)
+            # Add one day to include all sessions on that day
+            end_dt += timedelta(days=1)
+            sessions = sessions.filter(end_time__lt=timezone.make_aware(end_dt))
+        except (ValueError, TypeError):
+            pass
+
+    if note_snippet:
+        sessions = sessions.filter(note__icontains=note_snippet)
+
+    if tags:
+        sessions = sessions.filter(project__tags__id__in=tags).distinct()
+
     return sessions
+
+
+def group_sessions_by_date(sessions):
+    """
+    Group a list or queryset of sessions by their end_time date.
+    Returns an OrderedDict with date strings as keys and dicts with 'sessions' and 'total_duration'.
+    """
+    from collections import OrderedDict
+
+    grouped = OrderedDict()
+
+    # Sort sessions by end_time descending to ensure grouping order
+    sorted_sessions = sorted(
+        sessions, key=lambda s: s.end_time or timezone.now(), reverse=True
+    )
+
+    for session in sorted_sessions:
+        if not session.end_time:
+            continue
+
+        # Get local date string
+        local_end_time = timezone.localtime(session.end_time)
+        session_date = local_end_time.strftime("%m-%d-%Y")
+
+        if session_date not in grouped:
+            grouped[session_date] = {"sessions": [], "total_duration": 0}
+
+        grouped[session_date]["sessions"].append(session)
+        grouped[session_date]["total_duration"] += session.duration or 0
+
+    return grouped
 
 
 def tally_project_durations(sessions) -> list[dict]:
@@ -570,7 +563,9 @@ def json_decompress(content: dict | str | bytes) -> dict:
     return content
 
 
-def get_period_bounds(period: str, reference_date: datetime = None) -> tuple[datetime, datetime]:
+def get_period_bounds(
+    period: str, reference_date: datetime = None
+) -> tuple[datetime, datetime]:
     """
     Calculate the start and end datetime for a given period.
 
@@ -588,17 +583,17 @@ def get_period_bounds(period: str, reference_date: datetime = None) -> tuple[dat
     # Get the start of the day for reference
     ref_date = reference_date.date()
 
-    if period == 'daily':
+    if period == "daily":
         start_date = ref_date
         end_date = ref_date + timedelta(days=1)
 
-    elif period == 'weekly':
+    elif period == "weekly":
         # Week starts on Monday (weekday() returns 0 for Monday)
         days_since_monday = ref_date.weekday()
         start_date = ref_date - timedelta(days=days_since_monday)
         end_date = start_date + timedelta(days=7)
 
-    elif period == 'fortnightly':
+    elif period == "fortnightly":
         # Two-week period starting on Monday
         # Use ISO week number to determine which fortnight
         days_since_monday = ref_date.weekday()
@@ -611,18 +606,18 @@ def get_period_bounds(period: str, reference_date: datetime = None) -> tuple[dat
             start_date = week_start
         end_date = start_date + timedelta(days=14)
 
-    elif period == 'monthly':
+    elif period == "monthly":
         start_date = ref_date.replace(day=1)
         # Move to first day of next month
-        end_date = (start_date + relativedelta(months=1))
+        end_date = start_date + relativedelta(months=1)
 
-    elif period == 'quarterly':
+    elif period == "quarterly":
         # Q1: Jan-Mar, Q2: Apr-Jun, Q3: Jul-Sep, Q4: Oct-Dec
         quarter_month = ((ref_date.month - 1) // 3) * 3 + 1
         start_date = ref_date.replace(month=quarter_month, day=1)
         end_date = start_date + relativedelta(months=3)
 
-    elif period == 'yearly':
+    elif period == "yearly":
         start_date = ref_date.replace(month=1, day=1)
         end_date = start_date + relativedelta(years=1)
 
@@ -652,10 +647,10 @@ def get_commitment_progress(commitment) -> dict:
         project=commitment.project,
         is_active=False,
         end_time__gte=period_start,
-        end_time__lt=period_end
+        end_time__lt=period_end,
     )
 
-    if commitment.commitment_type == 'time':
+    if commitment.commitment_type == "time":
         # Sum durations in minutes
         total_duration = sum(s.duration or 0 for s in sessions)
         actual = round(total_duration, 2)
@@ -668,26 +663,30 @@ def get_commitment_progress(commitment) -> dict:
 
     # Determine status for progress bar styling
     if percentage >= 100:
-        status = 'complete'
+        status = "complete"
+    elif percentage >= 75:
+        status = "approaching"
     elif percentage >= 50:
-        status = 'on-track'
+        status = "on-track"
+    elif percentage >= 25:
+        status = "warning"
     else:
-        status = 'behind'
+        status = "behind"
 
     # Calculate surplus/deficit for this period (not yet banked)
     current_surplus = actual - target
 
     return {
-        'actual': actual,
-        'target': target,
-        'percentage': percentage,
-        'balance': commitment.balance,
-        'current_surplus': round(current_surplus, 2),
-        'status': status,
-        'period_start': period_start,
-        'period_end': period_end,
-        'commitment_type': commitment.commitment_type,
-        'period': commitment.period,
+        "actual": actual,
+        "target": target,
+        "percentage": percentage,
+        "balance": commitment.balance,
+        "current_surplus": round(current_surplus, 2),
+        "status": status,
+        "period_start": period_start,
+        "period_end": period_end,
+        "commitment_type": commitment.commitment_type,
+        "period": commitment.period,
     }
 
 
@@ -711,10 +710,8 @@ def calculate_daily_activity_streak(user, reference_date=None) -> dict:
 
     # Get all completed session dates for this user
     sessions = Sessions.objects.filter(
-        user=user,
-        is_active=False,
-        end_time__isnull=False
-    ).values_list('end_time', flat=True)
+        user=user, is_active=False, end_time__isnull=False
+    ).values_list("end_time", flat=True)
 
     # Convert to set of dates (in local timezone)
     active_dates = set()
@@ -740,15 +737,9 @@ def calculate_daily_activity_streak(user, reference_date=None) -> dict:
     recent_days = []
     for i in range(13, -1, -1):  # 14 days, oldest first
         day = today - timedelta(days=i)
-        recent_days.append({
-            'date': day,
-            'active': day in active_dates
-        })
+        recent_days.append({"date": day, "active": day in active_dates})
 
-    return {
-        'current_streak': current_streak,
-        'recent_days': recent_days
-    }
+    return {"current_streak": current_streak, "recent_days": recent_days}
 
 
 def calculate_commitment_streak(commitment, num_periods=8) -> dict:
@@ -775,17 +766,17 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
         else:
             # Previous periods
             # Go back by the period duration
-            if commitment.period == 'daily':
+            if commitment.period == "daily":
                 ref_date = now - timedelta(days=i)
-            elif commitment.period == 'weekly':
+            elif commitment.period == "weekly":
                 ref_date = now - timedelta(weeks=i)
-            elif commitment.period == 'fortnightly':
+            elif commitment.period == "fortnightly":
                 ref_date = now - timedelta(weeks=i * 2)
-            elif commitment.period == 'monthly':
+            elif commitment.period == "monthly":
                 ref_date = now - relativedelta(months=i)
-            elif commitment.period == 'quarterly':
+            elif commitment.period == "quarterly":
                 ref_date = now - relativedelta(months=i * 3)
-            elif commitment.period == 'yearly':
+            elif commitment.period == "yearly":
                 ref_date = now - relativedelta(years=i)
             else:
                 ref_date = now - timedelta(weeks=i)
@@ -802,24 +793,26 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
             project=commitment.project,
             is_active=False,
             end_time__gte=period_start,
-            end_time__lt=period_end
+            end_time__lt=period_end,
         )
 
-        if commitment.commitment_type == 'time':
+        if commitment.commitment_type == "time":
             actual = sum(s.duration or 0 for s in sessions)
         else:
             actual = sessions.count()
 
         target_met = actual >= commitment.target
 
-        periods.append({
-            'period_start': period_start,
-            'period_end': period_end,
-            'actual': actual,
-            'target': commitment.target,
-            'met': target_met,
-            'is_current': is_current
-        })
+        periods.append(
+            {
+                "period_start": period_start,
+                "period_end": period_end,
+                "actual": actual,
+                "target": commitment.target,
+                "met": target_met,
+                "is_current": is_current,
+            }
+        )
 
         # Calculate streak (only count completed periods)
         if not is_current and not streak_broken:
@@ -831,10 +824,7 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
     # Reverse so oldest is first (for display)
     periods.reverse()
 
-    return {
-        'current_streak': current_streak,
-        'periods': periods
-    }
+    return {"current_streak": current_streak, "periods": periods}
 
 
 def reconcile_commitment(commitment, force: bool = False) -> bool:
@@ -859,8 +849,7 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
     if commitment.last_reconciled:
         # Get the previous period's bounds
         prev_period_start, prev_period_end = get_period_bounds(
-            commitment.period,
-            period_start - timedelta(days=1)
+            commitment.period, period_start - timedelta(days=1)
         )
 
         # If we've already reconciled within the current period, skip
@@ -904,10 +893,10 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
             project=commitment.project,
             is_active=False,
             end_time__gte=p_start,
-            end_time__lt=p_end
+            end_time__lt=p_end,
         )
 
-        if commitment.commitment_type == 'time':
+        if commitment.commitment_type == "time":
             actual = sum(s.duration or 0 for s in sessions)
         else:
             actual = sessions.count()
@@ -917,7 +906,9 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
         if commitment.banking_enabled:
             # Update balance with clamping
             new_balance = commitment.balance + surplus
-            new_balance = max(commitment.min_balance, min(commitment.max_balance, new_balance))
+            new_balance = max(
+                commitment.min_balance, min(commitment.max_balance, new_balance)
+            )
             commitment.balance = int(new_balance)
 
     commitment.last_reconciled = now

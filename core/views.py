@@ -14,16 +14,22 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import get_object_or_404, render, redirect, reverse
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView
+from django.views.generic import (
+    ListView,
+    CreateView,
+    UpdateView,
+    DeleteView,
+    TemplateView,
+)
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
-    template_name = 'core/dashboard.html'
+    template_name = "core/dashboard.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Dashboard'
+        context["title"] = "Dashboard"
         user = self.request.user
 
         # Import streak functions
@@ -36,14 +42,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         )
 
         # 1. Daily activity streak
-        context['daily_streak'] = calculate_daily_activity_streak(user)
+        context["daily_streak"] = calculate_daily_activity_streak(user)
 
         # 2. Get all active commitments with progress and streak data
         commitments_data = []
-        commitments = Commitment.objects.filter(
-            user=user,
-            active=True
-        ).select_related('project')
+        commitments = Commitment.objects.filter(user=user, active=True).select_related(
+            "project"
+        )
 
         for commitment in commitments:
             # Reconcile past periods
@@ -53,56 +58,57 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             # Get commitment streak
             streak = calculate_commitment_streak(commitment)
 
-            commitments_data.append({
-                'commitment': commitment,
-                'progress': progress,
-                'streak': streak,
-            })
+            commitments_data.append(
+                {
+                    "commitment": commitment,
+                    "progress": progress,
+                    "streak": streak,
+                }
+            )
 
         # Sort by urgency: lowest percentage first (most behind)
-        commitments_data.sort(key=lambda x: x['progress']['percentage'])
-        context['commitments_data'] = commitments_data
+        commitments_data.sort(key=lambda x: x["progress"]["percentage"])
+        context["commitments_data"] = commitments_data
 
-        # 3. Recent 10 completed sessions
-        recent_sessions = Sessions.objects.filter(
-            user=user,
-            is_active=False,
-            end_time__isnull=False
-        ).select_related('project').prefetch_related('subprojects').order_by('-end_time')[:10]
-        context['recent_sessions'] = recent_sessions
+        # 3. Recent 5 completed sessions
+        recent_sessions = (
+            Sessions.objects.filter(user=user, is_active=False, end_time__isnull=False)
+            .select_related("project")
+            .prefetch_related("subprojects")
+            .order_by("-end_time")[:5]
+        )
+        context["recent_sessions"] = recent_sessions
+
+        from core.utils import group_sessions_by_date
+
+        context["grouped_sessions"] = group_sessions_by_date(recent_sessions)
 
         # 4. Quick stats
         now = timezone.now()
-        today_start = timezone.make_aware(
-            datetime.combine(now.date(), time.min)
-        )
+        today_start = timezone.make_aware(datetime.combine(now.date(), time.min))
         week_start = today_start - timedelta(days=now.weekday())
 
         # Today's total time
         today_sessions = Sessions.objects.filter(
-            user=user,
-            is_active=False,
-            end_time__gte=today_start
+            user=user, is_active=False, end_time__gte=today_start
         )
         today_total = sum(s.duration or 0 for s in today_sessions)
-        context['today_total'] = today_total
+        context["today_total"] = today_total
 
         # This week's total time
         week_sessions = Sessions.objects.filter(
-            user=user,
-            is_active=False,
-            end_time__gte=week_start
+            user=user, is_active=False, end_time__gte=week_start
         )
         week_total = sum(s.duration or 0 for s in week_sessions)
-        context['week_total'] = week_total
+        context["week_total"] = week_total
 
         # Active timers count
         active_timers = Sessions.objects.filter(user=user, is_active=True)
         active_timers = filter_by_active_context(active_timers, self.request)
-        context['active_timers_count'] = active_timers.count()
+        context["active_timers_count"] = active_timers.count()
 
         # 5. Active timers (up to 5)
-        context['active_timers'] = active_timers[:5]
+        context["active_timers"] = active_timers[:5]
 
         return context
 
@@ -111,17 +117,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 def start_timer(request):
     if request.method == "POST":
         try:
-            project_name = request.POST.get('project')
-            subproject_names = request.POST.getlist('subprojects')
+            project_name = request.POST.get("project")
+            subproject_names = request.POST.getlist("subprojects")
 
             # Fetch the project
-            project = Projects.objects.filter(name=project_name, user=request.user).first()
+            project = Projects.objects.filter(
+                name=project_name, user=request.user
+            ).first()
             if not project:
                 raise ValueError("Project not found")
 
             # Fetch all subprojects related to the project and in the list of submitted subproject names
-            subprojects = SubProjects.objects.filter(name__in=subproject_names, parent_project=project,
-                                                     user=request.user)
+            subprojects = SubProjects.objects.filter(
+                name__in=subproject_names, parent_project=project, user=request.user
+            )
             if not subprojects.exists() and len(subproject_names) > 0:
                 raise ValueError("No subprojects found for the selected project")
 
@@ -130,7 +139,7 @@ def start_timer(request):
                 user=request.user,
                 project=project,
                 start_time=timezone.make_aware(datetime.now()),
-                is_active=True
+                is_active=True,
             )
 
             # Add the subprojects to the session
@@ -140,21 +149,21 @@ def start_timer(request):
             session.full_clean()
             session.save()
             messages.success(request, "Started timer")
-            return redirect('timers')
+            return redirect("timers")
 
         except ValueError as ve:
             messages.error(request, str(ve))
-            return redirect('start_timer')
+            return redirect("start_timer")
 
         except Exception as e:
-            messages.error(request, f"An error occurred while starting the timer. Error: {e}")
-            return redirect('start_timer')
+            messages.error(
+                request, f"An error occurred while starting the timer. Error: {e}"
+            )
+            return redirect("start_timer")
 
-    context = {
-        'title': 'Start Timer'
-    }
+    context = {"title": "Start Timer"}
 
-    return render(request, 'core/start_timer.html', context)
+    return render(request, "core/start_timer.html", context)
 
 
 def remove_ambiguous_time_error(time_value):
@@ -164,10 +173,10 @@ def remove_ambiguous_time_error(time_value):
 
     # If tz has a pytz-style `localize` (pytz timezone), use it to control is_dst.
     try:
-        if hasattr(tz, 'localize'):
+        if hasattr(tz, "localize"):
             return tz.localize(naive_dt, is_dst=True)
     except pytz.AmbiguousTimeError:
-        if hasattr(tz, 'localize'):
+        if hasattr(tz, "localize"):
             return tz.localize(naive_dt, is_dst=False)
 
     # Fallback: let Django create an aware datetime (best-effort; may raise for ambiguous times)
@@ -180,9 +189,10 @@ def remove_ambiguous_time_error(time_value):
 
 def fix_ambiguous_time(form, field_name, raw_time):
     for error in form.errors.get(field_name, []):
-        if 'ambiguous' in error:
+        if "ambiguous" in error:
             return remove_ambiguous_time_error(raw_time)
     return None  # Return None if no changes were made
+
 
 @login_required
 @transaction.atomic
@@ -198,23 +208,25 @@ def update_session(request, session_id: int):
         valid = form.is_valid()
         post_data = None
 
-        if not valid: # correct ambiguous time errors that occur on daylights saving time changes
+        if (
+            not valid
+        ):  # correct ambiguous time errors that occur on daylights saving time changes
             # Extract start and end times from POST data
-            start_time_raw = request.POST.get('start_time')
-            end_time_raw = request.POST.get('end_time')
+            start_time_raw = request.POST.get("start_time")
+            end_time_raw = request.POST.get("end_time")
 
             # Make a local mutable copy of POST to avoid mutating the request object (and satisfy type checkers)
             post = request.POST.copy()
             post_data = post  # keep a reference for later use when reading subprojects
 
             # Attempt to fix ambiguous times
-            fixed_start_time = fix_ambiguous_time(form, 'start_time', start_time_raw)
-            fixed_end_time = fix_ambiguous_time(form, 'end_time', end_time_raw)
+            fixed_start_time = fix_ambiguous_time(form, "start_time", start_time_raw)
+            fixed_end_time = fix_ambiguous_time(form, "end_time", end_time_raw)
 
             if fixed_start_time:
-                post['start_time'] = fixed_start_time
+                post["start_time"] = fixed_start_time
             if fixed_end_time:
-                post['end_time'] = fixed_end_time
+                post["end_time"] = fixed_end_time
 
             # recreate the form with the updated POST data and try again
             form = UpdateSessionForm(post, instance=current_session)
@@ -222,19 +234,19 @@ def update_session(request, session_id: int):
 
         if valid:
             try:
-                project_name = form.cleaned_data['project_name']
+                project_name = form.cleaned_data["project_name"]
                 # Prefer local mutable POST data if we created it earlier; otherwise fall back to request.POST.
                 if post_data is not None:
-                    subproject_names = post_data.getlist('subprojects')  # type: ignore[name-defined]
+                    subproject_names = post_data.getlist("subprojects")  # type: ignore[name-defined]
                 else:
-                    subproject_names = request.POST.getlist('subprojects')
+                    subproject_names = request.POST.getlist("subprojects")
 
-                project = get_object_or_404(Projects, name=project_name, user=request.user)
+                project = get_object_or_404(
+                    Projects, name=project_name, user=request.user
+                )
 
                 subprojects = SubProjects.objects.filter(
-                    name__in=subproject_names,
-                    parent_project=project,
-                    user=request.user
+                    name__in=subproject_names, parent_project=project, user=request.user
                 )
 
                 if not subprojects.exists() and subproject_names:
@@ -244,10 +256,12 @@ def update_session(request, session_id: int):
                 new_session = Sessions.objects.create(
                     user=request.user,
                     project=project,
-                    start_time=form.cleaned_data['start_time'],  # form.cleaned_data returns an aware datetime object
-                    end_time=form.cleaned_data['end_time'],
-                    note=form.cleaned_data['note'],
-                    is_active=False
+                    start_time=form.cleaned_data[
+                        "start_time"
+                    ],  # form.cleaned_data returns an aware datetime object
+                    end_time=form.cleaned_data["end_time"],
+                    note=form.cleaned_data["note"],
+                    is_active=False,
                 )
 
                 new_session.full_clean()
@@ -259,31 +273,35 @@ def update_session(request, session_id: int):
                 current_session.delete()
 
                 messages.success(request, "Updated session")
-                return redirect('update_session', session_id=new_session.id)
+                return redirect("update_session", session_id=new_session.id)
 
             except ValueError as ve:
                 messages.error(request, str(ve))
             except Exception as e:
-                messages.error(request, f"An error occurred while updating the session. Error: {e}")
+                messages.error(
+                    request, f"An error occurred while updating the session. Error: {e}"
+                )
         else:
             messages.error(request, "Invalid form data. Please check your inputs.")
     else:
-        form = UpdateSessionForm(instance=current_session,
-                                 initial={
-                                     'project_name': current_session.project.name if current_session.project else ''
-                                 })
+        form = UpdateSessionForm(
+            instance=current_session,
+            initial={
+                "project_name": current_session.project.name
+                if current_session.project
+                else ""
+            },
+        )
 
     subprojects = SubProjects.objects.filter(parent_project=current_session.project)
     session_subs = current_session.subprojects.all()
-    filtered_subs = [{'subproject': sp, 'is_selected': sp in session_subs} for sp in subprojects]
+    filtered_subs = [
+        {"subproject": sp, "is_selected": sp in session_subs} for sp in subprojects
+    ]
 
-    context = {
-        'title': 'Update Session',
-        'filtered_subs': filtered_subs,
-        'form': form
-    }
+    context = {"title": "Update Session", "filtered_subs": filtered_subs, "form": form}
 
-    return render(request, 'core/update_session.html', context)
+    return render(request, "core/update_session.html", context)
 
 
 @login_required
@@ -294,19 +312,16 @@ def stop_timer(request, session_id: int):
         timer.is_active = False
         timer.end_time = timezone.now()
 
-        if 'session_note' in request.POST:
-            timer.note = request.POST['session_note']
+        if "session_note" in request.POST:
+            timer.note = request.POST["session_note"]
 
         timer.save()
         messages.success(request, "Stopped timer")
-        return redirect('timers')
+        return redirect("timers")
 
-    context = {
-        'title': 'Stop Timer',
-        'timer': timer
-    }
+    context = {"title": "Stop Timer", "timer": timer}
 
-    return render(request, 'core/stop_timer.html', context)
+    return render(request, "core/stop_timer.html", context)
 
 
 @login_required
@@ -318,7 +333,7 @@ def restart_timer(request, session_id: int):
     timer.save()
     messages.success(request, "Restarted timer")
 
-    return redirect('timers')
+    return redirect("timers")
 
 
 @login_required
@@ -328,38 +343,32 @@ def remove_timer(request, session_id: int):
     if request.method == "POST":
         timer.delete()
         messages.success(request, "Removed timer")
-        return redirect('timers')
+        return redirect("timers")
 
-    context = {
-        'title': 'Remove Timer',
-        'timer': timer
-    }
+    context = {"title": "Remove Timer", "timer": timer}
 
-    return render(request, 'core/remove_timer.html', context)
+    return render(request, "core/remove_timer.html", context)
 
 
 @login_required
 def ChartsView(request):
     # Preserve multi-select tags across reloads (?tags=1&tags=2)
-    selected_tags = request.GET.getlist('tags')
+    selected_tags = request.GET.getlist("tags")
 
     search_form = SearchProjectForm(
         initial={
-            'project_name': request.GET.get('project_name'),
-            'start_date': request.GET.get('start_date'),
-            'end_date': request.GET.get('end_date'),
-            'chart_type': request.GET.get('chart_type'),
-            'context': request.GET.get('context') or '',
-            'tags': selected_tags,
+            "project_name": request.GET.get("project_name"),
+            "start_date": request.GET.get("start_date"),
+            "end_date": request.GET.get("end_date"),
+            "chart_type": request.GET.get("chart_type"),
+            "context": request.GET.get("context") or "",
+            "tags": selected_tags,
         },
         user=request.user,
     )
 
-    context = {
-        'title': 'Charts',
-        'search_form': search_form
-    }
-    return render(request, 'core/charts.html', context)
+    context = {"title": "Charts", "search_form": search_form}
+    return render(request, "core/charts.html", context)
 
 
 def stream_response(message):
@@ -369,84 +378,89 @@ def stream_response(message):
 @login_required
 def import_view(request):
     # clear session data
-    request.session.delete('file_path')
-    request.session.delete('import_data')
+    request.session.delete("file_path")
+    request.session.delete("import_data")
 
     if request.method == "POST":
         form = ImportJSONForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
-            uploaded_file = request.FILES.get('file')
+            uploaded_file = request.FILES.get("file")
 
             if uploaded_file:
                 # Save to disk in media/temp
-                file_path = os.path.join(settings.MEDIA_ROOT, 'temp', uploaded_file.name)
+                file_path = os.path.join(
+                    settings.MEDIA_ROOT, "temp", uploaded_file.name
+                )
 
                 if not os.path.exists(os.path.dirname(file_path)):
                     os.makedirs(os.path.dirname(file_path))
 
-                with open(file_path, 'wb+') as destination:
+                with open(file_path, "wb+") as destination:
                     for chunk in uploaded_file.chunks():
                         destination.write(chunk)
 
                 # Store file path in session for later processing
-                request.session['file_path'] = file_path
+                request.session["file_path"] = file_path
 
             # Exclude 'file' since it's already handled separately
             form_data = form.cleaned_data.copy()
-            form_data.pop('file', None)  # Remove the file from cleaned_data
+            form_data.pop("file", None)  # Remove the file from cleaned_data
 
             # ModelChoiceField isn't JSON/session friendly; store just the id.
-            ctx = form_data.get('import_context')
-            form_data['import_context_id'] = ctx.id if ctx else None
-            form_data.pop('import_context', None)
+            ctx = form_data.get("import_context")
+            form_data["import_context_id"] = ctx.id if ctx else None
+            form_data.pop("import_context", None)
 
-            request.session['import_data'] = form_data
-            return JsonResponse({'message': 'Form submitted successfully.'}, status=200)
+            request.session["import_data"] = form_data
+            return JsonResponse({"message": "Form submitted successfully."}, status=200)
 
         # Return form errors so the streaming JS can surface them as a notification.
-        return JsonResponse({'errors': form.errors}, status=400)
+        return JsonResponse({"errors": form.errors}, status=400)
     else:
         form = ImportJSONForm(user=request.user)
 
     context = {
-        'title': 'Import Data',
-        'form': form,
+        "title": "Import Data",
+        "form": form,
     }
 
-    return render(request, 'core/import.html', context)
+    return render(request, "core/import.html", context)
 
 
 @csrf_exempt
 def import_stream(request):
-
     def event_stream():
         # get data from session
-        file_path = request.session.get('file_path')
-        import_data = request.session.get('import_data') or {}
-        autumn_import = import_data.get('autumn_import')
-        force = import_data.get('force')
-        merge = import_data.get('merge')
-        tolerance = import_data.get('tolerance')
-        verbose = import_data.get('verbose')
+        file_path = request.session.get("file_path")
+        import_data = request.session.get("import_data") or {}
+        autumn_import = import_data.get("autumn_import")
+        force = import_data.get("force")
+        merge = import_data.get("merge")
+        tolerance = import_data.get("tolerance")
+        verbose = import_data.get("verbose")
 
-        import_context_id = import_data.get('import_context_id')
-        import_context_new = (import_data.get('import_context_new') or '').strip()
+        import_context_id = import_data.get("import_context_id")
+        import_context_new = (import_data.get("import_context_new") or "").strip()
 
         user = request.user
         skipped = []
 
         import_into_context = None
         if import_context_new:
-            import_into_context, _ = Context.objects.get_or_create(user=user, name=import_context_new)
+            import_into_context, _ = Context.objects.get_or_create(
+                user=user, name=import_context_new
+            )
         elif import_context_id:
             try:
-                import_into_context = Context.objects.get(user=user, id=int(import_context_id))
+                import_into_context = Context.objects.get(
+                    user=user, id=int(import_context_id)
+                )
             except (Context.DoesNotExist, ValueError, TypeError):
                 import_into_context = None
 
         # clear session data
-        request.session.pop('file_path', None)
-        request.session.pop('import_data', None)
+        request.session.pop("file_path", None)
+        request.session.pop("import_data", None)
 
         try:
             with open(file_path) as f:
@@ -464,24 +478,30 @@ def import_stream(request):
 
             total_projects = len(data.items())
             for idx, (project_name, project_data) in enumerate(data.items(), 1):
-                yield stream_response(f"Processing project {idx}/{total_projects}: {project_name}")
+                yield stream_response(
+                    f"Processing project {idx}/{total_projects}: {project_name}"
+                )
 
                 project = Projects.objects.filter(name=project_name, user=user).first()
 
                 if project:
                     if force:
                         yield stream_response(
-                            f"Force option enabled - deleting existing project '{project_name}'")
+                            f"Force option enabled - deleting existing project '{project_name}'"
+                        )
                         # Only delete projects belonging to the current user to avoid removing other users' projects
                         Projects.objects.filter(name=project_name, user=user).delete()
                         project = None
                     elif merge:
                         if verbose:
                             yield stream_response(
-                                f"Merging new sessions and subprojects into '{project_name}'...")
+                                f"Merging new sessions and subprojects into '{project_name}'..."
+                            )
                     else:
                         skipped.append(project_name)
-                        yield stream_response(f"Skipping existing project: {project_name}")
+                        yield stream_response(
+                            f"Skipping existing project: {project_name}"
+                        )
                         continue
 
                 if not project:
@@ -489,30 +509,44 @@ def import_stream(request):
                         user=user,
                         name=project_name,
                         start_date=timezone.make_aware(
-                            datetime.strptime(project_data['Start Date'], '%m-%d-%Y')),
+                            datetime.strptime(project_data["Start Date"], "%m-%d-%Y")
+                        ),
                         last_updated=timezone.make_aware(
-                            datetime.strptime(project_data['Last Updated'], '%m-%d-%Y')),
+                            datetime.strptime(project_data["Last Updated"], "%m-%d-%Y")
+                        ),
                         total_time=0.0,
-                        description=project_data['Description'] if 'Description' in project_data else '',
+                        description=project_data["Description"]
+                        if "Description" in project_data
+                        else "",
                         context=import_into_context,
                     )
 
-                    if 'Status' in project_data:  # handle old versions from before the status field was added
+                    if (
+                        "Status" in project_data
+                    ):  # handle old versions from before the status field was added
                         # Find the status tuple that matches the project_data['Status']
                         status_tuple = next(
-                            (status for status in status_choices if status[0] == project_data['Status']), None)
+                            (
+                                status
+                                for status in status_choices
+                                if status[0] == project_data["Status"]
+                            ),
+                            None,
+                        )
 
                         if status_tuple:
                             project.status = status_tuple[0]
                         else:
-                            raise ValueError(f"Invalid status: {project_data['Status']}")
+                            raise ValueError(
+                                f"Invalid status: {project_data['Status']}"
+                            )
                     project.save()
 
                 # Apply context/tags (backwards compatible)
                 # If importing into a context, don't let the file override it.
                 if import_into_context is not None:
                     sanitized_project_data = dict(project_data)
-                    sanitized_project_data.pop('Context', None)
+                    sanitized_project_data.pop("Context", None)
                 else:
                     sanitized_project_data = project_data
 
@@ -520,36 +554,43 @@ def import_stream(request):
                     user=user,
                     project=project,
                     project_data=sanitized_project_data,
-                    merge=bool(merge and Projects.objects.filter(
-                        name=project_name,
-                        user=user,
-                    ).exists()),
+                    merge=bool(
+                        merge
+                        and Projects.objects.filter(
+                            name=project_name,
+                            user=user,
+                        ).exists()
+                    ),
                 )
 
                 # Existing project + merge: optionally force it under the chosen context
                 if merge and project is not None and import_into_context is not None:
                     project.context = import_into_context
-                    project.save(update_fields=['context'])
+                    project.save(update_fields=["context"])
 
                 # Process subprojects
-                total_subprojects = len(project_data['Sub Projects'])
+                total_subprojects = len(project_data["Sub Projects"])
 
                 if verbose and total_subprojects > 0:
-                    yield stream_response(f"Processing {total_subprojects} subprojects for {project_name}")
+                    yield stream_response(
+                        f"Processing {total_subprojects} subprojects for {project_name}"
+                    )
 
-                for subproject_name, subproject_time in project_data['Sub Projects'].items():
+                for subproject_name, subproject_time in project_data[
+                    "Sub Projects"
+                ].items():
                     subproject_name_lower = subproject_name.lower()
                     if autumn_import:
                         subproject, created = SubProjects.objects.get_or_create(
                             user=user,
                             name=subproject_name_lower,
                             parent_project=project,
-                            defaults={ # these values aren't used in the search. But they are added to new instances
-                                'start_date': project.start_date,
-                                'last_updated': project.last_updated,
-                                'total_time': 0.0,
-                                'description': '',
-                            }
+                            defaults={  # these values aren't used in the search. But they are added to new instances
+                                "start_date": project.start_date,
+                                "last_updated": project.last_updated,
+                                "total_time": 0.0,
+                                "description": "",
+                            },
                         )
                     else:
                         subproject, created = SubProjects.objects.get_or_create(
@@ -558,47 +599,80 @@ def import_stream(request):
                             parent_project=project,
                             defaults={  # these values aren't used in the search. But they are added to new instances
                                 "start_date": timezone.make_aware(
-                                    datetime.strptime(project_data['Sub Projects'][subproject_name]['Start Date'], '%m-%d-%Y')),
+                                    datetime.strptime(
+                                        project_data["Sub Projects"][subproject_name][
+                                            "Start Date"
+                                        ],
+                                        "%m-%d-%Y",
+                                    )
+                                ),
                                 "last_updated": timezone.make_aware(
-                                    datetime.strptime(project_data['Sub Projects'][subproject_name]['Last Updated'], '%m-%d-%Y')),
-                                "description": project_data['Sub Projects'][subproject_name]['Description']
-                                if 'Description' in project_data['Sub Projects'][subproject_name] else '',
-                            }
+                                    datetime.strptime(
+                                        project_data["Sub Projects"][subproject_name][
+                                            "Last Updated"
+                                        ],
+                                        "%m-%d-%Y",
+                                    )
+                                ),
+                                "description": project_data["Sub Projects"][
+                                    subproject_name
+                                ]["Description"]
+                                if "Description"
+                                in project_data["Sub Projects"][subproject_name]
+                                else "",
+                            },
                         )
 
                     if created and verbose:
                         yield stream_response(
-                            f"Created new subproject '{subproject_name}' under project '{project_name}'")
+                            f"Created new subproject '{subproject_name}' under project '{project_name}'"
+                        )
 
                 # Process sessions
-                total_sessions = len(project_data['Session History'])
-                yield stream_response(f"Processing {total_sessions} sessions for {project_name}")
+                total_sessions = len(project_data["Session History"])
+                yield stream_response(
+                    f"Processing {total_sessions} sessions for {project_name}"
+                )
 
-                for session_idx, session_data in enumerate(project_data['Session History'], 1):
-
+                for session_idx, session_data in enumerate(
+                    project_data["Session History"], 1
+                ):
                     start_time = timezone.make_aware(
-                        datetime.strptime(f"{session_data['Date']} {session_data['Start Time']}",
-                                          '%m-%d-%Y %H:%M:%S')
+                        datetime.strptime(
+                            f"{session_data['Date']} {session_data['Start Time']}",
+                            "%m-%d-%Y %H:%M:%S",
+                        )
                     )
                     end_time = timezone.make_aware(
-                        datetime.strptime(f"{session_data['Date']} {session_data['End Time']}",
-                                          '%m-%d-%Y %H:%M:%S')
+                        datetime.strptime(
+                            f"{session_data['Date']} {session_data['End Time']}",
+                            "%m-%d-%Y %H:%M:%S",
+                        )
                     )
 
-                    subproject_names = [name.lower() for name in session_data['Sub-Projects']]
-                    note = session_data['Note']
+                    subproject_names = [
+                        name.lower() for name in session_data["Sub-Projects"]
+                    ]
+                    note = session_data["Note"]
 
                     if end_time < start_time:
                         start_time -= timedelta(days=1)
 
-                    if session_exists(user, project, start_time, end_time, subproject_names,
-                                      time_tolerance=timedelta(minutes=tolerance)):
+                    if session_exists(
+                        user,
+                        project,
+                        start_time,
+                        end_time,
+                        subproject_names,
+                        time_tolerance=timedelta(minutes=tolerance),
+                    ):
                         continue
 
                     if verbose:
                         yield stream_response(
                             f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
-                            f"{session_data['End Time']}...")
+                            f"{session_data['End Time']}..."
+                        )
 
                     session = Sessions.objects.create(
                         user=user,
@@ -611,15 +685,18 @@ def import_stream(request):
 
                     for subproject_name in subproject_names:
                         try:
-                            subproject = SubProjects.objects.get(user=user, name=subproject_name,
-                                                                 parent_project=project)
+                            subproject = SubProjects.objects.get(
+                                user=user, name=subproject_name, parent_project=project
+                            )
                             session.subprojects.add(subproject)
                         except SubProjects.DoesNotExist:
-                            yield stream_response(f"Warning: Subproject not found: {subproject_name}. Subproject "
-                                                  f"will not be added to session.")
+                            yield stream_response(
+                                f"Warning: Subproject not found: {subproject_name}. Subproject "
+                                f"will not be added to session."
+                            )
                             continue
 
-                    session.full_clean()       
+                    session.full_clean()
                     session.save()
 
                 yield stream_response(f"\n\n")
@@ -637,35 +714,42 @@ def import_stream(request):
                     project.save()
 
                     for subproject in project.subprojects.all():
-                        earliest_start, latest_end = sessions_get_earliest_latest(subproject.sessions.all())
-                        subproject.start_date = earliest_start if earliest_start else project.start_date
-                        subproject.last_updated = latest_end if latest_end else project.last_updated
+                        earliest_start, latest_end = sessions_get_earliest_latest(
+                            subproject.sessions.all()
+                        )
+                        subproject.start_date = (
+                            earliest_start if earliest_start else project.start_date
+                        )
+                        subproject.last_updated = (
+                            latest_end if latest_end else project.last_updated
+                        )
                         subproject.save()
 
                 if not merge:
-                    mismatch = abs(project.total_time - project_data['Total Time'])
+                    mismatch = abs(project.total_time - project_data["Total Time"])
                     if mismatch > tolerance:
                         tally = project.total_time
                         project.delete()
-                        yield stream_response(f"Error: Total time mismatch for project '{project_name}': "
-                                              f"expected {project_data['Total Time']}, got {tally}. "
-                                              f"Mismatch: {mismatch}")
+                        yield stream_response(
+                            f"Error: Total time mismatch for project '{project_name}': "
+                            f"expected {project_data['Total Time']}, got {tally}. "
+                            f"Mismatch: {mismatch}"
+                        )
                         return
 
             if len(skipped) > 0:
-                yield stream_response(f"Import completed with skipped projects: {', '.join(skipped)}")
+                yield stream_response(
+                    f"Import completed with skipped projects: {', '.join(skipped)}"
+                )
             else:
                 yield stream_response("Import completed successfully!")
 
         except Exception as e:
             yield stream_response(f"Error: {str(e)}")
 
-    response = StreamingHttpResponse(
-        event_stream(),
-        content_type='text/event-stream'
-    )
-    response['Cache-Control'] = 'no-cache'
-    response['X-Accel-Buffering'] = 'no'
+    response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
     return response
 
 
@@ -674,23 +758,25 @@ def export_view(request):
         form = ExportJSONForm(request.POST, user=request.user)
         if not form.is_valid():
             messages.error(request, "Invalid form data. Please check your inputs.")
-            return render(request, 'core/export.html', {'title': 'Export Data', 'form': form})
+            return render(
+                request, "core/export.html", {"title": "Export Data", "form": form}
+            )
 
         # pull form data
-        project_name      = form.cleaned_data['project_name']
-        output_file       = form.cleaned_data['output_file']
-        compress          = form.cleaned_data['compress']
-        autumn_compatible = form.cleaned_data['autumn_compatible']
-        start_date        = form.cleaned_data['start_date']
-        end_date          = form.cleaned_data['end_date']
-        context_id        = form.cleaned_data.get('context')
-        tag_objs          = form.cleaned_data.get('tags')
+        project_name = form.cleaned_data["project_name"]
+        output_file = form.cleaned_data["output_file"]
+        compress = form.cleaned_data["compress"]
+        autumn_compatible = form.cleaned_data["autumn_compatible"]
+        start_date = form.cleaned_data["start_date"]
+        end_date = form.cleaned_data["end_date"]
+        context_id = form.cleaned_data.get("context")
+        tag_objs = form.cleaned_data.get("tags")
 
         # default filename
         if not output_file:
             output_file = f"{project_name or 'projects'}.json"
-        if not output_file.endswith('.json'):
-            output_file += '.json'
+        if not output_file.endswith(".json"):
+            output_file += ".json"
 
         # prepare date-filters
         start_dt = None
@@ -726,9 +812,9 @@ def export_view(request):
                 qs = qs.filter(project__tags__id__in=tag_ids).distinct()
 
         # Avoid N+1 when later reading .project and .subprojects
-        qs = qs.select_related('project', 'project__context').prefetch_related(
-            'subprojects',
-            'project__tags',
+        qs = qs.select_related("project", "project__context").prefetch_related(
+            "subprojects",
+            "project__tags",
         )
 
         # build export dict
@@ -740,24 +826,24 @@ def export_view(request):
             if compress
             else json.dumps(export_dict, indent=4)
         )
-        response = HttpResponse(contents, content_type='application/json')
-        response['Content-Disposition'] = f'attachment; filename=\"{output_file}\"'
+        response = HttpResponse(contents, content_type="application/json")
+        response["Content-Disposition"] = f'attachment; filename="{output_file}"'
         return response
 
     # GET
     form = ExportJSONForm(user=request.user)
-    return render(request, 'core/export.html', {'title': 'Export Data', 'form': form})
+    return render(request, "core/export.html", {"title": "Export Data", "form": form})
 
 
 class TimerListView(LoginRequiredMixin, ListView):
     model = Sessions
-    template_name = 'core/timers.html'
-    context_object_name = 'timers'
-    ordering = ['-start_time']
+    template_name = "core/timers.html"
+    context_object_name = "timers"
+    ordering = ["-start_time"]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Timers'
+        context["title"] = "Timers"
 
         return context
 
@@ -769,29 +855,29 @@ class TimerListView(LoginRequiredMixin, ListView):
 
 class ProjectsListView(LoginRequiredMixin, ListView):
     model = Projects
-    template_name = 'core/projects_list.html'
-    context_object_name = 'projects'
-    ordering = ['-last_updated']
+    template_name = "core/projects_list.html"
+    context_object_name = "projects"
+    ordering = ["-last_updated"]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Autumn'
+        context["title"] = "Autumn"
 
-        context['search_form'] = SearchProjectForm(
+        context["search_form"] = SearchProjectForm(
             initial={
-                'project_name': self.request.GET.get('project_name'),
-                'start_date': self.request.GET.get('start_date'),
-                'end_date': self.request.GET.get('end_date'),
-                'context': self.request.GET.get('context') or '',
-                'tags': self.request.GET.getlist('tags'),
+                "project_name": self.request.GET.get("project_name"),
+                "start_date": self.request.GET.get("start_date"),
+                "end_date": self.request.GET.get("end_date"),
+                "context": self.request.GET.get("context") or "",
+                "tags": self.request.GET.getlist("tags"),
             },
             user=self.request.user,
         )
 
-        ungrouped_projects = context['object_list']
+        ungrouped_projects = context["object_list"]
 
         # One reliable empty check for the whole page
-        context['has_projects'] = ungrouped_projects.exists()
+        context["has_projects"] = ungrouped_projects.exists()
 
         # Build commitment progress data for all projects with active commitments
         commitment_progress = {}
@@ -802,20 +888,29 @@ class ProjectsListView(LoginRequiredMixin, ListView):
                     # Reconcile past periods
                     reconcile_commitment(commitment)
                     # Get current progress
-                    commitment_progress[project.id] = get_commitment_progress(commitment)
+                    commitment_progress[project.id] = get_commitment_progress(
+                        commitment
+                    )
             except Commitment.DoesNotExist:
                 pass
-        context['commitment_progress'] = commitment_progress
+        context["commitment_progress"] = commitment_progress
 
         # group by project status (active, paused, complete) from the status_choices tuple
         grouped_projects = []
-        for status, displayName in status_choices:  # db_Status is how the status is stored in the database
-            grouped_projects.append({
-                'status': displayName,
-                'projects': ungrouped_projects.filter(status=status).order_by('-last_updated'),
-            })
+        for (
+            status,
+            displayName,
+        ) in status_choices:  # db_Status is how the status is stored in the database
+            grouped_projects.append(
+                {
+                    "status": displayName,
+                    "projects": ungrouped_projects.filter(status=status).order_by(
+                        "-last_updated"
+                    ),
+                }
+            )
 
-        context['grouped_projects'] = grouped_projects
+        context["grouped_projects"] = grouped_projects
 
         return context
 
@@ -823,13 +918,15 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         projects = Projects.objects.filter(user=self.request.user)
 
         # Allow explicit ?context= to override global active context
-        override_context_id = self.request.GET.get('context')
-        projects = filter_by_active_context(projects, self.request, override_context_id=override_context_id)
+        override_context_id = self.request.GET.get("context")
+        projects = filter_by_active_context(
+            projects, self.request, override_context_id=override_context_id
+        )
 
-        search_name = self.request.GET.get('project_name')
-        start_date = self.request.GET.get('start_date')
-        end_date = self.request.GET.get('end_date')
-        tag_ids = self.request.GET.getlist('tags')
+        search_name = self.request.GET.get("project_name")
+        start_date = self.request.GET.get("start_date")
+        end_date = self.request.GET.get("end_date")
+        tag_ids = self.request.GET.getlist("tags")
 
         if search_name:
             projects = filter_by_projects(projects, name=search_name)
@@ -837,7 +934,9 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         if start_date:
             start = timezone.make_aware(parse_date_or_datetime(start_date))
             if end_date:
-                end = timezone.make_aware(parse_date_or_datetime(end_date) + timedelta(days=1))
+                end = timezone.make_aware(
+                    parse_date_or_datetime(end_date) + timedelta(days=1)
+                )
                 projects = projects.filter(start_date__range=[start, end])
             else:
                 projects = projects.filter(start_date__gte=start)
@@ -850,78 +949,98 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
 class CreateProjectView(LoginRequiredMixin, CreateView):
     model = Projects
-    context_object_name = 'project'
+    context_object_name = "project"
     form_class = CreateProjectForm
-    template_name = 'core/create_project.html'
+    template_name = "core/create_project.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Project'
+        context["title"] = "Create Project"
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
+        kwargs["user"] = self.request.user
         return kwargs
 
     def form_valid(self, form):
-        form.instance.user = self.request.user  # set the user field of the project to the current user
-        if Projects.objects.filter(user=self.request.user, name=form.instance.name).exists():
-            form.add_error('name', 'You already have a project with this name.')
+        form.instance.user = (
+            self.request.user
+        )  # set the user field of the project to the current user
+        if Projects.objects.filter(
+            user=self.request.user, name=form.instance.name
+        ).exists():
+            form.add_error("name", "You already have a project with this name.")
             return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Project created successfully")
-        return redirect('projects')
+        return redirect("projects")
 
 
 class CreateSubProjectView(LoginRequiredMixin, CreateView):
     model = SubProjects
     form_class = CreateSubProjectForm
-    template_name = 'core/create_subproject.html'
+    template_name = "core/create_subproject.html"
 
     def get_initial(self):
         initial = super().get_initial()
-        if 'pk' in self.kwargs:
-            initial['parent_project'] = Projects.objects.get(pk=self.kwargs.get('pk'), user=self.request.user)
-        elif 'project_name' in self.kwargs:
-            initial['parent_project'] = Projects.objects.get(name=self.kwargs.get('project_name'), user=self.request.user)
+        if "pk" in self.kwargs:
+            initial["parent_project"] = Projects.objects.get(
+                pk=self.kwargs.get("pk"), user=self.request.user
+            )
+        elif "project_name" in self.kwargs:
+            initial["parent_project"] = Projects.objects.get(
+                name=self.kwargs.get("project_name"), user=self.request.user
+            )
         return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Create Subproject'
+        context["title"] = "Create Subproject"
         return context
 
     def form_valid(self, form):
-        form.instance.user = self.request.user  # set the user field of the subproject to the current user
+        form.instance.user = (
+            self.request.user
+        )  # set the user field of the subproject to the current user
         form.save()
         messages.success(self.request, "Subproject created successfully")
-        return redirect('projects')
+        return redirect("projects")
 
     def form_invalid(self, form):
         # add an error for the name field if the user already has a subproject with the same name under the same project
         if SubProjects.objects.filter(
-                user=self.request.user,
-                name=form.instance.name,
-                parent_project=form.instance.parent_project
+            user=self.request.user,
+            name=form.instance.name,
+            parent_project=form.instance.parent_project,
         ).exists():
-            form.add_error('name', 'You already have a subproject with this name under the selected project.')
+            form.add_error(
+                "name",
+                "You already have a subproject with this name under the selected project.",
+            )
         return super().form_invalid(form)
 
 
 class UpdateProjectView(LoginRequiredMixin, UpdateView):
     model = Projects
     form_class = UpdateProjectForm
-    template_name = 'core/update_project.html'
-    context_object_name = 'project'
+    template_name = "core/update_project.html"
+    context_object_name = "project"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Update Project'
-        context['subprojects'] = self.object.subprojects.all()  # get all subprojects related to the project
-        context['session_count'] = self.object.sessions.count()  # get the number of sessions related to the project
-        context['average_session_duration'] = self.object.total_time / context['session_count'] \
-            if context['session_count'] > 0 else 0
+        context["title"] = "Update Project"
+        context["subprojects"] = (
+            self.object.subprojects.all()
+        )  # get all subprojects related to the project
+        context["session_count"] = (
+            self.object.sessions.count()
+        )  # get the number of sessions related to the project
+        context["average_session_duration"] = (
+            self.object.total_time / context["session_count"]
+            if context["session_count"] > 0
+            else 0
+        )
 
         # Add commitment data if exists
         try:
@@ -930,33 +1049,37 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
                 # Reconcile any past periods
                 reconcile_commitment(commitment)
                 # Get current progress
-                context['commitment'] = commitment
-                context['commitment_progress'] = get_commitment_progress(commitment)
+                context["commitment"] = commitment
+                context["commitment_progress"] = get_commitment_progress(commitment)
         except Commitment.DoesNotExist:
-            context['commitment'] = None
-            context['commitment_progress'] = None
+            context["commitment"] = None
+            context["commitment_progress"] = None
 
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
+        kwargs["user"] = self.request.user
         return kwargs
 
     def form_valid(self, form):
-        if Projects.objects.filter(user=self.request.user, name=form.instance.name).exclude(pk=self.object.pk).exists():
-            form.add_error('name', 'You already have a project with this name.')
+        if (
+            Projects.objects.filter(user=self.request.user, name=form.instance.name)
+            .exclude(pk=self.object.pk)
+            .exists()
+        ):
+            form.add_error("name", "You already have a project with this name.")
             return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Project updated successfully")
-        return redirect('update_project', pk=self.kwargs['pk'])
+        return redirect("update_project", pk=self.kwargs["pk"])
 
 
 class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
     model = SubProjects
     form_class = UpdateSubProjectForm
-    template_name = 'core/update_subproject.html'
-    context_object_name = 'subproject'
+    template_name = "core/update_subproject.html"
+    context_object_name = "subproject"
 
     def get_object(self, queryset=None):
         subproject = super().get_object(queryset)
@@ -965,98 +1088,101 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Update Subproject'
-        context['session_count'] = self.object.sessions.count()  # get the number of sessions related to the project
-        context['average_session_duration'] = self.object.total_time / context['session_count'] \
-            if context['session_count'] > 0 else 0
+        context["title"] = "Update Subproject"
+        context["session_count"] = (
+            self.object.sessions.count()
+        )  # get the number of sessions related to the project
+        context["average_session_duration"] = (
+            self.object.total_time / context["session_count"]
+            if context["session_count"] > 0
+            else 0
+        )
         return context
 
     def form_valid(self, form):
-        if SubProjects.objects.filter(
+        if (
+            SubProjects.objects.filter(
                 user=self.request.user,
                 name=form.instance.name,
-                parent_project=form.instance.parent_project
-        ).exclude(pk=self.object.pk).exists():
-            form.add_error('name', 'You already have a subproject with this name under the selected project.')
+                parent_project=form.instance.parent_project,
+            )
+            .exclude(pk=self.object.pk)
+            .exists()
+        ):
+            form.add_error(
+                "name",
+                "You already have a subproject with this name under the selected project.",
+            )
             return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Subproject updated successfully")
-        return redirect('update_subproject', pk=self.kwargs['pk'])
+        return redirect("update_subproject", pk=self.kwargs["pk"])
 
 
 class DeleteProjectView(LoginRequiredMixin, DeleteView):
     model = Projects
-    template_name = 'core/delete_project.html'
-    context_object_name = 'project'
+    template_name = "core/delete_project.html"
+    context_object_name = "project"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Delete Project'
+        context["title"] = "Delete Project"
         return context
 
     def get_success_url(self):
         messages.success(self.request, "Project deleted successfully")
-        return reverse('projects')
+        return reverse("projects")
 
 
 class DeleteSubProjectView(LoginRequiredMixin, DeleteView):
     model = SubProjects
-    template_name = 'core/delete_subproject.html'
-    context_object_name = 'subproject'
+    template_name = "core/delete_subproject.html"
+    context_object_name = "subproject"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Delete Subproject'
+        context["title"] = "Delete Subproject"
         return context
 
     def get_success_url(self):
         messages.success(self.request, "Subproject deleted successfully")
-        return reverse('projects')
+        return reverse("projects")
 
 
 class SessionsListView(LoginRequiredMixin, ListView):
     model = Sessions
-    template_name = 'core/list_sessions.html'
-    context_object_name = 'sessions'
-    ordering = ['-end_time']
+    template_name = "core/list_sessions.html"
+    context_object_name = "sessions"
+    ordering = ["-end_time"]
     paginate_by = 7
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Sessions'
-        context['search_form'] = SearchProjectForm(
+        context["title"] = "Sessions"
+        context["search_form"] = SearchProjectForm(
             initial={
-                'project_name': self.request.GET.get('project_name'),
-                'start_date': self.request.GET.get('start_date'),
-                'end_date': self.request.GET.get('end_date'),
-                'note_snippet': self.request.GET.get('note_snippet'),
-                'context': self.request.GET.get('context') or '',
-                'tags': self.request.GET.getlist('tags'),
+                "project_name": self.request.GET.get("project_name"),
+                "start_date": self.request.GET.get("start_date"),
+                "end_date": self.request.GET.get("end_date"),
+                "note_snippet": self.request.GET.get("note_snippet"),
+                "context": self.request.GET.get("context") or "",
+                "tags": self.request.GET.getlist("tags"),
             },
             user=self.request.user,
         )
 
-        paginated_sessions = context['object_list']
+        paginated_sessions = context["object_list"]
+        from core.utils import group_sessions_by_date
 
-        # Group by session_date
-        grouped_sessions = {}
-        for session in paginated_sessions:
-            if session.end_time.tzinfo != timezone.get_default_timezone():  # convert utc to local timezone
-                session_date = session.end_time.astimezone(timezone.get_default_timezone()).strftime('%m-%d-%Y')
-            else:
-                session_date = timezone.make_aware(session.end_time).strftime('%m-%d-%Y')
-
-            if session_date not in grouped_sessions:
-                grouped_sessions[session_date] = {'sessions': [session], 'total_duration': session.duration}
-            else:
-                grouped_sessions[session_date]['sessions'].append(session)
-                grouped_sessions[session_date]['total_duration'] += session.duration
-
-        context['grouped_sessions'] = grouped_sessions
+        context["grouped_sessions"] = group_sessions_by_date(paginated_sessions)
 
         # Check if any search-related query parameters are present. we only want to display the message on a search
-        if (self.request.GET.get('project_name') or self.request.GET.get('start_date')
-                or self.request.GET.get('end_date') or self.request.GET.get('note_snippet')):
+        if (
+            self.request.GET.get("project_name")
+            or self.request.GET.get("start_date")
+            or self.request.GET.get("end_date")
+            or self.request.GET.get("note_snippet")
+        ):
             messages.success(self.request, f"Found {len(self.get_queryset())} results")
 
         return context
@@ -1065,28 +1191,32 @@ class SessionsListView(LoginRequiredMixin, ListView):
         sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
 
         # Allow explicit ?context= to override the global active context
-        override_context_id = self.request.GET.get('context')
-        sessions = filter_by_active_context(sessions, self.request, override_context_id=override_context_id)
+        override_context_id = self.request.GET.get("context")
+        sessions = filter_by_active_context(
+            sessions, self.request, override_context_id=override_context_id
+        )
 
         return filter_sessions_by_params(self.request, sessions)
 
 
 class DeleteSessionView(LoginRequiredMixin, DeleteView):
     model = Sessions
-    template_name = 'core/delete_session.html'
-    context_object_name = 'session'
+    template_name = "core/delete_session.html"
+    context_object_name = "session"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Delete Session'
+        context["title"] = "Delete Session"
         return context
 
     def get_object(self, queryset=None):
-        return get_object_or_404(Sessions, pk=self.kwargs['session_id'], user=self.request.user)
+        return get_object_or_404(
+            Sessions, pk=self.kwargs["session_id"], user=self.request.user
+        )
 
     def get_success_url(self):
         messages.success(self.request, "Session deleted successfully")
-        return reverse('sessions')  # redirect to the sessions page
+        return reverse("sessions")  # redirect to the sessions page
 
 
 @login_required
@@ -1100,49 +1230,60 @@ def merge_projects(request):
         form = MergeProjectsForm(request.POST)
         if form.is_valid():
             try:
-                project1_name = form.cleaned_data['project1']
-                project2_name = form.cleaned_data['project2']
-                new_project_name = form.cleaned_data['new_project_name']
-                
+                project1_name = form.cleaned_data["project1"]
+                project2_name = form.cleaned_data["project2"]
+                new_project_name = form.cleaned_data["new_project_name"]
+
                 # Get the projects to merge
-                project1 = get_object_or_404(Projects, name=project1_name, user=request.user)
-                project2 = get_object_or_404(Projects, name=project2_name, user=request.user)
-                
+                project1 = get_object_or_404(
+                    Projects, name=project1_name, user=request.user
+                )
+                project2 = get_object_or_404(
+                    Projects, name=project2_name, user=request.user
+                )
+
                 # Check if new project name already exists
-                if Projects.objects.filter(user=request.user, name=new_project_name).exists():
-                    form.add_error('new_project_name', 'You already have a project with this name.')
-                    return render(request, 'core/merge_projects.html', {
-                        'title': 'Merge Projects',
-                        'form': form
-                    })
-                
+                if Projects.objects.filter(
+                    user=request.user, name=new_project_name
+                ).exists():
+                    form.add_error(
+                        "new_project_name", "You already have a project with this name."
+                    )
+                    return render(
+                        request,
+                        "core/merge_projects.html",
+                        {"title": "Merge Projects", "form": form},
+                    )
+
                 # Create merged description
-                merged_description = f"Merged from '{project1.name}' and '{project2.name}'\n\n"
-                
+                merged_description = (
+                    f"Merged from '{project1.name}' and '{project2.name}'\n\n"
+                )
+
                 if project1.description:
                     merged_description += f"--- {project1.name} Description ---\n{project1.description}\n\n"
-                
+
                 if project2.description:
                     merged_description += f"--- {project2.name} Description ---\n{project2.description}\n\n"
-                
+
                 # Remove trailing newlines
                 merged_description = merged_description.strip()
-                
+
                 # Create the new merged project
                 merged_project = Projects.objects.create(
-        user=request.user,
+                    user=request.user,
                     name=new_project_name,
                     start_date=min(project1.start_date, project2.start_date),
                     last_updated=max(project1.last_updated, project2.last_updated),
                     total_time=0.0,  # Will be calculated by audit function
-                    status='active',  # Default to active
-                    description=merged_description
+                    status="active",  # Default to active
+                    description=merged_description,
                 )
-                
+
                 # Move all sessions from both projects to the merged project
                 project1_sessions = project1.sessions.all()
                 project2_sessions = project2.sessions.all()
-                
+
                 for session in project1_sessions:
                     session.project = merged_project
                     session.save()
@@ -1150,20 +1291,20 @@ def merge_projects(request):
                 for session in project2_sessions:
                     session.project = merged_project
                     session.save()
-                
+
                 # Move all subprojects from both projects to the merged project
                 # Handle potential name conflicts by renaming duplicates
                 project1_subprojects = list(project1.subprojects.all())
                 project2_subprojects = list(project2.subprojects.all())
-                
+
                 # Get existing subproject names in the merged project
                 existing_subproject_names = set()
-                
+
                 # First, move all subprojects from project1
                 for subproject in project1_subprojects:
                     original_name = subproject.name
                     new_name = original_name
-                    
+
                     # If name conflict exists, append project name to make it unique
                     if new_name in existing_subproject_names:
                         new_name = f"{original_name} ({project1.name})"
@@ -1171,17 +1312,17 @@ def merge_projects(request):
                         while new_name in existing_subproject_names:
                             new_name = f"{original_name} ({project1.name}) {counter}"
                             counter += 1
-                    
+
                     subproject.name = new_name
                     subproject.parent_project = merged_project
                     subproject.save()
                     existing_subproject_names.add(new_name)
-                
+
                 # Then, move all subprojects from project2
                 for subproject in project2_subprojects:
                     original_name = subproject.name
                     new_name = original_name
-                    
+
                     # If name conflict exists, append project name to make it unique
                     if new_name in existing_subproject_names:
                         new_name = f"{original_name} ({project2.name})"
@@ -1189,46 +1330,51 @@ def merge_projects(request):
                         while new_name in existing_subproject_names:
                             new_name = f"{original_name} ({project2.name}) {counter}"
                             counter += 1
-                    
+
                     subproject.name = new_name
                     subproject.parent_project = merged_project
                     subproject.save()
                     existing_subproject_names.add(new_name)
-                
+
                 # Audit total time for the merged project and all its subprojects
                 merged_project.audit_total_time(log=False)
                 for subproject in merged_project.subprojects.all():
                     subproject.audit_total_time(log=False)
-                
+
                 # Delete the original projects
                 project1.delete()
                 project2.delete()
-                
+
                 # Check if any subprojects were renamed
                 renamed_count = 0
                 for sp in project1_subprojects + project2_subprojects:
-                    if ' (' in sp.name and sp.name.endswith(')'):
+                    if " (" in sp.name and sp.name.endswith(")"):
                         renamed_count += 1
-                
+
                 if renamed_count > 0:
-                    messages.success(request, f"Successfully merged '{project1_name}' and '{project2_name}' into '{new_project_name}'. {renamed_count} subprojects were renamed to avoid conflicts.")
+                    messages.success(
+                        request,
+                        f"Successfully merged '{project1_name}' and '{project2_name}' into '{new_project_name}'. {renamed_count} subprojects were renamed to avoid conflicts.",
+                    )
                 else:
-                    messages.success(request, f"Successfully merged '{project1_name}' and '{project2_name}' into '{new_project_name}'")
-                return redirect('projects')
-                
+                    messages.success(
+                        request,
+                        f"Successfully merged '{project1_name}' and '{project2_name}' into '{new_project_name}'",
+                    )
+                return redirect("projects")
+
             except Exception as e:
-                messages.error(request, f"An error occurred while merging projects: {e}")
+                messages.error(
+                    request, f"An error occurred while merging projects: {e}"
+                )
         else:
             messages.error(request, "Invalid form data. Please check your inputs.")
     else:
         form = MergeProjectsForm()
-    
-    context = {
-        'title': 'Merge Projects',
-        'form': form
-    }
-    
-    return render(request, 'core/merge_projects.html', context)
+
+    context = {"title": "Merge Projects", "form": form}
+
+    return render(request, "core/merge_projects.html", context)
 
 
 @login_required
@@ -1239,87 +1385,117 @@ def merge_subprojects(request, project_id):
     Moves all sessions from both subprojects to the new merged subproject.
     """
     parent_project = get_object_or_404(Projects, id=project_id, user=request.user)
-    
+
     if request.method == "POST":
         form = MergeSubProjectsForm(request.POST)
         if form.is_valid():
             try:
-                subproject1_name = form.cleaned_data['subproject1']
-                subproject2_name = form.cleaned_data['subproject2']
-                new_subproject_name = form.cleaned_data['new_subproject_name']
-                
+                subproject1_name = form.cleaned_data["subproject1"]
+                subproject2_name = form.cleaned_data["subproject2"]
+                new_subproject_name = form.cleaned_data["new_subproject_name"]
+
                 # Get the subprojects to merge (must belong to the same parent project)
-                subproject1 = get_object_or_404(SubProjects, name=subproject1_name, parent_project=parent_project, user=request.user)
-                subproject2 = get_object_or_404(SubProjects, name=subproject2_name, parent_project=parent_project, user=request.user)
-                
+                subproject1 = get_object_or_404(
+                    SubProjects,
+                    name=subproject1_name,
+                    parent_project=parent_project,
+                    user=request.user,
+                )
+                subproject2 = get_object_or_404(
+                    SubProjects,
+                    name=subproject2_name,
+                    parent_project=parent_project,
+                    user=request.user,
+                )
+
                 # Check if new subproject name already exists in the same project
-                if SubProjects.objects.filter(user=request.user, name=new_subproject_name, parent_project=parent_project).exists():
-                    form.add_error('new_subproject_name', 'You already have a subproject with this name in this project.')
-                    return render(request, 'core/merge_subprojects.html', {
-                        'title': 'Merge Subprojects',
-                        'form': form,
-                        'parent_project': parent_project
-                    })
-                
+                if SubProjects.objects.filter(
+                    user=request.user,
+                    name=new_subproject_name,
+                    parent_project=parent_project,
+                ).exists():
+                    form.add_error(
+                        "new_subproject_name",
+                        "You already have a subproject with this name in this project.",
+                    )
+                    return render(
+                        request,
+                        "core/merge_subprojects.html",
+                        {
+                            "title": "Merge Subprojects",
+                            "form": form,
+                            "parent_project": parent_project,
+                        },
+                    )
+
                 # Create merged description
-                merged_description = f"Merged from '{subproject1.name}' and '{subproject2.name}'\n\n"
-                
+                merged_description = (
+                    f"Merged from '{subproject1.name}' and '{subproject2.name}'\n\n"
+                )
+
                 if subproject1.description:
                     merged_description += f"--- {subproject1.name} Description ---\n{subproject1.description}\n\n"
-                
+
                 if subproject2.description:
                     merged_description += f"--- {subproject2.name} Description ---\n{subproject2.description}\n\n"
-                
+
                 # Remove trailing newlines
                 merged_description = merged_description.strip()
-                
+
                 # Create the new merged subproject
                 merged_subproject = SubProjects.objects.create(
                     user=request.user,
                     name=new_subproject_name,
                     parent_project=parent_project,
                     start_date=min(subproject1.start_date, subproject2.start_date),
-                    last_updated=max(subproject1.last_updated, subproject2.last_updated),
+                    last_updated=max(
+                        subproject1.last_updated, subproject2.last_updated
+                    ),
                     total_time=0.0,  # Will be calculated by audit function
-                    description=merged_description
+                    description=merged_description,
                 )
-                
+
                 # Move all sessions from both subprojects to the merged subproject
                 subproject1_sessions = subproject1.sessions.all()
                 subproject2_sessions = subproject2.sessions.all()
-                
+
                 for session in subproject1_sessions:
                     session.subprojects.remove(subproject1)
                     session.subprojects.add(merged_subproject)
-                
+
                 for session in subproject2_sessions:
                     session.subprojects.remove(subproject2)
                     session.subprojects.add(merged_subproject)
-                
+
                 # Audit total time for the merged subproject
                 merged_subproject.audit_total_time(log=False)
-                
+
                 # Delete the original subprojects
                 subproject1.delete()
                 subproject2.delete()
-                
-                messages.success(request, f"Successfully merged '{subproject1_name}' and '{subproject2_name}' into '{new_subproject_name}'")
-                return redirect('update_project', pk=project_id)
-                
+
+                messages.success(
+                    request,
+                    f"Successfully merged '{subproject1_name}' and '{subproject2_name}' into '{new_subproject_name}'",
+                )
+                return redirect("update_project", pk=project_id)
+
             except Exception as e:
-                messages.error(request, f"An error occurred while merging subprojects: {e}")
+                messages.error(
+                    request, f"An error occurred while merging subprojects: {e}"
+                )
         else:
             messages.error(request, "Invalid form data. Please check your inputs.")
     else:
         form = MergeSubProjectsForm()
-    
+
     context = {
-        'title': 'Merge Subprojects',
-        'form': form,
-        'parent_project': parent_project
+        "title": "Merge Subprojects",
+        "form": form,
+        "parent_project": parent_project,
     }
-    
-    return render(request, 'core/merge_subprojects.html', context)
+
+    return render(request, "core/merge_subprojects.html", context)
 
 
 @login_required
@@ -1336,12 +1512,16 @@ def set_active_context(request):
             except (Context.DoesNotExist, ValueError, TypeError):
                 context_id = "all"
         set_active_context(request, context_id)
-        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or reverse('home')
+        next_url = (
+            request.POST.get("next")
+            or request.META.get("HTTP_REFERER")
+            or reverse("home")
+        )
         return redirect(next_url)
 
     # Fallback GET handler – treat like resetting to All
     set_active_context(request, "all")
-    return redirect('home')
+    return redirect("home")
 
 
 @login_required
@@ -1356,23 +1536,23 @@ def manage_contexts(request):
             ctx.user = request.user
             # Enforce per-user uniqueness gracefully
             if Context.objects.filter(user=request.user, name=ctx.name).exists():
-                form.add_error('name', 'You already have a context with this name.')
+                form.add_error("name", "You already have a context with this name.")
             else:
                 ctx.save()
                 messages.success(request, "Context created successfully")
-                return redirect('contexts')
+                return redirect("contexts")
     else:
         form = ContextForm()
 
-    contexts = Context.objects.filter(user=request.user).order_by('name')
+    contexts = Context.objects.filter(user=request.user).order_by("name")
 
     context = {
-        'title': 'Contexts',
-        'form': form,
-        'contexts': contexts,
+        "title": "Contexts",
+        "form": form,
+        "contexts": contexts,
     }
 
-    return render(request, 'core/contexts.html', context)
+    return render(request, "core/contexts.html", context)
 
 
 @login_required
@@ -1386,241 +1566,275 @@ def manage_tags(request):
             tag = form.save(commit=False)
             tag.user = request.user
             if Tag.objects.filter(user=request.user, name=tag.name).exists():
-                form.add_error('name', 'You already have a tag with this name.')
+                form.add_error("name", "You already have a tag with this name.")
             else:
                 tag.save()
                 messages.success(request, "Tag created successfully")
-                return redirect('tags')
+                return redirect("tags")
     else:
         form = TagForm()
 
-    tags = Tag.objects.filter(user=request.user).order_by('name')
+    tags = Tag.objects.filter(user=request.user).order_by("name")
 
     context = {
-        'title': 'Tags',
-        'form': form,
-        'tags': tags,
+        "title": "Tags",
+        "form": form,
+        "tags": tags,
     }
 
-    return render(request, 'core/tags.html', context)
+    return render(request, "core/tags.html", context)
 
 
 # New views to update/delete Context and Tag
 class UpdateContextView(LoginRequiredMixin, UpdateView):
     model = Context
     form_class = ContextForm
-    template_name = 'core/update_context.html'
-    context_object_name = 'context_obj'
+    template_name = "core/update_context.html"
+    context_object_name = "context_obj"
 
     def get_queryset(self):
         return Context.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['title'] = 'Update Context'
+        ctx["title"] = "Update Context"
 
         # Sidebar stats for this context
-        projects_qs = Projects.objects.filter(user=self.request.user, context=self.object)
+        projects_qs = Projects.objects.filter(
+            user=self.request.user, context=self.object
+        )
         # Respect any globally selected active context (if it's a different context, this becomes empty)
         projects_qs = filter_by_active_context(projects_qs, self.request)
 
         total_projects = projects_qs.count()
-        agg = projects_qs.aggregate(total_time=Sum('total_time'))
-        total_time = agg.get('total_time') or 0
+        agg = projects_qs.aggregate(total_time=Sum("total_time"))
+        total_time = agg.get("total_time") or 0
 
         # Per-status counts
         sidebar_status_counts = {
-            'active': projects_qs.filter(status='active').count(),
-            'paused': projects_qs.filter(status='paused').count(),
-            'complete': projects_qs.filter(status='complete').count(),
-            'archived': projects_qs.filter(status='archived').count(),
+            "active": projects_qs.filter(status="active").count(),
+            "paused": projects_qs.filter(status="paused").count(),
+            "complete": projects_qs.filter(status="complete").count(),
+            "archived": projects_qs.filter(status="archived").count(),
         }
 
-        sessions_qs = Sessions.objects.filter(user=self.request.user, project__in=projects_qs, is_active=False)
+        sessions_qs = Sessions.objects.filter(
+            user=self.request.user, project__in=projects_qs, is_active=False
+        )
         session_count = sessions_qs.count()
-        average_session_duration = (total_time / session_count) if session_count > 0 else 0
+        average_session_duration = (
+            (total_time / session_count) if session_count > 0 else 0
+        )
 
-        ctx.update({
-            'sidebar_total_projects': total_projects,
-            'sidebar_total_time': total_time,
-            'sidebar_average_session_duration': average_session_duration,
-            'sidebar_status_counts': sidebar_status_counts,
-        })
+        ctx.update(
+            {
+                "sidebar_total_projects": total_projects,
+                "sidebar_total_time": total_time,
+                "sidebar_average_session_duration": average_session_duration,
+                "sidebar_status_counts": sidebar_status_counts,
+            }
+        )
         return ctx
 
     def form_valid(self, form):
-        if Context.objects.filter(user=self.request.user, name=form.instance.name).exclude(pk=self.object.pk).exists():
-            form.add_error('name', 'You already have a context with this name.')
+        if (
+            Context.objects.filter(user=self.request.user, name=form.instance.name)
+            .exclude(pk=self.object.pk)
+            .exists()
+        ):
+            form.add_error("name", "You already have a context with this name.")
             return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Context updated successfully")
-        return redirect('contexts')
+        return redirect("contexts")
 
 
 class DeleteContextView(LoginRequiredMixin, DeleteView):
     model = Context
-    template_name = 'core/delete_context.html'
-    context_object_name = 'context_obj'
+    template_name = "core/delete_context.html"
+    context_object_name = "context_obj"
 
     def get_queryset(self):
         return Context.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Delete Context'
+        context["title"] = "Delete Context"
         return context
 
     def get_success_url(self):
         messages.success(self.request, "Context deleted successfully")
-        return reverse('contexts')
+        return reverse("contexts")
 
 
 class UpdateTagView(LoginRequiredMixin, UpdateView):
     model = Tag
     form_class = TagForm
-    template_name = 'core/update_tag.html'
-    context_object_name = 'tag'
+    template_name = "core/update_tag.html"
+    context_object_name = "tag"
 
     def get_queryset(self):
         return Tag.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        ctx['title'] = 'Update Tag'
+        ctx["title"] = "Update Tag"
 
         # Allow explicit ?context= to override the global active context for the sidebar stats.
         # (Used by the context dropdown on this page.)
-        override_context_id = self.request.GET.get('context')
+        override_context_id = self.request.GET.get("context")
 
         # Sidebar stats for this tag
-        projects_qs = Projects.objects.filter(user=self.request.user, tags=self.object).distinct()
-        projects_qs = filter_by_active_context(projects_qs, self.request, override_context_id=override_context_id)
+        projects_qs = Projects.objects.filter(
+            user=self.request.user, tags=self.object
+        ).distinct()
+        projects_qs = filter_by_active_context(
+            projects_qs, self.request, override_context_id=override_context_id
+        )
 
         total_projects = projects_qs.count()
-        total_time = (projects_qs.aggregate(total_time=Sum('total_time')).get('total_time') or 0)
+        total_time = (
+            projects_qs.aggregate(total_time=Sum("total_time")).get("total_time") or 0
+        )
 
         # Per-status counts
         sidebar_status_counts = {
-            'active': projects_qs.filter(status='active').count(),
-            'paused': projects_qs.filter(status='paused').count(),
-            'complete': projects_qs.filter(status='complete').count(),
-            'archived': projects_qs.filter(status='archived').count(),
+            "active": projects_qs.filter(status="active").count(),
+            "paused": projects_qs.filter(status="paused").count(),
+            "complete": projects_qs.filter(status="complete").count(),
+            "archived": projects_qs.filter(status="archived").count(),
         }
 
-        sessions_qs = Sessions.objects.filter(user=self.request.user, project__in=projects_qs, is_active=False)
+        sessions_qs = Sessions.objects.filter(
+            user=self.request.user, project__in=projects_qs, is_active=False
+        )
         session_count = sessions_qs.count()
-        average_session_duration = (total_time / session_count) if session_count > 0 else 0
+        average_session_duration = (
+            (total_time / session_count) if session_count > 0 else 0
+        )
 
-        ctx.update({
-            'override_context_id': override_context_id or '',
-            'sidebar_total_projects': total_projects,
-            'sidebar_total_time': total_time,
-            'sidebar_average_session_duration': average_session_duration,
-            'sidebar_status_counts': sidebar_status_counts,
-        })
+        ctx.update(
+            {
+                "override_context_id": override_context_id or "",
+                "sidebar_total_projects": total_projects,
+                "sidebar_total_time": total_time,
+                "sidebar_average_session_duration": average_session_duration,
+                "sidebar_status_counts": sidebar_status_counts,
+            }
+        )
         return ctx
 
     def form_valid(self, form):
-        if Tag.objects.filter(user=self.request.user, name=form.instance.name).exclude(pk=self.object.pk).exists():
-            form.add_error('name', 'You already have a tag with this name.')
+        if (
+            Tag.objects.filter(user=self.request.user, name=form.instance.name)
+            .exclude(pk=self.object.pk)
+            .exists()
+        ):
+            form.add_error("name", "You already have a tag with this name.")
             return self.form_invalid(form)
         form.save()
         messages.success(self.request, "Tag updated successfully")
-        return redirect('tags')
+        return redirect("tags")
 
 
 class DeleteTagView(LoginRequiredMixin, DeleteView):
     model = Tag
-    template_name = 'core/delete_tag.html'
-    context_object_name = 'tag'
+    template_name = "core/delete_tag.html"
+    context_object_name = "tag"
 
     def get_queryset(self):
         return Tag.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Delete Tag'
+        context["title"] = "Delete Tag"
         return context
 
     def get_success_url(self):
         messages.success(self.request, "Tag deleted successfully")
-        return reverse('tags')
+        return reverse("tags")
 
 
 class CreateCommitmentView(LoginRequiredMixin, CreateView):
     model = Commitment
     form_class = CommitmentForm
-    template_name = 'core/create_commitment.html'
+    template_name = "core/create_commitment.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Add Commitment'
-        context['project'] = get_object_or_404(Projects, pk=self.kwargs['project_pk'], user=self.request.user)
+        context["title"] = "Add Commitment"
+        context["project"] = get_object_or_404(
+            Projects, pk=self.kwargs["project_pk"], user=self.request.user
+        )
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        kwargs['project'] = get_object_or_404(Projects, pk=self.kwargs['project_pk'], user=self.request.user)
+        kwargs["user"] = self.request.user
+        kwargs["project"] = get_object_or_404(
+            Projects, pk=self.kwargs["project_pk"], user=self.request.user
+        )
         return kwargs
 
     def form_valid(self, form):
-        project = get_object_or_404(Projects, pk=self.kwargs['project_pk'], user=self.request.user)
+        project = get_object_or_404(
+            Projects, pk=self.kwargs["project_pk"], user=self.request.user
+        )
 
         # Check if commitment already exists
-        if hasattr(project, 'commitment'):
+        if hasattr(project, "commitment"):
             messages.error(self.request, "This project already has a commitment.")
-            return redirect('update_project', pk=project.pk)
+            return redirect("update_project", pk=project.pk)
 
         form.instance.user = self.request.user
         form.instance.project = project
         form.save()
         messages.success(self.request, "Commitment added successfully")
-        return redirect('update_project', pk=project.pk)
+        return redirect("update_project", pk=project.pk)
 
 
 class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
     model = Commitment
     form_class = UpdateCommitmentForm
-    template_name = 'core/update_commitment.html'
-    context_object_name = 'commitment'
+    template_name = "core/update_commitment.html"
+    context_object_name = "commitment"
 
     def get_queryset(self):
         return Commitment.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Update Commitment'
+        context["title"] = "Update Commitment"
         # Reconcile and get progress
         reconcile_commitment(self.object)
-        context['progress'] = get_commitment_progress(self.object)
+        context["progress"] = get_commitment_progress(self.object)
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        kwargs['project'] = self.object.project
+        kwargs["user"] = self.request.user
+        kwargs["project"] = self.object.project
         return kwargs
 
     def form_valid(self, form):
         form.save()
         messages.success(self.request, "Commitment updated successfully")
-        return redirect('update_project', pk=self.object.project.pk)
+        return redirect("update_project", pk=self.object.project.pk)
 
 
 class DeleteCommitmentView(LoginRequiredMixin, DeleteView):
     model = Commitment
-    template_name = 'core/delete_commitment.html'
-    context_object_name = 'commitment'
+    template_name = "core/delete_commitment.html"
+    context_object_name = "commitment"
 
     def get_queryset(self):
         return Commitment.objects.filter(user=self.request.user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Delete Commitment'
+        context["title"] = "Delete Commitment"
         return context
 
     def get_success_url(self):
         messages.success(self.request, "Commitment deleted successfully")
-        return reverse('update_project', kwargs={'pk': self.object.project.pk})
+        return reverse("update_project", kwargs={"pk": self.object.project.pk})
