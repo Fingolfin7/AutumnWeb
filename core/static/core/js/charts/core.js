@@ -90,6 +90,38 @@ function formatDuration(hours) {
     }
 }
 
+/**
+ * Consolidate data to top N items plus "Other"
+ * @param {Array} data - Array of objects with name and total_time properties
+ * @param {number} topN - Number of top items to keep (default 7)
+ * @param {string} timeKey - Key for the time value (default 'total_time')
+ * @returns {Array} Consolidated array with top N items + Other
+ */
+function consolidateTopN(data, topN = 7, timeKey = 'total_time') {
+    if (!data || data.length <= topN) {
+        return data;
+    }
+
+    // Sort by time descending
+    const sorted = [...data].sort((a, b) => (b[timeKey] || 0) - (a[timeKey] || 0));
+
+    // Take top N
+    const top = sorted.slice(0, topN);
+
+    // Aggregate the rest into "Other"
+    const rest = sorted.slice(topN);
+    if (rest.length > 0) {
+        const otherTime = rest.reduce((sum, item) => sum + (item[timeKey] || 0), 0);
+        top.push({
+            name: `Other (${rest.length})`,
+            [timeKey]: otherTime,
+            _isOther: true
+        });
+    }
+
+    return top;
+}
+
 // ============================================================================
 // Data Fetching
 // ============================================================================
@@ -308,5 +340,6 @@ window.AutumnCharts.utils = {
     format_date,
     countWeekdays,
     clearChart,
-    formatDuration
+    formatDuration,
+    consolidateTopN
 };

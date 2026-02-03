@@ -1116,6 +1116,11 @@ def hierarchy_data(request):
     user = request.user
     contexts = Context.objects.filter(user=user)
 
+    # Apply context filter if provided
+    context_id = request.query_params.get("context")
+    if context_id:
+        contexts = contexts.filter(id=context_id)
+
     # Apply date filters to sessions for time calculation
     sessions = Sessions.objects.filter(is_active=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
@@ -1138,6 +1143,11 @@ def hierarchy_data(request):
     for ctx in contexts:
         ctx_children = []
         ctx_projects = Projects.objects.filter(user=user, context=ctx)
+
+        # Apply tag filters to projects
+        ctx_projects = _apply_tag_filters(
+            request.query_params, ctx_projects, kind="projects", user=user
+        )
 
         for proj in ctx_projects:
             proj_time = project_times.get(proj.id, 0)

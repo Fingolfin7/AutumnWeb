@@ -11,12 +11,18 @@
     // ========================================================================
 
     function pie_chart(data, ctx) {
-        const colors = data.map((element, index) => utils.generateRandomColor(index, data.length));
+        // Consolidate to top 7 + Other
+        const consolidated = utils.consolidateTopN(data, 7);
+        const colors = consolidated.map((element, index) => {
+            // Use gray for "Other"
+            if (element._isOther) return 'hsl(0, 0%, 70%)';
+            return utils.generateRandomColor(index, consolidated.length);
+        });
 
         const chartData = {
-            labels: data.map(item => item.name),
+            labels: consolidated.map(item => item.name),
             datasets: [{
-                data: data.map(item => item.total_time / 60),
+                data: consolidated.map(item => item.total_time / 60),
                 backgroundColor: colors,
                 borderWidth: 0.5
             }]
@@ -48,13 +54,19 @@
     // ========================================================================
 
     function bar_graph(data, ctx) {
-        let colors = data.map((element, index) => utils.generateRandomColor(index, data.length));
+        // Consolidate to top 7 + Other
+        const consolidated = utils.consolidateTopN(data, 7);
+        let colors = consolidated.map((element, index) => {
+            // Use gray for "Other"
+            if (element._isOther) return 'hsl(0, 0%, 70%)';
+            return utils.generateRandomColor(index, consolidated.length);
+        });
 
         const chartData = {
-            labels: data.map(item => item.name),
+            labels: consolidated.map(item => item.name),
             datasets: [{
                 label: 'Project Totals',
-                data: data.map(item => item.total_time / 60),
+                data: consolidated.map(item => item.total_time / 60),
                 backgroundColor: colors,
                 borderWidth: 0.5
             }]
@@ -89,20 +101,39 @@
             };
         });
 
-        const groupedData = Object.entries(
-            sessionData.reduce((acc, item) => {
-                if (!acc[item.projectName]) acc[item.projectName] = [];
-                acc[item.projectName].push(item);
-                return acc;
-            }, {})
-        );
+        // Group by project and calculate totals for ranking
+        const projectGroups = sessionData.reduce((acc, item) => {
+            if (!acc[item.projectName]) acc[item.projectName] = { sessions: [], totalTime: 0 };
+            acc[item.projectName].sessions.push(item);
+            acc[item.projectName].totalTime += item.y;
+            return acc;
+        }, {});
 
-        groupedData.sort((a, b) => a[0].localeCompare(b[0]));
+        // Sort projects by total time and take top 7
+        const sortedProjects = Object.entries(projectGroups)
+            .sort((a, b) => b[1].totalTime - a[1].totalTime);
+
+        const topN = 7;
+        const topProjects = sortedProjects.slice(0, topN);
+        const otherProjects = sortedProjects.slice(topN);
+
+        // Build final grouped data
+        let groupedData = topProjects.map(([name, data]) => [name, data.sessions]);
+
+        // Merge remaining projects into "Other"
+        if (otherProjects.length > 0) {
+            const otherSessions = otherProjects.flatMap(([_, data]) =>
+                data.sessions.map(s => ({ ...s, projectName: `Other (${otherProjects.length})` }))
+            );
+            groupedData.push([`Other (${otherProjects.length})`, otherSessions]);
+        }
 
         const projectColors = {};
-        groupedData.forEach((item, index) => {
-            if (!projectColors[item[0]]) {
-                projectColors[item[0]] = utils.generateRandomColor(index, groupedData.length);
+        groupedData.forEach(([name], index) => {
+            if (name.startsWith('Other (')) {
+                projectColors[name] = 'hsl(0, 0%, 70%)';
+            } else {
+                projectColors[name] = utils.generateRandomColor(index, groupedData.length);
             }
         });
 
@@ -235,6 +266,7 @@
 
     function line_graph(data, ctx) {
         const dailyTotals = {};
+        const projectTotalTime = {};
 
         data.forEach(item => {
             const startTime = new Date(item.start_time);
@@ -246,15 +278,45 @@
             if (!dailyTotals[projectName]) dailyTotals[projectName] = {};
             if (!dailyTotals[projectName][dateKey]) dailyTotals[projectName][dateKey] = 0;
             dailyTotals[projectName][dateKey] += duration;
+
+            // Track total time per project for ranking
+            projectTotalTime[projectName] = (projectTotalTime[projectName] || 0) + duration;
         });
+
+        // Sort projects by total time and identify top 7
+        const topN = 7;
+        const sortedProjects = Object.entries(projectTotalTime)
+            .sort((a, b) => b[1] - a[1]);
+        const topProjectNames = new Set(sortedProjects.slice(0, topN).map(([name]) => name));
+        const otherProjects = sortedProjects.slice(topN);
+
+        // Merge "other" projects into single entry
+        if (otherProjects.length > 0) {
+            const otherName = `Other (${otherProjects.length})`;
+            dailyTotals[otherName] = {};
+            otherProjects.forEach(([projectName]) => {
+                Object.entries(dailyTotals[projectName]).forEach(([date, time]) => {
+                    dailyTotals[otherName][date] = (dailyTotals[otherName][date] || 0) + time;
+                });
+                delete dailyTotals[projectName];
+            });
+        }
 
         const allDates = [...new Set(
             Object.values(dailyTotals).flatMap(proj => Object.keys(proj))
         )].sort();
 
-        const projectNames = Object.keys(dailyTotals).sort();
+        const projectNames = Object.keys(dailyTotals);
+        // Sort so top projects come first, "Other" last
+        projectNames.sort((a, b) => {
+            if (a.startsWith('Other (')) return 1;
+            if (b.startsWith('Other (')) return -1;
+            return (projectTotalTime[b] || 0) - (projectTotalTime[a] || 0);
+        });
+
         const datasets = projectNames.map((projectName, index) => {
-            const color = utils.generateRandomColor(index, projectNames.length);
+            const isOther = projectName.startsWith('Other (');
+            const color = isOther ? 'hsl(0, 0%, 70%)' : utils.generateRandomColor(index, projectNames.length);
             const projectData = dailyTotals[projectName];
 
             const dataPoints = allDates.map(date => ({

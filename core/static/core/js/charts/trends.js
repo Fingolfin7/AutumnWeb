@@ -12,6 +12,7 @@
 
     function stacked_area_chart(data, ctx) {
         const dailyTotals = {};
+        const projectTotalTime = {};
 
         data.forEach(item => {
             const startTime = new Date(item.start_time);
@@ -23,16 +24,45 @@
             if (!dailyTotals[projectName]) dailyTotals[projectName] = {};
             if (!dailyTotals[projectName][dateKey]) dailyTotals[projectName][dateKey] = 0;
             dailyTotals[projectName][dateKey] += duration;
+
+            // Track total time per project for ranking
+            projectTotalTime[projectName] = (projectTotalTime[projectName] || 0) + duration;
         });
+
+        // Sort projects by total time and identify top 7
+        const topN = 7;
+        const sortedProjects = Object.entries(projectTotalTime)
+            .sort((a, b) => b[1] - a[1]);
+        const otherProjects = sortedProjects.slice(topN);
+
+        // Merge "other" projects into single entry
+        if (otherProjects.length > 0) {
+            const otherName = `Other (${otherProjects.length})`;
+            dailyTotals[otherName] = {};
+            otherProjects.forEach(([projectName]) => {
+                Object.entries(dailyTotals[projectName]).forEach(([date, time]) => {
+                    dailyTotals[otherName][date] = (dailyTotals[otherName][date] || 0) + time;
+                });
+                delete dailyTotals[projectName];
+            });
+        }
 
         // Get all unique dates and sort them
         const allDates = [...new Set(
             Object.values(dailyTotals).flatMap(proj => Object.keys(proj))
         )].sort();
 
-        const projectNames = Object.keys(dailyTotals).sort();
+        const projectNames = Object.keys(dailyTotals);
+        // Sort so top projects come first, "Other" last
+        projectNames.sort((a, b) => {
+            if (a.startsWith('Other (')) return 1;
+            if (b.startsWith('Other (')) return -1;
+            return (projectTotalTime[b] || 0) - (projectTotalTime[a] || 0);
+        });
+
         const datasets = projectNames.map((projectName, index) => {
-            const color = utils.generateRandomColor(index, projectNames.length);
+            const isOther = projectName.startsWith('Other (');
+            const color = isOther ? 'hsl(0, 0%, 70%)' : utils.generateRandomColor(index, projectNames.length);
             const projectData = dailyTotals[projectName];
 
             // Include all dates (with 0 for missing days) for proper stacking
@@ -45,7 +75,7 @@
                 label: projectName,
                 data: dataPoints,
                 borderColor: color,
-                backgroundColor: color.replace('hsl', 'hsla').replace(')', ', 0.6)'),
+                backgroundColor: isOther ? 'hsla(0, 0%, 70%, 0.6)' : color.replace('hsl', 'hsla').replace(')', ', 0.6)'),
                 fill: true,
                 tension: 0.3,
                 pointRadius: 0,
