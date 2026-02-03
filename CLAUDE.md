@@ -9,6 +9,13 @@ Autumn is a Django-based time and project tracking web application. It's the bro
 ## Commands
 
 ```bash
+# Create/activate virtual env (optional but recommended)
+python -m venv .venv
+# Windows PowerShell:
+.\.venv\Scripts\Activate.ps1
+# macOS/Linux:
+source .venv/bin/activate
+
 # Development server
 python manage.py runserver
 
@@ -70,6 +77,7 @@ Pluggable handler architecture with a base class:
 - `claude_handler.py` - Anthropic Claude (user-provided key only)
 
 User API keys are encrypted with Fernet (derived from `SECRET_KEY`) and stored in the Profile model as BinaryFields.
+Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate/re-encrypt them.
 
 ### Key Files
 

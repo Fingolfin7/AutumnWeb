@@ -812,6 +812,9 @@ body.dark-mode :where(.label-input) select.select-caret {
   border-radius: 8px;
   transition: width 0.3s ease;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  display: block;
+  float: none;
+  min-width: 2px;
 }
 
 .progress-bar.behind {
@@ -1011,6 +1014,21 @@ body.light-mode .streak-inactive {
   margin-top: 1rem;
 }
 
+.commitment-progress-container {
+  height: 16px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+#commitments .progress-bar,
+.progress-bar-container .progress-bar {
+  height: 100%;
+  max-width: 100%;
+}
+
 .commitment-card {
   padding: 1rem;
   border: 1px solid var(--border-dark);
@@ -1088,32 +1106,66 @@ body.light-mode .commitment-card {
   margin-top: 1rem;
 }
 
-.dashboard-session-item {
+.dashboard-session-card {
   display: flex;
-  flex-direction: row;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border-dark);
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem;
+  margin-bottom: 0.4rem;
 }
 
-body.light-mode .dashboard-session-item {
+.dashboard-date-header {
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-dark);
+  padding-bottom: 0.25rem;
+  font-size: 0.95em;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+body.light-mode .dashboard-date-header {
   border-bottom-color: var(--border-light);
 }
 
-.dashboard-session-item:last-child {
-  border-bottom: none;
+.dashboard-date-total {
+  font-size: 0.85em;
 }
 
-.dashboard-session-item .restart-form {
+.dashboard-session-duration {
+  font-size: 0.85em;
+  color: var(--dark-text);
+  margin: 0 0.3rem;
+}
+
+.dashboard-project-name {
+  max-width: 200px;
+}
+
+.dashboard-session-subprojects {
+  font-size: 0.85em;
+  color: var(--main-muted);
+}
+
+.dashboard-session-arrow {
+  font-size: 0.8em;
+}
+
+.dashboard-session-actions {
   display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
   margin-left: auto;
 }
 
-.dashboard-session-item .primary-button {
-  padding: 0.3rem 0.5rem;
-  font-size: 0.85rem;
+.dashboard-restart-form {
+  display: inline-flex;
+}
+
+.dashboard-session-actions .primary-button {
+  padding: 3px 7px;
 }
 
 .sessions-footer {
@@ -1123,6 +1175,73 @@ body.light-mode .dashboard-session-item {
 
 .sessions-footer a:hover {
   color: var(--brand-orange);
+}
+
+.activity-card {
+  padding: 1rem;
+}
+
+.activity-range-controls {
+  display: flex;
+  justify-content: flex-start;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.activity-range-button {
+  background: transparent;
+  border: 1px solid var(--border-dark);
+  color: var(--dark-text);
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.activity-range-button.is-active {
+  background: var(--main-green);
+  color: var(--dark-background);
+  border-color: var(--main-green);
+}
+
+body.light-mode .activity-range-button {
+  border-color: var(--border-light);
+  color: var(--light-text);
+}
+
+.activity-calendar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: flex-start;
+  margin-bottom: 0.8rem;
+}
+
+.activity-day {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 0.6rem;
+}
+
+.activity-day.is-active {
+  background-color: var(--main-green);
+  color: var(--dark-background);
+}
+
+.activity-day.is-inactive {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--main-muted);
+  border: 1px solid var(--border-dark);
+}
+
+body.light-mode .activity-day.is-inactive {
+  background-color: var(--border-light);
+  border-color: var(--border-light);
 }
 
 /* ----------------------------- */

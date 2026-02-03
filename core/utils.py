@@ -690,13 +690,14 @@ def get_commitment_progress(commitment) -> dict:
     }
 
 
-def calculate_daily_activity_streak(user, reference_date=None) -> dict:
+def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -> dict:
     """
     Calculate consecutive days with any logged time.
 
     :param user: User instance
     :param reference_date: The date to calculate from (defaults to now)
-    :return: Dict with 'current_streak' (int) and 'recent_days' (list of 14 dicts with date and active status)
+    :param days: Number of recent days to return for the activity calendar
+    :return: Dict with 'current_streak' (int) and 'recent_days' (list of day dicts with date and active status)
     """
     from core.models import Sessions  # Import here to avoid circular import
 
@@ -733,9 +734,11 @@ def calculate_daily_activity_streak(user, reference_date=None) -> dict:
         current_streak += 1
         check_date -= timedelta(days=1)
 
-    # Generate 14-day history for visual display
+    # Generate recent-day history for visual display
+    if days < 1:
+        days = 1
     recent_days = []
-    for i in range(13, -1, -1):  # 14 days, oldest first
+    for i in range(days - 1, -1, -1):  # oldest first
         day = today - timedelta(days=i)
         recent_days.append({"date": day, "active": day in active_dates})
 

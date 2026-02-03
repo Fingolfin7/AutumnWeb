@@ -41,8 +41,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             filter_by_active_context,
         )
 
-        # 1. Daily activity streak
-        context["daily_streak"] = calculate_daily_activity_streak(user)
+        # 1. Daily activity streak (precompute 30 days for toggleable view)
+        context["daily_streak"] = calculate_daily_activity_streak(user, days=30)
 
         # 2. Get all active commitments with progress and streak data
         commitments_data = []

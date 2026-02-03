@@ -6,6 +6,7 @@
 {% block head_includes %}
     <script src="{% static 'core/js/session_sliders.js' %}?v={{ static_version.session_sliders }}" type="text/javascript"></script>
     <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
+
 {% endblock %}
 
 {% block content %}
@@ -64,69 +65,62 @@
                 {% if grouped_sessions %}
                 {% for date, data in grouped_sessions.items %}
                     <div class="date-group" style="margin-bottom: 1rem;">
-                        <h4 style="margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-dark); padding-bottom: 0.25rem; font-size: 0.9em;">
-                            <u>{{ date|day_date_formatter }}</u>
-                            <span class="text-green" style="font-size: 0.8em; float: right;">
-                                ({{ data.total_duration|duration_formatter }})
-                            </span>
+                        <h4 class="dashboard-date-header">
+                            <span><u>{{ date|day_date_formatter }}</u></span>
+                            <span class="text-green dashboard-date-total">({{ data.total_duration|duration_formatter }})</span>
                         </h4>
 
                         {% for session in data.sessions %}
-                        <div class="card" id="session-{{ session.id }}" style="margin-bottom: 0.4rem; padding: 0.6rem; position: relative;">
-                            <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.4rem;">
-                                <div style="flex: 1; min-width: 200px;">
-                                    <span class="text-cyan" style="font-size: 0.85em;">{{ session.start_time|time_formatter }}</span>
-                                    <span class="text-muted" style="font-size: 0.8em;">to</span>
-                                    <span class="text-cyan" style="font-size: 0.85em;">{{ session.end_time|time_formatter }}</span>
-                                    
-                                    <span style="margin: 0 0.3rem; font-size: 0.85em;">{{ session.duration|duration_formatter }}</span>
+                        <div class="card dashboard-session-card" id="session-{{ session.id }}">
+                            <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
+                            <span class="text-muted">to</span>
+                            <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
 
-                                    <div class="project-name-slider" style="max-width: 200px; vertical-align: bottom;">
-                                        <a class="plain-link text-red project-name" href="{% url 'update_project' session.project.id %}" style="font-size: 0.9em;">
-                                            {{ session.project.name }}
-                                        </a>
-                                    </div>
+                            <span class="dashboard-session-duration">{{ session.duration|duration_formatter }}</span>
 
-                                    {% if session.subprojects.all %}
-                                    <span class="text-muted" style="font-size: 0.8em;">
-                                        {% for subproject in session.subprojects.all %}
-                                            {% if forloop.first %}[ {% endif %}'<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}{% if forloop.last %} ]{% endif %}
-                                        {% endfor %}
-                                    </span>
-                                    {% endif %}
-                                </div>
+                            <span class="text-red project-name-slider dashboard-project-name">
+                                <a class="plain-link" href="{% url 'update_project' session.project.id %}">
+                                    {{ session.project.name }}
+                                </a>
+                            </span>
 
-                                <div style="display: flex; gap: 0.2rem;">
-                                    <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'" title="Edit" style="padding: 3px 7px;">
-                                        <i class="fa fa-pen" style="font-size: 0.75em;"></i>
-                                    </button>
-                                    <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'" title="Delete" style="padding: 3px 7px;">
-                                        <i class="fa fa-trash" style="font-size: 0.75em;"></i>
-                                    </button>
-                                    <form method="post" action="{% url 'start_timer' %}" style="display: inline;">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="project" value="{{ session.project.name }}">
-                                        {% for sub in session.subprojects.all %}
-                                        <input type="hidden" name="subprojects" value="{{ sub.name }}">
-                                        {% endfor %}
-                                        <button type="submit" class="primary-button" title="Restart" style="padding: 3px 7px;">
-                                            <i class="fas fa-redo" style="font-size: 0.75em;"></i>
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
+                            {% if session.subprojects.all %}
+                            <span class="dashboard-session-subprojects">
+                                {% for subproject in session.subprojects.all %}
+                                    {% if forloop.first %}[ {% endif %}'<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}{% if forloop.last %} ]{% endif %}
+                                {% endfor %}
+                            </span>
+                            {% endif %}
 
                             {% if session.note %}
-                            <div style="margin-top: 0.3rem; display: flex; align-items: center; gap: 0.4rem;">
-                                <span class="text-muted" style="font-size: 0.8em;">→</span>
-                                <div class="session-note-slider" style="flex: 1;">
-                                    <div class="session-note text-yellow" style="font-size: 0.8em;">
+                                <span class="text-muted dashboard-session-arrow">-></span>
+                                <div class="session-note-slider">
+                                    <span class="text-yellow session-note">
                                         {{ session.note|markdown|safe }}
-                                    </div>
+                                    </span>
                                 </div>
-                            </div>
                             {% endif %}
+
+                            <span class="dashboard-session-actions">
+                                <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'" title="Edit">
+                                    <i class="fa fa-pen"></i>
+                                </button>
+                                <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'" title="Delete">
+                                    <i class="fa fa-trash"></i>
+                                </button>
+                                <form method="post" action="{% url 'start_timer' %}" class="dashboard-restart-form">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="project" value="{{ session.project.name }}">
+                                    {% for sub in session.subprojects.all %}
+                                    <input type="hidden" name="subprojects" value="{{ sub.name }}">
+                                    {% endfor %}
+                                    <button type="submit" class="primary-button" title="Restart">
+                                        <i class="fas fa-redo"></i>
+                                    </button>
+                                </form>
+                            </span>
                         </div>
+
                         {% endfor %}
                     </div>
                 {% endfor %}
@@ -163,8 +157,8 @@
                         <span class="text-green">{{ item.progress.actual|floatformat:0 }}{% if item.progress.commitment_type == 'time' %}m{% endif %} / {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
                     </div>
 
-                    <div class="progress-bar-container" style="margin: 0.5rem 0; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.1); height: 16px; border-radius: 8px;">
-                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%; height: 100%; border-radius: 8px;"></div>
+                    <div class="progress-bar-container commitment-progress-container">
+                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%;"></div>
                     </div>
 
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
@@ -192,18 +186,56 @@
             <!-- Activity Streak Details -->
             <section id="activity-streak-details">
                 <h3 class="card" style="margin-bottom: 1rem;"><i class="fas fa-calendar-alt text-green"></i> Activity</h3>
-                <div class="card" style="padding: 1rem;">
-                    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin-bottom: 1rem;">
+                <div class="card activity-card">
+                    <div class="activity-range-controls">
+                        <button type="button" class="activity-range-button is-active" data-days="14">2 weeks</button>
+                        <button type="button" class="activity-range-button" data-days="7">Week</button>
+                        <button type="button" class="activity-range-button" data-days="30">Month</button>
+                    </div>
+                    <div class="activity-calendar" data-total-days="{{ daily_streak.recent_days|length }}">
                         {% for day in daily_streak.recent_days %}
-                        <div style="width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center; border-radius: 3px; font-size: 0.6rem; {% if day.active %}background-color: var(--main-green); color: var(--dark-background);{% else %}background-color: rgba(255, 255, 255, 0.05); color: var(--main-muted); border: 1px solid var(--border-dark);{% endif %}" title="{{ day.date|date:'M d' }}">
+                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" title="{{ day.date|date:'M d' }}">
                             {{ day.date|date:'d' }}
                         </div>
                         {% endfor %}
                     </div>
-                    <p class="text-muted" style="font-size: 0.8rem; text-align: center;">Last 14 days activity</p>
+                    <p class="text-muted activity-range-label">Last 14 days activity</p>
                 </div>
             </section>
+
         </div>
     </div>
-{% endblock %}
 
+    <script type="text/javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            const buttons = document.querySelectorAll(".activity-range-button");
+            const days = Array.from(document.querySelectorAll(".activity-day"));
+            const label = document.querySelector(".activity-range-label");
+            if (!buttons.length || !days.length || !label) {
+                return;
+            }
+
+            const totalDays = days.length;
+
+            function setRange(dayCount) {
+                const startIndex = Math.max(0, totalDays - dayCount);
+                days.forEach((day, index) => {
+                    day.style.display = index >= startIndex ? "flex" : "none";
+                });
+                label.textContent = `Last ${dayCount} days activity`;
+            }
+
+            buttons.forEach((button) => {
+                button.addEventListener("click", () => {
+                    buttons.forEach((btn) => btn.classList.remove("is-active"));
+                    button.classList.add("is-active");
+                    const dayCount = parseInt(button.dataset.days || "14", 10);
+                    setRange(dayCount);
+                });
+            });
+
+            setRange(14);
+        });
+    </script>
+
+{% endblock %}
