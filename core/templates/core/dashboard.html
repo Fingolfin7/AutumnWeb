@@ -192,6 +192,15 @@
                         <button type="button" class="activity-range-button" data-days="7">Week</button>
                         <button type="button" class="activity-range-button" data-days="30">Month</button>
                     </div>
+                    <div class="activity-weekdays">
+                        <span>Mon</span>
+                        <span>Tue</span>
+                        <span>Wed</span>
+                        <span>Thu</span>
+                        <span>Fri</span>
+                        <span>Sat</span>
+                        <span>Sun</span>
+                    </div>
                     <div class="activity-calendar" data-total-days="{{ daily_streak.recent_days|length }}">
                         {% for day in daily_streak.recent_days %}
                         <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" title="{{ day.date|date:'M d' }}">

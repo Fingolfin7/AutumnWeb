@@ -1189,6 +1189,23 @@ body.light-mode .dashboard-date-header {
   flex-wrap: wrap;
 }
 
+.activity-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1.7rem);
+  column-gap: 0.45rem;
+  row-gap: 0.35rem;
+  margin-bottom: 0.35rem;
+  color: var(--main-muted);
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  justify-content: flex-start;
+}
+
+.activity-weekdays span {
+  text-align: center;
+}
+
 .activity-range-button {
   background: transparent;
   border: 1px solid var(--border-dark);
@@ -1211,16 +1228,17 @@ body.light-mode .activity-range-button {
 }
 
 .activity-calendar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+  display: grid;
+  grid-template-columns: repeat(7, 1.7rem);
+  column-gap: 0.45rem;
+  row-gap: 0.45rem;
   justify-content: flex-start;
   margin-bottom: 0.8rem;
 }
 
 .activity-day {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.7rem;
+  height: 1.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
