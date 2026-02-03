@@ -12,6 +12,7 @@ django-environ
 google-genai
 pytz
 django-cleanup
+python-dateutil
 python-toon
 cryptography
 openai
