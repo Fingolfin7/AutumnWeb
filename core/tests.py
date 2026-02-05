@@ -1729,3 +1729,4 @@ class ProjectsListStillWorksTests(TestCase):
         response = self.client.get(reverse('projects'))
         self.assertIn('grouped_projects', response.context)
         self.assertTrue(response.context['has_projects'])
+

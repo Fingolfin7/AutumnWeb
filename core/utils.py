@@ -712,7 +712,7 @@ def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -
     if timezone.is_naive(reference_date):
         reference_date = timezone.make_aware(reference_date)
 
-    today = reference_date.date()
+    today = timezone.localtime(reference_date).date()
 
     # Get all completed session dates for this user
     sessions = Sessions.objects.filter(
