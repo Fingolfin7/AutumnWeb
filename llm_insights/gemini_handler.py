@@ -61,6 +61,7 @@ class GeminiHandler(BaseLLMHandler):
     async def _create_chat(self, model, history=None):
         """Helper to (re)create a chat for a given model."""
         gemini_history = []
+        history = history if history is not None else self.conversation_history
         if history:
             for m in history:
                 role = "user" if m["role"] in ["user", "system"] else "model"
@@ -227,7 +228,7 @@ class GeminiHandler(BaseLLMHandler):
         update_session_data_prompt = ""
         try:
             if not self.chat:
-                await self._create_chat(self.model)
+                await self._create_chat(self.model, history=self.conversation_history)
 
             # Update stored session data
             self.session_data = encode(
@@ -287,7 +288,7 @@ class GeminiHandler(BaseLLMHandler):
         """Send a message to the LLM and return the response"""
         try:
             if not self.chat:
-                await self._create_chat(self.model)
+                await self._create_chat(self.model, history=self.conversation_history)
 
             if not self.chat:
                 return "Error: Chat not initialized"
