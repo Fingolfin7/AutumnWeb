@@ -10,7 +10,7 @@ This project builds on the original [Autumn CLI](https://github.com/Fingolfin7/A
 ### Try It
 
 A demo is available here:
-👉 [http://fingolfin7.pythonanywhere.com/](http://fingolfin7.pythonanywhere.com/)
+👉 https://autumn-lg0b.onrender.com/
 
 Use this demo account to explore the features:
 - **Username**: `Finrod` 
