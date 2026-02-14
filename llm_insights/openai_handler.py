@@ -127,15 +127,76 @@ class OpenAIHandler(BaseLLMHandler):
         return unique_sources
 
     async def update_session_data(self, sessions_data, user_prompt) -> str:
+        """Update the session data without exposing it in user-visible chat history"""
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
-        prompt = self.update_session_data_template.format(
+        update_prompt = self.update_session_data_template.format(
             username=self.username,
             user_prompt=user_prompt,
             session_data=self.session_data,
         )
-        return await self.send_message(prompt)
+
+        # Build API messages from existing conversation history
+        msgs = []
+        for m in self.conversation_history:
+            role = m["role"] if m["role"] in ["user", "assistant", "system"] else "user"
+            msgs.append({"role": role, "content": m["content"]})
+
+        # Send the full update prompt (with session data) to the API
+        msgs.append({"role": "user", "content": update_prompt})
+
+        resp = None
+        sources = []
+        try:
+            resp = await self.client.responses.create(
+                model=self.model,
+                input=msgs,
+                tools=[{"type": "web_search"}],
+                include=["web_search_call.action.sources"],
+            )
+            if hasattr(resp, "output_text"):
+                text = resp.output_text
+            else:
+                text = ""
+                if hasattr(resp, "output") and resp.output:
+                    for o in resp.output:
+                        if o.type == "message":
+                            for c in o.content:
+                                if hasattr(c, "text") and hasattr(c.text, "value"):
+                                    text += c.text.value
+                if not text:
+                    text = str(resp)
+
+            sources = self._extract_sources(resp)
+        except Exception as e:
+            text = f"OpenAI error: {e}"
+
+        # Store update prompt as system (hidden from UI), user prompt separately (visible)
+        self.conversation_history.append(
+            {"role": "system", "content": update_prompt}
+        )
+        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": text,
+                "sources": sources,
+                "model": self.model,
+                "usage": {
+                    "prompt": getattr(resp.usage, "prompt_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                    "response": getattr(resp.usage, "completion_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                },
+            }
+        )
+
+        if resp:
+            self._update_usage(resp)
+        return text
 
     async def send_message(self, message) -> str:
         msgs = []

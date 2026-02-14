@@ -71,15 +71,96 @@ class ClaudeHandler(BaseLLMHandler):
         self.conversation_history = history
 
     async def update_session_data(self, sessions_data, user_prompt) -> str:
+        """Update the session data without exposing it in user-visible chat history"""
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
-        prompt = self.update_session_data_template.format(
+        update_prompt = self.update_session_data_template.format(
             username=self.username,
             user_prompt=user_prompt,
             session_data=self.session_data,
         )
-        return await self.send_message(prompt)
+
+        # Build API messages from existing conversation history
+        msgs = []
+        for m in self.conversation_history:
+            if m["role"] == "system":
+                continue
+            elif m["role"] in ("user", "assistant"):
+                msgs.append({"role": m["role"], "content": m["content"]})
+
+        # If first user message exists and there's a system prompt, prepend system content
+        if (
+            msgs
+            and msgs[0]["role"] == "user"
+            and self.conversation_history
+            and self.conversation_history[0]["role"] == "system"
+        ):
+            msgs[0]["content"] = self.conversation_history[0]["content"]
+
+        # Send the full update prompt (with session data) to the API
+        msgs.append({"role": "user", "content": update_prompt})
+
+        resp = None
+        sources = []
+        try:
+            resp = await self.client.messages.create(
+                model=self.model,
+                messages=msgs,
+                max_tokens=1024,
+            )
+
+            text = ""
+            if resp and resp.content:
+                for block in resp.content:
+                    block_text = getattr(block, "text", "")
+                    if block_text:
+                        text += str(block_text)
+                if not text:
+                    text = "(No content)"
+            else:
+                text = "(No content)"
+
+            citations = getattr(resp, "citations", None)
+            if citations:
+                for citation in citations:
+                    url = getattr(citation, "url", None)
+                    if url:
+                        sources.append(
+                            {
+                                "link": url,
+                                "title": getattr(citation, "title", url),
+                            }
+                        )
+        except Exception as e:
+            text = f"Claude error: {e}"
+            resp = None
+
+        # Store update prompt as system (hidden from UI), user prompt separately (visible)
+        self.conversation_history.append(
+            {"role": "system", "content": update_prompt}
+        )
+        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": text,
+                "sources": sources,
+                "model": self.model,
+                "usage": {
+                    "prompt": getattr(resp.usage, "input_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                    "response": getattr(resp.usage, "output_tokens", 0)
+                    if resp and resp.usage
+                    else 0,
+                },
+            }
+        )
+
+        if resp:
+            self._update_usage(resp)
+        return text
 
     async def send_message(self, message) -> str:
         msgs = []
