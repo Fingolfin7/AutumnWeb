@@ -112,7 +112,7 @@
                         </span>
                         <div style="display: flex; gap: 0.2rem;">
                             {% for period in item.streak.periods %}
-                            <span style="width: 1.2rem; height: 1.2rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 2px; font-size: 0.6rem; {% if period.is_current %}background-color: var(--main-yellow); color: var(--dark-background);{% elif period.met %}background-color: var(--main-green); color: var(--dark-background);{% else %}background-color: var(--main-red); color: white;{% endif %}" title="{{ period.actual|floatformat:0 }}/{{ period.target }}">
+                            <span style="width: 1.2rem; height: 1.2rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 2px; font-size: 0.6rem; {% if period.is_current %}background-color: var(--main-yellow); color: var(--dark-background);{% elif period.saved_by_bank %}background-color: var(--main-cyan); color: var(--dark-background);{% elif period.met %}background-color: var(--main-green); color: var(--dark-background);{% else %}background-color: var(--main-red); color: white;{% endif %}" title="{% if period.saved_by_bank %}{{ period.actual|floatformat:0 }}/{{ period.target }} (bank covered deficit){% else %}{{ period.actual|floatformat:0 }}/{{ period.target }}{% endif %}">
                                 {% if period.is_current %}<i class="fas fa-hourglass-half"></i>{% elif period.met %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}
                             </span>
                             {% endfor %}

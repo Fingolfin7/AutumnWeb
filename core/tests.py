@@ -1699,6 +1699,195 @@ class CommitmentStreakTests(TestCase):
         current_periods = [p for p in result['periods'] if p['is_current']]
         self.assertEqual(len(current_periods), 1)
 
+    def test_streak_preserved_by_bank(self):
+        """Test that banked time preserves streak when a period is missed."""
+        now = timezone.now()
+
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='daily',
+            target=60,  # 60 minutes per day
+            banking_enabled=True,
+            max_balance=600,
+            min_balance=-600,
+        )
+        # Set created_at to start of day -3 so no empty periods before sessions
+        day3 = now - timedelta(days=3)
+        ps_day3, _ = get_period_bounds('daily', day3)
+        Commitment.objects.filter(pk=commitment.pk).update(
+            created_at=ps_day3
+        )
+        commitment.refresh_from_db()
+
+        # Day -3: log 120 min (surplus of 60 → banked)
+        ps, pe = get_period_bounds('daily', day3)
+        session_time = ps + timedelta(hours=6)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=session_time, end_time=session_time + timedelta(minutes=120),
+            is_active=False
+        )
+
+        # Day -2: log 30 min (deficit of 30 → covered by bank)
+        day2 = now - timedelta(days=2)
+        ps2, pe2 = get_period_bounds('daily', day2)
+        session_time2 = ps2 + timedelta(hours=6)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=session_time2, end_time=session_time2 + timedelta(minutes=30),
+            is_active=False
+        )
+
+        # Day -1: log 60 min (met exactly)
+        day1 = now - timedelta(days=1)
+        ps1, pe1 = get_period_bounds('daily', day1)
+        session_time1 = ps1 + timedelta(hours=6)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=session_time1, end_time=session_time1 + timedelta(minutes=60),
+            is_active=False
+        )
+
+        result = calculate_commitment_streak(commitment)
+        # Streak should be 3 (day -3 met, day -2 saved by bank, day -1 met)
+        self.assertEqual(result['current_streak'], 3)
+
+        # Day -2 should be marked as saved_by_bank
+        completed = [p for p in result['periods'] if not p['is_current']]
+        # Find the day -2 period (second from oldest of the 3 completed days)
+        day2_period = None
+        for p in completed:
+            if p['period_start'] <= day2 < p['period_end']:
+                day2_period = p
+                break
+        self.assertIsNotNone(day2_period)
+        self.assertTrue(day2_period['saved_by_bank'])
+        self.assertTrue(day2_period['met'])
+
+    def test_streak_breaks_when_bank_insufficient(self):
+        """Test that streak breaks when bank can't cover the deficit."""
+        now = timezone.now()
+
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='daily',
+            target=60,
+            banking_enabled=True,
+            max_balance=600,
+            min_balance=-600,
+        )
+        day3 = now - timedelta(days=3)
+        ps_day3, _ = get_period_bounds('daily', day3)
+        Commitment.objects.filter(pk=commitment.pk).update(
+            created_at=ps_day3
+        )
+        commitment.refresh_from_db()
+
+        # Day -3: log 70 min (surplus of 10)
+        ps, pe = get_period_bounds('daily', day3)
+        st = ps + timedelta(hours=6)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=st, end_time=st + timedelta(minutes=70),
+            is_active=False
+        )
+
+        # Day -2: log 0 min (deficit of 60, bank only has 10 → not enough)
+        # No session created
+
+        # Day -1: log 60 min (met)
+        day1 = now - timedelta(days=1)
+        ps1, pe1 = get_period_bounds('daily', day1)
+        st1 = ps1 + timedelta(hours=6)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=st1, end_time=st1 + timedelta(minutes=60),
+            is_active=False
+        )
+
+        result = calculate_commitment_streak(commitment)
+        # Streak should be 1 (only day -1), because day -2 broke it
+        self.assertEqual(result['current_streak'], 1)
+
+    def test_streak_bank_simulation_forward(self):
+        """Test that banking balance is simulated forward correctly across periods."""
+        now = timezone.now()
+
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='sessions',
+            period='daily',
+            target=2,  # 2 sessions per day
+            banking_enabled=True,
+            max_balance=10,
+            min_balance=-10,
+        )
+        day4 = now - timedelta(days=4)
+        ps_day4, _ = get_period_bounds('daily', day4)
+        Commitment.objects.filter(pk=commitment.pk).update(
+            created_at=ps_day4
+        )
+        commitment.refresh_from_db()
+
+        # Day -4: 4 sessions (surplus 2 → balance = 2)
+        ps4, _ = get_period_bounds('daily', day4)
+        for j in range(4):
+            st = ps4 + timedelta(hours=j + 1)
+            Sessions.objects.create(
+                user=self.user, project=self.project,
+                start_time=st, end_time=st + timedelta(minutes=30),
+                is_active=False
+            )
+
+        # Day -3: 1 session (deficit 1, balance 2 → saved, balance = 1)
+        day3 = now - timedelta(days=3)
+        ps3, _ = get_period_bounds('daily', day3)
+        st3 = ps3 + timedelta(hours=1)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=st3, end_time=st3 + timedelta(minutes=30),
+            is_active=False
+        )
+
+        # Day -2: 1 session (deficit 1, balance 1 → saved, balance = 0)
+        day2 = now - timedelta(days=2)
+        ps2, _ = get_period_bounds('daily', day2)
+        st2 = ps2 + timedelta(hours=1)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=st2, end_time=st2 + timedelta(minutes=30),
+            is_active=False
+        )
+
+        # Day -1: 1 session (deficit 1, balance 0 → NOT saved, streak breaks)
+        day1 = now - timedelta(days=1)
+        ps1, _ = get_period_bounds('daily', day1)
+        st1 = ps1 + timedelta(hours=1)
+        Sessions.objects.create(
+            user=self.user, project=self.project,
+            start_time=st1, end_time=st1 + timedelta(minutes=30),
+            is_active=False
+        )
+
+        result = calculate_commitment_streak(commitment)
+        # Day -1 breaks it because bank is depleted, so streak = 0
+        self.assertEqual(result['current_streak'], 0)
+
+        # Verify saved_by_bank flags
+        completed = [p for p in result['periods'] if not p['is_current']]
+        # Day -3 and Day -2 should be saved_by_bank
+        day3_period = next(p for p in completed if p['period_start'] <= day3 < p['period_end'])
+        day2_period = next(p for p in completed if p['period_start'] <= day2 < p['period_end'])
+        day1_period = next(p for p in completed if p['period_start'] <= day1 < p['period_end'])
+        self.assertTrue(day3_period['saved_by_bank'])
+        self.assertTrue(day2_period['saved_by_bank'])
+        self.assertFalse(day1_period['met'])
+
 
 class ProjectsListStillWorksTests(TestCase):
     """Test that /projects/ still works after dashboard changes."""

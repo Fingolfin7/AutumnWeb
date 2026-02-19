@@ -782,7 +782,8 @@ def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -
 
 def calculate_commitment_streak(commitment, num_periods=8) -> dict:
     """
-    Calculate consecutive periods where commitment target was met.
+    Calculate consecutive periods where commitment target was met,
+    accounting for banked time/sessions that can cover deficits.
 
     :param commitment: A Commitment instance
     :param num_periods: Number of periods to return for visual display
@@ -791,40 +792,20 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
     from core.models import Sessions  # Import here to avoid circular import
 
     now = timezone.now()
-    periods = []
-    current_streak = 0
-    streak_broken = False
 
-    # Work backwards through periods
-    for i in range(num_periods):
-        if i == 0:
-            # Current period
-            period_start, period_end = get_period_bounds(commitment.period, now)
-            is_current = True
-        else:
-            # Previous periods
-            # Go back by the period duration
-            if commitment.period == "daily":
-                ref_date = now - timedelta(days=i)
-            elif commitment.period == "weekly":
-                ref_date = now - timedelta(weeks=i)
-            elif commitment.period == "fortnightly":
-                ref_date = now - timedelta(weeks=i * 2)
-            elif commitment.period == "monthly":
-                ref_date = now - relativedelta(months=i)
-            elif commitment.period == "quarterly":
-                ref_date = now - relativedelta(months=i * 3)
-            elif commitment.period == "yearly":
-                ref_date = now - relativedelta(years=i)
-            else:
-                ref_date = now - timedelta(weeks=i)
+    # Gather ALL periods from commitment creation to now (forward walk)
+    all_periods = []
+    check_date = commitment.created_at
 
-            period_start, period_end = get_period_bounds(commitment.period, ref_date)
-            is_current = False
+    while True:
+        period_start, period_end = get_period_bounds(commitment.period, check_date)
 
-        # Skip periods before commitment was created
-        if commitment.created_at >= period_end:
+        # Skip periods that ended before commitment was created
+        if period_end <= commitment.created_at:
+            check_date = period_end + timedelta(seconds=1)
             continue
+
+        is_current = period_start <= now < period_end
 
         # Get sessions for this period
         sessions = Sessions.objects.filter(
@@ -839,30 +820,73 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
         else:
             actual = sessions.count()
 
-        target_met = actual >= commitment.target
-
-        periods.append(
+        all_periods.append(
             {
                 "period_start": period_start,
                 "period_end": period_end,
                 "actual": actual,
                 "target": commitment.target,
-                "met": target_met,
                 "is_current": is_current,
             }
         )
 
-        # Calculate streak (only count completed periods)
-        if not is_current and not streak_broken:
-            if target_met:
-                current_streak += 1
+        if is_current or period_start > now:
+            break
+
+        # Move to next period
+        check_date = period_end + timedelta(seconds=1)
+
+    # Simulate banking balance forward to determine met/saved_by_bank status
+    simulated_balance = 0
+    for period in all_periods:
+        surplus = period["actual"] - period["target"]
+
+        if period["is_current"]:
+            # Current period: no banking simulation, just raw check
+            period["met"] = period["actual"] >= period["target"]
+            period["saved_by_bank"] = False
+        elif surplus >= 0:
+            # Met naturally
+            period["met"] = True
+            period["saved_by_bank"] = False
+            if commitment.banking_enabled:
+                simulated_balance = min(
+                    commitment.max_balance, simulated_balance + surplus
+                )
+        else:
+            # Deficit — can the bank cover it?
+            if (
+                commitment.banking_enabled
+                and simulated_balance + surplus >= 0
+            ):
+                # Bank covers the deficit
+                period["met"] = True
+                period["saved_by_bank"] = True
+                simulated_balance += surplus
             else:
-                streak_broken = True
+                # Missed
+                period["met"] = False
+                period["saved_by_bank"] = False
+                if commitment.banking_enabled:
+                    simulated_balance = max(
+                        commitment.min_balance, simulated_balance + surplus
+                    )
 
-    # Reverse so oldest is first (for display)
-    periods.reverse()
+    # Calculate streak: count consecutive completed periods (most recent backward)
+    # that are met (naturally or via bank)
+    current_streak = 0
+    for period in reversed(all_periods):
+        if period["is_current"]:
+            continue
+        if period["met"]:
+            current_streak += 1
+        else:
+            break
 
-    return {"current_streak": current_streak, "periods": periods}
+    # Return only the last num_periods for display (oldest first)
+    display_periods = all_periods[-num_periods:]
+
+    return {"current_streak": current_streak, "periods": display_periods}
 
 
 def reconcile_commitment(commitment, force: bool = False) -> bool:
