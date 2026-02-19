@@ -556,6 +556,12 @@ body.dark-mode .exclude-search-input {
   border-color: var(--border-dark);
 }
 
+/* Pinned (checked) exclude items get a subtle highlight */
+.exclude-option:has(input[type="checkbox"]:checked) {
+  background: rgba(0, 200, 81, 0.08);
+  border-bottom: 1px solid rgba(0, 200, 81, 0.2);
+}
+
 /* ----------------------------- */
 
 .switch {

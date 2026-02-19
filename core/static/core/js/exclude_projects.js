@@ -8,22 +8,19 @@
 $(document).ready(function () {
     // --- Text search within the dropdown ---
     $(".exclude-search-input").on("input", function () {
-        var term = $(this).val().toLowerCase();
-        $(this).closest(".exclude-options").find(".exclude-option").each(function () {
-            var label = $(this).find(".tag-label").text().toLowerCase();
-            $(this).toggle(label.indexOf(term) !== -1);
-        });
-        // Re-apply context/tag filtering after text search
         filterExcludeOptions();
     });
 
     // --- React to context / tag changes ---
-    // Context dropdown (select)
     $(document).on("change", "#context-filter, [name='context']", function () {
         filterExcludeOptions();
     });
-    // Tag checkboxes
     $(document).on("change", "input[name='tags']", function () {
+        filterExcludeOptions();
+    });
+
+    // --- React to checkbox changes (re-pin selected items) ---
+    $(document).on("change", "input[name='exclude_projects']", function () {
         filterExcludeOptions();
     });
 
@@ -51,8 +48,15 @@ $(document).ready(function () {
         $(".exclude-option").each(function () {
             var $opt = $(this);
             var $input = $opt.find("input[type='checkbox']");
+            var isChecked = $input.is(":checked");
             var pid = $input.val();
             var meta = EXCLUDE_PROJECT_META[pid];
+
+            // Checked items are always visible (pinned)
+            if (isChecked) {
+                $opt.show();
+                return;
+            }
 
             var visible = true;
 
@@ -76,11 +80,20 @@ $(document).ready(function () {
             }
 
             $opt.toggle(visible);
+        });
 
-            // Uncheck hidden options so they aren't submitted
-            if (!visible && $input.is(":checked")) {
-                $input.prop("checked", false);
-            }
+        // Pin checked items to the top of the options list
+        $(".exclude-options").each(function () {
+            var $container = $(this);
+            var $checked = $container.find(".exclude-option").filter(function () {
+                return $(this).find("input[type='checkbox']").is(":checked");
+            });
+            // Move each checked option right after the search input
+            // (reverse order to preserve original relative order)
+            var $anchor = $container.find(".exclude-search-input");
+            $checked.get().reverse().forEach(function (el) {
+                $anchor.after(el);
+            });
         });
     }
 });
