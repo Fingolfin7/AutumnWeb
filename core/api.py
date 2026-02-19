@@ -442,6 +442,7 @@ def projects_list_grouped(request):
     projects_qs = _apply_tag_filters(
         qp, projects_qs, kind="projects", user=request.user
     )
+    projects_qs = _apply_exclude_filters(qp, projects_qs, kind="projects", user=request.user)
 
     if start or end:
         projects = in_window(projects_qs, start, end)
@@ -493,6 +494,9 @@ def projects_list_flat(request):
 
     # Filter by tags
     projects_qs = _apply_tag_filters(qp, projects_qs, kind="projects", user=request.user)
+
+    # Exclude projects
+    projects_qs = _apply_exclude_filters(qp, projects_qs, kind="projects", user=request.user)
 
     # Search by name
     search_term = qp.get("search")
@@ -1043,6 +1047,11 @@ def tally_by_status(request):
         request.query_params, projects, kind="projects", user=user
     )
 
+    # Apply exclude filter (by ID from web UI)
+    exclude_ids = request.query_params.getlist("exclude_projects")
+    if exclude_ids:
+        projects = projects.exclude(id__in=exclude_ids)
+
     # Filter sessions by date range and other params to calculate accurate totals
     sessions = Sessions.objects.filter(is_active=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
@@ -1149,6 +1158,11 @@ def hierarchy_data(request):
             request.query_params, ctx_projects, kind="projects", user=user
         )
 
+        # Apply exclude filter (by ID from web UI)
+        exclude_ids = request.query_params.getlist("exclude_projects")
+        if exclude_ids:
+            ctx_projects = ctx_projects.exclude(id__in=exclude_ids)
+
         for proj in ctx_projects:
             proj_time = project_times.get(proj.id, 0)
             if proj_time == 0:
@@ -1199,6 +1213,11 @@ def projects_with_stats(request):
     projects = _apply_tag_filters(
         request.query_params, projects, kind="projects", user=user
     )
+
+    # Apply exclude filter (by ID from web UI)
+    exclude_ids = request.query_params.getlist("exclude_projects")
+    if exclude_ids:
+        projects = projects.exclude(id__in=exclude_ids)
 
     # Filter sessions by date range and other params
     sessions = Sessions.objects.filter(is_active=False, user=user)
@@ -1493,6 +1512,9 @@ def list_sessions(request):
     sessions = _apply_tag_filters(
         request.query_params, sessions, kind="sessions", user=request.user
     )
+    sessions = _apply_exclude_filters(
+        request.query_params, sessions, kind="sessions", user=request.user
+    )
     sessions = filter_sessions_by_params(request, sessions)
     serializer = SessionSerializer(sessions, many=True)
     # to_representation already compacts project/subprojects as names
@@ -1545,6 +1567,39 @@ def _apply_tag_filters(qp, qs, *, kind: str, user=None):
         return qs.filter(tags__name__in=tags).distinct()
     if kind == "sessions":
         return qs.filter(project__tags__name__in=tags).distinct()
+
+    return qs
+
+
+def _apply_exclude_filters(qp, qs, *, kind: str, user=None):
+    """Exclude projects by name from query params.
+
+    Query param: exclude="ProjectA,ProjectB" or exclude=["ProjectA","ProjectB"]
+
+    kind:
+      - "projects": expects Projects queryset
+      - "sessions": expects Sessions queryset (excludes via project__name)
+    """
+    try:
+        names = _coerce_list(qp.get("exclude"))
+    except Exception:
+        names = []
+
+    if not names:
+        return qs
+
+    if user is not None:
+        names = list(
+            Projects.objects.filter(user=user, name__in=names).values_list("name", flat=True)
+        )
+
+    if not names:
+        return qs
+
+    if kind == "projects":
+        return qs.exclude(name__in=names)
+    if kind == "sessions":
+        return qs.exclude(project__name__in=names)
 
     return qs
 

@@ -68,6 +68,16 @@ class SearchProjectForm(forms.Form):
         ),
     )
 
+    exclude_projects = forms.ModelMultipleChoiceField(
+        required=False,
+        queryset=Projects.objects.none(),
+        widget=forms.CheckboxSelectMultiple(
+            attrs={
+                'id': 'exclude-projects-filter',
+            }
+        ),
+    )
+
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
@@ -91,7 +101,12 @@ class SearchProjectForm(forms.Form):
 
             choices += [(str(ctx.id), ctx.name) for ctx in remaining_contexts]
 
-            cast(forms.ModelMultipleChoiceField, self.fields['tags']).queryset = Tag.objects.filter(user=user).order_by('name')
+            tags_field = cast(forms.ModelMultipleChoiceField, self.fields['tags'])
+            tags_field.queryset = Tag.objects.filter(user=user).order_by('name')
+            tags_field.label_from_instance = lambda obj: obj.name
+            exclude_field = cast(forms.ModelMultipleChoiceField, self.fields['exclude_projects'])
+            exclude_field.queryset = Projects.objects.filter(user=user).order_by('name')
+            exclude_field.label_from_instance = lambda obj: obj.name
         self.fields['context'].choices = choices
 
 
@@ -113,6 +128,7 @@ class CreateProjectForm(forms.ModelForm):
         if user is not None:
             self.fields['context'].queryset = Context.objects.filter(user=user).order_by('name')
             self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
+            self.fields['tags'].label_from_instance = lambda obj: obj.name
 
             # Default to the user's "General" context (created by migration 0030 for existing data)
             general = Context.objects.filter(user=user, name='General').first()
@@ -149,6 +165,7 @@ class UpdateProjectForm(forms.ModelForm):
         if user is not None:
             self.fields['context'].queryset = Context.objects.filter(user=user).order_by('name')
             self.fields['tags'].queryset = Tag.objects.filter(user=user).order_by('name')
+            self.fields['tags'].label_from_instance = lambda obj: obj.name
 
 class UpdateSubProjectForm(forms.ModelForm):
     class Meta:
@@ -309,6 +326,16 @@ class ExportJSONForm(forms.Form):
         )
     )
 
+    exclude_projects = forms.ModelMultipleChoiceField(
+        required=False,
+        queryset=Projects.objects.none(),
+        widget=forms.CheckboxSelectMultiple(
+            attrs={
+                'id': 'exclude-projects-filter',
+            }
+        ),
+    )
+
     output_file = forms.CharField(
         required=False,
         widget=forms.TextInput(
@@ -344,7 +371,12 @@ class ExportJSONForm(forms.Form):
 
             choices += [(str(ctx.id), ctx.name) for ctx in remaining_contexts]
 
-            cast(forms.ModelMultipleChoiceField, self.fields['tags']).queryset = Tag.objects.filter(user=user).order_by('name')
+            tags_field = cast(forms.ModelMultipleChoiceField, self.fields['tags'])
+            tags_field.queryset = Tag.objects.filter(user=user).order_by('name')
+            tags_field.label_from_instance = lambda obj: obj.name
+            exclude_field = cast(forms.ModelMultipleChoiceField, self.fields['exclude_projects'])
+            exclude_field.queryset = Projects.objects.filter(user=user).order_by('name')
+            exclude_field.label_from_instance = lambda obj: obj.name
 
         self.fields['context'].choices = choices
 

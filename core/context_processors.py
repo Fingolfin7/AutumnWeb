@@ -25,15 +25,25 @@ def static_version(request):
         'css': os.path.join(base_static, "core", "css"),
     }
 
-    # Scan each directory
+    # Scan each directory (including subdirectories)
     for dir_path in static_dirs.values():
         if os.path.exists(dir_path):
-            for file in os.listdir(dir_path):
-                file_path = os.path.join(dir_path, file)
-                if os.path.isfile(file_path):
-                    basename = os.path.basename(file_path)
-                    name, ext = os.path.splitext(basename)    # e.g. "style", ".css"
-                    version[name] = int(os.path.getmtime(file_path))
+            for entry in os.listdir(dir_path):
+                entry_path = os.path.join(dir_path, entry)
+                if os.path.isfile(entry_path):
+                    name, ext = os.path.splitext(entry)
+                    mtime = int(os.path.getmtime(entry_path))
+                    version[name] = max(version.get(name, 0), mtime)
+                elif os.path.isdir(entry_path):
+                    # For subdirectories, use the max mtime of all files
+                    # as the version key (e.g. "charts" for js/charts/)
+                    max_mtime = 0
+                    for sub_file in os.listdir(entry_path):
+                        sub_path = os.path.join(entry_path, sub_file)
+                        if os.path.isfile(sub_path):
+                            max_mtime = max(max_mtime, os.path.getmtime(sub_path))
+                    if max_mtime:
+                        version[entry] = max(version.get(entry, 0), int(max_mtime))
 
     # Cache the version dictionary and set timeout
     timeout = settings.STATIC_VERSION_CACHE_TIMEOUT['debug'] if settings.DEBUG \

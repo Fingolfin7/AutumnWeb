@@ -10,44 +10,95 @@ This project builds on the original [Autumn CLI](https://github.com/Fingolfin7/A
 ### Try It
 
 A demo is available here:
-👉 https://autumn-lg0b.onrender.com/
+https://autumn-lg0b.onrender.com/
 
 Use this demo account to explore the features:
-- **Username**: `Finrod` 
+- **Username**: `Finrod`
 - or **Email**: `finrod.felagund@houseoffinwe.ea`
 - **Password**: `autumnweb`
 
-The instance is running on a free PythonAnywhere account — load times may vary.
+The instance runs on Render and may sleep between requests.
 
 ---
 
 ### Screenshots
 
-**Projects Page (Dark mode + Bing wallpaper)**
-![Projects](https://github.com/user-attachments/assets/ea91c1d7-4ed5-4891-ab57-36daa2fdde27)
+**Home**
+![Home](docs/screenshots/home.png)
 
-**Projects Page (Dark mode, no background)**
-![Projects](https://github.com/user-attachments/assets/9d0f9211-f7c8-4359-91c8-90de571d4c29)
+**Projects**
+![Projects](docs/screenshots/projects.png)
 
-**Projects Page (Light mode)**
-![Projects](https://github.com/user-attachments/assets/a2c24c0f-ca49-447c-9072-83066797e766)
-
-**Session History**
-![Sessions](https://github.com/user-attachments/assets/f79a7097-0f2a-40d5-9190-a71b0bafe65e)
+**Session Logs**
+![Sessions](docs/screenshots/sessions.png)
 
 **Timers**
-![Timers](https://github.com/user-attachments/assets/2933c467-15cd-4191-befa-5bea096229f3)
+![Timers](docs/screenshots/timers.png)
 
-**Insights (LLM chat)**
-![Insights](https://github.com/user-attachments/assets/a6ae39f0-e972-418a-9989-f3b62c2cd4dd)
+**Insights**
+![Insights](docs/screenshots/insights.png)
 
-**Charts and Heatmaps**
-![Charts](https://github.com/user-attachments/assets/382046ca-7a65-46d9-851f-6185738ce2fb)
-*Gif Made with [this](https://github.com/Fingolfin7/GIF-Maker)
+**Import**
+![Import](docs/screenshots/import.png)
 
-**Profile Page and Background Settings**
-![Profile](https://github.com/user-attachments/assets/2409abdc-847a-4fbd-ac51-ba996174226d)
+**Export**
+![Export](docs/screenshots/export.png)
 
+**Profile**
+![Profile](docs/screenshots/profile.png)
+
+**Contexts**
+![Contexts](docs/screenshots/contexts.png)
+
+**Tags**
+![Tags](docs/screenshots/tags.png)
+
+### Chart Types
+
+**Pie**
+![Pie](docs/screenshots/chart-pie.png)
+
+**Bar**
+![Bar](docs/screenshots/chart-bar.png)
+
+**Scatter**
+![Scatter](docs/screenshots/chart-scatter.png)
+
+**Line**
+![Line](docs/screenshots/chart-line.png)
+
+**Calendar**
+![Calendar](docs/screenshots/chart-calendar.png)
+
+**Heatmap**
+![Heatmap](docs/screenshots/chart-heatmap.png)
+
+**Stacked Area**
+![Stacked Area](docs/screenshots/chart-stacked-area.png)
+
+**Cumulative**
+![Cumulative](docs/screenshots/chart-cumulative.png)
+
+**Treemap**
+![Treemap](docs/screenshots/chart-treemap.png)
+
+**Status**
+![Status](docs/screenshots/chart-status.png)
+
+**Context**
+![Context](docs/screenshots/chart-context.png)
+
+**Histogram**
+![Histogram](docs/screenshots/chart-histogram.png)
+
+**Radar**
+![Radar](docs/screenshots/chart-radar.png)
+
+**Tag Bubble**
+![Tag Bubble](docs/screenshots/chart-bubble.png)
+
+**Wordcloud**
+![Wordcloud](docs/screenshots/chart-wordcloud.png)
 
 ---
 
@@ -55,7 +106,7 @@ The instance is running on a free PythonAnywhere account — load times may vary
 
 * Track time spent on projects and subprojects
 * Start and stop timers directly in the browser
-* Browse and search session history
+* Browse and search session history, with the ability to exclude specific projects from results
 * Visualize data with charts, scatter plots, and heatmaps (via Chart.js)
 * Generate word clouds from session notes
 * Export and import data in JSON format (compatible with the old CLI version)
@@ -75,6 +126,7 @@ python -m venv venv
 source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 python manage.py migrate
+python manage.py shell -c "exec(open('scripts/seed_finrod.py', 'r', encoding='utf-8').read())"
 python manage.py runserver
 ```
 

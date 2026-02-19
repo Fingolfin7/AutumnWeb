@@ -10,6 +10,8 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script src="{% static 'core/js/session_sliders.js' %}?v={{ static_version.session_sliders }}" type="text/javascript"></script>
+    <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
+    <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
@@ -49,12 +51,28 @@
                     <div class="tag-options">
                         {% for cb in search_form.tags %}
                             <label class="tag-option">
-                                {{ cb }} <span class="tag-label">{{ cb.choice_label }}</span>
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
                             </label>
                         {% endfor %}
                     </div>
                 </details>
                 {{ search_form.tags.errors }}
+            </span>
+
+            <span class="label-input">
+                <label for="exclude-projects-filter"><i class="fa fa-ban"></i> Exclude Projects</label>
+                <details class="tag-dropdown exclude-dropdown">
+                    <summary class="tag-summary">Select projects to exclude</summary>
+                    <div class="tag-options exclude-options">
+                        <input type="text" class="exclude-search-input" placeholder="Search projects..." autocomplete="off">
+                        {% for cb in search_form.exclude_projects %}
+                            <label class="tag-option exclude-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                {{ search_form.exclude_projects.errors }}
             </span>
 
             <span class="label-input">
@@ -176,4 +194,5 @@
             </div>
         {% endif %}
     </section>
+
 {% endblock %}

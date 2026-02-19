@@ -3,7 +3,7 @@ from django.views.generic import View
 from django.contrib import messages
 from core.models import Sessions
 from core.forms import SearchProjectForm
-from core.utils import filter_sessions_by_params, filter_by_active_context
+from core.utils import filter_sessions_by_params, filter_by_active_context, build_exclude_project_meta
 from .llm_handlers import get_llm_handler
 from .models import LLMChat, LLMMessage
 import json
@@ -146,6 +146,11 @@ class InsightsView(View):
         if tags:
             params["tags"] = tags
 
+        # Get lists (exclude_projects)
+        exclude_projects = request.GET.getlist("exclude_projects") or request.POST.getlist("exclude_projects")
+        if exclude_projects:
+            params["exclude_projects"] = exclude_projects
+
         return params
 
     async def get(self, request, chat_id=None):
@@ -174,6 +179,7 @@ class InsightsView(View):
                 "note_snippet",
                 "context",
                 "tags",
+                "exclude_projects",
                 "filter",
             ]
             has_explicit_filters = any(k in request.GET for k in filter_keys)
@@ -254,6 +260,7 @@ class InsightsView(View):
                     "note_snippet": current_filters.get("note_snippet"),
                     "context": current_filters.get("context") or "",
                     "tags": current_filters.get("tags", []),
+                    "exclude_projects": current_filters.get("exclude_projects", []),
                 },
                 user=user,
             )
@@ -285,6 +292,7 @@ class InsightsView(View):
                 "conversation_history": history,
                 "recent_chats": list(recent_chats),
                 "usage_stats": usage_stats,
+                "exclude_project_meta_json": json.dumps(build_exclude_project_meta(user)),
             }
 
         data = await sync_to_async(get_all_sync_data)()
@@ -331,6 +339,7 @@ class InsightsView(View):
             "recent_chats": data["recent_chats"],
             "usage_stats": data["usage_stats"],
             "username": data["username"],
+            "exclude_project_meta_json": data["exclude_project_meta_json"],
         }
         return await sync_to_async(render)(
             request, "llm_insights/insights.html", context
@@ -370,6 +379,7 @@ class InsightsView(View):
                     "note_snippet",
                     "context",
                     "tags",
+                    "exclude_projects",
                 ]
                 # Check if current_filters has any meaningful values
                 has_values = any(current_filters.get(k) for k in filter_keys)

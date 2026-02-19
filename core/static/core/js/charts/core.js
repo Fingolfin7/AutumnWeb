@@ -126,7 +126,7 @@ function consolidateTopN(data, topN = 7, timeKey = 'total_time') {
 // Data Fetching
 // ============================================================================
 
-function get_project_data(type, start_date = "", end_date = "", project_name = "", context_id = "", tag_ids = []) {
+function get_project_data(type, start_date = "", end_date = "", project_name = "", context_id = "", tag_ids = [], exclude_ids = []) {
     let url = "";
 
     const wantSubprojects = project_name && (type === 'pie' || type === 'bar');
@@ -168,6 +168,9 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
     if (context_id) qs.set('context', context_id);
     if (Array.isArray(tag_ids) && tag_ids.length) {
         tag_ids.forEach(t => qs.append('tags', t));
+    }
+    if (Array.isArray(exclude_ids) && exclude_ids.length) {
+        exclude_ids.forEach(id => qs.append('exclude_projects', id));
     }
 
     const query = qs.toString();
@@ -254,7 +257,12 @@ function render() {
         .get()
         .filter(v => v && v !== 'on');
 
-    get_project_data(type, start_date, end_date, project_name, context_id, tag_ids)
+    const exclude_ids = $('input[type="checkbox"][name="exclude_projects"]:checked')
+        .map(function() { return String($(this).val()); })
+        .get()
+        .filter(v => v && v !== 'on');
+
+    get_project_data(type, start_date, end_date, project_name, context_id, tag_ids, exclude_ids)
         .then(data => {
             // Handle empty data
             if (!data || (Array.isArray(data) && !data.length)) {

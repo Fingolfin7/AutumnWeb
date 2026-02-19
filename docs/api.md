@@ -47,6 +47,15 @@ There are two tag-filter paths:
 
 Some endpoints apply both filters; `.distinct()` is used to prevent duplicates.
 
+### 5) Exclude filtering
+Many list endpoints support an `exclude` query param to remove specific projects from results:
+
+- `exclude` accepts project **names** as a comma-separated string or list (e.g. `?exclude=ProjectA,ProjectB`)
+- For project endpoints: excludes projects matching those names
+- For session endpoints: excludes sessions belonging to those projects
+- Names are validated against the current user's projects (no cross-user leakage)
+- The web UI uses `exclude_projects` (project IDs via multi-select checkboxes); the API uses `exclude` (project names, consistent with how tags work)
+
 ---
 
 # New “compact” endpoints
@@ -290,6 +299,8 @@ Query:
 
 - tags (optional; treated as tag names by _apply_tag_filters)
 
+- exclude (optional; comma-separated project names to exclude from results)
+
 - compact=true|false
 
 Compact response:
@@ -334,6 +345,7 @@ Query:
 - `status`: filter by status (active, paused, complete, archived) - optional
 - `context`: filter by context id or name - optional
 - `tags`: filter by tag names (comma-separated) - optional
+- `exclude`: exclude projects by name (comma-separated) - optional
 - `search`: search by name (icontains) - optional
 - `compact=true|false` (default true)
 
@@ -788,7 +800,7 @@ Shimmed onto the new compact endpoints:
 Direct:
 
 
-- GET /api/list_sessions/ (completed sessions)
+- GET /api/list_sessions/ (completed sessions; supports `exclude` param to exclude projects by name)
 
 - GET /api/list_active_sessions/
 

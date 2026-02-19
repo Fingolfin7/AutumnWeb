@@ -14,6 +14,25 @@ from core.models import Sessions, Projects, SubProjects, Context, Tag
 ACTIVE_CONTEXT_SESSION_KEY = "active_context_id"
 
 
+def build_exclude_project_meta(user) -> dict:
+    """Build a mapping of project_id -> {context_id, tag_ids} for the
+    exclude-projects dropdown so JS can show/hide options based on the
+    active context and tag selections.
+    """
+    projects = (
+        Projects.objects.filter(user=user)
+        .select_related("context")
+        .prefetch_related("tags")
+    )
+    meta = {}
+    for p in projects:
+        meta[str(p.id)] = {
+            "ctx": p.context_id,
+            "tags": [t.id for t in p.tags.all()],
+        }
+    return meta
+
+
 def parse_date_or_datetime(date_str):
     """ "
     Parse a date or datetime string into a datetime object. Supports the following formats:
@@ -235,6 +254,15 @@ def filter_sessions_by_params(
 
     if tags:
         sessions = sessions.filter(project__tags__id__in=tags).distinct()
+
+    if hasattr(params, "getlist"):
+        exclude_ids = params.getlist("exclude_projects")
+    else:
+        exclude_ids = params.get("exclude_projects") or []
+        if isinstance(exclude_ids, str):
+            exclude_ids = [exclude_ids]
+    if exclude_ids:
+        sessions = sessions.exclude(project__id__in=exclude_ids)
 
     return sessions
 

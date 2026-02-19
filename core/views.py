@@ -363,11 +363,16 @@ def ChartsView(request):
             "chart_type": request.GET.get("chart_type"),
             "context": request.GET.get("context") or "",
             "tags": selected_tags,
+            "exclude_projects": request.GET.getlist("exclude_projects"),
         },
         user=request.user,
     )
 
-    context = {"title": "Charts", "search_form": search_form}
+    context = {
+        "title": "Charts",
+        "search_form": search_form,
+        "exclude_project_meta_json": json.dumps(build_exclude_project_meta(request.user)),
+    }
     return render(request, "core/charts.html", context)
 
 
@@ -811,6 +816,11 @@ def export_view(request):
             if tag_ids:
                 qs = qs.filter(project__tags__id__in=tag_ids).distinct()
 
+        exclude_objs = form.cleaned_data.get("exclude_projects")
+        if exclude_objs:
+            exclude_ids = [p.id for p in exclude_objs]
+            qs = qs.exclude(project__id__in=exclude_ids)
+
         # Avoid N+1 when later reading .project and .subprojects
         qs = qs.select_related("project", "project__context").prefetch_related(
             "subprojects",
@@ -832,7 +842,11 @@ def export_view(request):
 
     # GET
     form = ExportJSONForm(user=request.user)
-    return render(request, "core/export.html", {"title": "Export Data", "form": form})
+    return render(request, "core/export.html", {
+        "title": "Export Data",
+        "form": form,
+        "exclude_project_meta_json": json.dumps(build_exclude_project_meta(request.user)),
+    })
 
 
 class TimerListView(LoginRequiredMixin, ListView):
@@ -870,6 +884,7 @@ class ProjectsListView(LoginRequiredMixin, ListView):
                 "end_date": self.request.GET.get("end_date"),
                 "context": self.request.GET.get("context") or "",
                 "tags": self.request.GET.getlist("tags"),
+                "exclude_projects": self.request.GET.getlist("exclude_projects"),
             },
             user=self.request.user,
         )
@@ -911,6 +926,9 @@ class ProjectsListView(LoginRequiredMixin, ListView):
             )
 
         context["grouped_projects"] = grouped_projects
+        context["exclude_project_meta_json"] = json.dumps(
+            build_exclude_project_meta(self.request.user)
+        )
 
         return context
 
@@ -943,6 +961,10 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
         if tag_ids:
             projects = projects.filter(tags__id__in=tag_ids).distinct()
+
+        exclude_ids = self.request.GET.getlist("exclude_projects")
+        if exclude_ids:
+            projects = projects.exclude(id__in=exclude_ids)
 
         return projects
 
@@ -1167,6 +1189,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
                 "note_snippet": self.request.GET.get("note_snippet"),
                 "context": self.request.GET.get("context") or "",
                 "tags": self.request.GET.getlist("tags"),
+                "exclude_projects": self.request.GET.getlist("exclude_projects"),
             },
             user=self.request.user,
         )
@@ -1184,6 +1207,10 @@ class SessionsListView(LoginRequiredMixin, ListView):
             or self.request.GET.get("note_snippet")
         ):
             messages.success(self.request, f"Found {len(self.get_queryset())} results")
+
+        context["exclude_project_meta_json"] = json.dumps(
+            build_exclude_project_meta(self.request.user)
+        )
 
         return context
 

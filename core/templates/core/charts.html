@@ -18,6 +18,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.0/wordcloud2.min.js"></script>
     <!-- Project search -->
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
+    <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
+    <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
     <!-- Modular chart files -->
     <script src="{% static 'core/js/charts/core.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
     <script src="{% static 'core/js/charts/basic.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
@@ -65,12 +67,28 @@
                     <div class="tag-options">
                         {% for cb in search_form.tags %}
                             <label class="tag-option">
-                                {{ cb }} <span class="tag-label">{{ cb.choice_label }}</span>
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
                             </label>
                         {% endfor %}
                     </div>
                 </details>
                 {{ search_form.tags.errors }}
+            </span>
+
+            <span class="label-input">
+                <label for="exclude-projects-filter"><i class="fa fa-ban"></i> Exclude Projects</label>
+                <details class="tag-dropdown exclude-dropdown">
+                    <summary class="tag-summary">Select projects to exclude</summary>
+                    <div class="tag-options exclude-options">
+                        <input type="text" class="exclude-search-input" placeholder="Search projects..." autocomplete="off">
+                        {% for cb in search_form.exclude_projects %}
+                            <label class="tag-option exclude-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                {{ search_form.exclude_projects.errors }}
             </span>
 
              <span class="label-input">
@@ -149,4 +167,5 @@
             <canvas id="chart"></canvas>
         </div>
     </section>
+
 {% endblock %}
