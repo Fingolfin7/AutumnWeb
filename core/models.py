@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timezone as dt_tz
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -174,6 +174,7 @@ class Sessions(models.Model):
     end_time = models.DateTimeField(null=True, blank=True)
     note = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    crosses_dst_transition = models.BooleanField(default=False)
 
     class Meta:
         verbose_name_plural = 'Sessions'
@@ -213,9 +214,59 @@ class Sessions(models.Model):
         if self.end_time is None and not self.is_active:
             return None
         elif self.is_active and not self.end_time:
-            return round((timezone.make_aware(datetime.now()) - self.start_time).total_seconds() / 60.0, 4)
+            start_time = self._ensure_aware(self.start_time)
+            if not start_time:
+                return None
+            return round(
+                (
+                    timezone.now().astimezone(dt_tz.utc)
+                    - start_time.astimezone(dt_tz.utc)
+                ).total_seconds()
+                / 60.0,
+                4,
+            )
         else:
-            return round((self.end_time - self.start_time).total_seconds() / 60.0, 4)
+            start_time = self._ensure_aware(self.start_time)
+            end_time = self._ensure_aware(self.end_time)
+            if not start_time or not end_time:
+                return None
+            # Measure elapsed time by absolute instant to avoid DST wall-clock artifacts.
+            return round(
+                (
+                    end_time.astimezone(dt_tz.utc)
+                    - start_time.astimezone(dt_tz.utc)
+                ).total_seconds()
+                / 60.0,
+                4,
+            )
+
+    @staticmethod
+    def _ensure_aware(dt: datetime | None) -> datetime | None:
+        if dt is None:
+            return None
+        if timezone.is_naive(dt):
+            return timezone.make_aware(dt, timezone.get_default_timezone())
+        return dt
+
+    @classmethod
+    def _compute_crosses_dst_transition(
+        cls, start_time: datetime | None, end_time: datetime | None
+    ) -> bool:
+        start_aware = cls._ensure_aware(start_time)
+        end_aware = cls._ensure_aware(end_time)
+        if not start_aware or not end_aware:
+            return False
+
+        default_tz = timezone.get_default_timezone()
+        start_local = timezone.localtime(start_aware, default_tz)
+        end_local = timezone.localtime(end_aware, default_tz)
+        return start_local.utcoffset() != end_local.utcoffset()
+
+    def save(self, *args, **kwargs):
+        self.crosses_dst_transition = self._compute_crosses_dst_transition(
+            self.start_time, self.end_time
+        )
+        super().save(*args, **kwargs)
 
 
 period_choices = (

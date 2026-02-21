@@ -119,6 +119,9 @@
                         <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
 
                         <span class="session-duration">{{ session.duration|duration_formatter }}</span>
+                        {% if session.crosses_dst_transition %}
+                            <span class="text-yellow" title="Session crosses a daylight savings transition">DST</span>
+                        {% endif %}
 
                         <span class="text-red project-name-slider" id="project-name">
                             <a class="plain-link" href="{% url 'update_project' session.project.id %}">

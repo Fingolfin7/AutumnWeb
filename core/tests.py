@@ -1919,3 +1919,63 @@ class ProjectsListStillWorksTests(TestCase):
         self.assertIn('grouped_projects', response.context)
         self.assertTrue(response.context['has_projects'])
 
+
+class DstTransitionSessionTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="dstuser", password="password")
+        self.client.login(username="dstuser", password="password")
+        self.project = Projects.objects.create(user=self.user, name="DST Project")
+
+    def test_duration_uses_absolute_elapsed_time_across_spring_transition(self):
+        # Europe/Prague spring-forward on March 29, 2026:
+        # 01:30 CET -> 03:30 CEST is 60 minutes of real elapsed time.
+        start = timezone.make_aware(datetime(2026, 3, 29, 1, 30, 0))
+        end = timezone.make_aware(datetime(2026, 3, 29, 3, 30, 0))
+        session = Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=start,
+            end_time=end,
+            is_active=False,
+        )
+
+        self.assertEqual(session.duration, 60.0)
+        self.assertTrue(session.crosses_dst_transition)
+
+    def test_duration_uses_absolute_elapsed_time_across_fall_transition(self):
+        # Europe/Prague fall-back on October 25, 2026:
+        # 01:30 CEST -> 03:30 CET is 180 minutes of real elapsed time.
+        start = timezone.make_aware(datetime(2026, 10, 25, 1, 30, 0))
+        end = timezone.make_aware(datetime(2026, 10, 25, 3, 30, 0))
+        session = Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=start,
+            end_time=end,
+            is_active=False,
+        )
+
+        self.assertEqual(session.duration, 180.0)
+        self.assertTrue(session.crosses_dst_transition)
+
+    def test_api_surfaces_crosses_dst_transition_flag(self):
+        start = timezone.make_aware(datetime(2026, 3, 29, 1, 30, 0))
+        end = timezone.make_aware(datetime(2026, 3, 29, 3, 30, 0))
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=start,
+            end_time=end,
+            is_active=False,
+        )
+
+        logs_resp = self.client.get("/api/log/?compact=true")
+        self.assertEqual(logs_resp.status_code, 200)
+        logs_payload = logs_resp.json()
+        self.assertTrue(logs_payload["logs"][0]["crosses_dst_transition"])
+
+        list_resp = self.client.get("/api/list_sessions/")
+        self.assertEqual(list_resp.status_code, 200)
+        list_payload = list_resp.json()
+        self.assertTrue(list_payload[0]["crosses_dst_transition"])
+

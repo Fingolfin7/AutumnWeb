@@ -1,7 +1,7 @@
-from datetime import datetime
 from django.apps import AppConfig
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.conf import settings
+from django.utils import timezone
 import logging
 import os
 
@@ -54,7 +54,7 @@ class CoreConfig(AppConfig):
                 # if the job is missed within a 60-second window, it will still run
                 max_instances=1,  # only one instance of the job can run at a time
                 replace_existing=True,  # if the job is already running, replace it with the new one
-                next_run_time=datetime.now(),
+                next_run_time=timezone.now(),
             )
 
             scheduler.start()

@@ -138,7 +138,7 @@ def start_timer(request):
             session = Sessions.objects.create(
                 user=request.user,
                 project=project,
-                start_time=timezone.make_aware(datetime.now()),
+                start_time=timezone.now(),
                 is_active=True,
             )
 

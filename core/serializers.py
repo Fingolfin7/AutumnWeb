@@ -47,7 +47,8 @@ class SessionSerializer(serializers.ModelSerializer):
             'start_time',
             'end_time',
             'note',
-            'is_active'
+            'is_active',
+            'crosses_dst_transition',
         )
     def to_representation(self, instance):
         rep = super().to_representation(instance)

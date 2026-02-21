@@ -2,6 +2,7 @@ import json
 import zlib
 import base64
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from collections import defaultdict
 from django.db.models import QuerySet
 from django.db.models import Min, Max, Sum, Count
@@ -43,6 +44,15 @@ def parse_date_or_datetime(date_str):
     :raises ValueError: if the date_str is not in a recognized format
 
     """
+    if isinstance(date_str, datetime):
+        return date_str
+
+    # Accept ISO-8601 datetimes used by API clients, e.g. 2026-02-21T10:30:00Z
+    # and 2026-02-21T10:30:00+00:00.
+    iso_dt = parse_datetime(str(date_str))
+    if iso_dt is not None:
+        return iso_dt
+
     date_formats = ["%m-%d-%Y", "%m-%d-%Y %H:%M:%S", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S"]
     for fmt in date_formats:
         try:

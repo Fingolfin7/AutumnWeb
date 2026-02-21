@@ -103,6 +103,7 @@ def _serialize_session(sess: Sessions, compact=True):
             "end": sess.end_time.isoformat() if sess.end_time else None,
             "active": sess.is_active,
             "elapsed": elapsed,
+            "crosses_dst_transition": sess.crosses_dst_transition,
         }
         if sess.note:
             d["note"] = sess.note
@@ -117,6 +118,7 @@ def _serialize_session(sess: Sessions, compact=True):
         "is_active": sess.is_active,
         "elapsed_minutes": elapsed,
         "note": sess.note or "",
+        "crosses_dst_transition": sess.crosses_dst_transition,
     }
 
 
@@ -797,6 +799,7 @@ def search_sessions(request):
                 "start": s.start_time.isoformat(),
                 "end": s.end_time.isoformat() if s.end_time else None,
                 "dur": s.duration,  # minutes
+                "crosses_dst_transition": s.crosses_dst_transition,
             }
             for s in sessions
         ]
@@ -813,6 +816,7 @@ def search_sessions(request):
                 "duration_minutes": s.duration,
                 "note": s.note or "",
                 "is_active": s.is_active,
+                "crosses_dst_transition": s.crosses_dst_transition,
             }
             for s in sessions
         ]
@@ -878,6 +882,7 @@ def log_activity(request):
                 "start": s.start_time.isoformat(),
                 "end": s.end_time.isoformat() if s.end_time else None,
                 "dur": s.duration,  # minutes
+                "crosses_dst_transition": s.crosses_dst_transition,
             }
             for s in sessions
         ]
@@ -892,6 +897,7 @@ def log_activity(request):
                 "end_time": s.end_time.isoformat() if s.end_time else None,
                 "duration_minutes": s.duration,
                 "note": s.note or "",
+                "crosses_dst_transition": s.crosses_dst_transition,
             }
             for s in sessions
         ]

@@ -9,6 +9,7 @@ All endpoints below live under `/api/` and use Django REST Framework with `IsAut
   - `Content-Type: application/json`
 - Datetimes are returned as ISO 8601 strings (`.isoformat()`).
 - **Durations are minutes** (float, typically rounded to 4 decimals).
+- Session payloads include `crosses_dst_transition` (boolean) for completed sessions that span a DST offset change in the server timezone.
 
 ---
 
@@ -95,6 +96,7 @@ Response:
     "end": null,
     "active": true,
     "elapsed": 0.0,
+    "crosses_dst_transition": false,
     "note": "optional"
   }
 }
@@ -254,6 +256,7 @@ A) Direct start/end
 start/end are parsed by parse_date_or_datetime, which accepts:
 
 
+- ISO-8601 datetimes (for example `2026-01-15T09:00:00Z` or `2026-01-15T09:00:00+01:00`)
 - %m-%d-%Y
 
 - %m-%d-%Y %H:%M:%S
