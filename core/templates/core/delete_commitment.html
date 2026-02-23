@@ -12,7 +12,7 @@
             <table>
                 <tr>
                     <td class="text-red">
-                        <h3>{{ commitment.project.name }}</h3>
+                        <h3>{{ commitment.target_name }}</h3>
                     </td>
                 </tr>
                 <tr>
@@ -50,7 +50,7 @@
         </p>
 
         <div class="button-row">
-            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'update_project' commitment.project.id %}'">
+            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'home' %}'">
                  <i class="fa fa-arrow-left"></i>
                 Back
             </button>

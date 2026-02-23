@@ -147,6 +147,11 @@ urlpatterns = [
     path("delete_tag/<int:pk>/", DeleteTagView.as_view(), name="delete_tag"),
     # commitment management
     path(
+        "create_commitment/",
+        CreateCommitmentView.as_view(),
+        name="create_commitment_generic",
+    ),
+    path(
         "create_commitment/<int:project_pk>/",
         CreateCommitmentView.as_view(),
         name="create_commitment",

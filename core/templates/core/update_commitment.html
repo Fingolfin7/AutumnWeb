@@ -4,11 +4,41 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-    <h2>Update Commitment for {{ commitment.project.name }}</h2>
+    <h2>Update Commitment for {{ commitment.target_name }}</h2>
 
     <form class="flex-row" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <section id="input-fields" class="card stacked half-width">
+            <span class="label-input">
+                {{ form.aggregation_type.label_tag }}
+                {{ form.aggregation_type }}
+                {{ form.aggregation_type.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.project.label_tag }}
+                {{ form.project }}
+                {{ form.project.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.subproject.label_tag }}
+                {{ form.subproject }}
+                {{ form.subproject.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.context.label_tag }}
+                {{ form.context }}
+                {{ form.context.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.tag.label_tag }}
+                {{ form.tag }}
+                {{ form.tag.errors }}
+            </span>
+
             <span class="label-input">
                 {{ form.commitment_type.label_tag }}
                 {{ form.commitment_type }}
@@ -82,7 +112,7 @@
                 </button>
 
                 <button type="button" class="secondary-button"
-                onclick="window.location.href = '{% url 'update_project' commitment.project.id %}' ">
+                onclick="window.location.href = '{% url 'home' %}' ">
                     <i class="fa fa-arrow-left"></i>
                     Back
                 </button>
