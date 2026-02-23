@@ -283,14 +283,25 @@ commitment_type_choices = (
     ('sessions', 'Session-based'),
 )
 
+aggregation_type_choices = (
+    ('project', 'Project'),
+    ('subproject', 'Subproject'),
+    ('context', 'Context'),
+    ('tag', 'Tag'),
+)
+
 
 class Commitment(models.Model):
     """
-    Optional commitment tracking for projects.
+    Optional commitment tracking across project aggregations.
     Tracks whether users are meeting their time/session goals with time-banking.
     """
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='commitments')
-    project = models.OneToOneField(Projects, on_delete=models.CASCADE, related_name='commitment')
+    aggregation_type = models.CharField(max_length=20, choices=aggregation_type_choices, default='project')
+    project = models.OneToOneField(Projects, on_delete=models.CASCADE, related_name='commitment', null=True, blank=True)
+    subproject = models.OneToOneField(SubProjects, on_delete=models.CASCADE, related_name='commitment', null=True, blank=True)
+    context = models.OneToOneField(Context, on_delete=models.CASCADE, related_name='commitment', null=True, blank=True)
+    tag = models.OneToOneField(Tag, on_delete=models.CASCADE, related_name='commitment', null=True, blank=True)
 
     commitment_type = models.CharField(max_length=10, choices=commitment_type_choices, default='time')
     period = models.CharField(max_length=15, choices=period_choices, default='weekly')
@@ -312,4 +323,41 @@ class Commitment(models.Model):
 
     def __str__(self):
         type_label = 'min' if self.commitment_type == 'time' else 'sessions'
-        return f"{self.project.name}: {self.target} {type_label}/{self.period}"
+        return f"{self.target_name}: {self.target} {type_label}/{self.period}"
+
+    @property
+    def target_object(self):
+        return {
+            'project': self.project,
+            'subproject': self.subproject,
+            'context': self.context,
+            'tag': self.tag,
+        }.get(self.aggregation_type)
+
+    @property
+    def target_name(self):
+        target = self.target_object
+        return target.name if target else 'Unknown target'
+
+    def clean(self):
+        super().clean()
+        targets = {
+            'project': self.project,
+            'subproject': self.subproject,
+            'context': self.context,
+            'tag': self.tag,
+        }
+
+        active_targets = [key for key, value in targets.items() if value is not None]
+        if len(active_targets) != 1:
+            raise ValidationError('Exactly one commitment target must be set.')
+
+        if self.aggregation_type not in targets:
+            raise ValidationError('Invalid aggregation type selected.')
+
+        if targets.get(self.aggregation_type) is None:
+            raise ValidationError('Aggregation type must match the selected target.')
+
+        target = targets[self.aggregation_type]
+        if getattr(target, 'user_id', None) != self.user_id:
+            raise ValidationError('Commitment target must belong to the same user.')

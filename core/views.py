@@ -47,7 +47,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # 2. Get all active commitments with progress and streak data
         commitments_data = []
         commitments = Commitment.objects.filter(user=user, active=True).select_related(
-            "project"
+            "project", "subproject", "context", "tag"
         )
 
         for commitment in commitments:
@@ -1790,34 +1790,35 @@ class CreateCommitmentView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Add Commitment"
-        context["project"] = get_object_or_404(
-            Projects, pk=self.kwargs["project_pk"], user=self.request.user
-        )
+        if "project_pk" in self.kwargs:
+            context["project"] = get_object_or_404(
+                Projects, pk=self.kwargs["project_pk"], user=self.request.user
+            )
         return context
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
-        kwargs["project"] = get_object_or_404(
-            Projects, pk=self.kwargs["project_pk"], user=self.request.user
-        )
+        kwargs["project"] = None
+        if "project_pk" in self.kwargs:
+            project = get_object_or_404(
+                Projects, pk=self.kwargs["project_pk"], user=self.request.user
+            )
+            kwargs["project"] = project
+            if self.request.method == "POST":
+                data = self.request.POST.copy()
+                data.setdefault("aggregation_type", "project")
+                data.setdefault("project", str(project.pk))
+                kwargs["data"] = data
         return kwargs
 
     def form_valid(self, form):
-        project = get_object_or_404(
-            Projects, pk=self.kwargs["project_pk"], user=self.request.user
-        )
-
-        # Check if commitment already exists
-        if hasattr(project, "commitment"):
-            messages.error(self.request, "This project already has a commitment.")
-            return redirect("update_project", pk=project.pk)
-
         form.instance.user = self.request.user
-        form.instance.project = project
         form.save()
         messages.success(self.request, "Commitment added successfully")
-        return redirect("update_project", pk=project.pk)
+        if form.instance.aggregation_type == "project" and form.instance.project_id:
+            return redirect("update_project", pk=form.instance.project.pk)
+        return redirect("home")
 
 
 class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
@@ -1840,13 +1841,15 @@ class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
-        kwargs["project"] = self.object.project
+        kwargs["project"] = self.object.project if self.object.aggregation_type == "project" else None
         return kwargs
 
     def form_valid(self, form):
         form.save()
         messages.success(self.request, "Commitment updated successfully")
-        return redirect("update_project", pk=self.object.project.pk)
+        if self.object.aggregation_type == "project" and self.object.project_id:
+            return redirect("update_project", pk=self.object.project.pk)
+        return redirect("home")
 
 
 class DeleteCommitmentView(LoginRequiredMixin, DeleteView):
@@ -1864,4 +1867,6 @@ class DeleteCommitmentView(LoginRequiredMixin, DeleteView):
 
     def get_success_url(self):
         messages.success(self.request, "Commitment deleted successfully")
-        return reverse("update_project", kwargs={"pk": self.object.project.pk})
+        if self.object.aggregation_type == "project" and self.object.project_id:
+            return reverse("update_project", kwargs={"pk": self.object.project.pk})
+        return reverse("home")

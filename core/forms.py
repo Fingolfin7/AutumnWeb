@@ -502,9 +502,19 @@ class TagForm(forms.ModelForm):
 
 
 class CommitmentForm(forms.ModelForm):
+    aggregation_type = forms.ChoiceField(
+        choices=[('project', 'Project'), ('subproject', 'Subproject'), ('context', 'Context'), ('tag', 'Tag')],
+        required=False,
+        widget=forms.Select(attrs={'class': 'half-width'}),
+    )
+    project = forms.ModelChoiceField(queryset=Projects.objects.none(), required=False, widget=forms.Select(attrs={'class': 'half-width'}))
+    subproject = forms.ModelChoiceField(queryset=SubProjects.objects.none(), required=False, widget=forms.Select(attrs={'class': 'half-width'}))
+    context = forms.ModelChoiceField(queryset=Context.objects.none(), required=False, widget=forms.Select(attrs={'class': 'half-width'}))
+    tag = forms.ModelChoiceField(queryset=Tag.objects.none(), required=False, widget=forms.Select(attrs={'class': 'half-width'}))
+
     class Meta:
         model = Commitment
-        fields = ['commitment_type', 'period', 'target', 'banking_enabled', 'max_balance', 'min_balance']
+        fields = ['aggregation_type', 'project', 'subproject', 'context', 'tag', 'commitment_type', 'period', 'target', 'banking_enabled', 'max_balance', 'min_balance']
         widgets = {
             'commitment_type': forms.Select(attrs={'class': 'half-width'}),
             'period': forms.Select(attrs={'class': 'half-width'}),
@@ -514,6 +524,7 @@ class CommitmentForm(forms.ModelForm):
             'banking_enabled': forms.CheckboxInput(),
         }
         labels = {
+            'aggregation_type': 'Aggregation Type',
             'commitment_type': 'Commitment Type',
             'period': 'Period',
             'target': 'Target',
@@ -529,27 +540,59 @@ class CommitmentForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
-        self.project = kwargs.pop('project', None)
+        self.project_obj = kwargs.pop('project', None)
         super().__init__(*args, **kwargs)
+
+        if self.user is not None and self.instance.user_id is None:
+            self.instance.user = self.user
+
+        if self.user is not None:
+            self.fields['project'].queryset = Projects.objects.filter(user=self.user).order_by('name')
+            self.fields['subproject'].queryset = SubProjects.objects.filter(user=self.user).order_by('name')
+            self.fields['context'].queryset = Context.objects.filter(user=self.user).order_by('name')
+            self.fields['tag'].queryset = Tag.objects.filter(user=self.user).order_by('name')
+
+        if self.project_obj is not None and not self.instance.pk:
+            self.initial['aggregation_type'] = 'project'
+            self.initial['project'] = self.project_obj
+
+        if self.instance.pk:
+            self.initial['aggregation_type'] = self.instance.aggregation_type
 
     def clean(self):
         cleaned_data = super().clean()
         min_balance = cleaned_data.get('min_balance')
         max_balance = cleaned_data.get('max_balance')
 
-        if min_balance is not None and max_balance is not None:
-            if min_balance > max_balance:
-                raise forms.ValidationError("Min balance cannot be greater than max balance.")
-
+        if min_balance is not None and max_balance is not None and min_balance > max_balance:
+            raise forms.ValidationError("Min balance cannot be greater than max balance.")
         if min_balance is not None and min_balance > 0:
             raise forms.ValidationError("Min balance must be zero or negative.")
+
+        aggregation_type = cleaned_data.get('aggregation_type') or getattr(self.instance, 'aggregation_type', None)
+        if not aggregation_type and self.project_obj is not None:
+            aggregation_type = 'project'
+        if not aggregation_type:
+            raise forms.ValidationError('Please select an aggregation type.')
+
+        selected_target = cleaned_data.get(aggregation_type)
+        if selected_target is None and self.instance.pk:
+            selected_target = getattr(self.instance, aggregation_type, None)
+        if selected_target is None and aggregation_type == 'project' and self.project_obj is not None:
+            selected_target = self.project_obj
+        if selected_target is None:
+            raise forms.ValidationError('Please select a target for the chosen aggregation type.')
+
+        cleaned_data['aggregation_type'] = aggregation_type
+        for field in ['project', 'subproject', 'context', 'tag']:
+            cleaned_data[field] = selected_target if field == aggregation_type else None
 
         return cleaned_data
 
 
 class UpdateCommitmentForm(CommitmentForm):
     class Meta(CommitmentForm.Meta):
-        fields = ['commitment_type', 'period', 'target', 'banking_enabled', 'max_balance', 'min_balance', 'active']
+        fields = CommitmentForm.Meta.fields + ['active']
         widgets = {
             **CommitmentForm.Meta.widgets,
             'active': forms.CheckboxInput(),

@@ -88,9 +88,9 @@
                 {% for item in commitments_data %}
                 <div class="card" style="background-color: rgba(0, 0, 0, 0.5); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link">
-                            <span class="text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.project.name }}</span>
-                        </a>
+                        {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}<a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link">{% endif %}
+                            <span class="text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }} <small class="text-muted">({{ item.commitment.get_aggregation_type_display }})</small></span>
+                        {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}</a>{% endif %}
                         <span style="font-size: 0.8em;" class="text-muted">
                             {{ item.progress.period }}
                         </span>
@@ -122,7 +122,7 @@
                 {% endfor %}
                 {% else %}
                 <div class="card">
-                    <p class="text-muted" style="font-size: 0.9em;">No active commitments. <a href="{% url 'projects' %}">Add one</a>.</p>
+                    <p class="text-muted" style="font-size: 0.9em;">No active commitments. <a href="{% url 'create_commitment_generic' %}">Add one</a>.</p>
                 </div>
                 {% endif %}
                 </div>

@@ -674,6 +674,27 @@ def get_period_bounds(
     return start, end
 
 
+
+
+def get_commitment_sessions_queryset(commitment, period_start, period_end):
+    sessions = Sessions.objects.filter(
+        user=commitment.user,
+        is_active=False,
+        end_time__gte=period_start,
+        end_time__lt=period_end,
+    )
+
+    if commitment.aggregation_type == "project" and commitment.project_id:
+        return sessions.filter(project=commitment.project)
+    if commitment.aggregation_type == "subproject" and commitment.subproject_id:
+        return sessions.filter(subprojects=commitment.subproject)
+    if commitment.aggregation_type == "context" and commitment.context_id:
+        return sessions.filter(project__context=commitment.context)
+    if commitment.aggregation_type == "tag" and commitment.tag_id:
+        return sessions.filter(project__tags=commitment.tag).distinct()
+
+    return sessions.none()
+
 def get_commitment_progress(commitment) -> dict:
     """
     Calculate the progress for a commitment in the current period.
@@ -681,17 +702,9 @@ def get_commitment_progress(commitment) -> dict:
     :param commitment: A Commitment instance
     :return: Dict with actual, target, percentage, balance, status, period_start, period_end
     """
-    from core.models import Sessions  # Import here to avoid circular import
-
     period_start, period_end = get_period_bounds(commitment.period)
 
-    # Get completed sessions for this project in the current period
-    sessions = Sessions.objects.filter(
-        project=commitment.project,
-        is_active=False,
-        end_time__gte=period_start,
-        end_time__lt=period_end,
-    )
+    sessions = get_commitment_sessions_queryset(commitment, period_start, period_end)
 
     if commitment.commitment_type == "time":
         # Sum durations in minutes
@@ -799,8 +812,6 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
     :param num_periods: Number of periods to return for visual display
     :return: Dict with 'current_streak' (int) and 'periods' (list of period status dicts)
     """
-    from core.models import Sessions  # Import here to avoid circular import
-
     now = timezone.now()
 
     # Gather ALL periods from commitment creation to now (forward walk)
@@ -818,12 +829,7 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
         is_current = period_start <= now < period_end
 
         # Get sessions for this period
-        sessions = Sessions.objects.filter(
-            project=commitment.project,
-            is_active=False,
-            end_time__gte=period_start,
-            end_time__lt=period_end,
-        )
+        sessions = get_commitment_sessions_queryset(commitment, period_start, period_end)
 
         if commitment.commitment_type == "time":
             actual = sum(s.duration or 0 for s in sessions)
@@ -908,8 +914,6 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
     :param force: If True, reconcile even if already reconciled for this period
     :return: True if reconciliation occurred, False otherwise
     """
-    from core.models import Sessions  # Import here to avoid circular import
-
     now = timezone.now()
     period_start, period_end = get_period_bounds(commitment.period)
 
@@ -961,12 +965,7 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
 
     # Process each period
     for p_start, p_end in periods_to_reconcile:
-        sessions = Sessions.objects.filter(
-            project=commitment.project,
-            is_active=False,
-            end_time__gte=p_start,
-            end_time__lt=p_end,
-        )
+        sessions = get_commitment_sessions_queryset(commitment, p_start, p_end)
 
         if commitment.commitment_type == "time":
             actual = sum(s.duration or 0 for s in sessions)
