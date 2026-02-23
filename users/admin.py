@@ -1,9 +1,32 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 from django.db.models import Count, Sum
 
+from core.audit import audit_project_totals_for_user
 from .models import Profile
+
+
+@admin.action(description="Run project/subproject audit for selected users")
+def run_audit_for_selected_users(modeladmin, request, queryset):
+    audited_users = 0
+    audited_projects = 0
+    audited_subprojects = 0
+
+    for user in queryset.iterator():
+        project_count, subproject_count = audit_project_totals_for_user(user, log=False)
+        audited_users += 1
+        audited_projects += project_count
+        audited_subprojects += subproject_count
+
+    modeladmin.message_user(
+        request,
+        (
+            f"Audit complete for {audited_users} user(s): "
+            f"projects={audited_projects}, subprojects={audited_subprojects}."
+        ),
+        messages.SUCCESS,
+    )
 
 
 class ProfileInline(admin.StackedInline):
@@ -25,6 +48,7 @@ class UserAdmin(BaseUserAdmin):
     )
     list_filter = BaseUserAdmin.list_filter + ("is_staff", "is_active")
     search_fields = ("username", "email", "first_name", "last_name")
+    actions = (run_audit_for_selected_users,)
 
     def get_queryset(self, request):
         return super().get_queryset(request).annotate(

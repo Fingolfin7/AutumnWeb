@@ -1,40 +1,79 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth.models import User
-from core.models import Projects, SubProjects
 import logging
 
-logger = logging.getLogger('models')
+from core.audit import audit_project_totals_all_users, audit_project_totals_for_user
+
+logger = logging.getLogger("models")
 
 
 class Command(BaseCommand):
-    help = 'Audit the total time for all projects and subprojects'
+    help = (
+        "Audit project and subproject total time values. "
+        "Use --username/--user-id for a single user, or --all for the full database."
+    )
 
     def add_arguments(self, parser):
-        parser.add_argument('--username', type=str, help='Username of the user to audit the data for')
+        target_group = parser.add_mutually_exclusive_group()
+        target_group.add_argument("--username", type=str, help="Audit one user by username")
+        target_group.add_argument("--user-id", type=int, help="Audit one user by numeric id")
+        target_group.add_argument(
+            "--all",
+            action="store_true",
+            help="Audit all users (full database). This is also the default when no target is provided.",
+        )
+        parser.add_argument(
+            "--quiet",
+            action="store_true",
+            help="Reduce per-project logging noise while still reporting summary output.",
+        )
 
     def handle(self, *args, **options):
-        if options['username']:
-            # check if the user exists
-            try:
-                user = User.objects.get(username=options['username'])
-                self.stdout.write(f'Auditing project data for user: {user.username}')
-                logger.info(f"Auditing project data for user: {user.username}")
-                projects = Projects.objects.filter(user=user)
-                for project in projects:
-                    project.audit_total_time()
-                    for subproject in SubProjects.objects.filter(parent_project=project, user=user):
-                        subproject.audit_total_time()
-            except User.DoesNotExist:
-                logger.error(f'User not found: {options["username"]}')
-                raise CommandError(f'User not found: {options["username"]}')
-        else:
-            self.stdout.write('Auditing all project data')
-            logger.info("Auditing all project data")
-            projects = Projects.objects.all()
-            for project in projects:
-                project.audit_total_time(log=False)
-                for subproject in SubProjects.objects.filter(parent_project=project):
-                    subproject.audit_total_time(log=False)
+        log_per_item = not options["quiet"]
 
-        self.stdout.write(self.style.SUCCESS('Successfully audited project data'))
-        logger.info("Successfully audited project data")
+        if options["username"]:
+            try:
+                user = User.objects.get(username=options["username"])
+            except User.DoesNotExist as exc:
+                logger.error("User not found: %s", options["username"])
+                raise CommandError(f'User not found: {options["username"]}') from exc
+
+            self.stdout.write(f"Auditing project data for user: {user.username}")
+            logger.info("Auditing project data for user: %s", user.username)
+            project_count, subproject_count = audit_project_totals_for_user(user, log=log_per_item)
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Successfully audited user={user.username}: "
+                    f"projects={project_count}, subprojects={subproject_count}"
+                )
+            )
+            return
+
+        if options["user_id"]:
+            try:
+                user = User.objects.get(pk=options["user_id"])
+            except User.DoesNotExist as exc:
+                logger.error("User not found: id=%s", options["user_id"])
+                raise CommandError(f'User not found: id={options["user_id"]}') from exc
+
+            self.stdout.write(f"Auditing project data for user id={user.id} ({user.username})")
+            logger.info("Auditing project data for user id=%s (%s)", user.id, user.username)
+            project_count, subproject_count = audit_project_totals_for_user(user, log=log_per_item)
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"Successfully audited user={user.username}: "
+                    f"projects={project_count}, subprojects={subproject_count}"
+                )
+            )
+            return
+
+        # Default path and explicit --all path both audit everything
+        self.stdout.write("Auditing all project data")
+        logger.info("Auditing all project data")
+        user_count, project_count, subproject_count = audit_project_totals_all_users(log=log_per_item)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Successfully audited full db: users={user_count}, "
+                f"projects={project_count}, subprojects={subproject_count}"
+            )
+        )
