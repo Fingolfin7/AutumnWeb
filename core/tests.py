@@ -875,6 +875,48 @@ class TrackApiRegressionTests(TestCase):
         self.assertAlmostEqual(sp2.total_time, 9.0, places=2)
 
 
+class CreateSubprojectApiCompatTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="subprojapiuser", password="password"
+        )
+        self.client.login(username="subprojapiuser", password="password")
+        self.token = Token.objects.create(user=self.user)
+        self.project = Projects.objects.create(user=self.user, name="API Parent")
+
+    def test_create_subproject_accepts_parent_project_name(self):
+        resp = self.client.post(
+            reverse("api_create_subproject"),
+            data={"parent_project": self.project.name, "name": "from-name"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            SubProjects.objects.filter(
+                user=self.user,
+                parent_project=self.project,
+                name="from-name",
+            ).exists()
+        )
+
+    def test_create_subproject_accepts_parent_project_pk_without_user(self):
+        resp = self.client.post(
+            reverse("api_create_subproject"),
+            data={"parent_project": self.project.id, "name": "from-id"},
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Token {self.token.key}",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(
+            SubProjects.objects.filter(
+                user=self.user,
+                parent_project=self.project,
+                name="from-id",
+            ).exists()
+        )
+
+
 # =============================================================================
 # Commitment Feature Tests
 # =============================================================================

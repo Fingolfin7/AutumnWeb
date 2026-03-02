@@ -1292,16 +1292,33 @@ def delete_project(request, project_name):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_subproject(request):
-    parent_name = request.data.get("parent_project")
-    if not parent_name:
+    parent_raw = request.data.get("parent_project")
+    if not parent_raw:
         return _err("Missing 'parent_project'")
-    if not Projects.objects.filter(name=parent_name, user=request.user).exists():
+
+    parent_project = None
+    if isinstance(parent_raw, int) or (
+        isinstance(parent_raw, str) and parent_raw.isdigit()
+    ):
+        parent_project = Projects.objects.filter(
+            pk=int(parent_raw), user=request.user
+        ).first()
+    else:
+        parent_project = Projects.objects.filter(
+            name=str(parent_raw), user=request.user
+        ).first()
+
+    if parent_project is None:
         return Response(
-            {"error": f"Parent project {parent_name} does not exist"}, status=400
+            {"error": f"Parent project {parent_raw} does not exist"}, status=400
         )
-    serializer = SubProjectSerializer(data=request.data)
+
+    payload = request.data.copy()
+    payload["parent_project"] = parent_project.pk
+    payload["user"] = request.user.pk
+    serializer = SubProjectSerializer(data=payload)
     if serializer.is_valid():
-        serializer.save(user=request.user)
+        serializer.save(user=request.user, parent_project=parent_project)
         return Response(serializer.data)
     return Response(serializer.errors, status=400)
 
