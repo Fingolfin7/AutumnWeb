@@ -88,9 +88,20 @@
                 {% for item in commitments_data %}
                 <div class="card" style="background-color: rgba(0, 0, 0, 0.5); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}<a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link">{% endif %}
-                            <span class="text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }} <small class="text-muted">({{ item.commitment.get_aggregation_type_display }})</small></span>
-                        {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}</a>{% endif %}
+                        <div style="display: inline-flex; align-items: baseline; gap: 0.35rem;">
+                            {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}
+                                <a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</a>
+                            {% elif item.commitment.aggregation_type == 'subproject' and item.commitment.subproject %}
+                                <a href="{% url 'update_subproject' item.commitment.subproject.id %}" class="plain-link text-blue" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</a>
+                            {% elif item.commitment.aggregation_type == 'context' and item.commitment.context %}
+                                <a href="{% url 'update_context' item.commitment.context.id %}" class="plain-link text-orange" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</a>
+                            {% elif item.commitment.aggregation_type == 'tag' and item.commitment.tag %}
+                                <a href="{% url 'update_tag' item.commitment.tag.id %}" class="plain-link" style="font-weight: bold; font-size: 1.1em; {% if item.commitment.tag.color %}color: {{ item.commitment.tag.color }};{% endif %}">{{ item.commitment.target_name }}</a>
+                            {% else %}
+                                <span style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</span>
+                            {% endif %}
+                            <small class="text-muted">({{ item.commitment.get_aggregation_type_display }})</small>
+                        </div>
                         <span style="font-size: 0.8em;" class="text-muted">
                             {{ item.progress.period }}
                         </span>
@@ -104,6 +115,23 @@
                     <div class="progress-bar-container commitment-progress-container">
                         <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%;"></div>
                     </div>
+
+                    {% if item.commitment.banking_enabled %}
+                    <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 0.45rem;">
+                        <span>
+                            Bank (reconciled):
+                            <span class="{% if item.progress.balance >= 0 %}text-green{% else %}text-red{% endif %}">
+                                {% if item.progress.balance >= 0 %}+{% endif %}{{ item.progress.balance }}{% if item.progress.commitment_type == 'time' %}m{% endif %}
+                            </span>
+                        </span>
+                        <span>
+                            This period (unbanked):
+                            <span class="{% if item.progress.current_surplus >= 0 %}text-green{% else %}text-red{% endif %}">
+                                {% if item.progress.current_surplus >= 0 %}+{% endif %}{{ item.progress.current_surplus }}{% if item.progress.commitment_type == 'time' %}m{% endif %}
+                            </span>
+                        </span>
+                    </div>
+                    {% endif %}
 
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
                         <span style="font-size: 0.85em;">

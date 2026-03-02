@@ -61,4 +61,8 @@
         </section>
 
     </form>
+
+    {% with commitment_entity_label='context' %}
+        {% include 'core/partials/commitments_panel.html' %}
+    {% endwith %}
 {% endblock %}

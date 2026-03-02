@@ -685,15 +685,88 @@ def get_commitment_sessions_queryset(commitment, period_start, period_end):
     )
 
     if commitment.aggregation_type == "project" and commitment.project_id:
-        return sessions.filter(project=commitment.project)
-    if commitment.aggregation_type == "subproject" and commitment.subproject_id:
-        return sessions.filter(subprojects=commitment.subproject)
-    if commitment.aggregation_type == "context" and commitment.context_id:
-        return sessions.filter(project__context=commitment.context)
-    if commitment.aggregation_type == "tag" and commitment.tag_id:
-        return sessions.filter(project__tags=commitment.tag).distinct()
+        sessions = sessions.filter(project=commitment.project)
+    elif commitment.aggregation_type == "subproject" and commitment.subproject_id:
+        sessions = sessions.filter(subprojects=commitment.subproject)
+    elif commitment.aggregation_type == "context" and commitment.context_id:
+        sessions = sessions.filter(project__context=commitment.context)
+    elif commitment.aggregation_type == "tag" and commitment.tag_id:
+        sessions = sessions.filter(project__tags=commitment.tag)
+    else:
+        return sessions.none()
 
-    return sessions.none()
+    return _apply_commitment_composable_filters(commitment, sessions)
+
+
+def _apply_commitment_composable_filters(commitment, sessions):
+    allowed_rule_dimensions = {
+        "context": {"tag", "project", "subproject"},
+        "tag": {"project", "subproject"},
+        "project": {"subproject"},
+        "subproject": set(),
+    }.get(commitment.aggregation_type, set())
+
+    include_projects = (
+        commitment.include_projects.all()
+        if "project" in allowed_rule_dimensions
+        else commitment.include_projects.none()
+    )
+    exclude_projects = (
+        commitment.exclude_projects.all()
+        if "project" in allowed_rule_dimensions
+        else commitment.exclude_projects.none()
+    )
+    include_subprojects = (
+        commitment.include_subprojects.all()
+        if "subproject" in allowed_rule_dimensions
+        else commitment.include_subprojects.none()
+    )
+    exclude_subprojects = (
+        commitment.exclude_subprojects.all()
+        if "subproject" in allowed_rule_dimensions
+        else commitment.exclude_subprojects.none()
+    )
+    include_contexts = (
+        commitment.include_contexts.all()
+        if "context" in allowed_rule_dimensions
+        else commitment.include_contexts.none()
+    )
+    exclude_contexts = (
+        commitment.exclude_contexts.all()
+        if "context" in allowed_rule_dimensions
+        else commitment.exclude_contexts.none()
+    )
+    include_tags = (
+        commitment.include_tags.all()
+        if "tag" in allowed_rule_dimensions
+        else commitment.include_tags.none()
+    )
+    exclude_tags = (
+        commitment.exclude_tags.all()
+        if "tag" in allowed_rule_dimensions
+        else commitment.exclude_tags.none()
+    )
+
+    # Include filters narrow the base scope; exclude filters remove matches from it.
+    if include_projects.exists():
+        sessions = sessions.filter(project__in=include_projects)
+    if include_subprojects.exists():
+        sessions = sessions.filter(subprojects__in=include_subprojects)
+    if include_contexts.exists():
+        sessions = sessions.filter(project__context__in=include_contexts)
+    if include_tags.exists():
+        sessions = sessions.filter(project__tags__in=include_tags)
+
+    if exclude_projects.exists():
+        sessions = sessions.exclude(project__in=exclude_projects)
+    if exclude_subprojects.exists():
+        sessions = sessions.exclude(subprojects__in=exclude_subprojects)
+    if exclude_contexts.exists():
+        sessions = sessions.exclude(project__context__in=exclude_contexts)
+    if exclude_tags.exists():
+        sessions = sessions.exclude(project__tags__in=exclude_tags)
+
+    return sessions.distinct()
 
 def get_commitment_progress(commitment) -> dict:
     """
@@ -703,8 +776,15 @@ def get_commitment_progress(commitment) -> dict:
     :return: Dict with actual, target, percentage, balance, status, period_start, period_end
     """
     period_start, period_end = get_period_bounds(commitment.period)
+    start_dt = get_commitment_start_datetime(commitment)
+    effective_period_start = max(period_start, start_dt)
 
-    sessions = get_commitment_sessions_queryset(commitment, period_start, period_end)
+    if effective_period_start >= period_end:
+        sessions = Sessions.objects.none()
+    else:
+        sessions = get_commitment_sessions_queryset(
+            commitment, effective_period_start, period_end
+        )
 
     if commitment.commitment_type == "time":
         # Sum durations in minutes
@@ -740,6 +820,7 @@ def get_commitment_progress(commitment) -> dict:
         "current_surplus": round(current_surplus, 2),
         "status": status,
         "period_start": period_start,
+        "effective_period_start": effective_period_start,
         "period_end": period_end,
         "commitment_type": commitment.commitment_type,
         "period": commitment.period,
@@ -813,23 +894,27 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
     :return: Dict with 'current_streak' (int) and 'periods' (list of period status dicts)
     """
     now = timezone.now()
+    start_dt = get_commitment_start_datetime(commitment)
 
     # Gather ALL periods from commitment creation to now (forward walk)
     all_periods = []
-    check_date = commitment.created_at
+    check_date = start_dt
 
     while True:
         period_start, period_end = get_period_bounds(commitment.period, check_date)
 
-        # Skip periods that ended before commitment was created
-        if period_end <= commitment.created_at:
+        # Skip periods that ended before commitment started.
+        if period_end <= start_dt:
             check_date = period_end + timedelta(seconds=1)
             continue
 
         is_current = period_start <= now < period_end
+        effective_start = max(period_start, start_dt)
 
         # Get sessions for this period
-        sessions = get_commitment_sessions_queryset(commitment, period_start, period_end)
+        sessions = get_commitment_sessions_queryset(
+            commitment, effective_start, period_end
+        )
 
         if commitment.commitment_type == "time":
             actual = sum(s.duration or 0 for s in sessions)
@@ -839,6 +924,7 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
         all_periods.append(
             {
                 "period_start": period_start,
+                "effective_period_start": effective_start,
                 "period_end": period_end,
                 "actual": actual,
                 "target": commitment.target,
@@ -915,10 +1001,11 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
     :return: True if reconciliation occurred, False otherwise
     """
     now = timezone.now()
+    start_dt = get_commitment_start_datetime(commitment)
     period_start, period_end = get_period_bounds(commitment.period)
 
-    # Skip if commitment was created after this period started
-    if commitment.created_at >= period_end:
+    # Skip if commitment starts after the current period ends.
+    if start_dt >= period_end:
         return False
 
     # Check if we've already reconciled for the previous period
@@ -939,8 +1026,8 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
     if commitment.last_reconciled:
         check_date = commitment.last_reconciled
     else:
-        # Start from when commitment was created
-        check_date = commitment.created_at
+        # Start from when commitment calculation begins.
+        check_date = start_dt
 
     # Find all complete periods that need reconciliation
     while True:
@@ -950,8 +1037,11 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
         if check_end > now:
             break
 
-        # If commitment was created during this period, adjust the start
-        effective_start = max(check_start, commitment.created_at)
+        # If commitment starts during this period, adjust the start.
+        effective_start = max(check_start, start_dt)
+        if effective_start >= check_end:
+            check_date = check_end + timedelta(seconds=1)
+            continue
 
         # Only add if we haven't reconciled this period yet
         if not commitment.last_reconciled or check_end > commitment.last_reconciled:
@@ -986,3 +1076,13 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
     commitment.save()
 
     return True
+
+
+def get_commitment_start_datetime(commitment) -> datetime:
+    start_date = getattr(commitment, "start_date", None)
+    if start_date is None:
+        if commitment.created_at:
+            start_date = timezone.localtime(commitment.created_at).date()
+        else:
+            start_date = timezone.localdate()
+    return timezone.make_aware(datetime.combine(start_date, datetime.min.time()))

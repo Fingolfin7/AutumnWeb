@@ -284,10 +284,10 @@ commitment_type_choices = (
 )
 
 aggregation_type_choices = (
-    ('project', 'Project'),
-    ('subproject', 'Subproject'),
     ('context', 'Context'),
     ('tag', 'Tag'),
+    ('project', 'Project'),
+    ('subproject', 'Subproject'),
 )
 
 
@@ -302,9 +302,53 @@ class Commitment(models.Model):
     subproject = models.OneToOneField(SubProjects, on_delete=models.CASCADE, related_name='commitment', null=True, blank=True)
     context = models.OneToOneField(Context, on_delete=models.CASCADE, related_name='commitment', null=True, blank=True)
     tag = models.OneToOneField(Tag, on_delete=models.CASCADE, related_name='commitment', null=True, blank=True)
+    include_projects = models.ManyToManyField(
+        Projects,
+        blank=True,
+        related_name='commitments_including',
+    )
+    exclude_projects = models.ManyToManyField(
+        Projects,
+        blank=True,
+        related_name='commitments_excluding',
+    )
+    include_subprojects = models.ManyToManyField(
+        SubProjects,
+        blank=True,
+        related_name='commitments_including',
+    )
+    exclude_subprojects = models.ManyToManyField(
+        SubProjects,
+        blank=True,
+        related_name='commitments_excluding',
+    )
+    include_contexts = models.ManyToManyField(
+        Context,
+        blank=True,
+        related_name='commitments_including',
+    )
+    exclude_contexts = models.ManyToManyField(
+        Context,
+        blank=True,
+        related_name='commitments_excluding',
+    )
+    include_tags = models.ManyToManyField(
+        Tag,
+        blank=True,
+        related_name='commitments_including',
+    )
+    exclude_tags = models.ManyToManyField(
+        Tag,
+        blank=True,
+        related_name='commitments_excluding',
+    )
 
     commitment_type = models.CharField(max_length=10, choices=commitment_type_choices, default='time')
     period = models.CharField(max_length=15, choices=period_choices, default='weekly')
+    start_date = models.DateField(
+        default=timezone.localdate,
+        help_text='Date when commitment period calculations begin',
+    )
     target = models.PositiveIntegerField(help_text='Minutes (time) or count (sessions)')
 
     # Banking

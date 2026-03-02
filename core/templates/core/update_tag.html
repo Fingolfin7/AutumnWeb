@@ -74,4 +74,8 @@
         </section>
 
     </form>
+
+    {% with commitment_entity_label='tag' %}
+        {% include 'core/partials/commitments_panel.html' %}
+    {% endwith %}
 {% endblock %}

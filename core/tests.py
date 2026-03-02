@@ -1,7 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
-from core.models import Projects, SubProjects, Sessions, Commitment
+from core.models import Projects, SubProjects, Sessions, Commitment, Tag
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
 from django.core.management import call_command
@@ -14,6 +14,7 @@ from rest_framework.authtoken.models import Token
 from core.utils import (
     get_period_bounds,
     get_commitment_progress,
+    get_commitment_sessions_queryset,
     reconcile_commitment,
     calculate_daily_activity_streak,
     calculate_commitment_streak,
@@ -1056,16 +1057,17 @@ class CommitmentProgressTests(TestCase):
 
     def test_time_based_progress(self):
         """Test time-based progress calculation."""
+        now = timezone.localtime(timezone.now())
+        period_start, _ = get_period_bounds('weekly', now)
         commitment = Commitment.objects.create(
             user=self.user,
             project=self.project,
             commitment_type='time',
             period='weekly',
-            target=100
+            target=100,
+            start_date=period_start.date(),
         )
 
-        now = timezone.now()
-        period_start, _ = get_period_bounds('weekly', now)
         session_start = period_start + timedelta(hours=1)
 
         Sessions.objects.create(
@@ -1084,16 +1086,16 @@ class CommitmentProgressTests(TestCase):
 
     def test_session_based_progress(self):
         """Test session-based progress calculation."""
+        now = timezone.localtime(timezone.now())
+        period_start, _ = get_period_bounds('weekly', now)
         commitment = Commitment.objects.create(
             user=self.user,
             project=self.project,
             commitment_type='sessions',
             period='weekly',
-            target=5
+            target=5,
+            start_date=period_start.date(),
         )
-
-        now = timezone.now()
-        period_start, _ = get_period_bounds('weekly', now)
 
         for i in range(3):
             session_start = period_start + timedelta(hours=i + 1)
@@ -1113,16 +1115,16 @@ class CommitmentProgressTests(TestCase):
 
     def test_complete_status(self):
         """Test that 100%+ progress shows complete status."""
+        now = timezone.localtime(timezone.now())
+        period_start, _ = get_period_bounds('weekly', now)
         commitment = Commitment.objects.create(
             user=self.user,
             project=self.project,
             commitment_type='sessions',
             period='weekly',
-            target=2
+            target=2,
+            start_date=period_start.date(),
         )
-
-        now = timezone.now()
-        period_start, _ = get_period_bounds('weekly', now)
 
         for i in range(3):
             session_start = period_start + timedelta(hours=i + 1)
@@ -1388,7 +1390,7 @@ class UpdateProjectViewCommitmentTests(TestCase):
             reverse('update_project', kwargs={'pk': self.project.pk})
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'No commitment set')
+        self.assertContains(response, 'No commitments currently apply to this project.')
         self.assertContains(response, 'Add Commitment')
 
     def test_project_page_shows_commitment(self):
@@ -1549,7 +1551,7 @@ class DailyStreakTests(TestCase):
 
     def test_streak_counts_consecutive_days(self):
         """Test that streak counts consecutive days correctly."""
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
         # Create sessions for today and yesterday
         for i in range(3):
             day_start = now - timedelta(days=i)
@@ -1565,7 +1567,7 @@ class DailyStreakTests(TestCase):
 
     def test_streak_breaks_on_gap_day(self):
         """Test that streak breaks when there's a gap."""
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
         # Create session for today
         Sessions.objects.create(
             user=self.user,
@@ -1593,7 +1595,7 @@ class DailyStreakTests(TestCase):
 
     def test_streak_starts_from_yesterday_if_no_activity_today(self):
         """Test that streak calculation starts from yesterday if no activity today."""
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
         # Create sessions for yesterday and day before
         for i in range(1, 3):
             day = now - timedelta(days=i)
@@ -1638,7 +1640,7 @@ class CommitmentStreakTests(TestCase):
 
     def test_commitment_streak_counts_consecutive_met_periods(self):
         """Test that commitment streak counts consecutive met periods."""
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
 
         # Create commitment with created_at in the past (before the periods we're testing)
         commitment = Commitment.objects.create(
@@ -1648,9 +1650,9 @@ class CommitmentStreakTests(TestCase):
             period='daily',
             target=1
         )
-        # Manually set created_at to 5 days ago so periods aren't skipped
+        # Manually set start_date to 5 days ago so periods aren't skipped
         Commitment.objects.filter(pk=commitment.pk).update(
-            created_at=now - timedelta(days=5)
+            start_date=(now - timedelta(days=2)).date()
         )
         commitment.refresh_from_db()
 
@@ -1701,7 +1703,7 @@ class CommitmentStreakTests(TestCase):
 
     def test_streak_preserved_by_bank(self):
         """Test that banked time preserves streak when a period is missed."""
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
 
         commitment = Commitment.objects.create(
             user=self.user,
@@ -1713,11 +1715,11 @@ class CommitmentStreakTests(TestCase):
             max_balance=600,
             min_balance=-600,
         )
-        # Set created_at to start of day -3 so no empty periods before sessions
+        # Set start_date to day -3 so no empty periods before sessions
         day3 = now - timedelta(days=3)
         ps_day3, _ = get_period_bounds('daily', day3)
         Commitment.objects.filter(pk=commitment.pk).update(
-            created_at=ps_day3
+            start_date=ps_day3.date()
         )
         commitment.refresh_from_db()
 
@@ -1768,7 +1770,7 @@ class CommitmentStreakTests(TestCase):
 
     def test_streak_breaks_when_bank_insufficient(self):
         """Test that streak breaks when bank can't cover the deficit."""
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
 
         commitment = Commitment.objects.create(
             user=self.user,
@@ -1783,7 +1785,7 @@ class CommitmentStreakTests(TestCase):
         day3 = now - timedelta(days=3)
         ps_day3, _ = get_period_bounds('daily', day3)
         Commitment.objects.filter(pk=commitment.pk).update(
-            created_at=ps_day3
+            start_date=ps_day3.date()
         )
         commitment.refresh_from_db()
 
@@ -1815,7 +1817,7 @@ class CommitmentStreakTests(TestCase):
 
     def test_streak_bank_simulation_forward(self):
         """Test that banking balance is simulated forward correctly across periods."""
-        now = timezone.now()
+        now = timezone.localtime(timezone.now())
 
         commitment = Commitment.objects.create(
             user=self.user,
@@ -1830,7 +1832,7 @@ class CommitmentStreakTests(TestCase):
         day4 = now - timedelta(days=4)
         ps_day4, _ = get_period_bounds('daily', day4)
         Commitment.objects.filter(pk=commitment.pk).update(
-            created_at=ps_day4
+            start_date=ps_day4.date()
         )
         commitment.refresh_from_db()
 
@@ -1887,6 +1889,134 @@ class CommitmentStreakTests(TestCase):
         self.assertTrue(day3_period['saved_by_bank'])
         self.assertTrue(day2_period['saved_by_bank'])
         self.assertFalse(day1_period['met'])
+
+
+class CommitmentComposableRulesTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='commitrulesuser',
+            email='commitrules@example.com',
+            password='testpass123'
+        )
+        self.context_work = Context.objects.create(user=self.user, name='Work')
+        self.context_personal = Context.objects.create(user=self.user, name='Personal')
+        self.tag_focus = Tag.objects.create(user=self.user, name='Focus')
+        self.tag_admin = Tag.objects.create(user=self.user, name='Admin')
+
+        self.project_alpha = Projects.objects.create(
+            user=self.user,
+            name='Alpha',
+            context=self.context_work,
+        )
+        self.project_alpha.tags.add(self.tag_focus)
+
+        self.project_beta = Projects.objects.create(
+            user=self.user,
+            name='Beta',
+            context=self.context_work,
+        )
+        self.project_beta.tags.add(self.tag_admin)
+
+        self.project_gamma = Projects.objects.create(
+            user=self.user,
+            name='Gamma',
+            context=self.context_personal,
+        )
+        self.project_gamma.tags.add(self.tag_focus)
+
+        self.alpha_sp1 = SubProjects.objects.create(
+            user=self.user, name='SP1', parent_project=self.project_alpha
+        )
+        self.alpha_sp2 = SubProjects.objects.create(
+            user=self.user, name='SP2', parent_project=self.project_alpha
+        )
+
+        now = timezone.localtime(timezone.now())
+        self.period_start, self.period_end = get_period_bounds('daily', now)
+        midpoint = self.period_start + timedelta(hours=10)
+
+        self.alpha_sp1_session = Sessions.objects.create(
+            user=self.user,
+            project=self.project_alpha,
+            start_time=midpoint,
+            end_time=midpoint + timedelta(minutes=60),
+            is_active=False,
+        )
+        self.alpha_sp1_session.subprojects.add(self.alpha_sp1)
+
+        self.alpha_sp2_session = Sessions.objects.create(
+            user=self.user,
+            project=self.project_alpha,
+            start_time=midpoint + timedelta(hours=2),
+            end_time=midpoint + timedelta(hours=2, minutes=60),
+            is_active=False,
+        )
+        self.alpha_sp2_session.subprojects.add(self.alpha_sp2)
+
+        self.beta_session = Sessions.objects.create(
+            user=self.user,
+            project=self.project_beta,
+            start_time=midpoint + timedelta(hours=3),
+            end_time=midpoint + timedelta(hours=4),
+            is_active=False,
+        )
+
+        self.gamma_session = Sessions.objects.create(
+            user=self.user,
+            project=self.project_gamma,
+            start_time=midpoint + timedelta(hours=4),
+            end_time=midpoint + timedelta(hours=5),
+            is_active=False,
+        )
+
+    def test_project_scope_can_exclude_specific_subproject(self):
+        commitment = Commitment.objects.create(
+            user=self.user,
+            aggregation_type='project',
+            project=self.project_alpha,
+            commitment_type='sessions',
+            period='daily',
+            target=1,
+        )
+        commitment.exclude_subprojects.add(self.alpha_sp2)
+
+        sessions = get_commitment_sessions_queryset(
+            commitment, self.period_start, self.period_end
+        )
+        self.assertEqual(list(sessions), [self.alpha_sp1_session])
+
+    def test_project_scope_can_include_only_selected_subproject(self):
+        commitment = Commitment.objects.create(
+            user=self.user,
+            aggregation_type='project',
+            project=self.project_alpha,
+            commitment_type='sessions',
+            period='daily',
+            target=1,
+        )
+        commitment.include_subprojects.add(self.alpha_sp2)
+
+        sessions = get_commitment_sessions_queryset(
+            commitment, self.period_start, self.period_end
+        )
+        self.assertEqual(list(sessions), [self.alpha_sp2_session])
+
+    def test_context_scope_supports_composed_include_exclude_rules(self):
+        commitment = Commitment.objects.create(
+            user=self.user,
+            aggregation_type='context',
+            context=self.context_work,
+            commitment_type='sessions',
+            period='daily',
+            target=1,
+        )
+        commitment.include_tags.add(self.tag_focus)
+        commitment.exclude_subprojects.add(self.alpha_sp2)
+
+        sessions = get_commitment_sessions_queryset(
+            commitment, self.period_start, self.period_end
+        )
+        self.assertEqual(list(sessions), [self.alpha_sp1_session])
 
 
 class ProjectsListStillWorksTests(TestCase):

@@ -1,0 +1,120 @@
+<section id="commitment-section" class="card">
+    <div class="commitments-toolbar">
+        <h3><i class="fa fa-bullseye"></i> Commitments</h3>
+        <div class="commitments-toolbar-actions">
+            <button type="button" class="collapse-toggle commitments-collapse-toggle" aria-expanded="true">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <button type="button" class="primary-button"
+                    onclick="window.location.href='{{ add_commitment_url }}'">
+                <i class="fa fa-plus"></i>
+                Add Commitment
+            </button>
+        </div>
+    </div>
+
+    <div class="commitments-collapsible-body">
+        {% if related_commitments %}
+            <div class="commitments-local-list">
+                {% for item in related_commitments %}
+                    <article class="commitment-card">
+                        <div class="commitment-header">
+                            <div>
+                                <div class="commitment-project">
+                                    {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}
+                                        <a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link text-red">{{ item.commitment.target_name }}</a>
+                                    {% elif item.commitment.aggregation_type == 'subproject' and item.commitment.subproject %}
+                                        <a href="{% url 'update_subproject' item.commitment.subproject.id %}" class="plain-link text-blue">{{ item.commitment.target_name }}</a>
+                                    {% elif item.commitment.aggregation_type == 'context' and item.commitment.context %}
+                                        <a href="{% url 'update_context' item.commitment.context.id %}" class="plain-link text-orange">{{ item.commitment.target_name }}</a>
+                                    {% elif item.commitment.aggregation_type == 'tag' and item.commitment.tag %}
+                                        <a href="{% url 'update_tag' item.commitment.tag.id %}" class="plain-link" {% if item.commitment.tag.color %}style="color: {{ item.commitment.tag.color }};"{% endif %}>{{ item.commitment.target_name }}</a>
+                                    {% else %}
+                                        {{ item.commitment.target_name }}
+                                    {% endif %}
+                                    <small class="text-muted">({{ item.commitment.get_aggregation_type_display }})</small>
+                                    {% if not item.commitment.active %}<span class="text-yellow">(paused)</span>{% endif %}
+                                </div>
+                            </div>
+                            <div class="text-cyan">
+                                <strong>{{ item.commitment.target }}{% if item.commitment.commitment_type == 'time' %} min{% else %} sessions{% endif %}</strong>
+                                / {{ item.commitment.get_period_display }}
+                            </div>
+                        </div>
+
+                        {% if item.progress %}
+                            <div class="commitment-metrics-row">
+                                <span>
+                                    Progress:
+                                    <strong>
+                                        {{ item.progress.actual }}{% if item.progress.commitment_type == 'time' %} min{% endif %}
+                                    </strong>
+                                    /
+                                    {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %} min{% endif %}
+                                    ({{ item.progress.percentage }}%)
+                                </span>
+                                {% if item.commitment.banking_enabled %}
+                                    <span>
+                                        Bank (reconciled):
+                                        <span class="{% if item.progress.balance >= 0 %}text-green{% else %}text-red{% endif %}">
+                                            {% if item.progress.balance >= 0 %}+{% endif %}{{ item.progress.balance }}{% if item.progress.commitment_type == 'time' %} min{% endif %}
+                                        </span>
+                                        |
+                                        This period (unbanked):
+                                        <span class="{% if item.progress.current_surplus >= 0 %}text-green{% else %}text-red{% endif %}">
+                                            {% if item.progress.current_surplus >= 0 %}+{% endif %}{{ item.progress.current_surplus }}{% if item.progress.commitment_type == 'time' %} min{% endif %}
+                                        </span>
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage }}%"></div>
+                            </div>
+                        {% endif %}
+
+                        <div class="commitment-rules">
+                            <div class="commitment-rules-title">Rule Composition</div>
+                            {% for line in item.rule_lines %}
+                                <div class="commitment-rule-line">{{ line }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="commitment-footer">
+                            <button type="button" class="primary-button"
+                                    onclick="window.location.href='{% url 'update_commitment' item.commitment.id %}'">
+                                <i class="fa fa-pen"></i>
+                                Edit Commitment
+                            </button>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="commitments-empty">No commitments currently apply to this {{ commitment_entity_label|default:'item' }}.</p>
+        {% endif %}
+    </div>
+</section>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const section = document.getElementById("commitment-section");
+        if (!section) {
+            return;
+        }
+        const button = section.querySelector(".commitments-collapse-toggle");
+        const body = section.querySelector(".commitments-collapsible-body");
+        if (!button || !body) {
+            return;
+        }
+
+        button.addEventListener("click", function () {
+            const isCollapsed = body.classList.toggle("is-collapsed");
+            button.setAttribute("aria-expanded", String(!isCollapsed));
+            const icon = button.querySelector("i");
+            if (icon) {
+                icon.classList.toggle("fa-chevron-down", !isCollapsed);
+                icon.classList.toggle("fa-chevron-right", isCollapsed);
+            }
+        });
+    });
+</script>

@@ -1,3 +1,4 @@
+import json
 import os
 import pytz
 from AutumnWeb import settings
@@ -22,6 +23,214 @@ from django.views.generic import (
     TemplateView,
 )
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
+
+
+def build_commitment_scope_meta(user) -> dict:
+    projects = (
+        Projects.objects.filter(user=user)
+        .select_related("context")
+        .prefetch_related("tags")
+        .order_by("name")
+    )
+    subprojects = (
+        SubProjects.objects.filter(user=user)
+        .select_related("parent_project__context")
+        .prefetch_related("parent_project__tags")
+        .order_by("name")
+    )
+
+    project_meta = {}
+    tag_context_ids = {}
+    for p in projects:
+        tag_ids = [t.id for t in p.tags.all()]
+        project_meta[str(p.id)] = {
+            "context_id": p.context_id,
+            "tag_ids": tag_ids,
+        }
+        for tid in tag_ids:
+            tag_context_ids.setdefault(str(tid), set()).add(p.context_id)
+
+    subproject_meta = {}
+    for sp in subprojects:
+        parent = sp.parent_project
+        subproject_meta[str(sp.id)] = {
+            "project_id": parent.id,
+            "context_id": parent.context_id,
+            "tag_ids": [t.id for t in parent.tags.all()],
+        }
+
+    tag_meta = {}
+    for t in Tag.objects.filter(user=user).order_by("name"):
+        tag_meta[str(t.id)] = {
+            "context_ids": sorted(
+                [cid for cid in tag_context_ids.get(str(t.id), set()) if cid is not None]
+            )
+        }
+
+    return {
+        "projects": project_meta,
+        "subprojects": subproject_meta,
+        "tags": tag_meta,
+    }
+
+
+def _project_has_any_subproject_in_qs(project: Projects, subprojects_qs) -> bool:
+    return subprojects_qs.filter(parent_project=project).exists()
+
+
+def _list_names(qs):
+    return list(qs.values_list("name", flat=True))
+
+
+def build_commitment_rule_lines(commitment: Commitment) -> list[str]:
+    lines = [
+        f"Scope: {commitment.get_aggregation_type_display()} = {commitment.target_name}"
+    ]
+
+    rule_parts = []
+    for label, include_qs, exclude_qs in [
+        ("Tags", commitment.include_tags.all(), commitment.exclude_tags.all()),
+        ("Projects", commitment.include_projects.all(), commitment.exclude_projects.all()),
+        (
+            "Subprojects",
+            commitment.include_subprojects.all(),
+            commitment.exclude_subprojects.all(),
+        ),
+        (
+            "Contexts",
+            commitment.include_contexts.all(),
+            commitment.exclude_contexts.all(),
+        ),
+    ]:
+        include_names = _list_names(include_qs)
+        exclude_names = _list_names(exclude_qs)
+        if include_names:
+            rule_parts.append(f"Include {label}: {', '.join(include_names)}")
+        if exclude_names:
+            rule_parts.append(f"Exclude {label}: {', '.join(exclude_names)}")
+
+    if not rule_parts:
+        lines.append("Rules: all sessions in scope count.")
+    else:
+        lines.extend(rule_parts)
+
+    return lines
+
+
+def _build_commitment_panel_items(commitments):
+    items = []
+    for commitment in commitments:
+        progress = None
+        if commitment.active:
+            reconcile_commitment(commitment)
+            progress = get_commitment_progress(commitment)
+        items.append(
+            {
+                "commitment": commitment,
+                "progress": progress,
+                "rule_lines": build_commitment_rule_lines(commitment),
+            }
+        )
+    return items
+
+
+def commitment_applies_to_project(commitment: Commitment, project: Projects) -> bool:
+    """
+    Determine whether a commitment is relevant to a given project based on
+    aggregation scope and composable include/exclude rules.
+    """
+    # Base aggregation scope
+    if commitment.aggregation_type == "context":
+        if commitment.context_id != project.context_id:
+            return False
+    elif commitment.aggregation_type == "tag":
+        if not project.tags.filter(pk=commitment.tag_id).exists():
+            return False
+    elif commitment.aggregation_type == "project":
+        if commitment.project_id != project.id:
+            return False
+    elif commitment.aggregation_type == "subproject":
+        if not commitment.subproject_id:
+            return False
+        return commitment.subproject.parent_project_id == project.id
+    else:
+        return False
+
+    # Descendant include/exclude filters
+    include_tags = commitment.include_tags.all()
+    exclude_tags = commitment.exclude_tags.all()
+    include_projects = commitment.include_projects.all()
+    exclude_projects = commitment.exclude_projects.all()
+    include_subprojects = commitment.include_subprojects.all()
+
+    if include_tags.exists() and not project.tags.filter(pk__in=include_tags.values("pk")).exists():
+        return False
+    if exclude_tags.exists() and project.tags.filter(pk__in=exclude_tags.values("pk")).exists():
+        return False
+    if include_projects.exists() and not include_projects.filter(pk=project.id).exists():
+        return False
+    if exclude_projects.exists() and exclude_projects.filter(pk=project.id).exists():
+        return False
+    if include_subprojects.exists() and not _project_has_any_subproject_in_qs(project, include_subprojects):
+        return False
+
+    return True
+
+
+def commitment_applies_to_subproject(
+    commitment: Commitment, subproject: SubProjects
+) -> bool:
+    project = subproject.parent_project
+
+    if commitment.aggregation_type == "context":
+        if commitment.context_id != project.context_id:
+            return False
+    elif commitment.aggregation_type == "tag":
+        if not project.tags.filter(pk=commitment.tag_id).exists():
+            return False
+    elif commitment.aggregation_type == "project":
+        if commitment.project_id != project.id:
+            return False
+    elif commitment.aggregation_type == "subproject":
+        if commitment.subproject_id != subproject.id:
+            return False
+    else:
+        return False
+
+    include_tags = commitment.include_tags.all()
+    exclude_tags = commitment.exclude_tags.all()
+    include_projects = commitment.include_projects.all()
+    exclude_projects = commitment.exclude_projects.all()
+    include_subprojects = commitment.include_subprojects.all()
+    exclude_subprojects = commitment.exclude_subprojects.all()
+
+    if include_tags.exists() and not project.tags.filter(pk__in=include_tags.values("pk")).exists():
+        return False
+    if exclude_tags.exists() and project.tags.filter(pk__in=exclude_tags.values("pk")).exists():
+        return False
+    if include_projects.exists() and not include_projects.filter(pk=project.id).exists():
+        return False
+    if exclude_projects.exists() and exclude_projects.filter(pk=project.id).exists():
+        return False
+    if include_subprojects.exists() and not include_subprojects.filter(pk=subproject.id).exists():
+        return False
+    if exclude_subprojects.exists() and exclude_subprojects.filter(pk=subproject.id).exists():
+        return False
+
+    return True
+
+
+def commitment_applies_to_context(commitment: Commitment, context_obj: Context) -> bool:
+    projects = Projects.objects.filter(user=commitment.user, context=context_obj)
+    return any(commitment_applies_to_project(commitment, p) for p in projects)
+
+
+def commitment_applies_to_tag(commitment: Commitment, tag_obj: Tag) -> bool:
+    projects = (
+        Projects.objects.filter(user=commitment.user, tags=tag_obj)
+        .distinct()
+    )
+    return any(commitment_applies_to_project(commitment, p) for p in projects)
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -1063,19 +1272,29 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
             if context["session_count"] > 0
             else 0
         )
+        # context["recent_sessions"] = self.object.recent_sessions.all()
 
-        # Add commitment data if exists
-        try:
-            commitment = self.object.commitment
-            if commitment and commitment.active:
-                # Reconcile any past periods
-                reconcile_commitment(commitment)
-                # Get current progress
-                context["commitment"] = commitment
-                context["commitment_progress"] = get_commitment_progress(commitment)
-        except Commitment.DoesNotExist:
-            context["commitment"] = None
-            context["commitment_progress"] = None
+        # Build all commitments relevant to this project (multiple scopes can apply).
+        commitments_qs = (
+            Commitment.objects.filter(user=self.request.user)
+            .select_related("project", "subproject", "context", "tag")
+            .prefetch_related(
+                "include_projects",
+                "exclude_projects",
+                "include_subprojects",
+                "exclude_subprojects",
+                "include_contexts",
+                "exclude_contexts",
+                "include_tags",
+                "exclude_tags",
+            )
+            .order_by("-active", "aggregation_type", "created_at")
+        )
+        filtered = [
+            c for c in commitments_qs if commitment_applies_to_project(c, self.object)
+        ]
+        context["related_commitments"] = _build_commitment_panel_items(filtered)
+        context["add_commitment_url"] = reverse("create_commitment", kwargs={"project_pk": self.object.id})
 
         return context
 
@@ -1118,6 +1337,30 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
             self.object.total_time / context["session_count"]
             if context["session_count"] > 0
             else 0
+        )
+        commitments_qs = (
+            Commitment.objects.filter(user=self.request.user)
+            .select_related("project", "subproject", "context", "tag")
+            .prefetch_related(
+                "include_projects",
+                "exclude_projects",
+                "include_subprojects",
+                "exclude_subprojects",
+                "include_contexts",
+                "exclude_contexts",
+                "include_tags",
+                "exclude_tags",
+            )
+            .order_by("-active", "aggregation_type", "created_at")
+        )
+        filtered = [
+            c
+            for c in commitments_qs
+            if commitment_applies_to_subproject(c, self.object)
+        ]
+        context["related_commitments"] = _build_commitment_panel_items(filtered)
+        context["add_commitment_url"] = (
+            f"{reverse('create_commitment_generic')}?aggregation_type=subproject&target_id={self.object.id}"
         )
         return context
 
@@ -1661,6 +1904,28 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
                 "sidebar_status_counts": sidebar_status_counts,
             }
         )
+        commitments_qs = (
+            Commitment.objects.filter(user=self.request.user)
+            .select_related("project", "subproject", "context", "tag")
+            .prefetch_related(
+                "include_projects",
+                "exclude_projects",
+                "include_subprojects",
+                "exclude_subprojects",
+                "include_contexts",
+                "exclude_contexts",
+                "include_tags",
+                "exclude_tags",
+            )
+            .order_by("-active", "aggregation_type", "created_at")
+        )
+        filtered = [
+            c for c in commitments_qs if commitment_applies_to_context(c, self.object)
+        ]
+        ctx["related_commitments"] = _build_commitment_panel_items(filtered)
+        ctx["add_commitment_url"] = (
+            f"{reverse('create_commitment_generic')}?aggregation_type=context&target_id={self.object.id}"
+        )
         return ctx
 
     def form_valid(self, form):
@@ -1749,6 +2014,26 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
                 "sidebar_status_counts": sidebar_status_counts,
             }
         )
+        commitments_qs = (
+            Commitment.objects.filter(user=self.request.user)
+            .select_related("project", "subproject", "context", "tag")
+            .prefetch_related(
+                "include_projects",
+                "exclude_projects",
+                "include_subprojects",
+                "exclude_subprojects",
+                "include_contexts",
+                "exclude_contexts",
+                "include_tags",
+                "exclude_tags",
+            )
+            .order_by("-active", "aggregation_type", "created_at")
+        )
+        filtered = [c for c in commitments_qs if commitment_applies_to_tag(c, self.object)]
+        ctx["related_commitments"] = _build_commitment_panel_items(filtered)
+        ctx["add_commitment_url"] = (
+            f"{reverse('create_commitment_generic')}?aggregation_type=tag&target_id={self.object.id}"
+        )
         return ctx
 
     def form_valid(self, form):
@@ -1787,9 +2072,44 @@ class CreateCommitmentView(LoginRequiredMixin, CreateView):
     form_class = CommitmentForm
     template_name = "core/create_commitment.html"
 
+    def _get_prefill_target(self):
+        if "project_pk" in self.kwargs:
+            project = get_object_or_404(
+                Projects, pk=self.kwargs["project_pk"], user=self.request.user
+            )
+            return "project", project
+
+        aggregation_type = (self.request.GET.get("aggregation_type") or "").strip()
+        target_id = (self.request.GET.get("target_id") or "").strip()
+        model_map = {
+            "context": Context,
+            "tag": Tag,
+            "project": Projects,
+            "subproject": SubProjects,
+        }
+        model = model_map.get(aggregation_type)
+        if model is None or not target_id:
+            return None, None
+        try:
+            target_obj = model.objects.get(pk=int(target_id), user=self.request.user)
+        except (ValueError, model.DoesNotExist):
+            return None, None
+        return aggregation_type, target_obj
+
+    def get_initial(self):
+        initial = super().get_initial()
+        aggregation_type, target_obj = self._get_prefill_target()
+        if aggregation_type and target_obj:
+            initial["aggregation_type"] = aggregation_type
+            initial[aggregation_type] = target_obj
+        return initial
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Add Commitment"
+        context["commitment_scope_meta_json"] = json.dumps(
+            build_commitment_scope_meta(self.request.user)
+        )
         if "project_pk" in self.kwargs:
             context["project"] = get_object_or_404(
                 Projects, pk=self.kwargs["project_pk"], user=self.request.user
@@ -1800,10 +2120,9 @@ class CreateCommitmentView(LoginRequiredMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
         kwargs["project"] = None
-        if "project_pk" in self.kwargs:
-            project = get_object_or_404(
-                Projects, pk=self.kwargs["project_pk"], user=self.request.user
-            )
+        aggregation_type, target_obj = self._get_prefill_target()
+        if aggregation_type == "project" and target_obj is not None:
+            project = target_obj
             kwargs["project"] = project
             if self.request.method == "POST":
                 data = self.request.POST.copy()
@@ -1833,6 +2152,9 @@ class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Update Commitment"
+        context["commitment_scope_meta_json"] = json.dumps(
+            build_commitment_scope_meta(self.request.user)
+        )
         # Reconcile and get progress
         reconcile_commitment(self.object)
         context["progress"] = get_commitment_progress(self.object)

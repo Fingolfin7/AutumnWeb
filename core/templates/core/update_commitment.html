@@ -9,6 +9,7 @@
     <form class="flex-row" method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <section id="input-fields" class="card stacked half-width">
+            <h4>Scope</h4>
             <span class="label-input">
                 {{ form.aggregation_type.label_tag }}
                 {{ form.aggregation_type }}
@@ -16,27 +17,140 @@
             </span>
 
             <span class="label-input">
-                {{ form.project.label_tag }}
-                {{ form.project }}
-                {{ form.project.errors }}
+                <label for="scope-target-search">Scope Target Search</label>
+                <input type="text" id="scope-target-search" class="half-width" placeholder="Search selected scope target..." autocomplete="off" list="scope-target-options">
+                <datalist id="scope-target-options"></datalist>
+                <small class="help-text">Type and pick a match. This is the only scope target selector.</small>
             </span>
 
-            <span class="label-input">
-                {{ form.subproject.label_tag }}
-                {{ form.subproject }}
-                {{ form.subproject.errors }}
-            </span>
-
-            <span class="label-input">
+            <span class="label-input commitment-target-field" data-target-type="context" style="display:none;">
                 {{ form.context.label_tag }}
                 {{ form.context }}
                 {{ form.context.errors }}
             </span>
 
-            <span class="label-input">
+            <span class="label-input commitment-target-field" data-target-type="tag" style="display:none;">
                 {{ form.tag.label_tag }}
                 {{ form.tag }}
                 {{ form.tag.errors }}
+            </span>
+
+            <span class="label-input commitment-target-field" data-target-type="project" style="display:none;">
+                {{ form.project.label_tag }}
+                {{ form.project }}
+                {{ form.project.errors }}
+            </span>
+
+            <span class="label-input commitment-target-field" data-target-type="subproject" style="display:none;">
+                {{ form.subproject.label_tag }}
+                {{ form.subproject }}
+                {{ form.subproject.errors }}
+            </span>
+
+            <hr>
+            <h4>Composable Rules</h4>
+            <small class="help-text">Include lists narrow scope. Exclude lists remove matching sessions.</small>
+
+            <span class="label-input commitment-rule-group" data-dimension="project">
+                <label for="id_include_projects">Only include projects</label>
+                <details class="tag-dropdown commitment-rule-dropdown">
+                    <summary class="tag-summary">Select projects</summary>
+                    <div class="tag-options">
+                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search projects..." autocomplete="off">
+                        {% for cb in form.include_projects %}
+                            <label class="tag-option commitment-rule-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                <small class="help-text">{{ form.include_projects.help_text }}</small>
+                {{ form.include_projects.errors }}
+            </span>
+
+            <span class="label-input commitment-rule-group" data-dimension="project">
+                <label for="id_exclude_projects">Exclude projects</label>
+                <details class="tag-dropdown commitment-rule-dropdown">
+                    <summary class="tag-summary">Select projects to exclude</summary>
+                    <div class="tag-options">
+                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search projects..." autocomplete="off">
+                        {% for cb in form.exclude_projects %}
+                            <label class="tag-option commitment-rule-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                <small class="help-text">{{ form.exclude_projects.help_text }}</small>
+                {{ form.exclude_projects.errors }}
+            </span>
+
+            <span class="label-input commitment-rule-group" data-dimension="subproject">
+                <label for="id_include_subprojects">Only include subprojects</label>
+                <details class="tag-dropdown commitment-rule-dropdown">
+                    <summary class="tag-summary">Select subprojects</summary>
+                    <div class="tag-options">
+                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search subprojects..." autocomplete="off">
+                        {% for cb in form.include_subprojects %}
+                            <label class="tag-option commitment-rule-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                <small class="help-text">{{ form.include_subprojects.help_text }}</small>
+                {{ form.include_subprojects.errors }}
+            </span>
+
+            <span class="label-input commitment-rule-group" data-dimension="subproject">
+                <label for="id_exclude_subprojects">Exclude subprojects</label>
+                <details class="tag-dropdown commitment-rule-dropdown">
+                    <summary class="tag-summary">Select subprojects to exclude</summary>
+                    <div class="tag-options">
+                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search subprojects..." autocomplete="off">
+                        {% for cb in form.exclude_subprojects %}
+                            <label class="tag-option commitment-rule-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                <small class="help-text">{{ form.exclude_subprojects.help_text }}</small>
+                {{ form.exclude_subprojects.errors }}
+            </span>
+
+            <span class="label-input commitment-rule-group" data-dimension="tag">
+                <label for="id_include_tags">Only include tags</label>
+                <details class="tag-dropdown commitment-rule-dropdown">
+                    <summary class="tag-summary">Select tags</summary>
+                    <div class="tag-options">
+                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search tags..." autocomplete="off">
+                        {% for cb in form.include_tags %}
+                            <label class="tag-option commitment-rule-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                <small class="help-text">{{ form.include_tags.help_text }}</small>
+                {{ form.include_tags.errors }}
+            </span>
+
+            <span class="label-input commitment-rule-group" data-dimension="tag">
+                <label for="id_exclude_tags">Exclude tags</label>
+                <details class="tag-dropdown commitment-rule-dropdown">
+                    <summary class="tag-summary">Select tags to exclude</summary>
+                    <div class="tag-options">
+                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search tags..." autocomplete="off">
+                        {% for cb in form.exclude_tags %}
+                            <label class="tag-option commitment-rule-option">
+                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
+                            </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                <small class="help-text">{{ form.exclude_tags.help_text }}</small>
+                {{ form.exclude_tags.errors }}
             </span>
 
             <span class="label-input">
@@ -49,6 +163,13 @@
                 {{ form.period.label_tag }}
                 {{ form.period }}
                 {{ form.period.errors }}
+            </span>
+
+            <span class="label-input">
+                {{ form.start_date.label_tag }}
+                {{ form.start_date }}
+                <small class="help-text">{{ form.start_date.help_text }}</small>
+                {{ form.start_date.errors }}
             </span>
 
             <span class="label-input">
@@ -171,4 +292,279 @@
             </p>
         </section>
     </form>
+{% endblock %}
+
+{% block head_includes %}
+    {{ block.super }}
+    <script>const COMMITMENT_SCOPE_META = {{ commitment_scope_meta_json|safe }};</script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const agg = document.getElementById('id_aggregation_type');
+            const targetRows = document.querySelectorAll('.commitment-target-field');
+            const ruleGroups = document.querySelectorAll('.commitment-rule-group');
+            const commitmentType = document.getElementById('id_commitment_type');
+            const targetHelp = document.querySelector('#id_target + .help-text');
+            const dropdowns = document.querySelectorAll('.commitment-rule-dropdown');
+            const scopeSearchInput = document.getElementById('scope-target-search');
+            const scopeTargetOptions = document.getElementById('scope-target-options');
+            const scopeMeta = (typeof COMMITMENT_SCOPE_META !== 'undefined' && COMMITMENT_SCOPE_META) ? COMMITMENT_SCOPE_META : {};
+            const targetSelectMap = {
+                context: document.getElementById('id_context'),
+                tag: document.getElementById('id_tag'),
+                project: document.getElementById('id_project'),
+                subproject: document.getElementById('id_subproject')
+            };
+
+            function getSelectedAggregationType() {
+                return agg ? agg.value : '';
+            }
+
+            function getActiveTargetSelect() {
+                return targetSelectMap[getSelectedAggregationType()] || null;
+            }
+
+            function getActiveScopeId() {
+                const select = getActiveTargetSelect();
+                if (!select || !select.value) {
+                    return null;
+                }
+                const parsed = parseInt(select.value, 10);
+                return Number.isNaN(parsed) ? null : parsed;
+            }
+
+            function syncTargetField() {
+                const selected = agg ? agg.value : '';
+                const visibleRuleDimensions = {
+                    context: ['tag', 'project', 'subproject'],
+                    tag: ['project', 'subproject'],
+                    project: ['subproject'],
+                    subproject: []
+                }[selected] || [];
+
+                targetRows.forEach(function (row) {
+                    row.style.display = 'none';
+                });
+                ruleGroups.forEach(function (row) {
+                    const isVisible = visibleRuleDimensions.indexOf(row.dataset.dimension) !== -1;
+                    row.style.display = isVisible ? '' : 'none';
+                    row.querySelectorAll('input').forEach(function (el) {
+                        el.disabled = !isVisible;
+                    });
+                });
+                syncScopeSearch();
+                applyScopeFilterToRules();
+            }
+
+            function syncTargetHelpText() {
+                if (!targetHelp || !commitmentType) {
+                    return;
+                }
+                targetHelp.textContent = commitmentType.value === 'time'
+                    ? 'Minutes for time-based commitments'
+                    : 'Count for session-based commitments';
+            }
+
+            function syncScopeSearch() {
+                const select = getActiveTargetSelect();
+                if (!scopeSearchInput || !select) {
+                    return;
+                }
+                if (scopeTargetOptions) {
+                    scopeTargetOptions.innerHTML = '';
+                    Array.from(select.options).forEach(function (opt) {
+                        if (!opt.value) {
+                            return;
+                        }
+                        const optionEl = document.createElement('option');
+                        optionEl.value = opt.text;
+                        scopeTargetOptions.appendChild(optionEl);
+                    });
+                }
+                const selectedOption = select.options[select.selectedIndex];
+                scopeSearchInput.value = selectedOption ? selectedOption.text : '';
+                scopeSearchInput.placeholder = 'Search ' + getSelectedAggregationType() + '...';
+            }
+
+            function commitScopeSearchToSelect() {
+                const select = getActiveTargetSelect();
+                if (!scopeSearchInput || !select) {
+                    return;
+                }
+                const query = (scopeSearchInput.value || '').trim().toLowerCase();
+                if (!query) {
+                    select.value = '';
+                    applyScopeFilterToRules();
+                    return;
+                }
+
+                const options = Array.from(select.options).filter(function (opt) {
+                    return !!opt.value;
+                });
+                let matched = options.find(function (opt) {
+                    return opt.text.toLowerCase() === query;
+                });
+                if (!matched) {
+                    const starts = options.filter(function (opt) {
+                        return opt.text.toLowerCase().indexOf(query) === 0;
+                    });
+                    if (starts.length === 1) {
+                        matched = starts[0];
+                    }
+                }
+                if (!matched) {
+                    const contains = options.filter(function (opt) {
+                        return opt.text.toLowerCase().indexOf(query) !== -1;
+                    });
+                    if (contains.length === 1) {
+                        matched = contains[0];
+                    }
+                }
+
+                if (matched) {
+                    select.value = matched.value;
+                    scopeSearchInput.value = matched.text;
+                } else {
+                    select.value = '';
+                }
+                applyScopeFilterToRules();
+            }
+
+            function isRuleOptionInScope(dimension, optionId, aggregationType, scopeId) {
+                if (!scopeId) {
+                    return true;
+                }
+                const projects = scopeMeta.projects || {};
+                const subprojects = scopeMeta.subprojects || {};
+                const tags = scopeMeta.tags || {};
+
+                if (aggregationType === 'context') {
+                    if (dimension === 'tag') {
+                        const tagMeta = tags[String(optionId)] || {};
+                        return (tagMeta.context_ids || []).indexOf(scopeId) !== -1;
+                    }
+                    if (dimension === 'project') {
+                        const projectMeta = projects[String(optionId)] || {};
+                        return projectMeta.context_id === scopeId;
+                    }
+                    if (dimension === 'subproject') {
+                        const subprojectMeta = subprojects[String(optionId)] || {};
+                        return subprojectMeta.context_id === scopeId;
+                    }
+                }
+                if (aggregationType === 'tag') {
+                    if (dimension === 'project') {
+                        const projectMeta = projects[String(optionId)] || {};
+                        return (projectMeta.tag_ids || []).indexOf(scopeId) !== -1;
+                    }
+                    if (dimension === 'subproject') {
+                        const subprojectMeta = subprojects[String(optionId)] || {};
+                        return (subprojectMeta.tag_ids || []).indexOf(scopeId) !== -1;
+                    }
+                }
+                if (aggregationType === 'project' && dimension === 'subproject') {
+                    const subprojectMeta = subprojects[String(optionId)] || {};
+                    return subprojectMeta.project_id === scopeId;
+                }
+                return true;
+            }
+
+            function applyScopeFilterToRules() {
+                const aggregationType = getSelectedAggregationType();
+                const scopeId = getActiveScopeId();
+
+                ruleGroups.forEach(function (group) {
+                    const dimension = group.dataset.dimension;
+                    group.querySelectorAll('.commitment-rule-option').forEach(function (opt) {
+                        const checkbox = opt.querySelector('input[type="checkbox"]');
+                        if (!checkbox) {
+                            return;
+                        }
+                        const optionId = parseInt(checkbox.value, 10);
+                        const inScope = isRuleOptionInScope(dimension, optionId, aggregationType, scopeId);
+                        if (!inScope) {
+                            checkbox.checked = false;
+                            checkbox.disabled = true;
+                            opt.style.display = 'none';
+                        } else {
+                            checkbox.disabled = false;
+                        }
+                    });
+                });
+            }
+
+            if (agg) {
+                agg.addEventListener('change', syncTargetField);
+                syncTargetField();
+            }
+            if (commitmentType) {
+                commitmentType.addEventListener('change', syncTargetHelpText);
+                syncTargetHelpText();
+            }
+            if (scopeSearchInput) {
+                scopeSearchInput.addEventListener('change', commitScopeSearchToSelect);
+                scopeSearchInput.addEventListener('blur', commitScopeSearchToSelect);
+            }
+            Object.values(targetSelectMap).forEach(function (select) {
+                if (!select) {
+                    return;
+                }
+                select.addEventListener('change', function () {
+                    syncScopeSearch();
+                    applyScopeFilterToRules();
+                    dropdowns.forEach(function (dropdown) {
+                        filterDropdownOptions(dropdown);
+                        updateDropdownSummary(dropdown);
+                    });
+                });
+            });
+
+            function updateDropdownSummary(dropdown) {
+                const summary = dropdown.querySelector('.tag-summary');
+                const options = dropdown.querySelectorAll('input[type="checkbox"]');
+                const checked = dropdown.querySelectorAll('input[type="checkbox"]:checked').length;
+                const noun = options.length === 1 ? 'item' : 'items';
+                summary.textContent = checked > 0 ? checked + ' selected' : 'Select ' + noun;
+            }
+
+            function filterDropdownOptions(dropdown) {
+                const group = dropdown.closest('.commitment-rule-group');
+                const dimension = group ? group.dataset.dimension : '';
+                const aggregationType = getSelectedAggregationType();
+                const scopeId = getActiveScopeId();
+                const searchEl = dropdown.querySelector('.commitment-rule-search');
+                const query = ((searchEl && searchEl.value) || '').toLowerCase();
+                dropdown.querySelectorAll('.commitment-rule-option').forEach(function (opt) {
+                    const labelEl = opt.querySelector('.tag-label');
+                    const checkboxEl = opt.querySelector('input[type="checkbox"]');
+                    const text = ((labelEl && labelEl.textContent) || '').toLowerCase();
+                    const checked = checkboxEl && checkboxEl.checked;
+                    const optionId = checkboxEl ? parseInt(checkboxEl.value, 10) : null;
+                    const inScope = optionId === null ? true : isRuleOptionInScope(dimension, optionId, aggregationType, scopeId);
+                    const searchMatch = checked || text.includes(query);
+                    const visible = inScope && searchMatch;
+                    opt.style.display = visible ? '' : 'none';
+                });
+            }
+
+            dropdowns.forEach(function (dropdown) {
+                applyScopeFilterToRules();
+                updateDropdownSummary(dropdown);
+                filterDropdownOptions(dropdown);
+
+                const searchInput = dropdown.querySelector('.commitment-rule-search');
+                if (searchInput) {
+                    searchInput.addEventListener('input', function () {
+                        filterDropdownOptions(dropdown);
+                    });
+                }
+
+                dropdown.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+                    cb.addEventListener('change', function () {
+                        updateDropdownSummary(dropdown);
+                        filterDropdownOptions(dropdown);
+                    });
+                });
+            });
+        });
+    </script>
 {% endblock %}
