@@ -94,7 +94,7 @@ class InsightsView(View):
         provider_models = {
             "gemini": [
                 ("gemini-3-flash-preview", "Gemini 3 Flash"),
-                ("gemini-3-pro-preview", "Gemini 3 Pro Preview"),
+                ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
             ]
         }
         if profile and profile.openai_api_key_enc:
@@ -103,6 +103,9 @@ class InsightsView(View):
                 ("gpt-5", "GPT-5"),
                 ("gpt-5.1", "GPT-5.1"),
                 ("gpt-5.2", "GPT-5.2"),
+                ("gpt-5.3", "GPT-5.3"),
+                ("gpt-5.4", "GPT-5.4"),
+                ("gpt-5.4-thinking", "GPT-5.4 Thinking"),
             ]
         if profile and profile.claude_api_key_enc:
             provider_models["claude"] = [
