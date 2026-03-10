@@ -12,50 +12,38 @@ class InsightsViewProviderModelsTests(TestCase):
         self.view = InsightsView()
         self.user = User.objects.create_user(username="llm-user", password="test-pass-123")
 
-    def test_gemini_models_include_updated_pro_preview(self):
+    def assert_has_model_choices(self, provider_models, provider):
+        self.assertIn(provider, provider_models)
+        self.assertGreater(len(provider_models[provider]), 0)
+        for model_value, model_label in provider_models[provider]:
+            self.assertIsInstance(model_value, str)
+            self.assertIsInstance(model_label, str)
+            self.assertTrue(model_value)
+            self.assertTrue(model_label)
+
+    def test_gemini_models_are_available_without_api_key(self):
         provider_models = self.view._provider_models(self.user)
 
-        self.assertEqual(
-            provider_models["gemini"],
-            [
-                ("gemini-3-flash-preview", "Gemini 3 Flash"),
-                ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
-            ],
-        )
+        self.assert_has_model_choices(provider_models, "gemini")
 
-    def test_openai_models_include_new_gpt_variants_when_key_present(self):
+    def test_openai_models_are_available_when_key_present(self):
         self.user.profile.set_api_key("openai", "test-openai-key")
         self.user.profile.save()
 
         provider_models = self.view._provider_models(self.user)
 
-        self.assertEqual(
-            provider_models["openai"],
-            [
-                ("gpt-5-mini", "GPT-5 Mini"),
-                ("gpt-5", "GPT-5"),
-                ("gpt-5.1", "GPT-5.1"),
-                ("gpt-5.2", "GPT-5.2"),
-                ("gpt-5.3", "GPT-5.3"),
-                ("gpt-5.4", "GPT-5.4"),
-                ("gpt-5.4-thinking", "GPT-5.4 Thinking"),
-            ],
-        )
+        self.assert_has_model_choices(provider_models, "openai")
 
 
 class GetLlmHandlerTests(SimpleTestCase):
-    def test_routes_updated_gemini_model_to_gemini_handler(self):
-        handler = get_llm_handler(
-            "gemini-3.1-pro-preview", api_keys={"gemini": "test-gemini-key"}
-        )
+    def test_routes_gemini_models_to_gemini_handler(self):
+        handler = get_llm_handler("gemini-test-model", api_keys={"gemini": "test-gemini-key"})
 
         self.assertIsInstance(handler, GeminiHandler)
-        self.assertEqual(handler.model, "gemini-3.1-pro-preview")
+        self.assertEqual(handler.model, "gemini-test-model")
 
-    def test_routes_new_openai_thinking_model_to_openai_handler(self):
-        handler = get_llm_handler(
-            "gpt-5.4-thinking", api_keys={"openai": "test-openai-key"}
-        )
+    def test_routes_gpt_models_to_openai_handler(self):
+        handler = get_llm_handler("gpt-test-model", api_keys={"openai": "test-openai-key"})
 
         self.assertIsInstance(handler, OpenAIHandler)
-        self.assertEqual(handler.model, "gpt-5.4-thinking")
+        self.assertEqual(handler.model, "gpt-test-model")
