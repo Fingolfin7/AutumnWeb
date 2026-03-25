@@ -72,7 +72,7 @@
   display: flex;
   gap: 0; /* Remove gap to allow cleaner borders */
   margin-top: 20px;
-  min-height: 600px;
+  height: 600px;
   border: 1px solid var(--border-dark);
   border-radius: 4px;
   overflow: hidden;
@@ -81,7 +81,9 @@
 
 .chat-sidebar {
   flex: 0 0 260px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-right: 1px solid var(--border-dark);
   padding: 15px;
   transition: all 0.3s ease;
@@ -133,6 +135,10 @@
   list-style: none;
   padding: 0;
   margin: 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .chat-item-container {
@@ -246,10 +252,27 @@
 
 .new-chat-btn {
   width: 100%;
+  flex-shrink: 0;
   margin-bottom: 15px;
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  color: var(--dark-background) !important;
+  line-height: 1;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.new-chat-btn i,
+.new-chat-btn span {
+  flex: 0 0 auto;
+}
+
+.new-chat-btn:hover,
+.new-chat-btn:focus,
+.new-chat-btn:active,
+.new-chat-btn:visited {
+  color: var(--dark-background) !important;
   text-decoration: none !important;
 }
