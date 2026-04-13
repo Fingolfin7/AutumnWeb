@@ -1,6 +1,7 @@
 $(document).ready(function() {
     const ACTIVE_TIMERS_SELECTOR = '#active-timers';
-    const TIMER_CARD_SELECTOR = `${ACTIVE_TIMERS_SELECTOR} .card[id^="timer-"]`;
+    const TIMER_CARD_SELECTOR = `${ACTIVE_TIMERS_SELECTOR} [data-timer-id]`;
+    const DASHBOARD_PATH = '/';
 
     function updateDurations() {
         $(TIMER_CARD_SELECTOR).each(function() {
@@ -43,7 +44,7 @@ $(document).ready(function() {
     function getLocalTimerIds() {
         return $(TIMER_CARD_SELECTOR)
             .map(function() {
-                return parseInt($(this).attr('id').replace('timer-', ''), 10);
+                return parseInt($(this).data('timer-id'), 10);
             })
             .get()
             .filter(Number.isFinite)
@@ -52,9 +53,6 @@ $(document).ready(function() {
 
     function syncActiveTimers() {
         const timersContainer = $(ACTIVE_TIMERS_SELECTOR);
-        if (timersContainer.length === 0) {
-            return;
-        }
 
         $.getJSON('/api/list_active_sessions/')
             .done(function(sessions) {
@@ -62,6 +60,14 @@ $(document).ready(function() {
                     .filter(session => session.is_active)
                     .map(session => session.id)
                     .sort((a, b) => a - b);
+
+                if (timersContainer.length === 0) {
+                    if (window.location.pathname === DASHBOARD_PATH && serverIds.length > 0) {
+                        window.location.reload();
+                    }
+                    return;
+                }
+
                 const localIds = getLocalTimerIds();
                 const serverSet = new Set(serverIds);
                 const allLocalTimersStillActive = localIds.every(id => serverSet.has(id));

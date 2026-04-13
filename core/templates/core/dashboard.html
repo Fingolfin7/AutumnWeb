@@ -35,7 +35,7 @@
 
     <!-- Active Timers (if any) -->
     {% if active_timers %}
-    <section id="active-timers" class="card" style="border-left: 4px solid var(--main-yellow);">
+    <section id="active-timers" class="card" data-partial-list="true" data-max-visible="5" style="border-left: 4px solid var(--main-yellow);">
         <h2 class="section-header collapsible-header" data-target="active-timers-body">
             <span><i class="fas fa-play-circle text-yellow"></i> <u>Active Timers</u></span>
             <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="active-timers-body">
@@ -44,7 +44,7 @@
         </h2>
         <div id="active-timers-body" class="collapsible-body active-timers-list">
             {% for timer in active_timers %}
-            <div class="active-timer-item card" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 4px; width: 100%;" data-start-time="{{ timer.start_time|utc_time_formatter }}">
+            <div class="active-timer-item card" data-timer-id="{{ timer.id }}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 4px; width: 100%;" data-start-time="{{ timer.start_time|utc_time_formatter }}">
                 <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
                     <span class="text-red timer-project" style="font-weight: bold;">{{ timer.project.name }}</span>
                     {% if timer.subprojects.all %}
