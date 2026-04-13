@@ -1548,6 +1548,9 @@ def list_sessions(request):
 @permission_classes([IsAuthenticated])
 def list_active_sessions(request):
     sessions = Sessions.objects.filter(is_active=True, user=request.user)
+    sessions = filter_by_active_context(
+        sessions, request, override_context_id=request.query_params.get("context")
+    )
     serializer = SessionSerializer(sessions, many=True)
     return Response(serializer.data)
 

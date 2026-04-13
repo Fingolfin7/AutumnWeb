@@ -12,7 +12,7 @@
             <u>Active Timers</u>
         </a>
     </h2>
-    <div id="active-timers">
+    <div id="active-timers" data-partial-list="true" data-max-visible="5">
         {% for timer in timers %}
             <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|date:"Y-m-d H:i:s" }}">
                 <table class="timer-row">
