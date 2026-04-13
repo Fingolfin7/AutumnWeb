@@ -15,7 +15,7 @@
     </section>
     <section id="active-timers">
         {% for timer in timers %}
-            <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}">
+            <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}">
                 <div class="timer-row-flex">
                     <span>[{{ forloop.counter0 }}]: Started</span>
                     <span class="text-red">

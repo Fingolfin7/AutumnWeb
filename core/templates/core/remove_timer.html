@@ -12,7 +12,7 @@
 
         <h3>Are you sure you want to remove this timer?</h3>
 
-        <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}">
+        <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}">
                 <table class="timer-row">
                     <tr>
                         <td class="text-red">
