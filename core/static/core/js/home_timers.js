@@ -1,6 +1,7 @@
 $(document).ready(function() {
     const ACTIVE_TIMERS_SELECTOR = '#active-timers';
     const TIMER_CARD_SELECTOR = `${ACTIVE_TIMERS_SELECTOR} .card[id^="timer-"]`;
+    const SYNC_INTERVAL_MS = 5000;
 
     function updateDurations() {
         $(TIMER_CARD_SELECTOR).each(function() {
@@ -20,24 +21,21 @@ $(document).ready(function() {
         let minutes = Math.floor(remainingSecondsAfterHours / 60);
         let seconds = remainingSecondsAfterHours % 60;
         let days = Math.floor(hours / 24);
-        hours = hours % 24; // Remaining hours after days
+        hours = hours % 24;
 
-        let build_time = '';
-
-
+        let buildTime = '';
         if (days > 0) {
-             build_time += days + ' day' + (days !== 1 ? 's ' : ' ');
+            buildTime += days + ' day' + (days !== 1 ? 's ' : ' ');
         }
         if (hours > 0) {
-           build_time += hours + ' hour' + (hours !== 1 ? 's ' : ' ');
+            buildTime += hours + ' hour' + (hours !== 1 ? 's ' : ' ');
         }
         if (minutes > 0) {
-            build_time += minutes + ' minute' + (minutes !== 1 ? 's ' : ' ') ;
+            buildTime += minutes + ' minute' + (minutes !== 1 ? 's ' : ' ');
         }
 
-        build_time += seconds + ' second' + (seconds !== 1 ? 's' : '');
-
-        return build_time;
+        buildTime += seconds + ' second' + (seconds !== 1 ? 's' : '');
+        return buildTime;
     }
 
     function getLocalTimerIds() {
@@ -48,6 +46,21 @@ $(document).ready(function() {
             .get()
             .filter(Number.isFinite)
             .sort((a, b) => a - b);
+    }
+
+    let refreshInFlight = false;
+
+    function refreshTimerSection() {
+        if (refreshInFlight) {
+            return;
+        }
+        refreshInFlight = true;
+
+        const refreshUrl = `${window.location.pathname} #active-timers > *`;
+        $(ACTIVE_TIMERS_SELECTOR).load(refreshUrl, function() {
+            refreshInFlight = false;
+            updateDurations();
+        });
     }
 
     function syncActiveTimers() {
@@ -65,36 +78,19 @@ $(document).ready(function() {
                 const localIds = getLocalTimerIds();
                 const serverSet = new Set(serverIds);
                 const allLocalTimersStillActive = localIds.every(id => serverSet.has(id));
-                const isPartialList = timersContainer.data('partial-list') === true;
                 const maxVisible = parseInt(timersContainer.data('max-visible'), 10);
-                const isAtCapacity = isPartialList && Number.isFinite(maxVisible) && localIds.length >= maxVisible;
+                const hasCapacity = Number.isFinite(maxVisible) ? localIds.length < maxVisible : true;
+                const canShowNewTimers = hasCapacity && serverIds.length !== localIds.length;
 
-                let hasChanges = !allLocalTimersStillActive;
-                if (!hasChanges) {
-                    // Full timer pages should always mirror the server list exactly.
-                    // Partial timer lists (dashboard) only need to refresh on additions
-                    // when there is available room.
-                    if (isPartialList) {
-                        if (!isAtCapacity && serverIds.length !== localIds.length) {
-                            hasChanges = true;
-                        }
-                    } else if (serverIds.length !== localIds.length) {
-                        hasChanges = true;
-                    }
-                }
-
-                if (hasChanges) {
-                    window.location.reload();
+                if (!allLocalTimersStillActive || canShowNewTimers) {
+                    refreshTimerSection();
                 }
             });
     }
 
-    // Update durations every second
     setInterval(updateDurations, 1000);
-    // Poll server state so timers stopped/started outside the web UI show up quickly.
-    setInterval(syncActiveTimers, 5000);
+    setInterval(syncActiveTimers, SYNC_INTERVAL_MS);
 
-    // Initial update
     updateDurations();
     syncActiveTimers();
 });
