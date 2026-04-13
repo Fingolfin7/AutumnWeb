@@ -63,25 +63,7 @@ $(document).ready(function() {
                     .map(session => session.id)
                     .sort((a, b) => a - b);
                 const localIds = getLocalTimerIds();
-                const serverSet = new Set(serverIds);
-                const allLocalTimersStillActive = localIds.every(id => serverSet.has(id));
-                const isPartialList = timersContainer.data('partial-list') === true;
-                const maxVisible = parseInt(timersContainer.data('max-visible'), 10);
-                const isAtCapacity = isPartialList && Number.isFinite(maxVisible) && localIds.length >= maxVisible;
-
-                let hasChanges = !allLocalTimersStillActive;
-                if (!hasChanges) {
-                    // Full timer pages should always mirror the server list exactly.
-                    // Partial timer lists (dashboard) only need to refresh on additions
-                    // when there is available room.
-                    if (isPartialList) {
-                        if (!isAtCapacity && serverIds.length !== localIds.length) {
-                            hasChanges = true;
-                        }
-                    } else if (serverIds.length !== localIds.length) {
-                        hasChanges = true;
-                    }
-                }
+                const hasChanges = serverIds.length !== localIds.length || serverIds.some((id, idx) => id !== localIds[idx]);
 
                 if (hasChanges) {
                     window.location.reload();
