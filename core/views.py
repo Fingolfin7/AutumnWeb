@@ -518,7 +518,19 @@ def stop_timer(request, session_id: int):
     timer = get_object_or_404(Sessions, id=session_id, user=request.user)
 
     if request.method == "POST":
-        form = StopTimerForm(request.POST, instance=timer)
+        post_data = request.POST.copy()
+
+        # Backward-compatibility with previous payloads/tests that posted `session_note`.
+        if "note" not in post_data and "session_note" in post_data:
+            post_data["note"] = post_data.get("session_note", "")
+
+        # Maintain legacy behavior where POSTing without explicit date/time still stops immediately.
+        if not post_data.get("start_time"):
+            post_data["start_time"] = timer.start_time.strftime("%Y-%m-%dT%H:%M")
+        if not post_data.get("end_time"):
+            post_data["end_time"] = timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M")
+
+        form = StopTimerForm(post_data, instance=timer)
         if form.is_valid():
             timer = form.save(commit=False)
             timer.is_active = False
