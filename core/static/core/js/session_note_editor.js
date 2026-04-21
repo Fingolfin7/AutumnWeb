@@ -27,6 +27,7 @@
     function setupDictation(editorContainer, textarea) {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const dictateButton = editorContainer.querySelector('[data-note-action="dictate"]');
+        const dictateLabel = dictateButton ? dictateButton.querySelector('[data-dictate-label]') : null;
         const status = editorContainer.querySelector('[data-note-status]');
 
         if (!dictateButton || !status) {
@@ -35,6 +36,9 @@
 
         if (!SpeechRecognition) {
             dictateButton.disabled = true;
+            if (dictateLabel) {
+                dictateLabel.textContent = 'Unavailable';
+            }
             status.textContent = 'Dictation unavailable in this browser.';
             return;
         }
@@ -56,13 +60,19 @@
 
         recognition.onstart = function () {
             listening = true;
-            dictateButton.textContent = 'Stop dictation';
+            dictateButton.classList.add('listening');
+            if (dictateLabel) {
+                dictateLabel.textContent = 'Stop';
+            }
             status.textContent = 'Listening...';
         };
 
         recognition.onend = function () {
             listening = false;
-            dictateButton.textContent = 'Dictate';
+            dictateButton.classList.remove('listening');
+            if (dictateLabel) {
+                dictateLabel.textContent = 'Dictate';
+            }
             status.textContent = 'Dictation stopped.';
         };
 

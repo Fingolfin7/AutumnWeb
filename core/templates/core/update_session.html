@@ -13,40 +13,42 @@
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <section id="input-fields" class="card stacked">
-           <div id="search-projects">
-                <span class="label-input">
+           <div class="session-top-grid">
+                <span class="label-input session-field">
                     {{ form.project_name.label_tag }}
                     {{ form.project_name}}
                     {{ form.project_name.errors }}
                 </span>
-                <div id="project-search-results"></div>
-            </div>
-
-           <div id="date-fields" class="flex-row">
-                <span class="label-input">
+                <span class="label-input session-field">
                     {{ form.start_time.label_tag }}
                     {{ form.start_time }}
                     {{ form.start_time.errors }}
                 </span>
-
-                <span class="label-input">
+                <span class="label-input session-field">
                     {{ form.end_time.label_tag }}
                     {{ form.end_time }}
                     {{ form.end_time.errors }}
                 </span>
            </div>
+           <div id="project-search-results"></div>
 
             <!--edit session notes-->
-            <span class="label-input" data-note-editor>
-                {{ form.note.label_tag }}
-                <div class="flex-row">
-                    <button type="button" class="secondary-button" data-note-action="bold"><b>B</b></button>
-                    <button type="button" class="secondary-button" data-note-action="italic"><i>I</i></button>
-                    <button type="button" class="secondary-button" data-note-action="link"><i class="fa fa-link"></i></button>
-                    <button type="button" class="secondary-button" data-note-action="dictate">Dictate</button>
+            <span class="label-input note-editor-field" data-note-editor>
+                <label for="{{ form.note.id_for_label }}">Note:</label>
+                <div class="note-editor-shell">
+                    <div class="note-editor-toolbar">
+                        <button type="button" class="note-tool-button" data-note-action="bold"><b>B</b></button>
+                        <button type="button" class="note-tool-button" data-note-action="italic"><i>I</i></button>
+                        <button type="button" class="note-tool-button" data-note-action="link"><i class="fa fa-link"></i></button>
+                        <span class="note-toolbar-divider" aria-hidden="true"></span>
+                        <button type="button" class="note-tool-button dictate-button" data-note-action="dictate">
+                            <i class="fa fa-microphone"></i>
+                            <span data-dictate-label>Dictate</span>
+                        </button>
+                    </div>
+                    {{ form.note }}
                 </div>
                 <small data-note-status></small>
-                {{ form.note }}
                 {{ form.note.errors }}
             </span>
         </section>
