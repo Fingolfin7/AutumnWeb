@@ -515,20 +515,27 @@ def update_session(request, session_id: int):
 
 @login_required
 def stop_timer(request, session_id: int):
-    timer = Sessions.objects.get(id=session_id)
+    timer = get_object_or_404(Sessions, id=session_id, user=request.user)
 
     if request.method == "POST":
-        timer.is_active = False
-        timer.end_time = timezone.now()
+        form = StopTimerForm(request.POST, instance=timer)
+        if form.is_valid():
+            timer = form.save(commit=False)
+            timer.is_active = False
+            timer.save()
+            messages.success(request, "Stopped timer")
+            return redirect("timers")
 
-        if "session_note" in request.POST:
-            timer.note = request.POST["session_note"]
+        messages.error(request, "Please correct the errors below.")
+    else:
+        form = StopTimerForm(
+            instance=timer,
+            initial={
+                "end_time": timezone.now(),
+            },
+        )
 
-        timer.save()
-        messages.success(request, "Stopped timer")
-        return redirect("timers")
-
-    context = {"title": "Stop Timer", "timer": timer}
+    context = {"title": "Stop Timer", "timer": timer, "form": form}
 
     return render(request, "core/stop_timer.html", context)
 
