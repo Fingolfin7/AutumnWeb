@@ -515,20 +515,39 @@ def update_session(request, session_id: int):
 
 @login_required
 def stop_timer(request, session_id: int):
-    timer = Sessions.objects.get(id=session_id)
+    timer = get_object_or_404(Sessions, id=session_id, user=request.user)
 
     if request.method == "POST":
-        timer.is_active = False
-        timer.end_time = timezone.now()
+        post_data = request.POST.copy()
 
-        if "session_note" in request.POST:
-            timer.note = request.POST["session_note"]
+        # Backward-compatibility with previous payloads/tests that posted `session_note`.
+        if "note" not in post_data and "session_note" in post_data:
+            post_data["note"] = post_data.get("session_note", "")
 
-        timer.save()
-        messages.success(request, "Stopped timer")
-        return redirect("timers")
+        # Maintain legacy behavior where POSTing without explicit date/time still stops immediately.
+        if not post_data.get("start_time"):
+            post_data["start_time"] = timer.start_time.strftime("%Y-%m-%dT%H:%M")
+        if not post_data.get("end_time"):
+            post_data["end_time"] = timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M")
 
-    context = {"title": "Stop Timer", "timer": timer}
+        form = StopTimerForm(post_data, instance=timer)
+        if form.is_valid():
+            timer = form.save(commit=False)
+            timer.is_active = False
+            timer.save()
+            messages.success(request, "Stopped timer")
+            return redirect("timers")
+
+        messages.error(request, "Please correct the errors below.")
+    else:
+        form = StopTimerForm(
+            instance=timer,
+            initial={
+                "end_time": timezone.now(),
+            },
+        )
+
+    context = {"title": "Stop Timer", "timer": timer, "form": form}
 
     return render(request, "core/stop_timer.html", context)
 

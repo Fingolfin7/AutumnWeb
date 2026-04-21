@@ -193,8 +193,60 @@ class UpdateSessionForm(forms.ModelForm):
         model = Sessions
         fields = ['start_time', 'end_time', 'note']
         widgets = {
+            'start_time': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'class': 'half-width'},
+                format='%Y-%m-%dT%H:%M',
+            ),
+            'end_time': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'class': 'half-width'},
+                format='%Y-%m-%dT%H:%M',
+            ),
             'note': forms.Textarea(attrs={'placeholder': 'Note', 'class': 'half-width', 'required': False}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['start_time'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S']
+        self.fields['end_time'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+
+        if start_time and end_time and end_time < start_time:
+            self.add_error('end_time', "End time cannot be earlier than start time.")
+
+        return cleaned_data
+
+
+class StopTimerForm(forms.ModelForm):
+    class Meta:
+        model = Sessions
+        fields = ['start_time', 'end_time', 'note']
+        widgets = {
+            'start_time': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'class': 'half-width'},
+                format='%Y-%m-%dT%H:%M',
+            ),
+            'end_time': forms.DateTimeInput(
+                attrs={'type': 'datetime-local', 'class': 'half-width'},
+                format='%Y-%m-%dT%H:%M',
+            ),
+            'note': forms.Textarea(
+                attrs={
+                    'placeholder': 'Session Note...',
+                    'class': 'half-width',
+                    'rows': 4,
+                    'required': False,
+                }
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['start_time'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S']
+        self.fields['end_time'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S']
 
     def clean(self):
         cleaned_data = super().clean()

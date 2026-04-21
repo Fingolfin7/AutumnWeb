@@ -1567,3 +1567,110 @@ body.light-mode .activity-day.is-inactive {
     display: none;
   }
 }
+
+/* -----------------------------
+   SESSION FORM POLISH
+------------------------------ */
+.session-top-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 1.25rem;
+  align-items: end;
+}
+
+.session-datetime-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 1.25rem;
+}
+
+.session-field input {
+  width: 100%;
+  min-height: 3rem;
+}
+
+.note-editor-field {
+  margin-top: 0.5rem;
+}
+
+.note-editor-shell {
+  margin-top: 0.45rem;
+  border: 1px solid var(--border-dark);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card-background-light);
+}
+
+body.dark-mode .note-editor-shell {
+  background: var(--card-background-dark);
+  border-color: var(--border-dark);
+}
+
+.note-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 0.8rem;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.note-tool-button {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  min-width: 2.1rem;
+  min-height: 2.1rem;
+  padding: 0 0.55rem;
+  border-radius: 6px;
+}
+
+.note-tool-button:hover {
+  cursor: pointer;
+  background: rgba(0, 191, 255, 0.2);
+}
+
+.note-toolbar-divider {
+  width: 1px;
+  height: 1.75rem;
+  margin: 0 0.25rem;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dictate-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: auto;
+  padding: 0 0.7rem;
+}
+
+.dictate-button.listening {
+  color: var(--main-red);
+}
+
+.note-editor-field textarea {
+  border: none !important;
+  border-radius: 0;
+  width: 100%;
+  min-height: 17rem;
+  padding: 1rem;
+  resize: vertical;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.note-editor-field [data-note-status] {
+  display: block;
+  margin-top: 0.45rem;
+}
+
+@media (max-width: 1000px) {
+  .session-top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .session-datetime-grid {
+    grid-template-columns: 1fr;
+  }
+}

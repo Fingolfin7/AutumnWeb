@@ -4,6 +4,7 @@
 
 {% block head_includes %}
     <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/session_note_editor.js' %}?v={{ static_version.session_note_editor }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
@@ -30,8 +31,39 @@
             </table>
         </div>
 
-        <textarea class="card" id="session_note" name="session_note" rows="4" cols="50"
-                  placeholder="Session Note...">{% if timer.note %}{{ timer.note }}{% endif %}</textarea>
+        <section id="input-fields" class="card stacked">
+            <div class="session-datetime-grid">
+                <span class="label-input session-field">
+                    {{ form.start_time.label_tag }}
+                    {{ form.start_time }}
+                    {{ form.start_time.errors }}
+                </span>
+                <span class="label-input session-field">
+                    {{ form.end_time.label_tag }}
+                    {{ form.end_time }}
+                    {{ form.end_time.errors }}
+                </span>
+            </div>
+
+            <div class="label-input note-editor-field" data-note-editor>
+                <label for="{{ form.note.id_for_label }}">Note:</label>
+                <div class="note-editor-shell">
+                    <div class="note-editor-toolbar">
+                        <button type="button" class="note-tool-button" data-note-action="bold"><b>B</b></button>
+                        <button type="button" class="note-tool-button" data-note-action="italic"><i>I</i></button>
+                        <button type="button" class="note-tool-button" data-note-action="link"><i class="fa fa-link"></i></button>
+                        <span class="note-toolbar-divider" aria-hidden="true"></span>
+                        <button type="button" class="note-tool-button dictate-button" data-note-action="dictate">
+                            <i class="fa fa-microphone"></i>
+                            <span data-dictate-label>Dictate</span>
+                        </button>
+                    </div>
+                    {{ form.note }}
+                </div>
+                <small data-note-status></small>
+                {{ form.note.errors }}
+            </div>
+        </section>
 
         <div class="button-row">
             <button type="button" class="timer-button" onclick="window.location.href='{% url 'timers' %}'">
