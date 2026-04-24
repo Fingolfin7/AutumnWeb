@@ -13,11 +13,13 @@ from core.models import Context
 from rest_framework.authtoken.models import Token
 from core.utils import (
     get_period_bounds,
+    calculate_daily_activity_streak,
+)
+from core.commitments import (
+    calculate_commitment_streak,
     get_commitment_progress,
     get_commitment_sessions_queryset,
     reconcile_commitment,
-    calculate_daily_activity_streak,
-    calculate_commitment_streak,
 )
 
 
