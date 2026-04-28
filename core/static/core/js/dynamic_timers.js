@@ -51,6 +51,60 @@ $(document).ready(function() {
             .sort((a, b) => a - b);
     }
 
+    function timerInstant(value) {
+        const timestamp = new Date(value).getTime();
+        return Number.isFinite(timestamp) ? timestamp : null;
+    }
+
+    function getLocalTimerStateById() {
+        const stateById = new Map();
+
+        $(TIMER_CARD_SELECTOR).each(function() {
+            const timer = $(this);
+            const id = parseInt(timer.data('timer-id'), 10);
+
+            if (Number.isFinite(id)) {
+                stateById.set(id, {
+                    start: timerInstant(timer.data('start-time')),
+                    projectId: parseInt(timer.data('project-id'), 10)
+                });
+            }
+        });
+
+        return stateById;
+    }
+
+    function getServerTimerStateById(sessions) {
+        const stateById = new Map();
+
+        sessions
+            .filter(session => session.is_active)
+            .forEach(function(session) {
+                stateById.set(session.id, {
+                    start: timerInstant(session.start_time),
+                    projectId: parseInt(session.project_id, 10)
+                });
+            });
+
+        return stateById;
+    }
+
+    function hasTimerStateChanges(localStateById, serverStateById) {
+        for (const [id, localState] of localStateById) {
+            const serverState = serverStateById.get(id);
+
+            if (
+                !serverState ||
+                localState.start !== serverState.start ||
+                localState.projectId !== serverState.projectId
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     function syncActiveTimers() {
         const timersContainer = $(ACTIVE_TIMERS_SELECTOR);
 
@@ -69,18 +123,22 @@ $(document).ready(function() {
                 }
 
                 const localIds = getLocalTimerIds();
+                const localStateById = getLocalTimerStateById();
+                const serverStateById = getServerTimerStateById(sessions);
                 const serverSet = new Set(serverIds);
                 const allLocalTimersStillActive = localIds.every(id => serverSet.has(id));
                 const isPartialList = timersContainer.data('partial-list') === true;
                 const maxVisible = parseInt(timersContainer.data('max-visible'), 10);
                 const isAtCapacity = isPartialList && Number.isFinite(maxVisible) && localIds.length >= maxVisible;
 
-                let hasChanges = !allLocalTimersStillActive;
+                let hasChanges = hasTimerStateChanges(localStateById, serverStateById);
                 if (!hasChanges) {
                     // Full timer pages should always mirror the server list exactly.
                     // Partial timer lists (dashboard) only need to refresh on additions
                     // when there is available room.
-                    if (isPartialList) {
+                    if (!allLocalTimersStillActive) {
+                        hasChanges = true;
+                    } else if (isPartialList) {
                         if (!isAtCapacity && serverIds.length !== localIds.length) {
                             hasChanges = true;
                         }

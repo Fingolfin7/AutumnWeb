@@ -48,6 +48,60 @@ $(document).ready(function() {
             .sort((a, b) => a - b);
     }
 
+    function timerInstant(value) {
+        const timestamp = new Date(value).getTime();
+        return Number.isFinite(timestamp) ? timestamp : null;
+    }
+
+    function getLocalTimerStateById() {
+        const stateById = new Map();
+
+        $(TIMER_CARD_SELECTOR).each(function() {
+            const timer = $(this);
+            const id = parseInt(timer.attr('id').replace('timer-', ''), 10);
+
+            if (Number.isFinite(id)) {
+                stateById.set(id, {
+                    start: timerInstant(timer.data('start-time')),
+                    projectId: parseInt(timer.data('project-id'), 10)
+                });
+            }
+        });
+
+        return stateById;
+    }
+
+    function getServerTimerStateById(sessions) {
+        const stateById = new Map();
+
+        sessions
+            .filter(session => session.is_active)
+            .forEach(function(session) {
+                stateById.set(session.id, {
+                    start: timerInstant(session.start_time),
+                    projectId: parseInt(session.project_id, 10)
+                });
+            });
+
+        return stateById;
+    }
+
+    function hasTimerStateChanges(localStateById, serverStateById) {
+        for (const [id, localState] of localStateById) {
+            const serverState = serverStateById.get(id);
+
+            if (
+                !serverState ||
+                localState.start !== serverState.start ||
+                localState.projectId !== serverState.projectId
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     let refreshInFlight = false;
 
     function refreshTimerSection() {
@@ -76,13 +130,15 @@ $(document).ready(function() {
                     .map(session => session.id)
                     .sort((a, b) => a - b);
                 const localIds = getLocalTimerIds();
+                const localStateById = getLocalTimerStateById();
+                const serverStateById = getServerTimerStateById(sessions);
                 const serverSet = new Set(serverIds);
                 const allLocalTimersStillActive = localIds.every(id => serverSet.has(id));
                 const maxVisible = parseInt(timersContainer.data('max-visible'), 10);
                 const hasCapacity = Number.isFinite(maxVisible) ? localIds.length < maxVisible : true;
                 const canShowNewTimers = hasCapacity && serverIds.length !== localIds.length;
 
-                if (!allLocalTimersStillActive || canShowNewTimers) {
+                if (hasTimerStateChanges(localStateById, serverStateById) || !allLocalTimersStillActive || canShowNewTimers) {
                     refreshTimerSection();
                 }
             });
