@@ -7,6 +7,7 @@ Pillow
 concurrent-log-handler
 apscheduler
 markdown
+pymdown-extensions
 inflect
 django-environ
 google-genai
