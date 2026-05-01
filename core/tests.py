@@ -21,6 +21,27 @@ from core.commitments import (
     get_commitment_sessions_queryset,
     reconcile_commitment,
 )
+from core.templatetags.markdown_render import markdown
+
+
+class MarkdownRenderTests(TestCase):
+    def test_single_tilde_renders_as_strikethrough(self):
+        rendered = markdown("testing ~single tilde~ support")
+
+        self.assertIn("<del>single tilde</del>", rendered)
+        self.assertNotIn("<sub>single tilde</sub>", rendered)
+
+    def test_double_tilde_still_renders_as_strikethrough(self):
+        rendered = markdown("testing ~~double tilde~~ support")
+
+        self.assertIn("<del>double tilde</del>", rendered)
+
+    def test_inline_subscript_style_tilde_is_left_literal(self):
+        rendered = markdown("H~2~O")
+
+        self.assertIn("H~2~O", rendered)
+        self.assertNotIn("<sub>2</sub>", rendered)
+        self.assertNotIn("<del>2</del>", rendered)
 
 
 class UpdateSessionTests(TestCase):
