@@ -89,6 +89,8 @@ def delete_chat(request, chat_id):
 
 
 class InsightsView(View):
+    OPENAI_REASONING_EFFORTS = ["minimal", "low", "medium", "high"]
+
     def _provider_models(self, user):
         profile = getattr(user, "profile", None)
         provider_models = {
@@ -99,11 +101,11 @@ class InsightsView(View):
         }
         if profile and profile.openai_api_key_enc:
             provider_models["openai"] = [
-                ("gpt-5-mini", "GPT-5 Mini"),
-                ("gpt-5", "GPT-5"),
-                ("gpt-5.2", "GPT-5.2"),
-                # ("gpt-5.3-codex", "GPT-5.3-Codex"),
+                ("gpt-5.5", "GPT-5.5"),
                 ("gpt-5.4", "GPT-5.4"),
+                ("gpt-5.2", "GPT-5.2"),
+                ("gpt-5", "GPT-5"),
+                ("gpt-5-mini", "GPT-5 Mini"),
             ]
         if profile and profile.claude_api_key_enc:
             provider_models["claude"] = [
@@ -131,6 +133,13 @@ class InsightsView(View):
         if not model or model not in model_values:
             model = valid_models[0][0]
         return provider, model
+
+    def _validate_reasoning_effort(self, provider, effort):
+        if provider != "openai":
+            return ""
+        if effort not in self.OPENAI_REASONING_EFFORTS:
+            return "medium"
+        return effort
 
     def _extract_filter_params(self, request):
         """Extract relevant filter params from request.GET or request.POST"""
@@ -315,6 +324,15 @@ class InsightsView(View):
         selected_provider, selected_model = self._validate_selection(
             provider_models, selected_provider, selected_model
         )
+        stored_reasoning_effort = (
+            data["chat_obj"].filters.get("reasoning_effort")
+            if data["chat_obj"] and data["chat_obj"].filters
+            else None
+        )
+        selected_reasoning_effort = self._validate_reasoning_effort(
+            selected_provider,
+            request.GET.get("reasoning_effort") or stored_reasoning_effort,
+        )
 
         provider_models_json = json.dumps(
             {
@@ -334,6 +352,8 @@ class InsightsView(View):
             "sessions_updated": data["sessions_updated"],
             "selected_model": selected_model,
             "selected_provider": selected_provider,
+            "selected_reasoning_effort": selected_reasoning_effort,
+            "openai_reasoning_efforts": self.OPENAI_REASONING_EFFORTS,
             "provider_models_json": provider_models_json,
             "providers": list(provider_models.keys()),
             "chat_id": chat_id,
@@ -448,6 +468,9 @@ class InsightsView(View):
         selected_provider, selected_model = self._validate_selection(
             provider_models, selected_provider, selected_model
         )
+        selected_reasoning_effort = self._validate_reasoning_effort(
+            selected_provider, request.POST.get("reasoning_effort")
+        )
 
         chat_obj = data["chat_obj"]
         current_filters = data["current_filters"]
@@ -463,15 +486,25 @@ class InsightsView(View):
                 user=user,
                 title=title,
                 model=f"{selected_provider}:{selected_model}",
-                filters=current_filters,
+                filters={
+                    **current_filters,
+                    "reasoning_effort": selected_reasoning_effort,
+                },
             )
             chat_id = chat_obj.id
         elif is_filtering:
             # Explicit filter update -> update pinned filters
-            chat_obj.filters = current_filters
+            chat_obj.filters = {
+                **current_filters,
+                "reasoning_effort": selected_reasoning_effort,
+            }
             await sync_to_async(chat_obj.save)()
 
-        handler = get_llm_handler(model=selected_model, api_keys=data["api_keys"])
+        handler = get_llm_handler(
+            model=selected_model,
+            api_keys=data["api_keys"],
+            reasoning_effort=selected_reasoning_effort,
+        )
 
         def load_history_sync():
             return [
@@ -505,6 +538,10 @@ class InsightsView(View):
             def finalize_post_session():
                 request.session["sessions_updated"] = False
                 chat_obj.model = f"{selected_provider}:{selected_model}"
+                chat_obj.filters = {
+                    **(chat_obj.filters or {}),
+                    "reasoning_effort": selected_reasoning_effort,
+                }
                 chat_obj.save()
 
             await sync_to_async(finalize_post_session)()

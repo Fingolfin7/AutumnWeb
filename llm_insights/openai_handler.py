@@ -5,9 +5,15 @@ from .base_handler import BaseLLMHandler
 
 
 class OpenAIHandler(BaseLLMHandler):
-    def __init__(self, model="gpt-5-mini", api_key: str | None = None):
+    def __init__(
+        self,
+        model="gpt-5.5",
+        api_key: str | None = None,
+        reasoning_effort: str | None = "medium",
+    ):
         self.model = model
         self.api_key = api_key
+        self.reasoning_effort = reasoning_effort
         self.client = (
             AsyncOpenAI(api_key=api_key) if api_key else AsyncOpenAI()
         )  # falls back to env var OPENAI_API_KEY
@@ -126,6 +132,17 @@ class OpenAIHandler(BaseLLMHandler):
 
         return unique_sources
 
+    def _response_create_kwargs(self, msgs):
+        kwargs = {
+            "model": self.model,
+            "input": msgs,
+            "tools": [{"type": "web_search"}],
+            "include": ["web_search_call.action.sources"],
+        }
+        if self.reasoning_effort:
+            kwargs["reasoning"] = {"effort": self.reasoning_effort}
+        return kwargs
+
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data without exposing it in user-visible chat history"""
         self.session_data = encode(
@@ -150,10 +167,7 @@ class OpenAIHandler(BaseLLMHandler):
         sources = []
         try:
             resp = await self.client.responses.create(
-                model=self.model,
-                input=msgs,
-                tools=[{"type": "web_search"}],
-                include=["web_search_call.action.sources"],
+                **self._response_create_kwargs(msgs)
             )
             if hasattr(resp, "output_text"):
                 text = resp.output_text
@@ -227,10 +241,7 @@ class OpenAIHandler(BaseLLMHandler):
             # Enable web search by default using Responses API
             # Include sources in the response
             resp = await self.client.responses.create(
-                model=self.model,
-                input=msgs,
-                tools=[{"type": "web_search"}],
-                include=["web_search_call.action.sources"],
+                **self._response_create_kwargs(msgs)
             )
             # Extract text from Responses API
             if hasattr(resp, "output_text"):

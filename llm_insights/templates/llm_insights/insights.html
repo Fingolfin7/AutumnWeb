@@ -28,6 +28,20 @@
             }
         }
 
+        function updateReasoningEffortVisibility(provider){
+            const reasoningField = $('#reasoning-effort-field');
+            const reasoningSelect = $('#reasoning_effort');
+            if (provider === 'openai') {
+                reasoningField.show();
+                reasoningSelect.prop('disabled', false);
+                $('#reasoning_effort_filter').val(reasoningSelect.val());
+            } else {
+                reasoningField.hide();
+                reasoningSelect.prop('disabled', true);
+                $('#reasoning_effort_filter').val('');
+            }
+        }
+
         function copyToClipboard(text, btn) {
             navigator.clipboard.writeText(text).then(() => {
                 const originalHtml = btn.innerHTML;
@@ -95,13 +109,18 @@
 
             // initial populate
             repopulateModels('{{ selected_provider }}','{{ selected_model }}');
+            updateReasoningEffortVisibility('{{ selected_provider }}');
             // keep GET filter hidden fields in sync
             $('#provider_filter').val($('#provider').val());
             $('#model_filter').val($('#model').val() || '{{ selected_model }}');
+            $('#reasoning_effort_filter').val(
+                $('#reasoning_effort').prop('disabled') ? '' : $('#reasoning_effort').val()
+            );
 
             $('#provider').on('change', function(){
                 const newProvider = $(this).val();
                 repopulateModels(newProvider,null);
+                updateReasoningEffortVisibility(newProvider);
                 $('#provider_filter').val(newProvider);
                 $('#model_filter').val($('#model').val());
             });
@@ -109,6 +128,10 @@
             $('#model').on('change', function() {
                 let selected = $(this).val();
                 $('#model_filter').val(selected);
+            });
+
+            $('#reasoning_effort').on('change', function() {
+                $('#reasoning_effort_filter').val($(this).prop('disabled') ? '' : $(this).val());
             });
 
             // Scroll conversation to bottom
@@ -190,6 +213,7 @@
 
             <input type="hidden" name="provider" id="provider_filter" value="{{ selected_provider }}">
             <input type="hidden" name="model" id="model_filter" value="{{ selected_model }}">
+            <input type="hidden" name="reasoning_effort" id="reasoning_effort_filter" value="{{ selected_reasoning_effort }}">
 
             <span>
                 <button type="submit" class="primary-button" id="search_button" name="filter" value="true">
@@ -270,6 +294,17 @@
                         <span class="label-input">
                             <label for="model">Model</label>
                             <select id="model" name="model"></select>
+                        </span>
+
+                        <span class="label-input" id="reasoning-effort-field">
+                            <label for="reasoning_effort">Reasoning Effort</label>
+                            <select id="reasoning_effort" name="reasoning_effort">
+                                {% for effort in openai_reasoning_efforts %}
+                                    <option value="{{ effort }}" {% if effort == selected_reasoning_effort %}selected{% endif %}>
+                                        {{ effort|capfirst }}
+                                    </option>
+                                {% endfor %}
+                            </select>
                         </span>
                     </div>
 

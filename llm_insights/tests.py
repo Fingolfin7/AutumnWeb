@@ -10,7 +10,9 @@ from llm_insights.views import InsightsView
 class InsightsViewProviderModelsTests(TestCase):
     def setUp(self):
         self.view = InsightsView()
-        self.user = User.objects.create_user(username="llm-user", password="test-pass-123")
+        self.user = User.objects.create_user(
+            username="llm-user", password="test-pass-123"
+        )
 
     def assert_has_model_choices(self, provider_models, provider):
         self.assertIn(provider, provider_models)
@@ -33,17 +35,37 @@ class InsightsViewProviderModelsTests(TestCase):
         provider_models = self.view._provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
+        self.assertIn(("gpt-5.5", "GPT-5.5"), provider_models["openai"])
+
+    def test_openai_reasoning_effort_defaults_to_medium(self):
+        self.assertEqual(
+            self.view._validate_reasoning_effort("openai", "unexpected"),
+            "medium",
+        )
+
+    def test_reasoning_effort_is_ignored_for_non_openai_providers(self):
+        self.assertEqual(
+            self.view._validate_reasoning_effort("gemini", "high"),
+            "",
+        )
 
 
 class GetLlmHandlerTests(SimpleTestCase):
     def test_routes_gemini_models_to_gemini_handler(self):
-        handler = get_llm_handler("gemini-test-model", api_keys={"gemini": "test-gemini-key"})
+        handler = get_llm_handler(
+            "gemini-test-model", api_keys={"gemini": "test-gemini-key"}
+        )
 
         self.assertIsInstance(handler, GeminiHandler)
         self.assertEqual(handler.model, "gemini-test-model")
 
     def test_routes_gpt_models_to_openai_handler(self):
-        handler = get_llm_handler("gpt-test-model", api_keys={"openai": "test-openai-key"})
+        handler = get_llm_handler(
+            "gpt-test-model",
+            api_keys={"openai": "test-openai-key"},
+            reasoning_effort="high",
+        )
 
         self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.model, "gpt-test-model")
+        self.assertEqual(handler.reasoning_effort, "high")
