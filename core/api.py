@@ -930,7 +930,9 @@ def mark_project(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_project(request):
-    serializer = ProjectSerializer(data=request.data)
+    payload = request.data.copy()
+    payload["user"] = request.user.pk
+    serializer = ProjectSerializer(data=payload)
     if serializer.is_valid():
         serializer.save(user=request.user)
         return Response(serializer.data)
@@ -1249,6 +1251,8 @@ def projects_with_stats(request):
         payload.append({
             "name": p.name,
             "total_time": stats["total_time"],
+            "computed_total_time": stats["total_time"],
+            "persisted_total_time": p.total_time,
             "session_count": stats["session_count"],
             "subproject_count": subproject_count,
             "days_since_update": days_since_update,
@@ -1339,7 +1343,12 @@ def list_subprojects(request, **kwargs):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def search_subprojects(request):
-    parent_project = request.query_params["project_name"]
+    parent_project = (
+        request.query_params.get("project_name")
+        or request.query_params.get("project")
+    )
+    if not parent_project:
+        return _err("Missing 'project_name' or 'project'")
     search_term = request.query_params.get("search_term", "")
     subprojects = SubProjects.objects.filter(
         parent_project__name=parent_project,
@@ -1401,7 +1410,16 @@ def log_session(request):
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def delete_session(request, session_id):
-    sess = get_object_or_404(Sessions, pk=session_id, user=request.user)
+    try:
+        session_id = int(session_id)
+    except (TypeError, ValueError):
+        return _err("Invalid session id", status.HTTP_400_BAD_REQUEST)
+    if session_id <= 0:
+        return _err("Session not found", status.HTTP_404_NOT_FOUND)
+
+    sess = Sessions.objects.filter(pk=session_id, user=request.user).first()
+    if not sess:
+        return _err("Session not found", status.HTTP_404_NOT_FOUND)
     sess.delete()
     return Response(status=204)
 
@@ -1430,7 +1448,16 @@ def edit_session(request, session_id):
     Returns the new session object (with new ID).
     """
     compact = _compact(request)
-    current_session = get_object_or_404(Sessions, pk=session_id, user=request.user)
+    try:
+        session_id = int(session_id)
+    except (TypeError, ValueError):
+        return _err("Invalid session id", status.HTTP_400_BAD_REQUEST)
+    if session_id <= 0:
+        return _err("Session not found", status.HTTP_404_NOT_FOUND)
+
+    current_session = Sessions.objects.filter(pk=session_id, user=request.user).first()
+    if not current_session:
+        return _err("Session not found", status.HTTP_404_NOT_FOUND)
 
     # Only allow editing completed sessions
     if current_session.is_active:
@@ -2105,48 +2132,96 @@ def tags_list(request):
 @permission_classes([IsAuthenticated])
 @transaction.atomic
 def audit(request):
-    """Recompute total_time for all of the user's projects and subprojects."""
+    """Recompute total_time for all of the user's projects and subprojects.
+
+    Send {"dry_run": true} or ?dry_run=true to preview without persisting.
+    """
+    dry_run = _bool(
+        request.data.get("dry_run")
+        if hasattr(request, "data") and "dry_run" in request.data
+        else request.query_params.get("dry_run"),
+        False,
+    )
     projects = Projects.objects.filter(user=request.user)
 
     proj_total_delta = 0.0
     proj_changed = 0
+    changed_projects = []
     for p in projects:
         before = float(p.total_time or 0.0)
-        p.audit_total_time(log=False)
-        p.refresh_from_db(fields=["total_time"])
-        after = float(p.total_time or 0.0)
+        after = float(
+            sum(
+                session.duration
+                for session in p.sessions.filter(is_active=False)
+                if session.duration is not None
+            )
+        )
         delta = after - before
         if abs(delta) > 1e-9:
             proj_changed += 1
             proj_total_delta += delta
+            changed_projects.append(
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "before": round(before, 4),
+                    "after": round(after, 4),
+                    "delta": round(delta, 4),
+                }
+            )
+            if not dry_run:
+                p.total_time = after
+                p.save(update_fields=["total_time"])
 
     subprojects = SubProjects.objects.filter(user=request.user)
 
     sub_total_delta = 0.0
     sub_changed = 0
+    changed_subprojects = []
     for sp in subprojects:
         before = float(sp.total_time or 0.0)
-        sp.audit_total_time(log=False)
-        sp.refresh_from_db(fields=["total_time"])
-        after = float(sp.total_time or 0.0)
+        after = float(
+            sum(
+                session.duration
+                for session in sp.sessions.filter(is_active=False)
+                if session.duration is not None
+            )
+        )
         delta = after - before
         if abs(delta) > 1e-9:
             sub_changed += 1
             sub_total_delta += delta
+            changed_subprojects.append(
+                {
+                    "id": sp.id,
+                    "name": sp.name,
+                    "project_id": sp.parent_project_id,
+                    "project": sp.parent_project.name,
+                    "before": round(before, 4),
+                    "after": round(after, 4),
+                    "delta": round(delta, 4),
+                }
+            )
+            if not dry_run:
+                sp.total_time = after
+                sp.save(update_fields=["total_time"])
 
     return Response(
         {
             "ok": True,
+            "dry_run": dry_run,
             "projects": {
                 "count": projects.count(),
                 "changed": proj_changed,
                 "delta": round(proj_total_delta, 4),
             },
+            "changed_projects": changed_projects,
             "subprojects": {
                 "count": subprojects.count(),
                 "changed": sub_changed,
                 "delta": round(sub_total_delta, 4),
             },
+            "changed_subprojects": changed_subprojects,
         },
         status=200,
     )

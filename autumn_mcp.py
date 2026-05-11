@@ -2,6 +2,8 @@
 import os
 import requests
 from typing import Optional, List, Dict, Any
+from urllib.parse import quote
+from json import JSONDecodeError
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("Autumn MCP Server")
@@ -45,14 +47,42 @@ def autumn_request(
     )
 
     if not resp.content or resp.status_code == 204:
-        return {"status": resp.status_code}
-    return resp.json()
+        return {"ok": resp.ok, "status": resp.status_code}
+
+    try:
+        payload = resp.json()
+    except JSONDecodeError:
+        return {
+            "ok": False,
+            "status": resp.status_code,
+            "error": "Non-JSON response from Autumn API",
+            "body": resp.text[:500],
+        }
+
+    if resp.status_code >= 400:
+        if isinstance(payload, dict):
+            return {"ok": False, "status": resp.status_code, **payload}
+        return {"ok": False, "status": resp.status_code, "error": payload}
+
+    return payload
 
 
 def _params_compact(compact: bool, extra: Optional[Dict[str, Any]] = None):
     params = dict(extra or {})
     if compact is False:
         params["compact"] = "false"
+    return params
+
+
+def _add_common_filters(
+    params: Dict[str, Any],
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    if context:
+        params["context"] = context
+    if tags:
+        params["tags"] = ",".join(tags)
     return params
 
 
@@ -64,6 +94,12 @@ def _with_units(payload: Any, compact: bool) -> Any:
     return payload
 
 
+def _collection(payload: Any, key: str) -> Any:
+    if isinstance(payload, list):
+        return {"count": len(payload), key: payload}
+    return payload
+
+
 @mcp.tool(
     description="Start a live timer for a project. "
     "Use this when the user begins working *now*."
@@ -71,6 +107,7 @@ def _with_units(payload: Any, compact: bool) -> Any:
 def start(
     project: str,
     subprojects: Optional[List[str]] = None,
+    note: Optional[str] = None,
     compact: bool = True,
 ):
     """Start a new timer for a project.
@@ -82,6 +119,8 @@ def start(
     payload: Dict[str, Any] = {"project": project}
     if subprojects:
         payload["subprojects"] = subprojects
+    if note:
+        payload["note"] = note
     res = autumn_request(
         "POST", "/api/timer/start/", json=payload, params=_params_compact(compact)
     )
@@ -177,10 +216,10 @@ def track(
 
 @mcp.tool()
 def delete_timer(session_id: Optional[int] = None):
-    payload: Dict[str, Any] = {}
+    params: Dict[str, Any] = {}
     if session_id is not None:
-        payload["session_id"] = session_id
-    return autumn_request("DELETE", "/api/timer/delete/", json=payload)
+        params["session_id"] = session_id
+    return autumn_request("DELETE", "/api/timer/delete/", params=params)
 
 
 @mcp.tool()
@@ -214,6 +253,8 @@ def restart(
 def projects(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
     compact: bool = True,
 ):
     params: Dict[str, Any] = {}
@@ -221,6 +262,7 @@ def projects(
         params["start_date"] = start_date
     if end_date:
         params["end_date"] = end_date
+    params = _add_common_filters(params, context=context, tags=tags)
     params = _params_compact(compact, params)
     return autumn_request("GET", "/api/projects/grouped/", params=params)
 
@@ -241,6 +283,8 @@ def totals(
     project: str,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
     compact: bool = True,
 ):
     params: Dict[str, Any] = {"project": project}
@@ -248,6 +292,7 @@ def totals(
         params["start_date"] = start_date
     if end_date:
         params["end_date"] = end_date
+    params = _add_common_filters(params, context=context, tags=tags)
     params = _params_compact(compact, params)
     res = autumn_request("GET", "/api/totals/", params=params)
     return _with_units(res, compact)
@@ -298,6 +343,8 @@ def log(
     project: Optional[str] = None,
     subproject: Optional[str] = None,
     note: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
     compact: bool = True,
 ):
     """
@@ -328,6 +375,7 @@ def log(
         params["subproject"] = subproject
     if note:
         params["note_snippet"] = note
+    params = _add_common_filters(params, context=context, tags=tags)
     params = _params_compact(compact, params)
     res = autumn_request("GET", "/api/log/", params=params)
     return _with_units(res, compact)
@@ -347,6 +395,8 @@ def search_sessions(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
     order: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
     compact: bool = True,
 ):
     """
@@ -372,9 +422,137 @@ def search_sessions(
         params["offset"] = str(offset)
     if order:
         params["order"] = order
+    params = _add_common_filters(params, context=context, tags=tags)
     params = _params_compact(compact, params)
     res = autumn_request("GET", "/api/sessions/search/", params=params)
     return _with_units(res, compact)
+
+
+@mcp.tool(description="Get the authenticated Autumn user identity.")
+def me():
+    return autumn_request("GET", "/api/me/")
+
+
+@mcp.tool(description="Create a new Autumn project.")
+def create_project(name: str, description: Optional[str] = None):
+    payload: Dict[str, Any] = {"name": name}
+    if description:
+        payload["description"] = description
+    return autumn_request("POST", "/api/create_project/", json=payload)
+
+
+@mcp.tool(description="Create a new subproject under an existing project.")
+def create_subproject(
+    parent_project: str,
+    name: str,
+    description: Optional[str] = None,
+):
+    payload: Dict[str, Any] = {"parent_project": parent_project, "name": name}
+    if description:
+        payload["description"] = description
+    return autumn_request("POST", "/api/create_subproject/", json=payload)
+
+
+@mcp.tool(
+    description="Mark a project status. Status should be active, paused, complete, or archived."
+)
+def mark_project(project: str, status: str):
+    return autumn_request("POST", "/api/mark/", json={"project": project, "status": status})
+
+
+@mcp.tool(description="Alias for mark_project, matching the CLI command name.")
+def mark(project: str, status: str):
+    return mark_project(project=project, status=status)
+
+
+@mcp.tool(description="Get detailed information about one project by name.")
+def get_project(name: str):
+    return autumn_request("GET", f"/api/get_project/{quote(name, safe='')}/")
+
+
+@mcp.tool(description="List projects as a flat ungrouped list with optional filters.")
+def list_projects(
+    status: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    search: Optional[str] = None,
+    compact: bool = True,
+):
+    params: Dict[str, Any] = {"compact": str(compact).lower()}
+    if status:
+        params["status"] = status
+    if search:
+        params["search"] = search
+    params = _add_common_filters(params, context=context, tags=tags)
+    return autumn_request("GET", "/api/projects/", params=params)
+
+
+@mcp.tool(description="Delete a subproject from a project.")
+def delete_subproject(project: str, subproject: str):
+    endpoint = f"/api/delete_subproject/{quote(project, safe='')}/{quote(subproject, safe='')}/"
+    return autumn_request("DELETE", endpoint)
+
+
+@mcp.tool(description="Alias for delete_subproject, matching the CLI command name.")
+def delete_sub(project: str, subproject: str):
+    return delete_subproject(project=project, subproject=subproject)
+
+
+@mcp.tool(description="Search subprojects by name within a parent project.")
+def search_subprojects(project: str, search_term: str):
+    res = autumn_request(
+        "GET",
+        "/api/search_subprojects/",
+        params={"project_name": project, "search_term": search_term},
+    )
+    return _collection(res, "subprojects")
+
+
+@mcp.tool(description="Edit an existing completed session.")
+def edit_session(
+    session_id: int,
+    project: Optional[str] = None,
+    subprojects: Optional[List[str]] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+    note: Optional[str] = None,
+    compact: bool = True,
+):
+    if session_id <= 0:
+        return {"ok": False, "status": 404, "error": "Session not found"}
+
+    payload: Dict[str, Any] = {}
+    if project is not None:
+        payload["project"] = project
+    if subprojects is not None:
+        payload["subprojects"] = subprojects
+    if start is not None:
+        payload["start"] = start
+    if end is not None:
+        payload["end"] = end
+    if note is not None:
+        payload["note"] = note
+    return autumn_request(
+        "PATCH",
+        f"/api/session/{session_id}/",
+        json=payload,
+        params={"compact": str(compact).lower()},
+    )
+
+
+@mcp.tool(
+    description="Delete a saved/completed session log by ID. "
+    "Use delete_timer for active or most-recent live timer sessions."
+)
+def delete_session(session_id: int):
+    if session_id <= 0:
+        return {"ok": False, "status": 404, "error": "Session not found"}
+    return autumn_request("DELETE", f"/api/delete_session/{session_id}/")
+
+
+@mcp.tool(description="Alias for delete_session, for deleting a saved session log.")
+def delete_session_log(session_id: int):
+    return delete_session(session_id=session_id)
 
 
 # Optional utility
@@ -383,15 +561,203 @@ def search_sessions(
     "Use this to confirm or resolve the correct project name "
     "before calling other tools that require a project argument."
 )
-def search_projects(search_term: str):
+def search_projects(search_term: str, status: Optional[str] = None):
     """Search for projects by name.
     - Use this when the user provides a project name that may not exactly match.
     - Always call this first if you are unsure whether the project exists.
     - The result will give you the canonical project name to use in other calls.
     """
+    params = {"search_term": search_term}
+    if status:
+        params["status"] = status
+    res = autumn_request("GET", "/api/search_projects/", params=params)
+    return _collection(res, "projects")
+
+
+@mcp.tool(description="List available contexts for filtering projects and sessions.")
+def contexts(compact: bool = True):
     return autumn_request(
-        "GET", "/api/search_projects/", params={"search_term": search_term}
+        "GET", "/api/contexts/", params={"compact": str(compact).lower()}
     )
+
+
+@mcp.tool(description="Alias for contexts, matching the CLI command name.")
+def context(compact: bool = True):
+    return contexts(compact=compact)
+
+
+@mcp.tool(description="List available tags for filtering projects and sessions.")
+def tags(compact: bool = True):
+    return autumn_request("GET", "/api/tags/", params={"compact": str(compact).lower()})
+
+
+@mcp.tool(description="Alias for tags, matching the CLI command name.")
+def tag(compact: bool = True):
+    return tags(compact=compact)
+
+
+@mcp.tool(description="Export Autumn data as JSON, optionally filtered.")
+def export_data(
+    project: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    context: Optional[int] = None,
+    tags: Optional[List[int]] = None,
+    compress: bool = False,
+    autumn_compatible: bool = True,
+):
+    payload: Dict[str, Any] = {}
+    if project:
+        payload["project_name"] = project
+    if start_date:
+        payload["start_date"] = start_date
+    if end_date:
+        payload["end_date"] = end_date
+    if context is not None:
+        payload["context"] = context
+    if tags:
+        payload["tags"] = tags
+    if compress:
+        payload["compress"] = True
+    if autumn_compatible:
+        payload["autumn_compatible"] = True
+    return autumn_request("POST", "/api/export/", json=payload)
+
+
+@mcp.tool(description="Alias for export_data, matching the CLI command name.")
+def export(
+    project: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    context: Optional[int] = None,
+    tags: Optional[List[int]] = None,
+    compress: bool = False,
+    autumn_compatible: bool = True,
+):
+    return export_data(
+        project=project,
+        start_date=start_date,
+        end_date=end_date,
+        context=context,
+        tags=tags,
+        compress=compress,
+        autumn_compatible=autumn_compatible,
+    )
+
+
+@mcp.tool(description="Recompute or preview all project and subproject totals.")
+def audit_totals(dry_run: bool = False):
+    return autumn_request("POST", "/api/audit/", json={"dry_run": dry_run})
+
+
+@mcp.tool(description="Alias for audit_totals, matching the CLI command name.")
+def audit():
+    return audit_totals()
+
+
+@mcp.tool(description="Get project totals across sessions, optionally filtered.")
+def tally_by_sessions(
+    project_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+):
+    params: Dict[str, Any] = {}
+    if project_name:
+        params["project_name"] = project_name
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+    params = _add_common_filters(params, context=context, tags=tags)
+    return autumn_request("GET", "/api/tally_by_sessions/", params=params)
+
+
+@mcp.tool(description="Get subproject totals for a project, optionally filtered.")
+def tally_by_subprojects(
+    project_name: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+):
+    params: Dict[str, Any] = {"project_name": project_name}
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+    params = _add_common_filters(params, context=context, tags=tags)
+    return autumn_request("GET", "/api/tally_by_subprojects/", params=params)
+
+
+@mcp.tool(description="List sessions for charts or analysis, optionally filtered.")
+def list_sessions(
+    project_name: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    compact: bool = False,
+):
+    params: Dict[str, Any] = {"compact": str(compact).lower()}
+    if project_name:
+        params["project_name"] = project_name
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+    params = _add_common_filters(params, context=context, tags=tags)
+    return autumn_request("GET", "/api/list_sessions/", params=params)
+
+
+@mcp.tool(description="Get time totals aggregated by context.")
+def tally_by_context(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    params: Dict[str, Any] = {}
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+    return autumn_request("GET", "/api/tally_by_context/", params=params)
+
+
+@mcp.tool(description="Get project count and time totals grouped by project status.")
+def tally_by_status(context: Optional[str] = None):
+    params: Dict[str, Any] = {}
+    if context:
+        params["context"] = context
+    return autumn_request("GET", "/api/tally_by_status/", params=params)
+
+
+@mcp.tool(description="Get time and project count aggregated by tag.")
+def tally_by_tags():
+    return autumn_request("GET", "/api/tally_by_tags/")
+
+
+@mcp.tool(description="Get nested Context -> Project -> Subproject hierarchy with totals.")
+def hierarchy(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+):
+    params: Dict[str, Any] = {}
+    if start_date:
+        params["start_date"] = start_date
+    if end_date:
+        params["end_date"] = end_date
+    return autumn_request("GET", "/api/hierarchy/", params=params)
+
+
+@mcp.tool(description="Get projects with statistics for visualization and comparison.")
+def projects_with_stats(
+    context: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+):
+    params: Dict[str, Any] = {}
+    params = _add_common_filters(params, context=context, tags=tags)
+    return autumn_request("GET", "/api/projects_with_stats/", params=params)
 
 
 @mcp.tool(

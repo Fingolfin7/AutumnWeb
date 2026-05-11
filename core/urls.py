@@ -1,5 +1,5 @@
 # urls.py
-from django.urls import path
+from django.urls import path, re_path
 from core.views import (
     DashboardView,
     ProjectsListView,
@@ -225,8 +225,8 @@ urlpatterns = [
     path("api/end_session/", end_session, name="api_end_session"),
     path("api/log_session/", log_session, name="api_log_session"),
     path("api/sessions/search/", search_sessions, name="api_sessions_search"),
-    path(
-        "api/delete_session/<int:session_id>/",
+    re_path(
+        r"^api/delete_session/(?P<session_id>-?\d+)/$",
         delete_session,
         name="api_delete_session",
     ),
@@ -248,7 +248,11 @@ urlpatterns = [
     path("api/projects/grouped/", projects_list_grouped, name="api_projects_grouped"),
     path("api/projects/", projects_list_flat, name="api_projects_flat"),
     path("api/subprojects/", subprojects_list, name="api_subprojects_list"),
-    path("api/session/<int:session_id>/", edit_session, name="api_edit_session"),
+    re_path(
+        r"^api/session/(?P<session_id>-?\d+)/$",
+        edit_session,
+        name="api_edit_session",
+    ),
     path("api/totals/", totals, name="api_totals"),
     path("api/rename/", rename_entity, name="api_rename"),
     path("api/project/delete/", project_delete_body, name="api_project_delete_body"),

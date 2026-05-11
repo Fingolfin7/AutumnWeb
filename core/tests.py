@@ -2174,3 +2174,106 @@ class DstTransitionSessionTests(TestCase):
         list_payload = list_resp.json()
         self.assertTrue(list_payload[0]["crosses_dst_transition"])
 
+
+class McpApiContractTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="mcpuser", password="password")
+        self.client.login(username="mcpuser", password="password")
+        self.project = Projects.objects.create(user=self.user, name="MCP Project")
+
+    def test_create_project_infers_user_from_auth(self):
+        response = self.client.post(
+            "/api/create_project/",
+            data=json.dumps({"name": "Created From MCP", "description": "No user field"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["name"], "Created From MCP")
+        self.assertEqual(payload["user"], self.user.id)
+
+    def test_negative_session_ids_return_json_errors(self):
+        edit_response = self.client.patch(
+            "/api/session/-1/",
+            data=json.dumps({"note": "impossible"}),
+            content_type="application/json",
+        )
+        delete_response = self.client.delete("/api/delete_session/-1/")
+
+        self.assertEqual(edit_response.status_code, 404)
+        self.assertEqual(edit_response.json(), {"ok": False, "error": "Session not found"})
+        self.assertEqual(delete_response.status_code, 404)
+        self.assertEqual(
+            delete_response.json(), {"ok": False, "error": "Session not found"}
+        )
+
+    def test_search_subprojects_accepts_project_alias(self):
+        SubProjects.objects.create(
+            user=self.user,
+            parent_project=self.project,
+            name="MCP Subproject",
+        )
+
+        response = self.client.get(
+            "/api/search_subprojects/",
+            {"project": "MCP Project", "search_term": "Subproject"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["name"], "MCP Subproject")
+
+    def test_audit_can_dry_run_and_report_changed_projects(self):
+        start = timezone.make_aware(datetime(2026, 5, 1, 9, 0, 0))
+        end = timezone.make_aware(datetime(2026, 5, 1, 10, 0, 0))
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=start,
+            end_time=end,
+            is_active=False,
+        )
+        self.project.total_time = 999
+        self.project.save(update_fields=["total_time"])
+
+        response = self.client.post(
+            "/api/audit/",
+            data=json.dumps({"dry_run": True}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["dry_run"])
+        self.assertEqual(payload["projects"]["changed"], 1)
+        self.assertEqual(payload["changed_projects"][0]["name"], "MCP Project")
+        self.assertEqual(payload["changed_projects"][0]["before"], 999)
+        self.assertEqual(payload["changed_projects"][0]["after"], 60)
+
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.total_time, 999)
+
+    def test_projects_with_stats_exposes_computed_and_persisted_totals(self):
+        start = timezone.make_aware(datetime(2026, 5, 1, 9, 0, 0))
+        end = timezone.make_aware(datetime(2026, 5, 1, 10, 0, 0))
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=start,
+            end_time=end,
+            is_active=False,
+        )
+        self.project.total_time = 999
+        self.project.save(update_fields=["total_time"])
+
+        response = self.client.get("/api/projects_with_stats/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        project_payload = next(p for p in payload if p["name"] == "MCP Project")
+        self.assertEqual(project_payload["total_time"], 60)
+        self.assertEqual(project_payload["computed_total_time"], 60)
+        self.assertEqual(project_payload["persisted_total_time"], 999)
+

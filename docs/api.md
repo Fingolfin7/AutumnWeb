@@ -415,6 +415,34 @@ Non-compact response includes stats and parent project ID:
 }
 ```
 
+## 9b) Search subprojects
+
+**GET** `/api/search_subprojects/`
+
+Query:
+
+- `project_name` or `project`: parent project name
+- `search_term`: optional substring to match
+
+Response 200 OK:
+
+```json
+[
+  {
+    "id": 1,
+    "user": 1,
+    "name": "A",
+    "description": "...",
+    "total_time": 750.0,
+    "parent_project": 42,
+    "start_date": "...",
+    "last_updated": "..."
+  }
+]
+```
+
+If no subproject matches the search term, the endpoint falls back to returning all subprojects for the parent project.
+
 ## 10) Totals (project + subproject totals)
 
 **GET** `/api/totals/`
@@ -718,6 +746,7 @@ Notes:
 - Returns the new session object with a **new ID**
 - If changing project, subprojects must exist under the new project
 - If `subprojects` is not provided, existing subprojects are preserved (if valid for the project)
+- Missing, invalid, or non-positive session IDs return structured JSON errors, e.g. `{"ok": false, "error": "Session not found"}`.
 
 Response 200 OK:
 
@@ -742,15 +771,42 @@ Response 200 OK:
 
 **POST** `/api/audit/`
 
-Recomputes and persists totals for all of the authenticated user's projects and subprojects using `audit_total_time(log=False)`.
+Recomputes totals for all of the authenticated user's projects and subprojects from completed sessions.
+
+Body:
+
+```json
+{ "dry_run": true }
+```
+
+Behavior:
+
+- `dry_run=true` previews the audit and reports exactly what would change without saving anything.
+- `dry_run=false` or omitted persists the recomputed `total_time` values.
+- Changed rows are returned in `changed_projects` and `changed_subprojects`, including `before`, `after`, and `delta`.
 
 Response 200 OK:
 
 ```json
 {
   "ok": true,
-  "projects": {"count": 3, "changed": 1, "delta_total": 9.0},
-  "subprojects": {"count": 5, "changed": 2, "delta_total": 18.0}
+  "dry_run": true,
+  "projects": {"count": 3, "changed": 1, "delta": 9.0},
+  "changed_projects": [
+    {"id": 120, "name": "Example", "before": 100.0, "after": 109.0, "delta": 9.0}
+  ],
+  "subprojects": {"count": 5, "changed": 2, "delta": 18.0},
+  "changed_subprojects": [
+    {
+      "id": 300,
+      "name": "Research",
+      "project_id": 120,
+      "project": "Example",
+      "before": 10.0,
+      "after": 19.0,
+      "delta": 9.0
+    }
+  ]
 }
 ```
 
@@ -765,7 +821,7 @@ These remain available and are used by older clients. Some are thin wrappers aro
 Projects
 
 
-- POST /api/create_project/
+- POST /api/create_project/ (infers `user` from the authenticated request; clients should not send a `user` field)
 
 - GET /api/list_projects/ (optional start_date, end_date, context)
 
@@ -782,7 +838,7 @@ Subprojects
 
 - GET /api/list_subprojects/<project_name>/ and /api/list_subprojects/?project_name=...
 
-- GET /api/search_subprojects/?project_name=...&search_term=...
+- GET /api/search_subprojects/?project_name=...&search_term=... (also accepts `project=...`)
 
 - DELETE /api/delete_subproject/<project_name>/<subproject_name>/
 
@@ -807,7 +863,7 @@ Direct:
 
 - GET /api/list_active_sessions/
 
-- DELETE /api/delete_session/<int:session_id>/
+- DELETE /api/delete_session/<session_id>/ (missing, invalid, or non-positive IDs return structured JSON errors)
 
 Tallies
 
@@ -948,6 +1004,8 @@ Response 200 OK:
   {
     "name": "Project A",
     "total_time": 12000.0,
+    "computed_total_time": 12000.0,
+    "persisted_total_time": 11950.0,
     "session_count": 45,
     "subproject_count": 3,
     "days_since_update": 2,
@@ -956,6 +1014,8 @@ Response 200 OK:
   {
     "name": "Project B",
     "total_time": 8000.0,
+    "computed_total_time": 8000.0,
+    "persisted_total_time": 8000.0,
     "session_count": 30,
     "subproject_count": 1,
     "days_since_update": 7,
@@ -964,7 +1024,12 @@ Response 200 OK:
 ]
 ```
 
-Note: `total_time` is in **minutes**.
+Notes:
+
+- `total_time` is in **minutes** and remains the live/computed value for backwards compatibility.
+- `computed_total_time` is calculated from completed sessions at request time.
+- `persisted_total_time` is the saved `Projects.total_time` value that `/api/audit/` can repair.
+- If `computed_total_time` and `persisted_total_time` differ, persisted totals are stale while session-derived chart totals are already correct.
 
 ---
 
