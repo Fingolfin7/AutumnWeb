@@ -95,7 +95,7 @@ class InsightsView(View):
         profile = getattr(user, "profile", None)
         provider_models = {
             "gemini": [
-                ("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash"),
+                ("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
                 ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
             ]
         }
