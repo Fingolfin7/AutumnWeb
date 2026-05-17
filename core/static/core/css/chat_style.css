@@ -67,6 +67,10 @@
   margin-top: 8px;
 }
 
+.reasoning-effort-control select {
+  min-width: 8rem;
+}
+
 /* Sidebar and Main Layout */
 .chat-layout {
   display: flex;

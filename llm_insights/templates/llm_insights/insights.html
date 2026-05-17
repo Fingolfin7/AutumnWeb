@@ -296,8 +296,8 @@
                             <select id="model" name="model"></select>
                         </span>
 
-                        <span class="label-input" id="reasoning-effort-field">
-                            <label for="reasoning_effort">Reasoning Effort</label>
+                        <span class="label-input reasoning-effort-control" id="reasoning-effort-field">
+                            <label for="reasoning_effort" title="OpenAI reasoning effort">Effort</label>
                             <select id="reasoning_effort" name="reasoning_effort">
                                 {% for effort in openai_reasoning_efforts %}
                                     <option value="{{ effort }}" {% if effort == selected_reasoning_effort %}selected{% endif %}>
