@@ -98,6 +98,7 @@ CORS_ALLOWED_ORIGINS = env.list(
     default=[
         "http://127.0.0.1:4173",
         "http://localhost:4173",
+        "https://fingolfin7.github.io",
     ],
 )
 CORS_ALLOW_CREDENTIALS = env.bool("CORS_ALLOW_CREDENTIALS", default=True)
