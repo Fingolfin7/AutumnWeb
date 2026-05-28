@@ -10,6 +10,7 @@ markdown
 pymdown-extensions
 inflect
 django-environ
+django-cors-headers
 google-genai
 pytz
 django-cleanup

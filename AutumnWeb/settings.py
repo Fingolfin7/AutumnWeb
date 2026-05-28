@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "llm_insights.apps.LlmInsightsConfig",
     "django.contrib.admin",
     "django.contrib.auth",
+    "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",  # for JWT token authentication
     "crispy_forms",
@@ -84,12 +85,23 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # for serving static files in production
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+CORS_ALLOWED_ORIGINS = env.list(
+    "CORS_ALLOWED_ORIGINS",
+    default=[
+        "http://127.0.0.1:4173",
+        "http://localhost:4173",
+    ],
+)
+CORS_ALLOW_CREDENTIALS = env.bool("CORS_ALLOW_CREDENTIALS", default=True)
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=CORS_ALLOWED_ORIGINS)
 
 CACHES = {
     "default": {
