@@ -1638,6 +1638,82 @@ class DashboardViewTests(TestCase):
         self.assertIn('login', response.url)
 
 
+class TimerSuggestionsTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="timeruser",
+            email="timer@example.com",
+            password="testpass123",
+        )
+        self.context = Context.objects.create(user=self.user, name="General")
+        self.project = Projects.objects.create(
+            user=self.user,
+            name="Timer Project",
+            context=self.context,
+        )
+        self.subproject = SubProjects.objects.create(
+            user=self.user,
+            name="Build",
+            parent_project=self.project,
+        )
+        self.client.login(username="timeruser", password="testpass123")
+
+    def create_completed_session(self, start_time=None, project=None, subprojects=None):
+        start_time = start_time or timezone.now() - timedelta(hours=2)
+        session = Sessions.objects.create(
+            user=self.user,
+            project=project or self.project,
+            start_time=start_time,
+            end_time=start_time + timedelta(minutes=45),
+            is_active=False,
+        )
+        if subprojects:
+            session.subprojects.add(*subprojects)
+        return session
+
+    def test_timers_page_shows_recent_presets(self):
+        self.create_completed_session(subprojects=[self.subproject])
+
+        response = self.client.get(reverse("timers"))
+
+        self.assertEqual(response.status_code, 200)
+        recent = response.context["timer_suggestions"]["recent"]
+        self.assertEqual(len(recent), 1)
+        self.assertEqual(recent[0]["project"], self.project)
+        self.assertEqual(recent[0]["subprojects"], [self.subproject])
+        self.assertContains(response, "Recent Presets")
+        self.assertContains(response, 'name="project" value="Timer Project"')
+
+    def test_timers_page_shows_habit_suggestions_for_same_weekday_and_hour(self):
+        habitual_start = timezone.now() - timedelta(days=7)
+        self.create_completed_session(start_time=habitual_start)
+
+        response = self.client.get(reverse("timers"))
+
+        habits = response.context["timer_suggestions"]["habits"]
+        self.assertEqual(len(habits), 1)
+        self.assertEqual(habits[0]["project"], self.project)
+        self.assertEqual(habits[0]["metric"], "1x")
+
+    def test_timers_page_shows_commitment_driven_suggestions(self):
+        Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type="time",
+            period="weekly",
+            target=120,
+        )
+
+        response = self.client.get(reverse("timers"))
+
+        commitments = response.context["timer_suggestions"]["commitments"]
+        self.assertEqual(len(commitments), 1)
+        self.assertEqual(commitments[0]["project"], self.project)
+        self.assertIn("remaining", commitments[0]["detail"])
+        self.assertContains(response, "Commitment Push")
+
+
 class DailyStreakTests(TestCase):
     """Test the calculate_daily_activity_streak function."""
 

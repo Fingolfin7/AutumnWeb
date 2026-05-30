@@ -13,41 +13,98 @@
             New Timer
         </button>
     </section>
-    <section id="active-timers">
-        {% for timer in timers %}
-            <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
-                <div class="timer-row-flex">
-                    <span>[{{ forloop.counter0 }}]: Started</span>
-                    <span class="text-red">
-                        <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
-                            {{ timer.project.name }}
-                        </a>
-                    </span>
-                    <span class="timer-subprojects">
-                        {% for subproject in timer.subprojects.all %}
-                            <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                                {% if forloop.first %}[{% endif %}
-                                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                                {% if forloop.last %}]{% endif %}
-                            </a>
-                        {% endfor %}
-                    </span>
-                    <span>
-                        <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
-                    </span>
-                    <span class="timer-actions">
-                        <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
-                            <i class="fas fa-redo-alt"></i>
-                        </button>
-                        <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'">
-                            <i class="fa fa-stopwatch"></i>
-                        </button>
-                        <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'">
-                            <i class="fa fa-trash"></i>
-                        </button>
-                    </span>
-                </div>
+
+    <section class="timer-suggestions card">
+        <div class="timer-suggestions-header">
+            <div>
+                <h2>Suggestions</h2>
             </div>
-        {% endfor %}
+        </div>
+
+        {% if timer_suggestions.commitments or timer_suggestions.habits or timer_suggestions.recent %}
+            {% if timer_suggestions.commitments %}
+                <div class="timer-suggestion-group">
+                    <h3><i class="fa fa-bullseye text-yellow"></i> Commitment Push</h3>
+                    <div class="timer-suggestion-list">
+                        {% for suggestion in timer_suggestions.commitments %}
+                            {% include 'core/partials/timer_suggestion_card.html' %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if timer_suggestions.habits %}
+                <div class="timer-suggestion-group">
+                    <h3><i class="fa fa-calendar-day text-blue"></i> Usually Now</h3>
+                    <div class="timer-suggestion-list">
+                        {% for suggestion in timer_suggestions.habits %}
+                            {% include 'core/partials/timer_suggestion_card.html' %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if timer_suggestions.recent %}
+                <div class="timer-suggestion-group">
+                    <h3><i class="fa fa-history text-green"></i> Recent Presets</h3>
+                    <div class="timer-suggestion-list">
+                        {% for suggestion in timer_suggestions.recent %}
+                            {% include 'core/partials/timer_suggestion_card.html' %}
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="timer-suggestions-empty">
+                <i class="fa fa-seedling"></i>
+                <span>No suggestions yet.</span>
+            </div>
+        {% endif %}
+    </section>
+
+    <section id="active-timers">
+        <h2>Active Timers</h2>
+        {% if timers %}
+            {% for timer in timers %}
+                <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
+                    <div class="timer-row-flex">
+                        <span>[{{ forloop.counter0 }}]: Started</span>
+                        <span class="text-red">
+                            <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
+                                {{ timer.project.name }}
+                            </a>
+                        </span>
+                        <span class="timer-subprojects">
+                            {% for subproject in timer.subprojects.all %}
+                                <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                    {% if forloop.first %}[{% endif %}
+                                    '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                    {% if forloop.last %}]{% endif %}
+                                </a>
+                            {% endfor %}
+                        </span>
+                        <span>
+                            <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
+                        </span>
+                        <span class="timer-actions">
+                            <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'" title="Restart">
+                                <i class="fas fa-redo-alt"></i>
+                            </button>
+                            <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'" title="Stop">
+                                <i class="fa fa-stopwatch"></i>
+                            </button>
+                            <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'" title="Remove">
+                                <i class="fa fa-trash"></i>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="timer-empty-state">
+                <i class="fa fa-clock"></i>
+                <span>No timers are running.</span>
+            </div>
+        {% endif %}
     </section>
 {% endblock %}

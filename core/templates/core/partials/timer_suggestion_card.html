@@ -1,0 +1,29 @@
+<article class="timer-suggestion-row timer-suggestion-{{ suggestion.kind }}">
+    <span class="timer-suggestion-main">
+        <span class="text-red project-name-slider">
+            {{ suggestion.project.name }}
+        </span>
+        <span class="timer-suggestion-subprojects">
+            {% for subproject in suggestion.subprojects %}
+                {% if forloop.first %}[{% endif %}
+                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                {% if forloop.last %}]{% endif %}
+            {% endfor %}
+        </span>
+        <span class="timer-suggestion-detail">{{ suggestion.detail }}</span>
+        {% if suggestion.kind == 'commitment' and suggestion.metric %}
+            <span class="timer-suggestion-metric">{{ suggestion.metric }}</span>
+        {% endif %}
+    </span>
+
+    <form method="post" action="{% url 'start_timer' %}" class="timer-suggestion-form">
+        {% csrf_token %}
+        <input type="hidden" name="project" value="{{ suggestion.project.name }}">
+        {% for subproject_name in suggestion.subproject_names %}
+            <input type="hidden" name="subprojects" value="{{ subproject_name }}">
+        {% endfor %}
+        <button type="submit" class="timer-button" title="Start {{ suggestion.project.name }}">
+            <i class="fa fa-play"></i>
+        </button>
+    </form>
+</article>

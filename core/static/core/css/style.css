@@ -363,6 +363,148 @@ body.dark-mode.bg-active .card {
   color: inherit;
 }
 
+.timer-suggestions {
+  margin: 1rem 0 1.5rem;
+  padding: 0.85rem 1rem;
+  width: min(100%, 42rem);
+}
+
+.timer-suggestions-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.55rem;
+}
+
+.timer-suggestions-header h2,
+#active-timers h2 {
+  font-size: 1.2rem;
+  line-height: 1.2;
+  margin-bottom: 0;
+}
+
+.timer-suggestion-group {
+  margin-top: 0.65rem;
+}
+
+.timer-suggestion-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.timer-suggestion-list {
+  display: block;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.light-mode .timer-suggestion-list {
+  border-top-color: rgba(18, 18, 18, 0.08);
+}
+
+.timer-suggestion-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 1.85rem;
+  padding: 0.18rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+body.light-mode .timer-suggestion-row {
+  border-bottom-color: rgba(18, 18, 18, 0.08);
+}
+
+.timer-suggestion-main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: 0.4rem;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.timer-suggestion-main .project-name-slider {
+  max-width: 42%;
+  font-size: 0.82rem;
+  font-weight: bold;
+}
+
+.timer-suggestion-detail {
+  flex: 1 1 auto;
+  min-width: 2rem;
+  color: rgba(192, 192, 192, 0.76);
+  font-size: 0.68rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.light-mode .timer-suggestion-detail {
+  color: rgba(18, 18, 18, 0.62);
+}
+
+.timer-suggestion-detail::before {
+  content: "-> ";
+}
+
+.timer-suggestion-subprojects {
+  color: inherit;
+  font-size: 0.72rem;
+}
+
+.timer-suggestion-metric {
+  flex: 0 0 auto;
+  color: var(--main-yellow);
+  font-size: 0.62rem;
+}
+
+.timer-suggestion-form {
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.timer-suggestion-form .timer-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  margin: 0;
+  padding: 0;
+  font-size: 0.7rem;
+}
+
+.timer-suggestions-empty,
+.timer-empty-state {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem;
+  border: 1px dashed var(--border-dark);
+  border-radius: 2px;
+  color: var(--main-muted);
+}
+
+body.light-mode .timer-suggestions-empty,
+body.light-mode .timer-empty-state {
+  border-color: var(--border-light);
+}
+
+@media (max-width: 28rem) {
+  .timer-suggestion-main .project-name-slider {
+    max-width: 65%;
+  }
+
+  .timer-suggestion-detail {
+    display: none;
+  }
+}
+
 .stacked {
   display: flex;
   flex-direction: column;
