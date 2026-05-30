@@ -8,6 +8,23 @@ $(document).ready(function() {
     let stopAfterAmount = $('#stop-after-amount');
     let stopAfterUnit = $('#stop-after-unit');
     let lastLoadedProject = '';
+    let presetSelectionActive = false;
+    const stopAfterPresets = {
+        minutes: [
+            {value: '15', label: '15m'},
+            {value: '25', label: '25m'},
+            {value: '30', label: '30m'},
+            {value: '45', label: '45m'},
+            {value: '60', label: '60m'}
+        ],
+        hours: [
+            {value: '1', label: '1h'},
+            {value: '2', label: '2h'},
+            {value: '3', label: '3h'},
+            {value: '4', label: '4h'},
+            {value: '8', label: '8h'}
+        ]
+    };
 
     function updateStartTimerSummary() {
         let projectName = search.val().trim();
@@ -39,6 +56,26 @@ $(document).ready(function() {
         }
 
         fillSubprojects(projectName);
+    }
+
+    function renderStopAfterPresets(selectDefault) {
+        let presets = stopAfterPresets[stopAfterUnit.val()] || stopAfterPresets.minutes;
+        let activeValue = stopAfterAmount.val().trim();
+
+        if (selectDefault) {
+            activeValue = presets[0].value;
+            stopAfterAmount.val(activeValue);
+        }
+
+        $('.timer-preset-button').each(function(index) {
+            let preset = presets[index];
+
+            $(this)
+                .toggle(Boolean(preset))
+                .toggleClass('is-active', Boolean(preset) && preset.value === activeValue)
+                .data('stop-after-preset', preset ? preset.value : '')
+                .text(preset ? preset.label : '');
+        });
     }
 
     search.on('keyup', function() {
@@ -97,20 +134,21 @@ $(document).ready(function() {
     });
 
     $('.timer-preset-button').on('click', function() {
+        presetSelectionActive = true;
         $('.timer-preset-button').removeClass('is-active');
         $(this).addClass('is-active');
         stopAfterAmount.val($(this).data('stop-after-preset'));
-        stopAfterUnit.val('minutes');
         updateStartTimerSummary();
     });
 
     stopAfterAmount.on('input', function() {
+        presetSelectionActive = false;
         $('.timer-preset-button').removeClass('is-active');
         updateStartTimerSummary();
     });
 
     stopAfterUnit.on('change', function() {
-        $('.timer-preset-button').removeClass('is-active');
+        renderStopAfterPresets(presetSelectionActive);
         updateStartTimerSummary();
     });
 
@@ -160,4 +198,5 @@ $(document).ready(function() {
     }
 
     updateStartTimerSummary();
+    renderStopAfterPresets(false);
 });
