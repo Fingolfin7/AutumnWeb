@@ -35,62 +35,76 @@
 {% endblock %}
 
 {% block content %}
-    <form class="card three-quarters-width" method="post" enctype="multipart/form-data">
+    <form class="card start-timer-form" method="post" enctype="multipart/form-data">
         {% csrf_token %}
-        <section id="search-projects">
-            <span class="label-input">
-                <label for="project-search"><i class="fa fa-search"></i> Search</label>
-                <input type="text" id="project-search" name="project" placeholder="Projects" class="three-quarters-width"
-                       autocomplete="off" data-ajax_url="{% url 'api_search_projects' %}">
-            </span>
-            <div id="project-search-results"></div>
-        </section>
 
-        <br>
+        <div class="start-timer-header">
+            <h2><i class="fa fa-stopwatch"></i> New Timer</h2>
+        </div>
 
-        <section class="pick-subprojects">
-            <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_list_subprojects_param' %}">
+        <div class="start-timer-grid">
+            <section class="start-timer-column">
+                <h3 class="timer-panel-title">Project</h3>
 
-            <div class="grid-rows">
-                <span id="select-all-block">
-                    <a class="plain-link" id="get_subs_list"><h3>Subprojects</h3></a>
-                    <br>
-                    <input type="checkbox" id="select-all" class="select-all">
-                    <label for="select-all">Select All</label>
-                </span>
-            </div>
+                <div id="search-projects">
+                    <span class="label-input start-project-field">
+                        <label for="project-search"><i class="fa fa-search"></i> Project</label>
+                        <input type="text" id="project-search" name="project" placeholder="Projects"
+                               autocomplete="off" data-ajax_url="{% url 'api_search_projects' %}">
+                    </span>
+                    <div id="project-search-results"></div>
+                </div>
 
-            <br>
+                <section id="pick-subprojects" class="pick-subprojects">
+                    <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_list_subprojects_param' %}">
 
-            <div class="grid-rows" id="subproject_options">
-                <!-- subprojects will be added here -->
-            </div>
-        </section>
+                    <div class="subproject-header" id="select-all-block">
+                        <h3>Subprojects</h3>
+                        <span class="subproject-select-all">
+                            <input type="checkbox" id="select-all" class="select-all">
+                            <label for="select-all">All</label>
+                        </span>
+                    </div>
 
-        <br>
+                    <div id="subproject_options">
+                        <!-- subprojects will be added here -->
+                    </div>
+                </section>
+            </section>
 
-        <section class="timer-stop-after">
-            <h3><i class="fa fa-hourglass-half"></i> Stop after</h3>
-            <div class="timer-stop-after-controls">
-                <span class="label-input timer-stop-after-amount">
-                    <label for="stop-after-amount">Duration</label>
-                    <input type="number" id="stop-after-amount" name="stop_after_amount" min="1" step="1" placeholder="No limit">
-                </span>
-                <span class="label-input timer-stop-after-unit">
-                    <label for="stop-after-unit">Unit</label>
-                    <select id="stop-after-unit" name="stop_after_unit">
-                        <option value="minutes" selected>Minutes</option>
-                        <option value="hours">Hours</option>
-                    </select>
-                </span>
-            </div>
-        </section>
+            <section class="start-timer-column timer-stop-after">
+                <h3 class="timer-panel-title"><i class="fa fa-hourglass-half"></i> Stop after</h3>
 
-        <br>
+                <div class="timer-duration-presets" role="group" aria-label="Stop after presets">
+                    <button type="button" class="timer-preset-button" data-stop-after-preset="15">15m</button>
+                    <button type="button" class="timer-preset-button" data-stop-after-preset="25">25m</button>
+                    <button type="button" class="timer-preset-button" data-stop-after-preset="30">30m</button>
+                    <button type="button" class="timer-preset-button" data-stop-after-preset="45">45m</button>
+                    <button type="button" class="timer-preset-button" data-stop-after-preset="60">60m</button>
+                </div>
 
-        <button type="submit" id="start-timer" class="timer-button">
-            <span class="hourglass-icon"></span>
-            Start Timer
-        </button>
+                <div class="timer-stop-after-controls">
+                    <span class="label-input timer-stop-after-amount">
+                        <label for="stop-after-amount">Duration</label>
+                        <input type="number" id="stop-after-amount" name="stop_after_amount" min="1" step="1" placeholder="No limit">
+                    </span>
+                    <span class="label-input timer-stop-after-unit">
+                        <label for="stop-after-unit">Unit</label>
+                        <select id="stop-after-unit" name="stop_after_unit" class="select-caret">
+                            <option value="minutes" selected>Minutes</option>
+                            <option value="hours">Hours</option>
+                        </select>
+                    </span>
+                </div>
+            </section>
+        </div>
+
+        <footer class="start-timer-footer">
+            <span class="start-timer-summary" data-start-timer-summary>No project selected</span>
+            <button type="submit" id="start-timer" class="timer-button" disabled>
+                <span class="hourglass-icon"></span>
+                Start Timer
+            </button>
+        </footer>
     </form>
 {% endblock %}

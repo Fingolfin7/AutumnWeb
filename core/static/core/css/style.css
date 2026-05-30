@@ -846,44 +846,181 @@ input:checked + .slider:before {
   margin-left: auto;
 }
 
-.timer-stop-after {
-  border-top: 1px solid var(--border-dark);
-  border-bottom: 1px solid var(--border-dark);
-  padding: 0.85rem 0;
+.start-timer-form {
+  width: min(100%, 58rem);
+  padding: 0;
+  overflow: hidden;
 }
 
-body.light-mode .timer-stop-after {
+.start-timer-header {
+  padding: 1.25rem 1.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-dark);
+}
+
+body.light-mode .start-timer-header {
   border-color: var(--border-light);
 }
 
-.timer-stop-after h3 {
-  margin: 0 0 0.75rem;
+.start-timer-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.start-timer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(17rem, 0.85fr);
+  min-height: 13rem;
+}
+
+.start-timer-column {
+  padding: 1.5rem;
+  min-width: 0;
+}
+
+.start-timer-column + .start-timer-column {
+  border-left: 1px solid var(--border-dark);
+}
+
+body.light-mode .start-timer-column + .start-timer-column {
+  border-color: var(--border-light);
+}
+
+.timer-panel-title {
+  margin: 0 0 1.1rem;
+  font-size: 0.95rem;
+}
+
+.start-project-field,
+.start-project-field input,
+#search-projects,
+#project-search-results {
+  width: 100%;
+}
+
+.pick-subprojects {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-dark);
+}
+
+body.light-mode .pick-subprojects {
+  border-color: var(--border-light);
+}
+
+.subproject-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.subproject-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.subproject-select-all,
+.subproject-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.subproject-option,
+.subproject-empty-state {
+  min-height: 1.8rem;
+}
+
+.subproject-empty-state {
+  color: var(--main-muted);
+}
+
+#subproject_options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.55rem 1rem;
+}
+
+.timer-stop-after {
+  background: rgba(0, 191, 255, 0.05);
+}
+
+.timer-duration-presets {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  border: 1px solid var(--border-dark);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+}
+
+body.light-mode .timer-duration-presets {
+  border-color: var(--border-light);
+}
+
+.timer-preset-button {
+  min-height: 2.5rem;
+  border: 0;
+  border-right: 1px solid var(--border-dark);
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.timer-preset-button:last-child {
+  border-right: 0;
+}
+
+.timer-preset-button:hover,
+.timer-preset-button.is-active {
+  background: var(--accent-color);
+  color: var(--dark-background);
 }
 
 .timer-stop-after-controls {
-  display: flex;
-  align-items: end;
+  display: grid;
+  grid-template-columns: minmax(7rem, 1fr) minmax(8rem, 1fr);
   gap: 0.75rem;
-  flex-wrap: wrap;
 }
 
 .timer-stop-after-amount input,
 .timer-stop-after-unit select {
-  min-height: 2.1rem;
-}
-
-.timer-stop-after-amount input {
-  width: 9rem;
-}
-
-.timer-stop-after-unit select {
-  width: 8rem;
+  width: 100%;
+  min-height: 2.8rem;
 }
 
 .timer-stop-after-status {
   color: var(--main-muted);
   font-size: 0.85em;
   white-space: nowrap;
+}
+
+.start-timer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-dark);
+}
+
+body.light-mode .start-timer-footer {
+  border-color: var(--border-light);
+}
+
+.start-timer-summary {
+  color: var(--main-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timer-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 
@@ -1761,6 +1898,28 @@ body.light-mode .activity-day.is-inactive {
 
   .container.show-sidebar .main-body {
     display: none;
+  }
+
+  .start-timer-form {
+    width: 100%;
+  }
+
+  .start-timer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .start-timer-column + .start-timer-column {
+    border-left: 0;
+    border-top: 1px solid var(--border-dark);
+  }
+
+  .start-timer-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .start-timer-footer .timer-button {
+    width: 100%;
   }
 }
 
