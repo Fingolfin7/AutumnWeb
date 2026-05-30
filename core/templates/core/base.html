@@ -11,11 +11,18 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="description" content="Autumn is a time management application">
+        <meta name="theme-color" content="#8f3f24">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="Autumn">
+        <link rel="manifest" href="{% url 'pwa_manifest' %}">
+        <link rel="apple-touch-icon" href="{% static 'core/images/icons/autumn-icon-192.png' %}">
         <link rel="stylesheet" type="text/css" href="{% static 'core/css/style.css' %}?v={{ static_version.style }}">
         <link rel="stylesheet" type="text/css" href="{% static 'core/css/colours.css' %}?v={{ static_version.colours }}">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
         <script type="text/javascript" src="{% static 'core/js/jquery-3.6.0.min.js' %}"></script>
         <script type="text/javascript" src="{% static 'core/js/script.js' %}?v={{ static_version.script }}"></script>
+        <script type="text/javascript" src="{% static 'core/js/pwa.js' %}?v={{ static_version.pwa }}"></script>
         <script type="text/javascript">
             $(document).ready(function() {
                 // Calculate default dates for the insights link

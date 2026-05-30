@@ -44,6 +44,51 @@ class MarkdownRenderTests(TestCase):
         self.assertNotIn("<del>2</del>", rendered)
 
 
+class PwaTests(TestCase):
+    def test_manifest_contains_installability_basics(self):
+        response = self.client.get(reverse("pwa_manifest"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/manifest+json")
+
+        payload = response.json()
+        self.assertEqual(payload["name"], "Autumn")
+        self.assertEqual(payload["start_url"], "/")
+        self.assertEqual(payload["scope"], "/")
+        self.assertEqual(payload["display"], "standalone")
+
+        icon_sizes = {icon["sizes"] for icon in payload["icons"]}
+        self.assertIn("192x192", icon_sizes)
+        self.assertIn("512x512", icon_sizes)
+        self.assertTrue(
+            any(icon.get("purpose") == "maskable" for icon in payload["icons"])
+        )
+
+    def test_service_worker_is_root_scoped(self):
+        response = self.client.get(reverse("service_worker"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Service-Worker-Allowed"], "/")
+        self.assertIn("text/javascript", response["Content-Type"])
+
+        content = b"".join(response.streaming_content).decode("utf-8")
+        self.assertIn("self.addEventListener(\"fetch\"", content)
+        self.assertIn("/static/core/pwa/offline.html", content)
+
+    def test_base_templates_advertise_manifest_and_register_worker(self):
+        user = User.objects.create_user(username="pwauser", password="password")
+        self.client.login(username="pwauser", password="password")
+
+        dashboard_response = self.client.get(reverse("home"))
+        self.assertContains(dashboard_response, 'rel="manifest"')
+        self.assertContains(dashboard_response, "core/js/pwa.js")
+
+        self.client.logout()
+        login_response = self.client.get(reverse("login"))
+        self.assertContains(login_response, 'rel="manifest"')
+        self.assertContains(login_response, "core/js/pwa.js")
+
+
 class UpdateSessionTests(TestCase):
     def setUp(self):
         # Create a user

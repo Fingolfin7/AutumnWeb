@@ -21,12 +21,15 @@ from django.conf.urls.static import static
 from django.urls import path, include, reverse_lazy, re_path
 from django.contrib.auth import views as auth_views
 from rest_framework.authtoken.views import obtain_auth_token
+from core import pwa
 from users import views as user_views
 from users.forms import UserLoginForm
 
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),
+    path("service-worker.js", pwa.service_worker, name="service_worker"),
     path("", include("core.urls")),
     path("get-auth-token/", obtain_auth_token, name="get-auth-token"),
     path(
