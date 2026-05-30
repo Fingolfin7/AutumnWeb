@@ -172,6 +172,7 @@ class Sessions(models.Model):
     subprojects = models.ManyToManyField(SubProjects, related_name='sessions')
     start_time = models.DateTimeField(default=timezone.now)
     end_time = models.DateTimeField(null=True, blank=True)
+    auto_stop_at = models.DateTimeField(null=True, blank=True)
     note = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     crosses_dst_transition = models.BooleanField(default=False)
@@ -196,6 +197,8 @@ class Sessions(models.Model):
         super().clean()
         if self.start_time and self.end_time and self.end_time < self.start_time:
             raise ValidationError({"end_time": "End time cannot be earlier than start time."})
+        if self.start_time and self.auto_stop_at and self.auto_stop_at <= self.start_time:
+            raise ValidationError({"auto_stop_at": "Auto-stop time must be after start time."})
 
     @property
     def get_start(self):

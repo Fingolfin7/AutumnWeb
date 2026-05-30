@@ -12,6 +12,13 @@ $(document).ready(function() {
 
             $(this).find('.timer-duration').text(formattedDuration);
         });
+
+        $('.timer-stop-after-remaining').each(function() {
+            let stopAt = new Date($(this).data('auto-stop-at'));
+            let remainingTime = stopAt - new Date();
+
+            $(this).text(formatTime(Math.max(0, remainingTime)));
+        });
     }
 
     function formatTime(milliseconds) {
@@ -63,6 +70,7 @@ $(document).ready(function() {
             if (Number.isFinite(id)) {
                 stateById.set(id, {
                     start: timerInstant(timer.data('start-time')),
+                    autoStopAt: timerInstant(timer.data('auto-stop-at')),
                     projectId: parseInt(timer.data('project-id'), 10)
                 });
             }
@@ -79,6 +87,7 @@ $(document).ready(function() {
             .forEach(function(session) {
                 stateById.set(session.id, {
                     start: timerInstant(session.start_time),
+                    autoStopAt: timerInstant(session.auto_stop_at),
                     projectId: parseInt(session.project_id, 10)
                 });
             });
@@ -93,6 +102,7 @@ $(document).ready(function() {
             if (
                 !serverState ||
                 localState.start !== serverState.start ||
+                localState.autoStopAt !== serverState.autoStopAt ||
                 localState.projectId !== serverState.projectId
             ) {
                 return true;
@@ -135,10 +145,17 @@ $(document).ready(function() {
                 const serverSet = new Set(serverIds);
                 const allLocalTimersStillActive = localIds.every(id => serverSet.has(id));
                 const maxVisible = parseInt(timersContainer.data('max-visible'), 10);
-                const hasCapacity = Number.isFinite(maxVisible) ? localIds.length < maxVisible : true;
-                const canShowNewTimers = hasCapacity && serverIds.length !== localIds.length;
+                const isPartialList = Number.isFinite(maxVisible);
 
-                if (hasTimerStateChanges(localStateById, serverStateById) || !allLocalTimersStillActive || canShowNewTimers) {
+                const hasChanges = isPartialList
+                    ? (localIds.length > 0 && !allLocalTimersStillActive)
+                    : (
+                        hasTimerStateChanges(localStateById, serverStateById) ||
+                        !allLocalTimersStillActive ||
+                        serverIds.length !== localIds.length
+                    );
+
+                if (hasChanges) {
                     refreshTimerSection();
                 }
             });

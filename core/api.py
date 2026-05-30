@@ -31,6 +31,8 @@ from .utils import (
     filter_by_active_context,
     build_project_json_from_sessions,
     json_compress,
+    parse_stop_after_duration,
+    stop_expired_timers,
 )
 from django.db import transaction
 
@@ -78,6 +80,7 @@ def _err(msg, code=status.HTTP_400_BAD_REQUEST):
 
 
 def _get_active_sessions(user, project_name=None):
+    stop_expired_timers(user)
     qs = Sessions.objects.filter(is_active=True, user=user).order_by("-start_time")
     if project_name:
         qs = qs.filter(project__name__iexact=project_name)
@@ -101,6 +104,7 @@ def _serialize_session(sess: Sessions, compact=True):
             "subs": [sp.name for sp in sess.subprojects.all()],
             "start": sess.start_time.isoformat(),
             "end": sess.end_time.isoformat() if sess.end_time else None,
+            "stop_at": sess.auto_stop_at.isoformat() if sess.auto_stop_at else None,
             "active": sess.is_active,
             "elapsed": elapsed,
             "crosses_dst_transition": sess.crosses_dst_transition,
@@ -115,6 +119,7 @@ def _serialize_session(sess: Sessions, compact=True):
         "subprojects": [sp.name for sp in sess.subprojects.all()],
         "start_time": sess.start_time.isoformat(),
         "end_time": sess.end_time.isoformat() if sess.end_time else None,
+        "auto_stop_at": sess.auto_stop_at.isoformat() if sess.auto_stop_at else None,
         "is_active": sess.is_active,
         "elapsed_minutes": elapsed,
         "note": sess.note or "",
@@ -214,6 +219,15 @@ def timer_start(request):
     if not project:
         return _err("Project not found", status.HTTP_404_NOT_FOUND)
 
+    stop_after_value = request.data.get("stop_after")
+    if stop_after_value is None:
+        stop_after_value = request.data.get("stop_after_minutes")
+
+    try:
+        stop_after = parse_stop_after_duration(stop_after_value)
+    except ValueError as exc:
+        return _err(str(exc))
+
     subs = _coerce_list(request.data.get("subprojects"))
     note = request.data.get("note", "").strip()
 
@@ -227,10 +241,12 @@ def timer_start(request):
         missing = [s for s in subs if s.lower() not in existing]
         return _err(f"Unknown subprojects: {', '.join(missing)}")
 
+    start_time = _now()
     sess = Sessions.objects.create(
         user=request.user,
         project=project,
-        start_time=_now(),
+        start_time=start_time,
+        auto_stop_at=start_time + stop_after if stop_after else None,
         is_active=True,
         note=note or None,
     )
@@ -254,6 +270,7 @@ def timer_stop(request):
     JSON: { "session_id": int?, "project": str?, "note": str? }
     """
     compact = _compact(request)
+    stop_expired_timers(request.user)
     sess = _pick_target_session(
         request.user,
         session_id=request.data.get("session_id"),
@@ -261,9 +278,12 @@ def timer_stop(request):
     )
     if not sess:
         return _err("No active timer found", status.HTTP_404_NOT_FOUND)
+    if not sess.is_active:
+        return _err("Session not active", status.HTTP_400_BAD_REQUEST)
 
     sess.end_time = _now()
     sess.is_active = False
+    sess.auto_stop_at = None
     if "note" in request.data and request.data["note"] is not None:
         sess.note = str(request.data["note"])
     sess.full_clean()
@@ -288,6 +308,7 @@ def timer_status(request):
     Show status of current timer(s).
     Query: session_id?, project?
     """
+    stop_expired_timers(request.user)
     compact = _compact(request)
     qp = request.query_params
     session_id = qp.get("session_id")
@@ -323,6 +344,7 @@ def timer_restart(request):
     JSON: { "session_id": int?, "project": str? }
     """
     compact = _compact(request)
+    stop_expired_timers(request.user)
     sess = _pick_target_session(
         request.user,
         session_id=request.data.get("session_id"),
@@ -331,9 +353,20 @@ def timer_restart(request):
     if not sess:
         return _err("No active timer found", status.HTTP_404_NOT_FOUND)
 
-    sess.start_time = _now()
+    restart_time = _now()
+    auto_stop_duration = None
+    if sess.auto_stop_at and sess.start_time and sess.auto_stop_at > sess.start_time:
+        auto_stop_duration = sess.auto_stop_at - sess.start_time
+
+    sess.start_time = restart_time
     sess.is_active = True
     sess.end_time = None
+    sess.auto_stop_at = (
+        restart_time + auto_stop_duration
+        if auto_stop_duration
+        else None
+    )
+    sess.full_clean()
     sess.save()
     return Response(_json_ok({"session": _serialize_session(sess, compact)}, compact))
 
@@ -1574,6 +1607,7 @@ def list_sessions(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_active_sessions(request):
+    stop_expired_timers(request.user)
     sessions = Sessions.objects.filter(is_active=True, user=request.user)
     sessions = filter_by_active_context(
         sessions, request, override_context_id=request.query_params.get("context")

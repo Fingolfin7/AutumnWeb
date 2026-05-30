@@ -41,6 +41,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = "core/dashboard.html"
 
     def get_context_data(self, **kwargs):
+        stop_expired_timers(self.request.user)
         context = super().get_context_data(**kwargs)
         context["title"] = "Autumn"
         user = self.request.user
@@ -129,6 +130,14 @@ def start_timer(request):
         try:
             project_name = request.POST.get("project")
             subproject_names = request.POST.getlist("subprojects")
+            stop_after_amount = (request.POST.get("stop_after_amount") or "").strip()
+            stop_after_unit = request.POST.get("stop_after_unit", "minutes")
+            stop_after = (
+                f"{stop_after_amount} {stop_after_unit}"
+                if stop_after_amount
+                else request.POST.get("stop_after")
+            )
+            stop_after_duration = parse_stop_after_duration(stop_after)
 
             # Fetch the project
             project = Projects.objects.filter(
@@ -145,10 +154,16 @@ def start_timer(request):
                 raise ValueError("No subprojects found for the selected project")
 
             # Create a new session
+            start_time = timezone.now()
             session = Sessions.objects.create(
                 user=request.user,
                 project=project,
-                start_time=timezone.now(),
+                start_time=start_time,
+                auto_stop_at=(
+                    start_time + stop_after_duration
+                    if stop_after_duration
+                    else None
+                ),
                 is_active=True,
             )
 
@@ -316,7 +331,11 @@ def update_session(request, session_id: int):
 
 @login_required
 def stop_timer(request, session_id: int):
+    stop_expired_timers(request.user)
     timer = get_object_or_404(Sessions, id=session_id, user=request.user)
+    if not timer.is_active:
+        messages.info(request, "That timer has already stopped.")
+        return redirect("timers")
 
     if request.method == "POST":
         post_data = request.POST.copy()
@@ -335,6 +354,7 @@ def stop_timer(request, session_id: int):
         if form.is_valid():
             timer = form.save(commit=False)
             timer.is_active = False
+            timer.auto_stop_at = None
             timer.save()
             messages.success(request, "Stopped timer")
             return redirect("timers")
@@ -355,9 +375,22 @@ def stop_timer(request, session_id: int):
 
 @login_required
 def restart_timer(request, session_id: int):
-    timer = Sessions.objects.get(id=session_id)
+    stop_expired_timers(request.user)
+    timer = get_object_or_404(Sessions, id=session_id, user=request.user)
 
-    timer.start_time = timezone.now()
+    restart_time = timezone.now()
+    auto_stop_duration = None
+    if timer.auto_stop_at and timer.start_time and timer.auto_stop_at > timer.start_time:
+        auto_stop_duration = timer.auto_stop_at - timer.start_time
+
+    timer.start_time = restart_time
+    timer.end_time = None
+    timer.is_active = True
+    timer.auto_stop_at = (
+        restart_time + auto_stop_duration
+        if auto_stop_duration
+        else None
+    )
 
     timer.save()
     messages.success(request, "Restarted timer")
@@ -367,7 +400,7 @@ def restart_timer(request, session_id: int):
 
 @login_required
 def remove_timer(request, session_id: int):
-    timer = Sessions.objects.get(id=session_id)
+    timer = get_object_or_404(Sessions, id=session_id, user=request.user)
 
     if request.method == "POST":
         timer.delete()
@@ -894,6 +927,7 @@ class TimerListView(LoginRequiredMixin, ListView):
         return context
 
     def get_queryset(self):
+        stop_expired_timers(self.request.user)
         qs = Sessions.objects.filter(is_active=True, user=self.request.user)
         # Respect active context (timers only for projects in the active context)
         return filter_by_active_context(qs, self.request)

@@ -69,6 +69,25 @@
 
         <br>
 
+        <section class="timer-stop-after">
+            <h3><i class="fa fa-hourglass-half"></i> Stop after</h3>
+            <div class="timer-stop-after-controls">
+                <span class="label-input timer-stop-after-amount">
+                    <label for="stop-after-amount">Duration</label>
+                    <input type="number" id="stop-after-amount" name="stop_after_amount" min="1" step="1" placeholder="No limit">
+                </span>
+                <span class="label-input timer-stop-after-unit">
+                    <label for="stop-after-unit">Unit</label>
+                    <select id="stop-after-unit" name="stop_after_unit">
+                        <option value="minutes" selected>Minutes</option>
+                        <option value="hours">Hours</option>
+                    </select>
+                </span>
+            </div>
+        </section>
+
+        <br>
+
         <button type="submit" id="start-timer" class="timer-button">
             <span class="hourglass-icon"></span>
             Start Timer

@@ -66,7 +66,7 @@
             <h2>Active Timers</h2>
             {% if timers %}
                 {% for timer in timers %}
-                    <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
+                    <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
                         <div class="timer-row-flex">
                             <span>[{{ forloop.counter0 }}]: Started</span>
                             <span class="text-red">
@@ -86,6 +86,11 @@
                             <span>
                                 <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
                             </span>
+                            {% if timer.auto_stop_at %}
+                                <span class="timer-stop-after-status">
+                                    stops in <span class="timer-stop-after-remaining" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"></span>
+                                </span>
+                            {% endif %}
                             <span class="timer-actions">
                                 <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'" title="Restart">
                                     <i class="fas fa-redo-alt"></i>

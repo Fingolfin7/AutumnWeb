@@ -1,4 +1,5 @@
 import json
+import re
 import zlib
 import base64
 from django.utils import timezone
@@ -13,6 +14,63 @@ from core.models import Sessions, Projects, SubProjects, Context, Tag
 
 
 ACTIVE_CONTEXT_SESSION_KEY = "active_context_id"
+MAX_AUTO_STOP_MINUTES = 7 * 24 * 60
+
+
+def parse_stop_after_duration(value) -> timedelta | None:
+    """Parse an optional auto-stop duration into a timedelta."""
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        minutes = float(value)
+    else:
+        text = str(value).strip().lower().replace(",", ".")
+        if not text:
+            return None
+
+        match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([a-z]*)", text)
+        if not match:
+            raise ValueError("Stop after must be a number of minutes or hours.")
+
+        amount = float(match.group(1))
+        unit = match.group(2) or "minutes"
+        if unit in {"m", "min", "mins", "minute", "minutes"}:
+            minutes = amount
+        elif unit in {"h", "hr", "hrs", "hour", "hours"}:
+            minutes = amount * 60
+        else:
+            raise ValueError("Stop after unit must be minutes or hours.")
+
+    if minutes <= 0:
+        raise ValueError("Stop after must be greater than zero.")
+    if minutes > MAX_AUTO_STOP_MINUTES:
+        raise ValueError("Stop after cannot be longer than 7 days.")
+
+    return timedelta(minutes=minutes)
+
+
+def stop_expired_timers(user=None, now=None):
+    """Close active sessions whose optional auto-stop deadline has passed."""
+    now = now or timezone.now()
+    sessions = Sessions.objects.filter(
+        is_active=True,
+        auto_stop_at__isnull=False,
+        auto_stop_at__lte=now,
+    )
+    if user is not None:
+        sessions = sessions.filter(user=user)
+
+    stopped = []
+    for session in sessions.select_related("project").prefetch_related("subprojects"):
+        session.end_time = session.auto_stop_at
+        session.auto_stop_at = None
+        session.is_active = False
+        session.full_clean()
+        session.save()
+        stopped.append(session)
+
+    return stopped
 
 
 def build_exclude_project_meta(user) -> dict:

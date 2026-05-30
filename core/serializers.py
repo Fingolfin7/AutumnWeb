@@ -46,6 +46,7 @@ class SessionSerializer(serializers.ModelSerializer):
             'subprojects',
             'start_time',
             'end_time',
+            'auto_stop_at',
             'note',
             'is_active',
             'crosses_dst_transition',

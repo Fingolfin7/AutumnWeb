@@ -194,6 +194,73 @@ class StopTimerTests(TestCase):
         self.assertAlmostEqual(self.subproject.total_time, expected_duration, places=2)
 
 
+class StopAfterTimerTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="stopafter", password="password")
+        self.client.login(username="stopafter", password="password")
+        self.project = Projects.objects.create(user=self.user, name="Focus Block")
+
+    def test_start_timer_accepts_stop_after_duration(self):
+        response = self.client.post(
+            reverse("start_timer"),
+            data={
+                "project": self.project.name,
+                "stop_after_amount": "30",
+                "stop_after_unit": "minutes",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        session = Sessions.objects.get(user=self.user, project=self.project)
+        self.assertTrue(session.is_active)
+        self.assertIsNotNone(session.auto_stop_at)
+        self.assertAlmostEqual(
+            (session.auto_stop_at - session.start_time).total_seconds(),
+            30 * 60,
+            delta=2,
+        )
+
+    def test_api_start_timer_accepts_stop_after_duration(self):
+        response = self.client.post(
+            "/api/timer/start/?compact=false",
+            data=json.dumps({"project": self.project.name, "stop_after": "1.5 hours"}),
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        payload = response.json()
+        self.assertIsNotNone(payload["session"]["auto_stop_at"])
+
+        session = Sessions.objects.get(id=payload["session"]["id"])
+        self.assertAlmostEqual(
+            (session.auto_stop_at - session.start_time).total_seconds(),
+            90 * 60,
+            delta=2,
+        )
+
+    def test_expired_stop_after_timer_is_closed_before_listing_active_timers(self):
+        start = timezone.now() - timedelta(minutes=45)
+        auto_stop_at = start + timedelta(minutes=30)
+        session = Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=start,
+            auto_stop_at=auto_stop_at,
+            is_active=True,
+        )
+
+        response = self.client.get(reverse("timers"))
+
+        self.assertEqual(response.status_code, 200)
+        session.refresh_from_db()
+        self.project.refresh_from_db()
+        self.assertFalse(session.is_active)
+        self.assertEqual(session.end_time, auto_stop_at)
+        self.assertIsNone(session.auto_stop_at)
+        self.assertAlmostEqual(self.project.total_time, 30.0, places=2)
+        self.assertEqual(len(response.context["timers"]), 0)
+
+
 class DeleteSessionTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser", password="password")

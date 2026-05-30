@@ -14,7 +14,7 @@
     </h2>
     <div id="active-timers" data-max-visible="5">
         {% for timer in timers %}
-            <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
+            <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
                 <table class="timer-row">
                     <tr>
                         <td>
@@ -32,6 +32,11 @@
                         </td>
                         <td>
                             <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
+                            {% if timer.auto_stop_at %}
+                                <span class="timer-stop-after-status">
+                                    stops in <span class="timer-stop-after-remaining" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"></span>
+                                </span>
+                            {% endif %}
                         </td>
                         <td>
                             <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
