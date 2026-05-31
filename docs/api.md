@@ -10,6 +10,10 @@ All endpoints below live under `/api/` and use Django REST Framework with `IsAut
 - Datetimes are returned as ISO 8601 strings (`.isoformat()`).
 - **Durations are minutes** (float, typically rounded to 4 decimals).
 - Session payloads include `crosses_dst_transition` (boolean) for completed sessions that span a DST offset change in the server timezone.
+- Active timer payloads may include an auto-stop deadline:
+  - compact mode: `stop_at`
+  - non-compact/serializer mode: `auto_stop_at`
+  - Both are ISO 8601 strings or `null`.
 
 ---
 
@@ -69,6 +73,7 @@ Body:
 {
   "project": "Project Name",
   "subprojects": ["A", "B"],
+  "stop_after": "30 minutes",
   "note": "optional"
 }
 ```
@@ -79,6 +84,17 @@ Notes:
 - subprojects may also be "A,B" (comma-separated).
 
 - Subprojects must already exist under the given project, or you get Unknown subprojects: ....
+
+- `stop_after` is optional. It accepts a number of minutes or a string with minutes/hours, for example:
+  - `30`
+  - `"30 minutes"`
+  - `"30m"`
+  - `"1.5 hours"`
+  - `"2h"`
+
+- `stop_after_minutes` is also accepted as a minutes-only alias for CLI clients.
+
+- Auto-stop durations must be greater than zero and no longer than 7 days.
 
 Response:
 
@@ -94,6 +110,7 @@ Response:
     "subs": ["A", "B"],
     "start": "2026-01-15T12:34:56+01:00",
     "end": null,
+    "stop_at": "2026-01-15T13:04:56+01:00",
     "active": true,
     "elapsed": 0.0,
     "crosses_dst_transition": false,
@@ -103,6 +120,14 @@ Response:
 ```
 
 Note: All session responses now include `pid` (compact) or `project_id` (non-compact) for the parent project ID.
+
+Non-compact session responses use `auto_stop_at` instead of compact `stop_at`.
+
+Auto-stop behavior:
+
+- The app does not require the CLI to call a special stop endpoint at the deadline.
+- Active timer endpoints sweep expired auto-stop timers before returning active timer state.
+- When an auto-stop timer expires, the session is saved with `end_time = auto_stop_at`, `is_active = false`, and `auto_stop_at = null`.
 
 ## 2) Stop timer
 
@@ -137,6 +162,8 @@ Response 200 OK:
   "duration": 42.5
 }
 ```
+
+Manual stop clears `auto_stop_at` on the session.
 
 ## 3) Timer status
 
@@ -177,6 +204,7 @@ Responses:
       "subs": [],
       "start": "2026-01-15T12:00:00+01:00",
       "end": null,
+      "stop_at": "2026-01-15T12:30:00+01:00",
       "active": true,
       "elapsed": 3.2
     }
@@ -205,6 +233,8 @@ Behavior:
 
 
 - Sets start_time = now, is_active = true, and end_time = null.
+
+- If the timer had an auto-stop deadline, restart preserves the same auto-stop duration from the new start time.
 
 Response:
 
