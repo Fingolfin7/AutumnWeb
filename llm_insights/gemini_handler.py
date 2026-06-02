@@ -1,6 +1,7 @@
 from toon import encode
 from google import genai
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
+from typing import Any, AsyncIterator
 from AutumnWeb.settings import GEMINI_API_KEY
 from core.utils import build_project_json_from_sessions
 from .base_handler import BaseLLMHandler
@@ -223,6 +224,34 @@ class GeminiHandler(BaseLLMHandler):
                 sources.append({"link": web.uri, "title": title})
         return sources
 
+    async def _stream_chat_response(self, prompt) -> AsyncIterator[dict[str, Any]]:
+        stream = await self.chat.send_message_stream(prompt)
+        chunks = []
+        last_response = None
+        async for response in stream:
+            last_response = response
+            delta = getattr(response, "text", "") or ""
+            if delta:
+                chunks.append(delta)
+                yield {"type": "delta", "text": delta}
+        usage = {"prompt": 0, "response": 0}
+        if last_response and getattr(last_response, "usage_metadata", None):
+            usage = {
+                "prompt": getattr(last_response.usage_metadata, "prompt_token_count", 0)
+                or 0,
+                "response": getattr(
+                    last_response.usage_metadata, "candidates_token_count", 0
+                )
+                or 0,
+            }
+        yield {
+            "type": "final",
+            "text": "".join(chunks),
+            "sources": self._extract_sources(last_response),
+            "usage": usage,
+            "response": last_response,
+        }
+
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data without adding to chat history"""
         update_session_data_prompt = ""
@@ -283,6 +312,70 @@ class GeminiHandler(BaseLLMHandler):
         self._update_usage(response)
 
         return str(assistant_response)
+
+    async def stream_update_session_data(
+        self, sessions_data, user_prompt
+    ) -> AsyncIterator[str]:
+        """Update session data and stream the assistant response."""
+        update_session_data_prompt = ""
+        result = None
+        try:
+            if not self.chat:
+                await self._create_chat(self.model, history=self.conversation_history)
+
+            self.session_data = encode(
+                build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+            )
+            update_session_data_prompt = self.update_session_data_template.format(
+                username=self.username,
+                user_prompt=user_prompt,
+                session_data=self.session_data,
+            )
+
+            if not self.chat:
+                result = {
+                    "text": "Error: Chat not initialized",
+                    "sources": [],
+                    "usage": {"prompt": 0, "response": 0},
+                    "response": None,
+                }
+                yield result["text"]
+            else:
+                async for event in self._stream_chat_response(
+                    update_session_data_prompt
+                ):
+                    if event.get("type") == "delta":
+                        yield event.get("text", "")
+                    elif event.get("type") == "final":
+                        result = event
+        except Exception as e:
+            error_text = self._handle_error(
+                e, original_message=update_session_data_prompt, allow_fallback=True
+            )
+            yield error_text
+            return
+
+        result = result or {
+            "text": "",
+            "sources": [],
+            "usage": {"prompt": 0, "response": 0},
+            "response": None,
+        }
+        self.conversation_history.append(
+            {"role": "system", "content": update_session_data_prompt}
+        )
+        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": result["text"],
+                "sources": result.get("sources", []),
+                "model": self.model,
+                "usage": result.get("usage", {"prompt": 0, "response": 0}),
+            }
+        )
+        if result.get("response"):
+            self._update_usage(result["response"])
 
     async def send_message(self, message) -> str:
         """Send a message to the LLM and return the response"""
@@ -353,6 +446,60 @@ class GeminiHandler(BaseLLMHandler):
         except Exception as e:
             # Catch any unexpected formatting/parsing errors
             return self._handle_error(e, original_message=message, allow_fallback=False)
+
+    async def stream_message(self, message) -> AsyncIterator[str]:
+        """Send a message to Gemini and stream response text chunks."""
+        try:
+            if not self.chat:
+                await self._create_chat(self.model, history=self.conversation_history)
+
+            if not self.chat:
+                yield "Error: Chat not initialized"
+                return
+
+            if len(self.conversation_history) == 0:
+                prompt = self.system_prompt_template.format(
+                    username=self.username,
+                    user_prompt=message,
+                    session_data=self.session_data,
+                )
+                self.conversation_history.append(
+                    {"role": "system", "content": prompt}
+                )
+                self.conversation_history.append({"role": "user", "content": message})
+            else:
+                prompt = message
+                self.conversation_history.append({"role": "user", "content": message})
+
+            result = None
+            async for event in self._stream_chat_response(prompt):
+                if event.get("type") == "delta":
+                    yield event.get("text", "")
+                elif event.get("type") == "final":
+                    result = event
+
+            result = result or {
+                "text": "",
+                "sources": [],
+                "usage": {"prompt": 0, "response": 0},
+                "response": None,
+            }
+            self.conversation_history.append(
+                {
+                    "role": "assistant",
+                    "content": result["text"],
+                    "sources": result.get("sources", []),
+                    "model": self.model,
+                    "usage": result.get("usage", {"prompt": 0, "response": 0}),
+                }
+            )
+            if result.get("response"):
+                self._update_usage(result["response"])
+        except Exception as e:
+            error_text = self._handle_error(
+                e, original_message=message, allow_fallback=False
+            )
+            yield error_text
 
     def get_conversation_history(self) -> list:
         """Return standardized conversation history"""

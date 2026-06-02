@@ -1,5 +1,6 @@
 from toon import encode
 from anthropic import AsyncAnthropic
+from typing import Any, AsyncIterator
 from core.utils import build_project_json_from_sessions
 from .base_handler import BaseLLMHandler
 
@@ -69,6 +70,51 @@ class ClaudeHandler(BaseLLMHandler):
 
     def set_conversation_history(self, history: list):
         self.conversation_history = history
+
+    async def _stream_message_response(
+        self, messages
+    ) -> AsyncIterator[dict[str, Any]]:
+        text = ""
+        final_message = None
+        async with self.client.messages.stream(
+            model=self.model,
+            messages=messages,
+            max_tokens=1024,
+        ) as stream:
+            async for delta in stream.text_stream:
+                if delta:
+                    text += str(delta)
+                    yield {"type": "delta", "text": str(delta)}
+            final_message = await stream.get_final_message()
+
+        sources = []
+        citations = getattr(final_message, "citations", None)
+        if citations:
+            for citation in citations:
+                url = getattr(citation, "url", None)
+                if url:
+                    sources.append(
+                        {
+                            "link": url,
+                            "title": getattr(citation, "title", url),
+                        }
+                    )
+
+        usage = {
+            "prompt": getattr(final_message.usage, "input_tokens", 0)
+            if final_message and final_message.usage
+            else 0,
+            "response": getattr(final_message.usage, "output_tokens", 0)
+            if final_message and final_message.usage
+            else 0,
+        }
+        yield {
+            "type": "final",
+            "text": text or "(No content)",
+            "sources": sources,
+            "usage": usage,
+            "response": final_message,
+        }
 
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data without exposing it in user-visible chat history"""
@@ -161,6 +207,66 @@ class ClaudeHandler(BaseLLMHandler):
         if resp:
             self._update_usage(resp)
         return text
+
+    async def stream_update_session_data(
+        self, sessions_data, user_prompt
+    ) -> AsyncIterator[str]:
+        """Update session data and stream the assistant response."""
+        self.session_data = encode(
+            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+        )
+        update_prompt = self.update_session_data_template.format(
+            username=self.username,
+            user_prompt=user_prompt,
+            session_data=self.session_data,
+        )
+
+        msgs = []
+        for m in self.conversation_history:
+            if m["role"] == "system":
+                continue
+            if m["role"] in ("user", "assistant"):
+                msgs.append({"role": m["role"], "content": m["content"]})
+
+        if (
+            msgs
+            and msgs[0]["role"] == "user"
+            and self.conversation_history
+            and self.conversation_history[0]["role"] == "system"
+        ):
+            msgs[0]["content"] = self.conversation_history[0]["content"]
+
+        msgs.append({"role": "user", "content": update_prompt})
+
+        result = None
+        try:
+            async for event in self._stream_message_response(msgs):
+                if event.get("type") == "delta":
+                    yield event.get("text", "")
+                elif event.get("type") == "final":
+                    result = event
+        except Exception as e:
+            result = {
+                "text": f"Claude error: {e}",
+                "sources": [],
+                "usage": {"prompt": 0, "response": 0},
+                "response": None,
+            }
+            yield result["text"]
+
+        self.conversation_history.append({"role": "system", "content": update_prompt})
+        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": result["text"],
+                "sources": result.get("sources", []),
+                "model": self.model,
+                "usage": result.get("usage", {"prompt": 0, "response": 0}),
+            }
+        )
+        if result.get("response"):
+            self._update_usage(result["response"])
 
     async def send_message(self, message) -> str:
         msgs = []
@@ -265,6 +371,54 @@ class ClaudeHandler(BaseLLMHandler):
         if resp:
             self._update_usage(resp)
         return text
+
+    async def stream_message(self, message) -> AsyncIterator[str]:
+        """Send a message to Claude and stream response text chunks."""
+        if len(self.conversation_history) == 0:
+            system_prompt = self.system_prompt_template.format(
+                username=self.username,
+                user_prompt=message,
+                session_data=self.session_data,
+            )
+            msgs = [{"role": "user", "content": system_prompt}]
+            self.conversation_history.append({"role": "system", "content": system_prompt})
+        else:
+            msgs = []
+            for m in self.conversation_history:
+                if m["role"] == "system":
+                    continue
+                if m["role"] in ("user", "assistant"):
+                    msgs.append({"role": m["role"], "content": m["content"]})
+            msgs.append({"role": "user", "content": message})
+
+        result = None
+        try:
+            async for event in self._stream_message_response(msgs):
+                if event.get("type") == "delta":
+                    yield event.get("text", "")
+                elif event.get("type") == "final":
+                    result = event
+        except Exception as e:
+            result = {
+                "text": f"Claude error: {e}",
+                "sources": [],
+                "usage": {"prompt": 0, "response": 0},
+                "response": None,
+            }
+            yield result["text"]
+
+        self.conversation_history.append({"role": "user", "content": message})
+        self.conversation_history.append(
+            {
+                "role": "assistant",
+                "content": result["text"],
+                "sources": result.get("sources", []),
+                "model": self.model,
+                "usage": result.get("usage", {"prompt": 0, "response": 0}),
+            }
+        )
+        if result.get("response"):
+            self._update_usage(result["response"])
 
     def get_conversation_history(self) -> list:
         return self.conversation_history

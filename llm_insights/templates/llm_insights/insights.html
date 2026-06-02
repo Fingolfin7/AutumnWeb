@@ -11,6 +11,7 @@
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/insights_stream.js' %}?v={{ static_version.insights_stream }}" type="text/javascript"></script>
     <link rel="stylesheet" type="text/css" href="{% static 'core/css/chat_style.css' %}?v={{ static_version.chat_style }}">
     <script type="text/javascript">
         const PROVIDER_MODELS = {{ provider_models_json|safe }};
@@ -278,7 +279,9 @@
                     {% endif %}
                 </div>
 
-                <form method="post" class="chat-form" style="display: flex; flex-direction: column; flex: 1;">
+                <form method="post" class="chat-form" id="chat-form"
+                      data-stream-url="{% if chat_id %}{% url 'insights_detail_stream' chat_id %}{% else %}{% url 'insights_stream' %}{% endif %}"
+                      style="display: flex; flex-direction: column; flex: 1;">
                     {% csrf_token %}
 
                     <div class="button-group" style="margin-bottom: 15px;">

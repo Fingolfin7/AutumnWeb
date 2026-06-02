@@ -1,11 +1,13 @@
 from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
+from asgiref.sync import async_to_sync
 from unittest.mock import patch
 
 from llm_insights.gemini_handler import GeminiHandler
 from llm_insights.llm_handlers import get_llm_handler
+from llm_insights.models import LLMChat, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
-from llm_insights.views import InsightsView
+from llm_insights.views import InsightsView, perform_llm_analysis_stream
 from users.codex_auth import serialize_token_bundle
 
 
@@ -133,3 +135,65 @@ class GetLlmHandlerTests(SimpleTestCase):
 
         self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX_WITH_API_FALLBACK)
+
+
+class FakeStreamingHandler:
+    def __init__(self):
+        self.conversation_history = []
+        self.initialized = False
+
+    def initialize_chat(self, username, sessions):
+        self.initialized = True
+
+    async def stream_message(self, message):
+        yield "Hello"
+        yield " world"
+        self.conversation_history = [
+            {"role": "system", "content": "system prompt"},
+            {"role": "user", "content": message},
+            {
+                "role": "assistant",
+                "content": "Hello world",
+                "sources": [{"link": "https://example.com", "title": "Example"}],
+                "model": "fake-model",
+                "usage": {"prompt": 1, "response": 2},
+            },
+        ]
+
+    def get_conversation_history(self):
+        return self.conversation_history
+
+
+class PerformLlmAnalysisStreamTests(TestCase):
+    def test_streaming_analysis_yields_chunks_and_persists_final_history(self):
+        user = User.objects.create_user(username="stream-user")
+        chat = LLMChat.objects.create(
+            user=user,
+            title="Stream test",
+            model="fake:fake-model",
+        )
+        handler = FakeStreamingHandler()
+
+        async def collect_chunks():
+            chunks = []
+            async for chunk in perform_llm_analysis_stream(
+                llm_handler=handler,
+                sessions=[],
+                user_prompt="Say hello",
+                username=user.username,
+                conversation_history=[],
+                sessions_updated=False,
+                chat_obj=chat,
+            ):
+                chunks.append(chunk)
+            return chunks
+
+        chunks = async_to_sync(collect_chunks)()
+
+        self.assertEqual(chunks, ["Hello", " world"])
+        self.assertTrue(handler.initialized)
+        self.assertEqual(LLMMessage.objects.filter(chat=chat).count(), 3)
+        assistant = LLMMessage.objects.get(chat=chat, role="assistant")
+        self.assertEqual(assistant.content, "Hello world")
+        self.assertEqual(assistant.metadata["model"], "fake-model")
+        self.assertEqual(assistant.metadata["usage"], {"prompt": 1, "response": 2})

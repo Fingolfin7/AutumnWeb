@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import AsyncIterator
 
 
 class BaseLLMHandler(ABC):
@@ -25,3 +26,22 @@ class BaseLLMHandler(ABC):
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data the LLM is working with"""
         pass
+
+    async def stream_message(self, message) -> AsyncIterator[str]:
+        """Stream a message response.
+
+        Handlers can override this for token-by-token SDK streaming. The default
+        keeps older handlers compatible by yielding the final response as one
+        chunk after send_message updates the conversation history.
+        """
+        response = await self.send_message(message)
+        if response:
+            yield response
+
+    async def stream_update_session_data(
+        self, sessions_data, user_prompt
+    ) -> AsyncIterator[str]:
+        """Stream a response after updating the session data context."""
+        response = await self.update_session_data(sessions_data, user_prompt)
+        if response:
+            yield response

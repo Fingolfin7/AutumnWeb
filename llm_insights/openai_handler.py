@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, AsyncIterator
 
 from openai import AsyncOpenAI
 from toon import encode
@@ -206,6 +206,128 @@ class OpenAIHandler(BaseLLMHandler):
             "source": "codex",
         }
 
+    async def _stream_api_events(self, messages) -> AsyncIterator[dict[str, Any]]:
+        request = self._api_response_kwargs(messages)
+        request["stream"] = True
+        event_stream = await self._api_client().responses.create(**request)
+        chunks = []
+        usage = {"prompt": 0, "response": 0}
+        sources = []
+        async for event in event_stream:
+            event_type = getattr(event, "type", "")
+            if event_type == "response.output_text.delta":
+                delta = getattr(event, "delta", "")
+                if isinstance(delta, str) and delta:
+                    chunks.append(delta)
+                    yield {"type": "delta", "text": delta}
+            elif event_type in {"response.completed", "response.incomplete", "response.failed"}:
+                response = getattr(event, "response", None)
+                usage = self._usage_from_api_response(response)
+                event_sources = self._extract_sources(response)
+                if event_sources:
+                    sources = event_sources
+                if event_type == "response.failed":
+                    error = getattr(response, "error", None)
+                    message = getattr(error, "message", None) or "OpenAI response failed."
+                    yield {"type": "delta", "text": f"\n\nOpenAI error: {message}"}
+                    chunks.append(f"\n\nOpenAI error: {message}")
+        yield {
+            "type": "final",
+            "text": "".join(chunks).strip(),
+            "sources": sources,
+            "usage": usage,
+            "source": "api_key",
+        }
+
+    async def _stream_codex_events(self, kwargs) -> AsyncIterator[dict[str, Any]]:
+        request = dict(kwargs)
+        request["stream"] = True
+        event_stream = await self.codex_client.responses.create(**request)
+        chunks = []
+        usage = {"prompt": 0, "response": 0}
+        sources = []
+        async for event in event_stream:
+            event_type = getattr(event, "type", "")
+            if event_type == "response.output_text.delta":
+                delta = getattr(event, "delta", "")
+                if isinstance(delta, str) and delta:
+                    chunks.append(delta)
+                    yield {"type": "delta", "text": delta}
+            elif event_type in {"response.completed", "response.incomplete", "response.failed"}:
+                usage = self._usage_from_codex_event(event)
+                event_sources = self._extract_sources(getattr(event, "response", None))
+                if event_sources:
+                    sources = event_sources
+                if event_type == "response.failed":
+                    response = getattr(event, "response", None)
+                    error = getattr(response, "error", None) if response else None
+                    message = getattr(error, "message", None) or "OpenAI response failed."
+                    yield {"type": "delta", "text": f"\n\nOpenAI error: {message}"}
+                    chunks.append(f"\n\nOpenAI error: {message}")
+        yield {
+            "type": "final",
+            "text": "".join(chunks).strip(),
+            "sources": sources,
+            "usage": usage,
+            "source": "codex",
+        }
+
+    async def _stream_codex_with_fallback_events(
+        self, messages
+    ) -> AsyncIterator[dict[str, Any]]:
+        if self.codex_client is None:
+            raise RuntimeError("Codex auth is not configured.")
+
+        kwargs = self._codex_response_kwargs(messages, include_web_search=True)
+        try:
+            async for event in self._stream_codex_events(kwargs):
+                yield event
+        except Exception as exc:
+            msg = str(exc).lower()
+            fallback = dict(kwargs)
+            if "unsupported parameter: tools" in msg or "unsupported parameter: include" in msg:
+                fallback.pop("tools", None)
+                fallback.pop("include", None)
+            elif "unsupported parameter: max_output_tokens" in msg:
+                fallback.pop("max_output_tokens", None)
+            elif "unsupported parameter: reasoning" in msg:
+                fallback.pop("reasoning", None)
+            else:
+                raise
+            async for event in self._stream_codex_events(fallback):
+                yield event
+
+    async def _stream_with_priority_events(
+        self, messages
+    ) -> AsyncIterator[dict[str, Any]]:
+        if self.auth_mode == self.AUTH_CODEX:
+            async for event in self._stream_codex_with_fallback_events(messages):
+                if event.get("type") == "final":
+                    event["source"] = "codex"
+                    self.last_auth_source = "codex"
+                yield event
+            return
+        if self.auth_mode == self.AUTH_CODEX_WITH_API_FALLBACK:
+            try:
+                async for event in self._stream_codex_with_fallback_events(messages):
+                    if event.get("type") == "final":
+                        event["source"] = "codex"
+                        self.last_auth_source = "codex"
+                    yield event
+                return
+            except Exception:
+                async for event in self._stream_api_events(messages):
+                    if event.get("type") == "final":
+                        event["source"] = "api_key_fallback"
+                        self.last_auth_source = "api_key_fallback"
+                    yield event
+                return
+        async for event in self._stream_api_events(messages):
+            if event.get("type") == "final":
+                event["source"] = "api_key"
+                self.last_auth_source = "api_key"
+            yield event
+
     async def _send_with_priority(self, messages) -> dict[str, Any]:
         if self.auth_mode == self.AUTH_CODEX:
             result = await self._send_codex(messages)
@@ -251,6 +373,45 @@ class OpenAIHandler(BaseLLMHandler):
         self._append_assistant_result(result)
         return result["text"]
 
+    async def stream_update_session_data(
+        self, sessions_data, user_prompt
+    ) -> AsyncIterator[str]:
+        self.session_data = encode(
+            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+        )
+        update_prompt = self.update_session_data_template.format(
+            username=self.username,
+            user_prompt=user_prompt,
+            session_data=self.session_data,
+        )
+        messages = self._messages_from_history()
+        messages.append({"role": "user", "content": update_prompt})
+
+        result = None
+        try:
+            async for event in self._stream_with_priority_events(messages):
+                if event.get("type") == "delta":
+                    yield event.get("text", "")
+                elif event.get("type") == "final":
+                    result = event
+        except Exception as e:
+            result = {
+                "text": f"OpenAI error: {e}",
+                "sources": [],
+                "usage": {"prompt": 0, "response": 0},
+                "source": self.last_auth_source,
+            }
+            yield result["text"]
+
+        self.conversation_history.append({"role": "system", "content": update_prompt})
+        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self._append_assistant_result(result or {
+            "text": "",
+            "sources": [],
+            "usage": {"prompt": 0, "response": 0},
+            "source": self.last_auth_source,
+        })
+
     async def send_message(self, message) -> str:
         if len(self.conversation_history) == 0:
             system_prompt = self.system_prompt_template.format(
@@ -276,6 +437,42 @@ class OpenAIHandler(BaseLLMHandler):
         self.conversation_history.append({"role": "user", "content": message})
         self._append_assistant_result(result)
         return result["text"]
+
+    async def stream_message(self, message) -> AsyncIterator[str]:
+        if len(self.conversation_history) == 0:
+            system_prompt = self.system_prompt_template.format(
+                username=self.username,
+                user_prompt=message,
+                session_data=self.session_data,
+            )
+            self.conversation_history.append({"role": "system", "content": system_prompt})
+
+        messages = self._messages_from_history()
+        messages.append({"role": "user", "content": message})
+
+        result = None
+        try:
+            async for event in self._stream_with_priority_events(messages):
+                if event.get("type") == "delta":
+                    yield event.get("text", "")
+                elif event.get("type") == "final":
+                    result = event
+        except Exception as e:
+            result = {
+                "text": f"OpenAI error: {e}",
+                "sources": [],
+                "usage": {"prompt": 0, "response": 0},
+                "source": self.last_auth_source,
+            }
+            yield result["text"]
+
+        self.conversation_history.append({"role": "user", "content": message})
+        self._append_assistant_result(result or {
+            "text": "",
+            "sources": [],
+            "usage": {"prompt": 0, "response": 0},
+            "source": self.last_auth_source,
+        })
 
     def _append_assistant_result(self, result):
         self.conversation_history.append(

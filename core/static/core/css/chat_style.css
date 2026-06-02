@@ -5,6 +5,7 @@
   flex: 1; /* Grow to fill available space */
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   margin-bottom: 12px;
   padding: 15px;
   border: 1px solid var(--border-dark);
@@ -28,6 +29,8 @@
   margin: 5px 0;
   border-radius: 4px; /* Slightly rounded corners for message bubbles */
   max-width: 80%;
+  min-width: 0;
+  box-sizing: border-box;
   transition: background-color 0.3s;
 }
 
@@ -58,7 +61,33 @@
 }
 
 .message-content {
-  word-wrap: break-word;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.message-content * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.message-content p {
+  margin-top: 0;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content pre {
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.message-content code {
+  white-space: pre-wrap;
 }
 
 .button-group {
@@ -250,6 +279,23 @@
 
 .assistant-message:hover .copy-btn {
   opacity: 1;
+}
+
+.assistant-message.streaming .message-content::after {
+  content: "|";
+  color: var(--color-cyan);
+  margin-left: 2px;
+  animation: stream-caret-blink 1s steps(1) infinite;
+}
+
+.assistant-message.stream-error {
+  border: 1px solid var(--color-red);
+}
+
+@keyframes stream-caret-blink {
+  50% {
+    opacity: 0;
+  }
 }
 
 .copy-btn:hover {
