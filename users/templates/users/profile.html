@@ -139,8 +139,40 @@
 
             <!-- API Keys Section -->
             <hr>
-            <h3>Private LLM API Keys</h3>
+            <h3>LLM Connections</h3>
             <p class="small">Your keys are encrypted at rest. Leave fields blank to keep existing values. Use the clear switches to remove stored keys.</p>
+            <div class="api-key-note">
+                <strong>OpenAI options:</strong>
+                Use Codex Login to connect Autumn Insights to your ChatGPT/Codex account from this server. Regular OpenAI API keys are still supported separately.
+                <span class="api-key-actions">
+                    {% if have_keys.openai_chatgpt %}
+                        <button type="submit" name="disconnect_openai_chatgpt" class="secondary-button">
+                            <i class="fas fa-unlink"></i> Disconnect Codex
+                        </button>
+                    {% else %}
+                        <button type="submit" name="start_openai_chatgpt_login" class="secondary-button">
+                            <i class="fas fa-sign-in-alt"></i> Use Codex Login
+                        </button>
+                    {% endif %}
+                    <a class="secondary-button" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">
+                        <i class="fas fa-key"></i> API Key
+                    </a>
+                </span>
+                {% if have_keys.openai_chatgpt %}
+                    <small class="api-key-help">
+                        Codex connected{% if openai_chatgpt_summary.email %} as {{ openai_chatgpt_summary.email }}{% endif %}{% if openai_chatgpt_summary.plan %} ({{ openai_chatgpt_summary.plan }}){% endif %}.
+                    </small>
+                {% endif %}
+                {% if openai_chatgpt_device_code %}
+                    <div class="device-code-panel">
+                        <span>Open <a href="{{ openai_chatgpt_device_code.verification_url }}" target="_blank" rel="noopener noreferrer">{{ openai_chatgpt_device_code.verification_url }}</a> and enter:</span>
+                        <strong class="device-code">{{ openai_chatgpt_device_code.user_code }}</strong>
+                        <button type="submit" name="complete_openai_chatgpt_login" class="primary-button">
+                            <i class="fas fa-check-circle"></i> Complete Codex Login
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
             <div class="api-keys-grid">
                 <div class="api-key-item">
                     <div class="api-key-header">
@@ -161,12 +193,27 @@
                 </div>
                 <div class="api-key-item">
                     <div class="api-key-header">
-                        <label class="api-key-label">OpenAI Key Status:</label>
-                        <span class="api-key-status">{% if have_keys.openai %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
+                        <label class="api-key-label">OpenAI Connection:</label>
+                        <span class="api-key-status">
+                            {% if have_keys.openai %}
+                                <span class="text-green">Stored key</span>
+                            {% elif have_keys.openai_server %}
+                                <span class="text-green">Server key</span>
+                            {% else %}
+                                <span class="text-red">None</span>
+                            {% endif %}
+                        </span>
                     </div>
                     <div class="api-key-input-wrapper">
                         {{ profile_form.openai_api_key }}
                     </div>
+                    <small class="api-key-help">
+                        {% if have_keys.openai_server and not have_keys.openai %}
+                            Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key here to override it for your account.
+                        {% else %}
+                            Paste an OpenAI API key to enable OpenAI models on the Insights page.
+                        {% endif %}
+                    </small>
                     <div class="api-key-clear-wrapper">
                         <label class="switch">
                             {{ profile_form.clear_openai_api_key }}
@@ -200,6 +247,36 @@
                     gap: 1.5rem;
                     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
                     margin-top: 1rem;
+                }
+                .api-key-note {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                    padding: 1rem;
+                    margin: 1rem 0;
+                    border: 1px solid var(--border-dark);
+                    border-radius: 4px;
+                    background-color: var(--card-background-dark);
+                }
+                .api-key-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 0.75rem;
+                }
+                .device-code-panel {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                    padding-top: 0.75rem;
+                    border-top: 1px solid var(--border-dark);
+                }
+                .device-code {
+                    width: fit-content;
+                    padding: 0.5rem 0.75rem;
+                    border: 1px solid var(--border-dark);
+                    border-radius: 4px;
+                    letter-spacing: 0.08em;
+                    background-color: var(--dark-background);
                 }
                 .api-key-item {
                     display: flex;
@@ -243,6 +320,10 @@
                 .api-key-clear-label {
                     margin: 0;
                     font-size: 0.9em;
+                }
+                .api-key-help {
+                    color: var(--dark-text-secondary, inherit);
+                    line-height: 1.4;
                 }
                 .api-key-item .errorlist {
                     margin-top: 0.5rem;

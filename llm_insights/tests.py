@@ -1,10 +1,13 @@
 from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
+from unittest.mock import patch
 
 from llm_insights.gemini_handler import GeminiHandler
 from llm_insights.llm_handlers import get_llm_handler
+from llm_insights.openai_chatgpt_handler import OpenAIChatGPTHandler
 from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.views import InsightsView
+from users.codex_auth import serialize_token_bundle
 
 
 class InsightsViewProviderModelsTests(TestCase):
@@ -36,6 +39,31 @@ class InsightsViewProviderModelsTests(TestCase):
 
         self.assert_has_model_choices(provider_models, "openai")
         self.assertIn(("gpt-5.5", "GPT-5.5"), provider_models["openai"])
+
+    def test_openai_models_are_available_when_server_key_present(self):
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-server-key"}):
+            provider_models = self.view._provider_models(self.user)
+
+        self.assert_has_model_choices(provider_models, "openai")
+
+    def test_openai_models_are_available_when_chatgpt_token_present(self):
+        self.user.profile.set_api_key(
+            "openai_chatgpt",
+            serialize_token_bundle(
+                {
+                    "id_token": "id-token",
+                    "access_token": "access-token",
+                    "refresh_token": "refresh-token",
+                }
+            ),
+        )
+        self.user.profile.save()
+
+        provider_models = self.view._provider_models(self.user)
+
+        self.assert_has_model_choices(provider_models, "openai")
+        self.assertIn(("gpt-5.5", "GPT-5.5"), provider_models["openai"])
+        self.assertNotIn("openai_chatgpt", provider_models)
 
     def test_openai_reasoning_effort_defaults_to_medium(self):
         self.assertEqual(
@@ -69,3 +97,24 @@ class GetLlmHandlerTests(SimpleTestCase):
         self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.model, "gpt-test-model")
         self.assertEqual(handler.reasoning_effort, "high")
+
+    def test_routes_codex_models_to_openai_chatgpt_handler(self):
+        handler = get_llm_handler(
+            "gpt-5-codex",
+            api_keys={"openai_chatgpt": "test-chatgpt-token"},
+            reasoning_effort="medium",
+        )
+
+        self.assertIsInstance(handler, OpenAIChatGPTHandler)
+        self.assertEqual(handler.model, "gpt-5-codex")
+        self.assertEqual(handler.reasoning_effort, "medium")
+
+    def test_routes_gpt_models_to_chatgpt_handler_when_only_codex_auth_present(self):
+        handler = get_llm_handler(
+            "gpt-5.5",
+            api_keys={"openai_chatgpt": "test-chatgpt-token"},
+            reasoning_effort="medium",
+        )
+
+        self.assertIsInstance(handler, OpenAIChatGPTHandler)
+        self.assertEqual(handler.model, "gpt-5.5")

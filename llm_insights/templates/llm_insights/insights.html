@@ -307,6 +307,20 @@
                             </select>
                         </span>
                     </div>
+                    {% if openai_connection_source == "server" %}
+                        <p class="text-muted" style="margin-top: -8px;">
+                            OpenAI models are available through the server <code>OPENAI_API_KEY</code>.
+                            Add a personal key in <a href="{% url 'profile' %}" class="plain-link">Profile</a> to use your own API account.
+                        </p>
+                    {% elif openai_connection_source == "codex" %}
+                        <p class="text-muted" style="margin-top: -8px;">
+                            OpenAI models are available through your Codex login.
+                        </p>
+                    {% elif "openai" not in providers %}
+                        <p class="text-muted" style="margin-top: -8px;">
+                            OpenAI models need an API key or Codex login. Add one in <a href="{% url 'profile' %}" class="plain-link">Profile</a>.
+                        </p>
+                    {% endif %}
 
                     <div id="conversation-container" class="conversation-container">
                         {% if conversation_history %}

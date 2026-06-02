@@ -1,4 +1,13 @@
 from .forms import *
+from .codex_auth import (
+    CodexAuthError,
+    CodexDevicePending,
+    deserialize_token_bundle,
+    poll_device_code_login,
+    serialize_token_bundle,
+    start_device_code_login,
+    token_bundle_summary,
+)
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
@@ -68,12 +77,47 @@ class CustomLoginView(LoginView):
 @login_required
 def profile(request):
     if request.method == 'POST':
+        profile = request.user.profile
+        if 'start_openai_chatgpt_login' in request.POST:
+            try:
+                device_code = start_device_code_login()
+            except CodexAuthError as e:
+                messages.error(request, f'Could not start Codex login: {e}')
+            else:
+                request.session['openai_chatgpt_device_code'] = device_code.as_session_dict()
+                messages.success(request, 'Codex login started. Use the code shown below, then complete the login.')
+            return redirect('profile')
+
+        if 'complete_openai_chatgpt_login' in request.POST:
+            device_code = request.session.get('openai_chatgpt_device_code')
+            if not device_code:
+                messages.error(request, 'Start Codex login first.')
+                return redirect('profile')
+            try:
+                bundle = poll_device_code_login(device_code)
+            except CodexDevicePending:
+                messages.info(request, 'Still waiting for OpenAI authorization. Try Complete again after entering the code.')
+            except CodexAuthError as e:
+                messages.error(request, f'Could not complete Codex login: {e}')
+            else:
+                profile.set_api_key('openai_chatgpt', serialize_token_bundle(bundle))
+                profile.save()
+                request.session.pop('openai_chatgpt_device_code', None)
+                messages.success(request, 'Connected Codex login for Insights.')
+            return redirect('profile')
+
+        if 'disconnect_openai_chatgpt' in request.POST:
+            profile.set_api_key('openai_chatgpt', None)
+            profile.save()
+            request.session.pop('openai_chatgpt_device_code', None)
+            messages.success(request, 'Disconnected OpenAI Codex login.')
+            return redirect('profile')
+
         u_form = UserUpdateForm(request.POST, instance=request.user)
-        p_form = ProfileUpdateForm(request.POST, request.FILES, instance=request.user.profile)
+        p_form = ProfileUpdateForm(request.POST, request.FILES, instance=profile)
 
         if u_form.is_valid() and p_form.is_valid():
             u_form.save()
-            profile = request.user.profile
             # handle automatic background image setting
             if p_form.cleaned_data.get('automatic_background'):
                 background_choice = p_form.cleaned_data.get('background_choice')
@@ -120,12 +164,18 @@ def profile(request):
     have_keys = {
         'gemini': bool(profile.gemini_api_key_enc),
         'openai': bool(profile.openai_api_key_enc),
+        'openai_chatgpt': bool(profile.openai_chatgpt_token_enc),
         'claude': bool(profile.claude_api_key_enc),
+        'openai_server': bool(os.environ.get('OPENAI_API_KEY')),
     }
+    have_keys['openai_available'] = have_keys['openai'] or have_keys['openai_server']
+    openai_chatgpt_bundle = deserialize_token_bundle(profile.get_api_key('openai_chatgpt'))
     context = {
         'user_form': u_form,
         'profile_form': p_form,
         'have_keys': have_keys,
+        'openai_chatgpt_device_code': request.session.get('openai_chatgpt_device_code'),
+        'openai_chatgpt_summary': token_bundle_summary(openai_chatgpt_bundle),
     }
     return render(request, 'users/profile.html', context)
 

@@ -35,6 +35,7 @@ class Profile(models.Model):
     # Encrypted API key fields (nullable)
     gemini_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     openai_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
+    openai_chatgpt_token_enc = models.BinaryField(null=True, blank=True, editable=False)
     claude_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
 
     def __str__(self):
@@ -45,6 +46,7 @@ class Profile(models.Model):
         field_map = {
             'gemini': 'gemini_api_key_enc',
             'openai': 'openai_api_key_enc',
+            'openai_chatgpt': 'openai_chatgpt_token_enc',
             'claude': 'claude_api_key_enc',
         }
         fname = field_map.get(provider.lower())
@@ -60,6 +62,7 @@ class Profile(models.Model):
         field_map = {
             'gemini': 'gemini_api_key_enc',
             'openai': 'openai_api_key_enc',
+            'openai_chatgpt': 'openai_chatgpt_token_enc',
             'claude': 'claude_api_key_enc',
         }
         fname = field_map.get(provider.lower())

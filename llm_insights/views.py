@@ -13,6 +13,14 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 import datetime
+import os
+from users.codex_auth import (
+    CodexAuthError,
+    access_token_expires_soon,
+    deserialize_token_bundle,
+    refresh_token_bundle,
+    serialize_token_bundle,
+)
 
 
 async def perform_llm_analysis(
@@ -91,6 +99,9 @@ def delete_chat(request, chat_id):
 class InsightsView(View):
     OPENAI_REASONING_EFFORTS = ["minimal", "low", "medium", "high"]
 
+    def _has_env_api_key(self, env_var):
+        return bool(os.environ.get(env_var))
+
     def _provider_models(self, user):
         profile = getattr(user, "profile", None)
         provider_models = {
@@ -99,7 +110,11 @@ class InsightsView(View):
                 ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
             ]
         }
-        if profile and profile.openai_api_key_enc:
+        if (
+            (profile and profile.openai_api_key_enc)
+            or (profile and profile.openai_chatgpt_token_enc)
+            or self._has_env_api_key("OPENAI_API_KEY")
+        ):
             provider_models["openai"] = [
                 ("gpt-5.5", "GPT-5.5"),
                 ("gpt-5.4", "GPT-5.4"),
@@ -115,6 +130,16 @@ class InsightsView(View):
             ]
         return provider_models
 
+    def _openai_connection_source(self, user):
+        profile = getattr(user, "profile", None)
+        if profile and profile.openai_api_key_enc:
+            return "profile"
+        if profile and profile.openai_chatgpt_token_enc:
+            return "codex"
+        if self._has_env_api_key("OPENAI_API_KEY"):
+            return "server"
+        return ""
+
     def _build_api_keys(self, user):
         profile = getattr(user, "profile", None)
         if not profile:
@@ -122,8 +147,24 @@ class InsightsView(View):
         return {
             "gemini": profile.get_api_key("gemini"),
             "openai": profile.get_api_key("openai"),
+            "openai_chatgpt": self._get_openai_chatgpt_access_token(profile),
             "claude": profile.get_api_key("claude"),
         }
+
+    def _get_openai_chatgpt_access_token(self, profile):
+        bundle = deserialize_token_bundle(profile.get_api_key("openai_chatgpt"))
+        if not bundle:
+            return None
+        if not access_token_expires_soon(bundle):
+            return bundle.get("access_token")
+        try:
+            refreshed = refresh_token_bundle(bundle)
+        except CodexAuthError:
+            return bundle.get("access_token")
+        if refreshed != bundle:
+            profile.set_api_key("openai_chatgpt", serialize_token_bundle(refreshed))
+            profile.save(update_fields=["openai_chatgpt_token_enc"])
+        return refreshed.get("access_token")
 
     def _validate_selection(self, provider_models, provider, model):
         if not provider or provider not in provider_models:
@@ -302,6 +343,7 @@ class InsightsView(View):
                 "conversation_history": history,
                 "recent_chats": list(recent_chats),
                 "usage_stats": usage_stats,
+                "openai_connection_source": self._openai_connection_source(user),
                 "exclude_project_meta_json": json.dumps(build_exclude_project_meta(user)),
             }
 
@@ -360,6 +402,7 @@ class InsightsView(View):
             "recent_chats": data["recent_chats"],
             "usage_stats": data["usage_stats"],
             "username": data["username"],
+            "openai_connection_source": data["openai_connection_source"],
             "exclude_project_meta_json": data["exclude_project_meta_json"],
         }
         return await sync_to_async(render)(
