@@ -132,10 +132,12 @@ class InsightsView(View):
 
     def _openai_connection_source(self, user):
         profile = getattr(user, "profile", None)
-        if profile and profile.openai_api_key_enc:
-            return "profile"
+        if profile and profile.openai_chatgpt_token_enc and profile.openai_api_key_enc:
+            return "codex_with_api_fallback"
         if profile and profile.openai_chatgpt_token_enc:
             return "codex"
+        if profile and profile.openai_api_key_enc:
+            return "profile"
         if self._has_env_api_key("OPENAI_API_KEY"):
             return "server"
         return ""

@@ -5,146 +5,129 @@
 {% load background_images %}
 
 {% block content %}
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" enctype="multipart/form-data" class="profile-page">
         {% csrf_token %}
-        <section class="card stacked">
-            <h2>Update Profile</h2>
 
-            <span class="spaced flex-row align-center">
-                <img class="profile-pic" src="{{ user.profile.image_url }}" alt="profile picture">
-
-                <label for="{{ profile_form.image.id_for_label }}" class="custom-file-upload">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    Upload Image
-                    {{ profile_form.image }}
-                </label>
-                {{ profile_form.image.errors }}
-                <script>
-                    // Add the selected file name to the label so that the user can preview it
-                    $('#id_image').on('change',function(){
-                        //get the file name
-                        let fileName = $(this).val().split('\\').pop();
-
-                        // change the image preview
-                        if (this.files && this.files[0]) {
-                            let reader = new FileReader();
-
-                            reader.onload = function (e) {
-                                $('.profile-pic').attr('src', e.target.result);
-                            }
-                            reader.readAsDataURL(this.files[0]);
-                        }
-
-                        //replace the "Choose a file" label
-                        $(this).next('.custom-file-upload').html('<i class="fas fa-cloud-upload-alt"></i> '
-                            + fileName
-                            + '{{ profile_form.image }}'
-                        );
-                    })
-
-                </script>
-            </span>
-
-            <span class="label-input">
-                {{ user_form.username.errors }}
-                {{ user_form.username.label_tag }}
-                {{ user_form.username }}
-            </span>
-
-            <span class="label-input">
-                {{ user_form.email.errors }}
-                {{ user_form.email.label_tag }}
-                {{ user_form.email }}
-            </span>
-
-            <label>
-                {{ profile_form.automatic_background.label_tag }}
-                <label class="switch">
-                    {{ profile_form.automatic_background }}
-                    <span class="slider round"></span>
-                </label>
-                {{ profile_form.automatic_background.errors }}
-            </label>
-
-            <div id="automatic_background_options" style="display: none;">
-                <h4>Background Source:</h4>
-                {% for radio in profile_form.background_choice %}
-                    <div class="radio-option">
-                        {{ radio.tag }}
-                        <label for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
-                    </div>
-                {% endfor %}
-                {{ profile_form.background_choice.errors }}
+        <section class="card profile-shell">
+            <div class="profile-section-heading">
+                <div>
+                    <span class="section-kicker">Account</span>
+                    <h2>Profile</h2>
+                </div>
             </div>
 
-            <span class="label-input uploaded_backgrounds">
-                <label for="{{ profile_form.background_image.id_for_label }}">
-                    <i class="fas fa-cloud-upload-alt"></i> Upload Background Image
-                </label>
-                {{ profile_form.background_image }}
-            </span>
+            <div class="profile-overview-grid">
+                <div class="profile-avatar-panel">
+                    <img class="profile-pic profile-avatar-large" src="{{ user.profile.image_url }}" alt="profile picture">
+                    <label for="{{ profile_form.image.id_for_label }}" class="custom-file-upload profile-upload-button">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        Upload Image
+                        {{ profile_form.image }}
+                    </label>
+                    <small id="profile-image-filename" class="profile-muted">No new image selected</small>
+                    {{ profile_form.image.errors }}
+                </div>
 
-            <span class="uploaded_backgrounds">
-                 {% if user.profile.background_image %}
-                    <p>Current background:</p>
+                <div class="profile-fields-panel">
+                    <span class="label-input">
+                        {{ user_form.username.errors }}
+                        {{ user_form.username.label_tag }}
+                        {{ user_form.username }}
+                    </span>
 
-                    <br>
+                    <span class="label-input">
+                        {{ user_form.email.errors }}
+                        {{ user_form.email.label_tag }}
+                        {{ user_form.email }}
+                    </span>
+                </div>
+            </div>
 
-                    <img src="{{ user.profile.background_image.url }}" alt="Current background" style="max-width: 100px; max-height: 100px;">
-
-                    <br>
-
-                    <label>
-                        {{ profile_form.remove_background_image.label_tag }}
+            <div class="profile-background-panel">
+                <div class="profile-panel-title-row">
+                    <div>
+                        <span class="section-kicker">Background</span>
+                        <h3>Workspace Image</h3>
+                    </div>
+                    <label class="profile-switch-row">
+                        <span>{{ profile_form.automatic_background.label }}</span>
                         <label class="switch">
-                            {{ profile_form.remove_background_image }}
+                            {{ profile_form.automatic_background }}
                             <span class="slider round"></span>
                         </label>
-                        {{ profile_form.remove_background_image.errors }}
                     </label>
+                    {{ profile_form.automatic_background.errors }}
+                </div>
 
-                    <!-- Download manually uploaded background image -->
-                    <p>
-                        <button type="button" class="secondary-button" title="Download current background image" aria-label="Download current background image" onclick="window.location.href='{% url 'download_background' %}'">
-                            <i class="fas fa-download"></i> Download Background
-                        </button>
-                    </p>
-                 {% endif %}
-            </span>
+                <div id="automatic_background_options" class="profile-background-options" style="display: none;">
+                    {% for radio in profile_form.background_choice %}
+                        <label class="profile-choice-pill" for="{{ radio.id_for_label }}">
+                            {{ radio.tag }}
+                            <span>{{ radio.choice_label }}</span>
+                        </label>
+                    {% endfor %}
+                    {{ profile_form.background_choice.errors }}
+                </div>
 
+                <div class="uploaded_backgrounds profile-background-upload">
+                    <span class="label-input">
+                        <label for="{{ profile_form.background_image.id_for_label }}">
+                            <i class="fas fa-cloud-upload-alt"></i> Upload Background
+                        </label>
+                        {{ profile_form.background_image }}
+                    </span>
 
-            <script>
-                $(document).ready(function() {
-                    // Check initial state
-                    if ($('#id_automatic_background').is(':checked')) {
-                        $('#automatic_background_options').show();
-                        $('.uploaded_backgrounds').hide();
-                        $('.background-context').show();
-                    }
+                    {% if user.profile.background_image %}
+                        <div class="profile-current-background">
+                            <img src="{{ user.profile.background_image.url }}" alt="Current background">
+                            <div>
+                                <strong>Current background</strong>
+                                <label class="profile-switch-row">
+                                    <span>{{ profile_form.remove_background_image.label }}</span>
+                                    <label class="switch">
+                                        {{ profile_form.remove_background_image }}
+                                        <span class="slider round"></span>
+                                    </label>
+                                </label>
+                                {{ profile_form.remove_background_image.errors }}
+                                <button type="button" class="secondary-button compact-button" title="Download current background image" aria-label="Download current background image" onclick="window.location.href='{% url 'download_background' %}'">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
 
-                    // Toggle visibility when automatic background checkbox changes
-                    $('#id_automatic_background').change(function() {
-                        if ($(this).is(':checked')) {
-                            $('#automatic_background_options').show();
-                            $('.uploaded_backgrounds').hide();
-                            $('.background-context').show();
-                        } else {
-                            $('#automatic_background_options').hide();
-                            $('.uploaded_backgrounds').show();
-                            $('.background-context').hide();
-                        }
-                    });
-                });
-            </script>
+        <section class="card profile-shell llm-shell">
+            <div class="profile-section-heading">
+                <div>
+                    <span class="section-kicker blue">Insights</span>
+                    <h2>LLM Connections</h2>
+                </div>
+                <span class="profile-muted">Encrypted at rest</span>
+            </div>
 
-            <!-- API Keys Section -->
-            <hr>
-            <h3>LLM Connections</h3>
-            <p class="small">Your keys are encrypted at rest. Leave fields blank to keep existing values. Use the clear switches to remove stored keys.</p>
-            <div class="api-key-note">
-                <strong>OpenAI options:</strong>
-                Use Codex Login to connect Autumn Insights to your ChatGPT/Codex account from this server. Regular OpenAI API keys are still supported separately.
-                <span class="api-key-actions">
+            <div class="llm-codex-panel">
+                <div class="llm-codex-copy">
+                    <span class="section-kicker blue">Primary OpenAI Bucket</span>
+                    <h3>Codex Login</h3>
+                    <p>OpenAI models use Codex first when connected. A profile API key is kept as fallback.</p>
+                    {% if have_keys.openai_chatgpt %}
+                        <span class="connection-chip connected">
+                            <i class="fas fa-check-circle"></i>
+                            Codex connected{% if openai_chatgpt_summary.email %} as {{ openai_chatgpt_summary.email }}{% endif %}{% if openai_chatgpt_summary.plan %} ({{ openai_chatgpt_summary.plan }}){% endif %}
+                        </span>
+                    {% else %}
+                        <span class="connection-chip">
+                            <i class="fas fa-circle"></i>
+                            Codex not connected
+                        </span>
+                    {% endif %}
+                </div>
+
+                <div class="llm-codex-actions">
                     {% if have_keys.openai_chatgpt %}
                         <button type="submit" name="disconnect_openai_chatgpt" class="secondary-button">
                             <i class="fas fa-unlink"></i> Disconnect Codex
@@ -154,29 +137,23 @@
                             <i class="fas fa-sign-in-alt"></i> Use Codex Login
                         </button>
                     {% endif %}
-                    <a class="secondary-button" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">
-                        <i class="fas fa-key"></i> API Key
-                    </a>
-                </span>
-                {% if have_keys.openai_chatgpt %}
-                    <small class="api-key-help">
-                        Codex connected{% if openai_chatgpt_summary.email %} as {{ openai_chatgpt_summary.email }}{% endif %}{% if openai_chatgpt_summary.plan %} ({{ openai_chatgpt_summary.plan }}){% endif %}.
-                    </small>
-                {% endif %}
-                {% if openai_chatgpt_device_code %}
-                    <div class="device-code-panel">
-                        <span>Open <a href="{{ openai_chatgpt_device_code.verification_url }}" target="_blank" rel="noopener noreferrer">{{ openai_chatgpt_device_code.verification_url }}</a> and enter:</span>
-                        <strong class="device-code">{{ openai_chatgpt_device_code.user_code }}</strong>
-                        <button type="submit" name="complete_openai_chatgpt_login" class="primary-button">
-                            <i class="fas fa-check-circle"></i> Complete Codex Login
-                        </button>
-                    </div>
-                {% endif %}
+                </div>
             </div>
+
+            {% if openai_chatgpt_device_code %}
+                <div class="device-code-panel">
+                    <span>Open <a href="{{ openai_chatgpt_device_code.verification_url }}" target="_blank" rel="noopener noreferrer">{{ openai_chatgpt_device_code.verification_url }}</a> and enter:</span>
+                    <strong class="device-code">{{ openai_chatgpt_device_code.user_code }}</strong>
+                    <button type="submit" name="complete_openai_chatgpt_login" class="primary-button compact-button">
+                        <i class="fas fa-check-circle"></i> Complete Codex Login
+                    </button>
+                </div>
+            {% endif %}
+
             <div class="api-keys-grid">
                 <div class="api-key-item">
                     <div class="api-key-header">
-                        <label class="api-key-label">Gemini Key Status:</label>
+                        <label class="api-key-label">Gemini</label>
                         <span class="api-key-status">{% if have_keys.gemini %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
                     </div>
                     <div class="api-key-input-wrapper">
@@ -187,16 +164,17 @@
                             {{ profile_form.clear_gemini_api_key }}
                             <span class="slider round"></span>
                         </label>
-                        <small class="api-key-clear-label">Clear Gemini Key</small>
+                        <small class="api-key-clear-label">Clear key</small>
                     </div>
                     {{ profile_form.gemini_api_key.errors }}
                 </div>
+
                 <div class="api-key-item">
                     <div class="api-key-header">
-                        <label class="api-key-label">OpenAI Connection:</label>
+                        <label class="api-key-label">OpenAI API Key</label>
                         <span class="api-key-status">
                             {% if have_keys.openai %}
-                                <span class="text-green">Stored key</span>
+                                <span class="text-green">Fallback stored</span>
                             {% elif have_keys.openai_server %}
                                 <span class="text-green">Server key</span>
                             {% else %}
@@ -208,10 +186,12 @@
                         {{ profile_form.openai_api_key }}
                     </div>
                     <small class="api-key-help">
-                        {% if have_keys.openai_server and not have_keys.openai %}
-                            Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key here to override it for your account.
+                        {% if have_keys.openai_chatgpt %}
+                            Used after Codex if the Codex bucket is unavailable.
+                        {% elif have_keys.openai_server and not have_keys.openai %}
+                            Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key to override it.
                         {% else %}
-                            Paste an OpenAI API key to enable OpenAI models on the Insights page.
+                            Paste an OpenAI API key to enable OpenAI models.
                         {% endif %}
                     </small>
                     <div class="api-key-clear-wrapper">
@@ -219,13 +199,14 @@
                             {{ profile_form.clear_openai_api_key }}
                             <span class="slider round"></span>
                         </label>
-                        <small class="api-key-clear-label">Clear OpenAI Key</small>
+                        <small class="api-key-clear-label">Clear key</small>
                     </div>
                     {{ profile_form.openai_api_key.errors }}
                 </div>
+
                 <div class="api-key-item">
                     <div class="api-key-header">
-                        <label class="api-key-label">Claude Key Status:</label>
+                        <label class="api-key-label">Claude</label>
                         <span class="api-key-status">{% if have_keys.claude %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
                     </div>
                     <div class="api-key-input-wrapper">
@@ -236,110 +217,360 @@
                             {{ profile_form.clear_claude_api_key }}
                             <span class="slider round"></span>
                         </label>
-                        <small class="api-key-clear-label">Clear Claude Key</small>
+                        <small class="api-key-clear-label">Clear key</small>
                     </div>
                     {{ profile_form.claude_api_key.errors }}
                 </div>
             </div>
-            <style>
-                .api-keys-grid {
-                    display: grid;
-                    gap: 1.5rem;
-                    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-                    margin-top: 1rem;
-                }
-                .api-key-note {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.75rem;
-                    padding: 1rem;
-                    margin: 1rem 0;
-                    border: 1px solid var(--border-dark);
-                    border-radius: 4px;
-                    background-color: var(--card-background-dark);
-                }
-                .api-key-actions {
-                    display: flex;
-                    flex-wrap: wrap;
-                    gap: 0.75rem;
-                }
-                .device-code-panel {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.75rem;
-                    padding-top: 0.75rem;
-                    border-top: 1px solid var(--border-dark);
-                }
-                .device-code {
-                    width: fit-content;
-                    padding: 0.5rem 0.75rem;
-                    border: 1px solid var(--border-dark);
-                    border-radius: 4px;
-                    letter-spacing: 0.08em;
-                    background-color: var(--dark-background);
-                }
-                .api-key-item {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.75rem;
-                    padding: 1rem;
-                    border: 1px solid var(--border-dark);
-                    border-radius: 4px;
-                    background-color: var(--card-background-dark);
-                }
-                .api-key-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 0.25rem;
-                }
-                .api-key-label {
-                    font-weight: 500;
-                    margin: 0;
-                }
-                .api-key-status {
-                    font-weight: 600;
-                }
-                .api-key-input-wrapper {
-                    width: 100%;
-                }
-                .api-key-input-wrapper input[type=password] {
-                    width: 100%;
-                    padding: 0.5rem;
-                    border: 1px solid var(--border-dark);
-                    border-radius: 4px;
-                    background-color: var(--dark-background);
-                    color: var(--dark-text);
-                }
-                .api-key-clear-wrapper {
-                    display: flex;
-                    align-items: center;
-                    gap: 0.5rem;
-                    margin-top: 0.25rem;
-                }
-                .api-key-clear-label {
-                    margin: 0;
-                    font-size: 0.9em;
-                }
-                .api-key-help {
-                    color: var(--dark-text-secondary, inherit);
-                    line-height: 1.4;
-                }
-                .api-key-item .errorlist {
-                    margin-top: 0.5rem;
-                    color: var(--main-red);
-                    font-size: 0.85em;
-                }
-            </style>
-
-            <span>
-                <button type="submit" id="update-profile" class="primary-button">
-                    <i class="fa fa-check-circle"></i>
-                    Update Profile
-                </button>
-            </span>
         </section>
+
+        <div class="profile-submit-row">
+            <button type="submit" class="primary-button">
+                <i class="fa fa-check-circle"></i>
+                Update Profile
+            </button>
+        </div>
     </form>
+
+    <script>
+        $('#id_image').on('change',function(){
+            let fileName = $(this).val().split('\\').pop();
+            if (this.files && this.files[0]) {
+                let reader = new FileReader();
+                reader.onload = function (e) {
+                    $('.profile-pic').attr('src', e.target.result);
+                }
+                reader.readAsDataURL(this.files[0]);
+            }
+            $('#profile-image-filename').text(fileName || 'No new image selected');
+        });
+
+        $(document).ready(function() {
+            if ($('#id_automatic_background').is(':checked')) {
+                $('#automatic_background_options').show();
+                $('.uploaded_backgrounds').hide();
+                $('.background-context').show();
+            }
+
+            $('#id_automatic_background').change(function() {
+                if ($(this).is(':checked')) {
+                    $('#automatic_background_options').show();
+                    $('.uploaded_backgrounds').hide();
+                    $('.background-context').show();
+                } else {
+                    $('#automatic_background_options').hide();
+                    $('.uploaded_backgrounds').show();
+                    $('.background-context').hide();
+                }
+            });
+        });
+    </script>
+
+    <style>
+        .profile-page {
+            display: grid;
+            gap: 1.2rem;
+            width: 100%;
+            margin: 0;
+        }
+
+        .profile-shell {
+            padding: 1.6rem;
+            margin: 0;
+            border-color: rgba(85, 164, 190, 0.28);
+        }
+
+        .profile-section-heading,
+        .profile-panel-title-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(85, 164, 190, 0.22);
+        }
+
+        .profile-section-heading h2,
+        .profile-panel-title-row h3,
+        .llm-codex-copy h3 {
+            margin: 0.2rem 0 0;
+        }
+
+        .section-kicker {
+            color: var(--dark-text);
+            opacity: 0.7;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .section-kicker.blue {
+            color: var(--secondary-accent-color);
+            opacity: 1;
+        }
+
+        .profile-overview-grid {
+            display: grid;
+            grid-template-columns: minmax(13rem, 16rem) minmax(18rem, 1fr);
+            gap: 1.4rem;
+            margin-top: 1.3rem;
+            align-items: stretch;
+        }
+
+        .profile-avatar-panel,
+        .profile-fields-panel,
+        .profile-background-panel,
+        .api-key-item,
+        .llm-codex-panel,
+        .device-code-panel {
+            background: rgba(20, 24, 26, 0.66);
+            border: 1px solid rgba(85, 164, 190, 0.24);
+            border-radius: 6px;
+        }
+
+        .profile-avatar-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            padding: 1.2rem;
+        }
+
+        .profile-avatar-large {
+            width: 7.5rem;
+            height: 7.5rem;
+            margin: 0;
+            border: 2px solid rgba(0, 191, 255, 0.34);
+            box-shadow: 0 0 0 4px rgba(0, 191, 255, 0.08);
+            object-fit: cover;
+        }
+
+        .profile-upload-button {
+            margin: 0;
+            width: 100%;
+            text-align: center;
+        }
+
+        .profile-muted,
+        .api-key-help {
+            color: rgba(224, 224, 224, 0.72);
+            line-height: 1.45;
+        }
+
+        .profile-fields-panel {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(14rem, 1fr));
+            gap: 1.2rem;
+            padding: 1.4rem;
+            align-content: center;
+        }
+
+        .profile-background-panel {
+            margin-top: 1rem;
+            padding: 1.2rem;
+        }
+
+        .profile-switch-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+        }
+
+        .profile-background-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .profile-choice-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.55rem 0.7rem;
+            border: 1px solid rgba(85, 164, 190, 0.25);
+            border-radius: 6px;
+            background: rgba(0, 191, 255, 0.08);
+        }
+
+        .profile-background-upload {
+            display: grid;
+            grid-template-columns: minmax(16rem, 1fr) minmax(18rem, auto);
+            gap: 1rem;
+            margin-top: 1.2rem;
+            align-items: center;
+        }
+
+        .profile-current-background {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            padding: 0.75rem;
+            border: 1px solid rgba(85, 164, 190, 0.18);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .profile-current-background img {
+            width: 6rem;
+            height: 4rem;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+
+        .llm-shell {
+            background: rgba(0, 128, 170, 0.18);
+        }
+
+        .llm-codex-panel {
+            display: grid;
+            grid-template-columns: minmax(18rem, 1fr) auto;
+            gap: 1.2rem;
+            margin-top: 1.2rem;
+            padding: 1.2rem;
+            align-items: center;
+            background: rgba(0, 128, 170, 0.18);
+        }
+
+        .llm-codex-copy p {
+            margin: 0.4rem 0 0.8rem;
+            max-width: 58rem;
+            color: rgba(224, 224, 224, 0.78);
+        }
+
+        .llm-codex-actions,
+        .api-key-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.6rem;
+            justify-content: flex-end;
+        }
+
+        .connection-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            padding: 0.42rem 0.62rem;
+            border: 1px solid rgba(85, 164, 190, 0.3);
+            border-radius: 6px;
+            color: rgba(224, 224, 224, 0.8);
+            background: rgba(18, 18, 18, 0.44);
+        }
+
+        .connection-chip.connected {
+            color: var(--accent-color);
+            border-color: rgba(0, 200, 81, 0.35);
+            background: rgba(0, 200, 81, 0.08);
+        }
+
+        .device-code-panel {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.9rem;
+            margin-top: 1rem;
+            padding: 1rem;
+        }
+
+        .device-code {
+            width: fit-content;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid rgba(0, 191, 255, 0.4);
+            border-radius: 4px;
+            letter-spacing: 0.08em;
+            background-color: rgba(0, 191, 255, 0.12);
+            color: var(--secondary-accent-color);
+        }
+
+        .api-keys-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            margin-top: 1rem;
+        }
+
+        .api-key-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 1rem;
+        }
+
+        .api-key-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.7rem;
+        }
+
+        .api-key-label {
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .api-key-status {
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .api-key-input-wrapper input[type=password] {
+            width: 100%;
+            padding: 0.65rem;
+            border: 1px solid rgba(85, 164, 190, 0.28);
+            border-radius: 4px;
+            background-color: rgba(18, 18, 18, 0.72);
+            color: var(--dark-text);
+        }
+
+        .api-key-clear-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: auto;
+        }
+
+        .api-key-clear-label {
+            margin: 0;
+            font-size: 0.9em;
+        }
+
+        .api-key-item .errorlist {
+            margin-top: 0.5rem;
+            color: var(--main-red);
+            font-size: 0.85em;
+        }
+
+        .profile-submit-row {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .compact-button {
+            width: fit-content;
+        }
+
+        @media (max-width: 920px) {
+            .profile-overview-grid,
+            .profile-fields-panel,
+            .profile-background-upload,
+            .llm-codex-panel,
+            .api-keys-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .profile-section-heading,
+            .profile-panel-title-row {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .llm-codex-actions {
+                justify-content: flex-start;
+            }
+        }
+    </style>
 
     <!-- Background image context card -->
     {% if user.profile.automatic_background %}
@@ -371,7 +602,5 @@
                 <p>No automatic background source selected.</p>
             {% endif %}
         </section>
-    {% else %}
-        <section class="card stacked background-context" style="display:none;"></section>
     {% endif %}
 {% endblock %}

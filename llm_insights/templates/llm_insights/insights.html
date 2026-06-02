@@ -312,9 +312,17 @@
                             OpenAI models are available through the server <code>OPENAI_API_KEY</code>.
                             Add a personal key in <a href="{% url 'profile' %}" class="plain-link">Profile</a> to use your own API account.
                         </p>
+                    {% elif openai_connection_source == "codex_with_api_fallback" %}
+                        <p class="text-muted" style="margin-top: -8px;">
+                            OpenAI models use your Codex login first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.
+                        </p>
                     {% elif openai_connection_source == "codex" %}
                         <p class="text-muted" style="margin-top: -8px;">
                             OpenAI models are available through your Codex login.
+                        </p>
+                    {% elif openai_connection_source == "profile" %}
+                        <p class="text-muted" style="margin-top: -8px;">
+                            OpenAI models are using your profile API key.
                         </p>
                     {% elif "openai" not in providers %}
                         <p class="text-muted" style="margin-top: -8px;">

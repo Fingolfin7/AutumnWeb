@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from llm_insights.gemini_handler import GeminiHandler
 from llm_insights.llm_handlers import get_llm_handler
-from llm_insights.openai_chatgpt_handler import OpenAIChatGPTHandler
 from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.views import InsightsView
 from users.codex_auth import serialize_token_bundle
@@ -97,24 +96,40 @@ class GetLlmHandlerTests(SimpleTestCase):
         self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.model, "gpt-test-model")
         self.assertEqual(handler.reasoning_effort, "high")
+        self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_API)
 
-    def test_routes_codex_models_to_openai_chatgpt_handler(self):
+    def test_routes_codex_models_to_openai_handler_with_codex_auth_mode(self):
         handler = get_llm_handler(
             "gpt-5-codex",
             api_keys={"openai_chatgpt": "test-chatgpt-token"},
             reasoning_effort="medium",
         )
 
-        self.assertIsInstance(handler, OpenAIChatGPTHandler)
+        self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.model, "gpt-5-codex")
         self.assertEqual(handler.reasoning_effort, "medium")
+        self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX)
 
-    def test_routes_gpt_models_to_chatgpt_handler_when_only_codex_auth_present(self):
+    def test_routes_gpt_models_to_openai_handler_with_codex_auth_mode(self):
         handler = get_llm_handler(
             "gpt-5.5",
             api_keys={"openai_chatgpt": "test-chatgpt-token"},
             reasoning_effort="medium",
         )
 
-        self.assertIsInstance(handler, OpenAIChatGPTHandler)
+        self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.model, "gpt-5.5")
+        self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX)
+
+    def test_routes_gpt_models_to_openai_handler_with_codex_primary_api_fallback(self):
+        handler = get_llm_handler(
+            "gpt-5.5",
+            api_keys={
+                "openai": "test-openai-key",
+                "openai_chatgpt": "test-chatgpt-token",
+            },
+            reasoning_effort="medium",
+        )
+
+        self.assertIsInstance(handler, OpenAIHandler)
+        self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX_WITH_API_FALLBACK)
