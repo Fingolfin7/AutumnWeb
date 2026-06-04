@@ -531,75 +531,115 @@ class InsightsView(View):
                 status=401,
             )
 
+        try:
+            post_data = request.POST.copy()
+            data = self._get_initial_post_data(request, user, chat_id)
+
+            provider_models = data["provider_models"]
+            selected_provider = post_data.get("provider")
+            selected_model = post_data.get("model")
+            selected_provider, selected_model = self._validate_selection(
+                provider_models, selected_provider, selected_model
+            )
+            selected_reasoning_effort = self._validate_reasoning_effort(
+                selected_provider, post_data.get("reasoning_effort")
+            )
+
+            chat_obj = data["chat_obj"]
+            current_filters = data["current_filters"]
+            is_filtering = data["is_filtering"]
+            reset_requested = "reset_conversation" in post_data
+            user_prompt = (post_data.get("prompt") or "").strip()
+
+            if not chat_obj:
+                title = (
+                    user_prompt[:40] + "..."
+                    if len(user_prompt) > 40
+                    else user_prompt
+                )
+                if not title:
+                    title = "New Chat"
+                chat_obj = LLMChat.objects.create(
+                    user=user,
+                    title=title,
+                    model=f"{selected_provider}:{selected_model}",
+                    filters={
+                        **current_filters,
+                        "reasoning_effort": selected_reasoning_effort,
+                    },
+                )
+            elif is_filtering:
+                chat_obj.filters = {
+                    **current_filters,
+                    "reasoning_effort": selected_reasoning_effort,
+                }
+                chat_obj.save()
+
+            history = [
+                {
+                    "role": m.role,
+                    "content": m.content,
+                    "sources": m.metadata.get("sources", []),
+                    "model": m.metadata.get("model", ""),
+                    "usage": m.metadata.get("usage", {}),
+                    "auth_source": m.metadata.get("auth_source", ""),
+                }
+                for m in chat_obj.messages.all()
+            ]
+
+            chat_url = reverse("insights_detail", kwargs={"chat_id": chat_obj.id})
+            stream_url = reverse(
+                "insights_detail_stream", kwargs={"chat_id": chat_obj.id}
+            )
+            stream_context = {
+                "api_keys": data["api_keys"],
+                "chat_id": chat_obj.id,
+                "chat_obj": chat_obj,
+                "chat_url": chat_url,
+                "current_filters": current_filters,
+                "history": history,
+                "model": selected_model,
+                "provider": selected_provider,
+                "reasoning_effort": selected_reasoning_effort,
+                "reset_requested": reset_requested,
+                "sessions": data["sessions"],
+                "sessions_updated": data["sessions_updated"],
+                "stream_url": stream_url,
+                "user_prompt": user_prompt,
+                "username": data["username"],
+            }
+
+            if data["sessions_updated"]:
+                request.session["sessions_updated"] = False
+                request.session.save()
+        except Exception as exc:
+            return StreamingHttpResponse(
+                iter([stream_event("error", {"message": str(exc)})]),
+                content_type="text/event-stream",
+                status=500,
+            )
+
         event_queue = queue.Queue()
         stream_done = object()
 
         async def stream_worker():
-            chat_obj = None
             try:
-                data = await sync_to_async(self._get_initial_post_data)(
-                    request, user, chat_id
-                )
-
-                provider_models = data["provider_models"]
-                selected_provider = request.POST.get("provider")
-                selected_model = request.POST.get("model")
-                selected_provider, selected_model = self._validate_selection(
-                    provider_models, selected_provider, selected_model
-                )
-                selected_reasoning_effort = self._validate_reasoning_effort(
-                    selected_provider, request.POST.get("reasoning_effort")
-                )
-
-                chat_obj = data["chat_obj"]
-                current_filters = data["current_filters"]
-                is_filtering = data["is_filtering"]
-                user_prompt = request.POST.get("prompt", "").strip()
-
-                if not chat_obj:
-                    title = (
-                        user_prompt[:40] + "..."
-                        if len(user_prompt) > 40
-                        else user_prompt
-                    )
-                    if not title:
-                        title = "New Chat"
-                    chat_obj = await sync_to_async(LLMChat.objects.create)(
-                        user=user,
-                        title=title,
-                        model=f"{selected_provider}:{selected_model}",
-                        filters={
-                            **current_filters,
-                            "reasoning_effort": selected_reasoning_effort,
-                        },
-                    )
-                elif is_filtering:
-                    chat_obj.filters = {
-                        **current_filters,
-                        "reasoning_effort": selected_reasoning_effort,
-                    }
-                    await sync_to_async(chat_obj.save)()
-
-                chat_url = reverse("insights_detail", kwargs={"chat_id": chat_obj.id})
-                stream_url = reverse(
-                    "insights_detail_stream", kwargs={"chat_id": chat_obj.id}
-                )
                 event_queue.put(stream_event(
                     "chat",
                     {
-                        "chat_id": str(chat_obj.id),
-                        "chat_url": chat_url,
-                        "stream_url": stream_url,
+                        "chat_id": str(stream_context["chat_id"]),
+                        "chat_url": stream_context["chat_url"],
+                        "stream_url": stream_context["stream_url"],
                     },
                 ))
 
-                if "reset_conversation" in request.POST or not user_prompt:
+                if stream_context["reset_requested"] or not stream_context["user_prompt"]:
                     event_queue.put(stream_event(
                         "done",
                         {
-                            "chat_id": str(chat_obj.id),
-                            "chat_url": chat_url,
-                            "stream_url": stream_url,
+                            "chat_id": str(stream_context["chat_id"]),
+                            "chat_url": stream_context["chat_url"],
+                            "stream_url": stream_context["stream_url"],
                             "content": "",
                             "sources": [],
                             "usage": {"prompt": 0, "response": 0},
@@ -608,35 +648,21 @@ class InsightsView(View):
                     return
 
                 handler = get_llm_handler(
-                    model=selected_model,
-                    api_keys=data["api_keys"],
-                    reasoning_effort=selected_reasoning_effort,
+                    model=stream_context["model"],
+                    api_keys=stream_context["api_keys"],
+                    reasoning_effort=stream_context["reasoning_effort"],
                 )
-
-                def load_history_sync():
-                    return [
-                        {
-                            "role": m.role,
-                            "content": m.content,
-                            "sources": m.metadata.get("sources", []),
-                            "model": m.metadata.get("model", ""),
-                            "usage": m.metadata.get("usage", {}),
-                            "auth_source": m.metadata.get("auth_source", ""),
-                        }
-                        for m in chat_obj.messages.all()
-                    ]
-
-                history = await sync_to_async(load_history_sync)()
+                history = stream_context["history"]
                 handler.set_conversation_history(history)
 
                 async for chunk in perform_llm_analysis_stream(
                     llm_handler=handler,
-                    sessions=data["sessions"],
-                    user_prompt=user_prompt,
-                    username=data["username"],
+                    sessions=stream_context["sessions"],
+                    user_prompt=stream_context["user_prompt"],
+                    username=stream_context["username"],
                     conversation_history=history,
-                    sessions_updated=data["sessions_updated"],
-                    chat_obj=chat_obj,
+                    sessions_updated=stream_context["sessions_updated"],
+                    chat_obj=stream_context["chat_obj"],
                 ):
                     if chunk:
                         event_queue.put(stream_event("delta", {"content": chunk}))
@@ -652,28 +678,29 @@ class InsightsView(View):
                 )
 
                 def finalize_stream_session():
-                    request.session["sessions_updated"] = False
-                    request.session.save()
-                    chat_obj.model = f"{selected_provider}:{selected_model}"
-                    chat_obj.filters = {
-                        **(chat_obj.filters or {}),
-                        "reasoning_effort": selected_reasoning_effort,
+                    chat_to_save = LLMChat.objects.get(id=stream_context["chat_id"])
+                    chat_to_save.model = (
+                        f"{stream_context['provider']}:{stream_context['model']}"
+                    )
+                    chat_to_save.filters = {
+                        **(chat_to_save.filters or {}),
+                        "reasoning_effort": stream_context["reasoning_effort"],
                     }
-                    chat_obj.save()
+                    chat_to_save.save()
 
                 await sync_to_async(finalize_stream_session)()
 
                 event_queue.put(stream_event(
                     "done",
                     {
-                        "chat_id": str(chat_obj.id),
-                        "chat_url": chat_url,
-                        "stream_url": stream_url,
+                        "chat_id": str(stream_context["chat_id"]),
+                        "chat_url": stream_context["chat_url"],
+                        "stream_url": stream_context["stream_url"],
                         "content": latest_assistant.get("content", ""),
                         "html": render_markdown(latest_assistant.get("content", "")),
                         "sources": latest_assistant.get("sources", []),
                         "usage": latest_assistant.get("usage", {}),
-                        "model": latest_assistant.get("model", selected_model),
+                        "model": latest_assistant.get("model", stream_context["model"]),
                     },
                 ))
             except Exception as exc:
