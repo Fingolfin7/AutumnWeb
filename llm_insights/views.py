@@ -33,18 +33,24 @@ def stream_event(event_name, payload):
 
 
 async def save_llm_messages(chat_obj, messages_to_save):
-    for msg in messages_to_save:
-        await sync_to_async(LLMMessage.objects.create)(
-            chat=chat_obj,
-            role=msg["role"],
-            content=msg["content"],
-            metadata={
-                "sources": msg.get("sources", []),
-                "model": msg.get("model", ""),
-                "usage": msg.get("usage", {}),
-                "auth_source": msg.get("auth_source", ""),
-            },
-        )
+    chat_id = getattr(chat_obj, "id", chat_obj)
+
+    def create_messages():
+        chat = LLMChat.objects.get(id=chat_id)
+        for msg in messages_to_save:
+            LLMMessage.objects.create(
+                chat=chat,
+                role=msg["role"],
+                content=msg["content"],
+                metadata={
+                    "sources": msg.get("sources", []),
+                    "model": msg.get("model", ""),
+                    "usage": msg.get("usage", {}),
+                    "auth_source": msg.get("auth_source", ""),
+                },
+            )
+
+    await sync_to_async(create_messages)()
 
 
 async def perform_llm_analysis(
@@ -594,7 +600,6 @@ class InsightsView(View):
             stream_context = {
                 "api_keys": data["api_keys"],
                 "chat_id": chat_obj.id,
-                "chat_obj": chat_obj,
                 "chat_url": chat_url,
                 "current_filters": current_filters,
                 "history": history,
@@ -662,7 +667,7 @@ class InsightsView(View):
                     username=stream_context["username"],
                     conversation_history=history,
                     sessions_updated=stream_context["sessions_updated"],
-                    chat_obj=stream_context["chat_obj"],
+                    chat_obj=stream_context["chat_id"],
                 ):
                     if chunk:
                         event_queue.put(stream_event("delta", {"content": chunk}))

@@ -183,7 +183,7 @@ class PerformLlmAnalysisStreamTests(TestCase):
                 username=user.username,
                 conversation_history=[],
                 sessions_updated=False,
-                chat_obj=chat,
+                chat_obj=chat.id,
             ):
                 chunks.append(chunk)
             return chunks
