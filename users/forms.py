@@ -41,7 +41,7 @@ class ProfileUpdateForm(forms.ModelForm):
     background_dimming = forms.IntegerField(
         min_value=0,
         max_value=85,
-        required=True,
+        required=False,
         label='Background Dimming',
         widget=forms.NumberInput(attrs={
             'type': 'range',
@@ -79,6 +79,14 @@ class ProfileUpdateForm(forms.ModelForm):
         self.fields['gemini_api_key'].initial = ''
         self.fields['openai_api_key'].initial = ''
         self.fields['claude_api_key'].initial = ''
+
+    def clean_background_dimming(self):
+        value = self.cleaned_data.get('background_dimming')
+        if value is not None:
+            return value
+        if self.instance and self.instance.pk:
+            return self.instance.background_dimming
+        return self._meta.model._meta.get_field('background_dimming').default
 
     class Meta:
         model = Profile
