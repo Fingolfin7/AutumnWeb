@@ -1,18 +1,18 @@
 :root {
   /* Background colors */
-  --color-dodgerblue: dodgerblue;
-  --color-dark-red: rgb(199, 0, 57);
-  --color-blue-grey: rgb(115, 147, 179);
-  --color-cobalt-blue: rgb(0, 71, 171);
-  --color-forestgreen: rgb(34, 139, 34);
-  --color-ferngreen: rgb(79, 121, 66);
-  --color-kellygreen: rgb(76, 187, 23);
-  --color-lincolngreen: rgb(71, 135, 120);
-  --color-cadmium-red: rgb(210, 43, 43);
+  --color-dodgerblue: #7896b8;
+  --color-dark-red: #be675f;
+  --color-blue-grey: #4c5b64;
+  --color-cobalt-blue: #7896b8;
+  --color-forestgreen: #607f58;
+  --color-ferngreen: #4e9a8e;
+  --color-kellygreen: #7ca36a;
+  --color-lincolngreen: #4e9a8e;
+  --color-cadmium-red: #be675f;
   --color-transparent-white: rgba(255, 255, 255, 0.2);
 
   /* Text color */
-  --color-text-light: #c0c0c0; /* Silver/Light Gray */
+  --color-text-light: #d9dedb;
 }
 
 /* Using the variables (This section can be kept for compatibility or removed if unused) */
