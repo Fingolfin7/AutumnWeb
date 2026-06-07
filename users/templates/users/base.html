@@ -28,19 +28,15 @@
 
         <link rel="shortcut icon" href="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" type="image/png">
     </head>
-    <body>
+    <body class="dark-mode">
         <div class="container">
             <div class="ribbon"> <!-- ribbon at the top of the page -->
                 <a href="{% url 'home' %}" class="plain-link flex-row thirds-width align-center">
-                    <img src="{% static 'core/images/clear_autumn_leaf_transparent_slanted.png' %}" class="ribbon-logo">
+                    <img src="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}?v={{ static_version.style }}" class="ribbon-logo">
                     <h1 class="main-title">Autumn</h1>
                 </a>
                 <div class="ribbon-buttons">
                     <i class="fas fa-bars burger-menu" id="burger-menu"></i> <!-- Added burger menu icon -->
-                    <label class="switch">
-                        <input type="checkbox" id="theme-switch">
-                        <span class="slider round"></span>
-                    </label>
                 </div>
             </div>
 

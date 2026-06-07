@@ -29,6 +29,7 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     image = models.ImageField(default='default.jpg', upload_to='profile_pics')
     background_image = models.ImageField(upload_to='background_pics', null=True, blank=True)
+    background_dimming = models.PositiveSmallIntegerField(default=55)
     automatic_background = models.BooleanField(default=False)  # Automatically set background image
     bing_background = models.BooleanField(default=False)  # Use Bing's daily image (if automatic_background is True)
     nasa_apod_background = models.BooleanField(default=False)  # Use NASA's Astronomy Picture of the Day (if automatic_background is True)
@@ -40,6 +41,11 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} Profile"
+
+    @property
+    def background_dimming_alpha(self):
+        value = max(0, min(85, self.background_dimming))
+        return f"{value / 100:.2f}"
 
     # Encryption / Decryption helpers
     def set_api_key(self, provider: str, raw_key: str | None):

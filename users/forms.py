@@ -38,6 +38,19 @@ class UserUpdateForm(forms.ModelForm):
 class ProfileUpdateForm(forms.ModelForm):
     image = forms.ImageField(widget=forms.FileInput(), required=False)
     automatic_background = forms.BooleanField(required=False, label='Automatically Set Background Image')
+    background_dimming = forms.IntegerField(
+        min_value=0,
+        max_value=85,
+        required=True,
+        label='Background Dimming',
+        widget=forms.NumberInput(attrs={
+            'type': 'range',
+            'min': '0',
+            'max': '85',
+            'step': '5',
+            'class': 'background-dimming-slider',
+        }),
+    )
 
     BACKGROUND_CHOICES = [
         ('bing', 'Use Bing Wallpaper as Background'),
@@ -69,6 +82,6 @@ class ProfileUpdateForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ['image', 'automatic_background','background_image', 'remove_background_image',
+        fields = ['image', 'automatic_background', 'background_dimming', 'background_image', 'remove_background_image',
                   'gemini_api_key', 'openai_api_key', 'claude_api_key',
                   'clear_gemini_api_key', 'clear_openai_api_key', 'clear_claude_api_key']

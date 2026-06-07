@@ -19,13 +19,16 @@ window.AutumnCharts = window.AutumnCharts || {
 // ============================================================================
 
 function generateRandomColor(element_position, element_count) {
-    let hue = (element_position * 360) / element_count;
-    return `hsl(${hue}, 100%, 70%)`;
+    const palette = [
+        '#c98245', '#4e9a8e', '#b9a66a', '#7896b8',
+        '#7ca36a', '#be675f', '#9b83a7', '#8c7656',
+        '#66837f', '#a87854', '#6f8465', '#596d80'
+    ];
+    return palette[element_position % palette.length];
 }
 
 function generateColorWithSaturation(element_position, element_count, saturation = 100, lightness = 70) {
-    let hue = (element_position * 360) / element_count;
-    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    return generateRandomColor(element_position, element_count);
 }
 
 function fillDates(minDate, maxDate) {
@@ -203,6 +206,14 @@ function initUIElements() {
     $loading = $('#chart-loading');
     $empty = $('#chart-empty');
     $canvasContainer = $('#canvas_container');
+
+    if (window.Chart) {
+        Chart.defaults.color = '#d9dedb';
+        Chart.defaults.borderColor = 'rgba(217, 222, 219, 0.12)';
+        Chart.defaults.font.family = '"Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
+        Chart.defaults.plugins.legend.labels.boxWidth = 12;
+        Chart.defaults.plugins.legend.labels.boxHeight = 12;
+    }
 }
 
 function showLoading(message = 'Loading chart…') {
@@ -226,6 +237,13 @@ function hideEmpty() {
     if ($canvasContainer && $canvasContainer.length) $canvasContainer.show();
 }
 
+function applyChartLayout(type) {
+    if (!$canvasContainer || !$canvasContainer.length) return;
+
+    const circularTypes = ['pie', 'status'];
+    $canvasContainer.toggleClass('chart-circular', circularTypes.includes(type));
+}
+
 // ============================================================================
 // Main Render Orchestration
 // ============================================================================
@@ -236,6 +254,7 @@ function render() {
     let selectType = $('#chart_type');
     let type = selectType.val();
     let canvasCtx = $('#chart')[0].getContext('2d');
+    applyChartLayout(type);
 
     let start_date = $('#start_date').val();
     let end_date = $('#end_date').val();

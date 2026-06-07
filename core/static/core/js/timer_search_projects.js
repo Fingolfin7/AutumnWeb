@@ -27,13 +27,17 @@ $(document).ready(function() {
     };
 
     function updateStartTimerSummary() {
+        if (!summary.length || !startButton.length) {
+            return;
+        }
+
         let projectName = search.val().trim();
-        let stopAfterValue = stopAfterAmount.val().trim();
+        let stopAfterValue = stopAfterAmount.length ? stopAfterAmount.val().trim() : '';
         let stopAfterText = '';
 
         startButton.prop('disabled', projectName === '');
 
-        if (stopAfterValue !== '') {
+        if (stopAfterValue !== '' && stopAfterUnit.length) {
             stopAfterText = ` - stops after ${stopAfterValue} ${stopAfterUnit.val()}`;
         }
 
@@ -59,6 +63,10 @@ $(document).ready(function() {
     }
 
     function renderStopAfterPresets(selectDefault) {
+        if (!stopAfterAmount.length || !stopAfterUnit.length || !$('.timer-preset-button').length) {
+            return;
+        }
+
         let presets = stopAfterPresets[stopAfterUnit.val()] || stopAfterPresets.minutes;
         let activeValue = stopAfterAmount.val().trim();
 

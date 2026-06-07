@@ -1,42 +1,17 @@
 $(document).ready(function() {
-    const toggleSwitch = $('#theme-switch');
-    const currentTheme = localStorage.getItem('theme') || 'light';
     const burgerMenu = $('#burger-menu');
     const container = $('.container');
     const body = $('body');
     const bgUrl = body.data('bg-url');
 
-    body.addClass(currentTheme + '-mode');
+    body.removeClass('light-mode').addClass('dark-mode');
+    localStorage.removeItem('theme');
 
-    // Set background image if dark mode is active
-    if (currentTheme === 'dark' && bgUrl) {
-        body.css('background-image', "url('" + bgUrl + "')").addClass('bg-active');
+    if (bgUrl) {
+        body.css('--workspace-bg-image', "url('" + bgUrl + "')").addClass('bg-active');
     } else {
-        body.css('background-image', '').removeClass('bg-active');
+        body.css('--workspace-bg-image', 'none').removeClass('bg-active');
     }
-
-    toggleSwitch.prop('checked', currentTheme === 'dark');
-
-    toggleSwitch.on('change', function() {
-        let theme = 'light';
-        if ($(this).prop('checked')) {
-            theme = 'dark';
-        }
-        
-        // Remove both classes first
-        body.removeClass('light-mode dark-mode');
-        // Add the appropriate class
-        body.addClass(theme + '-mode');
-
-        // Set background image if dark mode is active
-        if (theme === 'dark' && bgUrl) {
-            body.css('background-image', "url('" + bgUrl + "')").addClass('bg-active');
-        } else {
-            body.css('background-image', '').removeClass('bg-active');
-        }
-        
-        localStorage.setItem('theme', theme);
-    });
 
     burgerMenu.on('click', function() {
         container.toggleClass('show-sidebar');
