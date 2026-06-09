@@ -1,3 +1,5 @@
+import queue
+
 from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase
 from asgiref.sync import async_to_sync
@@ -10,7 +12,10 @@ from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.views import (
     InsightsView,
     perform_llm_analysis_stream,
+    save_llm_messages,
     save_partial_stream_messages,
+    stream_keepalive,
+    stream_queue_events,
 )
 from users.codex_auth import serialize_token_bundle
 
@@ -141,6 +146,24 @@ class GetLlmHandlerTests(SimpleTestCase):
         self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX_WITH_API_FALLBACK)
 
 
+class StreamQueueEventsTests(SimpleTestCase):
+    def test_stream_queue_events_yields_keepalive_while_idle(self):
+        event_queue = queue.Queue()
+        stream_done = object()
+        stream = stream_queue_events(
+            event_queue, stream_done, heartbeat_seconds=0.001
+        )
+
+        self.assertEqual(next(stream), stream_keepalive())
+
+        event_queue.put("event: done\ndata: {}\n\n")
+        self.assertEqual(next(stream), "event: done\ndata: {}\n\n")
+
+        event_queue.put(stream_done)
+        with self.assertRaises(StopIteration):
+            next(stream)
+
+
 class FakeStreamingHandler:
     def __init__(self):
         self.conversation_history = []
@@ -229,3 +252,22 @@ class PerformLlmAnalysisStreamTests(TestCase):
         self.assertIn("Partial answer", messages[1].content)
         self.assertTrue(messages[1].metadata["error"])
         self.assertEqual(messages[1].metadata["error_message"], "connection closed")
+
+    def test_save_llm_messages_refreshes_db_connections_around_write(self):
+        user = User.objects.create_user(username="fresh-db-user")
+        chat = LLMChat.objects.create(
+            user=user,
+            title="Fresh DB test",
+            model="fake:fake-model",
+        )
+
+        with patch("llm_insights.views.close_old_connections") as close_connections:
+            async_to_sync(save_llm_messages)(
+                chat.id,
+                [{"role": "user", "content": "hello"}],
+            )
+
+        self.assertGreaterEqual(close_connections.call_count, 2)
+        message = LLMMessage.objects.get(chat=chat)
+        self.assertEqual(message.role, "user")
+        self.assertEqual(message.content, "hello")

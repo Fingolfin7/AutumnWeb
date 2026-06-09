@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import View
 from django.contrib import messages
 from django.http import StreamingHttpResponse
+from django.db import close_old_connections, transaction
 from core.models import Sessions
 from core.forms import SearchProjectForm
 from core.templatetags.markdown_render import markdown as render_markdown
@@ -28,8 +29,38 @@ from users.codex_auth import (
 )
 
 
+SSE_HEARTBEAT_SECONDS = 15
+
+
 def stream_event(event_name, payload):
     return f"event: {event_name}\ndata: {json.dumps(payload)}\n\n"
+
+
+def stream_keepalive():
+    return ": keep-alive\n\n"
+
+
+def stream_queue_events(event_queue, stream_done, heartbeat_seconds=SSE_HEARTBEAT_SECONDS):
+    while True:
+        try:
+            item = event_queue.get(timeout=heartbeat_seconds)
+        except queue.Empty:
+            yield stream_keepalive()
+            continue
+        if item is stream_done:
+            break
+        yield item
+
+
+def database_sync_to_async(func):
+    def wrapped(*args, **kwargs):
+        close_old_connections()
+        try:
+            return func(*args, **kwargs)
+        finally:
+            close_old_connections()
+
+    return sync_to_async(wrapped)
 
 
 async def save_llm_messages(chat_obj, messages_to_save):
@@ -37,22 +68,23 @@ async def save_llm_messages(chat_obj, messages_to_save):
 
     def create_messages():
         chat = LLMChat.objects.get(id=chat_id)
-        for msg in messages_to_save:
-            LLMMessage.objects.create(
-                chat=chat,
-                role=msg["role"],
-                content=msg["content"],
-                metadata={
-                    "sources": msg.get("sources", []),
-                    "model": msg.get("model", ""),
-                    "usage": msg.get("usage", {}),
-                    "auth_source": msg.get("auth_source", ""),
-                    "error": msg.get("error", False),
-                    "error_message": msg.get("error_message", ""),
-                },
-            )
+        with transaction.atomic():
+            for msg in messages_to_save:
+                LLMMessage.objects.create(
+                    chat=chat,
+                    role=msg["role"],
+                    content=msg["content"],
+                    metadata={
+                        "sources": msg.get("sources", []),
+                        "model": msg.get("model", ""),
+                        "usage": msg.get("usage", {}),
+                        "auth_source": msg.get("auth_source", ""),
+                        "error": msg.get("error", False),
+                        "error_message": msg.get("error_message", ""),
+                    },
+                )
 
-    await sync_to_async(create_messages)()
+    await database_sync_to_async(create_messages)()
 
 
 async def save_partial_stream_messages(
@@ -746,7 +778,7 @@ class InsightsView(View):
                     }
                     chat_to_save.save()
 
-                await sync_to_async(finalize_stream_session)()
+                await database_sync_to_async(finalize_stream_session)()
 
                 event_queue.put(stream_event(
                     "done",
@@ -803,6 +835,7 @@ class InsightsView(View):
                     },
                 ))
             finally:
+                close_old_connections()
                 event_queue.put(stream_done)
 
         def run_stream_worker():
@@ -815,17 +848,14 @@ class InsightsView(View):
         def event_stream():
             worker = threading.Thread(target=run_stream_worker, daemon=True)
             worker.start()
-            while True:
-                item = event_queue.get()
-                if item is stream_done:
-                    break
-                yield item
+            yield from stream_queue_events(event_queue, stream_done)
 
         response = StreamingHttpResponse(
             event_stream(), content_type="text/event-stream"
         )
         response["Cache-Control"] = "no-cache"
         response["X-Accel-Buffering"] = "no"
+        response["Connection"] = "keep-alive"
         return response
 
     async def post(self, request, chat_id=None):
