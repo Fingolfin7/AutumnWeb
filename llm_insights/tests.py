@@ -7,7 +7,11 @@ from llm_insights.gemini_handler import GeminiHandler
 from llm_insights.llm_handlers import get_llm_handler
 from llm_insights.models import LLMChat, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
-from llm_insights.views import InsightsView, perform_llm_analysis_stream
+from llm_insights.views import (
+    InsightsView,
+    perform_llm_analysis_stream,
+    save_partial_stream_messages,
+)
 from users.codex_auth import serialize_token_bundle
 
 
@@ -197,3 +201,31 @@ class PerformLlmAnalysisStreamTests(TestCase):
         self.assertEqual(assistant.content, "Hello world")
         self.assertEqual(assistant.metadata["model"], "fake-model")
         self.assertEqual(assistant.metadata["usage"], {"prompt": 1, "response": 2})
+
+    def test_partial_stream_failure_persists_recoverable_messages(self):
+        user = User.objects.create_user(username="partial-stream-user")
+        chat = LLMChat.objects.create(
+            user=user,
+            title="Partial stream test",
+            model="fake:fake-model",
+        )
+        handler = FakeStreamingHandler()
+
+        async_to_sync(save_partial_stream_messages)(
+            chat.id,
+            previous_history=[],
+            llm_handler=handler,
+            user_prompt="Start streaming",
+            assistant_content="Partial answer\n\nStream error: connection closed",
+            model="fake-model",
+            error_message="connection closed",
+        )
+
+        messages = list(LLMMessage.objects.filter(chat=chat).order_by("created_at"))
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0].role, "user")
+        self.assertEqual(messages[0].content, "Start streaming")
+        self.assertEqual(messages[1].role, "assistant")
+        self.assertIn("Partial answer", messages[1].content)
+        self.assertTrue(messages[1].metadata["error"])
+        self.assertEqual(messages[1].metadata["error_message"], "connection closed")

@@ -47,10 +47,58 @@ async def save_llm_messages(chat_obj, messages_to_save):
                     "model": msg.get("model", ""),
                     "usage": msg.get("usage", {}),
                     "auth_source": msg.get("auth_source", ""),
+                    "error": msg.get("error", False),
+                    "error_message": msg.get("error_message", ""),
                 },
             )
 
     await sync_to_async(create_messages)()
+
+
+async def save_partial_stream_messages(
+    chat_obj,
+    previous_history,
+    llm_handler,
+    user_prompt,
+    assistant_content,
+    model,
+    error_message,
+):
+    current_history = llm_handler.get_conversation_history() if llm_handler else []
+    pending_messages = (
+        current_history[len(previous_history):]
+        if len(current_history) >= len(previous_history)
+        else []
+    )
+
+    if pending_messages:
+        has_assistant = any(msg.get("role") == "assistant" for msg in pending_messages)
+        if not has_assistant:
+            pending_messages.append(
+                {
+                    "role": "assistant",
+                    "content": assistant_content,
+                    "model": model,
+                    "usage": {"prompt": 0, "response": 0},
+                    "error": True,
+                    "error_message": error_message,
+                }
+            )
+    elif user_prompt:
+        pending_messages = [
+            {"role": "user", "content": user_prompt},
+            {
+                "role": "assistant",
+                "content": assistant_content,
+                "model": model,
+                "usage": {"prompt": 0, "response": 0},
+                "error": True,
+                "error_message": error_message,
+            },
+        ]
+
+    if pending_messages:
+        await save_llm_messages(chat_obj, pending_messages)
 
 
 async def perform_llm_analysis(
@@ -628,6 +676,9 @@ class InsightsView(View):
         stream_done = object()
 
         async def stream_worker():
+            handler = None
+            streamed_chunks = []
+            messages_persisted = False
             try:
                 event_queue.put(stream_event(
                     "chat",
@@ -670,7 +721,9 @@ class InsightsView(View):
                     chat_obj=stream_context["chat_id"],
                 ):
                     if chunk:
+                        streamed_chunks.append(chunk)
                         event_queue.put(stream_event("delta", {"content": chunk}))
+                messages_persisted = True
 
                 conversation_history = handler.get_conversation_history()
                 latest_assistant = next(
@@ -709,7 +762,46 @@ class InsightsView(View):
                     },
                 ))
             except Exception as exc:
-                event_queue.put(stream_event("error", {"message": str(exc)}))
+                error_message = str(exc)
+                partial_content = "".join(streamed_chunks).strip()
+                if partial_content:
+                    assistant_content = (
+                        f"{partial_content}\n\nStream error: {error_message}"
+                    )
+                else:
+                    assistant_content = f"Stream error: {error_message}"
+
+                if not messages_persisted and stream_context["user_prompt"]:
+                    try:
+                        await save_partial_stream_messages(
+                            stream_context["chat_id"],
+                            stream_context["history"],
+                            handler,
+                            stream_context["user_prompt"],
+                            assistant_content,
+                            stream_context["model"],
+                            error_message,
+                        )
+                    except Exception as save_exc:
+                        assistant_content = (
+                            f"{assistant_content}\n\n"
+                            f"Could not save partial chat history: {save_exc}"
+                        )
+
+                event_queue.put(stream_event(
+                    "done",
+                    {
+                        "chat_id": str(stream_context["chat_id"]),
+                        "chat_url": stream_context["chat_url"],
+                        "stream_url": stream_context["stream_url"],
+                        "content": assistant_content,
+                        "html": render_markdown(assistant_content),
+                        "sources": [],
+                        "usage": {"prompt": 0, "response": 0},
+                        "model": stream_context["model"],
+                        "error": error_message,
+                    },
+                ))
             finally:
                 event_queue.put(stream_done)
 
