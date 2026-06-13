@@ -78,6 +78,20 @@ class CustomLoginView(LoginView):
 def profile(request):
     if request.method == 'POST':
         profile = request.user.profile
+        ai_features_enabled = profile.ai_features_enabled
+        ai_action_submitted = any(
+            action in request.POST
+            for action in (
+                'start_openai_chatgpt_login',
+                'complete_openai_chatgpt_login',
+                'disconnect_openai_chatgpt',
+            )
+        )
+        if ai_action_submitted and not ai_features_enabled:
+            request.session.pop('openai_chatgpt_device_code', None)
+            messages.error(request, 'AI features are disabled for this account.')
+            return redirect('profile')
+
         if 'start_openai_chatgpt_login' in request.POST:
             try:
                 device_code = start_device_code_login()
@@ -135,19 +149,20 @@ def profile(request):
                 if profile.background_image:
                     profile.background_image.delete(save=False)
                 profile.background_image = None
-            # Handle API keys store/clear
-            if p_form.cleaned_data.get('clear_gemini_api_key'):
-                profile.set_api_key('gemini', None)
-            elif p_form.cleaned_data.get('gemini_api_key'):
-                profile.set_api_key('gemini', p_form.cleaned_data.get('gemini_api_key').strip())
-            if p_form.cleaned_data.get('clear_openai_api_key'):
-                profile.set_api_key('openai', None)
-            elif p_form.cleaned_data.get('openai_api_key'):
-                profile.set_api_key('openai', p_form.cleaned_data.get('openai_api_key').strip())
-            if p_form.cleaned_data.get('clear_claude_api_key'):
-                profile.set_api_key('claude', None)
-            elif p_form.cleaned_data.get('claude_api_key'):
-                profile.set_api_key('claude', p_form.cleaned_data.get('claude_api_key').strip())
+            # Handle API keys store/clear only when the account trait allows AI features.
+            if profile.ai_features_enabled:
+                if p_form.cleaned_data.get('clear_gemini_api_key'):
+                    profile.set_api_key('gemini', None)
+                elif p_form.cleaned_data.get('gemini_api_key'):
+                    profile.set_api_key('gemini', p_form.cleaned_data.get('gemini_api_key').strip())
+                if p_form.cleaned_data.get('clear_openai_api_key'):
+                    profile.set_api_key('openai', None)
+                elif p_form.cleaned_data.get('openai_api_key'):
+                    profile.set_api_key('openai', p_form.cleaned_data.get('openai_api_key').strip())
+                if p_form.cleaned_data.get('clear_claude_api_key'):
+                    profile.set_api_key('claude', None)
+                elif p_form.cleaned_data.get('claude_api_key'):
+                    profile.set_api_key('claude', p_form.cleaned_data.get('claude_api_key').strip())
             profile.save()
             p_form.save()
             messages.success(request, f'Profile updated successfully.')
@@ -161,6 +176,7 @@ def profile(request):
                                    })
     # Provide masked info about which keys are set
     profile = request.user.profile
+    ai_features_enabled = profile.ai_features_enabled
     have_keys = {
         'gemini': bool(profile.gemini_api_key_enc),
         'openai': bool(profile.openai_api_key_enc),
@@ -169,12 +185,17 @@ def profile(request):
         'openai_server': bool(os.environ.get('OPENAI_API_KEY')),
     }
     have_keys['openai_available'] = have_keys['openai'] or have_keys['openai_server']
-    openai_chatgpt_bundle = deserialize_token_bundle(profile.get_api_key('openai_chatgpt'))
+    openai_chatgpt_bundle = (
+        deserialize_token_bundle(profile.get_api_key('openai_chatgpt'))
+        if ai_features_enabled
+        else None
+    )
     context = {
         'user_form': u_form,
         'profile_form': p_form,
+        'ai_features_enabled': ai_features_enabled,
         'have_keys': have_keys,
-        'openai_chatgpt_device_code': request.session.get('openai_chatgpt_device_code'),
+        'openai_chatgpt_device_code': request.session.get('openai_chatgpt_device_code') if ai_features_enabled else None,
         'openai_chatgpt_summary': token_bundle_summary(openai_chatgpt_bundle),
     }
     return render(request, 'users/profile.html', context)

@@ -52,6 +52,16 @@ def stream_queue_events(event_queue, stream_done, heartbeat_seconds=SSE_HEARTBEA
         yield item
 
 
+def user_has_ai_features(user):
+    profile = getattr(user, "profile", None)
+    return bool(profile and profile.ai_features_enabled)
+
+
+def ai_features_disabled_response(request):
+    messages.error(request, "AI features are disabled for this account.")
+    return redirect("home")
+
+
 def database_sync_to_async(func):
     def wrapped(*args, **kwargs):
         close_old_connections()
@@ -233,6 +243,8 @@ async def perform_llm_analysis_stream(
 
 @login_required
 def delete_chat(request, chat_id):
+    if not user_has_ai_features(request.user):
+        return ai_features_disabled_response(request)
     chat = get_object_or_404(LLMChat, id=chat_id, user=request.user)
     chat.delete()
     messages.success(request, "Chat deleted.")
@@ -356,6 +368,8 @@ class InsightsView(View):
             from django.contrib.auth.views import redirect_to_login
 
             return redirect_to_login(request.get_full_path(), settings.LOGIN_URL)
+        if not await sync_to_async(user_has_ai_features)(user):
+            return await sync_to_async(ai_features_disabled_response)(request)
 
         def get_all_sync_data():
             # Get current chat if any
@@ -616,6 +630,12 @@ class InsightsView(View):
                 content_type="text/event-stream",
                 status=401,
             )
+        if not user_has_ai_features(user):
+            return StreamingHttpResponse(
+                iter([stream_event("error", {"message": "AI features are disabled for this account."})]),
+                content_type="text/event-stream",
+                status=403,
+            )
 
         try:
             post_data = request.POST.copy()
@@ -865,6 +885,8 @@ class InsightsView(View):
             from django.contrib.auth.views import redirect_to_login
 
             return redirect_to_login(request.get_full_path(), settings.LOGIN_URL)
+        if not await sync_to_async(user_has_ai_features)(user):
+            return await sync_to_async(ai_features_disabled_response)(request)
 
         def get_initial_post_data():
             chat_obj = None

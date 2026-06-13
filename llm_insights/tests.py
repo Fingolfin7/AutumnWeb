@@ -1,7 +1,8 @@
 import queue
 
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase
+from django.test import Client, SimpleTestCase, TestCase
+from django.urls import reverse
 from asgiref.sync import async_to_sync
 from unittest.mock import patch
 
@@ -86,6 +87,16 @@ class InsightsViewProviderModelsTests(TestCase):
             self.view._validate_reasoning_effort("gemini", "high"),
             "",
         )
+
+    def test_insights_page_redirects_when_ai_features_disabled(self):
+        self.user.profile.ai_features_enabled = False
+        self.user.profile.save()
+        client = Client()
+        client.force_login(self.user)
+
+        response = client.get(reverse("insights"))
+
+        self.assertRedirects(response, reverse("home"))
 
 
 class GetLlmHandlerTests(SimpleTestCase):

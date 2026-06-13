@@ -32,8 +32,10 @@
                 
                 // Update the insights link with the default dates
                 let insights_link = $('#insights-link');
-                let insights_url = insights_link.attr('href');
-                insights_link.attr('href', insights_url + '?start_date=' + start_date + '&end_date=' + end_date);
+                if (insights_link.length) {
+                    let insights_url = insights_link.attr('href');
+                    insights_link.attr('href', insights_url + '?start_date=' + start_date + '&end_date=' + end_date);
+                }
             });
         </script>
 
@@ -77,7 +79,9 @@
                 <a href="{% url 'projects' %}" class="main-link"><i class="fas fa-project-diagram"></i> Manage Projects</a>
                 <a href="{% url 'timers' %}" class="main-link"><i class="fas fa-clock"></i> Timers</a>
                 <a href="{% url 'sessions' %}" class="main-link"><i class="fas fa-book"></i> Session Logs</a>
-                <a href="{% url 'insights' %}" class="main-link" id="insights-link"><i class="fas fa-robot"></i> Insights</a>
+                {% if user.profile.ai_features_enabled %}
+                    <a href="{% url 'insights' %}" class="main-link" id="insights-link"><i class="fas fa-robot"></i> Insights</a>
+                {% endif %}
                 <a href="{% url 'charts' %}" class="main-link"><i class="fas fa-chart-bar"></i> Charts</a>
                 <a href="{% url 'import' %}" class="main-link"><i class="fas fa-file-import"></i> Import</a>
                 <a href="{% url 'export' %}" class="main-link"><i class="fas fa-file-export"></i> Export</a>

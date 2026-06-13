@@ -113,6 +113,33 @@ class ProfileSaveTests(TestCase):
         self.assertFalse(profile.nasa_apod_background)
         self.assertEqual(profile.get_api_key("openai"), "profile-openai-key")
 
+    def test_profile_hides_and_ignores_ai_settings_when_disabled(self):
+        profile = self.user.profile
+        profile.ai_features_enabled = False
+        profile.save()
+
+        response = self.client.get(reverse("profile"))
+
+        self.assertNotContains(response, "LLM Connections")
+        self.assertNotContains(response, "Gemini API Key")
+        self.assertNotContains(response, "Use Codex Login")
+
+        response = self.client.post(
+            reverse("profile"),
+            data={
+                "username": "updated-user",
+                "email": "updated@example.com",
+                "openai_api_key": "should-not-save",
+            },
+        )
+
+        self.assertRedirects(response, reverse("profile"))
+        self.user.refresh_from_db()
+        profile.refresh_from_db()
+        self.assertEqual(self.user.username, "updated-user")
+        self.assertEqual(self.user.email, "updated@example.com")
+        self.assertIsNone(profile.get_api_key("openai"))
+
     @patch("users.views.start_device_code_login")
     def test_codex_action_does_not_run_general_profile_save(self, start_login):
         start_login.return_value = codex_auth.CodexDeviceCode(
@@ -133,6 +160,27 @@ class ProfileSaveTests(TestCase):
         )
 
         self.assertRedirects(response, reverse("profile"))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.username, "profile-user")
+        self.assertEqual(self.user.email, "profile@example.com")
+
+    @patch("users.views.start_device_code_login")
+    def test_codex_action_is_blocked_when_ai_features_disabled(self, start_login):
+        profile = self.user.profile
+        profile.ai_features_enabled = False
+        profile.save()
+
+        response = self.client.post(
+            reverse("profile"),
+            data={
+                "start_openai_chatgpt_login": "1",
+                "username": "should-not-save",
+                "email": "should-not-save@example.com",
+            },
+        )
+
+        self.assertRedirects(response, reverse("profile"))
+        start_login.assert_not_called()
         self.user.refresh_from_db()
         self.assertEqual(self.user.username, "profile-user")
         self.assertEqual(self.user.email, "profile@example.com")

@@ -38,6 +38,11 @@ class Profile(models.Model):
     openai_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     openai_chatgpt_token_enc = models.BinaryField(null=True, blank=True, editable=False)
     claude_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
+    ai_features_enabled = models.BooleanField(
+        default=True,
+        verbose_name="AI features",
+        help_text="Allow this account to use Insights and configure AI provider credentials.",
+    )
 
     def __str__(self):
         return f"{self.user.username} Profile"

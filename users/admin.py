@@ -32,6 +32,27 @@ def run_audit_for_selected_users(modeladmin, request, queryset):
 class ProfileInline(admin.StackedInline):
     model = Profile
     can_delete = False
+    fieldsets = (
+        (
+            "Account traits",
+            {
+                "fields": ("ai_features_enabled",),
+            },
+        ),
+        (
+            None,
+            {
+                "fields": (
+                    "image",
+                    "background_image",
+                    "background_dimming",
+                    "automatic_background",
+                    "bing_background",
+                    "nasa_apod_background",
+                ),
+            },
+        ),
+    )
 
 
 class UserAdmin(BaseUserAdmin):
@@ -77,4 +98,14 @@ class UserAdmin(BaseUserAdmin):
 
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
-admin.site.register(Profile)
+
+
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "user_email", "ai_features_enabled")
+    list_filter = ("ai_features_enabled",)
+    search_fields = ("user__username", "user__email")
+
+    @admin.display(description="Email", ordering="user__email")
+    def user_email(self, obj):
+        return obj.user.email
