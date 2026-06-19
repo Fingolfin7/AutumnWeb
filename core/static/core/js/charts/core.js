@@ -240,7 +240,7 @@ function hideEmpty() {
 function applyChartLayout(type) {
     if (!$canvasContainer || !$canvasContainer.length) return;
 
-    const circularTypes = ['pie', 'status'];
+    const circularTypes = ['pie', 'status', 'radar'];
     $canvasContainer.toggleClass('chart-circular', circularTypes.includes(type));
 }
 
