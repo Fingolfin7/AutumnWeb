@@ -47,6 +47,10 @@ AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
 AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
 AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
 AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-north-1")
+AWS_S3_ENDPOINT_URL = env(
+    "AWS_S3_ENDPOINT_URL",
+    default=f"https://s3.{AWS_S3_REGION_NAME}.amazonaws.com",
+)
 AWS_S3_SIGNATURE_VERSION = "s3v4"
 AWS_S3_FILE_OVERWRITE = False  # don't overwrite user uploaded files
 AWS_DEFAULT_ACL = None
