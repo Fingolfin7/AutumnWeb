@@ -11,8 +11,6 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
-from concurrent_log_handler import ConcurrentRotatingFileHandler
-import logging.handlers
 import environ
 import os
 
@@ -42,6 +40,37 @@ GEMINI_API_KEY = env("GEMINI_API_KEY")
 # NASA API Key (for Astronomy Picture of the Day, optional)
 NASA_API_KEY = env("NASA_API_KEY", default="DEMO_KEY")  # Use a demo key if not set
 
+# AWS/S3 media storage settings.
+# Django 4.2+ uses STORAGES; DEFAULT_FILE_STORAGE is ignored by Django 5.x.
+# Set USE_S3=FALSE to force local media storage even if bucket env vars are present.
+AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
+AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="eu-north-1")
+AWS_S3_SIGNATURE_VERSION = "s3v4"
+AWS_S3_FILE_OVERWRITE = False  # don't overwrite user uploaded files
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=True)
+AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default="")
+AWS_LOCATION = env("AWS_LOCATION", default="")
+USE_S3 = env.bool("USE_S3", default=bool(AWS_STORAGE_BUCKET_NAME))
+
+STORAGES = {
+    "default": {
+        "BACKEND": (
+            "storages.backends.s3boto3.S3Boto3Storage"
+            if USE_S3
+            else "django.core.files.storage.FileSystemStorage"
+        ),
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# Compatibility for older Django versions and third-party packages that still read this setting.
+DEFAULT_FILE_STORAGE = STORAGES["default"]["BACKEND"]
+
 
 ALLOWED_HOSTS = ["*"]
 
@@ -58,6 +87,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",  # for JWT token authentication
     "crispy_forms",
     "crispy_bootstrap4",
+    "storages",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",

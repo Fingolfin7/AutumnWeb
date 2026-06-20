@@ -66,7 +66,18 @@ class CodexAuthTests(SimpleTestCase):
 class ProfileSaveTests(TestCase):
     def setUp(self):
         self.media_root = tempfile.mkdtemp()
-        self.override = override_settings(MEDIA_ROOT=self.media_root)
+        self.override = override_settings(
+            MEDIA_ROOT=self.media_root,
+            USE_S3=False,
+            STORAGES={
+                "default": {
+                    "BACKEND": "django.core.files.storage.FileSystemStorage",
+                },
+                "staticfiles": {
+                    "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+                },
+            },
+        )
         self.override.enable()
         self.user = User.objects.create_user(
             username="profile-user",
@@ -112,6 +123,12 @@ class ProfileSaveTests(TestCase):
         self.assertTrue(profile.bing_background)
         self.assertFalse(profile.nasa_apod_background)
         self.assertEqual(profile.get_api_key("openai"), "profile-openai-key")
+
+    def test_image_url_uses_active_storage_for_default_image(self):
+        profile = self.user.profile
+        profile.image = None
+
+        self.assertEqual(profile.image_url, "/media/default.jpg")
 
     def test_profile_hides_and_ignores_ai_settings_when_disabled(self):
         profile = self.user.profile

@@ -22,3 +22,5 @@ anthropic
 gunicorn
 whitenoise
 psycopg2-binary
+boto3
+django-storages
