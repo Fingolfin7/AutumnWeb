@@ -12,6 +12,9 @@ from llm_insights.models import LLMChat, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.views import (
     InsightsView,
+    clean_generated_chat_title,
+    fallback_chat_title,
+    generate_and_save_chat_title,
     perform_llm_analysis_stream,
     save_llm_messages,
     save_partial_stream_messages,
@@ -200,6 +203,50 @@ class FakeStreamingHandler:
 
     def get_conversation_history(self):
         return self.conversation_history
+
+
+class FakeTitleHandler:
+    async def generate_chat_title(self, prompt):
+        self.prompt = prompt
+        return '"Project Focus Patterns."'
+
+
+class ChatTitleGenerationTests(TestCase):
+    def test_fallback_chat_title_uses_prompt_until_llm_title_is_available(self):
+        self.assertEqual(fallback_chat_title("  What did I work on?  "), "What did I work on?")
+        self.assertEqual(fallback_chat_title(""), "New Chat")
+        self.assertEqual(
+            fallback_chat_title("x" * 45),
+            f"{'x' * 40}...",
+        )
+
+    def test_clean_generated_chat_title_removes_wrapping_noise(self):
+        self.assertEqual(
+            clean_generated_chat_title('"Deep Work Rhythm."', "Fallback"),
+            "Deep Work Rhythm",
+        )
+        self.assertEqual(clean_generated_chat_title("", "Fallback"), "Fallback")
+
+    def test_generate_and_save_chat_title_updates_chat(self):
+        user = User.objects.create_user(username="title-user")
+        chat = LLMChat.objects.create(
+            user=user,
+            title="What did I work on?",
+            model="fake:fake-model",
+        )
+        handler = FakeTitleHandler()
+        history = [
+            {"role": "system", "content": "hidden session data"},
+            {"role": "user", "content": "What did I work on?"},
+            {"role": "assistant", "content": "You spent most of the week on Project Focus."},
+        ]
+
+        title = async_to_sync(generate_and_save_chat_title)(chat, handler, history)
+
+        chat.refresh_from_db()
+        self.assertEqual(title, "Project Focus Patterns")
+        self.assertEqual(chat.title, "Project Focus Patterns")
+        self.assertNotIn("hidden session data", handler.prompt)
 
 
 class PerformLlmAnalysisStreamTests(TestCase):

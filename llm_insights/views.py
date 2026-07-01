@@ -14,6 +14,7 @@ import uuid
 import asyncio
 import queue
 import threading
+import re
 from asgiref.sync import sync_to_async
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -38,6 +39,83 @@ def stream_event(event_name, payload):
 
 def stream_keepalive():
     return ": keep-alive\n\n"
+
+
+def fallback_chat_title(user_prompt):
+    title = re.sub(r"\s+", " ", (user_prompt or "").strip())
+    if not title:
+        return "New Chat"
+    return title[:40] + "..." if len(title) > 40 else title
+
+
+def build_chat_title_prompt(conversation_history):
+    visible_messages = [
+        msg
+        for msg in conversation_history
+        if msg.get("role") in {"user", "assistant"} and msg.get("content")
+    ]
+    if not visible_messages:
+        return ""
+
+    transcript_parts = []
+    for msg in visible_messages[-8:]:
+        content = re.sub(r"\s+", " ", str(msg.get("content", ""))).strip()
+        if len(content) > 1200:
+            content = f"{content[:1200]}..."
+        transcript_parts.append(f"{msg['role'].title()}: {content}")
+
+    transcript = "\n".join(transcript_parts)
+    return (
+        "Write a concise, specific title for this Autumn AI insights chat. "
+        "Use 3 to 8 words. Avoid generic labels like Session Analysis, Chat, or Summary. "
+        "Return only the title, with no quotes, markdown, or trailing punctuation.\n\n"
+        f"Chat transcript:\n{transcript}"
+    )
+
+
+def clean_generated_chat_title(raw_title, fallback_title):
+    title = re.sub(r"^```(?:text)?|```$", "", (raw_title or "").strip()).strip()
+    title = re.sub(r"^(title\s*:\s*)", "", title, flags=re.IGNORECASE).strip()
+    title = title.strip("\"'` ")
+    if not title:
+        return fallback_title
+    if "\n" in title:
+        title = title.splitlines()[0].strip()
+    title = re.sub(r"\s+", " ", title)
+    title = title.rstrip(".:;,- ")
+    if len(title) > 80:
+        title = title[:77].rstrip() + "..."
+    return title or fallback_title
+
+
+async def generate_and_save_chat_title(
+    chat_obj, llm_handler, conversation_history, fallback_title=None
+):
+    prompt = build_chat_title_prompt(conversation_history)
+    if not prompt:
+        return fallback_title or getattr(chat_obj, "title", "New Chat")
+
+    fallback_title = fallback_title or getattr(chat_obj, "title", None) or "New Chat"
+    try:
+        raw_title = await llm_handler.generate_chat_title(prompt)
+    except Exception:
+        return fallback_title
+
+    title = clean_generated_chat_title(raw_title, fallback_title)
+    if title == fallback_title:
+        return title
+
+    chat_id = getattr(chat_obj, "id", chat_obj)
+
+    def save_title():
+        chat = LLMChat.objects.get(id=chat_id)
+        chat.title = title
+        chat.save(update_fields=["title", "updated_at"])
+
+    await database_sync_to_async(save_title)()
+    if hasattr(chat_obj, "title"):
+        chat_obj.title = title
+    return title
 
 
 def stream_queue_events(event_queue, stream_done, heartbeat_seconds=SSE_HEARTBEAT_SECONDS):
@@ -658,13 +736,7 @@ class InsightsView(View):
             user_prompt = (post_data.get("prompt") or "").strip()
 
             if not chat_obj:
-                title = (
-                    user_prompt[:40] + "..."
-                    if len(user_prompt) > 40
-                    else user_prompt
-                )
-                if not title:
-                    title = "New Chat"
+                title = fallback_chat_title(user_prompt)
                 chat_obj = LLMChat.objects.create(
                     user=user,
                     title=title,
@@ -712,6 +784,7 @@ class InsightsView(View):
                 "stream_url": stream_url,
                 "user_prompt": user_prompt,
                 "username": data["username"],
+                "fallback_title": chat_obj.title,
             }
 
             if data["sessions_updated"]:
@@ -800,12 +873,20 @@ class InsightsView(View):
 
                 await database_sync_to_async(finalize_stream_session)()
 
+                chat_title = await generate_and_save_chat_title(
+                    stream_context["chat_id"],
+                    handler,
+                    conversation_history,
+                    fallback_title=stream_context["fallback_title"],
+                )
+
                 event_queue.put(stream_event(
                     "done",
                     {
                         "chat_id": str(stream_context["chat_id"]),
                         "chat_url": stream_context["chat_url"],
                         "stream_url": stream_context["stream_url"],
+                        "chat_title": chat_title,
                         "content": latest_assistant.get("content", ""),
                         "html": render_markdown(latest_assistant.get("content", "")),
                         "sources": latest_assistant.get("sources", []),
@@ -992,9 +1073,7 @@ class InsightsView(View):
 
         if not chat_obj:
             user_prompt = request.POST.get("prompt", "")
-            title = user_prompt[:40] + "..." if len(user_prompt) > 40 else user_prompt
-            if not title:
-                title = "New Chat"
+            title = fallback_chat_title(user_prompt)
 
             chat_obj = await sync_to_async(LLMChat.objects.create)(
                 user=user,
@@ -1059,6 +1138,12 @@ class InsightsView(View):
                 chat_obj.save()
 
             await sync_to_async(finalize_post_session)()
+            await generate_and_save_chat_title(
+                chat_obj,
+                handler,
+                conversation_history,
+                fallback_title=chat_obj.title,
+            )
 
         return redirect(reverse("insights_detail", kwargs={"chat_id": chat_id}))
 

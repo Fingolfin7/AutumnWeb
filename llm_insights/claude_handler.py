@@ -116,6 +116,29 @@ class ClaudeHandler(BaseLLMHandler):
             "response": final_message,
         }
 
+    async def generate_chat_title(self, prompt: str) -> str:
+        resp = await self.client.messages.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "user",
+                    "content": (
+                        "Write a concise title for this Autumn insights chat. "
+                        "Return only the title, with no quotes, markdown, or trailing punctuation.\n\n"
+                        f"{prompt}"
+                    ),
+                }
+            ],
+            max_tokens=40,
+        )
+        text = ""
+        if resp and resp.content:
+            for block in resp.content:
+                block_text = getattr(block, "text", "")
+                if block_text:
+                    text += str(block_text)
+        return text
+
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data without exposing it in user-visible chat history"""
         self.session_data = encode(

@@ -45,3 +45,7 @@ class BaseLLMHandler(ABC):
         response = await self.update_session_data(sessions_data, user_prompt)
         if response:
             yield response
+
+    async def generate_chat_title(self, prompt: str) -> str:
+        """Generate a short title without mutating the conversation history."""
+        return ""

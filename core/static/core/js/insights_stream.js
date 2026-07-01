@@ -112,6 +112,67 @@
         }
     }
 
+    function upsertActiveChatItem(payload) {
+        if (!payload.chat_title || !payload.chat_url) {
+            return;
+        }
+
+        const chatList = document.querySelector('.chat-list');
+        if (!chatList) {
+            return;
+        }
+
+        const chatPath = new URL(payload.chat_url, window.location.origin).pathname;
+        let link = Array.from(chatList.querySelectorAll('.chat-item')).find((item) => {
+            return new URL(item.href, window.location.origin).pathname === chatPath;
+        });
+
+        chatList.querySelectorAll('.chat-item-container, .chat-item').forEach((node) => {
+            node.classList.remove('active');
+        });
+
+        if (!link) {
+            chatList.querySelectorAll('.text-muted').forEach((node) => node.remove());
+
+            const container = document.createElement('div');
+            container.className = 'chat-item-container active';
+
+            link = document.createElement('a');
+            link.href = payload.chat_url;
+            link.className = 'chat-item active';
+
+            const title = document.createElement('span');
+            title.className = 'chat-title';
+            link.appendChild(title);
+
+            const deleteUrl = new URL(payload.chat_url, window.location.origin);
+            deleteUrl.pathname = deleteUrl.pathname.replace(/[^/]+\/$/, `delete/${payload.chat_id}/`);
+
+            const deleteLink = document.createElement('a');
+            deleteLink.href = deleteUrl.pathname;
+            deleteLink.className = 'delete-chat-btn';
+            deleteLink.onclick = function () {
+                return confirm('Delete this chat?');
+            };
+            deleteLink.innerHTML = '<i class="fa fa-trash"></i>';
+
+            container.appendChild(link);
+            container.appendChild(deleteLink);
+            chatList.prepend(container);
+        } else {
+            link.classList.add('active');
+            if (link.parentElement) {
+                link.parentElement.classList.add('active');
+            }
+        }
+
+        const titleNode = link.querySelector('.chat-title');
+        if (titleNode) {
+            titleNode.textContent = payload.chat_title;
+            titleNode.title = payload.chat_title;
+        }
+    }
+
     async function submitStreamingChat(event) {
         event.preventDefault();
 
@@ -213,6 +274,7 @@
                         if (parsed.payload.stream_url) {
                             form.dataset.streamUrl = parsed.payload.stream_url;
                         }
+                        upsertActiveChatItem(parsed.payload);
                         scrollToBottom(container);
                         return;
                     }

@@ -128,6 +128,35 @@ class OpenAIHandler(BaseLLMHandler):
             kwargs["include"] = ["web_search_call.action.sources"]
         return kwargs
 
+    def _api_title_response_kwargs(self, prompt):
+        return {
+            "model": self.model,
+            "input": [
+                {
+                    "role": "system",
+                    "content": (
+                        "You write concise conversation titles. Return only the title, "
+                        "with no quotes, markdown, or trailing punctuation."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            "max_output_tokens": 40,
+            "store": False,
+        }
+
+    def _codex_title_response_kwargs(self, prompt):
+        return {
+            "model": self.model,
+            "instructions": (
+                "You write concise conversation titles. Return only the title, "
+                "with no quotes, markdown, or trailing punctuation."
+            ),
+            "input": self._codex_input([{"role": "user", "content": prompt}]),
+            "max_output_tokens": 40,
+            "store": False,
+        }
+
     def _codex_input(self, messages):
         items = []
         for msg in messages:
@@ -179,6 +208,23 @@ class OpenAIHandler(BaseLLMHandler):
             if "unsupported parameter: reasoning" in msg:
                 fallback.pop("reasoning", None)
                 return await self._stream_codex(fallback)
+            raise
+
+    async def _create_openai_response_with_fallback(self, client, kwargs):
+        try:
+            return await client.responses.create(**kwargs)
+        except Exception as exc:
+            msg = str(exc).lower()
+            fallback = dict(kwargs)
+            changed = False
+            if "unsupported parameter: max_output_tokens" in msg:
+                fallback.pop("max_output_tokens", None)
+                changed = True
+            if "unsupported parameter: store" in msg:
+                fallback.pop("store", None)
+                changed = True
+            if changed:
+                return await client.responses.create(**fallback)
             raise
 
     async def _stream_codex(self, kwargs):
@@ -345,6 +391,32 @@ class OpenAIHandler(BaseLLMHandler):
         result = await self._send_api(messages)
         self.last_auth_source = "api_key"
         return result
+
+    async def generate_chat_title(self, prompt: str) -> str:
+        if self.auth_mode == self.AUTH_CODEX:
+            if self.codex_client is None:
+                return ""
+            resp = await self._create_openai_response_with_fallback(
+                self.codex_client, self._codex_title_response_kwargs(prompt)
+            )
+            return self._response_text(resp)
+        if self.auth_mode == self.AUTH_CODEX_WITH_API_FALLBACK:
+            if self.codex_client is not None:
+                try:
+                    resp = await self._create_openai_response_with_fallback(
+                        self.codex_client, self._codex_title_response_kwargs(prompt)
+                    )
+                    return self._response_text(resp)
+                except Exception:
+                    pass
+            resp = await self._create_openai_response_with_fallback(
+                self._api_client(), self._api_title_response_kwargs(prompt)
+            )
+            return self._response_text(resp)
+        resp = await self._create_openai_response_with_fallback(
+            self._api_client(), self._api_title_response_kwargs(prompt)
+        )
+        return self._response_text(resp)
 
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         self.session_data = encode(

@@ -252,6 +252,14 @@ class GeminiHandler(BaseLLMHandler):
             "response": last_response,
         }
 
+    async def generate_chat_title(self, prompt: str) -> str:
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=GenerateContentConfig(response_modalities=["TEXT"]),
+        )
+        return getattr(response, "text", "") or ""
+
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data without adding to chat history"""
         update_session_data_prompt = ""
