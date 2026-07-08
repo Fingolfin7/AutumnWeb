@@ -330,7 +330,7 @@ def delete_chat(request, chat_id):
 
 
 class InsightsView(View):
-    OPENAI_REASONING_EFFORTS = ["minimal", "low", "medium", "high"]
+    OPENAI_REASONING_EFFORTS = ["low", "medium", "high"]
 
     def _has_env_api_key(self, env_var):
         return bool(os.environ.get(env_var))

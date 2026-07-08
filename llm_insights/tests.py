@@ -1,4 +1,5 @@
 import queue
+from types import SimpleNamespace
 
 from django.contrib.auth.models import User
 from django.test import Client, SimpleTestCase, TestCase
@@ -158,6 +159,27 @@ class GetLlmHandlerTests(SimpleTestCase):
 
         self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX_WITH_API_FALLBACK)
+
+
+class GeminiHandlerUsageTests(SimpleTestCase):
+    def test_update_usage_counts_thought_tokens_in_response(self):
+        handler = object.__new__(GeminiHandler)
+        handler.usage_stats = {"prompt": 0, "response": 0, "total": 0}
+        handler.conversation_history = []
+        response = SimpleNamespace(
+            usage_metadata=SimpleNamespace(
+                prompt_token_count=100,
+                candidates_token_count=50,
+                thoughts_token_count=25,
+                total_token_count=175,
+            )
+        )
+
+        handler._update_usage(response)
+
+        self.assertEqual(
+            handler.usage_stats, {"prompt": 100, "response": 75, "total": 175}
+        )
 
 
 class StreamQueueEventsTests(SimpleTestCase):

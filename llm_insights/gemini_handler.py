@@ -84,9 +84,11 @@ class GeminiHandler(BaseLLMHandler):
         """Internal helper to extract and accumulate token usage metadata if available."""
         metadata = getattr(response, "usage_metadata", None)
         if metadata:
-            # Google response usage metadata fields: prompt_token_count, candidates_token_count, total_token_count
+            # Google response usage metadata fields: prompt_token_count, candidates_token_count, thoughts_token_count, total_token_count
             prompt_tokens = getattr(metadata, "prompt_token_count", 0) or 0
-            response_tokens = getattr(metadata, "candidates_token_count", 0) or 0
+            response_tokens = (getattr(metadata, "candidates_token_count", 0) or 0) + (
+                getattr(metadata, "thoughts_token_count", 0) or 0
+            )
             total_tokens = (
                 getattr(metadata, "total_token_count", prompt_tokens + response_tokens)
                 or 0
@@ -239,10 +241,16 @@ class GeminiHandler(BaseLLMHandler):
             usage = {
                 "prompt": getattr(last_response.usage_metadata, "prompt_token_count", 0)
                 or 0,
-                "response": getattr(
-                    last_response.usage_metadata, "candidates_token_count", 0
+                "response": (
+                    getattr(
+                        last_response.usage_metadata, "candidates_token_count", 0
+                    )
+                    or 0
                 )
-                or 0,
+                + (
+                    getattr(last_response.usage_metadata, "thoughts_token_count", 0)
+                    or 0
+                ),
             }
         yield {
             "type": "final",
@@ -307,8 +315,13 @@ class GeminiHandler(BaseLLMHandler):
                     "prompt": getattr(response.usage_metadata, "prompt_token_count", 0)
                     if response.usage_metadata
                     else 0,
-                    "response": getattr(
-                        response.usage_metadata, "candidates_token_count", 0
+                    "response": (
+                        getattr(response.usage_metadata, "candidates_token_count", 0)
+                        or 0
+                    )
+                    + (
+                        getattr(response.usage_metadata, "thoughts_token_count", 0)
+                        or 0
                     )
                     if response.usage_metadata
                     else 0,
@@ -438,8 +451,17 @@ class GeminiHandler(BaseLLMHandler):
                         )
                         if response.usage_metadata
                         else 0,
-                        "response": getattr(
-                            response.usage_metadata, "candidates_token_count", 0
+                        "response": (
+                            getattr(
+                                response.usage_metadata, "candidates_token_count", 0
+                            )
+                            or 0
+                        )
+                        + (
+                            getattr(
+                                response.usage_metadata, "thoughts_token_count", 0
+                            )
+                            or 0
                         )
                         if response.usage_metadata
                         else 0,
