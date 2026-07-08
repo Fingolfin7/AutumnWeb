@@ -112,6 +112,27 @@
         }
     }
 
+    function updateTokenUsage(usage) {
+        const el = document.getElementById('token-usage');
+        if (!el) {
+            return;
+        }
+
+        const currentPrompt = Number(el.dataset.prompt);
+        const currentResponse = Number(el.dataset.response);
+        const promptDelta = Number(usage.prompt);
+        const responseDelta = Number(usage.response);
+
+        const prompt = (Number.isNaN(currentPrompt) ? 0 : currentPrompt)
+            + (Number.isNaN(promptDelta) ? 0 : promptDelta);
+        const response = (Number.isNaN(currentResponse) ? 0 : currentResponse)
+            + (Number.isNaN(responseDelta) ? 0 : responseDelta);
+
+        el.dataset.prompt = prompt;
+        el.dataset.response = response;
+        el.textContent = 'In: ' + prompt.toLocaleString() + ' · Out: ' + response.toLocaleString();
+    }
+
     function upsertActiveChatItem(payload) {
         if (!payload.chat_title || !payload.chat_url) {
             return;
@@ -275,6 +296,7 @@
                             form.dataset.streamUrl = parsed.payload.stream_url;
                         }
                         upsertActiveChatItem(parsed.payload);
+                        updateTokenUsage(parsed.payload.usage || {});
                         scrollToBottom(container);
                         return;
                     }
@@ -304,6 +326,8 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        updateTokenUsage({});
+
         const form = document.getElementById('chat-form');
         if (form) {
             form.addEventListener('submit', submitStreamingChat);

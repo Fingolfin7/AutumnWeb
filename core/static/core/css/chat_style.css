@@ -1,3 +1,79 @@
+/* ---- Full-height page layout ----
+   This stylesheet only loads on the Insights page, so these overrides
+   turn the page into a fixed-viewport app view: the ribbon stays at the
+   top, .main-body scrolls internally, and the chat card fills the rest. */
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.main-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: 1.1rem;
+}
+
+/* The left panel is position:fixed with no explicit top, so it normally
+   inherits its static position (just below the ribbon). The flex container
+   above changes that static position, sliding the panel up under the
+   ribbon — anchor it explicitly instead. 4.25rem matches the ribbon
+   min-height that style.css already assumes in the panel's height calc. */
+.left-panel {
+  top: 4.25rem;
+  left: 0;
+}
+
+#messages,
+#search_options {
+  flex-shrink: 0;
+}
+
+/* ---- Collapsible session filters ---- */
+.filters-panel {
+  margin-bottom: 1rem;
+}
+
+.filters-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  user-select: none;
+}
+
+.filters-summary::-webkit-details-marker {
+  display: none;
+}
+
+.filters-summary .filters-hint {
+  font-size: 0.85em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filters-summary .filters-caret {
+  margin-left: auto;
+  opacity: 0.55;
+  transition: transform 0.2s ease;
+}
+
+.filters-panel[open] > .filters-summary .filters-caret {
+  transform: rotate(180deg);
+}
+
+.filters-panel[open] > .filters-summary {
+  margin-bottom: 1.4rem; /* room for the floating field labels below */
+}
+
 .conversation-container {
   flex: 1; /* Grow to fill available space */
   min-height: 0;
@@ -103,9 +179,8 @@
 .chat-layout {
   display: flex;
   gap: 0; /* Remove gap to allow cleaner borders */
-  margin-top: 20px;
-  min-height: 600px;
-  height: clamp(600px, 88vh, 1200px);
+  flex: 1; /* Fill whatever viewport space remains under the filters */
+  min-height: 24rem;
   border: 1px solid var(--border-dark);
   border-radius: 0;
   overflow: hidden;
@@ -152,17 +227,43 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 14px 20px 16px;
   background: var(--surface-1);
 }
 
 .chat-header {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
+  gap: 0.9rem;
+  flex-shrink: 0;
   margin-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 8px;
+}
+
+.chat-header-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.chat-header-meta h3 {
+  margin: 0;
+  font-size: 1.02rem;
+  white-space: nowrap;
+}
+
+.chat-header-range,
+.chat-header-tokens {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.chat-header .copy-full-chat-btn {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .chat-list {
@@ -333,4 +434,104 @@
 .chat-form {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- Composer: model controls + input docked at the bottom ---- */
+.composer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.composer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
+.composer-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.composer-field label {
+  font-size: 0.78rem;
+  color: var(--main-muted);
+}
+
+.composer-field select {
+  padding: 0.3rem 0.45rem;
+  font-size: 0.85rem;
+  background: var(--card-background-dark);
+  color: var(--dark-text);
+  border: 1px solid var(--border-dark);
+  border-radius: 4px;
+}
+
+.composer-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composer-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.composer-input-row textarea {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  min-height: 2.7rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  padding: 0.65rem;
+  background: var(--card-background-dark);
+  color: var(--dark-text);
+  border: 1px solid var(--border-dark);
+  border-radius: 4px;
+}
+
+.composer-input-row textarea:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.composer-input-row .primary-button {
+  flex-shrink: 0;
+  margin-bottom: 1px;
+}
+
+.light-mode .composer-field select,
+.light-mode .composer-input-row textarea {
+  background: var(--card-background-light);
+  color: var(--light-text);
+  border-color: var(--border-light);
+}
+
+@media (max-width: 58rem) {
+  .composer-toolbar {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .composer-note {
+    display: none;
+  }
+
+  .chat-sidebar {
+    flex: 0 0 200px;
+  }
 }
