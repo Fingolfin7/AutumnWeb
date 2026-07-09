@@ -33,6 +33,19 @@
         const message = document.createElement('div');
         message.className = className;
 
+        if (className.indexOf('user-message') !== -1) {
+            message.dataset.copyText = content;
+            const copyButton = document.createElement('button');
+            copyButton.type = 'button';
+            copyButton.className = 'copy-btn';
+            copyButton.title = 'Copy message';
+            copyButton.innerHTML = '<i class="fa fa-copy"></i>';
+            copyButton.addEventListener('click', function () {
+                copyToClipboard(message.dataset.copyText || '', this);
+            });
+            message.appendChild(copyButton);
+        }
+
         const contentNode = document.createElement('div');
         contentNode.className = 'message-content';
         contentNode.textContent = content;

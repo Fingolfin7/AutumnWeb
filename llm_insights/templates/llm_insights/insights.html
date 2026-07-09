@@ -53,9 +53,12 @@
             });
         }
 
-        function copyFullChat() {
+        function buildChatTranscript(onlySelected) {
             const messages = [];
-            $('.conversation-container > div').each(function() {
+            const selector = onlySelected
+                ? '.conversation-container > .msg-selected'
+                : '.conversation-container > div';
+            $(selector).each(function() {
                 let sender = 'User';
                 if ($(this).hasClass('user-message')) {
                     sender = '{{ username|default:"User" }}';
@@ -68,13 +71,54 @@
                     messages.push(`[${sender}]\n${content}`);
                 }
             });
-            const fullText = messages.join('\n\n---\n\n');
-            navigator.clipboard.writeText(fullText).then(() => {
-                const btn = $('#copy-full-chat-btn');
-                const originalText = btn.html();
-                btn.html('<i class="fa fa-check"></i> Copied!');
-                setTimeout(() => btn.html(originalText), 2000);
+            return messages.join('\n\n---\n\n');
+        }
+
+        function flashCopied(btn) {
+            const originalText = $(btn).html();
+            $(btn).html('<i class="fa fa-check"></i> Copied!');
+            setTimeout(() => $(btn).html(originalText), 2000);
+        }
+
+        function copyFullChat() {
+            navigator.clipboard.writeText(buildChatTranscript(false)).then(() => {
+                flashCopied(document.getElementById('copy-full-chat-btn'));
             });
+        }
+
+        let messageSelectMode = false;
+
+        function updateSelectedCount() {
+            const n = document.querySelectorAll('#conversation-container .msg-selected').length;
+            const btn = $('#copy-selected-btn');
+            btn.html('<i class="fa fa-copy"></i> Copy (' + n + ')');
+            btn.prop('disabled', n === 0);
+        }
+
+        function toggleSelectMode() {
+            messageSelectMode = !messageSelectMode;
+            const container = document.getElementById('conversation-container');
+            if (container) {
+                container.classList.toggle('selecting', messageSelectMode);
+                if (!messageSelectMode) {
+                    container.querySelectorAll('.msg-selected').forEach((m) => m.classList.remove('msg-selected'));
+                }
+            }
+            $('#select-messages-btn').html(
+                messageSelectMode
+                    ? '<i class="fa fa-times"></i> Cancel'
+                    : '<i class="fa fa-check-square"></i> Select'
+            );
+            $('#copy-selected-btn').toggle(messageSelectMode);
+            updateSelectedCount();
+        }
+
+        function copySelectedMessages(btn) {
+            const transcript = buildChatTranscript(true);
+            if (!transcript) {
+                return;
+            }
+            navigator.clipboard.writeText(transcript).then(() => flashCopied(btn));
         }
 
         function toggleSidebar() {
@@ -140,6 +184,17 @@
             if (container) {
                 container.scrollTop = container.scrollHeight;
             }
+
+            // Toggle message selection in select mode (delegated so it also
+            // covers messages appended later by the streaming code)
+            $(document).on('click', '#conversation-container > .user-message, #conversation-container > .assistant-message', function (e) {
+                if (!messageSelectMode) {
+                    return;
+                }
+                e.preventDefault();
+                $(this).toggleClass('msg-selected');
+                updateSelectedCount();
+            });
 
             // Composer: auto-grow textarea, Enter to send (Shift+Enter for newline)
             const promptEl = document.getElementById('prompt');
@@ -302,11 +357,17 @@
                             In: {{ usage_stats.prompt|default:0 }} &middot; Out: {{ usage_stats.response|default:0 }}
                         </span>
                     </div>
-                    {% if conversation_history %}
-                        <button type="button" id="copy-full-chat-btn" class="copy-full-chat-btn" onclick="copyFullChat()">
+                    <div class="chat-header-actions">
+                        <button type="button" id="select-messages-btn" class="chat-action-btn" onclick="toggleSelectMode()" title="Select messages to copy">
+                            <i class="fa fa-check-square"></i> Select
+                        </button>
+                        <button type="button" id="copy-selected-btn" class="chat-action-btn" onclick="copySelectedMessages(this)" style="display: none;" disabled>
+                            <i class="fa fa-copy"></i> Copy (0)
+                        </button>
+                        <button type="button" id="copy-full-chat-btn" class="chat-action-btn" onclick="copyFullChat()">
                             <i class="fa fa-copy"></i> Copy Full Chat
                         </button>
-                    {% endif %}
+                    </div>
                 {% endif %}
             </div>
             {% if not sessions and not conversation_history %}
@@ -324,6 +385,10 @@
                             {% for message in conversation_history %}
                                 {% if message.role == 'user' %}
                                     <div class="user-message">
+                                        <button type="button" class="copy-btn" title="Copy message"
+                                                onclick="copyToClipboard(`{{ message.content|escapejs }}`, this)">
+                                            <i class="fa fa-copy"></i>
+                                        </button>
                                         <div class="message-content">
                                             {{ message.content|markdown|safe|linebreaks }}
                                         </div>

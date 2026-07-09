@@ -112,7 +112,6 @@
   border: 1px solid rgba(201, 130, 69, 0.32);
   color: var(--dark-text);
   margin-left: auto;
-  text-align: right;
 }
 
 .dark-mode .assistant-message {
@@ -126,7 +125,6 @@
   background-color: var(--color-dodgerblue);
   color: #ffffff;
   margin-left: auto;
-  text-align: right;
 }
 
 .light-mode .assistant-message {
@@ -261,8 +259,12 @@
   white-space: nowrap;
 }
 
-.chat-header .copy-full-chat-btn {
+.chat-header-actions {
   margin-left: auto;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   flex-shrink: 0;
 }
 
@@ -345,7 +347,8 @@
     opacity: 0.6;
 }
 
-.copy-full-chat-btn {
+.copy-full-chat-btn,
+.chat-action-btn {
     background: transparent;
     border: 1px solid var(--border-dark);
     color: var(--dark-text);
@@ -356,13 +359,20 @@
     transition: all 0.2s;
 }
 
-.copy-full-chat-btn:hover {
+.copy-full-chat-btn:hover,
+.chat-action-btn:hover:not(:disabled) {
     background: var(--surface-2);
     border-color: var(--accent-color);
     color: var(--dark-text);
 }
 
-.assistant-message {
+.chat-action-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.assistant-message,
+.user-message {
   position: relative;
 }
 
@@ -379,8 +389,28 @@
   padding: 5px;
 }
 
-.assistant-message:hover .copy-btn {
+.assistant-message:hover .copy-btn,
+.user-message:hover .copy-btn {
   opacity: 1;
+}
+
+/* ---- Message multi-select (select mode) ---- */
+.conversation-container.selecting {
+  user-select: none;
+}
+
+.conversation-container.selecting .user-message,
+.conversation-container.selecting .assistant-message {
+  cursor: pointer;
+}
+
+.conversation-container.selecting .copy-btn {
+  pointer-events: none;
+}
+
+.conversation-container .msg-selected {
+  outline: 2px solid var(--accent-color);
+  outline-offset: -2px;
 }
 
 .assistant-message.streaming .message-content::after {
