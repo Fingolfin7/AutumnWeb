@@ -1,5 +1,6 @@
 # urls.py
 from django.urls import path, re_path
+from django.http import JsonResponse
 from core.views import (
     DashboardView,
     ProjectsListView,
@@ -52,6 +53,7 @@ from core.api import (
     search_sessions,
     mark_project,
     export_json_api,
+    import_json_api,
     edit_session,
     # existing (migrated)
     create_project,
@@ -81,11 +83,21 @@ from core.api import (
     merge_subprojects_api,
     contexts_list,
     tags_list,
+    update_project_metadata,
+    context_detail,
+    tag_detail,
     me,
     audit,
+    commitments,
+    commitment_detail,
 )
 
+
+def healthz(request):
+    return JsonResponse({"status": "ok"})
+
 urlpatterns = [
+    path("healthz/", healthz, name="healthz"),
     # pages
     path("", DashboardView.as_view(), name="home"),
     path("projects/", ProjectsListView.as_view(), name="projects"),
@@ -258,10 +270,20 @@ urlpatterns = [
     path("api/project/delete/", project_delete_body, name="api_project_delete_body"),
     path("api/log/", log_activity, name="api_log"),
     path("api/mark/", mark_project, name="api_mark_project"),
+    path("api/project/update/", update_project_metadata, name="api_project_update"),
     path("api/export/", export_json_api, name="api_export_json"),
+    path("api/import/", import_json_api, name="api_import_json"),
     # discovery endpoints (contexts/tags)
     path("api/contexts/", contexts_list, name="api_contexts_list"),
+    path("api/contexts/<int:context_id>/", context_detail, name="api_context_detail"),
     path("api/tags/", tags_list, name="api_tags_list"),
+    path("api/tags/<int:tag_id>/", tag_detail, name="api_tag_detail"),
     path("api/me/", me, name="api_me"),
     path("api/audit/", audit, name="api_audit"),
+    path("api/commitments/", commitments, name="api_commitments"),
+    path(
+        "api/commitments/<int:commitment_id>/",
+        commitment_detail,
+        name="api_commitment_detail",
+    ),
 ]

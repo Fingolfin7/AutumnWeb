@@ -60,13 +60,17 @@ User → Context → Projects → SubProjects → Sessions
 
 Two API styles coexist:
 
-1. **Compact endpoints** (CLI-optimized): `/api/timer/start/`, `/api/timer/stop/`, `/api/track/`, `/api/totals/`, etc.
+1. **Compact endpoints** (CLI-optimized): `/api/timer/start/`, `/api/timer/stop/`, `/api/track/`, `/api/totals/`, `/api/commitments/`, etc.
    - Default `compact=true` uses abbreviated keys (`p`, `subs`, `dur`, `elapsed`)
    - Pass `?compact=false` for expanded responses
 
-2. **Legacy endpoints**: `/api/create_project/`, `/api/start_session/`, etc.
+2. **Project/context/tag management**: `/api/project/update/`, `/api/contexts/`, `/api/contexts/<id>/`, `/api/tags/`, and `/api/tags/<id>/`; `/api/create_project/` also accepts context and tags.
 
-All endpoints require authentication (session or token). Durations are in **minutes** (float).
+3. **Import**: `POST /api/import/` accepts export JSON (or compressed JSON) and shares its import logic with the streaming web import flow.
+
+4. **Legacy endpoints**: `/api/create_project/`, `/api/start_session/`, etc.
+
+All API endpoints require authentication (session or token) except `GET /healthz/`, an unauthenticated health check used to probe or wake sleeping deployments. Durations are in **minutes** (float).
 
 ### LLM Handler Pattern (llm_insights/)
 
@@ -83,6 +87,8 @@ Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate
 
 - `core/views.py` (~60KB) - All UI views including timer, project, session management
 - `core/api.py` (~53KB) - Complete REST API implementation
+- `core/importer.py` - Shared `iter_import` generator and `run_import` wrapper used by web and API imports
+- `core/urls.py` - URL routing, including `/healthz/`
 - `core/utils.py` (~20KB) - Helper functions, date parsing, data formatting
 - `users/models.py` - Profile model with encrypted API key get/set methods
 - `autumn_mcp.py` - MCP server for Claude Code integration

@@ -1,6 +1,6 @@
 # Autumn API (/api/*) – reference for CLI wrapper
 
-All endpoints below live under `/api/` and use Django REST Framework with `IsAuthenticated`.
+All endpoints below live under `/api/` and use Django REST Framework with `IsAuthenticated`, except `/healthz/`.
 
 ## Auth + request basics
 
@@ -664,9 +664,9 @@ Accepts filters via query params (GET) or JSON body (POST):
 
 Response 200 OK: JSON object (either the export payload or a compressed wrapper).
 
-## 17) Contexts list
+## 17) Contexts list and create
 
-**GET** `/api/contexts/`
+**GET** or **POST** `/api/contexts/`
 
 Query:
 
@@ -697,9 +697,9 @@ Non-compact response includes stats:
 }
 ```
 
-## 18) Tags list
+## 18) Tags list and create
 
-**GET** `/api/tags/`
+**GET** or **POST** `/api/tags/`
 
 Query:
 
@@ -840,6 +840,85 @@ Response 200 OK:
 }
 ```
 
+## 22) Import JSON (sessions/projects)
+
+**POST** `/api/import/`
+
+Provide exactly one of `data` (an export JSON object) or `data_compressed` (a compressed export wrapper, JSON string or object).
+
+```json
+{"data": {"Project Name": {"...": "export payload"}}, "force": false, "merge": true, "tolerance": 2, "autumn_import": false, "context": "Imported Work"}
+```
+
+- `force` replaces an existing same-named project; `merge` merges non-duplicate sessions into it.
+- `tolerance` is a non-negative integer number of minutes for duplicate detection (default `2`).
+- `autumn_import` enables Autumn CLI-compatible subproject import behavior.
+- `context` is optional. A non-empty unknown name is created; supplied contexts override those in the export.
+
+Response 200 OK:
+
+```json
+{"ok": true, "summary": {"projects_processed": 1, "projects_created": 1, "projects_updated": 0, "sessions_imported": 4, "skipped": []}}
+```
+
+## 23) Project metadata
+
+**PATCH** `/api/project/update/`
+
+```json
+{"project": "Project Name", "description": "Optional project notes", "context": "Work", "tags": ["Client", "Priority"]}
+```
+
+Updates one or more of a project's description, context, and tags without renaming it or changing its status. `project` is required and matched case-insensitively. Send `context: null` or `context: ""` to clear it; otherwise it must name an existing context. `tags` must be a list of names, replaces the entire tag set, and creates missing tags. `compact=true|false` defaults to `true` (`p`, `desc`, `status`, `ctx`, `tags`); full mode uses descriptive names.
+
+`POST /api/create_project/` also accepts optional `context` (an existing context name) and `tags` (a list of names that creates missing tags).
+
+## 24) Context management
+
+**POST** `/api/contexts/` creates a context from required `name` and optional `description`; names are case-insensitively unique per user. It returns `201 Created` with `{"ok": true, "context": {...}}`.
+
+**PATCH** or **DELETE** `/api/contexts/<id>/`
+
+PATCH accepts one or both of `name` and `description`, returning `{"ok": true, "context": {...}}` (and `message: "success"` in full mode). DELETE returns `204 No Content` and clears the context from related projects.
+
+## 25) Tag management
+
+**POST** `/api/tags/` creates a tag from required `name` and optional `color` (up to 20 characters); names are case-insensitively unique per user. It returns `201 Created` with `{"ok": true, "tag": {...}}`.
+
+**PATCH** or **DELETE** `/api/tags/<id>/`
+
+PATCH accepts one or both of `name` and `color`, returning `{"ok": true, "tag": {...}}` (and `message: "success"` in full mode). DELETE returns `204 No Content`.
+
+## 26) Commitments
+
+**GET** or **POST** `/api/commitments/`
+
+GET query: `active=true|false`, `aggregation_type=project|subproject|context|tag`, `progress=true|false` (default true), `streak=true|false` (default false), and `compact=true|false` (default true). Compact list items use `agg`, `name`, `type`, `period`, `target`, `bal`, `active`, and `prog` (`actual`, `pct`, `status`); full mode includes banking fields, rules, and full progress data.
+
+Create body:
+
+```json
+{"aggregation_type": "project", "target": "Project Name", "target_value": 300, "commitment_type": "time", "period": "weekly", "start_date": "2026-01-15", "banking_enabled": true, "max_balance": 600, "min_balance": -600, "include_tags": ["Priority"], "exclude_subprojects": ["Project Name/Meetings"]}
+```
+
+- `aggregation_type` is required: `project`, `subproject`, `context`, or `tag`. `target` is resolved by name for the authenticated user; subproject targets also require `project` to disambiguate them.
+- `target_value` is a required positive integer (minutes for `time`, count for `sessions`). `commitment_type` defaults to `time`; `period` defaults to `weekly` and supports `daily`, `weekly`, `fortnightly`, `monthly`, `quarterly`, and `yearly`.
+- Banking defaults to enabled with `max_balance: 600` and `min_balance: -600`; the minimum must be zero or negative and not exceed the maximum.
+- Include/exclude rule arrays contain names; subproject rules use `Project/Subproject`. Only lower-scope rules are retained: context targets may rule on tags, projects, and subprojects; tag targets on projects and subprojects; project targets on subprojects.
+
+**GET**, **PATCH**, or **DELETE** `/api/commitments/<id>/`
+
+GET returns the full commitment with progress and streak data. PATCH accepts `commitment_type`, `period`, `target_value` (or numeric `target`), `start_date`, `banking_enabled`, `max_balance`, `min_balance`, `active`, and include/exclude rule arrays. It cannot change `aggregation_type` or the target name. DELETE returns `204 No Content`.
+
+## 27) Health check
+
+**GET** `/healthz/`
+
+Unauthenticated endpoint for clients to probe or wake a sleeping free-tier Render host before retrying an API request.
+
+```json
+{"status": "ok"}
+```
 
 ---
 
@@ -851,7 +930,7 @@ These remain available and are used by older clients. Some are thin wrappers aro
 Projects
 
 
-- POST /api/create_project/ (infers `user` from the authenticated request; clients should not send a `user` field)
+- POST /api/create_project/ (infers `user` from the authenticated request; clients should not send a `user` field; accepts optional `context` and `tags`)
 
 - GET /api/list_projects/ (optional start_date, end_date, context)
 

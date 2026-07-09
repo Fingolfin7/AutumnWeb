@@ -66,12 +66,12 @@ Autumn includes pie, bar, scatter, line, calendar, heatmap, stacked area, cumula
 ### Features
 
 * Track time spent on projects and subprojects
-* Start, stop, restart, and remove timers directly in the browser
+* Start, stop, restart, and remove timers directly in the browser, with optional server-side auto-stop deadlines
 * Browse and search session history, including context, tag, date, note, and excluded-project filters
 * Organize projects by hard **contexts** and soft **tags**
-* Create time-based or session-based commitments with weekly/monthly/etc. targets and banking
+* Create time-based or session-based commitments with weekly/monthly/etc. targets and banking, in the browser or API
 * Visualize data with Chart.js charts, scatter plots, heatmaps, treemaps, and word clouds
-* Export and import JSON data compatible with the old CLI version
+* Export and import JSON data compatible with the old CLI version, including JSON import through the API
 * Ask natural-language questions about selected sessions with optional LLM integration
 * Dark Night Ledger interface with optional custom, Bing, or NASA APOD workspace backgrounds
 
@@ -114,7 +114,7 @@ Access the app at `http://127.0.0.1:8000/`.
 
 ### API Docs
 
-See `docs/api.md` for a reference of `/api/*` endpoints used by the CLI wrapper and integrations.
+See `docs/api.md` for `/api/*` endpoints used by the CLI wrapper and integrations, including commitments, project metadata, context/tag management, and JSON import. `GET /healthz/` is an unauthenticated health check for waking or probing a sleeping deployment.
 
 ---
 

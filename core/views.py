@@ -4,6 +4,7 @@ import pytz
 from collections import Counter
 from AutumnWeb import settings
 from core.forms import *
+from core.importer import iter_import
 from core.utils import *
 from core.models import Context, Tag
 from django.contrib import messages
@@ -497,7 +498,7 @@ def import_view(request):
 @csrf_exempt
 def import_stream(request):
     def event_stream():
-        # get data from session
+        # Get data from the session.
         file_path = request.session.get("file_path")
         import_data = request.session.get("import_data") or {}
         autumn_import = import_data.get("autumn_import")
@@ -510,8 +511,6 @@ def import_stream(request):
         import_context_new = (import_data.get("import_context_new") or "").strip()
 
         user = request.user
-        skipped = []
-
         import_into_context = None
         if import_context_new:
             import_into_context, _ = Context.objects.get_or_create(
@@ -525,7 +524,7 @@ def import_stream(request):
             except (Context.DoesNotExist, ValueError, TypeError):
                 import_into_context = None
 
-        # clear session data
+        # Clear session data.
         request.session.pop("file_path", None)
         request.session.pop("import_data", None)
 
@@ -543,273 +542,18 @@ def import_stream(request):
 
             os.remove(file_path)
 
-            total_projects = len(data.items())
-            for idx, (project_name, project_data) in enumerate(data.items(), 1):
-                yield stream_response(
-                    f"Processing project {idx}/{total_projects}: {project_name}"
-                )
-
-                project = Projects.objects.filter(name=project_name, user=user).first()
-
-                if project:
-                    if force:
-                        yield stream_response(
-                            f"Force option enabled - deleting existing project '{project_name}'"
-                        )
-                        # Only delete projects belonging to the current user to avoid removing other users' projects
-                        Projects.objects.filter(name=project_name, user=user).delete()
-                        project = None
-                    elif merge:
-                        if verbose:
-                            yield stream_response(
-                                f"Merging new sessions and subprojects into '{project_name}'..."
-                            )
-                    else:
-                        skipped.append(project_name)
-                        yield stream_response(
-                            f"Skipping existing project: {project_name}"
-                        )
-                        continue
-
-                if not project:
-                    project = Projects.objects.create(
-                        user=user,
-                        name=project_name,
-                        start_date=timezone.make_aware(
-                            datetime.strptime(project_data["Start Date"], "%m-%d-%Y")
-                        ),
-                        last_updated=timezone.make_aware(
-                            datetime.strptime(project_data["Last Updated"], "%m-%d-%Y")
-                        ),
-                        total_time=0.0,
-                        description=project_data["Description"]
-                        if "Description" in project_data
-                        else "",
-                        context=import_into_context,
-                    )
-
-                    if (
-                        "Status" in project_data
-                    ):  # handle old versions from before the status field was added
-                        # Find the status tuple that matches the project_data['Status']
-                        status_tuple = next(
-                            (
-                                status
-                                for status in status_choices
-                                if status[0] == project_data["Status"]
-                            ),
-                            None,
-                        )
-
-                        if status_tuple:
-                            project.status = status_tuple[0]
-                        else:
-                            raise ValueError(
-                                f"Invalid status: {project_data['Status']}"
-                            )
-                    project.save()
-
-                # Apply context/tags (backwards compatible)
-                # If importing into a context, don't let the file override it.
-                if import_into_context is not None:
-                    sanitized_project_data = dict(project_data)
-                    sanitized_project_data.pop("Context", None)
-                else:
-                    sanitized_project_data = project_data
-
-                apply_context_and_tags_to_project(
-                    user=user,
-                    project=project,
-                    project_data=sanitized_project_data,
-                    merge=bool(
-                        merge
-                        and Projects.objects.filter(
-                            name=project_name,
-                            user=user,
-                        ).exists()
-                    ),
-                )
-
-                # Existing project + merge: optionally force it under the chosen context
-                if merge and project is not None and import_into_context is not None:
-                    project.context = import_into_context
-                    project.save(update_fields=["context"])
-
-                # Process subprojects
-                total_subprojects = len(project_data["Sub Projects"])
-
-                if verbose and total_subprojects > 0:
-                    yield stream_response(
-                        f"Processing {total_subprojects} subprojects for {project_name}"
-                    )
-
-                for subproject_name, subproject_time in project_data[
-                    "Sub Projects"
-                ].items():
-                    subproject_name_lower = subproject_name.lower()
-                    if autumn_import:
-                        subproject, created = SubProjects.objects.get_or_create(
-                            user=user,
-                            name=subproject_name_lower,
-                            parent_project=project,
-                            defaults={  # these values aren't used in the search. But they are added to new instances
-                                "start_date": project.start_date,
-                                "last_updated": project.last_updated,
-                                "total_time": 0.0,
-                                "description": "",
-                            },
-                        )
-                    else:
-                        subproject, created = SubProjects.objects.get_or_create(
-                            user=user,
-                            name=subproject_name_lower,
-                            parent_project=project,
-                            defaults={  # these values aren't used in the search. But they are added to new instances
-                                "start_date": timezone.make_aware(
-                                    datetime.strptime(
-                                        project_data["Sub Projects"][subproject_name][
-                                            "Start Date"
-                                        ],
-                                        "%m-%d-%Y",
-                                    )
-                                ),
-                                "last_updated": timezone.make_aware(
-                                    datetime.strptime(
-                                        project_data["Sub Projects"][subproject_name][
-                                            "Last Updated"
-                                        ],
-                                        "%m-%d-%Y",
-                                    )
-                                ),
-                                "description": project_data["Sub Projects"][
-                                    subproject_name
-                                ]["Description"]
-                                if "Description"
-                                in project_data["Sub Projects"][subproject_name]
-                                else "",
-                            },
-                        )
-
-                    if created and verbose:
-                        yield stream_response(
-                            f"Created new subproject '{subproject_name}' under project '{project_name}'"
-                        )
-
-                # Process sessions
-                total_sessions = len(project_data["Session History"])
-                yield stream_response(
-                    f"Processing {total_sessions} sessions for {project_name}"
-                )
-
-                for session_idx, session_data in enumerate(
-                    project_data["Session History"], 1
-                ):
-                    start_time = timezone.make_aware(
-                        datetime.strptime(
-                            f"{session_data['Date']} {session_data['Start Time']}",
-                            "%m-%d-%Y %H:%M:%S",
-                        )
-                    )
-                    end_time = timezone.make_aware(
-                        datetime.strptime(
-                            f"{session_data['Date']} {session_data['End Time']}",
-                            "%m-%d-%Y %H:%M:%S",
-                        )
-                    )
-
-                    subproject_names = [
-                        name.lower() for name in session_data["Sub-Projects"]
-                    ]
-                    note = session_data["Note"]
-
-                    if end_time < start_time:
-                        start_time -= timedelta(days=1)
-
-                    if session_exists(
-                        user,
-                        project,
-                        start_time,
-                        end_time,
-                        subproject_names,
-                        time_tolerance=timedelta(minutes=tolerance),
-                    ):
-                        continue
-
-                    if verbose:
-                        yield stream_response(
-                            f"Importing session on {session_data['Date']} from {session_data['Start Time']} to "
-                            f"{session_data['End Time']}..."
-                        )
-
-                    session = Sessions.objects.create(
-                        user=user,
-                        project=project,
-                        start_time=start_time,
-                        end_time=end_time,
-                        is_active=False,
-                        note=note,
-                    )
-
-                    for subproject_name in subproject_names:
-                        try:
-                            subproject = SubProjects.objects.get(
-                                user=user, name=subproject_name, parent_project=project
-                            )
-                            session.subprojects.add(subproject)
-                        except SubProjects.DoesNotExist:
-                            yield stream_response(
-                                f"Warning: Subproject not found: {subproject_name}. Subproject "
-                                f"will not be added to session."
-                            )
-                            continue
-
-                    session.full_clean()
-                    session.save()
-
-                yield stream_response(f"\n\n")
-
-                project.audit_total_time()
-                for subproject in project.subprojects.all():
-                    subproject.audit_total_time()
-
-                sessions = Sessions.objects.filter(project=project, user=user)
-                earliest_start, latest_end = sessions_get_earliest_latest(sessions)
-
-                if merge and earliest_start and latest_end:
-                    project.start_date = earliest_start
-                    project.last_updated = latest_end
-                    project.save()
-
-                    for subproject in project.subprojects.all():
-                        earliest_start, latest_end = sessions_get_earliest_latest(
-                            subproject.sessions.all()
-                        )
-                        subproject.start_date = (
-                            earliest_start if earliest_start else project.start_date
-                        )
-                        subproject.last_updated = (
-                            latest_end if latest_end else project.last_updated
-                        )
-                        subproject.save()
-
-                if not merge:
-                    mismatch = abs(project.total_time - project_data["Total Time"])
-                    if mismatch > tolerance:
-                        tally = project.total_time
-                        project.delete()
-                        yield stream_response(
-                            f"Error: Total time mismatch for project '{project_name}': "
-                            f"expected {project_data['Total Time']}, got {tally}. "
-                            f"Mismatch: {mismatch}"
-                        )
-                        return
-
-            if len(skipped) > 0:
-                yield stream_response(
-                    f"Import completed with skipped projects: {', '.join(skipped)}"
-                )
-            else:
-                yield stream_response("Import completed successfully!")
+            # Stream progress live as the importer works through the file.
+            for message in iter_import(
+                user,
+                data,
+                force=force,
+                merge=merge,
+                tolerance=tolerance,
+                verbose=verbose,
+                autumn_import=autumn_import,
+                import_into_context=import_into_context,
+            ):
+                yield stream_response(message)
 
         except Exception as e:
             yield stream_response(f"Error: {str(e)}")
