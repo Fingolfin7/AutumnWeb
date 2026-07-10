@@ -2,6 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from core.models import Projects, SubProjects, Sessions, Commitment, Tag
+from core.session_ledger import create_session as ledger_create_session
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
 from django.core.management import call_command
@@ -136,16 +137,18 @@ class UpdateSessionTests(TestCase):
         )
 
         # Create an initial session
-        self.session = Sessions.objects.create(
+        self.session = ledger_create_session(
             user=self.user,
             project=self.project,
             start_time=timezone.now() - timedelta(hours=2),
             end_time=timezone.now() - timedelta(hours=1),
             is_active=False,
+            subprojects=[self.subproject1],
         )
-        self.session.subprojects.add(self.subproject1)
 
     def test_update_session_updates_total_time(self):
+        original_session_id = self.session.id
+
         # Verify initial total times
         self.project.refresh_from_db()
         self.subproject1.refresh_from_db()
@@ -158,7 +161,7 @@ class UpdateSessionTests(TestCase):
 
         # Prepare data for updating the session
         new_start_time = timezone.now() - timedelta(hours=3)
-        new_end_time = timezone.now() - timedelta(hours=2)
+        new_end_time = new_start_time + timedelta(minutes=90)
         update_data = {
             "project_name": self.project.name,
             "start_time": new_start_time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -173,17 +176,71 @@ class UpdateSessionTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)  # Redirect after successful update
+        self.assertEqual(
+            response.url, reverse("update_session", args=[original_session_id])
+        )
+        self.assertEqual(Sessions.objects.filter(user=self.user).count(), 1)
+        updated_session = Sessions.objects.get(pk=original_session_id)
+        self.assertEqual(updated_session.note, "Updated session")
 
         self.project.refresh_from_db()
         self.subproject1.refresh_from_db()
         self.subproject2.refresh_from_db()
 
         # Verify updated total times
-        self.assertAlmostEqual(
-            self.project.total_time, 60.0, places=2
-        )  # Still 1 hour, but reassigned
+        self.assertAlmostEqual(self.project.total_time, 90.0, places=2)
         self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 60.0, places=2)
+        self.assertAlmostEqual(self.subproject2.total_time, 90.0, places=2)
+
+    def test_repeated_save_of_completed_session_is_idempotent(self):
+        self.session.note = "Only the note changed"
+        self.session.save()
+
+        self.project.refresh_from_db()
+        self.subproject1.refresh_from_db()
+        self.assertAlmostEqual(self.project.total_time, 60.0, places=2)
+        self.assertAlmostEqual(self.subproject1.total_time, 60.0, places=2)
+
+    def test_api_edit_preserves_id_and_reassigns_project_totals(self):
+        other_project = Projects.objects.create(user=self.user, name="Other Project")
+        other_subproject = SubProjects.objects.create(
+            user=self.user, name="Other Subproject", parent_project=other_project
+        )
+        original_session_id = self.session.id
+        new_start_time = timezone.now() - timedelta(minutes=45)
+        new_end_time = new_start_time + timedelta(minutes=30)
+
+        response = self.client.patch(
+            reverse("api_edit_session", args=[original_session_id]),
+            data={
+                "project": other_project.name,
+                "subprojects": [other_subproject.name],
+                "start": new_start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "end": new_end_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "note": "Moved in place",
+            },
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["session"]["id"], original_session_id)
+        self.assertEqual(Sessions.objects.filter(user=self.user).count(), 1)
+
+        updated_session = Sessions.objects.get(pk=original_session_id)
+        self.assertEqual(updated_session.project, other_project)
+        self.assertEqual(
+            list(updated_session.subprojects.values_list("id", flat=True)),
+            [other_subproject.id],
+        )
+
+        self.project.refresh_from_db()
+        self.subproject1.refresh_from_db()
+        other_project.refresh_from_db()
+        other_subproject.refresh_from_db()
+        self.assertAlmostEqual(self.project.total_time, 0.0, places=2)
+        self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
+        self.assertAlmostEqual(other_project.total_time, 30.0, places=2)
+        self.assertAlmostEqual(other_subproject.total_time, 30.0, places=2)
 
 
 class StopTimerTests(TestCase):
@@ -303,15 +360,14 @@ class DeleteSessionTests(TestCase):
             user=self.user, name="Subproject 2", parent_project=self.project
         )
 
-        self.session = Sessions.objects.create(
+        self.session = ledger_create_session(
             user=self.user,
             project=self.project,
             start_time=timezone.now() - timedelta(hours=2),
             end_time=timezone.now() - timedelta(hours=1),
             is_active=False,
+            subprojects=[self.subproject1, self.subproject2],
         )
-
-        self.session.subprojects.add(self.subproject1, self.subproject2)
 
     def test_delete_session(self):
         self.project.refresh_from_db()

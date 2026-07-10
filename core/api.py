@@ -18,6 +18,11 @@ from rest_framework.response import Response
 from rest_framework import status
 
 from .models import Commitment, Projects, SubProjects, Sessions, status_choices, Tag, Context
+from .session_ledger import (
+    create_session as ledger_create_session,
+    delete_session as ledger_delete_session,
+    mutate_session as ledger_mutate_session,
+)
 from .commitments import (
     build_commitment_rule_lines,
     calculate_commitment_streak,
@@ -623,19 +628,15 @@ def timer_start(request):
         return _err(f"Unknown subprojects: {', '.join(missing)}")
 
     start_time = _now()
-    sess = Sessions.objects.create(
+    sess = ledger_create_session(
         user=request.user,
         project=project,
         start_time=start_time,
         auto_stop_at=start_time + stop_after if stop_after else None,
         is_active=True,
         note=note or None,
+        subprojects=list(sub_qs),
     )
-    if sub_qs.exists():
-        sess.subprojects.add(*list(sub_qs))
-
-    sess.full_clean()
-    sess.save()
 
     return Response(
         _json_ok({"session": _serialize_session(sess, compact)}, compact),
@@ -662,13 +663,18 @@ def timer_stop(request):
     if not sess.is_active:
         return _err("Session not active", status.HTTP_400_BAD_REQUEST)
 
-    sess.end_time = _now()
-    sess.is_active = False
-    sess.auto_stop_at = None
+    end_time = _now()
+    note = sess.note
     if "note" in request.data and request.data["note"] is not None:
-        sess.note = str(request.data["note"])
-    sess.full_clean()
-    sess.save()
+        note = str(request.data["note"])
+    sess = ledger_mutate_session(
+        sess.pk,
+        user=request.user,
+        end_time=end_time,
+        is_active=False,
+        auto_stop_at=None,
+        note=note,
+    )
 
     return Response(
         _json_ok(
@@ -739,16 +745,16 @@ def timer_restart(request):
     if sess.auto_stop_at and sess.start_time and sess.auto_stop_at > sess.start_time:
         auto_stop_duration = sess.auto_stop_at - sess.start_time
 
-    sess.start_time = restart_time
-    sess.is_active = True
-    sess.end_time = None
-    sess.auto_stop_at = (
-        restart_time + auto_stop_duration
-        if auto_stop_duration
-        else None
+    sess = ledger_mutate_session(
+        sess.pk,
+        user=request.user,
+        start_time=restart_time,
+        is_active=True,
+        end_time=None,
+        auto_stop_at=(
+            restart_time + auto_stop_duration if auto_stop_duration else None
+        ),
     )
-    sess.full_clean()
-    sess.save()
     return Response(_json_ok({"session": _serialize_session(sess, compact)}, compact))
 
 
@@ -769,7 +775,7 @@ def timer_delete(request):
         return _err("No active timer found", status.HTTP_404_NOT_FOUND)
 
     sess_id = sess.id
-    sess.delete()
+    ledger_delete_session(sess.pk, user=request.user)
     return Response(_json_ok({"deleted": sess_id}, compact), status=200)
 
 
@@ -818,20 +824,15 @@ def track_session(request):
         return _err(f"Unknown subprojects: {', '.join(missing)}")
 
     note = request.data.get("note", "").strip()
-    # Sessions.objects.create() saves immediately. Avoid an extra save on a
-    # completed session, otherwise post_save signals can double-count totals.
-    sess = Sessions(
+    sess = ledger_create_session(
         user=request.user,
         project=project,
         start_time=start_time,
         end_time=end_time,
         is_active=False,
         note=note or None,
+        subprojects=list(sub_qs),
     )
-    sess.full_clean()
-    sess.save()
-    if sub_qs.exists():
-        sess.subprojects.add(*list(sub_qs))
 
     return Response(
         _json_ok({"session": _serialize_session(sess, compact)}, compact),
@@ -2049,7 +2050,7 @@ def delete_session(request, session_id):
     sess = Sessions.objects.filter(pk=session_id, user=request.user).first()
     if not sess:
         return _err("Session not found", status.HTTP_404_NOT_FOUND)
-    sess.delete()
+    ledger_delete_session(sess.pk, user=request.user)
     return Response(status=204)
 
 
@@ -2058,11 +2059,7 @@ def delete_session(request, session_id):
 @transaction.atomic
 def edit_session(request, session_id):
     """
-    Edit an existing session by deleting and recreating it.
-
-    This approach is used because the signal model for time totals relies on
-    session creation/deletion events. Editing in-place would require complex
-    delta calculations.
+    Edit an existing completed session in place, preserving its ID.
 
     JSON body (all optional, only provided fields are updated):
       - project: str (project name to reassign session to)
@@ -2074,7 +2071,7 @@ def edit_session(request, session_id):
     Query params:
       - compact: true/false (default true)
 
-    Returns the new session object (with new ID).
+    Returns the updated session object with the same ID.
     """
     compact = _compact(request)
     try:
@@ -2084,7 +2081,11 @@ def edit_session(request, session_id):
     if session_id <= 0:
         return _err("Session not found", status.HTTP_404_NOT_FOUND)
 
-    current_session = Sessions.objects.filter(pk=session_id, user=request.user).first()
+    current_session = (
+        Sessions.objects.select_for_update()
+        .filter(pk=session_id, user=request.user)
+        .first()
+    )
     if not current_session:
         return _err("Session not found", status.HTTP_404_NOT_FOUND)
 
@@ -2150,33 +2151,28 @@ def edit_session(request, session_id):
         else:
             sub_qs = SubProjects.objects.none()
 
-    # Create the new session (using same pattern as track_session to avoid double-counting)
-    new_session = Sessions(
-        user=request.user,
-        project=project,
-        start_time=start_time,
-        end_time=end_time,
-        is_active=False,
-        note=note,
-    )
-    new_session.full_clean()
-    new_session.save()
-
-    # Add subprojects
+    # Resolve the final subproject set before changing the existing row.
     if sub_qs is not None:
-        if sub_qs.exists():
-            new_session.subprojects.add(*list(sub_qs))
+        final_subprojects = list(sub_qs)
     else:
         # Keep existing subprojects (filtering to those valid for the new project)
-        valid_subs = [sp for sp in current_subs if sp.parent_project == project]
-        if valid_subs:
-            new_session.subprojects.add(*valid_subs)
+        final_subprojects = [
+            sp for sp in current_subs if sp.parent_project_id == project.id
+        ]
 
-    # Delete the old session (triggers pre_delete signal to subtract from totals)
-    current_session.delete()
+    current_session = ledger_mutate_session(
+        current_session.pk,
+        user=request.user,
+        project=project,
+        subprojects=final_subprojects,
+        start_time=start_time,
+        end_time=end_time,
+        note=note,
+        is_active=False,
+    )
 
     return Response(
-        _json_ok({"session": _serialize_session(new_session, compact)}, compact),
+        _json_ok({"session": _serialize_session(current_session, compact)}, compact),
         status=status.HTTP_200_OK,
     )
 

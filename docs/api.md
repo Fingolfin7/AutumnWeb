@@ -752,7 +752,7 @@ Response 200 OK:
 
 **PATCH** `/api/session/<id>/`
 
-Edit an existing completed session. Uses delete-and-recreate pattern internally to work correctly with signal-based time totals.
+Edit an existing completed session in place. Only the affected project and subproject totals are adjusted using atomic contribution deltas.
 
 Body (all fields optional - only provided fields are updated):
 
@@ -773,7 +773,7 @@ Query:
 Notes:
 
 - Cannot edit active sessions (stop the timer first)
-- Returns the new session object with a **new ID**
+- Preserves the existing session ID and returns the updated session object
 - If changing project, subprojects must exist under the new project
 - If `subprojects` is not provided, existing subprojects are preserved (if valid for the project)
 - Missing, invalid, or non-positive session IDs return structured JSON errors, e.g. `{"ok": false, "error": "Session not found"}`.

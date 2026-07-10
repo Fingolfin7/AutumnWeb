@@ -36,6 +36,11 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
+from core.session_ledger import (
+    create_session as ledger_create_session,
+    delete_session as ledger_delete_session,
+    mutate_session as ledger_mutate_session,
+)
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -154,9 +159,8 @@ def start_timer(request):
             if not subprojects.exists() and len(subproject_names) > 0:
                 raise ValueError("No subprojects found for the selected project")
 
-            # Create a new session
             start_time = timezone.now()
-            session = Sessions.objects.create(
+            session = ledger_create_session(
                 user=request.user,
                 project=project,
                 start_time=start_time,
@@ -166,14 +170,8 @@ def start_timer(request):
                     else None
                 ),
                 is_active=True,
+                subprojects=list(subprojects),
             )
-
-            # Add the subprojects to the session
-            for subproject in subprojects:
-                session.subprojects.add(subproject)
-
-            session.full_clean()
-            session.save()
             messages.success(request, "Started timer")
             return redirect("timers")
 
@@ -225,9 +223,11 @@ def fix_ambiguous_time(form, field_name, raw_time):
 def update_session(request, session_id: int):
     """
     Allow user to change session details, including project, subprojects, start time, end time, and note.
-    Deletes the existing session and creates a new one with the updated details.
+    Updates the existing session so its ID remains a stable reference.
     """
-    current_session = get_object_or_404(Sessions, id=session_id, user=request.user)
+    current_session = get_object_or_404(
+        Sessions.objects.select_for_update(), id=session_id, user=request.user
+    )
 
     if request.method == "POST":
         form = UpdateSessionForm(request.POST, instance=current_session)
@@ -278,28 +278,20 @@ def update_session(request, session_id: int):
                 if not subprojects.exists() and subproject_names:
                     raise ValueError("No subprojects found for the selected project")
 
-                # Create a new session
-                new_session = Sessions.objects.create(
+                candidate = form.save(commit=False)
+                updated_session = ledger_mutate_session(
+                    current_session.pk,
                     user=request.user,
                     project=project,
-                    start_time=form.cleaned_data[
-                        "start_time"
-                    ],  # form.cleaned_data returns an aware datetime object
-                    end_time=form.cleaned_data["end_time"],
-                    note=form.cleaned_data["note"],
+                    subprojects=list(subprojects),
+                    start_time=candidate.start_time,
+                    end_time=candidate.end_time,
+                    note=candidate.note,
                     is_active=False,
                 )
 
-                new_session.full_clean()
-                new_session.subprojects.add(*subprojects)
-                # no need to call save() since add() saves the m2m relationship, .set() works too but it replaces
-                # the existing relationships with the new ones.
-
-                # Delete the current session
-                current_session.delete()
-
                 messages.success(request, "Updated session")
-                return redirect("update_session", session_id=new_session.id)
+                return redirect("update_session", session_id=updated_session.id)
 
             except ValueError as ve:
                 messages.error(request, str(ve))
@@ -353,10 +345,16 @@ def stop_timer(request, session_id: int):
 
         form = StopTimerForm(post_data, instance=timer)
         if form.is_valid():
-            timer = form.save(commit=False)
-            timer.is_active = False
-            timer.auto_stop_at = None
-            timer.save()
+            candidate = form.save(commit=False)
+            timer = ledger_mutate_session(
+                timer.pk,
+                user=request.user,
+                start_time=candidate.start_time,
+                end_time=candidate.end_time,
+                note=candidate.note,
+                is_active=False,
+                auto_stop_at=None,
+            )
             messages.success(request, "Stopped timer")
             return redirect("timers")
 
@@ -384,16 +382,16 @@ def restart_timer(request, session_id: int):
     if timer.auto_stop_at and timer.start_time and timer.auto_stop_at > timer.start_time:
         auto_stop_duration = timer.auto_stop_at - timer.start_time
 
-    timer.start_time = restart_time
-    timer.end_time = None
-    timer.is_active = True
-    timer.auto_stop_at = (
-        restart_time + auto_stop_duration
-        if auto_stop_duration
-        else None
+    timer = ledger_mutate_session(
+        timer.pk,
+        user=request.user,
+        start_time=restart_time,
+        end_time=None,
+        is_active=True,
+        auto_stop_at=(
+            restart_time + auto_stop_duration if auto_stop_duration else None
+        ),
     )
-
-    timer.save()
     messages.success(request, "Restarted timer")
 
     return redirect("timers")
@@ -404,7 +402,7 @@ def remove_timer(request, session_id: int):
     timer = get_object_or_404(Sessions, id=session_id, user=request.user)
 
     if request.method == "POST":
-        timer.delete()
+        ledger_delete_session(timer.pk, user=request.user)
         messages.success(request, "Removed timer")
         return redirect("timers")
 
@@ -1365,6 +1363,11 @@ class DeleteSessionView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         messages.success(self.request, "Session deleted successfully")
         return reverse("sessions")  # redirect to the sessions page
+
+    def form_valid(self, form):
+        success_url = self.get_success_url()
+        ledger_delete_session(self.object.pk, user=self.request.user)
+        return redirect(success_url)
 
 
 @login_required

@@ -2,6 +2,12 @@ from django.contrib import admin, messages
 from django.db.models import Count, Sum
 
 from .models import Commitment, Context, Projects, Sessions, SubProjects, Tag
+from .session_ledger import (
+    advance_last_updated,
+    apply_contribution_change,
+    snapshot_contribution,
+    delete_session as ledger_delete_session,
+)
 
 
 @admin.action(description="Mark selected projects as active")
@@ -143,6 +149,29 @@ class SessionsAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("project", "user").prefetch_related("subprojects").annotate(
             _user_session_count=Count("user__sessions", distinct=True)
         )
+
+    def save_model(self, request, obj, form, change):
+        obj._ledger_before = (
+            snapshot_contribution(Sessions.objects.select_for_update().get(pk=obj.pk))
+            if change
+            else None
+        )
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        after = snapshot_contribution(form.instance)
+        apply_contribution_change(
+            getattr(form.instance, "_ledger_before", None), after
+        )
+        advance_last_updated(form.instance)
+
+    def delete_model(self, request, obj):
+        ledger_delete_session(obj.pk, user=obj.user)
+
+    def delete_queryset(self, request, queryset):
+        for session_id in queryset.values_list("pk", flat=True):
+            ledger_delete_session(session_id)
 
     @admin.display(description="Duration (minutes)")
     def duration_minutes(self, obj):
