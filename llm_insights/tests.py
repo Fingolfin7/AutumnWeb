@@ -53,7 +53,15 @@ class InsightsViewProviderModelsTests(TestCase):
         provider_models = self.view._provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
-        self.assertIn(("gpt-5.5", "GPT-5.5"), provider_models["openai"])
+        self.assertEqual(
+            provider_models["openai"],
+            [
+                ("gpt-5.6-sol", "GPT-5.6 Sol"),
+                ("gpt-5.6-terra", "GPT-5.6 Terra"),
+                ("gpt-5.6-luna", "GPT-5.6 Luna"),
+                ("gpt-5.5", "GPT-5.5"),
+            ],
+        )
 
     def test_openai_models_are_available_when_server_key_present(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-server-key"}):
@@ -77,7 +85,7 @@ class InsightsViewProviderModelsTests(TestCase):
         provider_models = self.view._provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
-        self.assertIn(("gpt-5.5", "GPT-5.5"), provider_models["openai"])
+        self.assertIn(("gpt-5.6-sol", "GPT-5.6 Sol"), provider_models["openai"])
         self.assertNotIn("openai_chatgpt", provider_models)
 
     def test_openai_reasoning_effort_defaults_to_medium(self):

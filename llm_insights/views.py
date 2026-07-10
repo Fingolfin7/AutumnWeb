@@ -349,11 +349,10 @@ class InsightsView(View):
             or self._has_env_api_key("OPENAI_API_KEY")
         ):
             provider_models["openai"] = [
+                ("gpt-5.6-sol", "GPT-5.6 Sol"),
+                ("gpt-5.6-terra", "GPT-5.6 Terra"),
+                ("gpt-5.6-luna", "GPT-5.6 Luna"),
                 ("gpt-5.5", "GPT-5.5"),
-                ("gpt-5.4", "GPT-5.4"),
-                ("gpt-5.2", "GPT-5.2"),
-                ("gpt-5", "GPT-5"),
-                ("gpt-5-mini", "GPT-5 Mini"),
             ]
         if profile and profile.claude_api_key_enc:
             provider_models["claude"] = [
