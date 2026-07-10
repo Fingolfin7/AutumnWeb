@@ -133,6 +133,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+
+# Local Codex and design workspaces
+/.claude/
+/design_concepts/
 # pytype static type analyzer
 .pytype/
 
