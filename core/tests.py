@@ -25,6 +25,35 @@ from core.templatetags.markdown_render import markdown
 
 
 class MarkdownRenderTests(TestCase):
+    def test_pipe_table_renders_as_table(self):
+        rendered = markdown(
+            "| Lift | Recent log | Verdict |\n"
+            "| --- | --- | --- |\n"
+            "| Bench press | 55kg x 6 | Decent novice |"
+        )
+
+        self.assertIn("<table>", rendered)
+        self.assertIn("<th>Lift</th>", rendered)
+        self.assertIn("<td>Bench press</td>", rendered)
+        self.assertNotIn("<p>| Lift |", rendered)
+
+    def test_pipe_table_supports_column_alignment(self):
+        rendered = markdown(
+            "| Left | Center | Right |\n"
+            "| :--- | :---: | ---: |\n"
+            "| A | B | C |"
+        )
+
+        self.assertIn('style="text-align: left;"', rendered)
+        self.assertIn('style="text-align: center;"', rendered)
+        self.assertIn('style="text-align: right;"', rendered)
+
+    def test_pipe_table_does_not_insert_breaks_between_table_elements(self):
+        rendered = markdown("| A | B |\n| --- | --- |\n| 1 | 2 |")
+
+        self.assertNotIn("<br", rendered)
+        self.assertNotIn("<p><table>", rendered)
+
     def test_single_tilde_renders_as_strikethrough(self):
         rendered = markdown("testing ~single tilde~ support")
 

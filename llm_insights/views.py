@@ -41,6 +41,12 @@ def stream_keepalive():
     return ": keep-alive\n\n"
 
 
+def configure_sse_response(response):
+    response["Cache-Control"] = "no-cache"
+    response["X-Accel-Buffering"] = "no"
+    return response
+
+
 def fallback_chat_title(user_prompt):
     title = re.sub(r"\s+", " ", (user_prompt or "").strip())
     if not title:
@@ -953,10 +959,7 @@ class InsightsView(View):
         response = StreamingHttpResponse(
             event_stream(), content_type="text/event-stream"
         )
-        response["Cache-Control"] = "no-cache"
-        response["X-Accel-Buffering"] = "no"
-        response["Connection"] = "keep-alive"
-        return response
+        return configure_sse_response(response)
 
     async def post(self, request, chat_id=None):
         user = await request.auser()

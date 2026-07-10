@@ -22,6 +22,10 @@ def normalize_single_tilde_strike(value):
 def markdown(value):
     return md.markdown(
         normalize_single_tilde_strike(value),
-        extensions=['markdown.extensions.fenced_code', 'pymdownx.tilde'],
+        extensions=[
+            'markdown.extensions.fenced_code',
+            'markdown.extensions.tables',
+            'pymdownx.tilde',
+        ],
         extension_configs={'pymdownx.tilde': {'subscript': False}},
     )

@@ -163,6 +163,33 @@
   white-space: pre-wrap;
 }
 
+.message-content table {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin: 0.75rem 0;
+  overflow-x: auto;
+  border-collapse: collapse;
+  white-space: normal;
+}
+
+.message-content th,
+.message-content td {
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border-dark);
+  text-align: left;
+  vertical-align: top;
+}
+
+.message-content th {
+  background: var(--card-bg-dark-alpha);
+  font-weight: 700;
+}
+
+.message-content tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.025);
+}
+
 .button-group {
   display: flex;
   gap: 10px;

@@ -2,6 +2,7 @@ import queue
 from types import SimpleNamespace
 
 from django.contrib.auth.models import User
+from django.http import StreamingHttpResponse
 from django.test import Client, SimpleTestCase, TestCase
 from django.urls import reverse
 from asgiref.sync import async_to_sync
@@ -14,6 +15,7 @@ from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.views import (
     InsightsView,
     clean_generated_chat_title,
+    configure_sse_response,
     fallback_chat_title,
     generate_and_save_chat_title,
     perform_llm_analysis_stream,
@@ -191,6 +193,15 @@ class GeminiHandlerUsageTests(SimpleTestCase):
 
 
 class StreamQueueEventsTests(SimpleTestCase):
+    def test_sse_response_uses_proxy_safe_headers(self):
+        response = configure_sse_response(
+            StreamingHttpResponse(iter(()), content_type="text/event-stream")
+        )
+
+        self.assertEqual(response["Cache-Control"], "no-cache")
+        self.assertEqual(response["X-Accel-Buffering"], "no")
+        self.assertNotIn("Connection", response)
+
     def test_stream_queue_events_yields_keepalive_while_idle(self):
         event_queue = queue.Queue()
         stream_done = object()
