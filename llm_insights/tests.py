@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from django.contrib.auth.models import User
 from django.http import StreamingHttpResponse
-from django.test import Client, SimpleTestCase, TestCase
+from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase
 from django.urls import reverse
 from asgiref.sync import async_to_sync
 from unittest.mock import patch
@@ -252,7 +252,10 @@ class FakeTitleHandler:
         return '"Project Focus Patterns."'
 
 
-class ChatTitleGenerationTests(TestCase):
+# TransactionTestCase (not TestCase): this code path calls close_old_connections(),
+# which closes the connection mid-test when TestCase wraps the test in a transaction.
+# SQLite hides this (in-memory test connections can't be closed); Postgres doesn't.
+class ChatTitleGenerationTests(TransactionTestCase):
     def test_fallback_chat_title_uses_prompt_until_llm_title_is_available(self):
         self.assertEqual(fallback_chat_title("  What did I work on?  "), "What did I work on?")
         self.assertEqual(fallback_chat_title(""), "New Chat")
@@ -290,7 +293,8 @@ class ChatTitleGenerationTests(TestCase):
         self.assertNotIn("hidden session data", handler.prompt)
 
 
-class PerformLlmAnalysisStreamTests(TestCase):
+# TransactionTestCase for the same close_old_connections() reason as above.
+class PerformLlmAnalysisStreamTests(TransactionTestCase):
     def test_streaming_analysis_yields_chunks_and_persists_final_history(self):
         user = User.objects.create_user(username="stream-user")
         chat = LLMChat.objects.create(
