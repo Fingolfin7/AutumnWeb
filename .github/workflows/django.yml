@@ -11,17 +11,38 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest]
-        python-version: ['3.10', '3.13']
+        include:
+          - os: ubuntu-latest # matches the Render deploy environment
+            python-version: '3.13'
+            db-image: postgres:16-alpine # test against the production DB engine
+          - os: windows-latest # matches local dev
+            python-version: '3.10'
+            db-image: '' # empty image skips the service (SQLite; Windows runners can't host Linux containers)
+
+    services:
+      postgres:
+        image: ${{ matrix.db-image }}
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: autumn
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -32,12 +53,16 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE_CONTENTS }}" > AutumnWeb/.env
 
-      - name: Make migrations (optional)
-        run: python manage.py makemigrations --noinput
-        
-      - name: Apply migrations
-        run: python manage.py migrate --noinput    
+      # Appended (not set as an env var) because settings.py reads .env with
+      # overwrite=True, so the file wins over OS environment variables.
+      - name: Point tests at the Postgres service (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          echo "" >> AutumnWeb/.env
+          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/autumn" >> AutumnWeb/.env
 
+      # No migrate step needed: the test runner creates its own database
+      # and applies migrations to it automatically.
       - name: Run Django tests
         env:
           DJANGO_SETTINGS_MODULE: AutumnWeb.settings

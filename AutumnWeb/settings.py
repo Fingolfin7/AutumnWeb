@@ -351,3 +351,11 @@ RUN_AUDIT_SCHEDULER = env.bool(
     "RUN_AUDIT_SCHEDULER", False
 )  # convert the string to a boolean
 AUDIT_PERIOD = env.int("AUDIT_PERIOD")
+
+# Test-only overrides. PBKDF2's slowness is a security feature in production but
+# dominates test runtime (~1.4s per test for create_user/login), so use MD5 there.
+import sys
+
+TESTING = len(sys.argv) > 1 and sys.argv[1] == "test"
+if TESTING:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
