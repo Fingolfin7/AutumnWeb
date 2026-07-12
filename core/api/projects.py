@@ -13,6 +13,7 @@ from core.utils import (
     filter_by_active_context,
 )
 from django.db import transaction
+from django.db.models import Count, DurationField, ExpressionWrapper, F, Sum
 from core.api.helpers import _apply_exclude_filters, _apply_tag_filters, _clean_optional_text, _clean_required_name, _coerce_list, _compact, _err, _json_ok, _resolve_context_name, _resolve_tag_names, _serialize_project_grouped, _serialize_project_metadata, in_window
 
 
@@ -371,15 +372,44 @@ def hierarchy_data(request):
     sessions = Sessions.objects.filter(is_active=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
 
-    # Build session duration lookup by project and subproject
-    project_times = {}
-    subproject_times = {}
-    for s in sessions:
-        dur = s.duration or 0
-        pid = s.project_id
-        project_times[pid] = project_times.get(pid, 0) + dur
-        for sub in s.subprojects.all():
-            subproject_times[sub.id] = subproject_times.get(sub.id, 0) + dur
+    # Re-anchor on session IDs so M2M filters cannot fan out duration sums.
+    base_sessions = Sessions.objects.filter(pk__in=sessions.values("pk"))
+    duration_expr = ExpressionWrapper(
+        F("end_time") - F("start_time"), output_field=DurationField()
+    )
+    project_times = {
+        row["project_id"]: (
+            row["total"].total_seconds() / 60.0 if row["total"] else 0.0
+        )
+        for row in base_sessions.values("project_id").annotate(
+            total=Sum(duration_expr)
+        )
+    }
+    subproject_times = {
+        row["subprojects"]: (
+            row["total"].total_seconds() / 60.0 if row["total"] else 0.0
+        )
+        for row in base_sessions.values("subprojects").annotate(
+            total=Sum(duration_expr)
+        )
+        if row["subprojects"] is not None
+    }
+
+    projects = Projects.objects.filter(user=user)
+    if context_id:
+        projects = projects.filter(context_id=context_id)
+    projects = _apply_tag_filters(
+        request.query_params, projects, kind="projects", user=user
+    )
+
+    # Apply exclude filter (by ID from web UI)
+    exclude_ids = request.query_params.getlist("exclude_projects")
+    if exclude_ids:
+        projects = projects.exclude(id__in=exclude_ids)
+
+    projects_by_context = {}
+    for project in projects.prefetch_related("subprojects"):
+        projects_by_context.setdefault(project.context_id, []).append(project)
 
     hierarchy = {
         "name": "All",
@@ -388,19 +418,7 @@ def hierarchy_data(request):
 
     for ctx in contexts:
         ctx_children = []
-        ctx_projects = Projects.objects.filter(user=user, context=ctx)
-
-        # Apply tag filters to projects
-        ctx_projects = _apply_tag_filters(
-            request.query_params, ctx_projects, kind="projects", user=user
-        )
-
-        # Apply exclude filter (by ID from web UI)
-        exclude_ids = request.query_params.getlist("exclude_projects")
-        if exclude_ids:
-            ctx_projects = ctx_projects.exclude(id__in=exclude_ids)
-
-        for proj in ctx_projects:
+        for proj in projects_by_context.get(ctx.id, []):
             proj_time = project_times.get(proj.id, 0)
             if proj_time == 0:
                 continue  # Skip projects with no time in range
@@ -456,25 +474,36 @@ def projects_with_stats(request):
     if exclude_ids:
         projects = projects.exclude(id__in=exclude_ids)
 
+    projects = projects.annotate(
+        aggregated_subproject_count=Count("subprojects", distinct=True)
+    ).order_by("name")
+
     # Filter sessions by date range and other params
     sessions = Sessions.objects.filter(is_active=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
 
-    # Build project stats lookup from filtered sessions
-    project_stats = {}
-    for s in sessions:
-        pid = s.project_id
-        dur = s.duration or 0
-        if pid not in project_stats:
-            project_stats[pid] = {"total_time": 0, "session_count": 0}
-        project_stats[pid]["total_time"] += dur
-        project_stats[pid]["session_count"] += 1
+    # Re-anchor on session IDs so M2M filters cannot fan out aggregates.
+    base_sessions = Sessions.objects.filter(pk__in=sessions.values("pk"))
+    duration_expr = ExpressionWrapper(
+        F("end_time") - F("start_time"), output_field=DurationField()
+    )
+    project_stats = {
+        row["project_id"]: {
+            "total_time": (
+                row["total"].total_seconds() / 60.0 if row["total"] else 0.0
+            ),
+            "session_count": row["session_count"],
+        }
+        for row in base_sessions.values("project_id").annotate(
+            total=Sum(duration_expr), session_count=Count("pk")
+        )
+    }
 
     now = timezone.now()
     payload = []
     for p in projects:
         stats = project_stats.get(p.id, {"total_time": 0, "session_count": 0})
-        subproject_count = p.subprojects.count()
+        subproject_count = p.aggregated_subproject_count
         days_since_update = (now - p.last_updated).days if p.last_updated else 999
 
         payload.append({

@@ -184,6 +184,7 @@ class Sessions(models.Model):
         indexes = [
             models.Index(fields=['is_active', 'end_time']),  # Optimizes queries that filter active/completed sessions
             models.Index(fields=['user', 'project']),  # Optimizes lookups by user and project
+            models.Index(fields=['user', 'is_active', 'end_time']),  # Dashboard/tallies/charts: user + completed + date range
         ]
 
     def __str__(self):

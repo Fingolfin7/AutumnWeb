@@ -1,9 +1,9 @@
 from __future__ import annotations
-from collections import defaultdict
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from core.models import Projects, Sessions, Tag
+from django.db.models import DurationField, ExpressionWrapper, F, Max, Sum
+from core.models import Projects, Sessions, SubProjects, Tag
 from core.utils import (
     filter_sessions_by_params,
     tally_project_durations,
@@ -34,18 +34,45 @@ def totals(request):
     )
     sessions = filter_sessions_by_params(request, sessions)
 
-    # Project total
-    proj_total = 0.0
-    sub_totals = defaultdict(float)
-    for s in sessions:
-        dur = s.duration or 0.0
-        proj_total += dur
-        subs = list(s.subprojects.all())
-        if subs:
-            for sp in subs:
-                sub_totals[sp.name] += dur
-        else:
-            sub_totals["no subproject"] += dur
+    # Re-anchor on session IDs so M2M filters cannot fan out duration sums.
+    base_sessions = Sessions.objects.filter(pk__in=sessions.values("pk"))
+    duration_expr = ExpressionWrapper(
+        F("end_time") - F("start_time"), output_field=DurationField()
+    )
+    project_rows = base_sessions.values("project_id").annotate(
+        total=Sum(duration_expr)
+    )
+    proj_total = sum(
+        row["total"].total_seconds() / 60.0 if row["total"] else 0.0
+        for row in project_rows
+    )
+
+    # Latest session time preserves the old bucket insertion order. The ID is a
+    # deterministic tie-breaker matching the usual M2M relation order.
+    sub_rows = list(
+        base_sessions.values("subprojects")
+        .annotate(total=Sum(duration_expr), latest_end_time=Max("end_time"))
+        .order_by("-latest_end_time", "subprojects")
+    )
+    subproject_ids = [
+        row["subprojects"]
+        for row in sub_rows
+        if row["subprojects"] is not None
+    ]
+    subproject_names = dict(
+        SubProjects.objects.filter(id__in=subproject_ids).values_list("id", "name")
+    )
+    sub_totals = {}
+    for row in sub_rows:
+        subproject_id = row["subprojects"]
+        name = (
+            "no subproject"
+            if subproject_id is None
+            else subproject_names[subproject_id]
+        )
+        sub_totals[name] = (
+            row["total"].total_seconds() / 60.0 if row["total"] else 0.0
+        )
 
     if compact:
         subs = [[k, round(v, 4)] for k, v in sub_totals.items()]

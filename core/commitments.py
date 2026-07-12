@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from django.db.models import DurationField, ExpressionWrapper, F, Sum
 from django.utils import timezone
 
 from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
@@ -267,66 +268,86 @@ def _apply_commitment_composable_filters(commitment, sessions):
         "subproject": set(),
     }.get(commitment.aggregation_type, set())
 
-    include_projects = (
-        commitment.include_projects.all()
+    include_project_ids = list(
+        commitment.include_projects.values_list("pk", flat=True)
         if "project" in allowed_rule_dimensions
-        else commitment.include_projects.none()
+        else []
     )
-    exclude_projects = (
-        commitment.exclude_projects.all()
+    exclude_project_ids = list(
+        commitment.exclude_projects.values_list("pk", flat=True)
         if "project" in allowed_rule_dimensions
-        else commitment.exclude_projects.none()
+        else []
     )
-    include_subprojects = (
-        commitment.include_subprojects.all()
+    include_subproject_ids = list(
+        commitment.include_subprojects.values_list("pk", flat=True)
         if "subproject" in allowed_rule_dimensions
-        else commitment.include_subprojects.none()
+        else []
     )
-    exclude_subprojects = (
-        commitment.exclude_subprojects.all()
+    exclude_subproject_ids = list(
+        commitment.exclude_subprojects.values_list("pk", flat=True)
         if "subproject" in allowed_rule_dimensions
-        else commitment.exclude_subprojects.none()
+        else []
     )
-    include_contexts = (
-        commitment.include_contexts.all()
+    include_context_ids = list(
+        commitment.include_contexts.values_list("pk", flat=True)
         if "context" in allowed_rule_dimensions
-        else commitment.include_contexts.none()
+        else []
     )
-    exclude_contexts = (
-        commitment.exclude_contexts.all()
+    exclude_context_ids = list(
+        commitment.exclude_contexts.values_list("pk", flat=True)
         if "context" in allowed_rule_dimensions
-        else commitment.exclude_contexts.none()
+        else []
     )
-    include_tags = (
-        commitment.include_tags.all()
+    include_tag_ids = list(
+        commitment.include_tags.values_list("pk", flat=True)
         if "tag" in allowed_rule_dimensions
-        else commitment.include_tags.none()
+        else []
     )
-    exclude_tags = (
-        commitment.exclude_tags.all()
+    exclude_tag_ids = list(
+        commitment.exclude_tags.values_list("pk", flat=True)
         if "tag" in allowed_rule_dimensions
-        else commitment.exclude_tags.none()
+        else []
     )
 
-    if include_projects.exists():
-        sessions = sessions.filter(project__in=include_projects)
-    if include_subprojects.exists():
-        sessions = sessions.filter(subprojects__in=include_subprojects)
-    if include_contexts.exists():
-        sessions = sessions.filter(project__context__in=include_contexts)
-    if include_tags.exists():
-        sessions = sessions.filter(project__tags__in=include_tags)
+    if include_project_ids:
+        sessions = sessions.filter(project_id__in=include_project_ids)
+    if include_subproject_ids:
+        sessions = sessions.filter(subprojects__pk__in=include_subproject_ids)
+    if include_context_ids:
+        sessions = sessions.filter(project__context_id__in=include_context_ids)
+    if include_tag_ids:
+        sessions = sessions.filter(project__tags__pk__in=include_tag_ids)
 
-    if exclude_projects.exists():
-        sessions = sessions.exclude(project__in=exclude_projects)
-    if exclude_subprojects.exists():
-        sessions = sessions.exclude(subprojects__in=exclude_subprojects)
-    if exclude_contexts.exists():
-        sessions = sessions.exclude(project__context__in=exclude_contexts)
-    if exclude_tags.exists():
-        sessions = sessions.exclude(project__tags__in=exclude_tags)
+    if exclude_project_ids:
+        sessions = sessions.exclude(project_id__in=exclude_project_ids)
+    if exclude_subproject_ids:
+        sessions = sessions.exclude(subprojects__pk__in=exclude_subproject_ids)
+    if exclude_context_ids:
+        sessions = sessions.exclude(project__context_id__in=exclude_context_ids)
+    if exclude_tag_ids:
+        sessions = sessions.exclude(project__tags__pk__in=exclude_tag_ids)
 
     return sessions.distinct()
+
+
+def commitment_actual(commitment, period_start, period_end) -> float | int:
+    sessions = get_commitment_sessions_queryset(
+        commitment, period_start, period_end
+    )
+
+    if commitment.commitment_type != "time":
+        return sessions.count()
+
+    distinct_sessions = Sessions.objects.filter(pk__in=sessions.values("pk"))
+    duration = distinct_sessions.aggregate(
+        total=Sum(
+            ExpressionWrapper(
+                F("end_time") - F("start_time"),
+                output_field=DurationField(),
+            )
+        )
+    )["total"]
+    return duration.total_seconds() / 60 if duration is not None else 0
 
 
 def get_commitment_progress(commitment) -> dict:
@@ -338,16 +359,14 @@ def get_commitment_progress(commitment) -> dict:
     effective_period_start = max(period_start, start_dt)
 
     if effective_period_start >= period_end:
-        sessions = Sessions.objects.none()
+        actual = 0
     else:
-        sessions = get_commitment_sessions_queryset(
+        actual = commitment_actual(
             commitment, effective_period_start, period_end
         )
 
     if commitment.commitment_type == "time":
-        actual = round(sum(session.duration or 0 for session in sessions), 2)
-    else:
-        actual = sessions.count()
+        actual = round(actual, 2)
 
     target = commitment.target
     percentage = min(round((actual / target) * 100, 1), 100) if target > 0 else 0
@@ -387,6 +406,16 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
     """
     now = timezone.now()
     start_dt = get_commitment_start_datetime(commitment)
+    _, span_end = get_period_bounds(commitment.period, now)
+    span_sessions = get_commitment_sessions_queryset(
+        commitment, start_dt, span_end
+    )
+    session_rows = list(
+        Sessions.objects.filter(pk__in=span_sessions.values("pk"))
+        .order_by("end_time", "pk")
+        .values_list("pk", "start_time", "end_time")
+    )
+    session_index = 0
 
     all_periods = []
     check_date = start_dt
@@ -400,14 +429,28 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
 
         is_current = period_start <= now < period_end
         effective_start = max(period_start, start_dt)
-        sessions = get_commitment_sessions_queryset(
-            commitment, effective_start, period_end
-        )
+
+        while (
+            session_index < len(session_rows)
+            and session_rows[session_index][2] < effective_start
+        ):
+            session_index += 1
+
+        bucket = []
+        while (
+            session_index < len(session_rows)
+            and session_rows[session_index][2] < period_end
+        ):
+            bucket.append(session_rows[session_index])
+            session_index += 1
 
         if commitment.commitment_type == "time":
-            actual = sum(session.duration or 0 for session in sessions)
+            actual = sum(
+                (end_time - start_time).total_seconds() / 60
+                for _, start_time, end_time in bucket
+            )
         else:
-            actual = sessions.count()
+            actual = len(bucket)
 
         all_periods.append(
             {
@@ -502,12 +545,7 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
         return False
 
     for period_start, period_end in periods_to_reconcile:
-        sessions = get_commitment_sessions_queryset(commitment, period_start, period_end)
-
-        if commitment.commitment_type == "time":
-            actual = sum(session.duration or 0 for session in sessions)
-        else:
-            actual = sessions.count()
+        actual = commitment_actual(commitment, period_start, period_end)
 
         surplus = actual - commitment.target
 

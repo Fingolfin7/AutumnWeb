@@ -767,17 +767,11 @@ def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -
 
     today = timezone.localtime(reference_date).date()
 
-    # Get all completed session dates for this user
+    # Get distinct completed-session dates in the active timezone.
     sessions = Sessions.objects.filter(
         user=user, is_active=False, end_time__isnull=False
-    ).values_list("end_time", flat=True)
-
-    # Convert to set of dates (in local timezone)
-    active_dates = set()
-    for end_time in sessions:
-        if end_time:
-            local_date = timezone.localtime(end_time).date()
-            active_dates.add(local_date)
+    )
+    active_dates = set(sessions.dates("end_time", "day"))
 
     # Calculate current streak
     current_streak = 0
