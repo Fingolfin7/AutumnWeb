@@ -56,7 +56,7 @@ User → Context → Projects → SubProjects → Sessions
 - **Sessions**: Time records with start/end times, notes, and subproject references
 - Sessions have many-to-many relationships with both Projects and SubProjects
 
-### API Structure (core/api.py)
+### API Structure (core/api/)
 
 Two API styles coexist:
 
@@ -85,8 +85,8 @@ Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate
 
 ### Key Files
 
-- `core/views.py` (~60KB) - All UI views including timer, project, session management
-- `core/api.py` (~53KB) - Complete REST API implementation
+- `core/views/` - UI views package, one module per area (`timers`, `sessions`, `projects`, `contexts_tags`, `commitments`, `import_export`, `charts`, `dashboard`); `__init__.py` re-exports every view so `from core.views import X` still works
+- `core/api/` - REST API package, same layout (`helpers`, `timers`, `sessions`, `projects`, `subprojects`, `tallies`, `commitments`, `contexts_tags`, `import_export`, `misc`); `__init__.py` re-exports every endpoint
 - `core/importer.py` - Shared `iter_import` generator and `run_import` wrapper used by web and API imports
 - `core/urls.py` - URL routing, including `/healthz/`
 - `core/utils.py` (~20KB) - Helper functions, date parsing, data formatting
