@@ -9,6 +9,7 @@ const PRECACHE_URLS = [
     "/static/core/css/colours.css",
     "/static/core/js/script.js",
     "/static/core/js/pwa.js",
+    "/static/core/js/page_loading.js",
     "/static/core/images/icons/autumn-icon-192.png",
     "/static/core/images/icons/autumn-icon-512.png",
     "/static/core/images/icons/autumn-maskable-512.png",

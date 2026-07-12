@@ -1142,23 +1142,79 @@ label > input[type="file"] {
   color: var(--ribbon-text);
 }
 
-.loading-spinner {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 3px solid rgba(255, 255, 255, 0.25);
-  border-top-color: rgba(255, 255, 255, 0.95);
-  animation: loading-spin 0.9s linear infinite;
+.loading-text {
+  font-size: 0.95rem;
 }
 
-@keyframes loading-spin {
-  to {
-    transform: rotate(360deg);
+/* Drifting-leaf loading indicator (animates the Autumn logo) */
+.loading-leaf {
+  width: 44px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-leaf img {
+  width: 30px;
+  height: auto;
+  animation: leaf-fall 2.4s ease-in-out infinite;
+}
+
+@keyframes leaf-fall {
+  0% {
+    transform: translate(-14px, -22px) rotate(-35deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  50% {
+    transform: translate(12px, 4px) rotate(30deg);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-12px, 26px) rotate(-25deg);
+    opacity: 0;
   }
 }
 
-.loading-text {
-  font-size: 0.95rem;
+@keyframes leaf-pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-leaf img {
+    animation: leaf-pulse 2s ease-in-out infinite;
+  }
+}
+
+/* Global page-navigation overlay (slow page loads / sleeping server) */
+.page-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.page-loading-overlay.visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* -----------------------------
