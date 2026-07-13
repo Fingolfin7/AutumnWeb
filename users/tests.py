@@ -1,6 +1,7 @@
 from unittest.mock import Mock, patch
 import shutil
 import tempfile
+from datetime import date
 from io import BytesIO
 
 from django.contrib.auth.models import User
@@ -123,6 +124,88 @@ class ProfileSaveTests(TestCase):
         self.assertTrue(profile.bing_background)
         self.assertFalse(profile.nasa_apod_background)
         self.assertEqual(profile.get_api_key("openai"), "profile-openai-key")
+
+    def test_profile_default_date_range_supports_each_requested_unit(self):
+        profile = self.user.profile
+        reference_date = date(2026, 7, 13)
+        expected_starts = {
+            "days": date(2026, 7, 3),
+            "weeks": date(2026, 5, 4),
+            "months": date(2025, 9, 13),
+            "years": date(2016, 7, 13),
+        }
+
+        for unit, expected_start in expected_starts.items():
+            with self.subTest(unit=unit):
+                profile.default_filter_value = 10
+                profile.default_filter_unit = unit
+                self.assertEqual(
+                    profile.default_filter_date_range(reference_date),
+                    (expected_start, reference_date),
+                )
+
+    def test_update_profile_saves_filter_and_chart_defaults(self):
+        response = self.client.post(
+            reverse("profile"),
+            data={
+                "username": self.user.username,
+                "email": self.user.email,
+                "default_filter_value": "6",
+                "default_filter_unit": "weeks",
+                "insights_default_filter_value": "3",
+                "insights_default_filter_unit": "months",
+                "default_chart_project_count": "12",
+            },
+        )
+
+        self.assertRedirects(response, reverse("profile"))
+        profile = self.user.profile
+        profile.refresh_from_db()
+        self.assertEqual(profile.default_filter_value, 6)
+        self.assertEqual(profile.default_filter_unit, "weeks")
+        self.assertEqual(profile.insights_default_filter_value, 3)
+        self.assertEqual(profile.insights_default_filter_unit, "months")
+        self.assertEqual(profile.default_chart_project_count, 12)
+
+    def test_charts_use_profile_defaults_until_dates_are_explicit(self):
+        profile = self.user.profile
+        profile.default_filter_value = 2
+        profile.default_filter_unit = "weeks"
+        profile.default_chart_project_count = 11
+        profile.save()
+
+        response = self.client.get(reverse("charts"))
+
+        expected_start, expected_end = profile.default_filter_date_range()
+        search_initial = response.context["search_form"].initial
+        self.assertEqual(search_initial["start_date"], expected_start)
+        self.assertEqual(search_initial["end_date"], expected_end)
+        self.assertContains(response, "window.AUTUM_CHART_PROJECT_COUNT = 11;")
+
+        response = self.client.get(
+            reverse("charts"),
+            {"start_date": "2026-01-02", "end_date": "2026-02-03"},
+        )
+        search_initial = response.context["search_form"].initial
+        self.assertEqual(search_initial["start_date"], "2026-01-02")
+        self.assertEqual(search_initial["end_date"], "2026-02-03")
+
+    def test_new_insights_chat_uses_its_separate_profile_date_range(self):
+        profile = self.user.profile
+        profile.default_filter_value = 2
+        profile.default_filter_unit = "weeks"
+        profile.insights_default_filter_value = 3
+        profile.insights_default_filter_unit = "months"
+        profile.save()
+
+        response = self.client.get(reverse("insights"))
+
+        expected_start, expected_end = profile.insights_default_filter_date_range()
+        app_start, _ = profile.default_filter_date_range()
+        search_initial = response.context["search_form"].initial
+        self.assertEqual(search_initial["start_date"], expected_start.isoformat())
+        self.assertEqual(search_initial["end_date"], expected_end.isoformat())
+        self.assertNotEqual(search_initial["start_date"], app_start.isoformat())
 
     def test_image_url_uses_active_storage_for_default_image(self):
         profile = self.user.profile

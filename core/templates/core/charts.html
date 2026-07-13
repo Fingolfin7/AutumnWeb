@@ -19,6 +19,7 @@
     <!-- Project search -->
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
+    <script>window.AUTUM_CHART_PROJECT_COUNT = {{ default_chart_project_count|default:7 }};</script>
     <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
     <!-- Modular chart files -->
     <script src="{% static 'core/js/charts/core.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>

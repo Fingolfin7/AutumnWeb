@@ -142,16 +142,6 @@
                 toggleSidebar();
             }
 
-            // Set the default start date to the start of the current month
-            let current_date = new Date();
-            // Only set default dates if they aren't already set (from a previous search)
-            if (!$('#start_date').val()) {
-                $('#start_date').val(new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0]);
-            }
-            if (!$('#end_date').val()) {
-                $('#end_date').val(new Date().toISOString().split('T')[0]);
-            }
-
             // initial populate
             repopulateModels('{{ selected_provider }}','{{ selected_model }}');
             updateReasoningEffortVisibility('{{ selected_provider }}');

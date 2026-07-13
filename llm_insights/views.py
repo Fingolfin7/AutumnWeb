@@ -444,6 +444,11 @@ class InsightsView(View):
 
         return params
 
+    def _apply_default_date_filters(self, current_filters, user):
+        start_date, end_date = user.profile.insights_default_filter_date_range()
+        current_filters["start_date"] = start_date.isoformat()
+        current_filters["end_date"] = end_date.isoformat()
+
     async def get(self, request, chat_id=None):
         user = await request.auser()
         if not user.is_authenticated:
@@ -496,17 +501,10 @@ class InsightsView(View):
                     current_filters = chat_obj.filters
                     using_stored_filters = True
 
-            # If New Chat (no chat_id) and no filters provided, set default dates
-            # to match the frontend JS behavior (Current Month)
+            # If New Chat (no chat_id) and no filters were supplied, use the
+            # user's profile-backed rolling date range.
             elif not has_explicit_filters:
-                now = timezone.now()
-                # Start of current month
-                start_date = now.replace(day=1).date().isoformat()
-                # Today
-                end_date = now.date().isoformat()
-
-                current_filters["start_date"] = start_date
-                current_filters["end_date"] = end_date
+                self._apply_default_date_filters(current_filters, user)
 
             # Get user's chat list
             recent_chats = LLMChat.objects.filter(user=user).only(
@@ -673,11 +671,7 @@ class InsightsView(View):
             ]
             has_values = any(current_filters.get(k) for k in filter_keys)
             if not has_values:
-                now = timezone.now()
-                current_filters["start_date"] = (
-                    now.replace(day=1).date().isoformat()
-                )
-                current_filters["end_date"] = now.date().isoformat()
+                self._apply_default_date_filters(current_filters, user)
 
         qs = (
             Sessions.objects.filter(is_active=False, user=user)
@@ -1002,11 +996,7 @@ class InsightsView(View):
                 # Check if current_filters has any meaningful values
                 has_values = any(current_filters.get(k) for k in filter_keys)
                 if not has_values:
-                    now = timezone.now()
-                    current_filters["start_date"] = (
-                        now.replace(day=1).date().isoformat()
-                    )
-                    current_filters["end_date"] = now.date().isoformat()
+                    self._apply_default_date_filters(current_filters, user)
 
             qs = (
                 Sessions.objects.filter(is_active=False, user=user)

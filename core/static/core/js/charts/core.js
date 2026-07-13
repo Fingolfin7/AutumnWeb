@@ -93,14 +93,19 @@ function formatDuration(hours) {
     }
 }
 
+function getProjectLimit() {
+    const configured = Number.parseInt(window.AUTUM_CHART_PROJECT_COUNT, 10);
+    return Number.isInteger(configured) && configured > 0 ? configured : 7;
+}
+
 /**
  * Consolidate data to top N items plus "Other"
  * @param {Array} data - Array of objects with name and total_time properties
- * @param {number} topN - Number of top items to keep (default 7)
+ * @param {number} topN - Number of top items to keep
  * @param {string} timeKey - Key for the time value (default 'total_time')
  * @returns {Array} Consolidated array with top N items + Other
  */
-function consolidateTopN(data, topN = 7, timeKey = 'total_time') {
+function consolidateTopN(data, topN = getProjectLimit(), timeKey = 'total_time') {
     if (!data || data.length <= topN) {
         return data;
     }
@@ -365,15 +370,6 @@ $(document).ready(function() {
         selectType.val(preselectedType);
     }
 
-    // Set default dates
-    let current_date = new Date();
-    if (!$('#start_date').val()) {
-        $('#start_date').val(new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0]);
-    }
-    if (!$('#end_date').val()) {
-        $('#end_date').val(new Date().toISOString().split('T')[0]);
-    }
-
     // Initial draw
     render();
     draw.on('click', render);
@@ -389,5 +385,6 @@ window.AutumnCharts.utils = {
     countWeekdays,
     clearChart,
     formatDuration,
+    getProjectLimit,
     consolidateTopN
 };

@@ -24,22 +24,6 @@
         <script type="text/javascript" src="{% static 'core/js/script.js' %}?v={{ static_version.script }}"></script>
         <script type="text/javascript" src="{% static 'core/js/pwa.js' %}?v={{ static_version.pwa }}"></script>
         <script type="text/javascript" src="{% static 'core/js/page_loading.js' %}?v={{ static_version.page_loading }}"></script>
-        <script type="text/javascript">
-            $(document).ready(function() {
-                // Calculate default dates for the insights link
-                let current_date = new Date();
-                let start_date = new Date(current_date.getFullYear(), current_date.getMonth(), 1).toISOString().split('T')[0];
-                let end_date = new Date().toISOString().split('T')[0];
-                
-                // Update the insights link with the default dates
-                let insights_link = $('#insights-link');
-                if (insights_link.length) {
-                    let insights_url = insights_link.attr('href');
-                    insights_link.attr('href', insights_url + '?start_date=' + start_date + '&end_date=' + end_date);
-                }
-            });
-        </script>
-
         {% block head_includes %}
         {% endblock %}
 

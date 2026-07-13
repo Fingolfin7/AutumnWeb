@@ -52,6 +52,18 @@ class ProfileInline(admin.StackedInline):
                 ),
             },
         ),
+        (
+            "Defaults",
+            {
+                "fields": (
+                    "default_filter_value",
+                    "default_filter_unit",
+                    "insights_default_filter_value",
+                    "insights_default_filter_unit",
+                    "default_chart_project_count",
+                ),
+            },
+        ),
     )
 
 

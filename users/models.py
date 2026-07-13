@@ -1,8 +1,13 @@
 import os
+from datetime import date, datetime
+
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.utils import timezone
+from dateutil.relativedelta import relativedelta
 from io import BytesIO
 from PIL import Image, ImageSequence
 from cryptography.fernet import Fernet
@@ -14,6 +19,13 @@ User._meta.get_field('email')._unique = True
 
 # Helper to get a stable fernet key (derive from SECRET_KEY)
 _DEF_FERNET = None
+
+DEFAULT_FILTER_UNIT_CHOICES = (
+    ('days', 'Days'),
+    ('weeks', 'Weeks'),
+    ('months', 'Months'),
+    ('years', 'Years'),
+)
 
 def get_fernet():
     global _DEF_FERNET
@@ -44,9 +56,76 @@ class Profile(models.Model):
         verbose_name="AI features",
         help_text="Allow this account to use Insights and configure AI provider credentials.",
     )
+    default_filter_value = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(1000)],
+        help_text="How far the default date filter looks back from today.",
+    )
+    default_filter_unit = models.CharField(
+        max_length=6,
+        choices=DEFAULT_FILTER_UNIT_CHOICES,
+        default='months',
+    )
+    insights_default_filter_value = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(1000)],
+        help_text="How far the default Insights date filter looks back from today.",
+    )
+    insights_default_filter_unit = models.CharField(
+        max_length=6,
+        choices=DEFAULT_FILTER_UNIT_CHOICES,
+        default='months',
+    )
+    default_chart_project_count = models.PositiveSmallIntegerField(
+        default=7,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text="Number of projects shown individually before the remainder are grouped as Other.",
+    )
 
     def __str__(self):
         return f"{self.user.username} Profile"
+
+    def _rolling_filter_date_range(
+        self,
+        value: int,
+        unit: str,
+        reference_date: date | datetime | None = None,
+    ) -> tuple[date, date]:
+        if reference_date is None:
+            end_date = timezone.localdate()
+        elif isinstance(reference_date, datetime):
+            if timezone.is_aware(reference_date):
+                reference_date = timezone.localtime(reference_date)
+            end_date = reference_date.date()
+        else:
+            end_date = reference_date
+
+        value = max(1, value)
+        if unit not in {choice[0] for choice in DEFAULT_FILTER_UNIT_CHOICES}:
+            unit = 'months'
+
+        start_date = end_date - relativedelta(**{unit: value})
+        return start_date, end_date
+
+    def default_filter_date_range(
+        self, reference_date: date | datetime | None = None
+    ) -> tuple[date, date]:
+        """Return the app's rolling default date range."""
+        return self._rolling_filter_date_range(
+            self.default_filter_value,
+            self.default_filter_unit,
+            reference_date,
+        )
+
+    def insights_default_filter_date_range(
+        self, reference_date: date | datetime | None = None
+    ) -> tuple[date, date]:
+        """Return the rolling default date range for new Insights chats."""
+        return self._rolling_filter_date_range(
+            self.insights_default_filter_value,
+            self.insights_default_filter_unit,
+            reference_date,
+        )
 
     @property
     def background_dimming_alpha(self):

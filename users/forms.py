@@ -64,6 +64,51 @@ class ProfileUpdateForm(forms.ModelForm):
 
     background_image = forms.ImageField(label='Background Image', required=False, widget=forms.FileInput())
     remove_background_image = forms.BooleanField(required=False, label='Remove current background image')
+    default_filter_value = forms.IntegerField(
+        min_value=1,
+        max_value=1000,
+        required=False,
+        label='Default date range',
+        widget=forms.NumberInput(attrs={
+            'min': '1',
+            'max': '1000',
+            'class': 'profile-default-number',
+        }),
+    )
+    default_filter_unit = forms.ChoiceField(
+        choices=DEFAULT_FILTER_UNIT_CHOICES,
+        required=False,
+        label='Date range unit',
+        widget=forms.Select(attrs={'class': 'profile-default-select'}),
+    )
+    insights_default_filter_value = forms.IntegerField(
+        min_value=1,
+        max_value=1000,
+        required=False,
+        label='Insights date range',
+        widget=forms.NumberInput(attrs={
+            'min': '1',
+            'max': '1000',
+            'class': 'profile-default-number',
+        }),
+    )
+    insights_default_filter_unit = forms.ChoiceField(
+        choices=DEFAULT_FILTER_UNIT_CHOICES,
+        required=False,
+        label='Insights date range unit',
+        widget=forms.Select(attrs={'class': 'profile-default-select'}),
+    )
+    default_chart_project_count = forms.IntegerField(
+        min_value=1,
+        max_value=100,
+        required=False,
+        label='Projects per chart',
+        widget=forms.NumberInput(attrs={
+            'min': '1',
+            'max': '100',
+            'class': 'profile-default-number',
+        }),
+    )
 
     # New API key fields (write-only)
     gemini_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'Gemini API Key', 'autocomplete': 'new-password'}))
@@ -88,8 +133,34 @@ class ProfileUpdateForm(forms.ModelForm):
             return self.instance.background_dimming
         return self._meta.model._meta.get_field('background_dimming').default
 
+    def _preserve_profile_default(self, field_name):
+        value = self.cleaned_data.get(field_name)
+        if value not in (None, ''):
+            return value
+        if self.instance and self.instance.pk:
+            return getattr(self.instance, field_name)
+        return self._meta.model._meta.get_field(field_name).default
+
+    def clean_default_filter_value(self):
+        return self._preserve_profile_default('default_filter_value')
+
+    def clean_default_filter_unit(self):
+        return self._preserve_profile_default('default_filter_unit')
+
+    def clean_insights_default_filter_value(self):
+        return self._preserve_profile_default('insights_default_filter_value')
+
+    def clean_insights_default_filter_unit(self):
+        return self._preserve_profile_default('insights_default_filter_unit')
+
+    def clean_default_chart_project_count(self):
+        return self._preserve_profile_default('default_chart_project_count')
+
     class Meta:
         model = Profile
         fields = ['image', 'automatic_background', 'background_dimming', 'background_image', 'remove_background_image',
+                  'default_filter_value', 'default_filter_unit',
+                  'insights_default_filter_value', 'insights_default_filter_unit',
+                  'default_chart_project_count',
                   'gemini_api_key', 'openai_api_key', 'claude_api_key',
                   'clear_gemini_api_key', 'clear_openai_api_key', 'clear_claude_api_key']

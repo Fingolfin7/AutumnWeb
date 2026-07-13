@@ -11,8 +11,8 @@
     // ========================================================================
 
     function pie_chart(data, ctx) {
-        // Consolidate to top 7 + Other
-        const consolidated = utils.consolidateTopN(data, 7);
+        // Consolidate to the user's preferred project count + Other
+        const consolidated = utils.consolidateTopN(data);
         const colors = consolidated.map((element, index) => {
             // Use gray for "Other"
             if (element._isOther) return 'hsl(0, 0%, 70%)';
@@ -54,8 +54,8 @@
     // ========================================================================
 
     function bar_graph(data, ctx) {
-        // Consolidate to top 7 + Other
-        const consolidated = utils.consolidateTopN(data, 7);
+        // Consolidate to the user's preferred project count + Other
+        const consolidated = utils.consolidateTopN(data);
         let colors = consolidated.map((element, index) => {
             // Use gray for "Other"
             if (element._isOther) return 'hsl(0, 0%, 70%)';
@@ -105,11 +105,11 @@
             return acc;
         }, {});
 
-        // Sort projects by total time and take top 7
+        // Sort projects by total time and take the user's preferred count
         const sortedProjects = Object.entries(projectGroups)
             .sort((a, b) => b[1].totalTime - a[1].totalTime);
 
-        const topN = 7;
+        const topN = utils.getProjectLimit();
         const topProjects = sortedProjects.slice(0, topN);
         const otherProjects = sortedProjects.slice(topN);
 
@@ -268,8 +268,8 @@
             projectTotalTime[projectName] = (projectTotalTime[projectName] || 0) + duration;
         });
 
-        // Sort projects by total time and identify top 7
-        const topN = 7;
+        // Sort projects by total time and identify the user's preferred count
+        const topN = utils.getProjectLimit();
         const sortedProjects = Object.entries(projectTotalTime)
             .sort((a, b) => b[1] - a[1]);
         const topProjectNames = new Set(sortedProjects.slice(0, topN).map(([name]) => name));

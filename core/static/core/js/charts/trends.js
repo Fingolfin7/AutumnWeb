@@ -27,8 +27,8 @@
             projectTotalTime[projectName] = (projectTotalTime[projectName] || 0) + duration;
         });
 
-        // Sort projects by total time and identify top 7
-        const topN = 7;
+        // Sort projects by total time and identify the user's preferred count
+        const topN = utils.getProjectLimit();
         const sortedProjects = Object.entries(projectTotalTime)
             .sort((a, b) => b[1] - a[1]);
         const otherProjects = sortedProjects.slice(topN);

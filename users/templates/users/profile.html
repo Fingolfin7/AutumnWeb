@@ -140,6 +140,59 @@
             </div>
         </section>
 
+        <section class="card profile-shell">
+            <div class="profile-section-heading">
+                <div>
+                    <span class="section-kicker">Preferences</span>
+                    <h2>Defaults</h2>
+                </div>
+                <span class="profile-muted">Independent starting points for each workflow</span>
+            </div>
+
+            <div class="profile-defaults-grid">
+                <div class="profile-default-item">
+                    <label for="{{ profile_form.default_filter_value.id_for_label }}">
+                        <i class="fa fa-calendar-alt"></i>
+                        App date range
+                    </label>
+                    <div class="profile-default-control">
+                        {{ profile_form.default_filter_value }}
+                        {{ profile_form.default_filter_unit }}
+                    </div>
+                    <p class="profile-muted">Charts and other date-filtered pages will look back this far from today.</p>
+                    {{ profile_form.default_filter_value.errors }}
+                    {{ profile_form.default_filter_unit.errors }}
+                </div>
+
+                <div class="profile-default-item">
+                    <label for="{{ profile_form.insights_default_filter_value.id_for_label }}">
+                        <i class="fa fa-lightbulb"></i>
+                        Insights date range
+                    </label>
+                    <div class="profile-default-control">
+                        {{ profile_form.insights_default_filter_value }}
+                        {{ profile_form.insights_default_filter_unit }}
+                    </div>
+                    <p class="profile-muted">New Insights chats will begin with this separate analysis window.</p>
+                    {{ profile_form.insights_default_filter_value.errors }}
+                    {{ profile_form.insights_default_filter_unit.errors }}
+                </div>
+
+                <div class="profile-default-item">
+                    <label for="{{ profile_form.default_chart_project_count.id_for_label }}">
+                        <i class="fa fa-chart-pie"></i>
+                        Projects per chart
+                    </label>
+                    <div class="profile-default-control">
+                        {{ profile_form.default_chart_project_count }}
+                        <span class="profile-default-suffix">projects</span>
+                    </div>
+                    <p class="profile-muted">Additional project series are combined into Other. Maximum 100.</p>
+                    {{ profile_form.default_chart_project_count.errors }}
+                </div>
+            </div>
+        </section>
+
         {% if ai_features_enabled %}
         <section class="card profile-shell llm-shell">
             <div class="profile-section-heading">
@@ -372,6 +425,7 @@
         .profile-avatar-panel,
         .profile-fields-panel,
         .profile-background-panel,
+        .profile-default-item,
         .api-key-item,
         .llm-codex-panel,
         .device-code-panel {
@@ -421,6 +475,55 @@
         .profile-background-panel {
             margin-top: 1rem;
             padding: 1.2rem;
+        }
+
+        .profile-defaults-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+            gap: 1rem;
+            margin-top: 1.2rem;
+        }
+
+        .profile-default-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            padding: 1.2rem;
+        }
+
+        .profile-default-item > label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .profile-default-item > label i {
+            color: var(--accent-color);
+        }
+
+        .profile-default-control {
+            display: grid;
+            grid-template-columns: minmax(7rem, 0.65fr) minmax(8rem, 1fr);
+            align-items: center;
+            gap: 0.65rem;
+        }
+
+        .profile-default-control input,
+        .profile-default-control select {
+            width: 100%;
+        }
+
+        .profile-default-suffix {
+            padding: 0.65rem 0.75rem;
+            border-left: 2px solid var(--accent-color);
+            color: var(--main-muted);
+            background: var(--surface-2);
+        }
+
+        .profile-default-item p {
+            margin: 0;
         }
 
         .profile-switch-row {
@@ -665,6 +768,7 @@
         @media (max-width: 920px) {
             .profile-overview-grid,
             .profile-fields-panel,
+            .profile-defaults-grid,
             .profile-background-upload,
             .llm-codex-panel,
             .api-keys-grid {
