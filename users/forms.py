@@ -72,14 +72,14 @@ class ProfileUpdateForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={
             'min': '1',
             'max': '1000',
-            'class': 'profile-default-number',
+            'class': 'profile-default-number profile-default-value',
         }),
     )
     default_filter_unit = forms.ChoiceField(
         choices=DEFAULT_FILTER_UNIT_CHOICES,
         required=False,
         label='Date range unit',
-        widget=forms.Select(attrs={'class': 'profile-default-select'}),
+        widget=forms.Select(attrs={'class': 'profile-default-select profile-default-unit'}),
     )
     insights_default_filter_value = forms.IntegerField(
         min_value=1,
@@ -89,14 +89,14 @@ class ProfileUpdateForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={
             'min': '1',
             'max': '1000',
-            'class': 'profile-default-number',
+            'class': 'profile-default-number profile-default-value',
         }),
     )
     insights_default_filter_unit = forms.ChoiceField(
         choices=DEFAULT_FILTER_UNIT_CHOICES,
         required=False,
         label='Insights date range unit',
-        widget=forms.Select(attrs={'class': 'profile-default-select'}),
+        widget=forms.Select(attrs={'class': 'profile-default-select profile-default-unit'}),
     )
     default_chart_project_count = forms.IntegerField(
         min_value=1,

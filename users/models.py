@@ -25,6 +25,9 @@ DEFAULT_FILTER_UNIT_CHOICES = (
     ('weeks', 'Weeks'),
     ('months', 'Months'),
     ('years', 'Years'),
+    ('month_to_date', 'Month to date'),
+    ('quarter_to_date', 'Quarter to date'),
+    ('year_to_date', 'Year to date'),
 )
 
 def get_fernet():
@@ -62,7 +65,7 @@ class Profile(models.Model):
         help_text="How far the default date filter looks back from today.",
     )
     default_filter_unit = models.CharField(
-        max_length=6,
+        max_length=15,
         choices=DEFAULT_FILTER_UNIT_CHOICES,
         default='months',
     )
@@ -72,7 +75,7 @@ class Profile(models.Model):
         help_text="How far the default Insights date filter looks back from today.",
     )
     insights_default_filter_unit = models.CharField(
-        max_length=6,
+        max_length=15,
         choices=DEFAULT_FILTER_UNIT_CHOICES,
         default='months',
     )
@@ -85,7 +88,7 @@ class Profile(models.Model):
     def __str__(self):
         return f"{self.user.username} Profile"
 
-    def _rolling_filter_date_range(
+    def _filter_date_range(
         self,
         value: int,
         unit: str,
@@ -100,8 +103,16 @@ class Profile(models.Model):
         else:
             end_date = reference_date
 
+        if unit == 'month_to_date':
+            return end_date.replace(day=1), end_date
+        if unit == 'quarter_to_date':
+            quarter_start_month = ((end_date.month - 1) // 3) * 3 + 1
+            return end_date.replace(month=quarter_start_month, day=1), end_date
+        if unit == 'year_to_date':
+            return end_date.replace(month=1, day=1), end_date
+
         value = max(1, value)
-        if unit not in {choice[0] for choice in DEFAULT_FILTER_UNIT_CHOICES}:
+        if unit not in {'days', 'weeks', 'months', 'years'}:
             unit = 'months'
 
         start_date = end_date - relativedelta(**{unit: value})
@@ -110,8 +121,8 @@ class Profile(models.Model):
     def default_filter_date_range(
         self, reference_date: date | datetime | None = None
     ) -> tuple[date, date]:
-        """Return the app's rolling default date range."""
-        return self._rolling_filter_date_range(
+        """Return the app's configured default date range."""
+        return self._filter_date_range(
             self.default_filter_value,
             self.default_filter_unit,
             reference_date,
@@ -120,8 +131,8 @@ class Profile(models.Model):
     def insights_default_filter_date_range(
         self, reference_date: date | datetime | None = None
     ) -> tuple[date, date]:
-        """Return the rolling default date range for new Insights chats."""
-        return self._rolling_filter_date_range(
+        """Return the configured default date range for new Insights chats."""
+        return self._filter_date_range(
             self.insights_default_filter_value,
             self.insights_default_filter_unit,
             reference_date,

@@ -350,7 +350,23 @@
             updateBackgroundDimmingPreview($(this).val());
         });
 
+        function syncDefaultRangeControl(select) {
+            const rangeSelect = $(select);
+            const control = rangeSelect.closest('.profile-default-control');
+            const valueInput = control.find('.profile-default-value');
+            const isToDate = String(rangeSelect.val()).endsWith('_to_date');
+
+            control.toggleClass('to-date-range', isToDate);
+            valueInput.prop('disabled', isToDate);
+        }
+
         $(document).ready(function() {
+            $('.profile-default-unit').each(function() {
+                syncDefaultRangeControl(this);
+            }).on('change', function() {
+                syncDefaultRangeControl(this);
+            });
+
             if ($('#id_automatic_background').is(':checked')) {
                 $('#automatic_background_options').show();
                 $('.uploaded_backgrounds').hide();
@@ -513,6 +529,14 @@
         .profile-default-control input,
         .profile-default-control select {
             width: 100%;
+        }
+
+        .profile-default-control.to-date-range .profile-default-value {
+            display: none;
+        }
+
+        .profile-default-control.to-date-range .profile-default-unit {
+            grid-column: 1 / -1;
         }
 
         .profile-default-suffix {

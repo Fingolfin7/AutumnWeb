@@ -127,12 +127,15 @@ class ProfileSaveTests(TestCase):
 
     def test_profile_default_date_range_supports_each_requested_unit(self):
         profile = self.user.profile
-        reference_date = date(2026, 7, 13)
+        reference_date = date(2026, 5, 13)
         expected_starts = {
-            "days": date(2026, 7, 3),
-            "weeks": date(2026, 5, 4),
-            "months": date(2025, 9, 13),
-            "years": date(2016, 7, 13),
+            "days": date(2026, 5, 3),
+            "weeks": date(2026, 3, 4),
+            "months": date(2025, 7, 13),
+            "years": date(2016, 5, 13),
+            "month_to_date": date(2026, 5, 1),
+            "quarter_to_date": date(2026, 4, 1),
+            "year_to_date": date(2026, 1, 1),
         }
 
         for unit, expected_start in expected_starts.items():
@@ -145,32 +148,34 @@ class ProfileSaveTests(TestCase):
                 )
 
     def test_update_profile_saves_filter_and_chart_defaults(self):
+        profile = self.user.profile
+        profile.default_filter_value = 6
+        profile.insights_default_filter_value = 3
+        profile.save()
+
         response = self.client.post(
             reverse("profile"),
             data={
                 "username": self.user.username,
                 "email": self.user.email,
-                "default_filter_value": "6",
-                "default_filter_unit": "weeks",
-                "insights_default_filter_value": "3",
-                "insights_default_filter_unit": "months",
+                "default_filter_unit": "quarter_to_date",
+                "insights_default_filter_unit": "year_to_date",
                 "default_chart_project_count": "12",
             },
         )
 
         self.assertRedirects(response, reverse("profile"))
-        profile = self.user.profile
         profile.refresh_from_db()
         self.assertEqual(profile.default_filter_value, 6)
-        self.assertEqual(profile.default_filter_unit, "weeks")
+        self.assertEqual(profile.default_filter_unit, "quarter_to_date")
         self.assertEqual(profile.insights_default_filter_value, 3)
-        self.assertEqual(profile.insights_default_filter_unit, "months")
+        self.assertEqual(profile.insights_default_filter_unit, "year_to_date")
         self.assertEqual(profile.default_chart_project_count, 12)
 
     def test_charts_use_profile_defaults_until_dates_are_explicit(self):
         profile = self.user.profile
         profile.default_filter_value = 2
-        profile.default_filter_unit = "weeks"
+        profile.default_filter_unit = "quarter_to_date"
         profile.default_chart_project_count = 11
         profile.save()
 
@@ -195,7 +200,7 @@ class ProfileSaveTests(TestCase):
         profile.default_filter_value = 2
         profile.default_filter_unit = "weeks"
         profile.insights_default_filter_value = 3
-        profile.insights_default_filter_unit = "months"
+        profile.insights_default_filter_unit = "year_to_date"
         profile.save()
 
         response = self.client.get(reverse("insights"))
