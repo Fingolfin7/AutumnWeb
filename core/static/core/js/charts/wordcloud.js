@@ -11,55 +11,13 @@
     // ========================================================================
 
     function wordcloud(data, ctx, canvasId) {
-        // List of common filler words to exclude
-        const stopWords = new Set([
-            "the", "and", "is", "in", "at", "of", "a", "an", "to", "for", "with",
-            "on", "by", "it", "this", "that", "from", "as", "be", "are", "was",
-            "were", "has", "have", "had", "but", "or", "not", "which", "we", "you",
-            "they", "he", "she", "it", "i", "me", "my", "mine", "your", "yours",
-            "about", "if", "so", "then", "there", "here", "where", "when", "how",
-            "can", "will", "would", "could", "should", "may", "might", "must",
-            "just", "also", "some", "all", "any", "more", "most", "other", "into",
-            "over", "such", "no", "than", "too", "very", "just", "only", "own",
-            "same", "so", "than", "too", "very", "will", "now", "been", "being",
-            "each", "few", "both", "these", "those", "what", "while", "who",
-            "whom", "why", "did", "does", "doing", "done", "get", "got", "getting"
-        ]);
-
-        // Extract words from all session notes
-        let notesText = data.map(item => item.note || "").join(" ");
         let canvasElement = $(canvasId)[0];
-
-        // Remove Markdown formatting using regex
-        const cleanText = notesText
-            .replace(/(\*{1,2}|_{1,2}|~{1,2})/g, '') // Remove bold/italic/strikethrough
-            .replace(/#{1,6}\s/g, '') // Remove headers
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // Remove links, keep text
-            .replace(/`[^`]+`/g, '') // Remove inline code
-            .replace(/```[\s\S]*?```/g, '') // Remove code blocks
-            .replace(/\s+/g, ' ') // Normalize whitespace
-            .trim();
-
-        // Count word frequencies, filtering out stop words
-        const wordCounts = {};
-        cleanText.toLowerCase().replace(/\b[a-z]+\b/g, word => {
-            if (!stopWords.has(word) && word.length > 2) {
-                wordCounts[word] = (wordCounts[word] || 0) + 1;
-            }
-        });
-
-        // Convert to array format for wordcloud2.js and limit top N words
-        const wordArray = Object.entries(wordCounts)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 100)
-            .map(([text, weight]) => [text, weight]);
+        const wordArray = data.map(item => [item.text, Number(item.weight)]);
 
         if (wordArray.length === 0) {
             utils.clearChart(ctx);
             return;
         }
-
-        console.log('wordArray:', wordArray);
 
         // Store dimensions from container
         const container = $('#canvas_container');
@@ -74,9 +32,21 @@
         canvasElement.height = prev_height;
 
         // Calculate dynamic sizing
-        let dynamicSize = wordArray.length > 50 ? 8 : 16;
-        let largestFrequency = wordArray[0][1];
-        let dynamicWeightFactor = dynamicSize * 30 / largestFrequency;
+        const dynamicSize = wordArray.length > 50 ? 8 : 16;
+        const largestFrequency = wordArray[0][1];
+        const smallestFrequency = wordArray[wordArray.length - 1][1];
+        const frequencyRange = largestFrequency - smallestFrequency;
+        const maxFontSize = Math.min(72, Math.max(36, canvasElement.width / 10));
+        const minFontSize = Math.max(12, maxFontSize / 4);
+
+        // Normalize frequencies into bounded font sizes. Multiplying raw counts
+        // made uniformly frequent words hundreds of pixels tall, so WordCloud
+        // could fail to place any of them and leave a blank canvas.
+        const dynamicWeightFactor = function(weight) {
+            if (!frequencyRange) return maxFontSize;
+            const ratio = (weight - smallestFrequency) / frequencyRange;
+            return minFontSize + ratio * (maxFontSize - minFontSize);
+        };
 
         // Initialize the word cloud
         WordCloud(canvasElement, {

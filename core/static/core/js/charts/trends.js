@@ -15,11 +15,9 @@
         const projectTotalTime = {};
 
         data.forEach(item => {
-            const startTime = new Date(item.start_time);
-            const endTime = new Date(item.end_time);
-            const duration = (endTime - startTime) / (1000 * 60 * 60);
-            const dateKey = startTime.toISOString().split('T')[0];
-            const projectName = item.project;
+            const duration = Number(item.hours);
+            const dateKey = item.date;
+            const projectName = item.series;
 
             if (!dailyTotals[projectName]) dailyTotals[projectName] = {};
             if (!dailyTotals[projectName][dateKey]) dailyTotals[projectName][dateKey] = 0;
@@ -85,7 +83,7 @@
 
         utils.clearChart(ctx);
 
-        const dates = data.map(item => new Date(item.start_time));
+        const dates = data.map(item => new Date(item.date));
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
         const chartUnit = utils.getChartUnit(maxDate, minDate);
@@ -138,20 +136,13 @@
         const dailyTotals = {};
 
         data.forEach(item => {
-            const startTime = new Date(item.start_time);
-            const endTime = new Date(item.end_time);
-            const duration = (endTime - startTime) / (1000 * 60 * 60);
-            const dateKey = startTime.toISOString().split('T')[0];
+            const duration = Number(item.hours);
+            const dateKey = item.date;
+            const subprojectName = item.series;
 
-            const subprojects = (item.subprojects || []).length
-                ? item.subprojects.map(sp => sp.name || sp)
-                : ['no subproject'];
-
-            subprojects.forEach(spName => {
-                if (!dailyTotals[spName]) dailyTotals[spName] = {};
-                if (!dailyTotals[spName][dateKey]) dailyTotals[spName][dateKey] = 0;
-                dailyTotals[spName][dateKey] += duration;
-            });
+            if (!dailyTotals[subprojectName]) dailyTotals[subprojectName] = {};
+            if (!dailyTotals[subprojectName][dateKey]) dailyTotals[subprojectName][dateKey] = 0;
+            dailyTotals[subprojectName][dateKey] += duration;
         });
 
         const allDates = [...new Set(
@@ -182,7 +173,7 @@
 
         utils.clearChart(ctx);
 
-        const dates = data.map(item => new Date(item.start_time));
+        const dates = data.map(item => new Date(item.date));
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
         const chartUnit = utils.getChartUnit(maxDate, minDate);
@@ -233,22 +224,13 @@
     // ========================================================================
 
     function cumulative_line_chart(data, ctx) {
-        // Sort sessions by start time
-        const sortedSessions = [...data].sort((a, b) =>
-            new Date(a.start_time) - new Date(b.start_time)
+        const sortedDays = [...data].sort((a, b) =>
+            new Date(a.date) - new Date(b.date)
         );
 
-        // Calculate daily totals first
-        const dailyTotals = {};
-        sortedSessions.forEach(item => {
-            const startTime = new Date(item.start_time);
-            const endTime = new Date(item.end_time);
-            const duration = (endTime - startTime) / (1000 * 60 * 60);
-            const dateKey = startTime.toISOString().split('T')[0];
-
-            if (!dailyTotals[dateKey]) dailyTotals[dateKey] = 0;
-            dailyTotals[dateKey] += duration;
-        });
+        const dailyTotals = Object.fromEntries(
+            sortedDays.map(item => [item.date, Number(item.hours)])
+        );
 
         // Sort dates and calculate cumulative
         const sortedDates = Object.keys(dailyTotals).sort();

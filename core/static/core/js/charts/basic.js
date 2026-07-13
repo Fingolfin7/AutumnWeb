@@ -90,14 +90,10 @@
 
     function scatter_graph(data, ctx) {
         const sessionData = data.map(item => {
-            const startTime = new Date(item.start_time);
-            const endTime = new Date(item.end_time);
-            const duration = (endTime - startTime) / (1000 * 60 * 60);
-
             return {
-                x: endTime,
-                y: duration,
-                projectName: item.project
+                x: new Date(item.x),
+                y: Number(item.y),
+                projectName: item.series
             };
         });
 
@@ -189,20 +185,11 @@
     }
 
     function scatter_subproject_graph(data, ctx) {
-        const pts = [];
-        data.forEach(s => {
-            const start = new Date(s.start_time);
-            const end = new Date(s.end_time);
-            const dur = (end - start) / (1000 * 60 * 60);
-            if ((s.subprojects || []).length) {
-                (s.subprojects).forEach(sp => {
-                    const name = sp.name || sp;
-                    pts.push({ x: end, y: dur, projectName: name });
-                });
-            } else {
-                pts.push({ x: end, y: dur, projectName: "no subproject" });
-            }
-        });
+        const pts = data.map(item => ({
+            x: new Date(item.x),
+            y: Number(item.y),
+            projectName: item.series
+        }));
 
         const grouped = Object.entries(
             pts.reduce((acc, p) => {
@@ -269,11 +256,9 @@
         const projectTotalTime = {};
 
         data.forEach(item => {
-            const startTime = new Date(item.start_time);
-            const endTime = new Date(item.end_time);
-            const duration = (endTime - startTime) / (1000 * 60 * 60);
-            const dateKey = startTime.toISOString().split('T')[0];
-            const projectName = item.project;
+            const duration = Number(item.hours);
+            const dateKey = item.date;
+            const projectName = item.series;
 
             if (!dailyTotals[projectName]) dailyTotals[projectName] = {};
             if (!dailyTotals[projectName][dateKey]) dailyTotals[projectName][dateKey] = 0;
@@ -338,7 +323,7 @@
 
         utils.clearChart(ctx);
 
-        const dates = data.map(item => new Date(item.start_time));
+        const dates = data.map(item => new Date(item.date));
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
         const chartUnit = utils.getChartUnit(maxDate, minDate);
@@ -377,20 +362,13 @@
         const dailyTotals = {};
 
         data.forEach(item => {
-            const startTime = new Date(item.start_time);
-            const endTime = new Date(item.end_time);
-            const duration = (endTime - startTime) / (1000 * 60 * 60);
-            const dateKey = startTime.toISOString().split('T')[0];
+            const duration = Number(item.hours);
+            const dateKey = item.date;
+            const subprojectName = item.series;
 
-            const subprojects = (item.subprojects || []).length
-                ? item.subprojects.map(sp => sp.name || sp)
-                : ['no subproject'];
-
-            subprojects.forEach(spName => {
-                if (!dailyTotals[spName]) dailyTotals[spName] = {};
-                if (!dailyTotals[spName][dateKey]) dailyTotals[spName][dateKey] = 0;
-                dailyTotals[spName][dateKey] += duration;
-            });
+            if (!dailyTotals[subprojectName]) dailyTotals[subprojectName] = {};
+            if (!dailyTotals[subprojectName][dateKey]) dailyTotals[subprojectName][dateKey] = 0;
+            dailyTotals[subprojectName][dateKey] += duration;
         });
 
         const allDates = [...new Set(
@@ -421,7 +399,7 @@
 
         utils.clearChart(ctx);
 
-        const dates = data.map(item => new Date(item.start_time));
+        const dates = data.map(item => new Date(item.date));
         const minDate = new Date(Math.min(...dates));
         const maxDate = new Date(Math.max(...dates));
         const chartUnit = utils.getChartUnit(maxDate, minDate);

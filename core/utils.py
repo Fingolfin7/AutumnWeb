@@ -270,16 +270,14 @@ def filter_by_active_context(
     """
     context, mode = get_active_context(request, override_context_id=override_context_id)
 
-    if mode == "all" or context is None or not data.exists():
+    if mode == "all" or context is None:
         return data
 
-    item = data.first()
-
-    if isinstance(item, Projects):
+    if data.model is Projects:
         return data.filter(context=context)
-    if isinstance(item, SubProjects):
+    if data.model is SubProjects:
         return data.filter(parent_project__context=context)
-    if isinstance(item, Sessions):
+    if data.model is Sessions:
         return data.filter(project__context=context)
 
     return data

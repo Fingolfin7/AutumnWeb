@@ -11,20 +11,9 @@
     // ========================================================================
 
     function calendar_graph(data, ctx, title = "Projects Calendar") {
-        // Aggregate data by date
-        const dateTotals = data.reduce((acc, item) => {
-            let date = new Date(item.start_time).toISOString().split('T')[0];
-            let startTime = new Date(item.start_time);
-            let endTime = new Date(item.end_time);
-            let duration = (endTime - startTime) / (1000 * 60 * 60);
-
-            if (!acc[date]) {
-                acc[date] = duration;
-            } else {
-                acc[date] += duration;
-            }
-            return acc;
-        }, {});
+        const dateTotals = Object.fromEntries(
+            data.map(item => [item.date, Number(item.hours)])
+        );
 
         // Sort dates and get the first date's year
         let year = new Date(Object.keys(dateTotals).sort()[0]).getFullYear();

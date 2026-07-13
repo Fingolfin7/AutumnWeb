@@ -129,13 +129,15 @@ function consolidateTopN(data, topN = 7, timeKey = 'total_time') {
 // Data Fetching
 // ============================================================================
 
+const chartDataCache = new Map();
+
 function get_project_data(type, start_date = "", end_date = "", project_name = "", context_id = "", tag_ids = [], exclude_ids = []) {
     let url = "";
 
     const wantSubprojects = project_name && (type === 'pie' || type === 'bar');
 
     // Map chart types to their data sources
-    const sessionBasedCharts = ['scatter', 'calendar', 'heatmap', 'line', 'stacked_area', 'cumulative', 'histogram'];
+    const chartDataCharts = ['scatter', 'calendar', 'heatmap', 'line', 'stacked_area', 'cumulative', 'histogram', 'wordcloud'];
     const hierarchyCharts = ['treemap'];
     const contextCharts = ['context'];
     const statusCharts = ['status'];
@@ -144,10 +146,8 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
 
     if (wantSubprojects) {
         url = $('#subprojects_tally_link').val();
-    } else if (sessionBasedCharts.includes(type)) {
-        url = $('#sessions_link').val();
-    } else if (type === 'wordcloud') {
-        url = $('#raw_sessions_link').val();
+    } else if (chartDataCharts.includes(type)) {
+        url = $('#chart_data_link').val();
     } else if (hierarchyCharts.includes(type)) {
         url = $('#hierarchy_link').val();
     } else if (contextCharts.includes(type)) {
@@ -165,6 +165,7 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
 
     // Build query string safely
     const qs = new URLSearchParams();
+    if (chartDataCharts.includes(type)) qs.set('chart_type', type);
     if (project_name) qs.set('project_name', project_name);
     if (start_date) qs.set('start_date', start_date);
     if (end_date) qs.set('end_date', end_date);
@@ -181,7 +182,11 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
 
     console.log('Fetching chart data:', url);
 
-    return new Promise((resolve, reject) => {
+    if (chartDataCache.has(url)) {
+        return chartDataCache.get(url);
+    }
+
+    const request = new Promise((resolve, reject) => {
         $.ajax({
             url: url,
             type: 'GET',
@@ -190,10 +195,14 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
                 resolve(data);
             },
             error: function(error) {
+                chartDataCache.delete(url);
                 reject(error);
             }
         });
     });
+
+    chartDataCache.set(url, request);
+    return request;
 }
 
 // ============================================================================
@@ -201,6 +210,7 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
 // ============================================================================
 
 let $loading, $empty, $canvasContainer;
+let renderGeneration = 0;
 
 function initUIElements() {
     $loading = $('#chart-loading');
@@ -249,6 +259,7 @@ function applyChartLayout(type) {
 // ============================================================================
 
 function render() {
+    const generation = ++renderGeneration;
     showLoading('Loading chart…');
 
     let selectType = $('#chart_type');
@@ -283,8 +294,13 @@ function render() {
 
     get_project_data(type, start_date, end_date, project_name, context_id, tag_ids, exclude_ids)
         .then(data => {
+            if (generation !== renderGeneration) return;
+
             // Handle empty data
-            if (!data || (Array.isArray(data) && !data.length)) {
+            const isEmptyHistogram = type === 'histogram'
+                && Array.isArray(data)
+                && data.every(item => !Number(item.count));
+            if (!data || (Array.isArray(data) && !data.length) || isEmptyHistogram) {
                 clearChart(canvasCtx);
                 showEmpty();
                 return;
@@ -319,12 +335,17 @@ function render() {
             }
         })
         .catch(err => {
+            if (generation !== renderGeneration) return;
+
             console.error('Chart error:', err);
             try { clearChart(canvasCtx); } catch(e) {}
             showEmpty();
         })
         .finally(() => {
-            requestAnimationFrame(() => hideLoading());
+            if (generation !== renderGeneration) return;
+            requestAnimationFrame(() => {
+                if (generation === renderGeneration) hideLoading();
+            });
         });
 }
 

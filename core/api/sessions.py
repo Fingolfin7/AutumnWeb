@@ -386,7 +386,11 @@ def edit_session(request, session_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def list_sessions(request):
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = (
+        Sessions.objects.filter(is_active=False, user=request.user)
+        .select_related("project")
+        .prefetch_related("subprojects")
+    )
     sessions = filter_by_active_context(
         sessions, request, override_context_id=request.query_params.get("context")
     )

@@ -11,35 +11,11 @@
     // ========================================================================
 
     function session_histogram(data, ctx) {
-        // Define duration buckets (in hours)
-        const buckets = [
-            { label: '0-15m', min: 0, max: 0.25 },
-            { label: '15-30m', min: 0.25, max: 0.5 },
-            { label: '30-60m', min: 0.5, max: 1 },
-            { label: '1-2h', min: 1, max: 2 },
-            { label: '2-4h', min: 2, max: 4 },
-            { label: '4-8h', min: 4, max: 8 },
-            { label: '8h+', min: 8, max: Infinity }
-        ];
-
-        // Count sessions in each bucket
-        const counts = buckets.map(() => 0);
-
-        data.forEach(item => {
-            const startTime = new Date(item.start_time);
-            const endTime = new Date(item.end_time);
-            const duration = (endTime - startTime) / (1000 * 60 * 60); // hours
-
-            for (let i = 0; i < buckets.length; i++) {
-                if (duration >= buckets[i].min && duration < buckets[i].max) {
-                    counts[i]++;
-                    break;
-                }
-            }
-        });
+        const labels = data.map(item => item.label);
+        const counts = data.map(item => Number(item.count));
 
         // Generate gradient colors from short (cool) to long (warm)
-        const colors = buckets.map((_, i) => {
+        const colors = labels.map((_, i) => {
             const hue = 200 - (i * 30); // Blue to red
             return `hsl(${Math.max(0, hue)}, 70%, 55%)`;
         });
@@ -49,7 +25,7 @@
         new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: buckets.map(b => b.label),
+                labels: labels,
                 datasets: [{
                     label: 'Number of Sessions',
                     data: counts,

@@ -63,6 +63,7 @@ from core.api import (
     tally_by_context,
     tally_by_status,
     tally_by_tags,
+    chart_data,
     hierarchy_data,
     projects_with_stats,
     search_projects,
@@ -212,6 +213,7 @@ urlpatterns = [
         projects_with_stats,
         name="api_projects_with_stats",
     ),
+    path("api/chart_data/", chart_data, name="api_chart_data"),
     path("api/search_projects/", search_projects, name="api_search_projects"),
     path("api/get_project/<str:project_name>/", get_project, name="api_get_project"),
     path(
