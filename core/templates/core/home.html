@@ -12,49 +12,7 @@
             <u>Active Timers</u>
         </a>
     </h2>
-    <div id="active-timers" data-max-visible="5">
-        {% for timer in timers %}
-            <div class="card" id="timer-{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
-                <table class="timer-row">
-                    <tr>
-                        <td>
-                            [{{ forloop.counter0 }}]: Started
-                        </td>
-                        <td class="text-red">
-                            {{ timer.project.name }}
-                        </td>
-                        <td >
-                            [
-                            {% for subproject in timer.subprojects.all %}
-                                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                            {% endfor %}
-                            ]
-                        </td>
-                        <td>
-                            <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
-                            {% if timer.auto_stop_at %}
-                                <span class="timer-stop-after-status">
-                                    stops in <span class="timer-stop-after-remaining" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"></span>
-                                </span>
-                            {% endif %}
-                        </td>
-                        <td>
-                            <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'">
-                                <i class="fas fa-redo-alt"></i>
-                            </button>
-                            <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'">
-                                <i class="fa fa-stopwatch"></i>
-                            </button>
-                            <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'">
-                                <i class="fa fa-trash"></i>
-                            </button>
-                        </td>
-
-                    </tr>
-                </table>
-            </div>
-        {% endfor %}
-    </div>
+    {% include 'core/partials/active_timers_home.html' %}
 
     <h2>Recent Sessions</h2>
     <div class="card" id="session-logs">

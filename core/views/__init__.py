@@ -3,6 +3,7 @@ from core.views.timers import (
     stop_timer,
     restart_timer,
     remove_timer,
+    active_timers_fragment,
     TimerListView,
     _timer_combo_key,
     _session_combo_key,

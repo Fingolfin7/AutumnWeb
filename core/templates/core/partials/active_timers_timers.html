@@ -1,0 +1,52 @@
+{% load time_formats %}
+
+<section id="active-timers" data-timer-surface="timers" data-refresh-url="{% url 'active_timers_fragment' %}">
+    <h2>Active Timers</h2>
+    {% if timers %}
+        {% for timer in timers %}
+            <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
+                <div class="timer-row-flex">
+                    <span>[{{ forloop.counter0 }}]: Started</span>
+                    <span class="text-red">
+                        <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
+                            {{ timer.project.name }}
+                        </a>
+                    </span>
+                    <span class="timer-subprojects">
+                        {% for subproject in timer.subprojects.all %}
+                            <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
+                                {% if forloop.first %}[{% endif %}
+                                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
+                                {% if forloop.last %}]{% endif %}
+                            </a>
+                        {% endfor %}
+                    </span>
+                    <span>
+                        <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
+                    </span>
+                    {% if timer.auto_stop_at %}
+                        <span class="timer-stop-after-status">
+                            stops in <span class="timer-stop-after-remaining" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"></span>
+                        </span>
+                    {% endif %}
+                    <span class="timer-actions">
+                        <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'" title="Restart">
+                            <i class="fas fa-redo-alt"></i>
+                        </button>
+                        <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'" title="Stop">
+                            <i class="fa fa-stopwatch"></i>
+                        </button>
+                        <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'" title="Remove">
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="timer-empty-state">
+            <i class="fa fa-clock"></i>
+            <span>No timers are running.</span>
+        </div>
+    {% endif %}
+</section>

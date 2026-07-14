@@ -48,130 +48,37 @@ $(document).ready(function() {
         return build_time;
     }
 
-    function getLocalTimerIds() {
-        return $(TIMER_CARD_SELECTOR)
-            .map(function() {
-                return parseInt($(this).data('timer-id'), 10);
-            })
-            .get()
-            .filter(Number.isFinite)
-            .sort((a, b) => a - b);
-    }
-
-    function timerInstant(value) {
-        const timestamp = new Date(value).getTime();
-        return Number.isFinite(timestamp) ? timestamp : null;
-    }
-
-    function getLocalTimerStateById() {
-        const stateById = new Map();
-
-        $(TIMER_CARD_SELECTOR).each(function() {
-            const timer = $(this);
-            const id = parseInt(timer.data('timer-id'), 10);
-
-            if (Number.isFinite(id)) {
-                stateById.set(id, {
-                    start: timerInstant(timer.data('start-time')),
-                    autoStopAt: timerInstant(timer.data('auto-stop-at')),
-                    projectId: parseInt(timer.data('project-id'), 10)
-                });
-            }
-        });
-
-        return stateById;
-    }
-
-    function getServerTimerStateById(sessions) {
-        const stateById = new Map();
-
-        sessions
-            .filter(session => session.is_active)
-            .forEach(function(session) {
-                stateById.set(session.id, {
-                    start: timerInstant(session.start_time),
-                    autoStopAt: timerInstant(session.auto_stop_at),
-                    projectId: parseInt(session.project_id, 10)
-                });
-            });
-
-        return stateById;
-    }
-
-    function hasTimerStateChanges(localStateById, serverStateById) {
-        for (const [id, localState] of localStateById) {
-            const serverState = serverStateById.get(id);
-
-            if (
-                !serverState ||
-                localState.start !== serverState.start ||
-                localState.autoStopAt !== serverState.autoStopAt ||
-                localState.projectId !== serverState.projectId
-            ) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     let refreshInFlight = false;
 
     function refreshTimerSection() {
+        const timersContainer = $(ACTIVE_TIMERS_SELECTOR);
+        const refreshUrl = timersContainer.data('refresh-url');
+        const surface = timersContainer.data('timer-surface');
+
         if (refreshInFlight) {
             return;
         }
+
+        if (timersContainer.length === 0 || !refreshUrl || !surface) {
+            return;
+        }
+
         refreshInFlight = true;
-
-        const refreshUrl = `${window.location.pathname} ${ACTIVE_TIMERS_SELECTOR} > *`;
-        $(ACTIVE_TIMERS_SELECTOR).load(refreshUrl, function() {
-            refreshInFlight = false;
-            updateDurations();
-        });
-    }
-
-    function syncActiveTimers() {
-        const timersContainer = $(ACTIVE_TIMERS_SELECTOR);
-
-        $.getJSON('/api/list_active_sessions/')
-            .done(function(sessions) {
-                const serverIds = sessions
-                    .filter(session => session.is_active)
-                    .map(session => session.id)
-                    .sort((a, b) => a - b);
-
-                if (timersContainer.length === 0) {
-                    return;
-                }
-
-                const localIds = getLocalTimerIds();
-                const localStateById = getLocalTimerStateById();
-                const serverStateById = getServerTimerStateById(sessions);
-                const serverSet = new Set(serverIds);
-                const allLocalTimersStillActive = localIds.every(id => serverSet.has(id));
-                const isPartialList = timersContainer.data('partial-list') === true;
-
-                let hasChanges = false;
-                if (isPartialList) {
-                    hasChanges = localIds.length > 0 && !allLocalTimersStillActive;
-                } else {
-                    hasChanges = hasTimerStateChanges(localStateById, serverStateById) ||
-                        !allLocalTimersStillActive ||
-                        serverIds.length !== localIds.length;
-                }
-
-                if (hasChanges) {
-                    refreshTimerSection();
-                }
+        $.get(refreshUrl, { surface: surface })
+            .done(function(html) {
+                timersContainer.replaceWith(html);
+                updateDurations();
+            })
+            .always(function() {
+                refreshInFlight = false;
             });
     }
 
     // Update durations every second
     setInterval(updateDurations, 1000);
-    // Poll server state so timers stopped/started outside the web UI show up quickly.
-    setInterval(syncActiveTimers, SYNC_INTERVAL_MS);
+    // Refresh the active-timer fragment so external timer changes show up quickly.
+    setInterval(refreshTimerSection, SYNC_INTERVAL_MS);
 
     // Initial update
     updateDurations();
-    syncActiveTimers();
 });

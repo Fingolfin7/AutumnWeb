@@ -10,6 +10,7 @@ from django.conf import settings
 import io
 import json
 import os
+from unittest.mock import patch
 from core.models import Context
 from rest_framework.authtoken.models import Token
 from core.utils import (
@@ -1864,6 +1865,130 @@ class TimerSuggestionsTests(TestCase):
         self.assertEqual(commitments[0]["project"], self.project)
         self.assertIn("remaining", commitments[0]["detail"])
         self.assertContains(response, "Commitment Push")
+
+
+class ActiveTimersFragmentTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            username="fragmentuser",
+            email="fragment@example.com",
+            password="testpass123",
+        )
+        self.other_user = User.objects.create_user(
+            username="otherfragmentuser",
+            email="other-fragment@example.com",
+            password="testpass123",
+        )
+        self.context = Context.objects.create(user=self.user, name="General")
+        self.project = Projects.objects.create(
+            user=self.user,
+            name="Fragment Project",
+            context=self.context,
+        )
+        self.other_project = Projects.objects.create(
+            user=self.other_user,
+            name="Other Fragment Project",
+        )
+        self.client.login(username="fragmentuser", password="testpass123")
+
+    def create_active_session(self, project=None, start_time=None):
+        return Sessions.objects.create(
+            user=self.user,
+            project=project or self.project,
+            start_time=start_time or timezone.now() - timedelta(minutes=10),
+            is_active=True,
+        )
+
+    def test_fragment_requires_login(self):
+        self.client.logout()
+
+        response = self.client.get(reverse("active_timers_fragment"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_fragment_rejects_unknown_surface(self):
+        response = self.client.get(
+            reverse("active_timers_fragment"),
+            {"surface": "not-real"},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    @patch("core.views.timers.build_timer_suggestions")
+    def test_timers_fragment_renders_active_timer_only(self, build_timer_suggestions):
+        active = self.create_active_session()
+        Sessions.objects.create(
+            user=self.user,
+            project=self.project,
+            start_time=timezone.now() - timedelta(hours=2),
+            end_time=timezone.now() - timedelta(hours=1),
+            is_active=False,
+            note="completed-session-marker",
+        )
+        Sessions.objects.create(
+            user=self.other_user,
+            project=self.other_project,
+            start_time=timezone.now() - timedelta(minutes=5),
+            is_active=True,
+        )
+
+        response = self.client.get(
+            reverse("active_timers_fragment"),
+            {"surface": "timers"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertContains(response, 'data-timer-surface="timers"')
+        self.assertContains(response, f'id="timer-{active.id}"')
+        self.assertContains(response, "Fragment Project")
+        self.assertNotContains(response, "completed-session-marker")
+        self.assertNotContains(response, "Other Fragment Project")
+        build_timer_suggestions.assert_not_called()
+
+    def test_dashboard_fragment_exists_when_empty_and_appears_with_timer(self):
+        empty_response = self.client.get(
+            reverse("active_timers_fragment"),
+            {"surface": "dashboard"},
+        )
+        self.assertContains(empty_response, 'id="active-timers"')
+        self.assertContains(empty_response, "display: none")
+
+        self.create_active_session()
+        active_response = self.client.get(
+            reverse("active_timers_fragment"),
+            {"surface": "dashboard"},
+        )
+
+        self.assertContains(active_response, 'data-timer-surface="dashboard"')
+        self.assertContains(active_response, "Fragment Project")
+        self.assertNotContains(active_response, "display: none")
+
+    def test_dashboard_and_home_fragments_limit_to_five_timers(self):
+        now = timezone.now()
+        for index in range(6):
+            project = Projects.objects.create(
+                user=self.user,
+                name=f"Timer Project {index}",
+                context=self.context,
+            )
+            self.create_active_session(
+                project=project,
+                start_time=now - timedelta(minutes=index),
+            )
+
+        for surface in ("dashboard", "home"):
+            response = self.client.get(
+                reverse("active_timers_fragment"),
+                {"surface": surface},
+            )
+
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Timer Project 0")
+            self.assertContains(response, "Timer Project 4")
+            self.assertNotContains(response, "Timer Project 5")
 
 
 class DailyStreakTests(TestCase):

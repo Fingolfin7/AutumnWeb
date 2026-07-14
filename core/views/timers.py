@@ -2,6 +2,9 @@ from collections import Counter
 from core.forms import *
 from core.utils import *
 from django.contrib import messages
+from django.db.models import Prefetch
+from django.http import HttpResponse, HttpResponseBadRequest
+from django.template.loader import render_to_string
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.decorators import login_required
@@ -22,6 +25,55 @@ from core.session_ledger import (
     delete_session as ledger_delete_session,
     mutate_session as ledger_mutate_session,
 )
+
+
+ACTIVE_TIMER_FRAGMENT_TEMPLATES = {
+    "dashboard": "core/partials/active_timers_dashboard.html",
+    "home": "core/partials/active_timers_home.html",
+    "timers": "core/partials/active_timers_timers.html",
+}
+
+
+@login_required
+def active_timers_fragment(request):
+    """Render only the active-timer region used by the polling UI."""
+    surface = request.GET.get("surface", "timers")
+    template_name = ACTIVE_TIMER_FRAGMENT_TEMPLATES.get(surface)
+    if template_name is None:
+        return HttpResponseBadRequest("Unknown timer surface")
+
+    stop_expired_timers(request.user)
+    timers = (
+        Sessions.objects.filter(is_active=True, user=request.user)
+        .select_related("project")
+        .prefetch_related(
+            Prefetch(
+                "subprojects",
+                queryset=SubProjects.objects.only("id", "name"),
+            )
+        )
+        .only(
+            "id",
+            "project_id",
+            "project__id",
+            "project__name",
+            "start_time",
+            "end_time",
+            "auto_stop_at",
+            "is_active",
+        )
+        .order_by("-start_time")
+    )
+    timers = filter_by_active_context(timers, request)
+    if surface in {"dashboard", "home"}:
+        timers = timers[:5]
+
+    # These partials do not need request context processors. Avoiding them keeps
+    # this five-second polling path limited to active-timer data.
+    html = render_to_string(template_name, {"timers": timers})
+    response = HttpResponse(html)
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @login_required
