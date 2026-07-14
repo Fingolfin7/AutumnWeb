@@ -1,7 +1,7 @@
 $(document).ready(function() {
     const ACTIVE_TIMERS_SELECTOR = '#active-timers';
     const TIMER_CARD_SELECTOR = `${ACTIVE_TIMERS_SELECTOR} [data-timer-id]`;
-    const SYNC_INTERVAL_MS = 5000;
+    const SYNC_INTERVAL_MS = 30000;
 
     function updateDurations() {
         $(TIMER_CARD_SELECTOR).each(function() {
