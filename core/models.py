@@ -1,4 +1,6 @@
 from datetime import datetime, time, timezone as dt_tz
+import uuid
+
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -168,6 +170,9 @@ class SubProjects(models.Model):
 
 class Sessions(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    uuid = models.UUIDField(
+        null=True, blank=True, editable=False, default=uuid.uuid4
+    )
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='sessions')
     subprojects = models.ManyToManyField(SubProjects, related_name='sessions')
     start_time = models.DateTimeField(default=timezone.now)
@@ -185,6 +190,12 @@ class Sessions(models.Model):
             models.Index(fields=['is_active', 'end_time']),  # Optimizes queries that filter active/completed sessions
             models.Index(fields=['user', 'project']),  # Optimizes lookups by user and project
             models.Index(fields=['user', 'is_active', 'end_time']),  # Dashboard/tallies/charts: user + completed + date range
+        ]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'uuid'], name='unique_session_uuid_per_user'
+            ),
         ]
 
     def __str__(self):
