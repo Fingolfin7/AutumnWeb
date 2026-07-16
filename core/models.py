@@ -168,13 +168,50 @@ class SubProjects(models.Model):
         super(SubProjects, self).delete(*args, **kwargs)
 
 
+class SessionSubproject(models.Model):
+    session = models.ForeignKey(
+        'Sessions',
+        on_delete=models.CASCADE,
+        db_column='sessions_id',
+        related_name='subproject_links',
+    )
+    subproject = models.ForeignKey(
+        'SubProjects',
+        on_delete=models.CASCADE,
+        db_column='subprojects_id',
+        related_name='session_links',
+    )
+    allocation_bp = models.IntegerField(default=10000, db_default=10000)
+
+    class Meta:
+        db_table = 'core_sessions_subprojects'
+        unique_together = (('session', 'subproject'),)
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(allocation_bp__gte=1) & models.Q(allocation_bp__lte=10000),
+                name='session_subproject_allocation_bp_range',
+            ),
+        ]
+
+
 class Sessions(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     uuid = models.UUIDField(
         null=True, blank=True, editable=False, default=uuid.uuid4
     )
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='sessions')
-    subprojects = models.ManyToManyField(SubProjects, related_name='sessions')
+    subprojects = models.ManyToManyField(
+        SubProjects,
+        related_name='sessions',
+        through='SessionSubproject',
+        through_fields=('session', 'subproject'),
+    )
+    allocation_mode = models.CharField(
+        max_length=16,
+        choices=[('legacy_full', 'legacy_full'), ('partitioned', 'partitioned')],
+        default='legacy_full',
+        db_default='legacy_full',
+    )
     start_time = models.DateTimeField(default=timezone.now)
     end_time = models.DateTimeField(null=True, blank=True)
     auto_stop_at = models.DateTimeField(null=True, blank=True)

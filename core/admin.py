@@ -2,7 +2,15 @@ from django.contrib import admin, messages
 from django.db import transaction
 from django.db.models import Count, Sum
 
-from .models import Commitment, Context, Projects, Sessions, SubProjects, Tag
+from .models import (
+    Commitment,
+    Context,
+    Projects,
+    Sessions,
+    SessionSubproject,
+    SubProjects,
+    Tag,
+)
 from .services import (
     CachedTotalsProjection,
     CommitmentTargetProtectedError,
@@ -169,6 +177,12 @@ class SubProjectsAdmin(admin.ModelAdmin):
             self.message_user(request, str(exc), messages.ERROR)
 
 
+class SessionSubprojectInline(admin.TabularInline):
+    model = SessionSubproject
+    extra = 0
+    autocomplete_fields = ("subproject",)
+
+
 @admin.register(Sessions)
 class SessionsAdmin(admin.ModelAdmin):
     list_display = (
@@ -183,7 +197,8 @@ class SessionsAdmin(admin.ModelAdmin):
     )
     list_filter = ("is_active", "crosses_dst_transition", "project", "user", "project__status")
     search_fields = ("note", "project__name", "subprojects__name", "user__username", "user__email")
-    autocomplete_fields = ("user", "project", "subprojects")
+    autocomplete_fields = ("user", "project")
+    inlines = (SessionSubprojectInline,)
     readonly_fields = ("crosses_dst_transition",)
 
     def get_queryset(self, request):
