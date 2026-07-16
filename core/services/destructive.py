@@ -86,7 +86,7 @@ class DestructiveMutationService:
                     counter += 1
             subproject.name = new_name
             subproject.parent_project = merged_project
-            subproject.save()
+            subproject.save(update_fields=["name", "parent_project"])
             existing_subproject_names.add(new_name)
 
         for subproject in project2_subprojects:
@@ -100,12 +100,8 @@ class DestructiveMutationService:
                     counter += 1
             subproject.name = new_name
             subproject.parent_project = merged_project
-            subproject.save()
+            subproject.save(update_fields=["name", "parent_project"])
             existing_subproject_names.add(new_name)
-
-        merged_project.audit_total_time(log=False)
-        for subproject in merged_project.subprojects.all():
-            subproject.audit_total_time(log=False)
 
         project1.delete()
         project2.delete()
@@ -172,7 +168,6 @@ class DestructiveMutationService:
             session.subprojects.remove(subproject2)
             session.subprojects.add(merged_subproject)
 
-        merged_subproject.audit_total_time(log=False)
         subproject1.delete()
         subproject2.delete()
         return merged_subproject
@@ -188,7 +183,7 @@ class DestructiveMutationService:
         ):
             raise DestructiveOperationError("Project name already exists")
         project.name = new_name
-        project.save()
+        project.save(update_fields=["name"])
         return project
 
     @staticmethod
@@ -210,7 +205,7 @@ class DestructiveMutationService:
         ):
             raise DestructiveOperationError("Subproject name already exists")
         subproject.name = new_name
-        subproject.save()
+        subproject.save(update_fields=["name"])
         return subproject
 
     @staticmethod

@@ -24,6 +24,15 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.templatetags.markdown_render import markdown
+from core.totals import derived_project_totals, derived_subproject_totals
+
+
+def derived_project_total(user, project):
+    return derived_project_totals(user, [project.pk])[project.pk]
+
+
+def derived_subproject_total(user, subproject):
+    return derived_subproject_totals(user, [subproject.pk])[subproject.pk]
 
 
 class MarkdownRenderTests(TestCase):
@@ -150,15 +159,16 @@ class UpdateSessionTests(TestCase):
     def test_update_session_updates_total_time(self):
         original_session_id = self.session.id
 
-        # Verify initial total times
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
+        # Verify initial derived total times.
         self.assertAlmostEqual(
-            self.project.total_time, 60.0, places=2
+            derived_project_total(self.user, self.project), 60.0, places=2
         )  # 1 hour, with 2 decimal precision
-        self.assertAlmostEqual(self.subproject1.total_time, 60.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 0.0, places=2)
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 0.0, places=2
+        )
 
         # Prepare data for updating the session
         new_start_time = timezone.now() - timedelta(hours=3)
@@ -184,23 +194,27 @@ class UpdateSessionTests(TestCase):
         updated_session = Sessions.objects.get(pk=original_session_id)
         self.assertEqual(updated_session.note, "Updated session")
 
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
-
-        # Verify updated total times
-        self.assertAlmostEqual(self.project.total_time, 90.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 90.0, places=2)
+        # Verify updated derived total times.
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 90.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 90.0, places=2
+        )
 
     def test_repeated_save_of_completed_session_is_idempotent(self):
         self.session.note = "Only the note changed"
         self.session.save()
 
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 60.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 60.0, places=2)
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 60.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
+        )
 
     def test_api_edit_preserves_id_and_reassigns_project_totals(self):
         other_project = Projects.objects.create(user=self.user, name="Other Project")
@@ -234,14 +248,18 @@ class UpdateSessionTests(TestCase):
             [other_subproject.id],
         )
 
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        other_project.refresh_from_db()
-        other_subproject.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
-        self.assertAlmostEqual(other_project.total_time, 30.0, places=2)
-        self.assertAlmostEqual(other_subproject.total_time, 30.0, places=2)
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_project_total(self.user, other_project), 30.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, other_subproject), 30.0, places=2
+        )
 
 
 class StopTimerTests(TestCase):
@@ -275,10 +293,14 @@ class StopTimerTests(TestCase):
         self.assertFalse(self.session.is_active)
         self.assertIsNotNone(self.session.end_time)
 
-        # Check that audit has updated total time; assume the duration is computed correctly.
+        # Derived totals follow the stopped session.
         expected_duration = self.session.duration
-        self.assertAlmostEqual(self.project.total_time, expected_duration, places=2)
-        self.assertAlmostEqual(self.subproject.total_time, expected_duration, places=2)
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), expected_duration, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject), expected_duration, places=2
+        )
 
 
 class StopAfterTimerTests(TestCase):
@@ -348,7 +370,9 @@ class StopAfterTimerTests(TestCase):
         expected_duration = round(
             (floored_auto_stop_at - start).total_seconds() / 60.0, 4
         )
-        self.assertEqual(self.project.total_time, expected_duration)
+        self.assertEqual(
+            derived_project_total(self.user, self.project), expected_duration
+        )
         self.assertEqual(len(response.context["timers"]), 0)
 
 
@@ -375,16 +399,16 @@ class DeleteSessionTests(TestCase):
         )
 
     def test_delete_session(self):
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
-
-        # Verify initial total times
+        # Verify initial derived total times.
         self.assertAlmostEqual(
-            self.project.total_time, 60.0, places=2
+            derived_project_total(self.user, self.project), 60.0, places=2
         )  # 1 hour, with 2 decimal precision
-        self.assertAlmostEqual(self.subproject1.total_time, 60.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 60.0, places=2)
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 60.0, places=2
+        )
 
         response = self.client.post(reverse("delete_session", args=[self.session.id]))
         self.assertEqual(response.status_code, 302)  # Expecting a redirect
@@ -393,14 +417,16 @@ class DeleteSessionTests(TestCase):
         session_exists = Sessions.objects.filter(id=self.session.id).exists()
         self.assertFalse(session_exists)
 
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
-
-        # Verify the project's and subprojects' total time is updated after deletion
-        self.assertAlmostEqual(self.project.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 0.0, places=2)
+        # Derived totals fall to zero after deletion.
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 0.0, places=2
+        )
 
 
 class MergeProjectsTests(TestCase):
@@ -502,9 +528,11 @@ class MergeProjectsTests(TestCase):
         self.assertIn("Development", subproject_names)
         self.assertIn("Testing", subproject_names)
 
-        # Check total time was recalculated (based on actual session durations)
+        # Check the derived total based on actual session durations.
         # Each session is 1 hour (60 minutes), so 2 sessions = 120 minutes
-        self.assertAlmostEqual(merged_project.total_time, 120.0, places=2)
+        self.assertAlmostEqual(
+            derived_project_total(self.user, merged_project), 120.0, places=2
+        )
 
     def test_merge_projects_duplicate_name(self):
         """Test merge fails when new project name already exists"""
@@ -632,9 +660,13 @@ class MergeSubProjectsTests(TestCase):
         self.assertIn(self.session1, merged_subproject.sessions.all())
         self.assertIn(self.session2, merged_subproject.sessions.all())
 
-        # Check total time was recalculated (based on actual session durations)
+        # Check the derived total based on actual session durations.
         # Each session is 1 hour (60 minutes), so 2 sessions = 120 minutes
-        self.assertAlmostEqual(merged_subproject.total_time, 120.0, places=2)
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, merged_subproject),
+            120.0,
+            places=2,
+        )
 
     def test_merge_subprojects_duplicate_name(self):
         """Test merge fails when new subproject name already exists"""
@@ -1091,13 +1123,15 @@ class TrackApiRegressionTests(TestCase):
         )
 
         self.assertEqual(resp.status_code, 201)
-        self.project.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 9.0, places=2)
-
-        sp1.refresh_from_db()
-        sp2.refresh_from_db()
-        self.assertAlmostEqual(sp1.total_time, 9.0, places=2)
-        self.assertAlmostEqual(sp2.total_time, 9.0, places=2)
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 9.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, sp1), 9.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, sp2), 9.0, places=2
+        )
 
 
 class CreateSubprojectApiCompatTests(TestCase):
@@ -2627,19 +2661,7 @@ class McpApiContractTests(TestCase):
         self.assertEqual(len(payload), 1)
         self.assertEqual(payload[0]["name"], "MCP Subproject")
 
-    def test_audit_can_dry_run_and_report_changed_projects(self):
-        start = timezone.make_aware(datetime(2026, 5, 1, 9, 0, 0))
-        end = timezone.make_aware(datetime(2026, 5, 1, 10, 0, 0))
-        Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=end,
-            is_active=False,
-        )
-        self.project.total_time = 999
-        self.project.save(update_fields=["total_time"])
-
+    def test_audit_returns_explicit_deprecation_notice(self):
         response = self.client.post(
             "/api/audit/",
             data=json.dumps({"dry_run": True}),
@@ -2647,15 +2669,17 @@ class McpApiContractTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertTrue(payload["dry_run"])
-        self.assertEqual(payload["projects"]["changed"], 1)
-        self.assertEqual(payload["changed_projects"][0]["name"], "MCP Project")
-        self.assertEqual(payload["changed_projects"][0]["before"], 999)
-        self.assertEqual(payload["changed_projects"][0]["after"], 60)
-
-        self.project.refresh_from_db()
-        self.assertEqual(self.project.total_time, 999)
+        self.assertEqual(
+            response.json(),
+            {
+                "ok": True,
+                "deprecated": True,
+                "message": (
+                    "Deprecated: totals are always derived from sessions now; "
+                    "there is nothing to audit."
+                ),
+            },
+        )
 
     def test_projects_with_stats_exposes_computed_and_persisted_totals(self):
         start = timezone.make_aware(datetime(2026, 5, 1, 9, 0, 0))
@@ -2667,9 +2691,6 @@ class McpApiContractTests(TestCase):
             end_time=end,
             is_active=False,
         )
-        self.project.total_time = 999
-        self.project.save(update_fields=["total_time"])
-
         response = self.client.get("/api/projects_with_stats/")
 
         self.assertEqual(response.status_code, 200)

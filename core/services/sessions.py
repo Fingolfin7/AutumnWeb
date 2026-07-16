@@ -1,4 +1,4 @@
-"""Atomic mutations for session rows and their cached total projections."""
+"""Atomic mutations for session rows."""
 
 from datetime import datetime
 
@@ -6,9 +6,6 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 
 from core.models import Sessions
-from core.services.totals_projection import CachedTotalsProjection
-
-
 UNSET = object()
 
 
@@ -43,7 +40,7 @@ class SessionMutationService:
     @staticmethod
     @transaction.atomic
     def create_session(*, subprojects=(), **fields):
-        """Create a session and add its completed contribution once."""
+        """Create a session."""
         session = Sessions(**fields)
         subprojects = list(subprojects)
         session.start_time = _floor_instant(session.start_time)
@@ -53,9 +50,6 @@ class SessionMutationService:
         session.full_clean()
         session.save()
         session.subprojects.set(subprojects)
-        after = CachedTotalsProjection.snapshot(session)
-        CachedTotalsProjection.apply_change(None, after)
-        CachedTotalsProjection.advance_last_updated(session)
         return session
 
     @staticmethod
@@ -72,13 +66,11 @@ class SessionMutationService:
         note=UNSET,
         is_active=UNSET,
     ):
-        """Edit an existing row in place and atomically move its contribution."""
+        """Edit an existing row in place."""
         queryset = Sessions.objects.select_for_update()
         if user is not None:
             queryset = queryset.filter(user=user)
         session = queryset.get(pk=session_id)
-        before = CachedTotalsProjection.snapshot(session)
-
         updates = {
             "project": project,
             "start_time": _floor_instant(start_time),
@@ -102,23 +94,18 @@ class SessionMutationService:
         if subprojects is not UNSET:
             session.subprojects.set(final_subprojects)
 
-        after = CachedTotalsProjection.snapshot(session)
-        CachedTotalsProjection.apply_change(before, after)
-        CachedTotalsProjection.advance_last_updated(session)
         return session
 
     @staticmethod
     @transaction.atomic
     def delete_session(session_id, *, user=None):
-        """Delete a session and remove exactly its current contribution."""
+        """Delete a session."""
         queryset = Sessions.objects.select_for_update()
         if user is not None:
             queryset = queryset.filter(user=user)
         session = queryset.get(pk=session_id)
-        before = CachedTotalsProjection.snapshot(session)
         deleted_id = session.pk
         session.delete()
-        CachedTotalsProjection.apply_change(before, None)
         return deleted_id
 
     @staticmethod

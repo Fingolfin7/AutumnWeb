@@ -294,7 +294,13 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
             except DestructiveOperationError:
                 form.add_error("name", "You already have a project with this name.")
                 return self.form_invalid(form)
-        form.save()
+        project = form.save(commit=False)
+        update_fields = [
+            field for field in form.changed_data if field != "tags"
+        ]
+        if update_fields:
+            project.save(update_fields=update_fields)
+        form.save_m2m()
         messages.success(self.request, "Project updated successfully")
         return redirect("update_project", pk=self.kwargs["pk"])
 
@@ -312,7 +318,6 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
 
     def get_object(self, queryset=None):
         subproject = super().get_object(queryset)
-        # subproject.audit_total_time()
         return subproject
 
     def get_context_data(self, **kwargs):
@@ -386,7 +391,9 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
                     "You already have a subproject with this name under the selected project.",
                 )
                 return self.form_invalid(form)
-        form.save()
+        subproject = form.save(commit=False)
+        if form.changed_data:
+            subproject.save(update_fields=form.changed_data)
         messages.success(self.request, "Subproject updated successfully")
         return redirect("update_subproject", pk=self.kwargs["pk"])
 

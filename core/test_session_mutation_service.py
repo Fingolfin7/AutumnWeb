@@ -1,15 +1,13 @@
 from datetime import timedelta
-from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import connection
 from django.test import TestCase
-from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from core.models import Projects, Sessions, SubProjects
 from core.services import SessionMutationService
+from core.totals import derived_project_totals, derived_subproject_totals
 
 
 class SessionMutationServiceTests(TestCase):
@@ -26,6 +24,16 @@ class SessionMutationServiceTests(TestCase):
             parent_project=self.project,
         )
 
+    def project_total(self, project=None):
+        project = project or self.project
+        return derived_project_totals(self.user, [project.pk])[project.pk]
+
+    def subproject_total(self, subproject=None):
+        subproject = subproject or self.subproject
+        return derived_subproject_totals(
+            self.user, [subproject.pk]
+        )[subproject.pk]
+
     def test_active_completed_active_transitions_adjust_once(self):
         start = timezone.now() - timedelta(minutes=40)
         session = SessionMutationService.create_session(
@@ -36,10 +44,8 @@ class SessionMutationServiceTests(TestCase):
             is_active=True,
         )
 
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-        self.assertEqual(self.project.total_time, 0)
-        self.assertEqual(self.subproject.total_time, 0)
+        self.assertEqual(self.project_total(), 0)
+        self.assertEqual(self.subproject_total(), 0)
 
         session = SessionMutationService.mutate_session(
             session.pk,
@@ -47,10 +53,8 @@ class SessionMutationServiceTests(TestCase):
             end_time=start + timedelta(minutes=40),
             is_active=False,
         )
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 40, places=2)
-        self.assertAlmostEqual(self.subproject.total_time, 40, places=2)
+        self.assertAlmostEqual(self.project_total(), 40, places=2)
+        self.assertAlmostEqual(self.subproject_total(), 40, places=2)
 
         SessionMutationService.mutate_session(
             session.pk,
@@ -58,10 +62,8 @@ class SessionMutationServiceTests(TestCase):
             end_time=None,
             is_active=True,
         )
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-        self.assertEqual(self.project.total_time, 0)
-        self.assertEqual(self.subproject.total_time, 0)
+        self.assertEqual(self.project_total(), 0)
+        self.assertEqual(self.subproject_total(), 0)
 
     def test_clearing_subprojects_only_removes_subproject_contribution(self):
         start = timezone.now() - timedelta(minutes=25)
@@ -78,12 +80,10 @@ class SessionMutationServiceTests(TestCase):
             session.pk, user=self.user, subprojects=[]
         )
 
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 25, places=2)
-        self.assertEqual(self.subproject.total_time, 0)
+        self.assertAlmostEqual(self.project_total(), 25, places=2)
+        self.assertEqual(self.subproject_total(), 0)
 
-    def test_duration_edit_uses_atomic_delta_without_history_audit(self):
+    def test_duration_edit_moves_derived_totals(self):
         start = timezone.now() - timedelta(minutes=30)
         session = SessionMutationService.create_session(
             user=self.user,
@@ -94,42 +94,14 @@ class SessionMutationServiceTests(TestCase):
             is_active=False,
         )
 
-        with (
-            patch.object(Projects, "audit_total_time") as project_audit,
-            patch.object(SubProjects, "audit_total_time") as subproject_audit,
-            CaptureQueriesContext(connection) as queries,
-        ):
-            SessionMutationService.mutate_session(
-                session.pk,
-                user=self.user,
-                start_time=start - timedelta(minutes=15),
-            )
-
-        project_audit.assert_not_called()
-        subproject_audit.assert_not_called()
-        sql = [query["sql"] for query in queries.captured_queries]
-        project_updates = [
-            statement
-            for statement in sql
-            if 'UPDATE "core_projects"' in statement
-            and '"total_time"' in statement
-        ]
-        self.assertTrue(project_updates)
-        self.assertTrue(
-            any('"total_time" +' in statement for statement in project_updates)
-        )
-        self.assertFalse(
-            any(
-                'FROM "core_sessions"' in statement
-                and 'WHERE "core_sessions"."project_id"' in statement
-                for statement in sql
-            )
+        SessionMutationService.mutate_session(
+            session.pk,
+            user=self.user,
+            start_time=start - timedelta(minutes=15),
         )
 
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 45, places=2)
-        self.assertAlmostEqual(self.subproject.total_time, 45, places=2)
+        self.assertAlmostEqual(self.project_total(), 45, places=2)
+        self.assertAlmostEqual(self.subproject_total(), 45, places=2)
 
     def test_rejects_subprojects_from_a_different_project(self):
         other_project = Projects.objects.create(
@@ -153,7 +125,7 @@ class SessionMutationServiceTests(TestCase):
 
         self.assertFalse(Sessions.objects.filter(project=self.project).exists())
 
-    def test_direct_note_save_does_not_change_cached_contribution(self):
+    def test_direct_note_save_does_not_change_derived_total(self):
         start = timezone.now() - timedelta(minutes=10)
         session = SessionMutationService.create_session(
             user=self.user,
@@ -166,6 +138,33 @@ class SessionMutationServiceTests(TestCase):
         session.note = "No contribution fields changed"
         session.save()
 
-        self.project.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 10, places=2)
+        self.assertAlmostEqual(self.project_total(), 10, places=2)
         self.assertEqual(Sessions.objects.filter(pk=session.pk).count(), 1)
+
+    def test_create_stop_delete_leaves_retired_columns_unchanged(self):
+        stored_last_updated = self.project.last_updated
+        start = timezone.now().replace(microsecond=0) - timedelta(minutes=15)
+        session = SessionMutationService.create_session(
+            user=self.user,
+            project=self.project,
+            start_time=start,
+            is_active=True,
+        )
+
+        self.assertEqual(self.project_total(), 0)
+        session = SessionMutationService.mutate_session(
+            session.pk,
+            user=self.user,
+            end_time=start + timedelta(minutes=15),
+            is_active=False,
+        )
+        self.assertEqual(self.project_total(), 15)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.total_time, 0)
+        self.assertEqual(self.project.last_updated, stored_last_updated)
+
+        SessionMutationService.delete_session(session.pk, user=self.user)
+        self.assertEqual(self.project_total(), 0)
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.total_time, 0)
+        self.assertEqual(self.project.last_updated, stored_last_updated)

@@ -11,6 +11,7 @@ from freezegun import freeze_time
 from core.commitments import reconcile_commitment
 from core.importer import run_import
 from core.models import Commitment, Projects, Sessions, SubProjects
+from core.totals import derived_project_totals, derived_subproject_totals
 
 
 class CurrentAttributionSemanticsTests(TestCase):
@@ -78,9 +79,13 @@ class CurrentMergeSemanticsTests(TestCase):
         session.refresh_from_db()
         self.assertEqual(list(session.subprojects.values_list("name", flat=True)), ["M"])
         merged = SubProjects.objects.get(parent_project=project, name="M")
-        project.refresh_from_db()
-        self.assertEqual(merged.total_time, 60.0)
-        self.assertEqual(project.total_time, 0.0)
+        # S7 contract: merge results are asserted through derived session totals.
+        self.assertEqual(
+            derived_subproject_totals(self.user)[merged.pk], 60.0
+        )
+        self.assertEqual(
+            derived_project_totals(self.user)[project.pk], 60.0
+        )
 
     def test_project_merge_preserves_both_duplicate_named_subprojects(self):
         # characterizes current behavior

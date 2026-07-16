@@ -98,7 +98,7 @@ def iter_import(
                     project.status = status_tuple[0]
                 else:
                     raise ValueError(f"Invalid status: {project_data['Status']}")
-            project.save()
+            project.save(update_fields=["status"])
 
         # Apply context/tags (backwards compatible). If importing into a
         # context, don't let the file override it.
@@ -255,17 +255,12 @@ def iter_import(
 
         yield ("\n\n")
 
-        project.audit_total_time()
-        for subproject in project.subprojects.all():
-            subproject.audit_total_time()
-
         sessions = Sessions.objects.filter(project=project, user=user)
         earliest_start, latest_end = sessions_get_earliest_latest(sessions)
 
         if merge and earliest_start and latest_end:
             project.start_date = earliest_start
-            project.last_updated = latest_end
-            project.save()
+            project.save(update_fields=["start_date"])
 
             for subproject in project.subprojects.all():
                 earliest_start, latest_end = sessions_get_earliest_latest(
@@ -274,10 +269,7 @@ def iter_import(
                 subproject.start_date = (
                     earliest_start if earliest_start else project.start_date
                 )
-                subproject.last_updated = (
-                    latest_end if latest_end else project.last_updated
-                )
-                subproject.save()
+                subproject.save(update_fields=["start_date"])
 
         if not merge:
             tally = derived_project_totals(user, [project.pk])[project.pk]

@@ -95,19 +95,6 @@ class Projects(models.Model):
     def get_end(self):
         return datetime.combine(self.last_updated, time())
 
-    def audit_total_time(self, log=True):
-        # Using select_related to fetch related projects in one query
-        if log:
-            logger.info(f"Auditing total time for project: {self.name}")
-            logger.info(f"Total Time before audit: {self.total_time}")
-
-        self.total_time = sum(
-            session.duration for session in self.sessions.filter(end_time__isnull=False) if session.duration is not None)
-        self.save()
-
-        if log:
-            logger.info(f"Total Time after audit: {self.total_time}\n")
-
     def save(self, *args, **kwargs):
         """Ensure projects always have a context.
 
@@ -147,18 +134,6 @@ class SubProjects(models.Model):
     @property
     def get_end(self):
         return datetime.combine(self.last_updated, time())
-
-    def audit_total_time(self, log=True):
-        if log:
-            logger.info(f"Auditing total time for subproject: {self.name}")
-            logger.info(f"Total Time before audit: {self.total_time}")
-
-        self.total_time = sum(
-            session.duration for session in self.sessions.filter(end_time__isnull=False) if session.duration is not None)
-        self.save()
-
-        if log:
-            logger.info(f"Total Time after audit: {self.total_time}\n")
 
     # when a subproject is deleted, remove it from all its sessions
     def delete(self, *args, **kwargs):

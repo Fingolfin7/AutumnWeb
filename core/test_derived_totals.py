@@ -29,18 +29,21 @@ class DerivedTotalsTests(TestCase):
             user=self.user,
             name="Derived Project",
             last_updated=self.stored_fallback,
+            total_time=999999,
         )
         self.subproject_a = SubProjects.objects.create(
             user=self.user,
             parent_project=self.project,
             name="Alpha",
             last_updated=self.stored_fallback,
+            total_time=999999,
         )
         self.subproject_b = SubProjects.objects.create(
             user=self.user,
             parent_project=self.project,
             name="Beta",
             last_updated=self.stored_fallback,
+            total_time=999999,
         )
 
     def _session(self, seconds, *, offset_minutes=0, completed=True, links=()):
@@ -81,27 +84,25 @@ class DerivedTotalsTests(TestCase):
         self.assertEqual(subproject_totals[self.subproject_a.pk], expected_a)
         self.assertEqual(subproject_totals[self.subproject_b.pk], expected_b)
 
-    def test_derived_matches_fresh_audited_cache(self):
+    def test_derived_totals_ignore_retired_column_values(self):
         self._session(1800, links=(self.subproject_a,))
         self._session(600, offset_minutes=31, links=(self.subproject_a,))
 
-        self.project.audit_total_time(log=False)
-        self.subproject_a.audit_total_time(log=False)
-        self.project.refresh_from_db()
-        self.subproject_a.refresh_from_db()
-
         self.assertEqual(
             derived_project_totals(self.user)[self.project.pk],
-            self.project.total_time,
+            40,
         )
         self.assertEqual(
             derived_subproject_totals(self.user)[self.subproject_a.pk],
-            self.subproject_a.total_time,
+            40,
         )
+        self.project.refresh_from_db()
+        self.subproject_a.refresh_from_db()
+        self.assertEqual(self.project.total_time, 999999)
+        self.assertEqual(self.subproject_a.total_time, 999999)
 
     def test_stale_cache_is_hidden_on_all_required_surfaces(self):
         self._session(3600, links=(self.subproject_a,))
-        Projects.objects.filter(pk=self.project.pk).update(total_time=999999)
 
         serialized = ProjectSerializer(self.project).data
         self.assertEqual(serialized["total_time"], 60)

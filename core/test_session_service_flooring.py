@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from core.models import Projects, Sessions, SubProjects
 from core.services import SessionMutationService
+from core.totals import derived_project_totals, derived_subproject_totals
 
 
 class SessionServiceFlooringTests(TestCase):
@@ -112,7 +113,7 @@ class SessionServiceFlooringTests(TestCase):
                 is_active=False,
             )
 
-    def test_replace_subprojects_moves_cached_totals(self):
+    def test_replace_subprojects_moves_derived_totals(self):
         before_subproject = SubProjects.objects.create(
             user=self.user,
             name="Before",
@@ -133,12 +134,12 @@ class SessionServiceFlooringTests(TestCase):
             is_active=False,
         )
 
-        self.project.refresh_from_db()
-        before_subproject.refresh_from_db()
-        after_subproject.refresh_from_db()
-        self.assertEqual(self.project.total_time, 30)
-        self.assertEqual(before_subproject.total_time, 30)
-        self.assertEqual(after_subproject.total_time, 0)
+        self.assertEqual(
+            derived_project_totals(self.user)[self.project.pk], 30
+        )
+        totals = derived_subproject_totals(self.user)
+        self.assertEqual(totals[before_subproject.pk], 30)
+        self.assertEqual(totals[after_subproject.pk], 0)
 
         session = SessionMutationService.replace_subprojects(
             session.pk,
@@ -146,13 +147,13 @@ class SessionServiceFlooringTests(TestCase):
             subprojects=[after_subproject],
         )
 
-        self.project.refresh_from_db()
-        before_subproject.refresh_from_db()
-        after_subproject.refresh_from_db()
         self.assertEqual(list(session.subprojects.all()), [after_subproject])
-        self.assertEqual(self.project.total_time, 30)
-        self.assertEqual(before_subproject.total_time, 0)
-        self.assertEqual(after_subproject.total_time, 30)
+        self.assertEqual(
+            derived_project_totals(self.user)[self.project.pk], 30
+        )
+        totals = derived_subproject_totals(self.user)
+        self.assertEqual(totals[before_subproject.pk], 0)
+        self.assertEqual(totals[after_subproject.pk], 30)
 
     def test_timer_start_and_track_apis_floor_instants(self):
         self.client.force_login(self.user)

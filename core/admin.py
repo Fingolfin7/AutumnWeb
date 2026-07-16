@@ -12,7 +12,6 @@ from .models import (
     Tag,
 )
 from .services import (
-    CachedTotalsProjection,
     CommitmentTargetProtectedError,
     DestructiveMutationService,
     SessionMutationService,
@@ -85,12 +84,24 @@ class ProjectsAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "user__username", "user__email", "context__name", "tags__name")
     autocomplete_fields = ("user", "context", "tags")
     list_editable = ("status", "context")
+    readonly_fields = ("total_time", "last_updated")
     actions = (
         mark_projects_active,
         mark_projects_paused,
         mark_projects_complete,
         mark_projects_archived,
     )
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            return super().save_model(request, obj, form, change)
+        update_fields = [
+            field
+            for field in form.changed_data
+            if field not in {"tags", "total_time", "last_updated"}
+        ]
+        if update_fields:
+            obj.save(update_fields=update_fields)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request).select_related("user", "context").prefetch_related("tags").annotate(
@@ -153,6 +164,18 @@ class SubProjectsAdmin(admin.ModelAdmin):
         "user__email",
     )
     autocomplete_fields = ("user", "parent_project")
+    readonly_fields = ("total_time", "last_updated")
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            return super().save_model(request, obj, form, change)
+        update_fields = [
+            field
+            for field in form.changed_data
+            if field not in {"total_time", "last_updated"}
+        ]
+        if update_fields:
+            obj.save(update_fields=update_fields)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request).select_related("user", "parent_project").annotate(
@@ -223,24 +246,6 @@ class SessionsAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("project", "user").prefetch_related("subprojects").annotate(
             _user_session_count=Count("user__sessions", distinct=True)
         )
-
-    def save_model(self, request, obj, form, change):
-        obj._ledger_before = (
-            CachedTotalsProjection.snapshot(
-                Sessions.objects.select_for_update().get(pk=obj.pk)
-            )
-            if change
-            else None
-        )
-        super().save_model(request, obj, form, change)
-
-    def save_related(self, request, form, formsets, change):
-        super().save_related(request, form, formsets, change)
-        after = CachedTotalsProjection.snapshot(form.instance)
-        CachedTotalsProjection.apply_change(
-            getattr(form.instance, "_ledger_before", None), after
-        )
-        CachedTotalsProjection.advance_last_updated(form.instance)
 
     def delete_model(self, request, obj):
         SessionMutationService.delete_session(obj.pk, user=obj.user)

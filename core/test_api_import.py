@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.models import Context, Projects, Sessions, SubProjects
+from core.totals import derived_project_totals
 from core.utils import json_compress
 
 
@@ -65,7 +66,7 @@ class ImportJsonApiTests(TestCase):
         context = Context.objects.get(user=self.user, name="Focused Work")
         project = Projects.objects.get(user=self.user, name="Client Work")
         self.assertEqual(project.context, context)
-        self.assertEqual(project.total_time, 60.0)
+        self.assertEqual(derived_project_totals(self.user)[project.pk], 60.0)
         subproject = SubProjects.objects.get(user=self.user, parent_project=project, name="planning")
         session = Sessions.objects.get(user=self.user, project=project)
         self.assertEqual(list(session.subprojects.all()), [subproject])

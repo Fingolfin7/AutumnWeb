@@ -269,7 +269,7 @@ def mark_project(request):
         return _err("Invalid status (use: active, paused, complete)")
     proj = get_object_or_404(Projects, name=project_name, user=request.user)
     proj.status = status_val
-    proj.save()
+    proj.save(update_fields=["status"])
     return Response({"ok": True, "project": proj.name, "status": proj.status})
 
 
