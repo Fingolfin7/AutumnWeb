@@ -1,0 +1,141 @@
+{
+  "sqlite": {
+    "constraints": {
+      "__primary__": {
+        "check": false,
+        "columns": [
+          "id"
+        ],
+        "foreign_key": null,
+        "index": false,
+        "primary_key": true,
+        "unique": false
+      },
+      "core_sessions_subprojects_sessions_id_a3ef6e38": {
+        "check": false,
+        "columns": [
+          "sessions_id"
+        ],
+        "foreign_key": null,
+        "index": true,
+        "orders": [
+          "ASC"
+        ],
+        "primary_key": false,
+        "type": "idx",
+        "unique": false
+      },
+      "core_sessions_subprojects_sessions_id_subprojects_id_20e527fe_uniq": {
+        "check": false,
+        "columns": [
+          "sessions_id",
+          "subprojects_id"
+        ],
+        "foreign_key": null,
+        "index": true,
+        "orders": [
+          "ASC",
+          "ASC"
+        ],
+        "primary_key": false,
+        "type": "idx",
+        "unique": true
+      },
+      "core_sessions_subprojects_subprojects_id_8c70b167": {
+        "check": false,
+        "columns": [
+          "subprojects_id"
+        ],
+        "foreign_key": null,
+        "index": true,
+        "orders": [
+          "ASC"
+        ],
+        "primary_key": false,
+        "type": "idx",
+        "unique": false
+      },
+      "fk_0": {
+        "check": false,
+        "columns": [
+          "subprojects_id"
+        ],
+        "foreign_key": [
+          "core_subprojects",
+          "id"
+        ],
+        "index": false,
+        "primary_key": false,
+        "unique": false
+      },
+      "fk_1": {
+        "check": false,
+        "columns": [
+          "sessions_id"
+        ],
+        "foreign_key": [
+          "core_sessions",
+          "id"
+        ],
+        "index": false,
+        "primary_key": false,
+        "unique": false
+      }
+    },
+    "pragma_indexes": [
+      {
+        "index_info": [
+          [
+            0,
+            2,
+            "subprojects_id"
+          ]
+        ],
+        "index_list": [
+          0,
+          "core_sessions_subprojects_subprojects_id_8c70b167",
+          0,
+          "c",
+          0
+        ]
+      },
+      {
+        "index_info": [
+          [
+            0,
+            1,
+            "sessions_id"
+          ]
+        ],
+        "index_list": [
+          1,
+          "core_sessions_subprojects_sessions_id_a3ef6e38",
+          0,
+          "c",
+          0
+        ]
+      },
+      {
+        "index_info": [
+          [
+            0,
+            1,
+            "sessions_id"
+          ],
+          [
+            1,
+            2,
+            "subprojects_id"
+          ]
+        ],
+        "index_list": [
+          2,
+          "core_sessions_subprojects_sessions_id_subprojects_id_20e527fe_uniq",
+          1,
+          "c",
+          0
+        ]
+      }
+    ]
+  }
+}

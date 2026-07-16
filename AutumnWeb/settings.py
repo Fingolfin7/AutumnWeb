@@ -203,6 +203,9 @@ else:
             }
         }
 
+if os.environ.get("AUTUMN_CHZ_DB"):
+    DATABASES["default"].setdefault("TEST", {})["NAME"] = os.environ["AUTUMN_CHZ_DB"]
+
 # Keep DB connections open a bit (helps in production). Set to 0 to disable.
 CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
 
