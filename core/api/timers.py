@@ -171,7 +171,7 @@ def timer_status(request):
 def timer_restart(request):
     """
     Restart current timer (or a specific one): set start_time=now, active=True.
-    JSON: { "session_id": int?, "project": str? }
+    JSON: { "session_id": int?, "project": str?, "start": iso? }
     """
     compact = _compact(request)
     stop_expired_timers(request.user)
@@ -184,6 +184,11 @@ def timer_restart(request):
         return _err("No active timer found", status.HTTP_404_NOT_FOUND)
 
     restart_time = _now()
+    if request.data.get("start"):
+        try:
+            restart_time = _parse_client_instant(request.data["start"], "start")
+        except ValueError as exc:
+            return _err(str(exc))
     auto_stop_duration = None
     if sess.auto_stop_at and sess.start_time and sess.auto_stop_at > sess.start_time:
         auto_stop_duration = sess.auto_stop_at - sess.start_time

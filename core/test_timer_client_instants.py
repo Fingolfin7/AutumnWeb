@@ -87,6 +87,32 @@ class TimerClientInstantTests(TestCase):
         self.assertIn("before the session start", response.json()["error"])
         self.assertTrue(Sessions.objects.get(pk=session_id).is_active)
 
+    def test_restart_uses_client_instant(self):
+        started = self._start(start="2026-07-16T10:00:00+00:00")
+        session_id = started.json()["session"]["id"]
+        client_restart = datetime(2026, 7, 16, 11, 45, 0, tzinfo=dt_timezone.utc)
+        response = self.client.post(
+            "/api/timer/restart/",
+            data={"session_id": session_id, "start": client_restart.isoformat()},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        sess = Sessions.objects.get(pk=session_id)
+        self.assertEqual(sess.start_time, client_restart)
+        self.assertTrue(sess.is_active)
+
+    def test_restart_rejects_far_future_instant(self):
+        started = self._start()
+        session_id = started.json()["session"]["id"]
+        future = timezone.now() + timedelta(minutes=10)
+        response = self.client.post(
+            "/api/timer/restart/",
+            data={"session_id": session_id, "start": future.isoformat()},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("future", response.json()["error"])
+
     def test_stop_rejects_far_future_instant(self):
         started = self._start()
         session_id = started.json()["session"]["id"]
