@@ -334,6 +334,7 @@ class MeView(V2APIView):
                 "user": {
                     "id": request.user.id,
                     "username": request.user.username,
+                    "email": request.user.email,
                     "timezone": profile_timezone,
                 },
             }

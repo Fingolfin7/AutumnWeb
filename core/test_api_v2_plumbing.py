@@ -60,6 +60,7 @@ class V2EndpointTests(TestCase):
                 "user": {
                     "id": self.user.id,
                     "username": "v2-user",
+                    "email": self.user.email,
                     "timezone": "America/New_York",
                 },
             },
