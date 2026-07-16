@@ -5,8 +5,12 @@ from datetime import datetime
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from core.models import Sessions
+from core.models import Commitment, Sessions
 UNSET = object()
+
+
+def _mark_commitments_dirty(user_id):
+    Commitment.objects.filter(user_id=user_id).update(needs_recompute=True)
 
 
 def _floor_instant(value):
@@ -50,6 +54,7 @@ class SessionMutationService:
         session.full_clean()
         session.save()
         session.subprojects.set(subprojects)
+        _mark_commitments_dirty(session.user_id)
         return session
 
     @staticmethod
@@ -95,6 +100,7 @@ class SessionMutationService:
         if subprojects is not UNSET:
             session.subprojects.set(final_subprojects)
 
+        _mark_commitments_dirty(session.user_id)
         return session
 
     @staticmethod
@@ -106,7 +112,9 @@ class SessionMutationService:
             queryset = queryset.filter(user=user)
         session = queryset.get(pk=session_id)
         deleted_id = session.pk
+        user_id = session.user_id
         session.delete()
+        _mark_commitments_dirty(user_id)
         return deleted_id
 
     @staticmethod

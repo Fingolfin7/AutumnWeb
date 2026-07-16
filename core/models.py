@@ -409,6 +409,10 @@ class Commitment(models.Model):
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_reconciled = models.DateTimeField(null=True, blank=True)
+    needs_recompute = models.BooleanField(default=False, db_default=False)
+    ledger_start_at = models.DateTimeField(null=True, blank=True)
+    generation = models.IntegerField(default=1, db_default=1)
+    version = models.IntegerField(default=1, db_default=1)
 
     class Meta:
         verbose_name = 'Commitment'
@@ -454,3 +458,101 @@ class Commitment(models.Model):
         target = targets[self.aggregation_type]
         if getattr(target, 'user_id', None) != self.user_id:
             raise ValidationError('Commitment target must belong to the same user.')
+
+
+class CommitmentRevision(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACTIVE = 'active'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACTIVE, 'Active'),
+    )
+
+    commitment = models.ForeignKey(
+        Commitment,
+        on_delete=models.CASCADE,
+        related_name='revisions',
+    )
+    generation = models.IntegerField(default=1, db_default=1)
+    effective_from_instant = models.DateTimeField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    aggregation_type = models.CharField(max_length=20, choices=aggregation_type_choices)
+    target_id = models.BigIntegerField(null=True, blank=True)
+    target_name = models.CharField(max_length=255, default='', db_default='')
+    filters_snapshot = models.JSONField(default=dict)
+    commitment_type = models.CharField(max_length=10, choices=commitment_type_choices)
+    cadence = models.CharField(max_length=15, choices=period_choices)
+    target_value = models.PositiveIntegerField()
+    banking_enabled = models.BooleanField(default=True, db_default=True)
+    max_balance = models.IntegerField(default=600, db_default=600)
+    min_balance = models.IntegerField(default=-600, db_default=-600)
+    start_date = models.DateField()
+    timezone = models.CharField(max_length=64, default='Europe/Prague', db_default='Europe/Prague')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['commitment'],
+                condition=models.Q(status='pending'),
+                name='one_pending_revision_per_commitment',
+            ),
+        ]
+
+
+class CommitmentPeriod(models.Model):
+    commitment = models.ForeignKey(
+        Commitment,
+        on_delete=models.CASCADE,
+        related_name='period_rows',
+    )
+    generation = models.IntegerField(default=1, db_default=1)
+    revision = models.ForeignKey(
+        CommitmentRevision,
+        on_delete=models.PROTECT,
+        related_name='period_rows',
+    )
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    accrued_numerator = models.BigIntegerField(default=0, db_default=0)
+    session_count = models.IntegerField(default=0, db_default=0)
+    carryover_in = models.IntegerField(default=0, db_default=0)
+    balance_out = models.IntegerField(default=0, db_default=0)
+    closed_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['commitment', 'generation', 'period_start'],
+                name='unique_commitment_generation_period_start',
+            ),
+        ]
+
+
+class CommitmentAdjustment(models.Model):
+    KIND_OPENING = 'opening'
+    KIND_RESTART_CARRY = 'restart_carry'
+    KIND_MANUAL = 'manual'
+    KIND_CHOICES = (
+        (KIND_OPENING, 'Opening'),
+        (KIND_RESTART_CARRY, 'Restart carry'),
+        (KIND_MANUAL, 'Manual'),
+    )
+
+    commitment = models.ForeignKey(
+        Commitment,
+        on_delete=models.CASCADE,
+        related_name='adjustments',
+    )
+    seq = models.IntegerField()
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    amount = models.IntegerField()
+    effective_at = models.DateTimeField()
+    reason = models.TextField(default='', db_default='')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['commitment', 'seq'],
+                name='unique_commitment_adjustment_seq',
+            ),
+        ]

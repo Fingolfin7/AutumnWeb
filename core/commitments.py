@@ -1,9 +1,22 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
+from django.conf import settings
+from django.db import transaction
 from django.db.models import DurationField, ExpressionWrapper, F, Sum
 from django.utils import timezone
 
-from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
+from core.models import (
+    Commitment,
+    CommitmentAdjustment,
+    CommitmentPeriod,
+    CommitmentRevision,
+    Context,
+    Projects,
+    Sessions,
+    SubProjects,
+    Tag,
+)
 from core.utils import get_period_bounds
 
 
@@ -350,6 +363,325 @@ def commitment_actual(commitment, period_start, period_end) -> float | int:
     return duration.total_seconds() / 60 if duration is not None else 0
 
 
+_REVISION_FILTER_FIELDS = (
+    "include_projects",
+    "exclude_projects",
+    "include_subprojects",
+    "exclude_subprojects",
+    "include_contexts",
+    "exclude_contexts",
+    "include_tags",
+    "exclude_tags",
+)
+
+
+def snapshot_commitment_definition(commitment: Commitment) -> dict:
+    """Return the immutable definition fields stored on a revision."""
+    target = commitment.target_object
+    filters = {}
+    for field in _REVISION_FILTER_FIELDS:
+        filters[field] = [
+            {"id": obj.pk, "name": obj.name}
+            for obj in getattr(commitment, field).all().order_by("pk")
+        ]
+
+    profile = getattr(commitment.user, "profile", None)
+    timezone_name = getattr(profile, "timezone", None) or settings.TIME_ZONE
+    return {
+        "generation": commitment.generation,
+        "aggregation_type": commitment.aggregation_type,
+        "target_id": target.pk if target is not None else None,
+        "target_name": target.name if target is not None else "",
+        "filters_snapshot": filters,
+        "commitment_type": commitment.commitment_type,
+        "cadence": commitment.period,
+        "target_value": commitment.target,
+        "banking_enabled": commitment.banking_enabled,
+        "max_balance": commitment.max_balance,
+        "min_balance": commitment.min_balance,
+        "start_date": commitment.start_date,
+        "timezone": timezone_name,
+    }
+
+
+def _local_midnight(day, zone):
+    return datetime.combine(day, datetime.min.time(), tzinfo=zone)
+
+
+def _ensure_ledger_initialized(commitment: Commitment, now):
+    """Bootstrap commitments created after the data migration.
+
+    The migration itself anchors existing rows at its cutover instant. Until the
+    revision-edit service lands, newly-created legacy/v1 rows are anchored at
+    their start-date midnight so their first reconciliation retains v1 math.
+    """
+    revision = (
+        commitment.revisions.filter(
+            generation=commitment.generation,
+            status=CommitmentRevision.STATUS_ACTIVE,
+        )
+        .order_by("-effective_from_instant", "-pk")
+        .first()
+    )
+    if commitment.ledger_start_at is not None and revision is not None:
+        return revision
+
+    definition = snapshot_commitment_definition(commitment)
+    zone = ZoneInfo(definition["timezone"])
+    anchor = commitment.ledger_start_at or _local_midnight(
+        definition["start_date"], zone
+    )
+    commitment.ledger_start_at = anchor
+    commitment.needs_recompute = True
+    commitment.save(update_fields=["ledger_start_at", "needs_recompute"])
+
+    if revision is None:
+        revision = CommitmentRevision.objects.create(
+            commitment=commitment,
+            effective_from_instant=anchor,
+            status=CommitmentRevision.STATUS_ACTIVE,
+            **definition,
+        )
+    if not commitment.adjustments.filter(
+        kind=CommitmentAdjustment.KIND_OPENING
+    ).exists():
+        next_seq = (
+            commitment.adjustments.order_by("-seq")
+            .values_list("seq", flat=True)
+            .first()
+            or 0
+        ) + 1
+        CommitmentAdjustment.objects.create(
+            commitment=commitment,
+            seq=next_seq,
+            kind=CommitmentAdjustment.KIND_OPENING,
+            amount=commitment.balance,
+            effective_at=anchor,
+            reason="Initial commitment opening balance",
+        )
+    return revision
+
+
+def _snapshot_ids(revision, field):
+    values = revision.filters_snapshot.get(field, [])
+    return [value["id"] if isinstance(value, dict) else value for value in values]
+
+
+def _revision_sessions_queryset(revision, period_start, period_end):
+    commitment = revision.commitment
+    sessions = Sessions.objects.filter(
+        user_id=commitment.user_id,
+        end_time__isnull=False,
+        end_time__gte=period_start,
+        end_time__lt=period_end,
+    )
+    target_id = revision.target_id
+    if revision.aggregation_type == "project" and target_id:
+        sessions = sessions.filter(project_id=target_id)
+    elif revision.aggregation_type == "subproject" and target_id:
+        sessions = sessions.filter(subprojects__pk=target_id)
+    elif revision.aggregation_type == "context" and target_id:
+        sessions = sessions.filter(project__context_id=target_id)
+    elif revision.aggregation_type == "tag" and target_id:
+        sessions = sessions.filter(project__tags__pk=target_id)
+    else:
+        return sessions.none()
+
+    allowed = {
+        "context": {"tag", "project", "subproject"},
+        "tag": {"project", "subproject"},
+        "project": {"subproject"},
+        "subproject": set(),
+    }.get(revision.aggregation_type, set())
+    dimensions = {
+        "projects": "project_id",
+        "subprojects": "subprojects__pk",
+        "contexts": "project__context_id",
+        "tags": "project__tags__pk",
+    }
+    for plural, lookup in dimensions.items():
+        singular = plural[:-1]
+        if singular not in allowed:
+            continue
+        include_ids = _snapshot_ids(revision, f"include_{plural}")
+        exclude_ids = _snapshot_ids(revision, f"exclude_{plural}")
+        if include_ids:
+            sessions = sessions.filter(**{f"{lookup}__in": include_ids})
+        if exclude_ids:
+            sessions = sessions.exclude(**{f"{lookup}__in": exclude_ids})
+    return sessions.distinct()
+
+
+def _revision_accrual(revision, period_start, period_end):
+    sessions = list(
+        _revision_sessions_queryset(revision, period_start, period_end)
+        .order_by("pk")
+        .values_list("pk", "start_time", "end_time")
+    )
+    total_microseconds = sum(
+        (
+            (end_time - start_time).days * 86_400_000_000
+            + (end_time - start_time).seconds * 1_000_000
+            + (end_time - start_time).microseconds
+        )
+        for _, start_time, end_time in sessions
+    )
+    # One numerator unit is 1/10000 minute, i.e. 6000 microseconds.
+    return total_microseconds // 6000, len(sessions)
+
+
+def _periods_for_replay(revision, ledger_start_at, now):
+    zone = ZoneInfo(revision.timezone)
+    start_dt = _local_midnight(revision.start_date, zone)
+    cursor = max(ledger_start_at, start_dt)
+    periods = []
+    while cursor <= now:
+        local_reference = cursor.astimezone(zone)
+        with timezone.override(zone):
+            period_start, period_end = get_period_bounds(
+                revision.cadence, local_reference
+            )
+        if period_end <= cursor:
+            cursor = period_end + timedelta(seconds=1)
+            continue
+        if period_end > now:
+            break
+        if period_end > ledger_start_at:
+            periods.append(
+                (period_start, max(period_start, ledger_start_at, start_dt), period_end)
+            )
+        cursor = period_end + timedelta(seconds=1)
+    return periods
+
+
+def mutation_affects_ledger(commitment: Commitment, instant) -> bool:
+    """Whether a mutation instant belongs to the current accounting ledger."""
+    if commitment.ledger_start_at is None:
+        return True
+    if timezone.is_naive(instant):
+        instant = timezone.make_aware(instant)
+    return instant >= commitment.ledger_start_at
+
+
+@transaction.atomic
+def recompute_commitment(commitment: Commitment) -> bool:
+    """Rebuild current-generation derived periods and replay their event stream."""
+    locked = Commitment.objects.select_for_update().get(pk=commitment.pk)
+    now = timezone.now()
+    old_balance = locked.balance
+    was_dirty = locked.needs_recompute
+    revision = _ensure_ledger_initialized(locked, now)
+    anchor = locked.ledger_start_at
+    desired = _periods_for_replay(revision, anchor, now)
+    existing = {
+        row.period_start: row
+        for row in locked.period_rows.filter(generation=locked.generation)
+    }
+    period_rows = []
+    derived_changed = False
+    for period_start, effective_start, period_end in desired:
+        accrued_numerator, session_count = _revision_accrual(
+            revision, effective_start, period_end
+        )
+        row = existing.get(period_start)
+        if row is None:
+            row = CommitmentPeriod.objects.create(
+                commitment=locked,
+                generation=locked.generation,
+                revision=revision,
+                period_start=period_start,
+                period_end=period_end,
+                accrued_numerator=accrued_numerator,
+                session_count=session_count,
+                closed_at=now,
+            )
+            derived_changed = True
+        else:
+            updates = {
+                "revision": revision,
+                "period_end": period_end,
+                "accrued_numerator": accrued_numerator,
+                "session_count": session_count,
+            }
+            changed_fields = [
+                field for field, value in updates.items() if getattr(row, field) != value
+            ]
+            if changed_fields:
+                for field, value in updates.items():
+                    setattr(row, field, value)
+                row.save(update_fields=changed_fields)
+                derived_changed = True
+        period_rows.append(row)
+
+    desired_starts = [row.period_start for row in period_rows]
+    stale = locked.period_rows.filter(generation=locked.generation)
+    if desired_starts:
+        stale = stale.exclude(period_start__in=desired_starts)
+    if stale.exists():
+        stale.delete()
+        derived_changed = True
+
+    events = []
+    for adjustment in locked.adjustments.filter(effective_at__gte=anchor):
+        events.append((adjustment.effective_at, 0, adjustment.seq, adjustment))
+    for row in period_rows:
+        events.append((row.period_end, 1, row.period_start, row))
+    events.sort(key=lambda event: (event[0], event[1], event[2]))
+
+    running = 0
+    last_initialized = 0
+    latest_balance_out = None
+    for _, event_type, _, event in events:
+        if event_type == 0:
+            if event.kind in {
+                CommitmentAdjustment.KIND_OPENING,
+                CommitmentAdjustment.KIND_RESTART_CARRY,
+            }:
+                running = event.amount
+                last_initialized = event.amount
+            else:
+                running += event.amount
+            continue
+
+        carryover_in = running
+        actual = (
+            event.accrued_numerator / 10000
+            if revision.commitment_type == "time"
+            else event.session_count
+        )
+        surplus = actual - revision.target_value
+        if revision.banking_enabled:
+            running = int(
+                max(
+                    revision.min_balance,
+                    min(revision.max_balance, running + surplus),
+                )
+            )
+        row_updates = []
+        if event.carryover_in != carryover_in:
+            event.carryover_in = carryover_in
+            row_updates.append("carryover_in")
+        if event.balance_out != running:
+            event.balance_out = running
+            row_updates.append("balance_out")
+        if row_updates:
+            event.save(update_fields=row_updates)
+            derived_changed = True
+        latest_balance_out = running
+
+    locked.balance = (
+        latest_balance_out if latest_balance_out is not None else last_initialized
+    )
+    locked.needs_recompute = False
+    locked.save(update_fields=["balance", "needs_recompute"])
+
+    commitment.balance = locked.balance
+    commitment.needs_recompute = False
+    commitment.ledger_start_at = locked.ledger_start_at
+    commitment.generation = locked.generation
+    return derived_changed or was_dirty or old_balance != locked.balance
+
+
 def get_commitment_progress(commitment) -> dict:
     """
     Calculate the progress for a commitment in the current period.
@@ -416,6 +748,15 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
         .values_list("pk", "start_time", "end_time")
     )
     session_index = 0
+    # Migration cutover deliberately creates no synthetic history. Closed rows
+    # are authoritative where present; older/missing periods continue to use
+    # the legacy session simulation so v1 streak payloads remain unchanged.
+    replay_rows = {
+        row.period_start: row
+        for row in commitment.period_rows.filter(
+            generation=commitment.generation
+        ).order_by("period_start")
+    }
 
     all_periods = []
     check_date = start_dt
@@ -451,6 +792,14 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
             )
         else:
             actual = len(bucket)
+
+        replay_row = replay_rows.get(period_start)
+        if replay_row is not None:
+            actual = (
+                replay_row.accrued_numerator / 10000
+                if commitment.commitment_type == "time"
+                else replay_row.session_count
+            )
 
         all_periods.append(
             {
@@ -508,58 +857,41 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
 
 
 def reconcile_commitment(commitment, force: bool = False) -> bool:
-    """
-    Update the commitment balance when completed periods have not yet been
-    reconciled.
-    """
-    now = timezone.now()
-    start_dt = get_commitment_start_datetime(commitment)
-    period_start, period_end = get_period_bounds(commitment.period)
+    """Compatibility wrapper for all v1/web lazy reconciliation call sites."""
+    state = Commitment.objects.only(
+        "needs_recompute", "ledger_start_at", "generation"
+    ).get(pk=commitment.pk)
+    commitment.needs_recompute = state.needs_recompute
+    commitment.ledger_start_at = state.ledger_start_at
+    commitment.generation = state.generation
+    if force or state.needs_recompute or state.ledger_start_at is None:
+        return recompute_commitment(commitment)
 
-    if start_dt >= period_end:
+    revision = (
+        state.revisions.filter(
+            generation=state.generation,
+            status=CommitmentRevision.STATUS_ACTIVE,
+        )
+        .order_by("-effective_from_instant", "-pk")
+        .first()
+    )
+    if revision is None:
+        return recompute_commitment(commitment)
+
+    closed_periods = _periods_for_replay(
+        revision, state.ledger_start_at, timezone.now()
+    )
+    if not closed_periods:
         return False
-
-    if commitment.last_reconciled and commitment.last_reconciled >= period_start and not force:
-        return False
-
-    periods_to_reconcile = []
-    check_date = commitment.last_reconciled or start_dt
-
-    while True:
-        check_start, check_end = get_period_bounds(commitment.period, check_date)
-
-        if check_end > now:
-            break
-
-        effective_start = max(check_start, start_dt)
-        if effective_start >= check_end:
-            check_date = check_end + timedelta(seconds=1)
-            continue
-
-        if not commitment.last_reconciled or check_end > commitment.last_reconciled:
-            periods_to_reconcile.append((effective_start, check_end))
-
-        check_date = check_end + timedelta(seconds=1)
-
-    if not periods_to_reconcile:
-        return False
-
-    for period_start, period_end in periods_to_reconcile:
-        actual = commitment_actual(commitment, period_start, period_end)
-
-        surplus = actual - commitment.target
-
-        if commitment.banking_enabled:
-            new_balance = commitment.balance + surplus
-            new_balance = max(
-                commitment.min_balance, min(commitment.max_balance, new_balance)
-            )
-            commitment.balance = int(new_balance)
-
-    commitment.last_reconciled = now
-    commitment.save()
-
-    return True
+    latest_start = (
+        state.period_rows.filter(generation=state.generation)
+        .order_by("-period_start")
+        .values_list("period_start", flat=True)
+        .first()
+    )
+    if latest_start != closed_periods[-1][0]:
+        return recompute_commitment(commitment)
+    return False
 
 
 def get_commitment_start_datetime(commitment) -> datetime:

@@ -22,6 +22,11 @@ def _ensure_unprotected(*, kind, target):
         )
 
 
+def _mark_commitments_dirty(user):
+    # This slice intentionally chooses the conservative user-wide invalidation.
+    Commitment.objects.filter(user=user).update(needs_recompute=True)
+
+
 class DestructiveMutationService:
     """The single atomic write path for destructive project mutations."""
 
@@ -105,6 +110,7 @@ class DestructiveMutationService:
 
         project1.delete()
         project2.delete()
+        _mark_commitments_dirty(user)
         return merged_project, project1_subprojects + project2_subprojects
 
     @staticmethod
@@ -170,6 +176,7 @@ class DestructiveMutationService:
 
         subproject1.delete()
         subproject2.delete()
+        _mark_commitments_dirty(user)
         return merged_subproject
 
     @staticmethod
@@ -184,6 +191,7 @@ class DestructiveMutationService:
             raise DestructiveOperationError("Project name already exists")
         project.name = new_name
         project.save(update_fields=["name"])
+        _mark_commitments_dirty(user)
         return project
 
     @staticmethod
@@ -206,6 +214,7 @@ class DestructiveMutationService:
             raise DestructiveOperationError("Subproject name already exists")
         subproject.name = new_name
         subproject.save(update_fields=["name"])
+        _mark_commitments_dirty(user)
         return subproject
 
     @staticmethod
@@ -214,6 +223,7 @@ class DestructiveMutationService:
         project = get_object_or_404(Projects, name=project_name, user=user)
         _ensure_unprotected(kind="project", target=project)
         project.delete()
+        _mark_commitments_dirty(user)
 
     @staticmethod
     @transaction.atomic
@@ -226,6 +236,7 @@ class DestructiveMutationService:
         )
         _ensure_unprotected(kind="subproject", target=subproject)
         subproject.delete()
+        _mark_commitments_dirty(user)
 
     @staticmethod
     @transaction.atomic
@@ -233,6 +244,7 @@ class DestructiveMutationService:
         context = get_object_or_404(Context, user=user, name=context_name)
         _ensure_unprotected(kind="context", target=context)
         context.delete()
+        _mark_commitments_dirty(user)
 
     @staticmethod
     @transaction.atomic
@@ -240,3 +252,4 @@ class DestructiveMutationService:
         tag = get_object_or_404(Tag, user=user, name=tag_name)
         _ensure_unprotected(kind="tag", target=tag)
         tag.delete()
+        _mark_commitments_dirty(user)

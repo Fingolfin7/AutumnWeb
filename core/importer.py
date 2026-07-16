@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from django.utils import timezone
 
-from .models import Projects, Sessions, SubProjects, status_choices
+from .models import Commitment, Projects, Sessions, SubProjects, status_choices
 from .services import DestructiveMutationService
 from .totals import derived_project_last_updated, derived_project_totals
 from .utils import (
@@ -252,6 +252,7 @@ def iter_import(
 
             session.full_clean()
             session.save()
+            Commitment.objects.filter(user=user).update(needs_recompute=True)
 
         yield ("\n\n")
 
@@ -270,6 +271,10 @@ def iter_import(
                     earliest_start if earliest_start else project.start_date
                 )
                 subproject.save(update_fields=["start_date"])
+
+        # Imports may also change project/context metadata without writing a
+        # session, so conservatively invalidate every commitment for the user.
+        Commitment.objects.filter(user=user).update(needs_recompute=True)
 
         if not merge:
             tally = derived_project_totals(user, [project.pk])[project.pk]
