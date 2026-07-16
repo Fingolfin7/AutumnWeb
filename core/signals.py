@@ -2,7 +2,7 @@
 
 Session totals deliberately do not use model signals. A scalar save and the
 following many-to-many update are separate events, so no signal sees a complete
-before/after edit. Normal mutations use core.session_ledger instead.
+before/after edit. Normal mutations use core.services instead.
 """
 
 from django.db.models.signals import pre_save

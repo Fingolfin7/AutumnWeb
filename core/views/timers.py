@@ -20,11 +20,7 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.models import Projects, SubProjects, Sessions, Commitment
-from core.session_ledger import (
-    create_session as ledger_create_session,
-    delete_session as ledger_delete_session,
-    mutate_session as ledger_mutate_session,
-)
+from core.services import SessionMutationService
 
 
 ACTIVE_TIMER_FRAGMENT_TEMPLATES = {
@@ -106,7 +102,7 @@ def start_timer(request):
                 raise ValueError("No subprojects found for the selected project")
 
             start_time = timezone.now()
-            session = ledger_create_session(
+            session = SessionMutationService.create_session(
                 user=request.user,
                 project=project,
                 start_time=start_time,
@@ -160,7 +156,7 @@ def stop_timer(request, session_id: int):
         form = StopTimerForm(post_data, instance=timer)
         if form.is_valid():
             candidate = form.save(commit=False)
-            timer = ledger_mutate_session(
+            timer = SessionMutationService.mutate_session(
                 timer.pk,
                 user=request.user,
                 start_time=candidate.start_time,
@@ -196,7 +192,7 @@ def restart_timer(request, session_id: int):
     if timer.auto_stop_at and timer.start_time and timer.auto_stop_at > timer.start_time:
         auto_stop_duration = timer.auto_stop_at - timer.start_time
 
-    timer = ledger_mutate_session(
+    timer = SessionMutationService.mutate_session(
         timer.pk,
         user=request.user,
         start_time=restart_time,
@@ -216,7 +212,7 @@ def remove_timer(request, session_id: int):
     timer = get_object_or_404(Sessions, id=session_id, user=request.user)
 
     if request.method == "POST":
-        ledger_delete_session(timer.pk, user=request.user)
+        SessionMutationService.delete_session(timer.pk, user=request.user)
         messages.success(request, "Removed timer")
         return redirect("timers")
 

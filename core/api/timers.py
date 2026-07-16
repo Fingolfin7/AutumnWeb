@@ -5,11 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from core.models import Projects, SubProjects, Sessions
-from core.session_ledger import (
-    create_session as ledger_create_session,
-    delete_session as ledger_delete_session,
-    mutate_session as ledger_mutate_session,
-)
+from core.services import SessionMutationService
 from core.utils import (
     parse_stop_after_duration,
     stop_expired_timers,
@@ -67,7 +63,7 @@ def timer_start(request):
         except ValueError as exc:
             return _err(str(exc))
 
-    sess = ledger_create_session(
+    sess = SessionMutationService.create_session(
         user=request.user,
         project=project,
         start_time=start_time,
@@ -114,7 +110,7 @@ def timer_stop(request):
     note = sess.note
     if "note" in request.data and request.data["note"] is not None:
         note = str(request.data["note"])
-    sess = ledger_mutate_session(
+    sess = SessionMutationService.mutate_session(
         sess.pk,
         user=request.user,
         end_time=end_time,
@@ -192,7 +188,7 @@ def timer_restart(request):
     if sess.auto_stop_at and sess.start_time and sess.auto_stop_at > sess.start_time:
         auto_stop_duration = sess.auto_stop_at - sess.start_time
 
-    sess = ledger_mutate_session(
+    sess = SessionMutationService.mutate_session(
         sess.pk,
         user=request.user,
         start_time=restart_time,
@@ -222,7 +218,7 @@ def timer_delete(request):
         return _err("No active timer found", status.HTTP_404_NOT_FOUND)
 
     sess_id = sess.id
-    ledger_delete_session(sess.pk, user=request.user)
+    SessionMutationService.delete_session(sess.pk, user=request.user)
     return Response(_json_ok({"deleted": sess_id}, compact), status=200)
 
 
@@ -271,7 +267,7 @@ def track_session(request):
         return _err(f"Unknown subprojects: {', '.join(missing)}")
 
     note = request.data.get("note", "").strip()
-    sess = ledger_create_session(
+    sess = SessionMutationService.create_session(
         user=request.user,
         project=project,
         start_time=start_time,

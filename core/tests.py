@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from core.models import Projects, SubProjects, Sessions, Commitment, Tag
-from core.session_ledger import create_session as ledger_create_session
+from core.services import SessionMutationService
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
 from django.core.management import call_command
@@ -138,7 +138,7 @@ class UpdateSessionTests(TestCase):
         )
 
         # Create an initial session
-        self.session = ledger_create_session(
+        self.session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             start_time=timezone.now() - timedelta(hours=2),
@@ -342,9 +342,13 @@ class StopAfterTimerTests(TestCase):
         session.refresh_from_db()
         self.project.refresh_from_db()
         self.assertFalse(session.is_active)
-        self.assertEqual(session.end_time, auto_stop_at)
+        floored_auto_stop_at = auto_stop_at.replace(microsecond=0)
+        self.assertEqual(session.end_time, floored_auto_stop_at)
         self.assertIsNone(session.auto_stop_at)
-        self.assertAlmostEqual(self.project.total_time, 30.0, places=2)
+        expected_duration = round(
+            (floored_auto_stop_at - start).total_seconds() / 60.0, 4
+        )
+        self.assertEqual(self.project.total_time, expected_duration)
         self.assertEqual(len(response.context["timers"]), 0)
 
 
@@ -361,7 +365,7 @@ class DeleteSessionTests(TestCase):
             user=self.user, name="Subproject 2", parent_project=self.project
         )
 
-        self.session = ledger_create_session(
+        self.session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             start_time=timezone.now() - timedelta(hours=2),

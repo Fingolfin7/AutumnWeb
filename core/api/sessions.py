@@ -6,10 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from core.models import Projects, SubProjects, Sessions
-from core.session_ledger import (
-    delete_session as ledger_delete_session,
-    mutate_session as ledger_mutate_session,
-)
+from core.services import SessionMutationService
 from core.serializers import (
     SessionSerializer,
 )
@@ -256,7 +253,7 @@ def delete_session(request, session_id):
     sess = Sessions.objects.filter(pk=session_id, user=request.user).first()
     if not sess:
         return _err("Session not found", status.HTTP_404_NOT_FOUND)
-    ledger_delete_session(sess.pk, user=request.user)
+    SessionMutationService.delete_session(sess.pk, user=request.user)
     return Response(status=204)
 
 
@@ -366,7 +363,7 @@ def edit_session(request, session_id):
             sp for sp in current_subs if sp.parent_project_id == project.id
         ]
 
-    current_session = ledger_mutate_session(
+    current_session = SessionMutationService.mutate_session(
         current_session.pk,
         user=request.user,
         project=project,

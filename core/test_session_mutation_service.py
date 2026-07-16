@@ -9,10 +9,10 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 
 from core.models import Projects, Sessions, SubProjects
-from core.session_ledger import create_session, mutate_session
+from core.services import SessionMutationService
 
 
-class SessionLedgerServiceTests(TestCase):
+class SessionMutationServiceTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username="ledger-user", password="password"
@@ -28,7 +28,7 @@ class SessionLedgerServiceTests(TestCase):
 
     def test_active_completed_active_transitions_adjust_once(self):
         start = timezone.now() - timedelta(minutes=40)
-        session = create_session(
+        session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             subprojects=[self.subproject],
@@ -41,7 +41,7 @@ class SessionLedgerServiceTests(TestCase):
         self.assertEqual(self.project.total_time, 0)
         self.assertEqual(self.subproject.total_time, 0)
 
-        session = mutate_session(
+        session = SessionMutationService.mutate_session(
             session.pk,
             user=self.user,
             end_time=start + timedelta(minutes=40),
@@ -52,7 +52,7 @@ class SessionLedgerServiceTests(TestCase):
         self.assertAlmostEqual(self.project.total_time, 40, places=2)
         self.assertAlmostEqual(self.subproject.total_time, 40, places=2)
 
-        mutate_session(
+        SessionMutationService.mutate_session(
             session.pk,
             user=self.user,
             end_time=None,
@@ -65,7 +65,7 @@ class SessionLedgerServiceTests(TestCase):
 
     def test_clearing_subprojects_only_removes_subproject_contribution(self):
         start = timezone.now() - timedelta(minutes=25)
-        session = create_session(
+        session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             subprojects=[self.subproject],
@@ -74,7 +74,9 @@ class SessionLedgerServiceTests(TestCase):
             is_active=False,
         )
 
-        mutate_session(session.pk, user=self.user, subprojects=[])
+        SessionMutationService.mutate_session(
+            session.pk, user=self.user, subprojects=[]
+        )
 
         self.project.refresh_from_db()
         self.subproject.refresh_from_db()
@@ -83,7 +85,7 @@ class SessionLedgerServiceTests(TestCase):
 
     def test_duration_edit_uses_atomic_delta_without_history_audit(self):
         start = timezone.now() - timedelta(minutes=30)
-        session = create_session(
+        session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             subprojects=[self.subproject],
@@ -97,7 +99,7 @@ class SessionLedgerServiceTests(TestCase):
             patch.object(SubProjects, "audit_total_time") as subproject_audit,
             CaptureQueriesContext(connection) as queries,
         ):
-            mutate_session(
+            SessionMutationService.mutate_session(
                 session.pk,
                 user=self.user,
                 start_time=start - timedelta(minutes=15),
@@ -140,7 +142,7 @@ class SessionLedgerServiceTests(TestCase):
         )
 
         with self.assertRaises(ValidationError):
-            create_session(
+            SessionMutationService.create_session(
                 user=self.user,
                 project=self.project,
                 subprojects=[other_subproject],
@@ -153,7 +155,7 @@ class SessionLedgerServiceTests(TestCase):
 
     def test_direct_note_save_does_not_change_cached_contribution(self):
         start = timezone.now() - timedelta(minutes=10)
-        session = create_session(
+        session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             start_time=start,

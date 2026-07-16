@@ -14,10 +14,7 @@ from django.views.generic import (
     DeleteView,
 )
 from core.models import Projects, SubProjects, Sessions
-from core.session_ledger import (
-    delete_session as ledger_delete_session,
-    mutate_session as ledger_mutate_session,
-)
+from core.services import SessionMutationService
 
 
 def remove_ambiguous_time_error(time_value):
@@ -109,7 +106,7 @@ def update_session(request, session_id: int):
                     raise ValueError("No subprojects found for the selected project")
 
                 candidate = form.save(commit=False)
-                updated_session = ledger_mutate_session(
+                updated_session = SessionMutationService.mutate_session(
                     current_session.pk,
                     user=request.user,
                     project=project,
@@ -228,5 +225,7 @@ class DeleteSessionView(LoginRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         success_url = self.get_success_url()
-        ledger_delete_session(self.object.pk, user=self.request.user)
+        SessionMutationService.delete_session(
+            self.object.pk, user=self.request.user
+        )
         return redirect(success_url)

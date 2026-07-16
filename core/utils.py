@@ -61,12 +61,12 @@ def stop_expired_timers(user=None, now=None):
     if user is not None:
         sessions = sessions.filter(user=user)
 
-    from core.session_ledger import mutate_session
+    from core.services import SessionMutationService
 
     stopped = []
     for session in sessions.select_related("project"):
         stopped.append(
-            mutate_session(
+            SessionMutationService.mutate_session(
                 session.pk,
                 user=user,
                 end_time=session.auto_stop_at,

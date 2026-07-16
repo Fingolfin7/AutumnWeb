@@ -2,12 +2,7 @@ from django.contrib import admin, messages
 from django.db.models import Count, Sum
 
 from .models import Commitment, Context, Projects, Sessions, SubProjects, Tag
-from .session_ledger import (
-    advance_last_updated,
-    apply_contribution_change,
-    snapshot_contribution,
-    delete_session as ledger_delete_session,
-)
+from .services import CachedTotalsProjection, SessionMutationService
 
 
 @admin.action(description="Mark selected projects as active")
@@ -152,7 +147,9 @@ class SessionsAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         obj._ledger_before = (
-            snapshot_contribution(Sessions.objects.select_for_update().get(pk=obj.pk))
+            CachedTotalsProjection.snapshot(
+                Sessions.objects.select_for_update().get(pk=obj.pk)
+            )
             if change
             else None
         )
@@ -160,18 +157,18 @@ class SessionsAdmin(admin.ModelAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
-        after = snapshot_contribution(form.instance)
-        apply_contribution_change(
+        after = CachedTotalsProjection.snapshot(form.instance)
+        CachedTotalsProjection.apply_change(
             getattr(form.instance, "_ledger_before", None), after
         )
-        advance_last_updated(form.instance)
+        CachedTotalsProjection.advance_last_updated(form.instance)
 
     def delete_model(self, request, obj):
-        ledger_delete_session(obj.pk, user=obj.user)
+        SessionMutationService.delete_session(obj.pk, user=obj.user)
 
     def delete_queryset(self, request, queryset):
         for session_id in queryset.values_list("pk", flat=True):
-            ledger_delete_session(session_id)
+            SessionMutationService.delete_session(session_id)
 
     @admin.display(description="Duration (minutes)")
     def duration_minutes(self, obj):
