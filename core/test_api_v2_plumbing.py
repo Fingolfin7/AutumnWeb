@@ -48,7 +48,12 @@ class V2EndpointTests(TestCase):
             response.json(),
             {
                 "api_version": 2,
-                "capabilities": ["timers", "sessions"],
+                "capabilities": [
+                    "timers",
+                    "sessions",
+                    "projects",
+                    "subprojects",
+                ],
                 "user": {
                     "id": self.user.id,
                     "username": "v2-user",

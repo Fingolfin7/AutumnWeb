@@ -19,6 +19,264 @@ paths:
               schema:
                 $ref: '#/components/schemas/Me'
           description: ''
+  /api/v2/projects/:
+    get:
+      operationId: projects_list
+      parameters:
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - id
+          type: string
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `id` - id
+      - in: query
+        name: search
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - paused
+          - complete
+          - archived
+          type: string
+          minLength: 1
+        description: |-
+          * `active` - active
+          * `paused` - paused
+          * `complete` - complete
+          * `archived` - archived
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+          description: ''
+    post:
+      operationId: projects_create
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResource'
+          description: ''
+  /api/v2/projects/{project_id}:
+    get:
+      operationId: projects_retrieve
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetailResource'
+          description: ''
+    patch:
+      operationId: projects_partial_update
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPatchRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResource'
+          description: ''
+    delete:
+      operationId: projects_destroy
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Project deleted.
+  /api/v2/projects/{project_id}/subprojects/:
+    get:
+      operationId: project_subprojects_list
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectListResponse'
+          description: ''
+    post:
+      operationId: project_subprojects_create
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubprojectCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubprojectCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubprojectCreateRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
+  /api/v2/projects/merge/:
+    post:
+      operationId: projects_merge
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectMergeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectMergeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectMergeRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResource'
+          description: ''
   /api/v2/sessions/:
     get:
       operationId: sessions_list
@@ -225,6 +483,105 @@ paths:
       responses:
         '204':
           description: Session deleted.
+  /api/v2/subprojects/{subproject_id}:
+    get:
+      operationId: subprojects_retrieve
+      parameters:
+      - in: path
+        name: subproject_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subprojects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
+    patch:
+      operationId: subprojects_partial_update
+      parameters:
+      - in: path
+        name: subproject_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subprojects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSubprojectPatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSubprojectPatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSubprojectPatchRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
+    delete:
+      operationId: subprojects_destroy
+      parameters:
+      - in: path
+        name: subproject_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subprojects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Subproject deleted.
+  /api/v2/subprojects/merge/:
+    post:
+      operationId: subprojects_merge
+      tags:
+      - subprojects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubprojectMergeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubprojectMergeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubprojectMergeRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
   /api/v2/timers/:
     get:
       operationId: timers_retrieve
@@ -411,6 +768,38 @@ components:
       - id
       - timezone
       - username
+    NamedResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    PatchedProjectPatchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        context_id:
+          type: integer
+          minimum: 1
+          nullable: true
+        tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        start_date:
+          type: string
+          format: date
     PatchedSessionPatchRequest:
       type: object
       properties:
@@ -435,6 +824,168 @@ components:
         note:
           type: string
           nullable: true
+    PatchedSubprojectPatchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+    ProjectCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: active
+        context_id:
+          type: integer
+          minimum: 1
+          nullable: true
+        tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - name
+    ProjectDetailResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        description:
+          type: string
+          readOnly: true
+        context:
+          allOf:
+          - $ref: '#/components/schemas/NamedResource'
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/NamedResource'
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          readOnly: true
+        last_activity:
+          type: string
+          format: date
+          nullable: true
+          readOnly: true
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        session_count:
+          type: integer
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectResource'
+          readOnly: true
+      required:
+      - context
+      - description
+      - id
+      - last_activity
+      - name
+      - session_count
+      - start_date
+      - status
+      - subprojects
+      - tags
+      - total_minutes
+    ProjectListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        total:
+          type: integer
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectResource'
+      required:
+      - count
+      - projects
+      - total
+    ProjectMergeRequest:
+      type: object
+      properties:
+        source_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 2
+          minItems: 2
+        new_name:
+          type: string
+          maxLength: 255
+      required:
+      - new_name
+      - source_ids
+    ProjectResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        description:
+          type: string
+          readOnly: true
+        context:
+          allOf:
+          - $ref: '#/components/schemas/NamedResource'
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/NamedResource'
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          readOnly: true
+        last_activity:
+          type: string
+          format: date
+          nullable: true
+          readOnly: true
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        session_count:
+          type: integer
+      required:
+      - context
+      - description
+      - id
+      - last_activity
+      - name
+      - session_count
+      - start_date
+      - status
+      - tags
+      - total_minutes
     ProjectSummary:
       type: object
       properties:
@@ -557,6 +1108,18 @@ components:
       - end
       - project_id
       - start
+    StatusEnum:
+      enum:
+      - active
+      - paused
+      - complete
+      - archived
+      type: string
+      description: |-
+        * `active` - active
+        * `paused` - paused
+        * `complete` - complete
+        * `archived` - archived
     SubprojectAllocation:
       type: object
       properties:
@@ -570,6 +1133,79 @@ components:
       - allocation_bp
       - name
       - subproject_id
+    SubprojectCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+      required:
+      - name
+    SubprojectListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectResource'
+      required:
+      - count
+      - subprojects
+    SubprojectMergeRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        source_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 2
+          minItems: 2
+        new_name:
+          type: string
+          maxLength: 255
+      required:
+      - new_name
+      - project_id
+      - source_ids
+    SubprojectResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          readOnly: true
+        project_id:
+          type: integer
+        last_activity:
+          type: string
+          format: date
+          nullable: true
+          readOnly: true
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        session_count:
+          type: integer
+      required:
+      - description
+      - id
+      - last_activity
+      - name
+      - project_id
+      - session_count
+      - total_minutes
     TimerListResponse:
       type: object
       properties:

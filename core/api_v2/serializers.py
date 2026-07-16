@@ -6,6 +6,14 @@ from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 
+def _local_date(value):
+    if value is None:
+        return None
+    if timezone.is_aware(value):
+        value = timezone.localtime(value)
+    return value.date()
+
+
 class UTCDateTimeField(serializers.DateTimeField):
     """An ISO-8601 instant which treats a missing offset as UTC."""
 
@@ -179,6 +187,166 @@ class SessionListQuerySerializer(serializers.Serializer):
     end_date = serializers.DateField(required=False)
     active = serializers.BooleanField(required=False)
     note_snippet = serializers.CharField(required=False)
+
+
+class NamedResourceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
+class SubprojectResourceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    description = serializers.SerializerMethodField()
+    project_id = serializers.IntegerField(source="parent_project_id")
+    last_activity = serializers.SerializerMethodField()
+    total_minutes = serializers.SerializerMethodField()
+    session_count = serializers.IntegerField(source="completed_session_count")
+
+    @extend_schema_field(serializers.CharField())
+    def get_description(self, subproject):
+        return subproject.description or ""
+
+    @extend_schema_field(serializers.DateField(allow_null=True))
+    def get_last_activity(self, subproject):
+        return _local_date(subproject.derived_last_updated)
+
+    @extend_schema_field(serializers.FloatField())
+    def get_total_minutes(self, subproject):
+        return round(subproject.derived_total_time, 2)
+
+
+class ProjectResourceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    status = serializers.ChoiceField(
+        choices=("active", "paused", "complete", "archived")
+    )
+    description = serializers.SerializerMethodField()
+    context = NamedResourceSerializer(allow_null=True)
+    tags = serializers.SerializerMethodField()
+    start_date = serializers.SerializerMethodField()
+    last_activity = serializers.SerializerMethodField()
+    total_minutes = serializers.SerializerMethodField()
+    session_count = serializers.IntegerField(source="completed_session_count")
+
+    @extend_schema_field(serializers.CharField())
+    def get_description(self, project):
+        return project.description or ""
+
+    @extend_schema_field(NamedResourceSerializer(many=True))
+    def get_tags(self, project):
+        tags = getattr(project, "prefetched_tags", None)
+        if tags is None:
+            tags = project.tags.order_by("name", "id")
+        return NamedResourceSerializer(tags, many=True).data
+
+    @extend_schema_field(serializers.DateField())
+    def get_start_date(self, project):
+        return _local_date(project.start_date)
+
+    @extend_schema_field(serializers.DateField(allow_null=True))
+    def get_last_activity(self, project):
+        return _local_date(project.derived_last_updated)
+
+    @extend_schema_field(serializers.FloatField())
+    def get_total_minutes(self, project):
+        return round(project.derived_total_time, 2)
+
+
+class ProjectDetailResourceSerializer(ProjectResourceSerializer):
+    subprojects = serializers.SerializerMethodField()
+
+    @extend_schema_field(SubprojectResourceSerializer(many=True))
+    def get_subprojects(self, project):
+        subprojects = getattr(project, "prefetched_subprojects", None)
+        if subprojects is None:
+            subprojects = project.subprojects.order_by("name", "id")
+        return SubprojectResourceSerializer(subprojects, many=True).data
+
+
+class ProjectCreateRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255, allow_blank=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.ChoiceField(
+        required=False,
+        default="active",
+        choices=("active", "paused", "complete", "archived"),
+    )
+    context_id = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
+    tag_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+
+
+class ProjectPatchRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, max_length=255, allow_blank=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    status = serializers.ChoiceField(
+        required=False, choices=("active", "paused", "complete", "archived")
+    )
+    context_id = serializers.IntegerField(
+        required=False, allow_null=True, min_value=1
+    )
+    tag_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    start_date = serializers.DateField(required=False)
+
+
+class ProjectMergeRequestSerializer(serializers.Serializer):
+    source_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), min_length=2, max_length=2
+    )
+    new_name = serializers.CharField(max_length=255, allow_blank=False)
+
+
+class ProjectListQuerySerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        required=False, choices=("active", "paused", "complete", "archived")
+    )
+    search = serializers.CharField(required=False)
+    context_ids = serializers.CharField(required=False)
+    tag_ids = serializers.CharField(required=False)
+    exclude_project_ids = serializers.CharField(required=False)
+    limit = serializers.IntegerField(
+        required=False, default=100, min_value=1, max_value=500
+    )
+    offset = serializers.IntegerField(required=False, default=0, min_value=0)
+    ordering = serializers.ChoiceField(
+        required=False, default="name", choices=("name", "id")
+    )
+
+
+class ProjectListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    total = serializers.IntegerField()
+    projects = ProjectResourceSerializer(many=True)
+
+
+class SubprojectCreateRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255, allow_blank=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+
+
+class SubprojectPatchRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(required=False, max_length=255, allow_blank=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+
+
+class SubprojectMergeRequestSerializer(serializers.Serializer):
+    project_id = serializers.IntegerField(min_value=1)
+    source_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), min_length=2, max_length=2
+    )
+    new_name = serializers.CharField(max_length=255, allow_blank=False)
+
+
+class SubprojectListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    subprojects = SubprojectResourceSerializer(many=True)
 
 
 class MeUserSerializer(serializers.Serializer):
