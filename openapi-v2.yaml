@@ -1772,11 +1772,20 @@ components:
           format: double
         met:
           type: boolean
+        percentage:
+          type: number
+          format: double
+          nullable: true
+        status:
+          type: string
+          nullable: true
       required:
       - accrued
       - end
       - met
+      - percentage
       - start
+      - status
       - target
     CommitmentFilters:
       type: object
@@ -1964,6 +1973,9 @@ components:
           format: date-time
           description: ISO-8601 instant; a timestamp without an offset is interpreted
             as UTC.
+        streak:
+          type: object
+          additionalProperties: {}
       required:
       - active
       - aggregation_type

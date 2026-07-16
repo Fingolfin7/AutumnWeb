@@ -331,6 +331,8 @@ class CommitmentCurrentPeriodSerializer(serializers.Serializer):
     accrued = serializers.FloatField()
     target = serializers.FloatField()
     met = serializers.BooleanField()
+    percentage = serializers.FloatField(allow_null=True)
+    status = serializers.CharField(allow_null=True)
 
 
 class CommitmentPendingRevisionSerializer(serializers.Serializer):
@@ -360,6 +362,8 @@ class CommitmentResourceSerializer(serializers.Serializer):
     current_period = CommitmentCurrentPeriodSerializer()
     pending_revision = CommitmentPendingRevisionSerializer(allow_null=True)
     ledger_start_at = UTCDateTimeField()
+    # Present on detail responses and list responses with ?include=streak.
+    streak = serializers.DictField(required=False)
 
 
 class CommitmentListResponseSerializer(serializers.Serializer):

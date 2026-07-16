@@ -24,7 +24,13 @@ from core.api_v2.serializers import (
     CommitmentResourceSerializer,
     CommitmentRestartRequestSerializer,
 )
-from core.commitments import _revision_accrual, reconcile_commitment
+from core.commitments import (
+    _revision_accrual,
+    calculate_commitment_streak,
+    get_commitment_progress,
+    reconcile_commitment,
+)
+from core.api.helpers import _iso_value
 from core.models import (
     Commitment,
     CommitmentAdjustment,
@@ -227,16 +233,21 @@ def _current_period_payload(commitment, revision):
         else session_count
     )
     target = _unit_value(revision.commitment_type, revision.target_value)
+    # percentage/status reuse the v1 progress semantics (five temporal
+    # states) so client displays carry over unchanged.
+    progress = get_commitment_progress(commitment)
     return {
         "start": _iso(period_start),
         "end": _iso(period_end),
         "accrued": accrued,
         "target": target,
         "met": accrued >= target,
+        "percentage": progress.get("percentage"),
+        "status": progress.get("status"),
     }
 
 
-def serialize_commitment(commitment, *, reconcile=True):
+def serialize_commitment(commitment, *, reconcile=True, include_streak=False):
     if reconcile:
         _prepare_for_read(commitment)
     revision = _active_revision(commitment)
@@ -265,6 +276,11 @@ def serialize_commitment(commitment, *, reconcile=True):
         "current_period": _current_period_payload(commitment, revision),
         "pending_revision": _pending_payload(commitment, revision),
         "ledger_start_at": _iso(commitment.ledger_start_at),
+        **(
+            {"streak": _iso_value(calculate_commitment_streak(commitment))}
+            if include_streak
+            else {}
+        ),
     }
 
 
@@ -370,11 +386,15 @@ class CommitmentsView(V2APIView):
         responses=CommitmentListResponseSerializer,
     )
     def get(self, request):
+        include_streak = request.query_params.get("include") == "streak"
         commitments = list(_commitment_queryset(request.user).order_by("pk"))
         return Response(
             {
                 "count": len(commitments),
-                "commitments": [serialize_commitment(item) for item in commitments],
+                "commitments": [
+                    serialize_commitment(item, include_streak=include_streak)
+                    for item in commitments
+                ],
             }
         )
 
@@ -418,7 +438,11 @@ class CommitmentDetailView(V2APIView):
         responses=CommitmentResourceSerializer,
     )
     def get(self, request, commitment_id):
-        return Response(serialize_commitment(_get_commitment(request.user, commitment_id)))
+        return Response(
+            serialize_commitment(
+                _get_commitment(request.user, commitment_id), include_streak=True
+            )
+        )
 
     @extend_schema(
         operation_id="commitments_partial_update",
