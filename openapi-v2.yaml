@@ -3,6 +3,99 @@ info:
   title: Autumn API v2
   version: 2.0.0
 paths:
+  /api/v2/contexts/:
+    get:
+      operationId: contexts_list
+      tags:
+      - contexts
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextListResponse'
+          description: ''
+    post:
+      operationId: contexts_create
+      tags:
+      - contexts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContextWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContextWriteRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResource'
+          description: ''
+  /api/v2/contexts/{context_id}:
+    patch:
+      operationId: contexts_partial_update
+      parameters:
+      - in: path
+        name: context_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - contexts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedContextWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedContextWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedContextWriteRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResource'
+          description: ''
+    delete:
+      operationId: contexts_destroy
+      parameters:
+      - in: path
+        name: context_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - contexts
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Context deleted.
   /api/v2/me/:
     get:
       operationId: me_retrieve
@@ -917,6 +1010,99 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubprojectResource'
           description: ''
+  /api/v2/tags/:
+    get:
+      operationId: tags_list
+      tags:
+      - tags
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagListResponse'
+          description: ''
+    post:
+      operationId: tags_create
+      tags:
+      - tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TagWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TagWriteRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResource'
+          description: ''
+  /api/v2/tags/{tag_id}:
+    patch:
+      operationId: tags_partial_update
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTagWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTagWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTagWriteRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResource'
+          description: ''
+    delete:
+      operationId: tags_destroy
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tags
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Tag deleted.
   /api/v2/timers/:
     get:
       operationId: timers_retrieve
@@ -1120,6 +1306,39 @@ components:
           type: string
         weight:
           type: integer
+    ContextListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        contexts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContextResource'
+      required:
+      - contexts
+      - count
+    ContextResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        project_count:
+          type: integer
+      required:
+      - id
+      - name
+      - project_count
+    ContextWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+      required:
+      - name
     KindEnum:
       enum:
       - subproject
@@ -1166,6 +1385,12 @@ components:
       required:
       - id
       - name
+    PatchedContextWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
     PatchedProjectPatchRequest:
       type: object
       properties:
@@ -1220,6 +1445,12 @@ components:
           maxLength: 255
         description:
           type: string
+    PatchedTagWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
     ProjectCreateRequest:
       type: object
       properties:
@@ -1693,6 +1924,39 @@ components:
       - project_id
       - session_count
       - total_minutes
+    TagListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagResource'
+      required:
+      - count
+      - tags
+    TagResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        project_count:
+          type: integer
+      required:
+      - id
+      - name
+      - project_count
+    TagWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+      required:
+      - name
     TimerListResponse:
       type: object
       properties:

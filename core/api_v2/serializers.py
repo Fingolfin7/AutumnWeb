@@ -194,6 +194,55 @@ class NamedResourceSerializer(serializers.Serializer):
     name = serializers.CharField()
 
 
+class CleanedNameField(serializers.CharField):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("max_length", 100)
+        kwargs.setdefault("allow_blank", False)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, value):
+        if not isinstance(value, str):
+            raise serializers.ValidationError("'name' must be a string.")
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Missing 'name'.")
+        if len(value) > 100:
+            raise serializers.ValidationError(
+                "'name' must be 100 characters or fewer."
+            )
+        return value
+
+
+class ContextWriteRequestSerializer(serializers.Serializer):
+    name = CleanedNameField()
+
+
+class TagWriteRequestSerializer(serializers.Serializer):
+    name = CleanedNameField()
+
+
+class ContextResourceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    project_count = serializers.IntegerField()
+
+
+class TagResourceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    project_count = serializers.IntegerField()
+
+
+class ContextListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    contexts = ContextResourceSerializer(many=True)
+
+
+class TagListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    tags = TagResourceSerializer(many=True)
+
+
 class SubprojectResourceSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()

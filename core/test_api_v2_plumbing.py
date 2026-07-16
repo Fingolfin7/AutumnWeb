@@ -53,6 +53,8 @@ class V2EndpointTests(TestCase):
                     "sessions",
                     "projects",
                     "subprojects",
+                    "contexts",
+                    "tags",
                     "reports",
                 ],
                 "user": {

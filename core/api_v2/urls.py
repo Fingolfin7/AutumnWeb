@@ -1,6 +1,8 @@
 from django.urls import path
 
 from core.api_v2.views import (
+    ContextDetailView,
+    ContextsView,
     MeView,
     ProjectDetailView,
     ProjectMergeView,
@@ -14,6 +16,8 @@ from core.api_v2.views import (
     TimerStopView,
     SubprojectDetailView,
     SubprojectMergeView,
+    TagDetailView,
+    TagsView,
 )
 from core.api_v2.reports import (
     ReportChartsView,
@@ -27,6 +31,14 @@ app_name = "api_v2"
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
+    path("contexts/", ContextsView.as_view(), name="contexts"),
+    path(
+        "contexts/<int:context_id>",
+        ContextDetailView.as_view(),
+        name="context-detail",
+    ),
+    path("tags/", TagsView.as_view(), name="tags"),
+    path("tags/<int:tag_id>", TagDetailView.as_view(), name="tag-detail"),
     path("reports/totals/", ReportTotalsView.as_view(), name="report-totals"),
     path("reports/tallies/", ReportTalliesView.as_view(), name="report-tallies"),
     path(

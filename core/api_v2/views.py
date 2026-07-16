@@ -16,6 +16,9 @@ from rest_framework.response import Response
 from core.api_v2.exceptions import V2APIView, _envelope
 from core.api_v2.filters import SessionFilterSpec
 from core.api_v2.serializers import (
+    ContextListResponseSerializer,
+    ContextResourceSerializer,
+    ContextWriteRequestSerializer,
     MeSerializer,
     ProjectCreateRequestSerializer,
     ProjectDetailResourceSerializer,
@@ -34,6 +37,9 @@ from core.api_v2.serializers import (
     SubprojectMergeRequestSerializer,
     SubprojectPatchRequestSerializer,
     SubprojectResourceSerializer,
+    TagListResponseSerializer,
+    TagResourceSerializer,
+    TagWriteRequestSerializer,
     TimerListResponseSerializer,
     TimerRestartRequestSerializer,
     TimerStartRequestSerializer,
@@ -321,6 +327,8 @@ class MeView(V2APIView):
                     "sessions",
                     "projects",
                     "subprojects",
+                    "contexts",
+                    "tags",
                     "reports",
                 ],
                 "user": {
@@ -330,6 +338,200 @@ class MeView(V2APIView):
                 },
             }
         )
+
+
+def _named_count_payload(target):
+    return {
+        "id": target.id,
+        "name": target.name,
+        "project_count": target.project_count,
+    }
+
+
+def _named_count_queryset(model, user):
+    return (
+        model.objects.filter(user=user)
+        .annotate(
+            project_count=Count(
+                "projects",
+                filter=Q(projects__user=user),
+            )
+        )
+        .order_by("name", "id")
+    )
+
+
+def _get_named_count_target(model, user, object_id, label):
+    try:
+        return _named_count_queryset(model, user).get(pk=object_id)
+    except model.DoesNotExist as exc:
+        raise NotFound(f"{label} {object_id} not found.") from exc
+
+
+class ContextsView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="contexts_list",
+        responses=ContextListResponseSerializer,
+    )
+    def get(self, request):
+        contexts = list(_named_count_queryset(Context, request.user))
+        return Response(
+            {
+                "count": len(contexts),
+                "contexts": ContextResourceSerializer(contexts, many=True).data,
+            }
+        )
+
+    @extend_schema(
+        operation_id="contexts_create",
+        request=ContextWriteRequestSerializer,
+        responses={201: ContextResourceSerializer},
+    )
+    def post(self, request):
+        serializer = ContextWriteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = serializer.validated_data["name"]
+        if Context.objects.filter(user=request.user, name__iexact=name).exists():
+            return _conflict(
+                DestructiveOperationError(
+                    "You already have a context with this name."
+                )
+            )
+        context = Context.objects.create(user=request.user, name=name)
+        return Response(
+            {"id": context.id, "name": context.name, "project_count": 0},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ContextDetailView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="contexts_partial_update",
+        request=ContextWriteRequestSerializer,
+        responses={200: ContextResourceSerializer},
+    )
+    def patch(self, request, context_id):
+        context = _get_named_count_target(
+            Context, request.user, context_id, "Context"
+        )
+        serializer = ContextWriteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = serializer.validated_data["name"]
+        if (
+            Context.objects.filter(user=request.user, name__iexact=name)
+            .exclude(pk=context.pk)
+            .exists()
+        ):
+            return _conflict(
+                DestructiveOperationError(
+                    "You already have a context with this name."
+                )
+            )
+        context.name = name
+        context.save(update_fields=["name"])
+        return Response(_named_count_payload(context))
+
+    @extend_schema(
+        operation_id="contexts_destroy",
+        request=None,
+        responses={204: OpenApiResponse(description="Context deleted.")},
+    )
+    def delete(self, request, context_id):
+        context = _delete_target_or_none(
+            Context, request.user, context_id, "Context"
+        )
+        if context is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            DestructiveMutationService.delete_context(
+                user=request.user, context_name=context.name
+            )
+        except DestructiveOperationError as exc:
+            return _conflict(exc)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TagsView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="tags_list",
+        responses=TagListResponseSerializer,
+    )
+    def get(self, request):
+        tags = list(_named_count_queryset(Tag, request.user))
+        return Response(
+            {
+                "count": len(tags),
+                "tags": TagResourceSerializer(tags, many=True).data,
+            }
+        )
+
+    @extend_schema(
+        operation_id="tags_create",
+        request=TagWriteRequestSerializer,
+        responses={201: TagResourceSerializer},
+    )
+    def post(self, request):
+        serializer = TagWriteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = serializer.validated_data["name"]
+        if Tag.objects.filter(user=request.user, name__iexact=name).exists():
+            return _conflict(
+                DestructiveOperationError("You already have a tag with this name.")
+            )
+        tag = Tag.objects.create(user=request.user, name=name)
+        return Response(
+            {"id": tag.id, "name": tag.name, "project_count": 0},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class TagDetailView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="tags_partial_update",
+        request=TagWriteRequestSerializer,
+        responses={200: TagResourceSerializer},
+    )
+    def patch(self, request, tag_id):
+        tag = _get_named_count_target(Tag, request.user, tag_id, "Tag")
+        serializer = TagWriteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        name = serializer.validated_data["name"]
+        if (
+            Tag.objects.filter(user=request.user, name__iexact=name)
+            .exclude(pk=tag.pk)
+            .exists()
+        ):
+            return _conflict(
+                DestructiveOperationError("You already have a tag with this name.")
+            )
+        tag.name = name
+        tag.save(update_fields=["name"])
+        return Response(_named_count_payload(tag))
+
+    @extend_schema(
+        operation_id="tags_destroy",
+        request=None,
+        responses={204: OpenApiResponse(description="Tag deleted.")},
+    )
+    def delete(self, request, tag_id):
+        tag = _delete_target_or_none(Tag, request.user, tag_id, "Tag")
+        if tag is None:
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        try:
+            DestructiveMutationService.delete_tag(
+                user=request.user, tag_name=tag.name
+            )
+        except DestructiveOperationError as exc:
+            return _conflict(exc)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class TimersView(V2APIView):
