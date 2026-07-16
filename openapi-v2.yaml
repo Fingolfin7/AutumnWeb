@@ -5,9 +5,9 @@ info:
 paths:
   /api/v2/me/:
     get:
-      operationId: api_v2_me_retrieve
+      operationId: me_retrieve
       tags:
-      - api
+      - me
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -19,8 +19,370 @@ paths:
               schema:
                 $ref: '#/components/schemas/Me'
           description: ''
+  /api/v2/sessions/:
+    get:
+      operationId: sessions_list
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: boolean
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: include
+        schema:
+          enum:
+          - note
+          type: string
+          minLength: 1
+        description: '* `note` - note'
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      tags:
+      - sessions
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+          description: ''
+    post:
+      operationId: sessions_create
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionTrackRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionTrackRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionTrackRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+  /api/v2/sessions/{session_id}:
+    get:
+      operationId: sessions_retrieve
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sessions
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+    patch:
+      operationId: sessions_partial_update
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionPatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionPatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionPatchRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+    delete:
+      operationId: sessions_destroy
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sessions
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Session deleted.
+  /api/v2/timers/:
+    get:
+      operationId: timers_retrieve
+      tags:
+      - timers
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimerListResponse'
+          description: ''
+    post:
+      operationId: timers_create
+      tags:
+      - timers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimerStartRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimerStartRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimerStartRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+  /api/v2/timers/{session_id}:
+    delete:
+      operationId: timers_destroy
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Timer deleted.
+  /api/v2/timers/{session_id}/restart/:
+    post:
+      operationId: timers_restart_create
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimerRestartRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimerRestartRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimerRestartRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+  /api/v2/timers/{session_id}/stop/:
+    post:
+      operationId: timers_stop_create
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimerStopRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimerStopRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimerStopRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
 components:
   schemas:
+    AllocationModeEnum:
+      enum:
+      - legacy_full
+      - partitioned
+      type: string
+      description: |-
+        * `legacy_full` - legacy_full
+        * `partitioned` - partitioned
     Me:
       type: object
       properties:
@@ -49,6 +411,225 @@ components:
       - id
       - timezone
       - username
+    PatchedSessionPatchRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        note:
+          type: string
+          nullable: true
+    ProjectSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    SessionListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        total:
+          type: integer
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResource'
+      required:
+      - count
+      - sessions
+      - total
+    SessionResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+        project:
+          $ref: '#/components/schemas/ProjectSummary'
+        allocation_mode:
+          $ref: '#/components/schemas/AllocationModeEnum'
+        subproject_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectAllocation'
+          readOnly: true
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        active:
+          type: boolean
+          readOnly: true
+        auto_stop_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        duration_minutes:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        elapsed_minutes:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        note:
+          type: string
+          nullable: true
+      required:
+      - active
+      - allocation_mode
+      - auto_stop_at
+      - duration_minutes
+      - elapsed_minutes
+      - end
+      - id
+      - project
+      - start
+      - subproject_allocations
+      - uuid
+      - version
+    SessionTrackRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        note:
+          type: string
+          nullable: true
+        uuid:
+          type: string
+          format: uuid
+      required:
+      - end
+      - project_id
+      - start
+    SubprojectAllocation:
+      type: object
+      properties:
+        subproject_id:
+          type: integer
+        name:
+          type: string
+        allocation_bp:
+          type: integer
+      required:
+      - allocation_bp
+      - name
+      - subproject_id
+    TimerListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        timers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResource'
+      required:
+      - count
+      - timers
+    TimerRestartRequest:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+    TimerStartRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        note:
+          type: string
+          nullable: true
+        stop_after_minutes:
+          type: number
+          format: double
+          maximum: 10080
+          minimum: 1.0e-06
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        uuid:
+          type: string
+          format: uuid
+      required:
+      - project_id
+    TimerStopRequest:
+      type: object
+      properties:
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        note:
+          type: string
+          nullable: true
   securitySchemes:
     basicAuth:
       type: http
