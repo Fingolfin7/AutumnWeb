@@ -91,19 +91,23 @@ class SemanticContractTests(CharacterizationTestCase):
             self._check("/api/commitments/%s/" % commitment.id)
 
     def test_all_chart_types_and_project_variants(self):
+        # v1 /api/chart_data/ was removed in S9b (web charts migrated to v2).
+        # The semantic suite keeps protecting the chart NUMBERS via the v2
+        # endpoint — same payload builders, same clone data.
         projects = top_projects(self.user)
         for chart_type in (
             "scatter", "line", "stacked_area", "calendar", "cumulative",
             "heatmap", "histogram", "wordcloud",
         ):
-            self._check("/api/chart_data/", {"chart_type": chart_type})
+            self._check("/api/v2/reports/charts/", {"chart_type": chart_type})
             for label, params in date_grids(self.meta):
                 if params:
                     self._check(
-                        "/api/chart_data/", dict(params, chart_type=chart_type)
+                        "/api/v2/reports/charts/",
+                        dict(params, chart_type=chart_type),
                     )
             if projects:
                 self._check(
-                    "/api/chart_data/",
+                    "/api/v2/reports/charts/",
                     {"chart_type": chart_type, "project_name": projects[0]},
                 )

@@ -119,28 +119,10 @@ class RawContractTests(CharacterizationTestCase):
             self._read("/api/totals/", {"project": project})
             self._read("/api/export/", {"project_name": project})
 
-    def test_chart_data_variants(self):
-        projects = top_projects(self.user)
-        bounded = date_grids(self.meta)[1][1]
-        for chart_type in (
-            "scatter",
-            "line",
-            "stacked_area",
-            "calendar",
-            "cumulative",
-            "heatmap",
-            "histogram",
-            "wordcloud",
-        ):
-            self._read("/api/chart_data/", {"chart_type": chart_type})
-            self._read(
-                "/api/chart_data/", dict(bounded, chart_type=chart_type)
-            )
-            if projects:
-                self._read(
-                    "/api/chart_data/",
-                    {"chart_type": chart_type, "project_name": projects[0]},
-                )
+    # /api/chart_data/ goldens were deleted when the endpoint was removed in
+    # S9b (its only consumer, the web charts template, migrated to
+    # /api/v2/reports/charts/ in the same release — per the single-user
+    # decision update, v1 endpoints and their goldens go together).
 
     def test_project_mutation_chain(self):
         created = self.raw_request("POST", "/api/create_project/", body={"name": "CHZ Project"})

@@ -7,6 +7,7 @@ their existing minutes/hours conversion.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import timedelta, timezone as datetime_timezone
 
 from django.db.models import (
@@ -466,3 +467,72 @@ def hierarchy_child_credit(sessions_qs):
     for row in rows:
         row["total"] = duration_from_numerator(row["total_numerator"])
     return rows
+
+
+def report_attribution(sessions_qs):
+    """Partition filtered sessions into per-project link and residual credit.
+
+    Values stay as integer ``duration microseconds * basis points`` numerators
+    until report views convert them to minutes.  This also preserves the
+    legacy rule: legacy-full links, and any historical allocation whose basis
+    points exceed 10000, each receive full session credit.
+    """
+
+    projects = {}
+    sessions = (
+        _reanchor(sessions_qs)
+        .select_related("project")
+        .prefetch_related("subproject_links__subproject")
+    )
+    for session in sessions.iterator(chunk_size=500):
+        project = projects.setdefault(
+            session.project_id,
+            {
+                "id": session.project_id,
+                "name": session.project.name,
+                "total_numerator": 0,
+                "children": defaultdict(
+                    lambda: {"id": None, "name": None, "total_numerator": 0}
+                ),
+                "residual_numerator": 0,
+            },
+        )
+        duration_numerator = _duration_numerator(
+            session.end_time - session.start_time
+        )
+        project["total_numerator"] += duration_numerator
+
+        links = list(session.subproject_links.all())
+        allocation_total = sum(link.allocation_bp for link in links)
+        full_credit_links = (
+            session.allocation_mode == "legacy_full"
+            or allocation_total > BASIS_POINTS
+        )
+        for link in links:
+            effective_bp = BASIS_POINTS if full_credit_links else link.allocation_bp
+            child = project["children"][link.subproject_id]
+            child["id"] = link.subproject_id
+            child["name"] = link.subproject.name
+            child["total_numerator"] += (
+                duration_numerator * effective_bp // BASIS_POINTS
+            )
+
+        residual_bp = 0
+        if not links:
+            residual_bp = BASIS_POINTS
+        elif (
+            session.allocation_mode == "partitioned"
+            and allocation_total < BASIS_POINTS
+        ):
+            residual_bp = BASIS_POINTS - allocation_total
+        project["residual_numerator"] += (
+            duration_numerator * residual_bp // BASIS_POINTS
+        )
+
+    for project in projects.values():
+        child_total = sum(
+            child["total_numerator"] for child in project["children"].values()
+        )
+        project["legacy_overallocated"] = child_total > project["total_numerator"]
+        project["children"] = dict(project["children"])
+    return projects

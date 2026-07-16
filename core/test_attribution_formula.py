@@ -244,7 +244,7 @@ class AttributionFormulaTests(TestCase):
         )
 
         scatter = self.client.get(
-            "/api/chart_data/",
+            "/api/v2/reports/charts/",
             {"chart_type": "scatter", "project_name": self.project.name},
         ).json()
         self.assertEqual(
@@ -258,7 +258,7 @@ class AttributionFormulaTests(TestCase):
         )
 
         line = self.client.get(
-            "/api/chart_data/",
+            "/api/v2/reports/charts/",
             {"chart_type": "line", "project_name": self.project.name},
         ).json()
         self.assertEqual(

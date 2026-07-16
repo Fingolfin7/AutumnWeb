@@ -53,6 +53,7 @@ class V2EndpointTests(TestCase):
                     "sessions",
                     "projects",
                     "subprojects",
+                    "reports",
                 ],
                 "user": {
                     "id": self.user.id,

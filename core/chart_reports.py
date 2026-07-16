@@ -16,15 +16,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import TruncDate
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-
-from core.api.helpers import _apply_exclude_filters, _apply_tag_filters
 from core.attribution import subproject_daily_series, subproject_session_points
-from core.models import Sessions
-from core.utils import filter_by_active_context, filter_sessions_by_params
 
 
 SESSION_POINT_CHARTS = {"scatter"}
@@ -60,23 +52,6 @@ def _duration_expression():
     return ExpressionWrapper(
         F("end_time") - F("start_time"), output_field=DurationField()
     )
-
-
-def _filtered_sessions(request):
-    sessions = Sessions.objects.filter(end_time__isnull=False, user=request.user)
-    sessions = filter_by_active_context(
-        sessions,
-        request,
-        override_context_id=request.query_params.get("context"),
-    )
-    sessions = _apply_tag_filters(
-        request.query_params, sessions, kind="sessions", user=request.user
-    )
-    sessions = _apply_exclude_filters(
-        request.query_params, sessions, kind="sessions", user=request.user
-    )
-    sessions = filter_sessions_by_params(request, sessions)
-    return Sessions.objects.filter(pk__in=sessions.values("pk")).order_by()
 
 
 def _duration_hours(duration):
@@ -208,30 +183,16 @@ def _wordcloud(sessions):
     ]
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def chart_data(request):
-    chart_type = (request.query_params.get("chart_type") or "").strip().lower()
-    if chart_type not in SUPPORTED_CHARTS:
-        return Response(
-            {"detail": "Unsupported chart_type"},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
-
-    sessions = _filtered_sessions(request)
-    use_subprojects = bool((request.query_params.get("project_name") or "").strip())
-
+def build_chart_payload(chart_type, sessions, *, use_subprojects=False):
+    """Build the legacy web-chart payload shape for an already filtered set."""
     if chart_type in SESSION_POINT_CHARTS:
-        payload = _session_points(sessions, use_subprojects)
+        return _session_points(sessions, use_subprojects)
     elif chart_type in DAILY_SERIES_CHARTS:
-        payload = _daily_series(sessions, use_subprojects)
+        return _daily_series(sessions, use_subprojects)
     elif chart_type in DAILY_TOTAL_CHARTS:
-        payload = _daily_totals(sessions)
+        return _daily_totals(sessions)
     elif chart_type in INTERVAL_CHARTS:
-        payload = _intervals(sessions)
+        return _intervals(sessions)
     elif chart_type == "histogram":
-        payload = _histogram(sessions)
-    else:
-        payload = _wordcloud(sessions)
-
-    return Response(payload)
+        return _histogram(sessions)
+    return _wordcloud(sessions)

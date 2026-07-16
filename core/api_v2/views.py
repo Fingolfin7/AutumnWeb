@@ -316,7 +316,13 @@ class MeView(V2APIView):
         return Response(
             {
                 "api_version": 2,
-                "capabilities": ["timers", "sessions", "projects", "subprojects"],
+                "capabilities": [
+                    "timers",
+                    "sessions",
+                    "projects",
+                    "subprojects",
+                    "reports",
+                ],
                 "user": {
                     "id": request.user.id,
                     "username": request.user.username,

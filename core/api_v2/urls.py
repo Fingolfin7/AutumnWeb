@@ -15,12 +15,26 @@ from core.api_v2.views import (
     SubprojectDetailView,
     SubprojectMergeView,
 )
+from core.api_v2.reports import (
+    ReportChartsView,
+    ReportHierarchyView,
+    ReportTalliesView,
+    ReportTotalsView,
+)
 
 
 app_name = "api_v2"
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
+    path("reports/totals/", ReportTotalsView.as_view(), name="report-totals"),
+    path("reports/tallies/", ReportTalliesView.as_view(), name="report-tallies"),
+    path(
+        "reports/hierarchy/",
+        ReportHierarchyView.as_view(),
+        name="report-hierarchy",
+    ),
+    path("reports/charts/", ReportChartsView.as_view(), name="report-charts"),
     path("timers/", TimersView.as_view(), name="timers"),
     path("timers/<int:session_id>", TimerDetailView.as_view(), name="timer-detail"),
     path(

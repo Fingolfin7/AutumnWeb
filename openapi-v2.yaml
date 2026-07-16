@@ -277,6 +277,341 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectResource'
           description: ''
+  /api/v2/reports/charts/:
+    get:
+      operationId: reports_charts_list
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: chart_type
+        schema:
+          type: string
+          enum:
+          - calendar
+          - cumulative
+          - heatmap
+          - histogram
+          - line
+          - scatter
+          - stacked_area
+          - wordcloud
+        required: true
+      - in: query
+        name: context
+        schema:
+          type: integer
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_projects
+        schema:
+          type: array
+          items:
+            type: integer
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: project_name
+        schema:
+          type: string
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      - in: query
+        name: tags
+        schema:
+          type: array
+          items:
+            type: integer
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChartPayloadRow'
+          description: ''
+  /api/v2/reports/hierarchy/:
+    get:
+      operationId: reports_hierarchy_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportHierarchy'
+          description: ''
+  /api/v2/reports/tallies/:
+    get:
+      operationId: reports_tallies_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: by
+        schema:
+          type: string
+          enum:
+          - context
+          - project
+          - status
+          - subproject
+          - tag
+        required: true
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTallies'
+          description: ''
+  /api/v2/reports/totals/:
+    get:
+      operationId: reports_totals_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTotals'
+          description: ''
   /api/v2/sessions/:
     get:
       operationId: sessions_list
@@ -740,6 +1075,59 @@ components:
       description: |-
         * `legacy_full` - legacy_full
         * `partitioned` - partitioned
+    ByEnum:
+      enum:
+      - project
+      - subproject
+      - context
+      - status
+      - tag
+      type: string
+      description: |-
+        * `project` - project
+        * `subproject` - subproject
+        * `context` - context
+        * `status` - status
+        * `tag` - tag
+    ChartPayloadRow:
+      type: object
+      properties:
+        x:
+          type: string
+          format: date-time
+        y:
+          type: number
+          format: double
+        series:
+          type: string
+        date:
+          type: string
+          format: date
+        hours:
+          type: number
+          format: double
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        label:
+          type: string
+        count:
+          type: integer
+        text:
+          type: string
+        weight:
+          type: integer
+    KindEnum:
+      enum:
+      - subproject
+      - residual
+      type: string
+      description: |-
+        * `subproject` - subproject
+        * `residual` - residual
     Me:
       type: object
       properties:
@@ -996,6 +1384,105 @@ components:
       required:
       - id
       - name
+    ReportHierarchy:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportHierarchyProject'
+      required:
+      - projects
+    ReportHierarchyChild:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        project_id:
+          type: integer
+        id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        total_minutes:
+          type: number
+          format: double
+      required:
+      - id
+      - kind
+      - name
+      - total_minutes
+    ReportHierarchyProject:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        total_minutes:
+          type: number
+          format: double
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportHierarchyChild'
+        legacy_overallocated:
+          type: boolean
+      required:
+      - children
+      - id
+      - legacy_overallocated
+      - name
+      - total_minutes
+    ReportTallies:
+      type: object
+      properties:
+        by:
+          $ref: '#/components/schemas/ByEnum'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportTallyEntry'
+      required:
+      - by
+      - entries
+    ReportTallyEntry:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        project_id:
+          type: integer
+        id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        total_minutes:
+          type: number
+          format: double
+        session_count:
+          type: integer
+        legacy_overallocated:
+          type: boolean
+      required:
+      - id
+      - name
+      - total_minutes
+    ReportTotals:
+      type: object
+      properties:
+        total_minutes:
+          type: number
+          format: double
+        session_count:
+          type: integer
+      required:
+      - session_count
+      - total_minutes
     SessionListResponse:
       type: object
       properties:

@@ -359,3 +359,61 @@ class MeSerializer(serializers.Serializer):
     api_version = serializers.IntegerField()
     capabilities = serializers.ListField(child=serializers.CharField())
     user = MeUserSerializer()
+
+
+class ReportTotalsSerializer(serializers.Serializer):
+    total_minutes = serializers.FloatField()
+    session_count = serializers.IntegerField()
+
+
+class ReportTallyEntrySerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(
+        choices=("subproject", "residual"), required=False
+    )
+    project_id = serializers.IntegerField(required=False)
+    id = serializers.IntegerField(allow_null=True)
+    name = serializers.CharField(allow_null=True)
+    total_minutes = serializers.FloatField()
+    session_count = serializers.IntegerField(required=False)
+    legacy_overallocated = serializers.BooleanField(required=False)
+
+
+class ReportTalliesSerializer(serializers.Serializer):
+    by = serializers.ChoiceField(
+        choices=("project", "subproject", "context", "status", "tag")
+    )
+    entries = ReportTallyEntrySerializer(many=True)
+
+
+class ReportHierarchyChildSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=("subproject", "residual"))
+    project_id = serializers.IntegerField(required=False)
+    id = serializers.IntegerField(allow_null=True)
+    name = serializers.CharField(allow_null=True)
+    total_minutes = serializers.FloatField()
+
+
+class ReportHierarchyProjectSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    total_minutes = serializers.FloatField()
+    children = ReportHierarchyChildSerializer(many=True)
+    legacy_overallocated = serializers.BooleanField()
+
+
+class ReportHierarchySerializer(serializers.Serializer):
+    projects = ReportHierarchyProjectSerializer(many=True)
+
+
+class ChartPayloadRowSerializer(serializers.Serializer):
+    x = serializers.DateTimeField(required=False)
+    y = serializers.FloatField(required=False)
+    series = serializers.CharField(required=False)
+    date = serializers.DateField(required=False)
+    hours = serializers.FloatField(required=False)
+    start_time = serializers.DateTimeField(required=False)
+    end_time = serializers.DateTimeField(required=False)
+    label = serializers.CharField(required=False)
+    count = serializers.IntegerField(required=False)
+    text = serializers.CharField(required=False)
+    weight = serializers.IntegerField(required=False)

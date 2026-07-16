@@ -130,7 +130,7 @@ class ChartApiRegressionTests(TestCase):
 
     def _get_chart(self, chart_type, **params):
         return self.client.get(
-            "/api/chart_data/",
+            "/api/v2/reports/charts/",
             {"chart_type": chart_type, **params},
         )
 
@@ -296,7 +296,18 @@ class ChartApiRegressionTests(TestCase):
     def test_invalid_chart_type_returns_400(self):
         response = self._get_chart("not-a-chart")
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"detail": "Unsupported chart_type"})
+        self.assertEqual(
+            response.json(),
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid input.",
+                    "details": {
+                        "chart_type": ["Unsupported chart_type."]
+                    },
+                }
+            },
+        )
 
     def test_empty_histogram_preserves_empty_chart_state(self):
         Sessions.objects.filter(user=self.user).delete()

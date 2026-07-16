@@ -91,7 +91,6 @@ from core.api.tallies import (
     tally_by_status,
     tally_by_tags,
 )
-from core.api.charts import chart_data
 from core.api.import_export import (
     export_json_api,
     import_json_api,
