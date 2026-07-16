@@ -60,7 +60,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # 3. Recent 3 completed sessions
         recent_sessions = (
-            Sessions.objects.filter(user=user, is_active=False, end_time__isnull=False)
+            Sessions.objects.filter(user=user, end_time__isnull=False)
             .select_related("project")
             .prefetch_related("subprojects")
             .order_by("-end_time")[:3]
@@ -78,20 +78,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # Today's total time
         today_sessions = Sessions.objects.filter(
-            user=user, is_active=False, end_time__gte=today_start
+            user=user, end_time__isnull=False, end_time__gte=today_start
         )
         today_total = sum(s.duration or 0 for s in today_sessions)
         context["today_total"] = today_total
 
         # This week's total time
         week_sessions = Sessions.objects.filter(
-            user=user, is_active=False, end_time__gte=week_start
+            user=user, end_time__isnull=False, end_time__gte=week_start
         )
         week_total = sum(s.duration or 0 for s in week_sessions)
         context["week_total"] = week_total
 
         # Active timers count
-        active_timers = Sessions.objects.filter(user=user, is_active=True)
+        active_timers = Sessions.objects.filter(user=user, end_time__isnull=True)
         active_timers = filter_by_active_context(active_timers, self.request)
         context["active_timers_count"] = active_timers.count()
 

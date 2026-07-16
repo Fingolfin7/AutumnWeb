@@ -54,7 +54,7 @@ def stop_expired_timers(user=None, now=None):
     """Close active sessions whose optional auto-stop deadline has passed."""
     now = now or timezone.now()
     sessions = Sessions.objects.filter(
-        is_active=True,
+        end_time__isnull=True,
         auto_stop_at__isnull=False,
         auto_stop_at__lte=now,
     )
@@ -767,7 +767,7 @@ def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -
 
     # Get distinct completed-session dates in the active timezone.
     sessions = Sessions.objects.filter(
-        user=user, is_active=False, end_time__isnull=False
+        user=user, end_time__isnull=False
     )
     active_dates = set(sessions.dates("end_time", "day"))
 

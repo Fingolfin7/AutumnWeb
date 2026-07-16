@@ -66,7 +66,9 @@ def search_sessions(request):
 
     sessions = Sessions.objects.filter(user=request.user)
     sessions = (
-        sessions.filter(is_active=True) if active else sessions.filter(is_active=False)
+        sessions.filter(end_time__isnull=True)
+        if active
+        else sessions.filter(end_time__isnull=False)
     )
 
     # context filter (consistent with other endpoints)
@@ -80,10 +82,12 @@ def search_sessions(request):
     shim = type("Req", (), {"query_params": qp2, "GET": qp2})()
     sessions = filter_sessions_by_params(shim, sessions)
 
+    # "id" tie-breaker keeps equal-sort-key rows in a stable order regardless
+    # of the query plan (matches the historical plan order: ascending id).
     try:
-        sessions = sessions.order_by(order)
+        sessions = sessions.order_by(order, "id")
     except Exception:
-        sessions = sessions.order_by("-end_time")
+        sessions = sessions.order_by("-end_time", "id")
 
     # lightweight paging
     try:
@@ -147,7 +151,7 @@ def log_activity(request):
     qp = request.query_params
     period = (qp.get("period") or "").lower()
 
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=request.user)
     sessions = filter_by_active_context(
         sessions, request, override_context_id=qp.get("context")
     )
@@ -175,7 +179,7 @@ def log_activity(request):
         qp2["project_name"] = qp2["project"]
 
     shim = type("Req", (), {"query_params": qp2, "GET": qp2})()
-    sessions = filter_sessions_by_params(shim, sessions).order_by("-end_time")
+    sessions = filter_sessions_by_params(shim, sessions).order_by("-end_time", "id")
 
     if compact:
         logs = [
@@ -384,7 +388,7 @@ def edit_session(request, session_id):
 @permission_classes([IsAuthenticated])
 def list_sessions(request):
     sessions = (
-        Sessions.objects.filter(is_active=False, user=request.user)
+        Sessions.objects.filter(end_time__isnull=False, user=request.user)
         .select_related("project")
         .prefetch_related("subprojects")
     )
@@ -398,6 +402,9 @@ def list_sessions(request):
         request.query_params, sessions, kind="sessions", user=request.user
     )
     sessions = filter_sessions_by_params(request, sessions)
+    # "id" tie-breaker keeps equal end_time rows in a stable order regardless
+    # of the query plan (matches the historical plan order: ascending id).
+    sessions = sessions.order_by("-end_time", "id")
     serializer = SessionSerializer(sessions, many=True)
     # to_representation already compacts project/subprojects as names
     return Response(serializer.data)
@@ -407,7 +414,7 @@ def list_sessions(request):
 @permission_classes([IsAuthenticated])
 def list_active_sessions(request):
     stop_expired_timers(request.user)
-    sessions = Sessions.objects.filter(is_active=True, user=request.user)
+    sessions = Sessions.objects.filter(end_time__isnull=True, user=request.user)
     sessions = filter_by_active_context(
         sessions, request, override_context_id=request.query_params.get("context")
     )

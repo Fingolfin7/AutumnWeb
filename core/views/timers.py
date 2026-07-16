@@ -40,7 +40,7 @@ def active_timers_fragment(request):
 
     stop_expired_timers(request.user)
     timers = (
-        Sessions.objects.filter(is_active=True, user=request.user)
+        Sessions.objects.filter(end_time__isnull=True, user=request.user)
         .select_related("project")
         .prefetch_related(
             Prefetch(
@@ -238,7 +238,7 @@ class TimerListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         stop_expired_timers(self.request.user)
-        qs = Sessions.objects.filter(is_active=True, user=self.request.user)
+        qs = Sessions.objects.filter(end_time__isnull=True, user=self.request.user)
         # Respect active context (timers only for projects in the active context)
         return filter_by_active_context(qs, self.request)
 
@@ -490,7 +490,7 @@ def build_timer_suggestions(user, request):
     lookback_start = now - timedelta(days=90)
 
     active_timers = filter_by_active_context(
-        Sessions.objects.filter(user=user, is_active=True)
+        Sessions.objects.filter(user=user, end_time__isnull=True)
         .select_related("project")
         .prefetch_related("subprojects"),
         request,
@@ -500,7 +500,6 @@ def build_timer_suggestions(user, request):
     recent_sessions_qs = filter_by_active_context(
         Sessions.objects.filter(
             user=user,
-            is_active=False,
             end_time__isnull=False,
             end_time__gte=lookback_start,
         )

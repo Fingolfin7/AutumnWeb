@@ -102,7 +102,7 @@ class Projects(models.Model):
             logger.info(f"Total Time before audit: {self.total_time}")
 
         self.total_time = sum(
-            session.duration for session in self.sessions.filter(is_active=False) if session.duration is not None)
+            session.duration for session in self.sessions.filter(end_time__isnull=False) if session.duration is not None)
         self.save()
 
         if log:
@@ -154,7 +154,7 @@ class SubProjects(models.Model):
             logger.info(f"Total Time before audit: {self.total_time}")
 
         self.total_time = sum(
-            session.duration for session in self.sessions.filter(is_active=False) if session.duration is not None)
+            session.duration for session in self.sessions.filter(end_time__isnull=False) if session.duration is not None)
         self.save()
 
         if log:
@@ -227,6 +227,27 @@ class Sessions(models.Model):
             models.Index(fields=['is_active', 'end_time']),  # Optimizes queries that filter active/completed sessions
             models.Index(fields=['user', 'project']),  # Optimizes lookups by user and project
             models.Index(fields=['user', 'is_active', 'end_time']),  # Dashboard/tallies/charts: user + completed + date range
+            models.Index(
+                fields=['user', 'start_time', 'id'],
+                name='sess_active_user_start_idx',
+                condition=models.Q(end_time__isnull=True),
+            ),
+            models.Index(
+                fields=['user', 'auto_stop_at', 'id'],
+                name='sess_autostop_partial_idx',
+                condition=models.Q(
+                    end_time__isnull=True,
+                    auto_stop_at__isnull=False,
+                ),
+            ),
+            models.Index(
+                fields=['user', 'end_time', 'id'],
+                name='sess_completed_user_end_idx',
+            ),
+            models.Index(
+                fields=['user', 'project', 'end_time', 'id'],
+                name='sess_completed_proj_end_idx',
+            ),
         ]
 
         constraints = [

@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from core.attribution import hierarchy_child_credit
 from core.models import Projects, SubProjects, Sessions, status_choices, Context
 from core.serializers import (
     ProjectSerializer,
@@ -109,7 +110,7 @@ def projects_list_flat(request):
     else:
         payload = []
         for p in projects_qs:
-            sessions = p.sessions.filter(is_active=False)
+            sessions = p.sessions.filter(end_time__isnull=False)
             session_count = sessions.count()
             total_minutes = float(p.total_time or 0.0)
             avg_session_minutes = (
@@ -372,7 +373,7 @@ def hierarchy_data(request):
         contexts = contexts.filter(id=context_id)
 
     # Apply date filters to sessions for time calculation
-    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
 
     # Re-anchor on session IDs so M2M filters cannot fan out duration sums.
@@ -389,13 +390,10 @@ def hierarchy_data(request):
         )
     }
     subproject_times = {
-        row["subprojects"]: (
+        row["subproject_id"]: (
             row["total"].total_seconds() / 60.0 if row["total"] else 0.0
         )
-        for row in base_sessions.values("subprojects").annotate(
-            total=Sum(duration_expr)
-        )
-        if row["subprojects"] is not None
+        for row in hierarchy_child_credit(base_sessions)
     }
 
     projects = Projects.objects.filter(user=user)
@@ -482,7 +480,7 @@ def projects_with_stats(request):
     ).order_by("name")
 
     # Filter sessions by date range and other params
-    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
 
     # Re-anchor on session IDs so M2M filters cannot fan out aggregates.

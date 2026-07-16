@@ -55,7 +55,7 @@ def subprojects_list(request):
 
     payload = []
     for sp in subprojects:
-        session_count = sp.sessions.filter(is_active=False).count()
+        session_count = sp.sessions.filter(end_time__isnull=False).count()
         total_minutes = float(sp.total_time or 0.0)
         payload.append(
             {

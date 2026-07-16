@@ -241,7 +241,7 @@ def commitment_applies_to_tag(commitment: Commitment, tag_obj: Tag) -> bool:
 def get_commitment_sessions_queryset(commitment, period_start, period_end):
     sessions = Sessions.objects.filter(
         user=commitment.user,
-        is_active=False,
+        end_time__isnull=False,
         end_time__gte=period_start,
         end_time__lt=period_end,
     )

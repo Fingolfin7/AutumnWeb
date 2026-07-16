@@ -67,7 +67,7 @@ def _iso_value(value):
 
 def _get_active_sessions(user, project_name=None):
     stop_expired_timers(user)
-    qs = Sessions.objects.filter(is_active=True, user=user).order_by("-start_time")
+    qs = Sessions.objects.filter(end_time__isnull=True, user=user).order_by("-start_time")
     if project_name:
         qs = qs.filter(project__name__iexact=project_name)
     return qs
@@ -127,7 +127,7 @@ def _serialize_project_grouped(projects, compact=True):
             groups[key].append(p.name)
         else:
             # Calculate session stats
-            sessions = p.sessions.filter(is_active=False)
+            sessions = p.sessions.filter(end_time__isnull=False)
             session_count = sessions.count()
             avg_session = (p.total_time / session_count) if session_count > 0 else 0
 
@@ -290,7 +290,7 @@ def _serialize_context_for_api(context, user, compact):
     sessions = Sessions.objects.filter(
         user=user,
         project__context=context,
-        is_active=False,
+        end_time__isnull=False,
     )
     session_count = sessions.count()
     total_minutes = sum(session.duration or 0 for session in sessions)
@@ -315,7 +315,7 @@ def _serialize_tag_for_api(tag, user, compact):
     sessions = Sessions.objects.filter(
         user=user,
         project__tags=tag,
-        is_active=False,
+        end_time__isnull=False,
     )
     session_count = sessions.count()
     total_minutes = sum(session.duration or 0 for session in sessions)

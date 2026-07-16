@@ -31,7 +31,7 @@ def audit(request):
         after = float(
             sum(
                 session.duration
-                for session in p.sessions.filter(is_active=False)
+                for session in p.sessions.filter(end_time__isnull=False)
                 if session.duration is not None
             )
         )
@@ -62,7 +62,7 @@ def audit(request):
         after = float(
             sum(
                 session.duration
-                for session in sp.sessions.filter(is_active=False)
+                for session in sp.sessions.filter(end_time__isnull=False)
                 if session.duration is not None
             )
         )
@@ -114,7 +114,9 @@ def me(request):
     Includes active_session_count for status indicators.
     """
     u = request.user
-    active_session_count = Sessions.objects.filter(user=u, is_active=True).count()
+    active_session_count = Sessions.objects.filter(
+        user=u, end_time__isnull=True
+    ).count()
     return Response(
         {
             "ok": True,

@@ -193,7 +193,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
         return context
 
     def get_queryset(self):
-        sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
+        sessions = Sessions.objects.filter(end_time__isnull=False, user=self.request.user)
 
         # Allow explicit ?context= to override the global active context
         override_context_id = self.request.GET.get("context")

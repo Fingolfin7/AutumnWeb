@@ -14,7 +14,8 @@ from django.db.models import (
     Value,
 )
 from django.db.models.functions import Coalesce
-from core.models import Projects, Sessions, SubProjects
+from core.attribution import subproject_tally
+from core.models import Projects, Sessions
 from core.utils import (
     filter_sessions_by_params,
     filter_by_active_context,
@@ -49,7 +50,7 @@ def totals(request):
     if not project_name:
         return _err("Missing 'project'")
 
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=request.user)
     sessions = sessions.filter(project__name__iexact=project_name)
     sessions = filter_by_active_context(
         sessions, request, override_context_id=request.query_params.get("context")
@@ -72,27 +73,10 @@ def totals(request):
 
     # Latest session time preserves the old bucket insertion order. The ID is a
     # deterministic tie-breaker matching the usual M2M relation order.
-    sub_rows = list(
-        base_sessions.values("subprojects")
-        .annotate(total=Sum(duration_expr), latest_end_time=Max("end_time"))
-        .order_by("-latest_end_time", "subprojects")
-    )
-    subproject_ids = [
-        row["subprojects"]
-        for row in sub_rows
-        if row["subprojects"] is not None
-    ]
-    subproject_names = dict(
-        SubProjects.objects.filter(id__in=subproject_ids).values_list("id", "name")
-    )
+    sub_rows = subproject_tally(base_sessions, group_by_id=True)
     sub_totals = {}
     for row in sub_rows:
-        subproject_id = row["subprojects"]
-        name = (
-            "no subproject"
-            if subproject_id is None
-            else subproject_names[subproject_id]
-        )
+        name = row["name"]
         sub_totals[name] = (
             row["total"].total_seconds() / 60.0 if row["total"] else 0.0
         )
@@ -118,7 +102,7 @@ def totals(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def tally_by_sessions(request):
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=request.user)
     project = request.query_params.get("project_name")
     if project:
         sessions = sessions.filter(project__name__iexact=project)
@@ -142,7 +126,7 @@ def tally_by_sessions(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def tally_by_subprojects(request):
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=request.user)
     project = request.query_params.get("project_name")
     if project:
         sessions = sessions.filter(project__name__iexact=project)
@@ -157,16 +141,7 @@ def tally_by_subprojects(request):
     base_sessions = _reanchor_sessions(sessions)
     payload = [
         {"name": row["name"], "total_time": _minutes(row["total"])}
-        for row in base_sessions.annotate(
-            name=Coalesce(
-                "subprojects__name",
-                Value("no subproject"),
-                output_field=CharField(),
-            )
-        )
-        .values("name")
-        .annotate(total=Sum(_duration_expression()), latest_end_time=Max("end_time"))
-        .order_by("-latest_end_time", "name")
+        for row in subproject_tally(base_sessions)
     ]
     return Response(payload)
 
@@ -175,7 +150,7 @@ def tally_by_subprojects(request):
 @permission_classes([IsAuthenticated])
 def tally_by_context(request):
     """Aggregate time by context."""
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=request.user)
     sessions = filter_sessions_by_params(request, sessions)
 
     base_sessions = _reanchor_sessions(sessions)
@@ -218,7 +193,7 @@ def tally_by_status(request):
         projects = projects.exclude(id__in=exclude_ids)
 
     # Filter sessions by date range and other params to calculate accurate totals
-    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
 
     status_counts = list(
@@ -257,7 +232,7 @@ def tally_by_tags(request):
     user = request.user
 
     # Filter sessions by date range, context, and other params
-    sessions = Sessions.objects.filter(is_active=False, user=user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=user)
     sessions = filter_sessions_by_params(request, sessions)
 
     base_sessions = _reanchor_sessions(sessions)

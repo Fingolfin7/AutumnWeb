@@ -178,7 +178,7 @@ def export_view(request):
             end_dt = timezone.make_aware(end_dt)
 
         # Flat query for every session in the window (and optionally a single project)
-        qs = Sessions.objects.filter(is_active=False, user=request.user)
+        qs = Sessions.objects.filter(end_time__isnull=False, user=request.user)
         if project_name:
             qs = qs.filter(project__name__icontains=project_name)
         if start_date:
@@ -208,6 +208,9 @@ def export_view(request):
             "subprojects",
             "project__tags",
         )
+        # "id" tie-breaker keeps equal end_time rows in a stable order
+        # regardless of the query plan (historical order: ascending id).
+        qs = qs.order_by("-end_time", "id")
 
         # build export dict
         export_dict = build_project_json_from_sessions(qs, autumn_compatible)

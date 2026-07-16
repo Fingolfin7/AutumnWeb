@@ -61,7 +61,7 @@ def contexts_list(request):
             sessions = Sessions.objects.filter(
                 user=request.user,
                 project__context=c,
-                is_active=False,
+                end_time__isnull=False,
             )
             session_count = sessions.count()
             total_minutes = sum(s.duration or 0 for s in sessions)
@@ -174,7 +174,7 @@ def tags_list(request):
             sessions = Sessions.objects.filter(
                 user=request.user,
                 project__tags=t,
-                is_active=False,
+                end_time__isnull=False,
             )
             session_count = sessions.count()
             total_minutes = sum(s.duration or 0 for s in sessions)

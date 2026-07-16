@@ -80,7 +80,7 @@ def export_json_api(request):
         except Exception:
             return _err("Invalid end_date; expected YYYY-MM-DD")
 
-    qs = Sessions.objects.filter(is_active=False, user=request.user)
+    qs = Sessions.objects.filter(end_time__isnull=False, user=request.user)
 
     if project_name:
         qs = qs.filter(project__name__icontains=project_name)
@@ -117,6 +117,9 @@ def export_json_api(request):
         "subprojects",
         "project__tags",
     )
+    # "id" tie-breaker keeps equal end_time rows in a stable order regardless
+    # of the query plan (matches the historical plan order: ascending id).
+    qs = qs.order_by("-end_time", "id")
 
     export_dict = build_project_json_from_sessions(qs, autumn_compatible)
     payload = json_compress(export_dict) if compress else export_dict

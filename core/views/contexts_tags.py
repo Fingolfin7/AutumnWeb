@@ -143,7 +143,9 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
         }
 
         sessions_qs = Sessions.objects.filter(
-            user=self.request.user, project__in=projects_qs, is_active=False
+            user=self.request.user,
+            project__in=projects_qs,
+            end_time__isnull=False,
         )
         session_count = sessions_qs.count()
         average_session_duration = (
@@ -262,7 +264,9 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
         }
 
         sessions_qs = Sessions.objects.filter(
-            user=self.request.user, project__in=projects_qs, is_active=False
+            user=self.request.user,
+            project__in=projects_qs,
+            end_time__isnull=False,
         )
         session_count = sessions_qs.count()
         average_session_duration = (

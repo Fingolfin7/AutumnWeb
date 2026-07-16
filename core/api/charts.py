@@ -6,7 +6,6 @@ from datetime import timedelta, timezone as datetime_timezone
 
 from django.db.models import (
     Case,
-    CharField,
     Count,
     DurationField,
     ExpressionWrapper,
@@ -16,13 +15,14 @@ from django.db.models import (
     Value,
     When,
 )
-from django.db.models.functions import Coalesce, TruncDate
+from django.db.models.functions import TruncDate
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api.helpers import _apply_exclude_filters, _apply_tag_filters
+from core.attribution import subproject_daily_series, subproject_session_points
 from core.models import Sessions
 from core.utils import filter_by_active_context, filter_sessions_by_params
 
@@ -63,7 +63,7 @@ def _duration_expression():
 
 
 def _filtered_sessions(request):
-    sessions = Sessions.objects.filter(is_active=False, user=request.user)
+    sessions = Sessions.objects.filter(end_time__isnull=False, user=request.user)
     sessions = filter_by_active_context(
         sessions,
         request,
@@ -83,20 +83,21 @@ def _duration_hours(duration):
     return duration.total_seconds() / 3600.0 if duration else 0.0
 
 
-def _series_expression(use_subprojects):
-    if use_subprojects:
-        return Coalesce(
-            "subprojects__name",
-            Value("no subproject"),
-            output_field=CharField(),
-        )
-    return F("project__name")
-
-
 def _session_points(sessions, use_subprojects):
+    if use_subprojects:
+        rows = subproject_session_points(sessions)
+        return [
+            {
+                "x": row["end_time"],
+                "y": _duration_hours(row["duration_value"]),
+                "series": row["series"],
+            }
+            for row in rows
+        ]
+
     rows = (
         sessions.annotate(
-            series=_series_expression(use_subprojects),
+            series=F("project__name"),
             duration_value=_duration_expression(),
         )
         .values("end_time", "series", "duration_value")
@@ -113,10 +114,21 @@ def _session_points(sessions, use_subprojects):
 
 
 def _daily_series(sessions, use_subprojects):
+    if use_subprojects:
+        rows = subproject_daily_series(sessions)
+        return [
+            {
+                "date": row["date"],
+                "series": row["series"],
+                "hours": _duration_hours(row["total"]),
+            }
+            for row in rows
+        ]
+
     rows = (
         sessions.annotate(
             date=TruncDate("start_time", tzinfo=datetime_timezone.utc),
-            series=_series_expression(use_subprojects),
+            series=F("project__name"),
         )
         .values("date", "series")
         .annotate(total=Sum(_duration_expression()))
