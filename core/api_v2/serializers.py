@@ -214,22 +214,44 @@ class CleanedNameField(serializers.CharField):
 
 
 class ContextWriteRequestSerializer(serializers.Serializer):
-    name = CleanedNameField()
+    name = CleanedNameField(required=False)
+    description = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError(
+                "Provide at least one of 'name' or 'description'."
+            )
+        return attrs
 
 
 class TagWriteRequestSerializer(serializers.Serializer):
-    name = CleanedNameField()
+    name = CleanedNameField(required=False)
+    color = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=20
+    )
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError(
+                "Provide at least one of 'name' or 'color'."
+            )
+        return attrs
 
 
 class ContextResourceSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
+    description = serializers.CharField(allow_null=True)
     project_count = serializers.IntegerField()
 
 
 class TagResourceSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
+    color = serializers.CharField(allow_null=True)
     project_count = serializers.IntegerField()
 
 

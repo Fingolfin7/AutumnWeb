@@ -35,8 +35,10 @@ class V2ContextsTagsTests(TestCase):
             {
                 "count": 2,
                 "contexts": [
-                    {"id": alpha.id, "name": "Alpha", "project_count": 2},
-                    {"id": beta.id, "name": "Beta", "project_count": 1},
+                    {"id": alpha.id, "name": "Alpha", "description": None,
+                     "project_count": 2},
+                    {"id": beta.id, "name": "Beta", "description": None,
+                     "project_count": 1},
                 ],
             },
         )
@@ -82,8 +84,10 @@ class V2ContextsTagsTests(TestCase):
             {
                 "count": 2,
                 "tags": [
-                    {"id": alpha.id, "name": "Alpha", "project_count": 2},
-                    {"id": beta.id, "name": "Beta", "project_count": 1},
+                    {"id": alpha.id, "name": "Alpha", "color": None,
+                     "project_count": 2},
+                    {"id": beta.id, "name": "Beta", "color": None,
+                     "project_count": 1},
                 ],
             },
         )
@@ -258,3 +262,53 @@ class V2ContextsTagsTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("contexts", response.json()["capabilities"])
         self.assertIn("tags", response.json()["capabilities"])
+
+
+class ContextDescriptionAndTagColorTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="v2-meta-extras")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_context_description_round_trip(self):
+        created = self.client.post(
+            "/api/v2/contexts/",
+            {"name": "Deep", "description": "Focus work"},
+            format="json",
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["description"], "Focus work")
+
+        cid = created.json()["id"]
+        patched = self.client.patch(
+            f"/api/v2/contexts/{cid}", {"description": "Updated"}, format="json"
+        )
+        if patched.status_code == 404:  # trailing-slash routing
+            patched = self.client.patch(
+                f"/api/v2/contexts/{cid}/", {"description": "Updated"}, format="json"
+            )
+        self.assertEqual(patched.status_code, 200)
+        self.assertEqual(patched.json()["description"], "Updated")
+        self.assertEqual(patched.json()["name"], "Deep")
+
+    def test_tag_color_round_trip(self):
+        created = self.client.post(
+            "/api/v2/tags/", {"name": "focus", "color": "#aa3355"}, format="json"
+        )
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["color"], "#aa3355")
+
+        tid = created.json()["id"]
+        patched = self.client.patch(
+            f"/api/v2/tags/{tid}", {"color": "blue"}, format="json"
+        )
+        if patched.status_code == 404:
+            patched = self.client.patch(
+                f"/api/v2/tags/{tid}/", {"color": "blue"}, format="json"
+            )
+        self.assertEqual(patched.status_code, 200)
+        self.assertEqual(patched.json()["color"], "blue")
+
+    def test_empty_write_rejected(self):
+        response = self.client.post("/api/v2/contexts/", {}, format="json")
+        self.assertEqual(response.status_code, 400)

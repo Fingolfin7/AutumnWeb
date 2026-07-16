@@ -34,7 +34,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/ContextWriteRequest'
-        required: true
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -1041,7 +1040,6 @@ paths:
           multipart/form-data:
             schema:
               $ref: '#/components/schemas/TagWriteRequest'
-        required: true
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -1325,9 +1323,13 @@ components:
           type: integer
         name:
           type: string
+        description:
+          type: string
+          nullable: true
         project_count:
           type: integer
       required:
+      - description
       - id
       - name
       - project_count
@@ -1337,8 +1339,9 @@ components:
         name:
           type: string
           maxLength: 100
-      required:
-      - name
+        description:
+          type: string
+          nullable: true
     KindEnum:
       enum:
       - subproject
@@ -1391,6 +1394,9 @@ components:
         name:
           type: string
           maxLength: 100
+        description:
+          type: string
+          nullable: true
     PatchedProjectPatchRequest:
       type: object
       properties:
@@ -1451,6 +1457,10 @@ components:
         name:
           type: string
           maxLength: 100
+        color:
+          type: string
+          nullable: true
+          maxLength: 20
     ProjectCreateRequest:
       type: object
       properties:
@@ -1943,9 +1953,13 @@ components:
           type: integer
         name:
           type: string
+        color:
+          type: string
+          nullable: true
         project_count:
           type: integer
       required:
+      - color
       - id
       - name
       - project_count
@@ -1955,8 +1969,10 @@ components:
         name:
           type: string
           maxLength: 100
-      required:
-      - name
+        color:
+          type: string
+          nullable: true
+          maxLength: 20
     TimerListResponse:
       type: object
       properties:
