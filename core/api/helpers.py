@@ -312,7 +312,7 @@ def _serialize_tag_for_api(tag, user, compact):
 
 # Needed by list_projects
 def in_window(data, start=None, end=None):
-    from .utils import in_window as _inw
+    from core.utils import in_window as _inw
 
     return _inw(data, start, end)
 
