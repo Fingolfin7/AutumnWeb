@@ -14,7 +14,7 @@ from core.utils import (
     parse_stop_after_duration,
     stop_expired_timers,
 )
-from core.api.helpers import _coerce_list, _compact, _err, _get_active_sessions, _json_ok, _now, _parse_track_times, _pick_target_session, _serialize_session
+from core.api.helpers import _coerce_list, _compact, _err, _get_active_sessions, _json_ok, _now, _parse_client_instant, _parse_track_times, _pick_target_session, _serialize_session
 
 
 # -----------------------
@@ -27,7 +27,7 @@ from core.api.helpers import _coerce_list, _compact, _err, _get_active_sessions,
 def timer_start(request):
     """
     Start a new timer.
-    JSON: { "project": str, "subprojects": [str]|"a,b", "note": str? }
+    JSON: { "project": str, "subprojects": [str]|"a,b", "note": str?, "start": iso? }
     """
     compact = _compact(request)
     project_name = request.data.get("project")
@@ -61,6 +61,12 @@ def timer_start(request):
         return _err(f"Unknown subprojects: {', '.join(missing)}")
 
     start_time = _now()
+    if request.data.get("start"):
+        try:
+            start_time = _parse_client_instant(request.data["start"], "start")
+        except ValueError as exc:
+            return _err(str(exc))
+
     sess = ledger_create_session(
         user=request.user,
         project=project,
@@ -82,7 +88,7 @@ def timer_start(request):
 def timer_stop(request):
     """
     Stop the current timer (or a specific one).
-    JSON: { "session_id": int?, "project": str?, "note": str? }
+    JSON: { "session_id": int?, "project": str?, "note": str?, "end": iso? }
     """
     compact = _compact(request)
     stop_expired_timers(request.user)
@@ -97,6 +103,14 @@ def timer_stop(request):
         return _err("Session not active", status.HTTP_400_BAD_REQUEST)
 
     end_time = _now()
+    if request.data.get("end"):
+        try:
+            end_time = _parse_client_instant(request.data["end"], "end")
+        except ValueError as exc:
+            return _err(str(exc))
+        if end_time < sess.start_time:
+            return _err("'end' is before the session start")
+
     note = sess.note
     if "note" in request.data and request.data["note"] is not None:
         note = str(request.data["note"])

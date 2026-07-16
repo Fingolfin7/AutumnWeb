@@ -157,6 +157,28 @@ def _serialize_project_grouped(projects, compact=True):
     return {"summary": summary, "projects": groups}
 
 
+def _parse_client_instant(value, field, *, max_future_minutes=5):
+    """Parse a client-supplied instant for timer start/stop.
+
+    Clients on sleeping hosts send the instant the user ran the command so a
+    wake delay never skews recorded times. Rejects instants more than
+    max_future_minutes ahead of server time (clock-skew guard).
+    """
+    from datetime import timedelta
+
+    try:
+        instant = parse_date_or_datetime(str(value))
+    except (ValueError, TypeError):
+        raise ValueError(f"Invalid '{field}' timestamp: {value!r}")
+    if instant is None:
+        raise ValueError(f"Invalid '{field}' timestamp: {value!r}")
+    if timezone.is_naive(instant):
+        instant = timezone.make_aware(instant)
+    if instant > timezone.now() + timedelta(minutes=max_future_minutes):
+        raise ValueError(f"'{field}' is in the future")
+    return instant
+
+
 def _parse_track_times(data):
     # Accept either ISO strings:
     #   start, end
