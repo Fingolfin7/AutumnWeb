@@ -8,7 +8,11 @@ from core.models import Projects, SubProjects
 from core.serializers import (
     SubProjectSerializer,
 )
-from django.db import transaction
+from core.services import (
+    CommitmentTargetProtectedError,
+    DestructiveMutationService,
+    DestructiveOperationError,
+)
 from core.api.helpers import _compact, _err
 
 
@@ -141,19 +145,21 @@ def search_subprojects(request):
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def delete_subproject(request, project_name, subproject_name):
-    subproject = get_object_or_404(
-        SubProjects,
-        name=subproject_name,
-        parent_project__name=project_name,
-        user=request.user,
-    )
-    subproject.delete()
+    try:
+        DestructiveMutationService.delete_subproject(
+            user=request.user,
+            project_name=project_name,
+            subproject_name=subproject_name,
+        )
+    except CommitmentTargetProtectedError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_409_CONFLICT
+        )
     return Response(status=204)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-@transaction.atomic
 def merge_subprojects_api(request):
     """
     API endpoint to merge two subprojects into one new subproject.
@@ -179,83 +185,13 @@ def merge_subprojects_api(request):
         )
 
     try:
-        # Get the parent project
-        parent_project = get_object_or_404(Projects, id=project_id, user=request.user)
-
-        # Get the subprojects to merge (must belong to the same parent project)
-        subproject1 = get_object_or_404(
-            SubProjects,
-            name=subproject1_name,
-            parent_project=parent_project,
+        merged_subproject = DestructiveMutationService.merge_subprojects(
             user=request.user,
+            project_id=project_id,
+            name1=subproject1_name,
+            name2=subproject2_name,
+            new_name=new_subproject_name,
         )
-        subproject2 = get_object_or_404(
-            SubProjects,
-            name=subproject2_name,
-            parent_project=parent_project,
-            user=request.user,
-        )
-
-        # Check if new subproject name already exists in the same project
-        if SubProjects.objects.filter(
-            user=request.user, name=new_subproject_name, parent_project=parent_project
-        ).exists():
-            return Response(
-                {
-                    "error": f'Subproject with name "{new_subproject_name}" already exists in this project'
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Create merged description
-        merged_description = (
-            f"Merged from '{subproject1.name}' and '{subproject2.name}'\n\n"
-        )
-
-        if subproject1.description:
-            merged_description += (
-                f"--- {subproject1.name} Description ---\n{subproject1.description}\n\n"
-            )
-
-        if subproject2.description:
-            merged_description += (
-                f"--- {subproject2.name} Description ---\n{subproject2.description}\n\n"
-            )
-
-        # Remove trailing newlines
-        merged_description = merged_description.strip()
-
-        # Create the new merged subproject
-        merged_subproject = SubProjects.objects.create(
-            user=request.user,
-            name=new_subproject_name,
-            parent_project=parent_project,
-            start_date=min(subproject1.start_date, subproject2.start_date),
-            last_updated=max(subproject1.last_updated, subproject2.last_updated),
-            total_time=0.0,  # Will be calculated by audit function
-            description=merged_description,
-        )
-
-        # Move all sessions from both subprojects to the merged subproject
-        subproject1_sessions = subproject1.sessions.all()
-        subproject2_sessions = subproject2.sessions.all()
-
-        for session in subproject1_sessions:
-            session.subprojects.remove(subproject1)
-            session.subprojects.add(merged_subproject)
-
-        for session in subproject2_sessions:
-            session.subprojects.remove(subproject2)
-            session.subprojects.add(merged_subproject)
-
-        # Audit total time for the merged subproject
-        merged_subproject.audit_total_time(log=False)
-
-        # Delete the original subprojects
-        subproject1.delete()
-        subproject2.delete()
-
-        # Serialize and return the merged subproject
         serializer = SubProjectSerializer(merged_subproject)
         return Response(
             {
@@ -265,6 +201,14 @@ def merge_subprojects_api(request):
             status=status.HTTP_201_CREATED,
         )
 
+    except CommitmentTargetProtectedError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_409_CONFLICT
+        )
+    except DestructiveOperationError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         return Response(
             {"error": f"An error occurred while merging subprojects: {str(e)}"},

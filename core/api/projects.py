@@ -8,6 +8,11 @@ from core.models import Projects, SubProjects, Sessions, status_choices, Context
 from core.serializers import (
     ProjectSerializer,
 )
+from core.services import (
+    CommitmentTargetProtectedError,
+    DestructiveMutationService,
+    DestructiveOperationError,
+)
 from core.utils import (
     filter_sessions_by_params,
     filter_by_active_context,
@@ -152,15 +157,12 @@ def rename_entity(request):
         old = request.data.get("project")
         if not old:
             return _err("Missing 'project'")
-        proj = get_object_or_404(Projects, name=old, user=request.user)
-        if (
-            Projects.objects.filter(user=request.user, name=new_name)
-            .exclude(pk=proj.pk)
-            .exists()
-        ):
-            return _err("Project name already exists", status.HTTP_409_CONFLICT)
-        proj.name = new_name
-        proj.save()
+        try:
+            proj = DestructiveMutationService.rename_project(
+                user=request.user, project_name=old, new_name=new_name
+            )
+        except DestructiveOperationError as exc:
+            return _err(str(exc), status.HTTP_409_CONFLICT)
         return Response({"ok": True, "project": proj.name})
 
     # subproject
@@ -168,20 +170,15 @@ def rename_entity(request):
     sub = request.data.get("subproject")
     if not parent or not sub:
         return _err("Missing 'project' or 'subproject'")
-    proj = get_object_or_404(Projects, name=parent, user=request.user)
-    sp = get_object_or_404(
-        SubProjects, parent_project=proj, user=request.user, name=sub
-    )
-    if (
-        SubProjects.objects.filter(
-            user=request.user, parent_project=proj, name=new_name
+    try:
+        sp = DestructiveMutationService.rename_subproject(
+            user=request.user,
+            project_name=parent,
+            subproject_name=sub,
+            new_name=new_name,
         )
-        .exclude(pk=sp.pk)
-        .exists()
-    ):
-        return _err("Subproject name already exists", status.HTTP_409_CONFLICT)
-    sp.name = new_name
-    sp.save()
+    except DestructiveOperationError as exc:
+        return _err(str(exc), status.HTTP_409_CONFLICT)
     return Response({"ok": True, "project": parent, "subproject": sp.name})
 
 
@@ -194,8 +191,14 @@ def project_delete_body(request):
     name = request.data.get("project")
     if not name:
         return _err("Missing 'project'")
-    proj = get_object_or_404(Projects, name=name, user=request.user)
-    proj.delete()
+    try:
+        DestructiveMutationService.delete_project(
+            user=request.user, project_name=name
+        )
+    except CommitmentTargetProtectedError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_409_CONFLICT
+        )
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -546,14 +549,19 @@ def get_project(request, project_name):
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def delete_project(request, project_name):
-    project = get_object_or_404(Projects, name=project_name, user=request.user)
-    project.delete()
+    try:
+        DestructiveMutationService.delete_project(
+            user=request.user, project_name=project_name
+        )
+    except CommitmentTargetProtectedError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_409_CONFLICT
+        )
     return Response(status=204)
 
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
-@transaction.atomic
 def merge_projects_api(request):
     """
     API endpoint to merge two projects into one new project.
@@ -576,110 +584,12 @@ def merge_projects_api(request):
         )
 
     try:
-        # Get the projects to merge
-        project1 = get_object_or_404(Projects, name=project1_name, user=request.user)
-        project2 = get_object_or_404(Projects, name=project2_name, user=request.user)
-
-        # Check if new project name already exists
-        if Projects.objects.filter(user=request.user, name=new_project_name).exists():
-            return Response(
-                {"error": f'Project with name "{new_project_name}" already exists'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Create merged description
-        merged_description = f"Merged from '{project1.name}' and '{project2.name}'\n\n"
-
-        if project1.description:
-            merged_description += (
-                f"--- {project1.name} Description ---\n{project1.description}\n\n"
-            )
-
-        if project2.description:
-            merged_description += (
-                f"--- {project2.name} Description ---\n{project2.description}\n\n"
-            )
-
-        # Remove trailing newlines
-        merged_description = merged_description.strip()
-
-        # Create the new merged project
-        merged_project = Projects.objects.create(
+        merged_project, _ = DestructiveMutationService.merge_projects(
             user=request.user,
-            name=new_project_name,
-            start_date=min(project1.start_date, project2.start_date),
-            last_updated=max(project1.last_updated, project2.last_updated),
-            total_time=0.0,  # Will be calculated by audit function
-            status="active",  # Default to active
-            description=merged_description,
+            project1_name=project1_name,
+            project2_name=project2_name,
+            new_project_name=new_project_name,
         )
-
-        # Move all sessions from both projects to the merged project
-        project1_sessions = project1.sessions.all()
-        project2_sessions = project2.sessions.all()
-
-        for session in project1_sessions:
-            session.project = merged_project
-            session.save()
-
-        for session in project2_sessions:
-            session.project = merged_project
-            session.save()
-
-        # Move all subprojects from both projects to the merged project
-        # Handle potential name conflicts by renaming duplicates
-        project1_subprojects = list(project1.subprojects.all())
-        project2_subprojects = list(project2.subprojects.all())
-
-        # Get existing subproject names in the merged project
-        existing_subproject_names = set()
-
-        # First, move all subprojects from project1
-        for subproject in project1_subprojects:
-            original_name = subproject.name
-            new_name = original_name
-
-            # If name conflict exists, append project name to make it unique
-            if new_name in existing_subproject_names:
-                new_name = f"{original_name} ({project1.name})"
-                counter = 1
-                while new_name in existing_subproject_names:
-                    new_name = f"{original_name} ({project1.name}) {counter}"
-                    counter += 1
-
-            subproject.name = new_name
-            subproject.parent_project = merged_project
-            subproject.save()
-            existing_subproject_names.add(new_name)
-
-        # Then, move all subprojects from project2
-        for subproject in project2_subprojects:
-            original_name = subproject.name
-            new_name = original_name
-
-            # If name conflict exists, append project name to make it unique
-            if new_name in existing_subproject_names:
-                new_name = f"{original_name} ({project2.name})"
-                counter = 1
-                while new_name in existing_subproject_names:
-                    new_name = f"{original_name} ({project2.name}) {counter}"
-                    counter += 1
-
-            subproject.name = new_name
-            subproject.parent_project = merged_project
-            subproject.save()
-            existing_subproject_names.add(new_name)
-
-        # Audit total time for the merged project and all its subprojects
-        merged_project.audit_total_time(log=False)
-        for subproject in merged_project.subprojects.all():
-            subproject.audit_total_time(log=False)
-
-        # Delete the original projects
-        project1.delete()
-        project2.delete()
-
-        # Serialize and return the merged project
         serializer = ProjectSerializer(merged_project)
         return Response(
             {
@@ -689,6 +599,14 @@ def merge_projects_api(request):
             status=status.HTTP_201_CREATED,
         )
 
+    except CommitmentTargetProtectedError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_409_CONFLICT
+        )
+    except DestructiveOperationError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST
+        )
     except Exception as e:
         return Response(
             {"error": f"An error occurred while merging projects: {str(e)}"},

@@ -16,6 +16,10 @@ from core.commitments import (
     commitment_applies_to_tag,
 )
 from core.models import Projects, Sessions, Commitment
+from core.services import (
+    CommitmentTargetProtectedError,
+    DestructiveMutationService,
+)
 
 
 @login_required
@@ -208,6 +212,16 @@ class DeleteContextView(LoginRequiredMixin, DeleteView):
         messages.success(self.request, "Context deleted successfully")
         return reverse("contexts")
 
+    def form_valid(self, form):
+        try:
+            DestructiveMutationService.delete_context(
+                user=self.request.user, context_name=self.object.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            messages.error(self.request, str(exc))
+            return redirect("contexts")
+        return redirect(self.get_success_url())
+
 
 class UpdateTagView(LoginRequiredMixin, UpdateView):
     model = Tag
@@ -315,3 +329,13 @@ class DeleteTagView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         messages.success(self.request, "Tag deleted successfully")
         return reverse("tags")
+
+    def form_valid(self, form):
+        try:
+            DestructiveMutationService.delete_tag(
+                user=self.request.user, tag_name=self.object.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            messages.error(self.request, str(exc))
+            return redirect("tags")
+        return redirect(self.get_success_url())

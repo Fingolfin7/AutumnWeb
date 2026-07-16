@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from core.models import Projects, SubProjects, Sessions, status_choices, Context
+from core.services import DestructiveMutationService
 from core.utils import (
     json_decompress,
     session_exists,
@@ -91,7 +92,9 @@ class Command(BaseCommand):
 
             if project:
                 if options['force']:
-                    Projects.objects.filter(name=project_name, user=user).delete()
+                    DestructiveMutationService.delete_project(
+                        user=user, project_name=project_name
+                    )
                     project = None  # to ensure a fresh creation
                 elif merge:
                     self.stdout.write(
@@ -251,7 +254,9 @@ class Command(BaseCommand):
                 mismatch = abs(project.total_time - project_data['Total Time'])
                 if mismatch > tolerance:
                     tally = project.total_time
-                    project.delete()
+                    DestructiveMutationService.delete_project(
+                        user=user, project_name=project.name
+                    )
                     raise CommandError(f"Total time mismatch for project '{project_name}': "
                                        f"expected {project_data['Total Time']}, got {tally}. "
                                        f"Mismatch: {mismatch}")

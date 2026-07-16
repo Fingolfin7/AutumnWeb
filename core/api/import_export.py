@@ -14,6 +14,7 @@ from core.utils import (
     json_decompress,
 )
 from core.importer import run_import
+from core.services import CommitmentTargetProtectedError
 from core.api.helpers import _bool, _coerce_list, _compact, _err, _json_ok
 
 
@@ -195,6 +196,10 @@ def import_json_api(request):
             tolerance=tolerance,
             autumn_import=_bool(body.get("autumn_import"), False),
             import_into_context=import_into_context,
+        )
+    except CommitmentTargetProtectedError as exc:
+        return Response(
+            {"error": str(exc)}, status=status.HTTP_409_CONFLICT
         )
     except Exception as exc:
         return _err(f"Invalid import data: {exc}")

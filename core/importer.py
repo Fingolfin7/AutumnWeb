@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 
 from .models import Projects, Sessions, SubProjects, status_choices
+from .services import DestructiveMutationService
 from .utils import (
     apply_context_and_tags_to_project,
     session_exists,
@@ -48,7 +49,9 @@ def iter_import(
                 )
                 # Only delete projects belonging to the current user to avoid
                 # removing other users' projects.
-                Projects.objects.filter(name=project_name, user=user).delete()
+                DestructiveMutationService.delete_project(
+                    user=user, project_name=project_name
+                )
                 project = None
             elif merge:
                 projects_updated += 1
@@ -276,7 +279,9 @@ def iter_import(
             mismatch = abs(project.total_time - project_data["Total Time"])
             if mismatch > tolerance:
                 tally = project.total_time
-                project.delete()
+                DestructiveMutationService.delete_project(
+                    user=user, project_name=project.name
+                )
                 yield (
                     f"Error: Total time mismatch for project '{project_name}': "
                     f"expected {project_data['Total Time']}, got {tally}. "

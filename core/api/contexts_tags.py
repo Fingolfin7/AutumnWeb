@@ -4,6 +4,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from core.models import Sessions, Tag, Context
+from core.services import (
+    CommitmentTargetProtectedError,
+    DestructiveMutationService,
+)
 from core.api.helpers import _clean_optional_text, _clean_required_name, _compact, _err, _json_ok, _serialize_context_for_api, _serialize_tag_for_api
 
 
@@ -86,7 +90,14 @@ def context_detail(request, context_id):
     if not context:
         return _err("Context not found.", status.HTTP_404_NOT_FOUND)
     if request.method == "DELETE":
-        context.delete()
+        try:
+            DestructiveMutationService.delete_context(
+                user=request.user, context_name=context.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            return Response(
+                {"error": str(exc)}, status=status.HTTP_409_CONFLICT
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     data = request.data
@@ -192,7 +203,14 @@ def tag_detail(request, tag_id):
     if not tag:
         return _err("Tag not found.", status.HTTP_404_NOT_FOUND)
     if request.method == "DELETE":
-        tag.delete()
+        try:
+            DestructiveMutationService.delete_tag(
+                user=request.user, tag_name=tag.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            return Response(
+                {"error": str(exc)}, status=status.HTTP_409_CONFLICT
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     data = request.data

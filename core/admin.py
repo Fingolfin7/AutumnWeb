@@ -1,8 +1,14 @@
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Count, Sum
 
 from .models import Commitment, Context, Projects, Sessions, SubProjects, Tag
-from .services import CachedTotalsProjection, SessionMutationService
+from .services import (
+    CachedTotalsProjection,
+    CommitmentTargetProtectedError,
+    DestructiveMutationService,
+    SessionMutationService,
+)
 
 
 @admin.action(description="Mark selected projects as active")
@@ -91,6 +97,24 @@ class ProjectsAdmin(admin.ModelAdmin):
     def user_total_project_minutes(self, obj):
         return round(obj._user_total_project_minutes or 0, 2)
 
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_project(
+                user=obj.user, project_name=obj.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for project in list(queryset):
+                    DestructiveMutationService.delete_project(
+                        user=project.user, project_name=project.name
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
 
 @admin.register(SubProjects)
 class SubProjectsAdmin(admin.ModelAdmin):
@@ -121,6 +145,28 @@ class SubProjectsAdmin(admin.ModelAdmin):
     @admin.display(description="User subproject count", ordering="_user_subproject_count")
     def user_subproject_count(self, obj):
         return obj._user_subproject_count or 0
+
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_subproject(
+                user=obj.user,
+                project_name=obj.parent_project.name,
+                subproject_name=obj.name,
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for subproject in list(queryset):
+                    DestructiveMutationService.delete_subproject(
+                        user=subproject.user,
+                        project_name=subproject.parent_project.name,
+                        subproject_name=subproject.name,
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
 
 
 @admin.register(Sessions)
@@ -231,6 +277,24 @@ class ContextAdmin(admin.ModelAdmin):
     def project_count(self, obj):
         return obj._project_count or 0
 
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_context(
+                user=obj.user, context_name=obj.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for context in list(queryset):
+                    DestructiveMutationService.delete_context(
+                        user=context.user, context_name=context.name
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
@@ -245,3 +309,21 @@ class TagAdmin(admin.ModelAdmin):
     @admin.display(description="Projects", ordering="_project_count")
     def project_count(self, obj):
         return obj._project_count or 0
+
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_tag(
+                user=obj.user, tag_name=obj.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for tag in list(queryset):
+                    DestructiveMutationService.delete_tag(
+                        user=tag.user, tag_name=tag.name
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
