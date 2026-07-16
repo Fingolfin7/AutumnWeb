@@ -40,6 +40,13 @@
                         {{ user_form.email.label_tag }}
                         {{ user_form.email }}
                     </span>
+
+                    <span class="label-input">
+                        {{ profile_form.timezone.errors }}
+                        {{ profile_form.timezone.label_tag }}
+                        {{ profile_form.timezone }}
+                        <small class="profile-muted">{{ profile_form.timezone.help_text }}</small>
+                    </span>
                 </div>
             </div>
 

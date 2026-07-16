@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",  # for JWT token authentication
+    "drf_spectacular",
     "crispy_forms",
     "crispy_bootstrap4",
     "storages",
@@ -107,6 +108,13 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Autumn API v2",
+    "VERSION": "2.0.0",
+    "PREPROCESSING_HOOKS": ["core.api_v2.schema.v2_endpoints_only"],
 }
 
 
@@ -123,6 +131,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "users.middleware.UserTimezoneMiddleware",
+    "core.api_v2.middleware.V2ErrorEnvelopeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

@@ -193,6 +193,7 @@ class Sessions(models.Model):
     note = models.TextField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
     crosses_dst_transition = models.BooleanField(default=False)
+    version = models.IntegerField(default=1, db_default=1)
 
     class Meta:
         verbose_name_plural = 'Sessions'

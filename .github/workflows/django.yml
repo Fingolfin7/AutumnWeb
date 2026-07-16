@@ -68,3 +68,11 @@ jobs:
           DJANGO_SETTINGS_MODULE: AutumnWeb.settings
         run: |
           python manage.py test
+
+      - name: Verify committed v2 OpenAPI schema (Linux only)
+        if: runner.os == 'Linux'
+        env:
+          DJANGO_SETTINGS_MODULE: AutumnWeb.settings
+        run: |
+          python manage.py spectacular --file "$RUNNER_TEMP/openapi-v2.yaml"
+          git diff --no-index -- openapi-v2.yaml "$RUNNER_TEMP/openapi-v2.yaml"

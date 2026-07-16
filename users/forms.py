@@ -37,6 +37,12 @@ class UserUpdateForm(forms.ModelForm):
 
 class ProfileUpdateForm(forms.ModelForm):
     image = forms.ImageField(widget=forms.FileInput(), required=False)
+    timezone = forms.CharField(
+        max_length=64,
+        required=False,
+        label='Timezone',
+        help_text='IANA timezone name, for example Europe/Prague.',
+    )
     automatic_background = forms.BooleanField(required=False, label='Automatically Set Background Image')
     background_dimming = forms.IntegerField(
         min_value=0,
@@ -144,6 +150,9 @@ class ProfileUpdateForm(forms.ModelForm):
     def clean_default_filter_value(self):
         return self._preserve_profile_default('default_filter_value')
 
+    def clean_timezone(self):
+        return self._preserve_profile_default('timezone')
+
     def clean_default_filter_unit(self):
         return self._preserve_profile_default('default_filter_unit')
 
@@ -158,7 +167,7 @@ class ProfileUpdateForm(forms.ModelForm):
 
     class Meta:
         model = Profile
-        fields = ['image', 'automatic_background', 'background_dimming', 'background_image', 'remove_background_image',
+        fields = ['image', 'timezone', 'automatic_background', 'background_dimming', 'background_image', 'remove_background_image',
                   'default_filter_value', 'default_filter_unit',
                   'insights_default_filter_value', 'insights_default_filter_unit',
                   'default_chart_project_count',

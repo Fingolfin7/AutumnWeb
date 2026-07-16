@@ -1,0 +1,64 @@
+openapi: 3.0.3
+info:
+  title: Autumn API v2
+  version: 2.0.0
+paths:
+  /api/v2/me/:
+    get:
+      operationId: api_v2_me_retrieve
+      tags:
+      - api
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: ''
+components:
+  schemas:
+    Me:
+      type: object
+      properties:
+        api_version:
+          type: integer
+        capabilities:
+          type: array
+          items:
+            type: string
+        user:
+          $ref: '#/components/schemas/MeUser'
+      required:
+      - api_version
+      - capabilities
+      - user
+    MeUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        timezone:
+          type: string
+      required:
+      - id
+      - timezone
+      - username
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"

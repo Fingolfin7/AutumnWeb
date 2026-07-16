@@ -89,6 +89,7 @@ class SessionMutationService:
             else list(subprojects)
         )
         _validate_buckets(session, final_subprojects)
+        session.version = (session.version or 1) + 1
         session.full_clean()
         session.save()
         if subprojects is not UNSET:
