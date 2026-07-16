@@ -1,6 +1,6 @@
 from django.contrib import admin, messages
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count
 
 from .models import (
     Commitment,
@@ -17,6 +17,7 @@ from .services import (
     DestructiveMutationService,
     SessionMutationService,
 )
+from .totals import annotate_project_totals, annotate_subproject_totals
 
 
 @admin.action(description="Mark selected projects as active")
@@ -75,10 +76,10 @@ class ProjectsAdmin(admin.ModelAdmin):
         "user",
         "context",
         "status",
-        "total_time",
+        "derived_total_time",
         "user_project_count",
         "user_total_project_minutes",
-        "last_updated",
+        "derived_last_updated",
     )
     list_filter = ("status", "context", "tags", "user")
     search_fields = ("name", "description", "user__username", "user__email", "context__name", "tags__name")
@@ -92,18 +93,26 @@ class ProjectsAdmin(admin.ModelAdmin):
     )
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("user", "context").prefetch_related("tags").annotate(
+        queryset = super().get_queryset(request).select_related("user", "context").prefetch_related("tags").annotate(
             _user_project_count=Count("user__projects", distinct=True),
-            _user_total_project_minutes=Sum("user__projects__total_time"),
         )
+        return annotate_project_totals(queryset, include_user_total=True)
+
+    @admin.display(description="Total time", ordering="derived_total_time")
+    def derived_total_time(self, obj):
+        return round(obj.derived_total_time or 0, 4)
+
+    @admin.display(description="Last updated", ordering="derived_last_updated")
+    def derived_last_updated(self, obj):
+        return obj.derived_last_updated
 
     @admin.display(description="User project count", ordering="_user_project_count")
     def user_project_count(self, obj):
         return obj._user_project_count or 0
 
-    @admin.display(description="User total project minutes", ordering="_user_total_project_minutes")
+    @admin.display(description="User total project minutes", ordering="derived_user_total_time")
     def user_total_project_minutes(self, obj):
-        return round(obj._user_total_project_minutes or 0, 2)
+        return round(obj.derived_user_total_time or 0, 2)
 
     def delete_model(self, request, obj):
         try:
@@ -131,9 +140,9 @@ class SubProjectsAdmin(admin.ModelAdmin):
         "name",
         "user",
         "parent_project",
-        "total_time",
+        "derived_total_time",
         "user_subproject_count",
-        "last_updated",
+        "derived_last_updated",
     )
     list_filter = ("user", "parent_project")
     search_fields = (
@@ -146,9 +155,18 @@ class SubProjectsAdmin(admin.ModelAdmin):
     autocomplete_fields = ("user", "parent_project")
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("user", "parent_project").annotate(
+        queryset = super().get_queryset(request).select_related("user", "parent_project").annotate(
             _user_subproject_count=Count("user__subprojects", distinct=True)
         )
+        return annotate_subproject_totals(queryset)
+
+    @admin.display(description="Total time", ordering="derived_total_time")
+    def derived_total_time(self, obj):
+        return round(obj.derived_total_time or 0, 4)
+
+    @admin.display(description="Last updated", ordering="derived_last_updated")
+    def derived_last_updated(self, obj):
+        return obj.derived_last_updated
 
     @admin.display(description="User subproject count", ordering="_user_subproject_count")
     def user_subproject_count(self, obj):

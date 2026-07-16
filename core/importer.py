@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from .models import Projects, Sessions, SubProjects, status_choices
 from .services import DestructiveMutationService
+from .totals import derived_project_last_updated, derived_project_totals
 from .utils import (
     apply_context_and_tags_to_project,
     session_exists,
@@ -127,6 +128,9 @@ def iter_import(
 
         # Process subprojects.
         total_subprojects = len(project_data["Sub Projects"])
+        project_latest_activity = derived_project_last_updated(
+            user, [project.pk]
+        )[project.pk]
 
         if verbose and total_subprojects > 0:
             yield (f"Processing {total_subprojects} subprojects for {project_name}")
@@ -140,7 +144,7 @@ def iter_import(
                     parent_project=project,
                     defaults={
                         "start_date": project.start_date,
-                        "last_updated": project.last_updated,
+                        "last_updated": project_latest_activity,
                         "total_time": 0.0,
                         "description": "",
                     },
@@ -276,9 +280,9 @@ def iter_import(
                 subproject.save()
 
         if not merge:
-            mismatch = abs(project.total_time - project_data["Total Time"])
+            tally = derived_project_totals(user, [project.pk])[project.pk]
+            mismatch = abs(tally - project_data["Total Time"])
             if mismatch > tolerance:
-                tally = project.total_time
                 DestructiveMutationService.delete_project(
                     user=user, project_name=project.name
                 )

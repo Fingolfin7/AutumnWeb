@@ -1,5 +1,6 @@
 from __future__ import annotations
 from django.shortcuts import get_object_or_404
+from django.db.models import Count, Q
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -14,6 +15,7 @@ from core.services import (
     DestructiveOperationError,
 )
 from core.api.helpers import _compact, _err
+from core.totals import annotate_subproject_totals
 
 
 @api_view(["GET"])
@@ -43,8 +45,8 @@ def subprojects_list(request):
     if not project:
         return _err("Project not found", status.HTTP_404_NOT_FOUND)
 
-    subprojects = SubProjects.objects.filter(
-        parent_project=project, user=request.user
+    subprojects = annotate_subproject_totals(
+        SubProjects.objects.filter(parent_project=project, user=request.user)
     ).order_by("name")
 
     compact = _compact(request)
@@ -54,9 +56,16 @@ def subprojects_list(request):
         )
 
     payload = []
+    subprojects = subprojects.annotate(
+        completed_session_count=Count(
+            "sessions",
+            filter=Q(sessions__end_time__isnull=False),
+            distinct=True,
+        )
+    )
     for sp in subprojects:
-        session_count = sp.sessions.filter(end_time__isnull=False).count()
-        total_minutes = float(sp.total_time or 0.0)
+        session_count = sp.completed_session_count
+        total_minutes = float(sp.derived_total_time)
         payload.append(
             {
                 "id": sp.id,
@@ -112,8 +121,10 @@ def list_subprojects(request, **kwargs):
     project_name = request.query_params.get("project_name") or kwargs.get(
         "project_name"
     )
-    subprojects = SubProjects.objects.filter(
-        parent_project__name=project_name, user=request.user
+    subprojects = annotate_subproject_totals(
+        SubProjects.objects.filter(
+            parent_project__name=project_name, user=request.user
+        )
     )
     serializer = SubProjectSerializer(subprojects, many=True)
     return Response(serializer.data)
@@ -129,14 +140,18 @@ def search_subprojects(request):
     if not parent_project:
         return _err("Missing 'project_name' or 'project'")
     search_term = request.query_params.get("search_term", "")
-    subprojects = SubProjects.objects.filter(
-        parent_project__name=parent_project,
-        name__icontains=search_term,
-        user=request.user,
+    subprojects = annotate_subproject_totals(
+        SubProjects.objects.filter(
+            parent_project__name=parent_project,
+            name__icontains=search_term,
+            user=request.user,
+        )
     )
     if not subprojects.exists():
-        subprojects = SubProjects.objects.filter(
-            parent_project__name=parent_project, user=request.user
+        subprojects = annotate_subproject_totals(
+            SubProjects.objects.filter(
+                parent_project__name=parent_project, user=request.user
+            )
         )
     serializer = SubProjectSerializer(subprojects, many=True)
     return Response(serializer.data)

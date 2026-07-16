@@ -4,8 +4,10 @@ from datetime import datetime
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Prefetch
 from AutumnWeb import settings
-from core.models import Projects, Context, Tag
+from core.models import Projects, SubProjects, Context, Tag
+from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.utils import json_compress
 
 
@@ -37,9 +39,14 @@ class Command(BaseCommand):
             raise CommandError(f"User '{options['username']}' does not exist")
 
         # Build base queryset with related data to avoid N+1 queries
-        base_qs = Projects.objects.filter(user=user).select_related("context").prefetch_related(
+        annotated_subprojects = annotate_subproject_totals(
+            SubProjects.objects.filter(user=user)
+        )
+        base_qs = annotate_project_totals(
+            Projects.objects.filter(user=user)
+        ).select_related("context").prefetch_related(
             "tags",
-            "subprojects",
+            Prefetch("subprojects", queryset=annotated_subprojects),
             "sessions",
         )
 
@@ -112,14 +119,14 @@ class Command(BaseCommand):
 
         for project in projects:
             # For each project, collect its details
-            project.audit_total_time()  # Ensure the total time is up-to-date
             project_name = project.name
+            # start_date remains stored, mutable legacy metadata.
             start_date = timezone.localtime(project.start_date)
-            last_updated = timezone.localtime(project.last_updated)
+            last_updated = timezone.localtime(project.derived_last_updated)
             project_obj = {
                 'Start Date': start_date.strftime('%m-%d-%Y'),
                 'Last Updated': last_updated.strftime('%m-%d-%Y'),
-                'Total Time': project.total_time,
+                'Total Time': project.derived_total_time,
                 'Status': project.status,
                 'Description': project.description if project.description else '',
                 'Sub Projects': {},
@@ -133,18 +140,18 @@ class Command(BaseCommand):
             # Fetch related subprojects
             subprojects = project.subprojects.all()
             for subproject in subprojects:
-                subproject.audit_total_time()
                 subproject_name = subproject.name
 
                 if autumn_compatible:
-                    project_obj['Sub Projects'][subproject_name] = subproject.total_time
+                    project_obj['Sub Projects'][subproject_name] = subproject.derived_total_time
                 else:
+                    # start_date remains stored, mutable legacy metadata.
                     start_date = timezone.localtime(subproject.start_date)
-                    last_updated = timezone.localtime(subproject.last_updated)
+                    last_updated = timezone.localtime(subproject.derived_last_updated)
                     subproject_obj = {
                         'Start Date': start_date.strftime('%m-%d-%Y'),
                         'Last Updated': last_updated.strftime('%m-%d-%Y'),
-                        'Total Time': subproject.total_time,
+                        'Total Time': subproject.derived_total_time,
                         'Description': subproject.description if subproject.description else '',
                     }
                     project_obj['Sub Projects'][subproject_name] = subproject_obj

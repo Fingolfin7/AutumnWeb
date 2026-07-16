@@ -2,7 +2,7 @@ from core.forms import *
 from core.utils import *
 from core.models import Context, Tag
 from django.contrib import messages
-from django.db.models import Sum
+from core.totals import derived_project_totals
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, redirect, reverse
@@ -131,8 +131,10 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
         projects_qs = filter_by_active_context(projects_qs, self.request)
 
         total_projects = projects_qs.count()
-        agg = projects_qs.aggregate(total_time=Sum("total_time"))
-        total_time = agg.get("total_time") or 0
+        project_ids = list(projects_qs.values_list("pk", flat=True))
+        total_time = sum(
+            derived_project_totals(self.request.user, project_ids).values()
+        )
 
         # Per-status counts
         sidebar_status_counts = {
@@ -251,8 +253,9 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
         )
 
         total_projects = projects_qs.count()
-        total_time = (
-            projects_qs.aggregate(total_time=Sum("total_time")).get("total_time") or 0
+        project_ids = list(projects_qs.values_list("pk", flat=True))
+        total_time = sum(
+            derived_project_totals(self.request.user, project_ids).values()
         )
 
         # Per-status counts

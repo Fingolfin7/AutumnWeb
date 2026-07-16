@@ -19,8 +19,30 @@ from core.utils import (
     filter_by_active_context,
 )
 from django.db import transaction
-from django.db.models import Count, DurationField, ExpressionWrapper, F, Sum
+from django.db.models import Count, DurationField, ExpressionWrapper, F, Prefetch, Q, Sum
+from core.totals import (
+    annotate_project_totals,
+    annotate_subproject_totals,
+    rounded_session_minutes,
+)
 from core.api.helpers import _apply_exclude_filters, _apply_tag_filters, _clean_optional_text, _clean_required_name, _coerce_list, _compact, _err, _json_ok, _resolve_context_name, _resolve_tag_names, _serialize_project_grouped, _serialize_project_metadata, in_window
+
+
+def _projects_for_serialization(user):
+    subprojects = annotate_subproject_totals(
+        SubProjects.objects.filter(user=user)
+    )
+    return annotate_project_totals(
+        Projects.objects.filter(user=user)
+    ).prefetch_related(Prefetch("subprojects", queryset=subprojects))
+
+
+def _in_derived_window(projects, start=None, end=None):
+    projects = list(projects)
+    for project in projects:
+        # in_window consults the legacy get_end property on each object.
+        project.last_updated = project.derived_last_updated
+    return in_window(projects, start, end)
 
 
 @api_view(["GET"])
@@ -44,10 +66,29 @@ def projects_list_grouped(request):
     )
     projects_qs = _apply_exclude_filters(qp, projects_qs, kind="projects", user=request.user)
 
+    if not compact:
+        projects_qs = (
+            annotate_project_totals(projects_qs)
+            .annotate(
+                completed_session_count=Count(
+                    "sessions",
+                    filter=Q(sessions__end_time__isnull=False),
+                    distinct=True,
+                )
+            )
+            .select_related("context")
+            .prefetch_related("tags")
+            # The aggregate annotation makes this a GROUP BY query, which
+            # drops Meta.ordering — restore the historical name order.
+            .order_by("name")
+        )
+
+    projects = list(projects_qs)
     if start or end:
-        projects = in_window(projects_qs, start, end)
-    else:
-        projects = list(projects_qs)
+        if not compact:
+            for project in projects:
+                project.last_updated = project.derived_last_updated
+        projects = in_window(projects, start, end)
 
     return Response(_serialize_project_grouped(projects, compact))
 
@@ -108,11 +149,22 @@ def projects_list_flat(request):
     if compact:
         payload = [p.name for p in projects_qs]
     else:
+        projects_qs = (
+            annotate_project_totals(projects_qs)
+            .annotate(
+                completed_session_count=Count(
+                    "sessions",
+                    filter=Q(sessions__end_time__isnull=False),
+                    distinct=True,
+                )
+            )
+            .select_related("context")
+            .prefetch_related("tags")
+        )
         payload = []
         for p in projects_qs:
-            sessions = p.sessions.filter(end_time__isnull=False)
-            session_count = sessions.count()
-            total_minutes = float(p.total_time or 0.0)
+            session_count = p.completed_session_count
+            total_minutes = float(p.derived_total_time)
             avg_session_minutes = (
                 round(total_minutes / session_count, 2) if session_count > 0 else 0.0
             )
@@ -334,24 +386,24 @@ def list_projects(request):
     if "start_date" in qp and "end_date" in qp:
         start = qp["start_date"]
         end = qp["end_date"]
-        projects_qs = Projects.objects.filter(user=request.user)
+        projects_qs = _projects_for_serialization(request.user)
         projects_qs = filter_by_active_context(
             projects_qs, request, override_context_id=qp.get("context")
         )
-        projects = in_window(projects_qs, start, end)
+        projects = _in_derived_window(projects_qs, start, end)
         serializer = ProjectSerializer(projects, many=True)
         return Response(serializer.data)
     elif "start_date" in qp:
         start = qp["start_date"]
-        projects_qs = Projects.objects.filter(user=request.user)
+        projects_qs = _projects_for_serialization(request.user)
         projects_qs = filter_by_active_context(
             projects_qs, request, override_context_id=qp.get("context")
         )
-        projects = in_window(projects_qs, start)
+        projects = _in_derived_window(projects_qs, start)
         serializer = ProjectSerializer(projects, many=True)
         return Response(serializer.data)
 
-    projects = Projects.objects.filter(user=request.user)
+    projects = _projects_for_serialization(request.user)
     projects = filter_by_active_context(
         projects, request, override_context_id=qp.get("context")
     )
@@ -475,7 +527,7 @@ def projects_with_stats(request):
     if exclude_ids:
         projects = projects.exclude(id__in=exclude_ids)
 
-    projects = projects.annotate(
+    projects = annotate_project_totals(projects).annotate(
         aggregated_subproject_count=Count("subprojects", distinct=True)
     ).order_by("name")
 
@@ -485,18 +537,13 @@ def projects_with_stats(request):
 
     # Re-anchor on session IDs so M2M filters cannot fan out aggregates.
     base_sessions = Sessions.objects.filter(pk__in=sessions.values("pk"))
-    duration_expr = ExpressionWrapper(
-        F("end_time") - F("start_time"), output_field=DurationField()
-    )
     project_stats = {
         row["project_id"]: {
-            "total_time": (
-                row["total"].total_seconds() / 60.0 if row["total"] else 0.0
-            ),
+            "total_time": float(row["total"] or 0.0),
             "session_count": row["session_count"],
         }
         for row in base_sessions.values("project_id").annotate(
-            total=Sum(duration_expr), session_count=Count("pk")
+            total=Sum(rounded_session_minutes()), session_count=Count("pk")
         )
     }
 
@@ -505,13 +552,14 @@ def projects_with_stats(request):
     for p in projects:
         stats = project_stats.get(p.id, {"total_time": 0, "session_count": 0})
         subproject_count = p.aggregated_subproject_count
-        days_since_update = (now - p.last_updated).days if p.last_updated else 999
+        latest_activity = p.derived_last_updated
+        days_since_update = (now - latest_activity).days if latest_activity else 999
 
         payload.append({
             "name": p.name,
             "total_time": stats["total_time"],
             "computed_total_time": stats["total_time"],
-            "persisted_total_time": p.total_time,
+            "persisted_total_time": float(p.derived_total_time),
             "session_count": stats["session_count"],
             "subproject_count": subproject_count,
             "days_since_update": days_since_update,
@@ -527,11 +575,11 @@ def search_projects(request):
     term = request.query_params.get("search_term", "")
     if "status" in request.query_params:
         st = request.query_params["status"]
-        projects = Projects.objects.filter(
+        projects = _projects_for_serialization(request.user).filter(
             name__icontains=term, status=st, user=request.user
         )
     else:
-        projects = Projects.objects.filter(name__icontains=term, user=request.user)
+        projects = _projects_for_serialization(request.user).filter(name__icontains=term)
     serializer = ProjectSerializer(projects, many=True)
     return Response(serializer.data)
 
@@ -539,7 +587,9 @@ def search_projects(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_project(request, project_name):
-    project = get_object_or_404(Projects, name=project_name, user=request.user)
+    project = get_object_or_404(
+        _projects_for_serialization(request.user), name=project_name
+    )
     serializer = ProjectSerializer(project)
     return Response(serializer.data)
 

@@ -2677,5 +2677,5 @@ class McpApiContractTests(TestCase):
         project_payload = next(p for p in payload if p["name"] == "MCP Project")
         self.assertEqual(project_payload["total_time"], 60)
         self.assertEqual(project_payload["computed_total_time"], 60)
-        self.assertEqual(project_payload["persisted_total_time"], 999)
+        self.assertEqual(project_payload["persisted_total_time"], 60)
 

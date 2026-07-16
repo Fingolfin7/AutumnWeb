@@ -126,21 +126,21 @@ def _serialize_project_grouped(projects, compact=True):
         if compact:
             groups[key].append(p.name)
         else:
-            # Calculate session stats
-            sessions = p.sessions.filter(end_time__isnull=False)
-            session_count = sessions.count()
-            avg_session = (p.total_time / session_count) if session_count > 0 else 0
+            session_count = p.completed_session_count
+            total_time = float(p.derived_total_time)
+            avg_session = (total_time / session_count) if session_count > 0 else 0
 
             groups[key].append(
                 {
                     "id": p.id,
                     "name": p.name,
                     "status": p.status,
-                    "total_time": p.total_time,
+                    "total_time": total_time,
                     "session_count": session_count,
                     "avg_session_duration": round(avg_session, 1),
+                    # start_date remains stored, mutable legacy metadata.
                     "start_date": p.start_date.isoformat(),
-                    "last_updated": p.last_updated.isoformat(),
+                    "last_updated": p.derived_last_updated.isoformat(),
                     "description": p.description or "",
                     "context": p.context.name if p.context else None,
                     "tags": [t.name for t in p.tags.all()],

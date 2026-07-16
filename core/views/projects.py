@@ -21,6 +21,8 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.models import Projects, SubProjects, Commitment, status_choices
+from django.db.models import Prefetch
+from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.services import (
     CommitmentTargetProtectedError,
     DestructiveMutationService,
@@ -32,8 +34,6 @@ class ProjectsListView(LoginRequiredMixin, ListView):
     model = Projects
     template_name = "core/projects_list.html"
     context_object_name = "projects"
-    ordering = ["-last_updated"]
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Projects"
@@ -50,10 +50,13 @@ class ProjectsListView(LoginRequiredMixin, ListView):
             user=self.request.user,
         )
 
-        ungrouped_projects = context["object_list"]
+        ungrouped_projects = list(context["object_list"])
+        for project in ungrouped_projects:
+            project.total_time = project.derived_total_time
+            project.last_updated = project.derived_last_updated
 
         # One reliable empty check for the whole page
-        context["has_projects"] = ungrouped_projects.exists()
+        context["has_projects"] = bool(ungrouped_projects)
 
         # Build commitment progress data for all projects with active commitments
         commitment_progress = {}
@@ -80,9 +83,11 @@ class ProjectsListView(LoginRequiredMixin, ListView):
             grouped_projects.append(
                 {
                     "status": displayName,
-                    "projects": ungrouped_projects.filter(status=status).order_by(
-                        "-last_updated"
-                    ),
+                    "projects": [
+                        project
+                        for project in ungrouped_projects
+                        if project.status == status
+                    ],
                 }
             )
 
@@ -127,7 +132,9 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         if exclude_ids:
             projects = projects.exclude(id__in=exclude_ids)
 
-        return projects
+        return annotate_project_totals(projects).order_by(
+            "-derived_last_updated"
+        )
 
 
 class CreateProjectView(LoginRequiredMixin, CreateView):
@@ -210,12 +217,23 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
     template_name = "core/update_project.html"
     context_object_name = "project"
 
+    def get_queryset(self):
+        subprojects = annotate_subproject_totals(
+            SubProjects.objects.filter(user=self.request.user)
+        )
+        return annotate_project_totals(
+            Projects.objects.filter(user=self.request.user)
+        ).prefetch_related(Prefetch("subprojects", queryset=subprojects))
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Update Project"
-        context["subprojects"] = (
-            self.object.subprojects.all()
-        )  # get all subprojects related to the project
+        self.object.total_time = self.object.derived_total_time
+        self.object.last_updated = self.object.derived_last_updated
+        context["subprojects"] = list(self.object.subprojects.all())
+        for subproject in context["subprojects"]:
+            subproject.total_time = subproject.derived_total_time
+            subproject.last_updated = subproject.derived_last_updated
         context["session_count"] = (
             self.object.sessions.count()
         )  # get the number of sessions related to the project
@@ -287,6 +305,11 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
     template_name = "core/update_subproject.html"
     context_object_name = "subproject"
 
+    def get_queryset(self):
+        return annotate_subproject_totals(
+            SubProjects.objects.filter(user=self.request.user)
+        )
+
     def get_object(self, queryset=None):
         subproject = super().get_object(queryset)
         # subproject.audit_total_time()
@@ -295,6 +318,8 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Update Subproject"
+        self.object.total_time = self.object.derived_total_time
+        self.object.last_updated = self.object.derived_last_updated
         context["session_count"] = (
             self.object.sessions.count()
         )  # get the number of sessions related to the project
@@ -371,9 +396,16 @@ class DeleteProjectView(LoginRequiredMixin, DeleteView):
     template_name = "core/delete_project.html"
     context_object_name = "project"
 
+    def get_queryset(self):
+        return annotate_project_totals(
+            Projects.objects.filter(user=self.request.user)
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Delete Project"
+        self.object.total_time = self.object.derived_total_time
+        self.object.last_updated = self.object.derived_last_updated
         return context
 
     def get_success_url(self):
@@ -396,9 +428,16 @@ class DeleteSubProjectView(LoginRequiredMixin, DeleteView):
     template_name = "core/delete_subproject.html"
     context_object_name = "subproject"
 
+    def get_queryset(self):
+        return annotate_subproject_totals(
+            SubProjects.objects.filter(user=self.request.user)
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["title"] = "Delete Subproject"
+        self.object.total_time = self.object.derived_total_time
+        self.object.last_updated = self.object.derived_last_updated
         return context
 
     def get_success_url(self):
