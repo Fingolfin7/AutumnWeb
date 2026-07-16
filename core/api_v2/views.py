@@ -53,6 +53,7 @@ from core.services import (
     DestructiveOperationError,
     SessionMutationService,
     UNSET,
+    even_split_bps,
 )
 from core.session_canonical import (
     canonical_existing_session,
@@ -176,16 +177,50 @@ def _canonical_existing(session):
     return canonical_existing_session(session)
 
 
-def _canonical_track_payload(project, subprojects, data):
-    allocations = sorted({(subproject.name, 10000) for subproject in subprojects})
+def _canonical_track_payload(project, allocation_mode, allocations, data):
     return canonical_session_content(
         project.name,
         data["start"],
         data["end"],
         data.get("note") or "",
-        "legacy_full",
-        allocations,
+        allocation_mode,
+        [(subproject.name, bp) for subproject, bp in allocations],
     )
+
+
+def _explicit_allocation_pairs(user, project, items):
+    ids = [item["subproject_id"] for item in items]
+    if len(ids) != len(set(ids)):
+        raise ValidationError(
+            {"subproject_allocations": ["Subprojects must be unique."]}
+        )
+    subprojects = _resolve_subprojects(user, project, ids)
+    by_id = {subproject.id: subproject for subproject in subprojects}
+    allocations = [
+        (by_id[item["subproject_id"]], item["allocation_bp"])
+        for item in items
+    ]
+    if sum(bp for _, bp in allocations) > 10000:
+        raise ValidationError(
+            {
+                "subproject_allocations": [
+                    "Partitioned allocations must not exceed 10000 basis points."
+                ]
+            }
+        )
+    return allocations
+
+
+def _even_allocation_pairs(subprojects):
+    split = even_split_bps(subproject.id for subproject in subprojects)
+    return [(subproject, split[subproject.id]) for subproject in subprojects]
+
+
+def _check_partitioned_writes_enabled():
+    if not settings.AUTUMN_PARTITIONED_ATTRIBUTION:
+        raise ValidationError(
+            {"allocation_mode": ["partitioned attribution is disabled"]}
+        )
 
 
 def _subproject_queryset(user):
@@ -802,9 +837,23 @@ class SessionsView(V2APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         project = _resolve_project(request.user, data["project_id"])
-        subprojects = _resolve_subprojects(
-            request.user, project, data.get("subproject_ids", [])
-        )
+        allocation_mode = data.get("allocation_mode", "legacy_full")
+        if allocation_mode == "partitioned":
+            _check_partitioned_writes_enabled()
+        if "subproject_allocations" in data:
+            allocations = _explicit_allocation_pairs(
+                request.user, project, data["subproject_allocations"]
+            )
+            subprojects = [subproject for subproject, _ in allocations]
+        else:
+            subprojects = _resolve_subprojects(
+                request.user, project, data.get("subproject_ids", [])
+            )
+            allocations = (
+                _even_allocation_pairs(subprojects)
+                if allocation_mode == "partitioned"
+                else [(subproject, 10000) for subproject in subprojects]
+            )
         if data["end"] < data["start"]:
             raise ValidationError({"end": ["End must be on or after start."]})
         _validate_not_future(data["end"], "end")
@@ -813,7 +862,7 @@ class SessionsView(V2APIView):
             existing = _session_queryset(request.user).filter(uuid=data["uuid"]).first()
             if existing is not None:
                 if _canonical_existing(existing) == _canonical_track_payload(
-                    project, subprojects, data
+                    project, allocation_mode, allocations, data
                 ):
                     return Response(_serialize(existing), status=status.HTTP_200_OK)
                 return Response(
@@ -836,7 +885,15 @@ class SessionsView(V2APIView):
         }
         if "uuid" in data:
             fields["uuid"] = data["uuid"]
-        session = SessionMutationService.create_session(**fields)
+        with transaction.atomic():
+            session = SessionMutationService.create_session(**fields)
+            if allocation_mode == "partitioned":
+                session = SessionMutationService.set_allocations(
+                    session.pk,
+                    user=request.user,
+                    allocations=allocations,
+                    allocation_mode="partitioned",
+                )
         return Response(_serialize(session), status=status.HTTP_201_CREATED)
 
 
@@ -867,14 +924,65 @@ class SessionDetailView(V2APIView):
             else session.project
         )
         subprojects = (
-            _resolve_subprojects(request.user, project, data["subproject_ids"])
+            []
+            if "subproject_allocations" in data
+            else _resolve_subprojects(request.user, project, data["subproject_ids"])
             if "subproject_ids" in data
             else list(session.subprojects.all())
         )
-        if "project_id" in data and "subproject_ids" not in data:
+        if (
+            "project_id" in data
+            and "subproject_ids" not in data
+            and "subproject_allocations" not in data
+        ):
             subprojects = _resolve_subprojects(
                 request.user, project, [subproject.id for subproject in subprojects]
             )
+
+        allocation_mode = data.get("allocation_mode", session.allocation_mode)
+        partitioned_relation_write = allocation_mode == "partitioned" and any(
+            field in data
+            for field in (
+                "allocation_mode",
+                "subproject_ids",
+                "subproject_allocations",
+                "project_id",
+            )
+        )
+        if partitioned_relation_write:
+            _check_partitioned_writes_enabled()
+
+        if "subproject_allocations" in data:
+            allocations = _explicit_allocation_pairs(
+                request.user, project, data["subproject_allocations"]
+            )
+            subprojects = [subproject for subproject, _ in allocations]
+        elif allocation_mode == "partitioned" and (
+            "subproject_ids" in data
+            or "project_id" in data
+            or session.allocation_mode != "partitioned"
+        ):
+            allocations = _even_allocation_pairs(subprojects)
+        elif allocation_mode == "partitioned":
+            current_bps = {
+                link.subproject_id: link.allocation_bp
+                for link in session.subproject_links.all()
+            }
+            allocations = [
+                (subproject, current_bps[subproject.id])
+                for subproject in subprojects
+            ]
+        else:
+            allocations = [(subproject, 10000) for subproject in subprojects]
+
+        replace_allocations = (
+            "subproject_allocations" in data
+            or "allocation_mode" in data
+            or (
+                session.allocation_mode == "partitioned"
+                and ("subproject_ids" in data or "project_id" in data)
+            )
+        )
 
         start_time = data.get("start", session.start_time)
         end_time = data.get("end", session.end_time)
@@ -886,19 +994,36 @@ class SessionDetailView(V2APIView):
             request.user,
             (session.start_time, session.end_time, start_time, end_time),
         )
-        session = SessionMutationService.mutate_session(
-            session.pk,
-            user=request.user,
-            project=project if "project_id" in data else UNSET,
-            subprojects=subprojects if (
-                "project_id" in data or "subproject_ids" in data
-            ) else UNSET,
-            start_time=data["start"] if "start" in data else UNSET,
-            end_time=data["end"] if "end" in data else UNSET,
-            is_active=False if "end" in data else UNSET,
-            auto_stop_at=None if "end" in data else UNSET,
-            note=data["note"] if "note" in data else UNSET,
+        base_fields_touched = any(
+            field in data for field in ("project_id", "start", "end", "note")
         )
+        with transaction.atomic():
+            if base_fields_touched or not replace_allocations:
+                session = SessionMutationService.mutate_session(
+                    session.pk,
+                    user=request.user,
+                    project=project if "project_id" in data else UNSET,
+                    subprojects=(
+                        []
+                        if replace_allocations and "project_id" in data
+                        else subprojects
+                        if not replace_allocations
+                        and ("project_id" in data or "subproject_ids" in data)
+                        else UNSET
+                    ),
+                    start_time=data["start"] if "start" in data else UNSET,
+                    end_time=data["end"] if "end" in data else UNSET,
+                    is_active=False if "end" in data else UNSET,
+                    auto_stop_at=None if "end" in data else UNSET,
+                    note=data["note"] if "note" in data else UNSET,
+                )
+            if replace_allocations:
+                session = SessionMutationService.set_allocations(
+                    session.pk,
+                    user=request.user,
+                    allocations=allocations,
+                    allocation_mode=allocation_mode,
+                )
         payload = _serialize(session)
         if history_unaffected:
             payload["commitment_history_unaffected"] = True

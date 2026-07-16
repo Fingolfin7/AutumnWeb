@@ -58,6 +58,11 @@ class SubprojectAllocationSerializer(serializers.Serializer):
     allocation_bp = serializers.IntegerField()
 
 
+class SubprojectAllocationWriteSerializer(serializers.Serializer):
+    subproject_id = serializers.IntegerField(min_value=1)
+    allocation_bp = serializers.IntegerField(min_value=1, max_value=10000)
+
+
 class SessionResourceSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     uuid = serializers.UUIDField(allow_null=True)
@@ -150,6 +155,26 @@ class SessionTrackRequestSerializer(serializers.Serializer):
     )
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     uuid = serializers.UUIDField(required=False)
+    allocation_mode = serializers.ChoiceField(
+        required=False, choices=("legacy_full", "partitioned")
+    )
+    subproject_allocations = SubprojectAllocationWriteSerializer(
+        many=True, required=False
+    )
+
+    def validate(self, attrs):
+        if (
+            "subproject_allocations" in attrs
+            and attrs.get("allocation_mode") != "partitioned"
+        ):
+            raise serializers.ValidationError(
+                {
+                    "subproject_allocations": [
+                        "subproject_allocations requires allocation_mode=partitioned."
+                    ]
+                }
+            )
+        return attrs
 
 
 class SessionPatchRequestSerializer(serializers.Serializer):
@@ -160,6 +185,26 @@ class SessionPatchRequestSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1), required=False
     )
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    allocation_mode = serializers.ChoiceField(
+        required=False, choices=("legacy_full", "partitioned")
+    )
+    subproject_allocations = SubprojectAllocationWriteSerializer(
+        many=True, required=False
+    )
+
+    def validate(self, attrs):
+        if (
+            "subproject_allocations" in attrs
+            and attrs.get("allocation_mode") != "partitioned"
+        ):
+            raise serializers.ValidationError(
+                {
+                    "subproject_allocations": [
+                        "subproject_allocations requires allocation_mode=partitioned."
+                    ]
+                }
+            )
+        return attrs
 
 
 class TimerListResponseSerializer(serializers.Serializer):

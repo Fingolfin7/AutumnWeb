@@ -9,6 +9,17 @@ from core.models import Commitment, Sessions, SessionSubproject
 UNSET = object()
 
 
+def even_split_bps(subproject_ids):
+    """Return a deterministic 10,000-bp split keyed by subproject id."""
+    sorted_ids = sorted(subproject_ids)
+    if not sorted_ids:
+        return {}
+    quotient, remainder = divmod(10000, len(sorted_ids))
+    split = {subproject_id: quotient for subproject_id in sorted_ids}
+    split[sorted_ids[0]] += remainder
+    return split
+
+
 def _mark_commitments_dirty(user_id):
     Commitment.objects.filter(user_id=user_id).update(needs_recompute=True)
 
@@ -52,7 +63,8 @@ def _set_allocations(session, allocations):
     )
 
 
-def _validate_allocations(session, allocations):
+def _validate_allocations(session, allocations, allocation_mode=None):
+    allocation_mode = allocation_mode or session.allocation_mode
     subproject_ids = [subproject.pk for subproject, _ in allocations]
     if len(subproject_ids) != len(set(subproject_ids)):
         raise ValidationError("Session allocations must have unique subprojects.")
@@ -67,12 +79,12 @@ def _validate_allocations(session, allocations):
     ]
     if invalid_bp:
         raise ValidationError("Session allocations must be from 1 to 10000 basis points.")
-    if session.allocation_mode == "legacy_full" and any(
+    if allocation_mode == "legacy_full" and any(
         allocation_bp != 10000 for _, allocation_bp in allocations
     ):
         raise ValidationError("legacy_full session allocations must equal 10000.")
     if (
-        session.allocation_mode == "partitioned"
+        allocation_mode == "partitioned"
         and sum(allocation_bp for _, allocation_bp in allocations) > 10000
     ):
         raise ValidationError("Partitioned session allocations must not exceed 10000.")
@@ -177,6 +189,31 @@ class SessionMutationService:
         session.delete()
         _mark_commitments_dirty(user_id)
         return deleted_id
+
+    @staticmethod
+    @transaction.atomic
+    def set_allocations(session_id, *, user, allocations, allocation_mode):
+        """Replace the complete allocation set and mode for one session."""
+        session = (
+            Sessions.objects.select_for_update()
+            .select_related("project")
+            .get(pk=session_id, user=user)
+        )
+        allocations = list(allocations)
+
+        if allocation_mode not in {"legacy_full", "partitioned"}:
+            raise ValidationError("Invalid session allocation mode.")
+        subprojects = [subproject for subproject, _ in allocations]
+        _validate_buckets(session, subprojects)
+        _validate_allocations(session, allocations, allocation_mode)
+
+        session.allocation_mode = allocation_mode
+        session.version = (session.version or 1) + 1
+        session.full_clean()
+        _set_allocations(session, allocations)
+        session.save(update_fields=["allocation_mode", "version"])
+        _mark_commitments_dirty(session.user_id)
+        return session
 
     @staticmethod
     @transaction.atomic

@@ -309,6 +309,14 @@ def edit_session(request, session_id):
 
     # Apply updates from request body
     data = request.data
+    if (
+        current_session.allocation_mode == "partitioned"
+        and "subprojects" in data
+    ):
+        return _err(
+            "This session uses partitioned attribution; upgrade autumn-cli or use the web UI.",
+            status.HTTP_409_CONFLICT,
+        )
 
     # Update project if provided
     if "project" in data and data["project"]:

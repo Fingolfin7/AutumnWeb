@@ -1,9 +1,18 @@
 """Atomic destructive mutations for projects and their related metadata."""
 
 from django.db import transaction
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 
-from core.models import Commitment, Context, Projects, SubProjects, Tag
+from core.models import (
+    Commitment,
+    Context,
+    Projects,
+    Sessions,
+    SessionSubproject,
+    SubProjects,
+    Tag,
+)
 
 
 class DestructiveOperationError(Exception):
@@ -142,6 +151,42 @@ class DestructiveMutationService:
                 f'Subproject with name "{new_name}" already exists in this project'
             )
 
+        source_ids = {subproject1.pk, subproject2.pk}
+        affected_sessions = list(
+            Sessions.objects.select_for_update()
+            .filter(
+                Q(subproject_links__subproject=subproject1)
+                | Q(subproject_links__subproject=subproject2)
+            )
+            .distinct()
+            .prefetch_related("subproject_links__subproject")
+            .order_by("id")
+        )
+        offending_session_ids = []
+        for session in affected_sessions:
+            if session.allocation_mode != "partitioned":
+                continue
+            links = list(session.subproject_links.all())
+            allocation_total = sum(link.allocation_bp for link in links)
+            merged_bp = sum(
+                link.allocation_bp
+                for link in links
+                if link.subproject_id in source_ids
+            )
+            invalid_links = any(
+                not 1 <= link.allocation_bp <= 10000
+                or link.subproject.user_id != session.user_id
+                or link.subproject.parent_project_id != session.project_id
+                for link in links
+            )
+            if invalid_links or allocation_total > 10000 or merged_bp > 10000:
+                offending_session_ids.append(session.pk)
+        if offending_session_ids:
+            ids = ", ".join(map(str, offending_session_ids))
+            raise DestructiveOperationError(
+                f"Cannot merge subprojects; invalid partitioned allocations in sessions: {ids}"
+            )
+
         merged_description = f"Merged from '{name1}' and '{name2}'\n\n"
         if subproject1.description:
             merged_description += (
@@ -165,14 +210,34 @@ class DestructiveMutationService:
             description=merged_description,
         )
 
-        subproject1_sessions = subproject1.sessions.all()
-        subproject2_sessions = subproject2.sessions.all()
-        for session in subproject1_sessions:
-            session.subprojects.remove(subproject1)
-            session.subprojects.add(merged_subproject)
-        for session in subproject2_sessions:
-            session.subprojects.remove(subproject2)
-            session.subprojects.add(merged_subproject)
+        for session in affected_sessions:
+            links = list(session.subproject_links.all())
+            retained = [
+                (link.subproject, link.allocation_bp)
+                for link in links
+                if link.subproject_id not in source_ids
+            ]
+            merged_bp = (
+                sum(
+                    link.allocation_bp
+                    for link in links
+                    if link.subproject_id in source_ids
+                )
+                if session.allocation_mode == "partitioned"
+                else 10000
+            )
+            allocations = [*retained, (merged_subproject, merged_bp)]
+            SessionSubproject.objects.filter(session=session).delete()
+            SessionSubproject.objects.bulk_create(
+                [
+                    SessionSubproject(
+                        session=session,
+                        subproject=subproject,
+                        allocation_bp=allocation_bp,
+                    )
+                    for subproject, allocation_bp in allocations
+                ]
+            )
 
         subproject1.delete()
         subproject2.delete()

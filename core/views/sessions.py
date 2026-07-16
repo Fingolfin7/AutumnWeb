@@ -14,7 +14,7 @@ from django.views.generic import (
     DeleteView,
 )
 from core.models import Projects, SubProjects, Sessions
-from core.services import SessionMutationService
+from core.services import SessionMutationService, even_split_bps
 
 
 def remove_ambiguous_time_error(time_value):
@@ -116,6 +116,20 @@ def update_session(request, session_id: int):
                     note=candidate.note,
                     is_active=False,
                 )
+                if request.POST.get("partition_evenly"):
+                    selected = list(subprojects)
+                    split = even_split_bps(
+                        subproject.id for subproject in selected
+                    )
+                    updated_session = SessionMutationService.set_allocations(
+                        updated_session.pk,
+                        user=request.user,
+                        allocations=[
+                            (subproject, split[subproject.id])
+                            for subproject in selected
+                        ],
+                        allocation_mode="partitioned",
+                    )
 
                 messages.success(request, "Updated session")
                 return redirect("update_session", session_id=updated_session.id)

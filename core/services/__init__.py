@@ -3,7 +3,7 @@ from .destructive import (
     DestructiveMutationService,
     DestructiveOperationError,
 )
-from .sessions import SessionMutationService, UNSET
+from .sessions import SessionMutationService, UNSET, even_split_bps
 from .commitments import CommitmentEditService, CommitmentRestartRequired
 
 __all__ = [
@@ -14,4 +14,5 @@ __all__ = [
     "CommitmentEditService",
     "CommitmentRestartRequired",
     "UNSET",
+    "even_split_bps",
 ]
