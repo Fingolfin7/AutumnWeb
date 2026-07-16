@@ -141,24 +141,6 @@ class SessionVersionAndV1SafetyTests(TestCase):
         )
         self.assertEqual(session.version, 3)
 
-    def test_v1_timer_start_and_session_serializer_hide_new_identity_fields(self):
-        client = APIClient()
-        client.force_authenticate(self.user)
-        response = client.post(
-            reverse("api_timer_start"),
-            {"project": self.project.name},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        timer_payload = response.data["session"]
-        self.assertNotIn("version", timer_payload)
-        self.assertNotIn("uuid", timer_payload)
-
-        session = Sessions.objects.get(pk=timer_payload["id"])
-        serializer_payload = SessionSerializer(session).data
-        self.assertNotIn("version", serializer_payload)
-        self.assertNotIn("uuid", serializer_payload)
 
 
 class SessionFilterSpecTests(TestCase):
@@ -302,25 +284,52 @@ class UserTimezoneMiddlewareTests(TestCase):
         )
         self.client.force_login(self.user)
 
-    def test_profile_timezone_is_active_during_v1_rendering_and_cleaned_up(self):
+    def _boundary_session(self):
+        # 2026-01-15T04:00Z is Jan 14 in New York but Jan 15 in Prague, so the
+        # v2 date filter reveals which timezone the middleware activated.
+        from core.services import SessionMutationService
+
+        return SessionMutationService.create_session(
+            user=self.user,
+            project=self.project,
+            start_time=datetime(2026, 1, 15, 3, 0, tzinfo=datetime_timezone.utc),
+            end_time=datetime(2026, 1, 15, 4, 0, tzinfo=datetime_timezone.utc),
+            is_active=False,
+        )
+
+    def test_profile_timezone_drives_v2_date_filtering_and_cleans_up(self):
+        session = self._boundary_session()
         self.user.profile.timezone = "America/New_York"
         self.user.profile.save(update_fields=["timezone"])
 
-        response = self.client.get(reverse("api_list_sessions"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()[0]["end_time"], "2026-01-15T07:00:00-05:00")
+        on_ny_date = self.client.get(
+            "/api/v2/sessions/", {"start_date": "2026-01-14", "end_date": "2026-01-14"}
+        )
+        self.assertIn(
+            session.id, [row["id"] for row in on_ny_date.json()["sessions"]]
+        )
+        off_ny_date = self.client.get(
+            "/api/v2/sessions/", {"start_date": "2026-01-15", "end_date": "2026-01-15"}
+        )
+        self.assertNotIn(
+            session.id, [row["id"] for row in off_ny_date.json()["sessions"]]
+        )
         self.assertEqual(timezone.get_current_timezone_name(), settings.TIME_ZONE)
 
     def test_invalid_profile_timezone_falls_back_safely_and_cleans_up(self):
+        session = self._boundary_session()
         type(self.user.profile).objects.filter(pk=self.user.profile.pk).update(
             timezone="Invalid/Timezone"
         )
 
-        response = self.client.get(reverse("api_list_sessions"))
-
+        # Fallback = server default (Europe/Prague): the instant is Jan 15.
+        response = self.client.get(
+            "/api/v2/sessions/", {"start_date": "2026-01-15", "end_date": "2026-01-15"}
+        )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()[0]["end_time"], "2026-01-15T13:00:00+01:00")
+        self.assertIn(
+            session.id, [row["id"] for row in response.json()["sessions"]]
+        )
         self.assertEqual(timezone.get_current_timezone_name(), settings.TIME_ZONE)
 
 

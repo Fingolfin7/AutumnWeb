@@ -11,8 +11,8 @@ from core.api_v2.filters import SessionFilterSpec
 from core.export2 import build_format2_export
 from core.importer import run_import
 from core.importer2 import Format2ConflictError, Format2ValidationError
-from core.models import Sessions
-from core.utils import json_compress
+from core.models import Context, Sessions
+from core.utils import build_project_json_from_sessions, json_compress, json_decompress
 
 
 class ExportQuerySerializer(serializers.Serializer):
@@ -28,11 +28,28 @@ class ExportQuerySerializer(serializers.Serializer):
     active = serializers.BooleanField(required=False)
     note_snippet = serializers.CharField(required=False)
     compress = serializers.BooleanField(required=False, default=False)
+    # "format" collides with DRF's renderer-override query param.
+    export_format = serializers.ChoiceField(required=False, choices=("1", "2"), default="2")
+    # format-1 only: emit the Autumn-CLI-compatible variant of the heritage doc
+    autumn_compatible = serializers.BooleanField(required=False, default=False)
 
 
 class ImportRequestSerializer(serializers.Serializer):
-    data = serializers.JSONField()
+    data = serializers.JSONField(required=False)
+    data_compressed = serializers.CharField(required=False)
     force = serializers.BooleanField(required=False, default=False)
+    # Heritage format-1 options (rejected for format-2 payloads)
+    merge = serializers.BooleanField(required=False, default=False)
+    tolerance = serializers.IntegerField(required=False, default=2, min_value=0)
+    autumn_import = serializers.BooleanField(required=False, default=False)
+    context = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        if ("data" in attrs) == ("data_compressed" in attrs):
+            raise serializers.ValidationError(
+                "Provide exactly one of 'data' or 'data_compressed'."
+            )
+        return attrs
 
 
 class ImportSummarySerializer(serializers.Serializer):
@@ -100,7 +117,15 @@ class ExportView(V2APIView):
         queryset = spec.apply(
             Sessions.objects.filter(user=request.user, end_time__isnull=False)
         )
-        document = build_format2_export(queryset)
+        if request.query_params.get("export_format") == "1":
+            autumn_compatible = serializers.BooleanField(
+                required=False, default=False
+            ).run_validation(request.query_params.get("autumn_compatible", False))
+            document = build_project_json_from_sessions(
+                queryset.order_by("-end_time", "id"), autumn_compatible
+            )
+        else:
+            document = build_format2_export(queryset)
         return Response(json_compress(document) if compress else document)
 
 
@@ -115,11 +140,57 @@ class ImportView(V2APIView):
     def post(self, request):
         serializer = ImportRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        validated = serializer.validated_data
+
+        if "data_compressed" in validated:
+            try:
+                import_data = json_decompress(validated["data_compressed"])
+            except Exception as exc:
+                raise ValidationError(
+                    {"data_compressed": ["Could not decompress payload."]}
+                ) from exc
+        else:
+            import_data = validated["data"]
+
+        is_format2 = isinstance(import_data, dict) and import_data.get("format") == 2
+        legacy_args_sent = any(
+            key in request.data for key in ("merge", "tolerance", "autumn_import", "context")
+        )
+        if is_format2 and legacy_args_sent:
+            raise ValidationError(
+                {
+                    "non_field_errors": [
+                        "merge/tolerance/autumn_import/context apply to "
+                        "format-1 payloads only."
+                    ]
+                }
+            )
+
+        import_kwargs = {"force": validated["force"]}
+        if not is_format2:
+            # Heritage format-1 semantics, mirrored from the removed v1 endpoint.
+            import_into_context = None
+            context_name = (validated.get("context") or "").strip()
+            if context_name:
+                import_into_context = Context.objects.filter(
+                    user=request.user, name__iexact=context_name
+                ).first()
+                if import_into_context is None:
+                    import_into_context = Context.objects.create(
+                        user=request.user, name=context_name
+                    )
+            import_kwargs.update(
+                merge=validated["merge"],
+                tolerance=validated["tolerance"],
+                autumn_import=validated["autumn_import"],
+                import_into_context=import_into_context,
+            )
+
         try:
             summary = run_import(
                 request.user,
-                serializer.validated_data["data"],
-                force=serializer.validated_data["force"],
+                import_data,
+                **import_kwargs,
             )
         except Format2ConflictError as exc:
             return Response(
@@ -142,12 +213,14 @@ class ImportView(V2APIView):
         except Exception as exc:
             raise ValidationError({"data": [str(exc)]}) from exc
 
-        return Response(
-            {
-                "projects_created": summary.get("projects_created", 0),
-                "projects_updated": summary.get("projects_updated", 0),
-                "sessions_imported": summary.get("sessions_imported", 0),
-                "sessions_skipped": summary.get("sessions_skipped", 0),
-                "conflicts": summary.get("conflicts", []),
-            }
-        )
+        payload = {
+            "projects_created": summary.get("projects_created", 0),
+            "projects_updated": summary.get("projects_updated", 0),
+            "sessions_imported": summary.get("sessions_imported", 0),
+            "sessions_skipped": summary.get("sessions_skipped", 0),
+            "conflicts": summary.get("conflicts", []),
+        }
+        # Heritage format-1 imports report skipped project names.
+        if summary.get("skipped"):
+            payload["skipped"] = summary["skipped"]
+        return Response(payload)

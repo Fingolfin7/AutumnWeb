@@ -302,7 +302,8 @@ class Format2ExportImportTests(TestCase):
         self.assertEqual(first, second)
 
         self.client.force_login(self.source)
-        v1_response = self.client.get(reverse("api_export_json"))
+        # Heritage format-1 now lives behind the v2 endpoint's format param.
+        v1_response = self.client.get(reverse("api_v2:export"), {"export_format": "1"})
         self.assertEqual(v1_response.status_code, 200)
         v1 = v1_response.json()
         self.assertNotIn("format", v1)

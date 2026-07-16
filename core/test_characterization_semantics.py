@@ -33,25 +33,41 @@ class CurrentAttributionSemanticsTests(TestCase):
         )
 
     def test_full_credit_and_no_subproject_bucket(self):
-        # characterizes current behavior
-        subprojects = self.client.get("/api/tally_by_subprojects/").json()
+        # characterizes current behavior (ported to v2 after v1 removal; the
+        # semantics are version-independent: legacy full credit per link and a
+        # residual bucket for zero-link sessions)
+        tally = self.client.get(
+            "/api/v2/reports/tallies/", {"by": "subproject"}
+        ).json()
+        buckets = {
+            (entry["name"] if entry.get("kind") != "residual" else "no subproject"):
+                entry["total_minutes"]
+            for entry in tally["entries"]
+        }
+        self.assertEqual(buckets, {"A": 60.0, "B": 60.0, "no subproject": 30.0})
+        projects = self.client.get(
+            "/api/v2/reports/tallies/", {"by": "project"}
+        ).json()
         self.assertEqual(
-            {row["name"]: row["total_time"] for row in subprojects},
-            {"A": 60.0, "B": 60.0, "no subproject": 30.0},
+            [(e["name"], e["total_minutes"]) for e in projects["entries"]],
+            [("Project", 90.0)],
         )
-        projects = self.client.get("/api/tally_by_sessions/").json()
-        self.assertEqual(projects, [{"name": "Project", "total_time": 90.0}])
 
-    def test_hierarchy_children_are_non_additive(self):
-        # characterizes current behavior
-        hierarchy = self.client.get("/api/hierarchy/").json()
-        project = hierarchy["children"][0]["children"][0]
-        self.assertEqual(project["total_time"], 90.0)
-        self.assertEqual(
-            {child["name"]: child["total_time"] for child in project["children"]},
-            {"A": 60.0, "B": 60.0},
-        )
-        self.assertEqual(sum(child["total_time"] for child in project["children"]), 120.0)
+    def test_hierarchy_children_keep_legacy_full_credit(self):
+        # characterizes current behavior: legacy sessions with multiple links
+        # keep full credit per child (children sum above the parent) and the
+        # v2 hierarchy flags the project as legacy_overallocated instead of
+        # emitting a residual child.
+        hierarchy = self.client.get("/api/v2/reports/hierarchy/").json()
+        project = hierarchy["projects"][0]
+        self.assertEqual(project["total_minutes"], 90.0)
+        children = {
+            child["name"]: child["total_minutes"] for child in project["children"]
+        }
+        # A and B keep legacy full credit; the zero-link session appears as
+        # the residual child (name None).
+        self.assertEqual(children, {"A": 60.0, "B": 60.0, None: 30.0})
+        self.assertEqual(sum(children.values()), 150.0)
 
 
 class CurrentMergeSemanticsTests(TestCase):
@@ -71,8 +87,8 @@ class CurrentMergeSemanticsTests(TestCase):
         )
         session.subprojects.add(sub_a, sub_b)
         response = self.client.post(
-            "/api/merge_subprojects/",
-            data={"project_id": project.id, "subproject1": "A", "subproject2": "B", "new_subproject_name": "M"},
+            "/api/v2/subprojects/merge/",
+            data={"project_id": project.id, "source_ids": [sub_a.id, sub_b.id], "new_name": "M"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 201)
@@ -94,8 +110,8 @@ class CurrentMergeSemanticsTests(TestCase):
         SubProjects.objects.create(user=self.user, parent_project=project_a, name="Shared")
         SubProjects.objects.create(user=self.user, parent_project=project_b, name="Shared")
         response = self.client.post(
-            "/api/merge_projects/",
-            data={"project1": "Project A", "project2": "Project B", "new_project_name": "Merged"},
+            "/api/v2/projects/merge/",
+            data={"source_ids": [project_a.id, project_b.id], "new_name": "Merged"},
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 201)
@@ -169,8 +185,11 @@ class CurrentDateAndImportSemanticsTests(TestCase):
                     is_active=False,
                 )
             )
+        # Ported to v2 after v1 removal: same inclusive-calendar-day semantics
+        # ([start 00:00, end+1d 00:00) in the user's timezone, bucketing by
+        # end_time), same two sessions included.
         response = self.client.get(
-            "/api/sessions/search/",
+            "/api/v2/sessions/",
             {"start_date": "2025-01-10", "end_date": "2025-01-10"},
         )
         self.assertEqual(response.status_code, 200)

@@ -79,11 +79,11 @@ class CommitmentReplayTests(TestCase):
             )
             client = APIClient()
             client.force_authenticate(self.user)
-            response = client.get("/api/commitments/")
+            response = client.get("/api/v2/commitments/")
 
         self.assertEqual(rows, [600, 100])
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["commitments"][0]["bal"], 100)
+        self.assertEqual(response.json()["commitments"][0]["balance"], 100)
 
     @freeze_time("2026-01-01 12:00:00+00:00")
     def test_adjustment_wins_period_close_tie(self):
@@ -236,14 +236,14 @@ class CommitmentReplayTests(TestCase):
         client = APIClient()
         client.force_authenticate(self.user)
 
-        list_first = client.get("/api/commitments/?compact=false").content
-        detail_first = client.get(f"/api/commitments/{commitment.pk}/").content
+        list_first = client.get("/api/v2/commitments/").content
+        detail_first = client.get(f"/api/v2/commitments/{commitment.pk}").content
         for _ in range(3):
             self.assertEqual(
-                client.get("/api/commitments/?compact=false").content, list_first
+                client.get("/api/v2/commitments/").content, list_first
             )
             self.assertEqual(
-                client.get(f"/api/commitments/{commitment.pk}/").content,
+                client.get(f"/api/v2/commitments/{commitment.pk}").content,
                 detail_first,
             )
 

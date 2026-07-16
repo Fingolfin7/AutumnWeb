@@ -49,35 +49,6 @@ class CommitmentWriteClosureTests(TestCase):
         self.assertEqual(commitment.version, 2)
         self.assertTrue(commitment.needs_recompute)
 
-    @freeze_time("2026-01-01 12:00:00+00:00")
-    def test_v1_next_boundary_edit_queues_and_restart_only_is_400(self):
-        commitment = CommitmentEditService.create(
-            self.user,
-            {"aggregation_type": "project", "project": self.project, "target": 60},
-        )
-        client = APIClient()
-        client.force_authenticate(self.user)
-
-        queued = client.patch(
-            f"/api/commitments/{commitment.pk}/",
-            {"target_value": 90},
-            format="json",
-        )
-        rejected = client.patch(
-            f"/api/commitments/{commitment.pk}/",
-            {"period": "daily", "target_value": 10},
-            format="json",
-        )
-
-        self.assertEqual(queued.status_code, 200)
-        self.assertEqual(rejected.status_code, 400)
-        self.assertIn("period", rejected.json()["error"])
-        self.assertIn("restart operation", rejected.json()["error"])
-        commitment.refresh_from_db()
-        self.assertEqual(commitment.target, 60)
-        self.assertEqual(commitment.revisions.get(status="pending").target_value, 90)
-        self.assertEqual(commitment.version, 2)
-        self.assertTrue(commitment.needs_recompute)
 
     def test_admin_definition_fields_are_readonly_and_submission_cannot_change(self):
         superuser = User.objects.create_superuser(

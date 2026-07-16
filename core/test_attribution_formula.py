@@ -7,7 +7,7 @@ from django.db.models.functions import Coalesce
 from django.test import TestCase
 from django.utils import timezone
 
-from core.api.helpers import _get_active_sessions
+from core.api_helpers import _get_active_sessions
 from core.attribution import (
     BASIS_POINTS,
     hierarchy_child_credit,
@@ -211,36 +211,36 @@ class AttributionFormulaTests(TestCase):
         self._link(residual, self.sub_a, 2500)
         self.client.force_login(self.user)
 
+        # Ported to v2 after v1 removal: same weighted semantics, 2dp minutes.
         tally = {
-            row["name"]: row["total_time"]
-            for row in self.client.get("/api/tally_by_subprojects/").json()
+            (row["name"] if row.get("kind") != "residual" else "no subproject"):
+                row["total_minutes"]
+            for row in self.client.get(
+                "/api/v2/reports/tallies/", {"by": "subproject"}
+            ).json()["entries"]
         }
         self.assertEqual(
             tally,
             {
-                "A": 46 / 60,
-                "B": 84 / 60,
-                "no subproject": 30 / 60,
+                "A": round(46 / 60, 2),
+                "B": round(84 / 60, 2),
+                "no subproject": round(30 / 60, 2),
             },
         )
 
-        totals = self.client.get(
-            "/api/totals/", {"project": self.project.name}
-        ).json()
-        self.assertEqual(
-            dict(totals["subs"]),
-            {"A": 0.7667, "B": 1.4, "no subproject": 0.5},
-        )
-
-        hierarchy = self.client.get("/api/hierarchy/").json()
-        project_row = hierarchy["children"][0]["children"][0]
-        self.assertEqual(project_row["total_time"], 160 / 60)
+        hierarchy = self.client.get("/api/v2/reports/hierarchy/").json()
+        project_row = hierarchy["projects"][0]
+        self.assertEqual(project_row["total_minutes"], round(160 / 60, 2))
         self.assertEqual(
             {
-                child["name"]: child["total_time"]
+                child["name"]: child["total_minutes"]
                 for child in project_row["children"]
             },
-            {"A": 46 / 60, "B": 84 / 60},
+            {
+                "A": round(46 / 60, 2),
+                "B": round(84 / 60, 2),
+                None: round(30 / 60, 2),
+            },
         )
 
         scatter = self.client.get(

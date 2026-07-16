@@ -75,7 +75,13 @@ IF_MATCH_PARAMETER = OpenApiParameter(
 
 
 def _session_queryset(user):
-    return Sessions.objects.filter(user=user).select_related("project")
+    # subproject_links prefetch keeps list serialization at O(1) queries
+    # (the serializer walks each session's allocations).
+    return (
+        Sessions.objects.filter(user=user)
+        .select_related("project")
+        .prefetch_related("subproject_links__subproject")
+    )
 
 
 def _get_session(user, session_id):

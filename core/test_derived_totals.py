@@ -5,8 +5,6 @@ from django.test import RequestFactory, TestCase
 from django.utils import timezone
 from rest_framework.test import force_authenticate
 
-from core.api.projects import get_project, projects_list_grouped, projects_with_stats
-from core.api.subprojects import subprojects_list
 from core.models import Projects, Sessions, SubProjects
 from core.serializers import ProjectSerializer
 from core.totals import (
@@ -101,28 +99,6 @@ class DerivedTotalsTests(TestCase):
         self.assertEqual(self.project.total_time, 999999)
         self.assertEqual(self.subproject_a.total_time, 999999)
 
-    def test_stale_cache_is_hidden_on_all_required_surfaces(self):
-        self._session(3600, links=(self.subproject_a,))
-
-        serialized = ProjectSerializer(self.project).data
-        self.assertEqual(serialized["total_time"], 60)
-
-        grouped = self.client.get("/api/projects/grouped/", {"compact": "false"})
-        self.assertEqual(grouped.status_code, 200)
-        grouped_project = grouped.json()["projects"]["active"][0]
-        self.assertEqual(grouped_project["total_time"], 60)
-        self.assertEqual(grouped_project["avg_session_duration"], 60)
-
-        stats = self.client.get("/api/projects_with_stats/")
-        self.assertEqual(stats.status_code, 200)
-        stats_project = stats.json()[0]
-        self.assertEqual(stats_project["total_time"], 60)
-        self.assertEqual(stats_project["computed_total_time"], 60)
-        self.assertEqual(stats_project["persisted_total_time"], 60)
-
-        detail = self.client.get("/api/get_project/Derived Project/")
-        self.assertEqual(detail.status_code, 200)
-        self.assertEqual(detail.json()["total_time"], 60)
 
     def test_last_updated_uses_latest_completed_end_and_stored_fallback(self):
         earlier = self._session(60, offset_minutes=0, links=(self.subproject_a,))
@@ -192,30 +168,8 @@ class DerivedTotalsQueryCountTests(TestCase):
         force_authenticate(request, user=self.user)
         return request
 
-    def test_projects_with_stats_query_count_is_bounded(self):
-        request = self._request("/api/projects_with_stats/")
-        with self.assertNumQueries(2):
-            response = projects_with_stats(request)
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.data), 3)
 
-    def test_subprojects_list_query_count_is_bounded(self):
-        request = self._request(
-            "/api/subprojects/", {"project": "Project 0", "compact": "false"}
-        )
-        with self.assertNumQueries(2):
-            response = subprojects_list(request)
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(len(response.data["subprojects"]), 1)
 
-    def test_grouped_full_query_count_is_bounded(self):
-        request = self._request(
-            "/api/projects/grouped/", {"compact": "false"}
-        )
-        with self.assertNumQueries(2):
-            response = projects_list_grouped(request)
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.data["summary"]["total"], 3)
 
     def test_annotation_variant_evaluates_in_one_query(self):
         with self.assertNumQueries(1):

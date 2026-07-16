@@ -161,14 +161,14 @@ class SessionServiceFlooringTests(TestCase):
             microsecond=654321
         )
         timer_response = self.client.post(
-            "/api/timer/start/",
+            "/api/v2/timers/",
             data=json.dumps(
-                {"project": self.project.name, "start": timer_start.isoformat()}
+                {"project_id": self.project.id, "start": timer_start.isoformat()}
             ),
             content_type="application/json",
         )
         self.assertEqual(timer_response.status_code, 201)
-        timer = Sessions.objects.get(pk=timer_response.json()["session"]["id"])
+        timer = Sessions.objects.get(pk=timer_response.json()["id"])
         self.assertEqual(timer.start_time.microsecond, 0)
 
         track_start = (timezone.now() - timedelta(hours=4)).replace(
@@ -178,10 +178,10 @@ class SessionServiceFlooringTests(TestCase):
             microsecond=987654
         )
         track_response = self.client.post(
-            "/api/track/",
+            "/api/v2/sessions/",
             data=json.dumps(
                 {
-                    "project": self.project.name,
+                    "project_id": self.project.id,
                     "start": track_start.isoformat(),
                     "end": track_end.isoformat(),
                 }
@@ -190,7 +190,7 @@ class SessionServiceFlooringTests(TestCase):
         )
         self.assertEqual(track_response.status_code, 201)
         tracked = Sessions.objects.get(
-            pk=track_response.json()["session"]["id"]
+            pk=track_response.json()["id"]
         )
         self.assertEqual(tracked.start_time.microsecond, 0)
         self.assertEqual(tracked.end_time.microsecond, 0)

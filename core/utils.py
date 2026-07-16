@@ -125,47 +125,6 @@ def parse_date_or_datetime(date_str):
     raise ValueError(f"Date string '{date_str}' is not in a recognized format")
 
 
-def in_window(
-    data: QuerySet, start: datetime | str = None, end: datetime | str = None
-) -> list:
-    """
-    Return a list of items in the data set that fall within the given window. Use this only when you need to
-    filter items by the get_start and get_end properties of the items since those cant be used in a filter
-    query. Otherwise, use the filter method of the QuerySet since it's more efficient.
-
-    :param data: a queryset of items
-    :param start: the start of the window (%m-%d-%Y) or (%m-%d-%Y %H:%M:%S)
-    :param end: the end of the window (%m-%d-%Y) or (%m-%d-%Y %H:%M:%S)
-
-    :return: a list of items that fall within the window
-    """
-
-    if isinstance(start, str):
-        start = parse_date_or_datetime(start)
-    if isinstance(end, str):
-        end = parse_date_or_datetime(end)
-
-    end = (
-        end + timedelta(days=1) if end else None
-    )  # add a day to the end date to include all sessions on that day
-
-    # can't use the filter property of a QuerySet because it doesn't support the get_start and get_end properties
-    try:
-        if end:
-            return [
-                item for item in data if item.get_start >= start and item.get_end <= end
-            ]
-        else:
-            return [item for item in data if item.get_start >= start]
-    except TypeError:
-        start = timezone.make_aware(start)
-        if end:
-            end = timezone.make_aware(end)
-            return [
-                item for item in data if item.get_start >= start and item.get_end <= end
-            ]
-        else:
-            return [item for item in data if item.get_start >= start]
 
 
 def filter_by_projects(

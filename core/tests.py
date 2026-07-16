@@ -216,50 +216,6 @@ class UpdateSessionTests(TestCase):
             derived_subproject_total(self.user, self.subproject1), 60.0, places=2
         )
 
-    def test_api_edit_preserves_id_and_reassigns_project_totals(self):
-        other_project = Projects.objects.create(user=self.user, name="Other Project")
-        other_subproject = SubProjects.objects.create(
-            user=self.user, name="Other Subproject", parent_project=other_project
-        )
-        original_session_id = self.session.id
-        new_start_time = timezone.now() - timedelta(minutes=45)
-        new_end_time = new_start_time + timedelta(minutes=30)
-
-        response = self.client.patch(
-            reverse("api_edit_session", args=[original_session_id]),
-            data={
-                "project": other_project.name,
-                "subprojects": [other_subproject.name],
-                "start": new_start_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "end": new_end_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "note": "Moved in place",
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["session"]["id"], original_session_id)
-        self.assertEqual(Sessions.objects.filter(user=self.user).count(), 1)
-
-        updated_session = Sessions.objects.get(pk=original_session_id)
-        self.assertEqual(updated_session.project, other_project)
-        self.assertEqual(
-            list(updated_session.subprojects.values_list("id", flat=True)),
-            [other_subproject.id],
-        )
-
-        self.assertAlmostEqual(
-            derived_project_total(self.user, self.project), 0.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_project_total(self.user, other_project), 30.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, other_subproject), 30.0, places=2
-        )
 
 
 class StopTimerTests(TestCase):
@@ -329,23 +285,6 @@ class StopAfterTimerTests(TestCase):
             delta=2,
         )
 
-    def test_api_start_timer_accepts_stop_after_duration(self):
-        response = self.client.post(
-            "/api/timer/start/?compact=false",
-            data=json.dumps({"project": self.project.name, "stop_after": "1.5 hours"}),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()
-        self.assertIsNotNone(payload["session"]["auto_stop_at"])
-
-        session = Sessions.objects.get(id=payload["session"]["id"])
-        self.assertAlmostEqual(
-            (session.auto_stop_at - session.start_time).total_seconds(),
-            90 * 60,
-            delta=2,
-        )
 
     def test_expired_stop_after_timer_is_closed_before_listing_active_timers(self):
         start = timezone.now() - timedelta(minutes=45)
@@ -740,59 +679,8 @@ class MergeProjectsAPITests(TestCase):
             total_time=180.0,
         )
 
-    def test_merge_projects_api_success(self):
-        """Test successful project merge via API"""
-        response = self.client.post(
-            "/api/merge_projects/",
-            {
-                "project1": "Project A",
-                "project2": "Project B",
-                "new_project_name": "Merged Project",
-            },
-            content_type="application/json",
-        )
 
-        self.assertEqual(response.status_code, 201)
-        data = response.json()
-        self.assertIn("Successfully merged", data["message"])
-        self.assertEqual(data["project"]["name"], "Merged Project")
 
-        # Check that original projects are deleted
-        self.assertFalse(Projects.objects.filter(name="Project A").exists())
-        self.assertFalse(Projects.objects.filter(name="Project B").exists())
-
-    def test_merge_projects_api_missing_parameters(self):
-        """Test API fails with missing parameters"""
-        response = self.client.post(
-            "/api/merge_projects/",
-            {
-                "project1": "Project A",
-                # Missing project2 and new_project_name
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("required", data["error"])
-
-    def test_merge_projects_api_duplicate_name(self):
-        """Test API fails when new project name already exists"""
-        Projects.objects.create(user=self.user, name="Merged Project")
-
-        response = self.client.post(
-            "/api/merge_projects/",
-            {
-                "project1": "Project A",
-                "project2": "Project B",
-                "new_project_name": "Merged Project",
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("already exists", data["error"])
 
 
 class MergeSubProjectsAPITests(TestCase):
@@ -819,63 +707,8 @@ class MergeSubProjectsAPITests(TestCase):
             total_time=120.0,
         )
 
-    def test_merge_subprojects_api_success(self):
-        """Test successful subproject merge via API"""
-        response = self.client.post(
-            "/api/merge_subprojects/",
-            {
-                "subproject1": "Design",
-                "subproject2": "UI",
-                "new_subproject_name": "Design & UI",
-                "project_id": self.parent_project.id,
-            },
-            content_type="application/json",
-        )
 
-        self.assertEqual(response.status_code, 201)
-        data = response.json()
-        self.assertIn("Successfully merged", data["message"])
-        self.assertEqual(data["subproject"]["name"], "Design & UI")
 
-        # Check that original subprojects are deleted
-        self.assertFalse(SubProjects.objects.filter(name="Design").exists())
-        self.assertFalse(SubProjects.objects.filter(name="UI").exists())
-
-    def test_merge_subprojects_api_missing_parameters(self):
-        """Test API fails with missing parameters"""
-        response = self.client.post(
-            "/api/merge_subprojects/",
-            {
-                "subproject1": "Design",
-                # Missing other parameters
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("required", data["error"])
-
-    def test_merge_subprojects_api_duplicate_name(self):
-        """Test API fails when new subproject name already exists"""
-        SubProjects.objects.create(
-            user=self.user, name="Design & UI", parent_project=self.parent_project
-        )
-
-        response = self.client.post(
-            "/api/merge_subprojects/",
-            {
-                "subproject1": "Design",
-                "subproject2": "UI",
-                "new_subproject_name": "Design & UI",
-                "project_id": self.parent_project.id,
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("already exists", data["error"])
 
 
 class ImportIntoContextCLITests(TestCase):
@@ -1066,23 +899,6 @@ class ProjectsGroupedApiTests(TestCase):
         # DRF token auth for API endpoints
         self.token = Token.objects.create(user=self.user)
 
-    def test_projects_grouped_includes_archived_and_returns_200(self):
-        Projects.objects.create(user=self.user, name="Active Project", status="active")
-        Projects.objects.create(
-            user=self.user, name="Archived Project", status="archived"
-        )
-
-        url = reverse("api_projects_grouped")
-        response = self.client.get(url, HTTP_AUTHORIZATION=f"Token {self.token.key}")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-
-        self.assertIn("projects", payload)
-        self.assertIn("archived", payload["projects"])
-        self.assertIn("Archived Project", payload["projects"]["archived"])
-        self.assertIn("summary", payload)
-        self.assertEqual(payload["summary"]["archived"], 1)
 
 
 class TrackApiRegressionTests(TestCase):
@@ -1093,45 +909,6 @@ class TrackApiRegressionTests(TestCase):
 
         self.project = Projects.objects.create(user=self.user, name="Track Project")
 
-    def test_track_session_does_not_double_count_project_total(self):
-        sp1 = SubProjects.objects.create(
-            user=self.user,
-            name="SP1",
-            parent_project=self.project,
-        )
-        sp2 = SubProjects.objects.create(
-            user=self.user,
-            name="SP2",
-            parent_project=self.project,
-        )
-
-        start = timezone.now().replace(microsecond=0) - timedelta(minutes=9)
-        end = start + timedelta(minutes=9)
-
-        resp = self.client.post(
-            reverse("api_track"),
-            data={
-                "project": self.project.name,
-                # core.utils.parse_date_or_datetime does not accept full ISO with timezone
-                # (e.g. 2026-01-28T10:00:00+00:00), so use a supported format.
-                "start": start.strftime("%Y-%m-%d %H:%M:%S"),
-                "end": end.strftime("%Y-%m-%d %H:%M:%S"),
-                "subprojects": [sp1.name, sp2.name],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-
-        self.assertEqual(resp.status_code, 201)
-        self.assertAlmostEqual(
-            derived_project_total(self.user, self.project), 9.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, sp1), 9.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, sp2), 9.0, places=2
-        )
 
 
 class CreateSubprojectApiCompatTests(TestCase):
@@ -1143,37 +920,7 @@ class CreateSubprojectApiCompatTests(TestCase):
         self.token = Token.objects.create(user=self.user)
         self.project = Projects.objects.create(user=self.user, name="API Parent")
 
-    def test_create_subproject_accepts_parent_project_name(self):
-        resp = self.client.post(
-            reverse("api_create_subproject"),
-            data={"parent_project": self.project.name, "name": "from-name"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(
-            SubProjects.objects.filter(
-                user=self.user,
-                parent_project=self.project,
-                name="from-name",
-            ).exists()
-        )
 
-    def test_create_subproject_accepts_parent_project_pk_without_user(self):
-        resp = self.client.post(
-            reverse("api_create_subproject"),
-            data={"parent_project": self.project.id, "name": "from-id"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(
-            SubProjects.objects.filter(
-                user=self.user,
-                parent_project=self.project,
-                name="from-id",
-            ).exists()
-        )
 
 
 # =============================================================================
@@ -2590,26 +2337,6 @@ class DstTransitionSessionTests(TestCase):
         self.assertEqual(session.duration, 180.0)
         self.assertTrue(session.crosses_dst_transition)
 
-    def test_api_surfaces_crosses_dst_transition_flag(self):
-        start = timezone.make_aware(datetime(2026, 3, 29, 1, 30, 0))
-        end = timezone.make_aware(datetime(2026, 3, 29, 3, 30, 0))
-        Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=end,
-            is_active=False,
-        )
-
-        logs_resp = self.client.get("/api/log/?compact=true")
-        self.assertEqual(logs_resp.status_code, 200)
-        logs_payload = logs_resp.json()
-        self.assertTrue(logs_payload["logs"][0]["crosses_dst_transition"])
-
-        list_resp = self.client.get("/api/list_sessions/")
-        self.assertEqual(list_resp.status_code, 200)
-        list_payload = list_resp.json()
-        self.assertTrue(list_payload[0]["crosses_dst_transition"])
 
 
 class McpApiContractTests(TestCase):
@@ -2618,86 +2345,8 @@ class McpApiContractTests(TestCase):
         self.client.login(username="mcpuser", password="password")
         self.project = Projects.objects.create(user=self.user, name="MCP Project")
 
-    def test_create_project_infers_user_from_auth(self):
-        response = self.client.post(
-            "/api/create_project/",
-            data=json.dumps({"name": "Created From MCP", "description": "No user field"}),
-            content_type="application/json",
-        )
 
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["name"], "Created From MCP")
-        self.assertEqual(payload["user"], self.user.id)
 
-    def test_negative_session_ids_return_json_errors(self):
-        edit_response = self.client.patch(
-            "/api/session/-1/",
-            data=json.dumps({"note": "impossible"}),
-            content_type="application/json",
-        )
-        delete_response = self.client.delete("/api/delete_session/-1/")
 
-        self.assertEqual(edit_response.status_code, 404)
-        self.assertEqual(edit_response.json(), {"ok": False, "error": "Session not found"})
-        self.assertEqual(delete_response.status_code, 404)
-        self.assertEqual(
-            delete_response.json(), {"ok": False, "error": "Session not found"}
-        )
 
-    def test_search_subprojects_accepts_project_alias(self):
-        SubProjects.objects.create(
-            user=self.user,
-            parent_project=self.project,
-            name="MCP Subproject",
-        )
-
-        response = self.client.get(
-            "/api/search_subprojects/",
-            {"project": "MCP Project", "search_term": "Subproject"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(len(payload), 1)
-        self.assertEqual(payload[0]["name"], "MCP Subproject")
-
-    def test_audit_returns_explicit_deprecation_notice(self):
-        response = self.client.post(
-            "/api/audit/",
-            data=json.dumps({"dry_run": True}),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
-                "ok": True,
-                "deprecated": True,
-                "message": (
-                    "Deprecated: totals are always derived from sessions now; "
-                    "there is nothing to audit."
-                ),
-            },
-        )
-
-    def test_projects_with_stats_exposes_computed_and_persisted_totals(self):
-        start = timezone.make_aware(datetime(2026, 5, 1, 9, 0, 0))
-        end = timezone.make_aware(datetime(2026, 5, 1, 10, 0, 0))
-        Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=end,
-            is_active=False,
-        )
-        response = self.client.get("/api/projects_with_stats/")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        project_payload = next(p for p in payload if p["name"] == "MCP Project")
-        self.assertEqual(project_payload["total_time"], 60)
-        self.assertEqual(project_payload["computed_total_time"], 60)
-        self.assertEqual(project_payload["persisted_total_time"], 60)
 

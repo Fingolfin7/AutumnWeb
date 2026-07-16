@@ -83,8 +83,10 @@ class SessionResourceSerializer(serializers.Serializer):
 
     @extend_schema_field(SubprojectAllocationSerializer(many=True))
     def get_subproject_allocations(self, session):
-        links = session.subproject_links.select_related("subproject").order_by(
-            "subproject_id"
+        # Sort in Python so a list-level prefetch_related is not defeated by
+        # a fresh queryset (order_by would re-query per session).
+        links = sorted(
+            session.subproject_links.all(), key=lambda link: link.subproject_id
         )
         return [
             {

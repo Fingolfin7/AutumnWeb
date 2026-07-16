@@ -57,7 +57,9 @@ class AuditDeprecationTests(TestCase):
         self.assertEqual(self.project.total_time, 999)
         self.assertEqual(self.subproject.total_time, 999)
 
-    def test_endpoint_ignores_dry_run_and_returns_deprecation_contract(self):
+    def test_endpoint_is_removed_with_the_v1_api(self):
+        # S12: the v1 audit endpoint is gone; the deprecation contract lives
+        # in the management command (above) and the CLI's local no-op.
         self.client.force_login(self.user)
 
         response = self.client.post(
@@ -66,15 +68,7 @@ class AuditDeprecationTests(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
-                "ok": True,
-                "deprecated": True,
-                "message": DEPRECATION_MESSAGE,
-            },
-        )
+        self.assertEqual(response.status_code, 404)
         self.project.refresh_from_db()
         self.subproject.refresh_from_db()
         self.assertEqual(self.project.total_time, 999)

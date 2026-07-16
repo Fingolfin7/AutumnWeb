@@ -156,41 +156,6 @@ class PartitionedSessionApiTests(TestCase):
             str(response.json()["error"]["details"]),
         )
 
-    def test_v1_relation_patch_is_rejected_but_note_patch_is_allowed(self):
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            subprojects=[self.sub_a],
-            allocation_mode="partitioned",
-            start_time=datetime(2026, 7, 16, 9, tzinfo=UTC),
-            end_time=datetime(2026, 7, 16, 10, tzinfo=UTC),
-            is_active=False,
-        )
-        SessionMutationService.set_allocations(
-            session.pk,
-            user=self.user,
-            allocations=[(self.sub_a, 5000)],
-            allocation_mode="partitioned",
-        )
-        self.client.force_authenticate(user=None)
-        self.client.force_login(self.user)
-
-        rejected = self.client.patch(
-            reverse("api_edit_session", args=[session.pk]),
-            {"subprojects": [self.sub_b.name]},
-            content_type="application/json",
-        )
-        allowed = self.client.patch(
-            reverse("api_edit_session", args=[session.pk]),
-            {"note": "still editable"},
-            content_type="application/json",
-        )
-
-        self.assertEqual(rejected.status_code, 409)
-        self.assertIn("upgrade autumn-cli", rejected.json()["error"])
-        self.assertEqual(allowed.status_code, 200)
-        session.refresh_from_db()
-        self.assertEqual(session.note, "still editable")
 
 
 class PartitionedMergeAndReadTests(TestCase):

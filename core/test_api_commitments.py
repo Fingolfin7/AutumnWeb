@@ -32,84 +32,11 @@ class CommitmentApiTests(TestCase):
         payload.update(overrides)
         return payload
 
-    def test_list_includes_full_progress(self):
-        Commitment.objects.create(user=self.user, project=self.project, target=120)
 
-        response = self.client.get("/api/commitments/?compact=false")
 
-        self.assertEqual(response.status_code, 200)
-        item = response.json()["commitments"][0]
-        self.assertEqual(item["target_name"], "AutumnWeb")
-        self.assertIn("progress", item)
-        self.assertIn("actual", item["progress"])
-        self.assertIn("percentage", item["progress"])
-        self.assertIn("status", item["progress"])
 
-    def test_create_project_target_and_duplicate_target(self):
-        response = self.client.post(
-            "/api/commitments/", self._project_payload(), format="json"
-        )
 
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["commitment"]["target_name"], "AutumnWeb")
 
-        duplicate = self.client.post(
-            "/api/commitments/", self._project_payload(), format="json"
-        )
-        self.assertEqual(duplicate.status_code, 400)
-        self.assertIn("already has a commitment", duplicate.json()["error"])
-
-    def test_create_subproject_target(self):
-        response = self.client.post(
-            "/api/commitments/",
-            {
-                "aggregation_type": "subproject",
-                "target": "API",
-                "project": "AutumnWeb",
-                "target_value": 3,
-                "commitment_type": "sessions",
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()["commitment"]
-        self.assertEqual(payload["aggregation_type"], "subproject")
-        self.assertEqual(payload["target_name"], "API")
-
-    def test_patch_target_value(self):
-        commitment = Commitment.objects.create(user=self.user, project=self.project, target=120)
-
-        response = self.client.patch(
-            f"/api/commitments/{commitment.id}/",
-            {"target_value": 240},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["commitment"]["target"], 120)
-        commitment.refresh_from_db()
-        self.assertEqual(commitment.target, 120)
-        self.assertEqual(commitment.revisions.get(status="pending").target_value, 240)
-
-    def test_delete_commitment(self):
-        commitment = Commitment.objects.create(user=self.user, project=self.project, target=120)
-
-        response = self.client.delete(f"/api/commitments/{commitment.id}/")
-
-        self.assertEqual(response.status_code, 204)
-        self.assertFalse(Commitment.objects.filter(pk=commitment.pk).exists())
-
-    def test_user_isolation(self):
-        commitment = Commitment.objects.create(user=self.user, project=self.project, target=120)
-        self.client.force_authenticate(self.other_user)
-
-        list_response = self.client.get("/api/commitments/")
-        detail_response = self.client.get(f"/api/commitments/{commitment.id}/")
-
-        self.assertEqual(list_response.status_code, 200)
-        self.assertEqual(list_response.json()["commitments"], [])
-        self.assertEqual(detail_response.status_code, 404)
 
     def test_healthz_requires_no_authentication(self):
         client = APIClient()

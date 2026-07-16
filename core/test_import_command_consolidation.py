@@ -95,23 +95,23 @@ class SessionUuidTests(TestCase):
         self.client.force_login(self.user)
         timer_start = timezone.now().replace(microsecond=0) - timedelta(hours=4)
         timer_response = self.client.post(
-            '/api/timer/start/',
+            '/api/v2/timers/',
             data=json.dumps(
-                {'project': self.project.name, 'start': timer_start.isoformat()}
+                {'project_id': self.project.id, 'start': timer_start.isoformat()}
             ),
             content_type='application/json',
         )
         self.assertEqual(timer_response.status_code, 201)
-        self.assertNotIn('uuid', timer_response.json()['session'])
-        timer = Sessions.objects.get(pk=timer_response.json()['session']['id'])
+        self.assertIn('uuid', timer_response.json())  # v2 exposes uuid
+        timer = Sessions.objects.get(pk=timer_response.json()['id'])
         self.assertIsNotNone(timer.uuid)
 
         track_start = timer_start + timedelta(hours=2)
         track_response = self.client.post(
-            '/api/track/',
+            '/api/v2/sessions/',
             data=json.dumps(
                 {
-                    'project': self.project.name,
+                    'project_id': self.project.id,
                     'start': track_start.isoformat(),
                     'end': (track_start + timedelta(hours=1)).isoformat(),
                 }
@@ -119,9 +119,9 @@ class SessionUuidTests(TestCase):
             content_type='application/json',
         )
         self.assertEqual(track_response.status_code, 201)
-        self.assertNotIn('uuid', track_response.json()['session'])
+        self.assertIn('uuid', track_response.json())
         tracked = Sessions.objects.get(
-            pk=track_response.json()['session']['id']
+            pk=track_response.json()['id']
         )
         self.assertIsNotNone(tracked.uuid)
 
