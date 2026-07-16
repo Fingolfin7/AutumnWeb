@@ -554,6 +554,45 @@ def _periods_for_replay(revision, ledger_start_at, now):
     return periods
 
 
+def _activate_due_revision(commitment, now):
+    pending = (
+        commitment.revisions.filter(
+            generation=commitment.generation,
+            status=CommitmentRevision.STATUS_PENDING,
+            effective_from_instant__lte=now,
+        )
+        .order_by("effective_from_instant", "pk")
+        .first()
+    )
+    if pending is None:
+        return False
+
+    pending.status = CommitmentRevision.STATUS_ACTIVE
+    pending.save(update_fields=["status"])
+    commitment.target = pending.target_value
+    commitment.banking_enabled = pending.banking_enabled
+    commitment.max_balance = pending.max_balance
+    commitment.min_balance = pending.min_balance
+    commitment.save(
+        update_fields=["target", "banking_enabled", "max_balance", "min_balance"]
+    )
+    for field in _REVISION_FILTER_FIELDS:
+        getattr(commitment, field).set(_snapshot_ids(pending, field))
+    return True
+
+
+def _revision_for_period(revisions, period_start):
+    governing = None
+    for revision in revisions:
+        if revision.effective_from_instant <= period_start:
+            governing = revision
+        else:
+            break
+    # A newly-created/restarted ledger may begin partway through its first
+    # canonical period, after that period's midnight boundary.
+    return governing or revisions[0]
+
+
 def mutation_affects_ledger(commitment: Commitment, instant) -> bool:
     """Whether a mutation instant belongs to the current accounting ledger."""
     if commitment.ledger_start_at is None:
@@ -570,16 +609,37 @@ def recompute_commitment(commitment: Commitment) -> bool:
     now = timezone.now()
     old_balance = locked.balance
     was_dirty = locked.needs_recompute
+
+    if not locked.active:
+        locked.needs_recompute = False
+        locked.save(update_fields=["needs_recompute"])
+        commitment.balance = locked.balance
+        commitment.needs_recompute = False
+        commitment.ledger_start_at = locked.ledger_start_at
+        commitment.generation = locked.generation
+        commitment.active = False
+        return was_dirty
+
     revision = _ensure_ledger_initialized(locked, now)
+    activated = _activate_due_revision(locked, now)
+    revisions = list(
+        locked.revisions.filter(
+            generation=locked.generation,
+            status=CommitmentRevision.STATUS_ACTIVE,
+        ).order_by("effective_from_instant", "pk")
+    )
+    if not revisions:
+        revisions = [revision]
     anchor = locked.ledger_start_at
-    desired = _periods_for_replay(revision, anchor, now)
+    desired = _periods_for_replay(revisions[0], anchor, now)
     existing = {
         row.period_start: row
         for row in locked.period_rows.filter(generation=locked.generation)
     }
     period_rows = []
-    derived_changed = False
+    derived_changed = activated
     for period_start, effective_start, period_end in desired:
+        revision = _revision_for_period(revisions, period_start)
         accrued_numerator, session_count = _revision_accrual(
             revision, effective_start, period_end
         )
@@ -644,6 +704,7 @@ def recompute_commitment(commitment: Commitment) -> bool:
             continue
 
         carryover_in = running
+        revision = event.revision
         actual = (
             event.accrued_numerator / 10000
             if revision.commitment_type == "time"
@@ -679,6 +740,12 @@ def recompute_commitment(commitment: Commitment) -> bool:
     commitment.needs_recompute = False
     commitment.ledger_start_at = locked.ledger_start_at
     commitment.generation = locked.generation
+    commitment.target = locked.target
+    commitment.banking_enabled = locked.banking_enabled
+    commitment.max_balance = locked.max_balance
+    commitment.min_balance = locked.min_balance
+    if activated:
+        commitment._prefetched_objects_cache = {}
     return derived_changed or was_dirty or old_balance != locked.balance
 
 

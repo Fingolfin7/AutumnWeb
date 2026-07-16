@@ -1593,11 +1593,12 @@ class CommitmentViewTests(TestCase):
                 'active': True,
             }
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
 
         commitment.refresh_from_db()
-        self.assertEqual(commitment.period, 'daily')
-        self.assertEqual(commitment.target, 60)
+        self.assertEqual(commitment.period, 'weekly')
+        self.assertEqual(commitment.target, 300)
+        self.assertContains(response, 'requires the restart operation')
 
     def test_delete_commitment_view_get(self):
         """Test GET request to delete commitment page."""

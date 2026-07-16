@@ -33,7 +33,6 @@ from core.api.commitments import (
     _resolve_commitment_target,
     _resolve_commitment_rules,
     _validate_commitment_rules,
-    _apply_commitment_rules,
     _commitment_target_value,
     _validate_commitment_balances,
     commitments,

@@ -43,30 +43,6 @@ def mark_projects_archived(modeladmin, request, queryset):
     modeladmin.message_user(request, f"Updated {updated} project(s) to archived.", messages.SUCCESS)
 
 
-@admin.action(description="Activate selected commitments")
-def activate_commitments(modeladmin, request, queryset):
-    updated = queryset.update(active=True)
-    modeladmin.message_user(request, f"Activated {updated} commitment(s).", messages.SUCCESS)
-
-
-@admin.action(description="Deactivate selected commitments")
-def deactivate_commitments(modeladmin, request, queryset):
-    updated = queryset.update(active=False)
-    modeladmin.message_user(request, f"Deactivated {updated} commitment(s).", messages.SUCCESS)
-
-
-@admin.action(description="Enable banking for selected commitments")
-def enable_banking(modeladmin, request, queryset):
-    updated = queryset.update(banking_enabled=True)
-    modeladmin.message_user(request, f"Enabled banking for {updated} commitment(s).", messages.SUCCESS)
-
-
-@admin.action(description="Disable banking for selected commitments")
-def disable_banking(modeladmin, request, queryset):
-    updated = queryset.update(banking_enabled=False)
-    modeladmin.message_user(request, f"Disabled banking for {updated} commitment(s).", messages.SUCCESS)
-
-
 @admin.register(Projects)
 class ProjectsAdmin(admin.ModelAdmin):
     list_display = (
@@ -296,9 +272,41 @@ class CommitmentAdmin(admin.ModelAdmin):
         "context__name",
         "tag__name",
     )
-    autocomplete_fields = ("user", "project", "subproject", "context", "tag")
-    list_editable = ("active", "banking_enabled", "target", "max_balance", "min_balance")
-    actions = (activate_commitments, deactivate_commitments, enable_banking, disable_banking)
+    readonly_fields = (
+        "user",
+        "aggregation_type",
+        "project",
+        "subproject",
+        "context",
+        "tag",
+        "include_projects",
+        "exclude_projects",
+        "include_subprojects",
+        "exclude_subprojects",
+        "include_contexts",
+        "exclude_contexts",
+        "include_tags",
+        "exclude_tags",
+        "commitment_type",
+        "period",
+        "start_date",
+        "target",
+        "banking_enabled",
+        "max_balance",
+        "min_balance",
+        "active",
+        "balance",
+        "last_reconciled",
+        "needs_recompute",
+        "ledger_start_at",
+        "generation",
+        "version",
+    )
+    list_editable = ()
+    actions = ()
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(Context)

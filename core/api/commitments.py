@@ -13,7 +13,7 @@ from core.commitments import (
     get_commitment_progress,
     reconcile_commitment,
 )
-from django.db import transaction
+from core.services import CommitmentEditService, CommitmentRestartRequired
 from core.api.helpers import _bool, _coerce_list, _compact, _err, _iso_value, _json_ok
 
 
@@ -183,11 +183,6 @@ def _validate_commitment_rules(aggregation_type, rules):
             )
 
 
-def _apply_commitment_rules(commitment, rules):
-    for field, objects in rules.items():
-        getattr(commitment, field).set(objects)
-
-
 def _commitment_target_value(data, require=True):
     value = data.get("target_value")
     if value is None and isinstance(data.get("target"), (int, float)):
@@ -292,9 +287,22 @@ def commitments(request):
     except (TypeError, ValueError, ValidationError) as exc:
         return _err(str(exc))
 
-    with transaction.atomic():
-        commitment.save()
-        _apply_commitment_rules(commitment, rules)
+    definition = {
+        "aggregation_type": aggregation_type,
+        aggregation_type: target,
+        "commitment_type": commitment.commitment_type,
+        "period": commitment.period,
+        "start_date": commitment.start_date,
+        "target": commitment.target,
+        "banking_enabled": commitment.banking_enabled,
+        "max_balance": commitment.max_balance,
+        "min_balance": commitment.min_balance,
+        **rules,
+    }
+    try:
+        commitment = CommitmentEditService.create(request.user, definition)
+    except (TypeError, ValueError, ValidationError) as exc:
+        return _err(str(exc))
     return Response(
         _json_ok(
             {"commitment": _serialize_commitment(commitment, compact=False)},
@@ -336,10 +344,11 @@ def commitment_detail(request, commitment_id):
         )
 
     data = request.data
-    if "aggregation_type" in data or "target_name" in data or (
-        isinstance(data.get("target"), str)
-    ):
-        return _err("Changing aggregation_type or target is not allowed.")
+    if "target_name" in data or isinstance(data.get("target"), str):
+        fields = [field for field in ("target_name", "target") if field in data]
+        return _err(
+            f"Changing {', '.join(fields)} requires the restart operation."
+        )
     allowed_fields = {
         "commitment_type",
         "period",
@@ -350,26 +359,35 @@ def commitment_detail(request, commitment_id):
         "active",
     }
     try:
+        changes = {}
         for field in allowed_fields.intersection(data.keys()):
             value = data[field]
             if field == "start_date":
                 value = date.fromisoformat(value)
             elif field in {"banking_enabled", "active"}:
                 value = _bool(value)
-            setattr(commitment, field, value)
+            changes[field] = value
+        if "aggregation_type" in data:
+            changes["aggregation_type"] = data["aggregation_type"]
         target_value = _commitment_target_value(data, require=False)
         if target_value is not None:
-            commitment.target = target_value
+            changes["target"] = target_value
         rules = _resolve_commitment_rules(request.user, data, existing=commitment)
         _validate_commitment_rules(commitment.aggregation_type, rules)
-        _validate_commitment_balances(commitment)
-        commitment.full_clean()
-    except (TypeError, ValueError, ValidationError) as exc:
+        for field in _COMMITMENT_RULE_MODELS:
+            if field in data:
+                changes[field] = rules[field]
+        min_balance = changes.get("min_balance", commitment.min_balance)
+        max_balance = changes.get("max_balance", commitment.max_balance)
+        if min_balance > max_balance:
+            raise ValidationError("Min balance cannot be greater than max balance.")
+        if min_balance > 0:
+            raise ValidationError("Min balance must be zero or negative.")
+        commitment = CommitmentEditService.edit(
+            commitment.pk, user=request.user, changes=changes
+        )
+    except (TypeError, ValueError, ValidationError, CommitmentRestartRequired) as exc:
         return _err(str(exc))
-
-    with transaction.atomic():
-        commitment.save()
-        _apply_commitment_rules(commitment, rules)
     return Response(
         _json_ok(
             {"commitment": _serialize_commitment(commitment, compact=False)},

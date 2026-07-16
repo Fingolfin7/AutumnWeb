@@ -87,9 +87,10 @@ class CommitmentApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["commitment"]["target"], 240)
+        self.assertEqual(response.json()["commitment"]["target"], 120)
         commitment.refresh_from_db()
-        self.assertEqual(commitment.target, 240)
+        self.assertEqual(commitment.target, 120)
+        self.assertEqual(commitment.revisions.get(status="pending").target_value, 240)
 
     def test_delete_commitment(self):
         commitment = Commitment.objects.create(user=self.user, project=self.project, target=120)
