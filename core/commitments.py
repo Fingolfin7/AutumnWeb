@@ -689,8 +689,6 @@ def recompute_commitment(commitment: Commitment) -> bool:
     events.sort(key=lambda event: (event[0], event[1], event[2]))
 
     running = 0
-    last_initialized = 0
-    latest_balance_out = None
     for _, event_type, _, event in events:
         if event_type == 0:
             if event.kind in {
@@ -698,7 +696,6 @@ def recompute_commitment(commitment: Commitment) -> bool:
                 CommitmentAdjustment.KIND_RESTART_CARRY,
             }:
                 running = event.amount
-                last_initialized = event.amount
             else:
                 running += event.amount
             continue
@@ -728,11 +725,10 @@ def recompute_commitment(commitment: Commitment) -> bool:
         if row_updates:
             event.save(update_fields=row_updates)
             derived_changed = True
-        latest_balance_out = running
-
-    locked.balance = (
-        latest_balance_out if latest_balance_out is not None else last_initialized
-    )
+    # Manual adjustments are effective immediately and remain unclamped until a
+    # period-close event. ``running`` is therefore the authoritative post-replay
+    # balance even when the final event is an adjustment.
+    locked.balance = running
     locked.needs_recompute = False
     locked.save(update_fields=["balance", "needs_recompute"])
 

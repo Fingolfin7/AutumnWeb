@@ -127,8 +127,11 @@ class CommitmentEditService:
     def create(user, definition):
         definition = _normalize_changes(definition)
         now = timezone.now()
-        timezone_name = _profile_timezone(user)
-        zone = ZoneInfo(timezone_name)
+        timezone_name = definition.get("timezone", _profile_timezone(user))
+        try:
+            zone = ZoneInfo(timezone_name)
+        except (ZoneInfoNotFoundError, ValueError, TypeError) as exc:
+            raise ValidationError("timezone must be a valid IANA timezone.") from exc
 
         aggregation_type = definition.get("aggregation_type", "project")
         scalar = {
@@ -294,6 +297,14 @@ class CommitmentEditService:
         )
         now = timezone.now()
         prior_generation = commitment.generation
+        current_revision = (
+            commitment.revisions.filter(
+                generation=prior_generation,
+                status=CommitmentRevision.STATUS_ACTIVE,
+            )
+            .order_by("-effective_from_instant", "-pk")
+            .first()
+        )
 
         commitment.revisions.filter(
             status=CommitmentRevision.STATUS_PENDING
@@ -348,7 +359,10 @@ class CommitmentEditService:
                 _validate_owned(values, user, field)
                 getattr(commitment, field).set(values)
 
-        timezone_name = changes.get("timezone", _profile_timezone(user))
+        timezone_name = changes.get(
+            "timezone",
+            current_revision.timezone if current_revision else _profile_timezone(user),
+        )
         try:
             ZoneInfo(timezone_name)
         except (ZoneInfoNotFoundError, ValueError, TypeError) as exc:

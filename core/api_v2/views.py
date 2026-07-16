@@ -19,6 +19,7 @@ from core.api_v2.serializers import (
     ContextListResponseSerializer,
     ContextResourceSerializer,
     ContextWriteRequestSerializer,
+    CommitmentHistoryWarningSerializer,
     MeSerializer,
     ProjectCreateRequestSerializer,
     ProjectDetailResourceSerializer,
@@ -45,7 +46,8 @@ from core.api_v2.serializers import (
     TimerStartRequestSerializer,
     TimerStopRequestSerializer,
 )
-from core.models import Context, Projects, Sessions, SubProjects, Tag
+from core.commitments import mutation_affects_ledger
+from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
 from core.services import (
     DestructiveMutationService,
     DestructiveOperationError,
@@ -110,6 +112,20 @@ def _check_version(request, session):
     if expected is not None and expected != session.version:
         return _version_conflict(session)
     return None
+
+
+def _commitment_history_unaffected(user, instants):
+    commitments = list(Commitment.objects.filter(user=user, active=True))
+    touched = [instant for instant in instants if instant is not None]
+    return bool(
+        commitments
+        and touched
+        and all(
+            not mutation_affects_ledger(commitment, instant)
+            for commitment in commitments
+            for instant in touched
+        )
+    )
 
 
 def _validate_not_future(value, field_name):
@@ -330,6 +346,7 @@ class MeView(V2APIView):
                     "contexts",
                     "tags",
                     "reports",
+                    "commitments",
                 ],
                 "user": {
                     "id": request.user.id,
@@ -875,6 +892,10 @@ class SessionDetailView(V2APIView):
             raise ValidationError({"end": ["End must be on or after start."]})
         if end_time is not None:
             _validate_not_future(end_time, "end")
+        history_unaffected = _commitment_history_unaffected(
+            request.user,
+            (session.start_time, session.end_time, start_time, end_time),
+        )
         session = SessionMutationService.mutate_session(
             session.pk,
             user=request.user,
@@ -888,12 +909,18 @@ class SessionDetailView(V2APIView):
             auto_stop_at=None if "end" in data else UNSET,
             note=data["note"] if "note" in data else UNSET,
         )
-        return Response(_serialize(session), status=status.HTTP_200_OK)
+        payload = _serialize(session)
+        if history_unaffected:
+            payload["commitment_history_unaffected"] = True
+        return Response(payload, status=status.HTTP_200_OK)
 
     @extend_schema(
         request=None,
         parameters=[IF_MATCH_PARAMETER],
-        responses={204: OpenApiResponse(description="Session deleted.")},
+        responses={
+            200: CommitmentHistoryWarningSerializer,
+            204: OpenApiResponse(description="Session deleted."),
+        },
     )
     def delete(self, request, session_id):
         session = (
@@ -906,7 +933,12 @@ class SessionDetailView(V2APIView):
         conflict = _check_version(request, session)
         if conflict is not None:
             return conflict
+        history_unaffected = _commitment_history_unaffected(
+            request.user, (session.start_time, session.end_time)
+        )
         SessionMutationService.delete_session(session.pk, user=request.user)
+        if history_unaffected:
+            return Response({"commitment_history_unaffected": True})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

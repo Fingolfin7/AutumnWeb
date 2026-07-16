@@ -56,6 +56,7 @@ class V2EndpointTests(TestCase):
                     "contexts",
                     "tags",
                     "reports",
+                    "commitments",
                 ],
                 "user": {
                     "id": self.user.id,

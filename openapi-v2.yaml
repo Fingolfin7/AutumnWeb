@@ -3,6 +3,243 @@ info:
   title: Autumn API v2
   version: 2.0.0
 paths:
+  /api/v2/commitments/:
+    get:
+      operationId: commitments_list
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentListResponse'
+          description: ''
+    post:
+      operationId: commitments_create
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommitmentCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommitmentCreateRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
+  /api/v2/commitments/{commitment_id}:
+    get:
+      operationId: commitments_retrieve
+      parameters:
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
+    patch:
+      operationId: commitments_partial_update
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer commitment version.
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCommitmentChangesRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCommitmentChangesRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCommitmentChangesRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
+    delete:
+      operationId: commitments_destroy
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer commitment version.
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Commitment deleted.
+  /api/v2/commitments/{commitment_id}/adjustments/:
+    post:
+      operationId: commitments_adjustments_create
+      parameters:
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentAdjustmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommitmentAdjustmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommitmentAdjustmentRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentAdjustmentResponse'
+          description: ''
+  /api/v2/commitments/{commitment_id}/periods/:
+    get:
+      operationId: commitments_periods_list
+      parameters:
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: generation
+        schema:
+          type: integer
+          minimum: 1
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentPeriodListResponse'
+          description: ''
+  /api/v2/commitments/{commitment_id}/restart/:
+    post:
+      operationId: commitments_restart
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer commitment version.
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentRestartRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommitmentRestartRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommitmentRestartRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
   /api/v2/contexts/:
     get:
       operationId: contexts_list
@@ -908,6 +1145,12 @@ paths:
       - cookieAuth: []
       - tokenAuth: []
       responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentHistoryWarning'
+          description: ''
         '204':
           description: Session deleted.
   /api/v2/subprojects/{subproject_id}:
@@ -1251,6 +1494,18 @@ paths:
           description: ''
 components:
   schemas:
+    AggregationTypeEnum:
+      enum:
+      - project
+      - subproject
+      - context
+      - tag
+      type: string
+      description: |-
+        * `project` - project
+        * `subproject` - subproject
+        * `context` - context
+        * `tag` - tag
     AllocationModeEnum:
       enum:
       - legacy_full
@@ -1304,6 +1559,461 @@ components:
           type: string
         weight:
           type: integer
+    CommitmentAdjustmentRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+        reason:
+          type: string
+          default: ''
+      required:
+      - amount
+    CommitmentAdjustmentResponse:
+      type: object
+      properties:
+        seq:
+          type: integer
+        amount:
+          type: integer
+        effective_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        reason:
+          type: string
+        balance:
+          type: number
+          format: double
+      required:
+      - amount
+      - balance
+      - effective_at
+      - reason
+      - seq
+    CommitmentChangesRequest:
+      type: object
+      properties:
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_id:
+          type: integer
+          minimum: 1
+        context_id:
+          type: integer
+          minimum: 1
+        tag_id:
+          type: integer
+          minimum: 1
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+          maxLength: 64
+        target_value:
+          type: integer
+          minimum: 1
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: integer
+        min_balance:
+          type: integer
+        active:
+          type: boolean
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+    CommitmentCreateRequest:
+      type: object
+      properties:
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_id:
+          type: integer
+          minimum: 1
+        context_id:
+          type: integer
+          minimum: 1
+        tag_id:
+          type: integer
+          minimum: 1
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+          maxLength: 64
+        target_value:
+          type: integer
+          minimum: 1
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: integer
+        min_balance:
+          type: integer
+        active:
+          type: boolean
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - aggregation_type
+      - target_value
+    CommitmentCurrentPeriod:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        accrued:
+          type: number
+          format: double
+        target:
+          type: number
+          format: double
+        met:
+          type: boolean
+      required:
+      - accrued
+      - end
+      - met
+      - start
+      - target
+    CommitmentFilters:
+      type: object
+      properties:
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+      required:
+      - exclude_context_ids
+      - exclude_project_ids
+      - exclude_subproject_ids
+      - exclude_tag_ids
+      - include_context_ids
+      - include_project_ids
+      - include_subproject_ids
+      - include_tag_ids
+    CommitmentHistoryWarning:
+      type: object
+      properties:
+        commitment_history_unaffected:
+          type: boolean
+      required:
+      - commitment_history_unaffected
+    CommitmentListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        commitments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommitmentResource'
+      required:
+      - commitments
+      - count
+    CommitmentPendingRevision:
+      type: object
+      properties:
+        effective_from:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        changes:
+          type: object
+          additionalProperties: {}
+      required:
+      - changes
+      - effective_from
+    CommitmentPeriod:
+      type: object
+      properties:
+        generation:
+          type: integer
+        period_start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        period_end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        accrued:
+          type: number
+          format: double
+        session_count:
+          type: integer
+        carryover_in:
+          type: number
+          format: double
+        balance_out:
+          type: number
+          format: double
+        closed_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        revision_id:
+          type: integer
+      required:
+      - accrued
+      - balance_out
+      - carryover_in
+      - closed_at
+      - generation
+      - period_end
+      - period_start
+      - revision_id
+      - session_count
+    CommitmentPeriodListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        total:
+          type: integer
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommitmentPeriod'
+      required:
+      - count
+      - periods
+      - total
+    CommitmentResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        version:
+          type: integer
+        active:
+          type: boolean
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        target:
+          $ref: '#/components/schemas/CommitmentTarget'
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+        generation:
+          type: integer
+        target_value:
+          type: number
+          format: double
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: number
+          format: double
+        min_balance:
+          type: number
+          format: double
+        balance:
+          type: number
+          format: double
+        filters:
+          $ref: '#/components/schemas/CommitmentFilters'
+        current_period:
+          $ref: '#/components/schemas/CommitmentCurrentPeriod'
+        pending_revision:
+          allOf:
+          - $ref: '#/components/schemas/CommitmentPendingRevision'
+          nullable: true
+        ledger_start_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+      required:
+      - active
+      - aggregation_type
+      - balance
+      - banking_enabled
+      - commitment_type
+      - current_period
+      - filters
+      - generation
+      - id
+      - ledger_start_at
+      - max_balance
+      - min_balance
+      - pending_revision
+      - period
+      - start_date
+      - target
+      - target_value
+      - timezone
+      - version
+    CommitmentRestartRequest:
+      type: object
+      properties:
+        keep_balance:
+          type: boolean
+        changes:
+          $ref: '#/components/schemas/CommitmentChangesRequest'
+      required:
+      - keep_balance
+    CommitmentTarget:
+      type: object
+      properties:
+        kind:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - kind
+      - name
+    CommitmentTypeEnum:
+      enum:
+      - time
+      - sessions
+      type: string
+      description: |-
+        * `time` - time
+        * `sessions` - sessions
     ContextListResponse:
       type: object
       properties:
@@ -1388,6 +2098,84 @@ components:
       required:
       - id
       - name
+    PatchedCommitmentChangesRequest:
+      type: object
+      properties:
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_id:
+          type: integer
+          minimum: 1
+        context_id:
+          type: integer
+          minimum: 1
+        tag_id:
+          type: integer
+          minimum: 1
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+          maxLength: 64
+        target_value:
+          type: integer
+          minimum: 1
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: integer
+        min_balance:
+          type: integer
+        active:
+          type: boolean
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
     PatchedContextWriteRequest:
       type: object
       properties:
@@ -1461,6 +2249,22 @@ components:
           type: string
           nullable: true
           maxLength: 20
+    PeriodEnum:
+      enum:
+      - daily
+      - weekly
+      - fortnightly
+      - monthly
+      - quarterly
+      - yearly
+      type: string
+      description: |-
+        * `daily` - daily
+        * `weekly` - weekly
+        * `fortnightly` - fortnightly
+        * `monthly` - monthly
+        * `quarterly` - quarterly
+        * `yearly` - yearly
     ProjectCreateRequest:
       type: object
       properties:
@@ -1792,6 +2596,8 @@ components:
         note:
           type: string
           nullable: true
+        commitment_history_unaffected:
+          type: boolean
       required:
       - active
       - allocation_mode

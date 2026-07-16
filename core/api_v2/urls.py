@@ -19,6 +19,13 @@ from core.api_v2.views import (
     TagDetailView,
     TagsView,
 )
+from core.api_v2.commitments import (
+    CommitmentAdjustmentsView,
+    CommitmentDetailView,
+    CommitmentPeriodsView,
+    CommitmentRestartView,
+    CommitmentsView,
+)
 from core.api_v2.reports import (
     ReportChartsView,
     ReportHierarchyView,
@@ -31,6 +38,27 @@ app_name = "api_v2"
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
+    path("commitments/", CommitmentsView.as_view(), name="commitments"),
+    path(
+        "commitments/<int:commitment_id>",
+        CommitmentDetailView.as_view(),
+        name="commitment-detail",
+    ),
+    path(
+        "commitments/<int:commitment_id>/restart/",
+        CommitmentRestartView.as_view(),
+        name="commitment-restart",
+    ),
+    path(
+        "commitments/<int:commitment_id>/adjustments/",
+        CommitmentAdjustmentsView.as_view(),
+        name="commitment-adjustments",
+    ),
+    path(
+        "commitments/<int:commitment_id>/periods/",
+        CommitmentPeriodsView.as_view(),
+        name="commitment-periods",
+    ),
     path("contexts/", ContextsView.as_view(), name="contexts"),
     path(
         "contexts/<int:context_id>",

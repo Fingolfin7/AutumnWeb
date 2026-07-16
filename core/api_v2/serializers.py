@@ -74,6 +74,7 @@ class SessionResourceSerializer(serializers.Serializer):
     duration_minutes = serializers.SerializerMethodField()
     elapsed_minutes = serializers.SerializerMethodField()
     note = serializers.CharField(allow_null=True, required=False)
+    commitment_history_unaffected = serializers.BooleanField(required=False)
 
     @extend_schema_field(SubprojectAllocationSerializer(many=True))
     def get_subproject_allocations(self, session):
@@ -172,6 +173,10 @@ class SessionListResponseSerializer(serializers.Serializer):
     sessions = SessionResourceSerializer(many=True)
 
 
+class CommitmentHistoryWarningSerializer(serializers.Serializer):
+    commitment_history_unaffected = serializers.BooleanField()
+
+
 class SessionListQuerySerializer(serializers.Serializer):
     limit = serializers.IntegerField(required=False, default=100, min_value=1, max_value=500)
     offset = serializers.IntegerField(required=False, default=0, min_value=0)
@@ -187,6 +192,205 @@ class SessionListQuerySerializer(serializers.Serializer):
     end_date = serializers.DateField(required=False)
     active = serializers.BooleanField(required=False)
     note_snippet = serializers.CharField(required=False)
+
+
+COMMITMENT_AGGREGATION_CHOICES = ("project", "subproject", "context", "tag")
+COMMITMENT_TYPE_CHOICES = ("time", "sessions")
+COMMITMENT_PERIOD_CHOICES = (
+    "daily",
+    "weekly",
+    "fortnightly",
+    "monthly",
+    "quarterly",
+    "yearly",
+)
+
+
+class CommitmentChangesRequestSerializer(serializers.Serializer):
+    aggregation_type = serializers.ChoiceField(
+        required=False, choices=COMMITMENT_AGGREGATION_CHOICES
+    )
+    project_id = serializers.IntegerField(required=False, min_value=1)
+    subproject_id = serializers.IntegerField(required=False, min_value=1)
+    context_id = serializers.IntegerField(required=False, min_value=1)
+    tag_id = serializers.IntegerField(required=False, min_value=1)
+    commitment_type = serializers.ChoiceField(
+        required=False, choices=COMMITMENT_TYPE_CHOICES
+    )
+    period = serializers.ChoiceField(
+        required=False, choices=COMMITMENT_PERIOD_CHOICES
+    )
+    start_date = serializers.DateField(required=False)
+    timezone = serializers.CharField(required=False, max_length=64)
+    target_value = serializers.IntegerField(required=False, min_value=1)
+    banking_enabled = serializers.BooleanField(required=False)
+    max_balance = serializers.IntegerField(required=False)
+    min_balance = serializers.IntegerField(required=False)
+    active = serializers.BooleanField(required=False)
+    include_project_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    exclude_project_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    include_subproject_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    exclude_subproject_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    include_context_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    exclude_context_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    include_tag_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+    exclude_tag_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1), required=False
+    )
+
+    def validate(self, attrs):
+        target_fields = (
+            "project_id",
+            "subproject_id",
+            "context_id",
+            "tag_id",
+        )
+        supplied = [field for field in target_fields if field in attrs]
+        if len(supplied) > 1:
+            raise serializers.ValidationError(
+                "Specify at most one commitment target ID."
+            )
+        return attrs
+
+
+class CommitmentCreateRequestSerializer(CommitmentChangesRequestSerializer):
+    aggregation_type = serializers.ChoiceField(
+        choices=COMMITMENT_AGGREGATION_CHOICES
+    )
+    target_value = serializers.IntegerField(min_value=1)
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        expected = f"{attrs['aggregation_type']}_id"
+        target_fields = (
+            "project_id",
+            "subproject_id",
+            "context_id",
+            "tag_id",
+        )
+        supplied = [field for field in target_fields if field in attrs]
+        if supplied != [expected]:
+            raise serializers.ValidationError(
+                f"Exactly one target ID is required and it must be '{expected}'."
+            )
+        return attrs
+
+
+class CommitmentRestartRequestSerializer(serializers.Serializer):
+    keep_balance = serializers.BooleanField()
+    changes = CommitmentChangesRequestSerializer(required=False, default=dict)
+
+
+class CommitmentAdjustmentRequestSerializer(serializers.Serializer):
+    amount = serializers.IntegerField()
+    reason = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class CommitmentPeriodsQuerySerializer(serializers.Serializer):
+    generation = serializers.IntegerField(required=False, min_value=1)
+    limit = serializers.IntegerField(
+        required=False, default=100, min_value=1, max_value=500
+    )
+    offset = serializers.IntegerField(required=False, default=0, min_value=0)
+
+
+class CommitmentTargetSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+
+
+class CommitmentFiltersSerializer(serializers.Serializer):
+    include_project_ids = serializers.ListField(child=serializers.IntegerField())
+    exclude_project_ids = serializers.ListField(child=serializers.IntegerField())
+    include_subproject_ids = serializers.ListField(child=serializers.IntegerField())
+    exclude_subproject_ids = serializers.ListField(child=serializers.IntegerField())
+    include_context_ids = serializers.ListField(child=serializers.IntegerField())
+    exclude_context_ids = serializers.ListField(child=serializers.IntegerField())
+    include_tag_ids = serializers.ListField(child=serializers.IntegerField())
+    exclude_tag_ids = serializers.ListField(child=serializers.IntegerField())
+
+
+class CommitmentCurrentPeriodSerializer(serializers.Serializer):
+    start = UTCDateTimeField()
+    end = UTCDateTimeField()
+    accrued = serializers.FloatField()
+    target = serializers.FloatField()
+    met = serializers.BooleanField()
+
+
+class CommitmentPendingRevisionSerializer(serializers.Serializer):
+    effective_from = UTCDateTimeField()
+    changes = serializers.DictField()
+
+
+class CommitmentResourceSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    version = serializers.IntegerField()
+    active = serializers.BooleanField()
+    aggregation_type = serializers.ChoiceField(
+        choices=COMMITMENT_AGGREGATION_CHOICES
+    )
+    target = CommitmentTargetSerializer()
+    commitment_type = serializers.ChoiceField(choices=COMMITMENT_TYPE_CHOICES)
+    period = serializers.ChoiceField(choices=COMMITMENT_PERIOD_CHOICES)
+    start_date = serializers.DateField()
+    timezone = serializers.CharField()
+    generation = serializers.IntegerField()
+    target_value = serializers.FloatField()
+    banking_enabled = serializers.BooleanField()
+    max_balance = serializers.FloatField()
+    min_balance = serializers.FloatField()
+    balance = serializers.FloatField()
+    filters = CommitmentFiltersSerializer()
+    current_period = CommitmentCurrentPeriodSerializer()
+    pending_revision = CommitmentPendingRevisionSerializer(allow_null=True)
+    ledger_start_at = UTCDateTimeField()
+
+
+class CommitmentListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    commitments = CommitmentResourceSerializer(many=True)
+
+
+class CommitmentAdjustmentResponseSerializer(serializers.Serializer):
+    seq = serializers.IntegerField()
+    amount = serializers.IntegerField()
+    effective_at = UTCDateTimeField()
+    reason = serializers.CharField()
+    balance = serializers.FloatField()
+
+
+class CommitmentPeriodSerializer(serializers.Serializer):
+    generation = serializers.IntegerField()
+    period_start = UTCDateTimeField()
+    period_end = UTCDateTimeField()
+    accrued = serializers.FloatField()
+    session_count = serializers.IntegerField()
+    carryover_in = serializers.FloatField()
+    balance_out = serializers.FloatField()
+    closed_at = UTCDateTimeField()
+    revision_id = serializers.IntegerField()
+
+
+class CommitmentPeriodListResponseSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    total = serializers.IntegerField()
+    periods = CommitmentPeriodSerializer(many=True)
 
 
 class NamedResourceSerializer(serializers.Serializer):
