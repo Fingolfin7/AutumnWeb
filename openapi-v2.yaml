@@ -332,6 +332,110 @@ paths:
       responses:
         '204':
           description: Context deleted.
+  /api/v2/export/:
+    get:
+      operationId: export_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: boolean
+      - in: query
+        name: compress
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      tags:
+      - export
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Format2Document'
+          description: ''
+  /api/v2/import/:
+    post:
+      operationId: import_create
+      tags:
+      - import
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSummary'
+          description: ''
   /api/v2/me/:
     get:
       operationId: me_retrieve
@@ -2064,6 +2168,136 @@ components:
         description:
           type: string
           nullable: true
+    Format2Document:
+      type: object
+      properties:
+        format:
+          type: integer
+          maximum: 2
+          minimum: 2
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Project'
+      required:
+      - format
+      - projects
+    Format2Link:
+      type: object
+      properties:
+        subproject:
+          type: string
+        allocation_bp:
+          type: integer
+          maximum: 10000
+          minimum: 1
+      required:
+      - allocation_bp
+      - subproject
+    Format2Project:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        description:
+          type: string
+        context:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        start_date:
+          type: string
+          format: date-time
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Subproject'
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Session'
+      required:
+      - context
+      - description
+      - name
+      - sessions
+      - start_date
+      - status
+      - subprojects
+      - tags
+    Format2Session:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          nullable: true
+        allocation_mode:
+          $ref: '#/components/schemas/AllocationModeEnum'
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        note:
+          type: string
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Link'
+      required:
+      - allocation_mode
+      - end
+      - links
+      - note
+      - start
+    Format2Subproject:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - name
+    ImportRequest:
+      type: object
+      properties:
+        data: {}
+        force:
+          type: boolean
+          default: false
+      required:
+      - data
+    ImportSummary:
+      type: object
+      properties:
+        projects_created:
+          type: integer
+        projects_updated:
+          type: integer
+        sessions_imported:
+          type: integer
+        sessions_skipped:
+          type: integer
+        conflicts:
+          type: array
+          items:
+            type: string
+      required:
+      - conflicts
+      - projects_created
+      - projects_updated
+      - sessions_imported
+      - sessions_skipped
     KindEnum:
       enum:
       - subproject

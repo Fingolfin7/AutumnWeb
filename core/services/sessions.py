@@ -5,7 +5,7 @@ from datetime import datetime
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from core.models import Commitment, Sessions
+from core.models import Commitment, Sessions, SessionSubproject
 UNSET = object()
 
 
@@ -38,22 +38,72 @@ def _validate_buckets(session, subprojects):
         )
 
 
+def _set_allocations(session, allocations):
+    SessionSubproject.objects.filter(session=session).delete()
+    SessionSubproject.objects.bulk_create(
+        [
+            SessionSubproject(
+                session=session,
+                subproject=subproject,
+                allocation_bp=allocation_bp,
+            )
+            for subproject, allocation_bp in allocations
+        ]
+    )
+
+
+def _validate_allocations(session, allocations):
+    subproject_ids = [subproject.pk for subproject, _ in allocations]
+    if len(subproject_ids) != len(set(subproject_ids)):
+        raise ValidationError("Session allocations must have unique subprojects.")
+    invalid_bp = [
+        allocation_bp
+        for _, allocation_bp in allocations
+        if (
+            isinstance(allocation_bp, bool)
+            or not isinstance(allocation_bp, int)
+            or not 1 <= allocation_bp <= 10000
+        )
+    ]
+    if invalid_bp:
+        raise ValidationError("Session allocations must be from 1 to 10000 basis points.")
+    if session.allocation_mode == "legacy_full" and any(
+        allocation_bp != 10000 for _, allocation_bp in allocations
+    ):
+        raise ValidationError("legacy_full session allocations must equal 10000.")
+    if (
+        session.allocation_mode == "partitioned"
+        and sum(allocation_bp for _, allocation_bp in allocations) > 10000
+    ):
+        raise ValidationError("Partitioned session allocations must not exceed 10000.")
+
+
 class SessionMutationService:
     """The single atomic write path for session rows."""
 
     @staticmethod
     @transaction.atomic
-    def create_session(*, subprojects=(), **fields):
+    def create_session(*, subprojects=(), allocations=None, **fields):
         """Create a session."""
         session = Sessions(**fields)
-        subprojects = list(subprojects)
+        allocations = None if allocations is None else list(allocations)
+        subprojects = (
+            list(subprojects)
+            if allocations is None
+            else [subproject for subproject, _ in allocations]
+        )
         session.start_time = _floor_instant(session.start_time)
         session.end_time = _floor_instant(session.end_time)
         session.auto_stop_at = _floor_instant(session.auto_stop_at)
         _validate_buckets(session, subprojects)
+        if allocations is not None:
+            _validate_allocations(session, allocations)
         session.full_clean()
         session.save()
-        session.subprojects.set(subprojects)
+        if allocations is None:
+            session.subprojects.set(subprojects)
+        else:
+            _set_allocations(session, allocations)
         _mark_commitments_dirty(session.user_id)
         return session
 
@@ -70,6 +120,8 @@ class SessionMutationService:
         auto_stop_at=UNSET,
         note=UNSET,
         is_active=UNSET,
+        allocation_mode=UNSET,
+        allocations=UNSET,
     ):
         """Edit an existing row in place."""
         queryset = Sessions.objects.select_for_update()
@@ -83,21 +135,30 @@ class SessionMutationService:
             "auto_stop_at": _floor_instant(auto_stop_at),
             "note": note,
             "is_active": is_active,
+            "allocation_mode": allocation_mode,
         }
         for field, value in updates.items():
             if value is not UNSET:
                 setattr(session, field, value)
 
-        final_subprojects = (
-            list(session.subprojects.all())
-            if subprojects is UNSET
-            else list(subprojects)
-        )
+        if allocations is not UNSET:
+            allocations = list(allocations)
+            final_subprojects = [subproject for subproject, _ in allocations]
+        else:
+            final_subprojects = (
+                list(session.subprojects.all())
+                if subprojects is UNSET
+                else list(subprojects)
+            )
         _validate_buckets(session, final_subprojects)
+        if allocations is not UNSET:
+            _validate_allocations(session, allocations)
         session.version = (session.version or 1) + 1
         session.full_clean()
         session.save()
-        if subprojects is not UNSET:
+        if allocations is not UNSET:
+            _set_allocations(session, allocations)
+        elif subprojects is not UNSET:
             session.subprojects.set(final_subprojects)
 
         _mark_commitments_dirty(session.user_id)

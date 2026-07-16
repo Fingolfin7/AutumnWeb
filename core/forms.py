@@ -399,6 +399,7 @@ class ExportJSONForm(forms.Form):
         )
     )
     autumn_compatible = forms.BooleanField(required=False, initial=False)
+    legacy_format = forms.BooleanField(required=False, initial=False)
     compress = forms.BooleanField(required=False, initial=False)
 
     def __init__(self, *args, **kwargs):

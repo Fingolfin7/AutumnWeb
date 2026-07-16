@@ -54,6 +54,11 @@ from core.services import (
     SessionMutationService,
     UNSET,
 )
+from core.session_canonical import (
+    canonical_existing_session,
+    canonical_instant,
+    canonical_session_content,
+)
 from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.utils import stop_expired_timers
 
@@ -164,39 +169,22 @@ def _resolve_subprojects(user, project, subproject_ids):
 
 
 def _canonical_instant(value):
-    if value is None:
-        return None
-    if timezone.is_naive(value):
-        value = value.replace(tzinfo=datetime_timezone.utc)
-    return value.astimezone(datetime_timezone.utc).replace(microsecond=0)
+    return canonical_instant(value)
 
 
 def _canonical_existing(session):
-    allocations = sorted(
-        {
-            (link.subproject.name, link.allocation_bp)
-            for link in session.subproject_links.select_related("subproject")
-        }
-    )
-    return (
-        session.project.name,
-        _canonical_instant(session.start_time),
-        _canonical_instant(session.end_time),
-        session.note or "",
-        session.allocation_mode,
-        tuple(allocations),
-    )
+    return canonical_existing_session(session)
 
 
 def _canonical_track_payload(project, subprojects, data):
     allocations = sorted({(subproject.name, 10000) for subproject in subprojects})
-    return (
+    return canonical_session_content(
         project.name,
-        _canonical_instant(data["start"]),
-        _canonical_instant(data["end"]),
+        data["start"],
+        data["end"],
         data.get("note") or "",
         "legacy_full",
-        tuple(allocations),
+        allocations,
     )
 
 
@@ -347,6 +335,8 @@ class MeView(V2APIView):
                     "tags",
                     "reports",
                     "commitments",
+                    "export",
+                    "import",
                 ],
                 "user": {
                     "id": request.user.id,

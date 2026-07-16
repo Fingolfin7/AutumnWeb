@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
 from core.models import Sessions
+from core.export2 import build_format2_export
 
 
 def stream_response(message):
@@ -154,6 +155,7 @@ def export_view(request):
         output_file = form.cleaned_data["output_file"]
         compress = form.cleaned_data["compress"]
         autumn_compatible = form.cleaned_data["autumn_compatible"]
+        legacy_format = form.cleaned_data["legacy_format"]
         start_date = form.cleaned_data["start_date"]
         end_date = form.cleaned_data["end_date"]
         context_id = form.cleaned_data.get("context")
@@ -213,7 +215,11 @@ def export_view(request):
         qs = qs.order_by("-end_time", "id")
 
         # build export dict
-        export_dict = build_project_json_from_sessions(qs, autumn_compatible)
+        export_dict = (
+            build_project_json_from_sessions(qs, autumn_compatible)
+            if legacy_format
+            else build_format2_export(qs)
+        )
 
         # finally serialize
         contents = (

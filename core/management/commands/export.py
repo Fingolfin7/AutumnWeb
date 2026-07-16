@@ -6,7 +6,8 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Prefetch
 from AutumnWeb import settings
-from core.models import Projects, SubProjects, Context, Tag
+from core.models import Projects, SubProjects, Context, Tag, Sessions
+from core.export2 import build_format2_export
 from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.utils import json_compress
 
@@ -20,6 +21,13 @@ class Command(BaseCommand):
         parser.add_argument('--project', type=str, help='Project name to export')
         parser.add_argument('--compress', action='store_true', help='Compress the output JSON file')
         parser.add_argument('--autumn_compatible', action='store_true', help='Print verbose output')
+        parser.add_argument(
+            '--format',
+            type=int,
+            choices=(1, 2),
+            default=2,
+            help='Export format version (default: 2)',
+        )
         parser.add_argument(
             '--context',
             type=str,
@@ -116,6 +124,16 @@ class Command(BaseCommand):
         autumn_compatible = options['autumn_compatible']
 
         project_data = {}
+
+        if options['format'] == 2:
+            project_data = build_format2_export(
+                Sessions.objects.filter(
+                    user=user,
+                    project_id__in=projects.values('id'),
+                    end_time__isnull=False,
+                )
+            )
+            projects = []
 
         for project in projects:
             # For each project, collect its details

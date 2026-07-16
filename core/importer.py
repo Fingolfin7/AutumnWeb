@@ -7,6 +7,7 @@ from django.utils import timezone
 from .models import Commitment, Projects, Sessions, SubProjects, status_choices
 from .services import DestructiveMutationService
 from .totals import derived_project_last_updated, derived_project_totals
+from .importer2 import import_format2
 from .utils import (
     apply_context_and_tags_to_project,
     session_exists,
@@ -14,7 +15,7 @@ from .utils import (
 )
 
 
-def iter_import(
+def _iter_import_format1(
     user,
     data: dict,
     *,
@@ -308,6 +309,42 @@ def iter_import(
         "sessions_imported": sessions_imported,
         "skipped": skipped,
     }
+
+
+def iter_import(
+    user,
+    data: dict,
+    *,
+    force=False,
+    merge=False,
+    tolerance=2,
+    verbose=False,
+    autumn_import=False,
+    import_into_context=None,
+):
+    """Detect the portable envelope while preserving legacy format-1 behavior."""
+    if isinstance(data, dict) and data.get("format") == 2:
+        yield "Validating format-2 import batch"
+        summary = import_format2(
+            user,
+            data,
+            force=force,
+            import_into_context=import_into_context,
+        )
+        yield "Import completed successfully!"
+        return summary
+    return (
+        yield from _iter_import_format1(
+            user,
+            data,
+            force=force,
+            merge=merge,
+            tolerance=tolerance,
+            verbose=verbose,
+            autumn_import=autumn_import,
+            import_into_context=import_into_context,
+        )
+    )
 
 
 def run_import(

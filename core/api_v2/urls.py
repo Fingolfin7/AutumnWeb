@@ -32,12 +32,15 @@ from core.api_v2.reports import (
     ReportTalliesView,
     ReportTotalsView,
 )
+from core.api_v2.import_export import ExportView, ImportView
 
 
 app_name = "api_v2"
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
+    path("export/", ExportView.as_view(), name="export"),
+    path("import/", ImportView.as_view(), name="import"),
     path("commitments/", CommitmentsView.as_view(), name="commitments"),
     path(
         "commitments/<int:commitment_id>",

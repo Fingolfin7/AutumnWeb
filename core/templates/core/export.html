@@ -89,6 +89,15 @@
             </span>
 
             <label>
+                Legacy format 1
+                <label class="switch">
+                    {{ form.legacy_format }}
+                    <span class="slider round"></span>
+                </label>
+                {{ form.legacy_format.errors }}
+            </label>
+
+            <label>
                 Autumn (CLI version) compatible
                 <label class="switch">
                     {{ form.autumn_compatible }}
