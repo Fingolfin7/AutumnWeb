@@ -79,10 +79,12 @@ class DestructiveMutationService:
 
         for session in project1.sessions.all():
             session.project = merged_project
-            session.save()
+            session.version = (session.version or 1) + 1
+            session.save(update_fields=["project", "version"])
         for session in project2.sessions.all():
             session.project = merged_project
-            session.save()
+            session.version = (session.version or 1) + 1
+            session.save(update_fields=["project", "version"])
 
         project1_subprojects = list(project1.subprojects.all())
         project2_subprojects = list(project2.subprojects.all())
@@ -236,6 +238,8 @@ class DestructiveMutationService:
                     for subproject, allocation_bp in allocations
                 ]
             )
+            session.version = (session.version or 1) + 1
+            session.save(update_fields=["version"])
 
         subproject1.delete()
         subproject2.delete()
