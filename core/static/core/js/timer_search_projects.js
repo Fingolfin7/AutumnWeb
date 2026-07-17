@@ -9,6 +9,7 @@ $(document).ready(function() {
     let stopAfterUnit = $('#stop-after-unit');
     let lastLoadedProject = '';
     let presetSelectionActive = false;
+    let projectIdsByName = {};
     const stopAfterPresets = {
         minutes: [
             {value: '15', label: '15m'},
@@ -100,12 +101,16 @@ $(document).ready(function() {
             url: ajax_url,
             type: 'GET',
             data: {
-                'search_term': value,
+                'search': value,
                 //'status': 'active'
             },
             dataType: 'json',
             success: function(data) {
-                let names = data.map(({name}) => name);
+                let projects = data.projects || [];
+                projects.forEach(({id, name}) => {
+                    projectIdsByName[name.toLowerCase()] = id;
+                });
+                let names = projects.map(({name}) => name);
                 $('#project-search').autocomplete({
                     appendTo: '#project-search-results',
                     source: names,
@@ -160,49 +165,88 @@ $(document).ready(function() {
         updateStartTimerSummary();
     });
 
+    function resolveProjectId(project_name) {
+        // Resolve a typed project name to its id (v2 routes are id-based).
+        let cached = projectIdsByName[project_name.toLowerCase()];
+        let deferred = $.Deferred();
+        if (cached !== undefined) {
+            return deferred.resolve(cached).promise();
+        }
+        $.ajax({
+            url: search.attr('data-ajax_url'),
+            type: 'GET',
+            data: {'search': project_name},
+            dataType: 'json',
+            success: function(data) {
+                let match = (data.projects || []).find(
+                    ({name}) => name.toLowerCase() === project_name.toLowerCase()
+                );
+                if (match) {
+                    projectIdsByName[match.name.toLowerCase()] = match.id;
+                    deferred.resolve(match.id);
+                } else {
+                    deferred.reject();
+                }
+            },
+            error: function() {
+                deferred.reject();
+            }
+        });
+        return deferred.promise();
+    }
+
     function fillSubprojects(project_name) {
-        let url = $('#list_subs').attr('data-ajax_url');
+        // data-ajax_url is the v2 route reversed with project_id=0;
+        // swap in the real id once the name resolves.
+        let urlTemplate = $('#list_subs').attr('data-ajax_url');
         if (project_name !== '') {
             lastLoadedProject = project_name;
             $('#pick-subprojects').show('slow');
             $('#select-all-block').show('slow');
             $('#subproject_options').html('<span class="subproject-empty-state">Loading...</span>');
 
-            $.ajax({
-                url: url,
-                data: {
-                    'project_name': project_name
-                },
-                dataType: 'json',
-                success: function(data) {
-                    if (data.length === 0) {
-                        $('#subproject_options').html('<span class="subproject-empty-state">No subprojects found.</span>');
-                        return;
-                    }
-
-                    let options = data.map(({name}, index) => {
-                        let optionId = `subproject-option-${index}`;
-                        return $('<span>', {class: 'subproject-option'}).append(
-                            $('<input>', {
-                                type: 'checkbox',
-                                name: 'subprojects',
-                                value: name,
-                                id: optionId
-                            }),
-                            $('<label>', {
-                                for: optionId,
-                                text: name
-                            })
-                        );
-                    });
-                    $('#subproject_options').empty().append(...options);
-                },
-                error: function() {
-                    lastLoadedProject = '';
-                    $('#subproject_options').html('<span class="subproject-empty-state">Could not load subprojects.</span>');
-                }
+            resolveProjectId(project_name).then(function(projectId) {
+                loadSubprojects(urlTemplate.replace('/0/', '/' + projectId + '/'));
+            }, function() {
+                lastLoadedProject = '';
+                $('#subproject_options').html('<span class="subproject-empty-state">Could not load subprojects.</span>');
             });
         }
+    }
+
+    function loadSubprojects(url) {
+        $.ajax({
+            url: url,
+            dataType: 'json',
+            success: function(data) {
+                let subprojects = data.subprojects || [];
+                if (subprojects.length === 0) {
+                    $('#subproject_options').html('<span class="subproject-empty-state">No subprojects found.</span>');
+                    return;
+                }
+
+                let options = subprojects.map(({name}, index) => {
+                    let optionId = `subproject-option-${index}`;
+                    return $('<span>', {class: 'subproject-option'}).append(
+                        $('<input>', {
+                            type: 'checkbox',
+                            name: 'subprojects',
+                            value: name,
+                            id: optionId
+                        }),
+                        $('<label>', {
+                            for: optionId,
+                            text: name
+                        })
+                    );
+                });
+                $('#subproject_options').empty().append(...options);
+            },
+            error: function() {
+                lastLoadedProject = '';
+                $('#subproject_options').html('<span class="subproject-empty-state">Could not load subprojects.</span>');
+            }
+        });
     }
 
     updateStartTimerSummary();

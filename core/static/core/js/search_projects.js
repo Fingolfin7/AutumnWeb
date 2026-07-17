@@ -13,12 +13,12 @@ $(document).ready(function() {
             url: ajax_url,
             type: 'GET',
             data: {
-                'search_term': value,
+                'search': value,
                 //'status': 'active'
             },
             dataType: 'json',
             success: function(data){
-                let names = data.map(({name}) => name);
+                let names = (data.projects || []).map(({name}) => name);
                 $("#project-search").autocomplete({
                     appendTo: '#project-search-results',
                     source: names,
