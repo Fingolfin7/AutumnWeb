@@ -47,13 +47,15 @@ def fix_ambiguous_time(form, field_name, raw_time):
 
 @login_required
 @transaction.atomic
-def update_session(request, session_id: int):
+def update_session(request, session_id: int = None, session_uuid=None):
     """
     Allow user to change session details, including project, subprojects, start time, end time, and note.
-    Updates the existing session so its ID remains a stable reference.
+    Reachable by integer id or by uuid; the uuid form survives export/re-import
+    cycles, so it can be used as a stable external link.
     """
+    lookup = {"id": session_id} if session_uuid is None else {"uuid": session_uuid}
     current_session = get_object_or_404(
-        Sessions.objects.select_for_update(), id=session_id, user=request.user
+        Sessions.objects.select_for_update(), user=request.user, **lookup
     )
 
     if request.method == "POST":

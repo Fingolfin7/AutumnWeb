@@ -239,6 +239,7 @@ class SessionListQuerySerializer(serializers.Serializer):
     end_date = serializers.DateField(required=False)
     active = serializers.BooleanField(required=False)
     note_snippet = serializers.CharField(required=False)
+    uuid = serializers.UUIDField(required=False)
 
 
 COMMITMENT_AGGREGATION_CHOICES = ("project", "subproject", "context", "tag")

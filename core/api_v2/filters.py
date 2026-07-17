@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from uuid import UUID
 
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
@@ -20,6 +21,7 @@ class SessionFilterSpec:
     end_date: date | None = None
     active: bool | None = None
     note_snippet: str | None = None
+    uuid: UUID | None = None
 
     @classmethod
     def from_query_params(cls, qp, user):
@@ -81,6 +83,15 @@ class SessionFilterSpec:
         raw_note = qp.get("note_snippet")
         values["note_snippet"] = raw_note if raw_note not in (None, "") else None
 
+        raw_uuid = qp.get("uuid")
+        if raw_uuid in (None, ""):
+            values["uuid"] = None
+        else:
+            try:
+                values["uuid"] = UUID(str(raw_uuid))
+            except (TypeError, ValueError):
+                errors["uuid"] = ["Enter a valid UUID."]
+
         if (
             values.get("start_date") is not None
             and values.get("end_date") is not None
@@ -108,9 +119,13 @@ class SessionFilterSpec:
         if self.exclude_tag_ids is not None:
             queryset = queryset.exclude(project__tags__id__in=self.exclude_tag_ids)
         if self.active is not None:
-            queryset = queryset.filter(is_active=self.active)
+            # is_active became a derived property in S12; end_time is the
+            # database truth (active == no end_time yet).
+            queryset = queryset.filter(end_time__isnull=self.active)
         if self.note_snippet is not None:
             queryset = queryset.filter(note__icontains=self.note_snippet)
+        if self.uuid is not None:
+            queryset = queryset.filter(uuid=self.uuid)
 
         current_timezone = timezone.get_current_timezone()
         if self.start_date is not None:

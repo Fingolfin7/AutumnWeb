@@ -1140,6 +1140,11 @@ paths:
         schema:
           type: string
           minLength: 1
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
       tags:
       - sessions
       security:

@@ -205,6 +205,17 @@ class UpdateSessionTests(TestCase):
             derived_subproject_total(self.user, self.subproject2), 90.0, places=2
         )
 
+    def test_session_is_reachable_by_uuid(self):
+        # The uuid survives export/re-import, so the uuid URL is a stable
+        # external link even when the integer pk changes.
+        by_uuid = reverse("update_session", args=[self.session.uuid])
+        self.assertIn(str(self.session.uuid), by_uuid)
+
+        response = self.client.get(by_uuid)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.project.name)
+
     def test_repeated_save_of_completed_session_is_idempotent(self):
         self.session.note = "Only the note changed"
         self.session.save()

@@ -225,6 +225,60 @@ class SessionFilterSpecTests(TestCase):
             [included],
         )
 
+    def test_active_filter_is_applied_at_the_endpoint(self):
+        # Regression: is_active became a derived property in S12; the filter
+        # must translate to end_time__isnull instead of raising FieldError.
+        end = timezone.now().replace(microsecond=0)
+        completed = SessionMutationService.create_session(
+            user=self.user,
+            project=self.project,
+            start_time=end - timedelta(minutes=30),
+            end_time=end,
+        )
+        running = SessionMutationService.create_session(
+            user=self.user,
+            project=self.project,
+            start_time=end - timedelta(minutes=5),
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.user)
+        # The sessions endpoint is the completed log, so active=true is
+        # vacuously empty; the regression is a FieldError 500 on either value.
+        for flag, expected_ids in (("true", []), ("false", [completed.id])):
+            with self.subTest(active=flag):
+                response = client.get("/api/v2/sessions/", {"active": flag})
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    [row["id"] for row in response.json()["sessions"]],
+                    expected_ids,
+                )
+        self.assertIsNone(running.end_time)
+
+    def test_uuid_filter_returns_the_matching_session(self):
+        end = timezone.now().replace(microsecond=0)
+        target, other = (
+            SessionMutationService.create_session(
+                user=self.user,
+                project=self.project,
+                start_time=end - timedelta(minutes=20 + offset),
+                end_time=end - timedelta(minutes=offset),
+            )
+            for offset in (0, 40)
+        )
+
+        client = APIClient()
+        client.force_authenticate(self.user)
+        response = client.get("/api/v2/sessions/", {"uuid": str(target.uuid)})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [row["id"] for row in response.json()["sessions"]], [target.id]
+        )
+
+        response = client.get("/api/v2/sessions/", {"uuid": "not-a-uuid"})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("uuid", response.json()["error"]["details"])
+
     @freeze_time("2026-01-20 12:00:00")
     def test_date_boundaries_use_active_profile_timezone_and_end_time(self):
         self.user.profile.timezone = "America/Los_Angeles"

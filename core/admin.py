@@ -215,6 +215,7 @@ class SessionsAdmin(admin.ModelAdmin):
     list_filter = ("project", "user", "project__status")
     search_fields = ("note", "project__name", "subprojects__name", "user__username", "user__email")
     autocomplete_fields = ("user", "project")
+    readonly_fields = ("uuid",)
     inlines = (SessionSubprojectInline,)
 
     def get_queryset(self, request):
