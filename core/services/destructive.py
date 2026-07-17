@@ -153,13 +153,19 @@ class DestructiveMutationService:
             )
 
         source_ids = {subproject1.pk, subproject2.pk}
-        affected_sessions = list(
-            Sessions.objects.select_for_update()
-            .filter(
+        # Postgres rejects FOR UPDATE with DISTINCT, so collect the ids first
+        # and lock by pk. Safe: everything runs in this one transaction.
+        affected_ids = list(
+            Sessions.objects.filter(
                 Q(subproject_links__subproject=subproject1)
                 | Q(subproject_links__subproject=subproject2)
             )
+            .values_list("pk", flat=True)
             .distinct()
+        )
+        affected_sessions = list(
+            Sessions.objects.select_for_update()
+            .filter(pk__in=affected_ids)
             .prefetch_related("subproject_links__subproject")
             .order_by("id")
         )

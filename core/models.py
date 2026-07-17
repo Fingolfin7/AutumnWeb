@@ -158,6 +158,9 @@ class SessionSubproject(models.Model):
         on_delete=models.CASCADE,
         db_column='sessions_id',
         related_name='subproject_links',
+        # The (session, subproject) unique constraint's prefix covers session
+        # lookups; the PG benchmark showed the standalone index redundant.
+        db_index=False,
     )
     subproject = models.ForeignKey(
         'SubProjects',
@@ -215,7 +218,8 @@ class Sessions(models.Model):
         ordering = ['-end_time']
 
         indexes = [
-            models.Index(fields=['user', 'project']),  # Optimizes lookups by user and project
+            # (user, project) dropped after the PG benchmark: the S5
+            # (user, end_time) indexes cover the hot paths within ~0.5ms.
             models.Index(
                 fields=['user', 'start_time', 'id'],
                 name='sess_active_user_start_idx',

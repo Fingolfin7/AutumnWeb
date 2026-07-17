@@ -486,7 +486,6 @@ class CommitmentDetailView(V2APIView):
         responses={204: OpenApiResponse(description="Commitment deleted.")},
     )
     def delete(self, request, commitment_id):
-        expected_version = _parse_if_match(request)
         with transaction.atomic():
             commitment = (
                 Commitment.objects.select_for_update()
@@ -494,7 +493,10 @@ class CommitmentDetailView(V2APIView):
                 .first()
             )
             if commitment is None:
+                # Idempotent delete: a missing resource is 204 even when the
+                # If-Match header is malformed (contract-tested).
                 return Response(status=status.HTTP_204_NO_CONTENT)
+            expected_version = _parse_if_match(request)
             if (
                 expected_version is not None
                 and expected_version != commitment.version

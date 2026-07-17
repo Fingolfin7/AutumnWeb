@@ -38,7 +38,10 @@ class SessionsSubprojectsThroughTableTests(TestCase):
             for item in constraints.values()
             if item.get("index")
         }
-        self.assertIn(("sessions_id",), indexed_columns)
+        # The standalone sessions_id index was dropped in 0047 (the unique
+        # (sessions_id, subprojects_id) prefix covers session lookups; PG
+        # benchmark confirmed it redundant).
+        self.assertNotIn(("sessions_id",), indexed_columns)
         self.assertIn(("subprojects_id",), indexed_columns)
 
         foreign_keys = [item for item in constraints.values() if item.get("foreign_key")]

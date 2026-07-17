@@ -337,7 +337,7 @@ class Format2ExportImportTests(TestCase):
         )
 
     def test_management_export_defaults_to_format2_and_supports_format1(self):
-        with tempfile.TemporaryDirectory(dir="C:\\tmp") as temp_dir, patch(
+        with tempfile.TemporaryDirectory() as temp_dir, patch(
             "core.management.commands.export.settings.BASE_DIR", Path(temp_dir)
         ):
             call_command("export", self.source.username, output_file="default.json")
