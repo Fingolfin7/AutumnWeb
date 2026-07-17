@@ -9,6 +9,18 @@ from core.models import Commitment, Sessions, SessionSubproject
 UNSET = object()
 
 
+class StaleVersionError(Exception):
+    """Optimistic-concurrency check failed against the freshly-locked row.
+
+    Carries the locked instance as ``.current`` so callers can build a
+    409 conflict response from authoritative post-lock state.
+    """
+
+    def __init__(self, current):
+        self.current = current
+        super().__init__("The row changed since the supplied version.")
+
+
 def even_split_bps(subproject_ids):
     """Return a deterministic 10,000-bp split keyed by subproject id."""
     sorted_ids = sorted(subproject_ids)
@@ -134,12 +146,15 @@ class SessionMutationService:
         is_active=UNSET,
         allocation_mode=UNSET,
         allocations=UNSET,
+        expected_version=None,
     ):
         """Edit an existing row in place."""
         queryset = Sessions.objects.select_for_update()
         if user is not None:
             queryset = queryset.filter(user=user)
         session = queryset.get(pk=session_id)
+        if expected_version is not None and (session.version or 1) != expected_version:
+            raise StaleVersionError(session)
         # is_active is accepted for caller compatibility but ignored: the
         # column was dropped in S12 and the state derives from end_time.
         updates = {
@@ -179,12 +194,14 @@ class SessionMutationService:
 
     @staticmethod
     @transaction.atomic
-    def delete_session(session_id, *, user=None):
+    def delete_session(session_id, *, user=None, expected_version=None):
         """Delete a session."""
         queryset = Sessions.objects.select_for_update()
         if user is not None:
             queryset = queryset.filter(user=user)
         session = queryset.get(pk=session_id)
+        if expected_version is not None and (session.version or 1) != expected_version:
+            raise StaleVersionError(session)
         deleted_id = session.pk
         user_id = session.user_id
         session.delete()
@@ -193,13 +210,17 @@ class SessionMutationService:
 
     @staticmethod
     @transaction.atomic
-    def set_allocations(session_id, *, user, allocations, allocation_mode):
+    def set_allocations(
+        session_id, *, user, allocations, allocation_mode, expected_version=None
+    ):
         """Replace the complete allocation set and mode for one session."""
         session = (
             Sessions.objects.select_for_update()
             .select_related("project")
             .get(pk=session_id, user=user)
         )
+        if expected_version is not None and (session.version or 1) != expected_version:
+            raise StaleVersionError(session)
         allocations = list(allocations)
 
         if allocation_mode not in {"legacy_full", "partitioned"}:

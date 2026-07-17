@@ -40,7 +40,11 @@ from core.models import (
     SubProjects,
     Tag,
 )
-from core.services import CommitmentEditService, CommitmentRestartRequired
+from core.services import (
+    CommitmentEditService,
+    CommitmentRestartRequired,
+    StaleVersionError,
+)
 from core.utils import get_period_bounds
 
 
@@ -452,9 +456,9 @@ class CommitmentDetailView(V2APIView):
     )
     def patch(self, request, commitment_id):
         commitment = _get_commitment(request.user, commitment_id)
-        conflict = _check_version(request, commitment)
-        if conflict is not None:
-            return conflict
+        # Parse (and validate the format of) If-Match here; the comparison
+        # itself happens under the row lock inside the edit service.
+        expected_version = _parse_if_match(request)
         serializer = CommitmentChangesRequestSerializer(
             data=request.data, partial=True
         )
@@ -466,8 +470,13 @@ class CommitmentDetailView(V2APIView):
         )
         try:
             commitment = CommitmentEditService.edit(
-                commitment.pk, user=request.user, changes=changes
+                commitment.pk,
+                user=request.user,
+                changes=changes,
+                expected_version=expected_version,
             )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
         except CommitmentRestartRequired as exc:
             return Response(
                 _envelope("restart_required", _service_message(exc)),

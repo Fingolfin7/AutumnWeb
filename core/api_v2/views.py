@@ -52,6 +52,7 @@ from core.services import (
     DestructiveMutationService,
     DestructiveOperationError,
     SessionMutationService,
+    StaleVersionError,
     UNSET,
     even_split_bps,
 )
@@ -700,9 +701,9 @@ class TimerStopView(V2APIView):
         session = _get_session(request.user, session_id)
         if session.end_time is not None:
             return Response(_serialize(session), status=status.HTTP_200_OK)
-        conflict = _check_version(request, session)
-        if conflict is not None:
-            return conflict
+        # Parse (and validate the format of) If-Match here; the comparison
+        # itself happens under the row lock inside the mutation service.
+        expected_version = _parse_if_match(request)
 
         serializer = TimerStopRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -715,14 +716,18 @@ class TimerStopView(V2APIView):
             raise ValidationError(
                 {"end": ["End must be on or after the session start."]}
             )
-        session = SessionMutationService.mutate_session(
-            session.pk,
-            user=request.user,
-            end_time=end_time,
-            is_active=False,
-            auto_stop_at=None,
-            note=data["note"] if "note" in data else UNSET,
-        )
+        try:
+            session = SessionMutationService.mutate_session(
+                session.pk,
+                user=request.user,
+                end_time=end_time,
+                is_active=False,
+                auto_stop_at=None,
+                note=data["note"] if "note" in data else UNSET,
+                expected_version=expected_version,
+            )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
         return Response(_serialize(session), status=status.HTTP_200_OK)
 
 
@@ -736,9 +741,7 @@ class TimerRestartView(V2APIView):
     )
     def post(self, request, session_id):
         session = _get_session(request.user, session_id)
-        conflict = _check_version(request, session)
-        if conflict is not None:
-            return conflict
+        expected_version = _parse_if_match(request)
 
         serializer = TimerRestartRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -752,16 +755,20 @@ class TimerRestartView(V2APIView):
             and session.auto_stop_at > session.start_time
         ):
             auto_stop_duration = session.auto_stop_at - session.start_time
-        session = SessionMutationService.mutate_session(
-            session.pk,
-            user=request.user,
-            start_time=restart_time,
-            end_time=None,
-            is_active=True,
-            auto_stop_at=(
-                restart_time + auto_stop_duration if auto_stop_duration else None
-            ),
-        )
+        try:
+            session = SessionMutationService.mutate_session(
+                session.pk,
+                user=request.user,
+                start_time=restart_time,
+                end_time=None,
+                is_active=True,
+                auto_stop_at=(
+                    restart_time + auto_stop_duration if auto_stop_duration else None
+                ),
+                expected_version=expected_version,
+            )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
         return Response(_serialize(session), status=status.HTTP_200_OK)
 
 
@@ -917,9 +924,7 @@ class SessionDetailView(V2APIView):
     )
     def patch(self, request, session_id):
         session = _get_session(request.user, session_id)
-        conflict = _check_version(request, session)
-        if conflict is not None:
-            return conflict
+        expected_version = _parse_if_match(request)
 
         serializer = SessionPatchRequestSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
@@ -1003,33 +1008,43 @@ class SessionDetailView(V2APIView):
         base_fields_touched = any(
             field in data for field in ("project_id", "start", "end", "note")
         )
-        with transaction.atomic():
-            if base_fields_touched or not replace_allocations:
-                session = SessionMutationService.mutate_session(
-                    session.pk,
-                    user=request.user,
-                    project=project if "project_id" in data else UNSET,
-                    subprojects=(
-                        []
-                        if replace_allocations and "project_id" in data
-                        else subprojects
-                        if not replace_allocations
-                        and ("project_id" in data or "subproject_ids" in data)
-                        else UNSET
-                    ),
-                    start_time=data["start"] if "start" in data else UNSET,
-                    end_time=data["end"] if "end" in data else UNSET,
-                    is_active=False if "end" in data else UNSET,
-                    auto_stop_at=None if "end" in data else UNSET,
-                    note=data["note"] if "note" in data else UNSET,
-                )
-            if replace_allocations:
-                session = SessionMutationService.set_allocations(
-                    session.pk,
-                    user=request.user,
-                    allocations=allocations,
-                    allocation_mode=allocation_mode,
-                )
+        try:
+            with transaction.atomic():
+                # Validate the supplied version against the first locked write in
+                # this transaction; once it bumps the version, later writes in the
+                # same transaction skip the check (allocation_expected_version).
+                allocation_expected_version = expected_version
+                if base_fields_touched or not replace_allocations:
+                    session = SessionMutationService.mutate_session(
+                        session.pk,
+                        user=request.user,
+                        project=project if "project_id" in data else UNSET,
+                        subprojects=(
+                            []
+                            if replace_allocations and "project_id" in data
+                            else subprojects
+                            if not replace_allocations
+                            and ("project_id" in data or "subproject_ids" in data)
+                            else UNSET
+                        ),
+                        start_time=data["start"] if "start" in data else UNSET,
+                        end_time=data["end"] if "end" in data else UNSET,
+                        is_active=False if "end" in data else UNSET,
+                        auto_stop_at=None if "end" in data else UNSET,
+                        note=data["note"] if "note" in data else UNSET,
+                        expected_version=expected_version,
+                    )
+                    allocation_expected_version = None
+                if replace_allocations:
+                    session = SessionMutationService.set_allocations(
+                        session.pk,
+                        user=request.user,
+                        allocations=allocations,
+                        allocation_mode=allocation_mode,
+                        expected_version=allocation_expected_version,
+                    )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
         payload = _serialize(session)
         if history_unaffected:
             payload["commitment_history_unaffected"] = True
@@ -1051,13 +1066,16 @@ class SessionDetailView(V2APIView):
         )
         if session is None:
             return Response(status=status.HTTP_204_NO_CONTENT)
-        conflict = _check_version(request, session)
-        if conflict is not None:
-            return conflict
+        expected_version = _parse_if_match(request)
         history_unaffected = _commitment_history_unaffected(
             request.user, (session.start_time, session.end_time)
         )
-        SessionMutationService.delete_session(session.pk, user=request.user)
+        try:
+            SessionMutationService.delete_session(
+                session.pk, user=request.user, expected_version=expected_version
+            )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
         if history_unaffected:
             return Response({"commitment_history_unaffected": True})
         return Response(status=status.HTTP_204_NO_CONTENT)

@@ -17,6 +17,7 @@ from core.models import (
     CommitmentAdjustment,
     CommitmentRevision,
 )
+from core.services.sessions import StaleVersionError
 from core.utils import get_period_bounds
 
 
@@ -179,11 +180,13 @@ class CommitmentEditService:
 
     @staticmethod
     @transaction.atomic
-    def edit(commitment_id, *, user, changes: dict):
+    def edit(commitment_id, *, user, changes: dict, expected_version=None):
         changes = _normalize_changes(changes)
         commitment = Commitment.objects.select_for_update().get(
             pk=commitment_id, user=user
         )
+        if expected_version is not None and commitment.version != expected_version:
+            raise StaleVersionError(commitment)
         now = timezone.now()
         active_revision = _ensure_ledger_initialized(commitment, now)
         pending = commitment.revisions.filter(
