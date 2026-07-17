@@ -28,9 +28,12 @@ def date_grids(meta):
 
 
 def top_projects(user, limit=3):
+    # total_time was dropped in S12; rank by derived totals instead.
+    from core.totals import annotate_project_totals
+
     return list(
-        Projects.objects.filter(user=user)
-        .order_by(F("total_time").desc(nulls_last=True), "name")
+        annotate_project_totals(Projects.objects.filter(user=user))
+        .order_by(F("derived_total_time").desc(nulls_last=True), "name")
         .values_list("name", flat=True)[:limit]
     )
 

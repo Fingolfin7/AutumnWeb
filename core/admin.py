@@ -60,7 +60,7 @@ class ProjectsAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "user__username", "user__email", "context__name", "tags__name")
     autocomplete_fields = ("user", "context", "tags")
     list_editable = ("status", "context")
-    readonly_fields = ("total_time", "last_updated")
+    readonly_fields = ("last_updated",)
     actions = (
         mark_projects_active,
         mark_projects_paused,
@@ -74,7 +74,7 @@ class ProjectsAdmin(admin.ModelAdmin):
         update_fields = [
             field
             for field in form.changed_data
-            if field not in {"tags", "total_time", "last_updated"}
+            if field not in {"tags", "last_updated"}
         ]
         if update_fields:
             obj.save(update_fields=update_fields)
@@ -140,7 +140,7 @@ class SubProjectsAdmin(admin.ModelAdmin):
         "user__email",
     )
     autocomplete_fields = ("user", "parent_project")
-    readonly_fields = ("total_time", "last_updated")
+    readonly_fields = ("last_updated",)
 
     def save_model(self, request, obj, form, change):
         if not change:
@@ -212,11 +212,10 @@ class SessionsAdmin(admin.ModelAdmin):
         "duration_minutes",
         "user_session_count",
     )
-    list_filter = ("is_active", "crosses_dst_transition", "project", "user", "project__status")
+    list_filter = ("project", "user", "project__status")
     search_fields = ("note", "project__name", "subprojects__name", "user__username", "user__email")
     autocomplete_fields = ("user", "project")
     inlines = (SessionSubprojectInline,)
-    readonly_fields = ("crosses_dst_transition",)
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("project", "user").prefetch_related("subprojects").annotate(

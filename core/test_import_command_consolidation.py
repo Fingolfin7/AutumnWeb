@@ -167,7 +167,6 @@ class ImportCommandConsolidationTests(TestCase):
                         subproject.name,
                         subproject.start_date,
                         subproject.last_updated,
-                        subproject.total_time,
                         subproject.description,
                     )
                 )
@@ -191,7 +190,6 @@ class ImportCommandConsolidationTests(TestCase):
                     project.name,
                     project.start_date,
                     project.last_updated,
-                    project.total_time,
                     project.status,
                     project.description,
                     project.context.name,

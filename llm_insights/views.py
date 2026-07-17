@@ -512,7 +512,7 @@ class InsightsView(View):
             )[:20]
 
             qs = (
-                Sessions.objects.filter(is_active=False, user=user)
+                Sessions.objects.filter(end_time__isnull=False, user=user)
                 .select_related("project", "project__context")
                 .prefetch_related("subprojects", "project__tags")
             )
@@ -674,7 +674,7 @@ class InsightsView(View):
                 self._apply_default_date_filters(current_filters, user)
 
         qs = (
-            Sessions.objects.filter(is_active=False, user=user)
+            Sessions.objects.filter(end_time__isnull=False, user=user)
             .select_related("project", "project__context")
             .prefetch_related("subprojects", "project__tags")
         )
@@ -999,7 +999,7 @@ class InsightsView(View):
                     self._apply_default_date_filters(current_filters, user)
 
             qs = (
-                Sessions.objects.filter(is_active=False, user=user)
+                Sessions.objects.filter(end_time__isnull=False, user=user)
                 .select_related("project", "project__context")
                 .prefetch_related("subprojects", "project__tags")
             )

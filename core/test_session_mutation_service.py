@@ -141,30 +141,3 @@ class SessionMutationServiceTests(TestCase):
         self.assertAlmostEqual(self.project_total(), 10, places=2)
         self.assertEqual(Sessions.objects.filter(pk=session.pk).count(), 1)
 
-    def test_create_stop_delete_leaves_retired_columns_unchanged(self):
-        stored_last_updated = self.project.last_updated
-        start = timezone.now().replace(microsecond=0) - timedelta(minutes=15)
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            is_active=True,
-        )
-
-        self.assertEqual(self.project_total(), 0)
-        session = SessionMutationService.mutate_session(
-            session.pk,
-            user=self.user,
-            end_time=start + timedelta(minutes=15),
-            is_active=False,
-        )
-        self.assertEqual(self.project_total(), 15)
-        self.project.refresh_from_db()
-        self.assertEqual(self.project.total_time, 0)
-        self.assertEqual(self.project.last_updated, stored_last_updated)
-
-        SessionMutationService.delete_session(session.pk, user=self.user)
-        self.assertEqual(self.project_total(), 0)
-        self.project.refresh_from_db()
-        self.assertEqual(self.project.total_time, 0)
-        self.assertEqual(self.project.last_updated, stored_last_updated)

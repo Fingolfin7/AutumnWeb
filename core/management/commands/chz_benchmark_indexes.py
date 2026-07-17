@@ -30,10 +30,10 @@ from core.models import Projects, Sessions, SessionSubproject, SubProjects
 BENCH_USERNAME = "chz-bench-user"
 
 # (table, columns) -> superseded by the S5 indexes / composite unique.
+# The is_active indexes were dropped with the column in S12; the remaining
+# candidates await the Postgres benchmark verdict.
 DROP_CANDIDATES = [
-    ("core_sessions", ["is_active", "end_time"]),
     ("core_sessions", ["user_id", "project_id"]),
-    ("core_sessions", ["user_id", "is_active", "end_time"]),
     ("core_sessions_subprojects", ["sessions_id"]),
 ]
 
@@ -131,7 +131,6 @@ class Command(BaseCommand):
                     project=projects[i % n_projects],
                     start_time=start,
                     end_time=start + timedelta(minutes=13),
-                    is_active=False,
                     uuid=uuid_lib.uuid4(),
                 )
             )
@@ -153,7 +152,6 @@ class Command(BaseCommand):
                 user=user,
                 project=projects[k],
                 start_time=now - timedelta(minutes=30 + k),
-                is_active=True,
                 auto_stop_at=now + timedelta(minutes=60),
                 uuid=uuid_lib.uuid4(),
             )

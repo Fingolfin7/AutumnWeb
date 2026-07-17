@@ -19,13 +19,12 @@ class AuditDeprecationTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="audit-user", password="x")
         self.project = Projects.objects.create(
-            user=self.user, name="Audit Project", total_time=999
+            user=self.user, name="Audit Project"
         )
         self.subproject = SubProjects.objects.create(
             user=self.user,
             parent_project=self.project,
             name="Audit Subproject",
-            total_time=999,
         )
 
         end = timezone.now()
@@ -52,10 +51,7 @@ class AuditDeprecationTests(TestCase):
                 self.assertIsNone(result)
                 self.assertEqual(stdout.getvalue(), DEPRECATION_MESSAGE + "\n")
 
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-        self.assertEqual(self.project.total_time, 999)
-        self.assertEqual(self.subproject.total_time, 999)
+
 
     def test_endpoint_is_removed_with_the_v1_api(self):
         # S12: the v1 audit endpoint is gone; the deprecation contract lives
@@ -69,7 +65,5 @@ class AuditDeprecationTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-        self.assertEqual(self.project.total_time, 999)
-        self.assertEqual(self.subproject.total_time, 999)
+
+

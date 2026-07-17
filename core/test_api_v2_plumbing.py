@@ -16,7 +16,6 @@ from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
 from core.api_v2.exceptions import V2APIView
 from core.api_v2.filters import SessionFilterSpec
 from core.models import Context, Projects, Sessions, SubProjects, Tag
-from core.serializers import SessionSerializer
 from core.services import SessionMutationService
 from users.forms import ProfileUpdateForm
 

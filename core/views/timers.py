@@ -56,7 +56,6 @@ def active_timers_fragment(request):
             "start_time",
             "end_time",
             "auto_stop_at",
-            "is_active",
         )
         .order_by("-start_time")
     )

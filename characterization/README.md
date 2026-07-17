@@ -65,3 +65,8 @@ metadata. Run it in each database environment; a later PostgreSQL run merges a
 ```powershell
 .\.venv\Scripts\python.exe manage.py chz_preflight
 ```
+
+> **S12 note:** the raw byte-level golden suite retired with the v1 API. The v2
+> contract is guarded by the committed `openapi-v2.yaml` (CI-diffed) and the
+> unit suites; this package now carries only the semantic (numeric) suite,
+> which runs against the cloned database exactly as before.

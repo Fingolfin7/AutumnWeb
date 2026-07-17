@@ -73,7 +73,6 @@ class DestructiveMutationService:
             name=new_project_name,
             start_date=min(project1.start_date, project2.start_date),
             last_updated=max(project1.last_updated, project2.last_updated),
-            total_time=0.0,
             status="active",
             description=merged_description,
         )
@@ -206,7 +205,6 @@ class DestructiveMutationService:
             last_updated=max(
                 subproject1.last_updated, subproject2.last_updated
             ),
-            total_time=0.0,
             description=merged_description,
         )
 

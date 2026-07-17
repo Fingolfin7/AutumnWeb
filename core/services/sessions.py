@@ -140,13 +140,14 @@ class SessionMutationService:
         if user is not None:
             queryset = queryset.filter(user=user)
         session = queryset.get(pk=session_id)
+        # is_active is accepted for caller compatibility but ignored: the
+        # column was dropped in S12 and the state derives from end_time.
         updates = {
             "project": project,
             "start_time": _floor_instant(start_time),
             "end_time": _floor_instant(end_time),
             "auto_stop_at": _floor_instant(auto_stop_at),
             "note": note,
-            "is_active": is_active,
             "allocation_mode": allocation_mode,
         }
         for field, value in updates.items():

@@ -76,7 +76,6 @@ def _iter_import_format1(
                 last_updated=timezone.make_aware(
                     datetime.strptime(project_data["Last Updated"], "%m-%d-%Y")
                 ),
-                total_time=0.0,
                 description=project_data["Description"]
                 if "Description" in project_data
                 else "",

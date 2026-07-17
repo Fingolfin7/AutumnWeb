@@ -323,7 +323,6 @@ def import_format2(user, document, *, force=False, import_into_context=None):
                 description=project_data["description"],
                 start_date=project_data["start_date"],
                 last_updated=project_data["start_date"],
-                total_time=0.0,
                 context=context,
             )
             projects_created += 1
@@ -362,7 +361,6 @@ def import_format2(user, document, *, force=False, import_into_context=None):
                     description=subproject_data["description"],
                     start_date=project.start_date,
                     last_updated=project.start_date,
-                    total_time=0.0,
                 )
 
         for session_data in project_data["sessions"]:

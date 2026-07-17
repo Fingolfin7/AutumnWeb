@@ -63,8 +63,13 @@ class Projects(models.Model):
     name = models.CharField(max_length=255)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
-    total_time = models.FloatField(default=0.0)
     status = models.CharField(max_length=25, choices=status_choices, default='active')
+
+    # Dropped in S12: totals are always derived (core/totals.py). The legacy
+    # creation kwarg is accepted and ignored.
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("total_time", None)
+        super().__init__(*args, **kwargs)
     description = models.TextField(null=True, blank=True)
     context = models.ForeignKey(
         Context,
@@ -116,9 +121,13 @@ class SubProjects(models.Model):
     name = models.CharField(max_length=255)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
-    total_time = models.FloatField(default=0.0)
     description = models.TextField(null=True, blank=True)
     parent_project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='subprojects')
+
+    # Dropped in S12: totals are always derived (core/totals.py).
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("total_time", None)
+        super().__init__(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'SubProjects'
@@ -171,9 +180,7 @@ class SessionSubproject(models.Model):
 
 class Sessions(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    uuid = models.UUIDField(
-        null=True, blank=True, editable=False, default=uuid.uuid4
-    )
+    uuid = models.UUIDField(blank=True, editable=False, default=uuid.uuid4)
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='sessions')
     subprojects = models.ManyToManyField(
         SubProjects,
@@ -191,18 +198,24 @@ class Sessions(models.Model):
     end_time = models.DateTimeField(null=True, blank=True)
     auto_stop_at = models.DateTimeField(null=True, blank=True)
     note = models.TextField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    crosses_dst_transition = models.BooleanField(default=False)
     version = models.IntegerField(default=1, db_default=1)
+
+    # Dropped in S12: is_active and crosses_dst_transition became derived
+    # properties (below). Legacy creation kwargs are accepted and ignored so
+    # long-standing call sites keep working.
+    _LEGACY_INIT_KWARGS = ("is_active", "crosses_dst_transition")
+
+    def __init__(self, *args, **kwargs):
+        for legacy in self._LEGACY_INIT_KWARGS:
+            kwargs.pop(legacy, None)
+        super().__init__(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'Sessions'
         ordering = ['-end_time']
 
         indexes = [
-            models.Index(fields=['is_active', 'end_time']),  # Optimizes queries that filter active/completed sessions
             models.Index(fields=['user', 'project']),  # Optimizes lookups by user and project
-            models.Index(fields=['user', 'is_active', 'end_time']),  # Dashboard/tallies/charts: user + completed + date range
             models.Index(
                 fields=['user', 'start_time', 'id'],
                 name='sess_active_user_start_idx',
@@ -311,11 +324,14 @@ class Sessions(models.Model):
         end_local = timezone.localtime(end_aware, default_tz)
         return start_local.utcoffset() != end_local.utcoffset()
 
-    def save(self, *args, **kwargs):
-        self.crosses_dst_transition = self._compute_crosses_dst_transition(
-            self.start_time, self.end_time
-        )
-        super().save(*args, **kwargs)
+    @property
+    def is_active(self):
+        """Derived timer state: a session is active until it has an end."""
+        return self.end_time is None
+
+    @property
+    def crosses_dst_transition(self):
+        return self._compute_crosses_dst_transition(self.start_time, self.end_time)
 
 
 period_choices = (

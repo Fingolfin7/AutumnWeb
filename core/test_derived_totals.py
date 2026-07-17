@@ -6,7 +6,6 @@ from django.utils import timezone
 from rest_framework.test import force_authenticate
 
 from core.models import Projects, Sessions, SubProjects
-from core.serializers import ProjectSerializer
 from core.totals import (
     annotate_project_totals,
     derived_project_last_updated,
@@ -82,22 +81,6 @@ class DerivedTotalsTests(TestCase):
         self.assertEqual(subproject_totals[self.subproject_a.pk], expected_a)
         self.assertEqual(subproject_totals[self.subproject_b.pk], expected_b)
 
-    def test_derived_totals_ignore_retired_column_values(self):
-        self._session(1800, links=(self.subproject_a,))
-        self._session(600, offset_minutes=31, links=(self.subproject_a,))
-
-        self.assertEqual(
-            derived_project_totals(self.user)[self.project.pk],
-            40,
-        )
-        self.assertEqual(
-            derived_subproject_totals(self.user)[self.subproject_a.pk],
-            40,
-        )
-        self.project.refresh_from_db()
-        self.subproject_a.refresh_from_db()
-        self.assertEqual(self.project.total_time, 999999)
-        self.assertEqual(self.subproject_a.total_time, 999999)
 
 
     def test_last_updated_uses_latest_completed_end_and_stored_fallback(self):

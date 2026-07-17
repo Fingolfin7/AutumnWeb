@@ -5,17 +5,10 @@ following many-to-many update are separate events, so no signal sees a complete
 before/after edit. Normal mutations use core.services instead.
 """
 
-from django.db.models.signals import m2m_changed, pre_save
+from django.db.models.signals import m2m_changed
 from django.dispatch import receiver
 
-from core.models import Commitment, Projects, Sessions
-
-
-@receiver(pre_save, sender=Sessions)
-def set_session_is_active(sender, instance, **kwargs):
-    """Keep persisted timer state consistent with whether an end time exists."""
-    if instance.pk or instance.is_active:
-        instance.is_active = not bool(instance.end_time)
+from core.models import Commitment, Projects
 
 
 @receiver(m2m_changed, sender=Projects.tags.through)
