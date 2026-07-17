@@ -50,13 +50,13 @@
                     <span class="label-input start-project-field">
                         <label for="project-search"><i class="fa fa-search"></i> Project</label>
                         <input type="text" id="project-search" name="project" placeholder="Projects"
-                               autocomplete="off" data-ajax_url="{% url 'api_search_projects' %}">
+                               autocomplete="off" data-ajax_url="{% url 'api_v2:projects' %}">
                     </span>
                     <div id="project-search-results"></div>
                 </div>
 
                 <section id="pick-subprojects" class="pick-subprojects">
-                    <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_list_subprojects_param' %}">
+                    <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_v2:project-subprojects' project_id=0 %}">
 
                     <div class="subproject-header" id="select-all-block">
                         <h3>Subprojects</h3>

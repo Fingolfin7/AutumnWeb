@@ -14,10 +14,7 @@ from django.views.generic import (
     DeleteView,
 )
 from core.models import Projects, SubProjects, Sessions
-from core.session_ledger import (
-    delete_session as ledger_delete_session,
-    mutate_session as ledger_mutate_session,
-)
+from core.services import SessionMutationService, even_split_bps
 
 
 def remove_ambiguous_time_error(time_value):
@@ -50,13 +47,15 @@ def fix_ambiguous_time(form, field_name, raw_time):
 
 @login_required
 @transaction.atomic
-def update_session(request, session_id: int):
+def update_session(request, session_id: int = None, session_uuid=None):
     """
     Allow user to change session details, including project, subprojects, start time, end time, and note.
-    Updates the existing session so its ID remains a stable reference.
+    Reachable by integer id or by uuid; the uuid form survives export/re-import
+    cycles, so it can be used as a stable external link.
     """
+    lookup = {"id": session_id} if session_uuid is None else {"uuid": session_uuid}
     current_session = get_object_or_404(
-        Sessions.objects.select_for_update(), id=session_id, user=request.user
+        Sessions.objects.select_for_update(), user=request.user, **lookup
     )
 
     if request.method == "POST":
@@ -109,7 +108,7 @@ def update_session(request, session_id: int):
                     raise ValueError("No subprojects found for the selected project")
 
                 candidate = form.save(commit=False)
-                updated_session = ledger_mutate_session(
+                updated_session = SessionMutationService.mutate_session(
                     current_session.pk,
                     user=request.user,
                     project=project,
@@ -119,6 +118,20 @@ def update_session(request, session_id: int):
                     note=candidate.note,
                     is_active=False,
                 )
+                if request.POST.get("partition_evenly"):
+                    selected = list(subprojects)
+                    split = even_split_bps(
+                        subproject.id for subproject in selected
+                    )
+                    updated_session = SessionMutationService.set_allocations(
+                        updated_session.pk,
+                        user=request.user,
+                        allocations=[
+                            (subproject, split[subproject.id])
+                            for subproject in selected
+                        ],
+                        allocation_mode="partitioned",
+                    )
 
                 messages.success(request, "Updated session")
                 return redirect("update_session", session_id=updated_session.id)
@@ -196,7 +209,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
         return context
 
     def get_queryset(self):
-        sessions = Sessions.objects.filter(is_active=False, user=self.request.user)
+        sessions = Sessions.objects.filter(end_time__isnull=False, user=self.request.user)
 
         # Allow explicit ?context= to override the global active context
         override_context_id = self.request.GET.get("context")
@@ -228,5 +241,7 @@ class DeleteSessionView(LoginRequiredMixin, DeleteView):
 
     def form_valid(self, form):
         success_url = self.get_success_url()
-        ledger_delete_session(self.object.pk, user=self.request.user)
+        SessionMutationService.delete_session(
+            self.object.pk, user=self.request.user
+        )
         return redirect(success_url)

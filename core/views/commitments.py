@@ -16,6 +16,7 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.models import Projects, SubProjects, Commitment
+from core.services import CommitmentEditService, CommitmentRestartRequired
 
 
 class CreateCommitmentView(LoginRequiredMixin, CreateView):
@@ -83,11 +84,15 @@ class CreateCommitmentView(LoginRequiredMixin, CreateView):
         return kwargs
 
     def form_valid(self, form):
-        form.instance.user = self.request.user
-        form.save()
+        definition = {
+            field: form.cleaned_data[field]
+            for field in form.fields
+            if field in form.cleaned_data
+        }
+        self.object = CommitmentEditService.create(self.request.user, definition)
         messages.success(self.request, "Commitment added successfully")
-        if form.instance.aggregation_type == "project" and form.instance.project_id:
-            return redirect("update_project", pk=form.instance.project.pk)
+        if self.object.aggregation_type == "project" and self.object.project_id:
+            return redirect("update_project", pk=self.object.project.pk)
         return redirect("home")
 
 
@@ -118,7 +123,19 @@ class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
-        form.save()
+        changes = {
+            field: form.cleaned_data[field]
+            for field in form.changed_data
+            if field in form.cleaned_data
+        }
+        try:
+            self.object = CommitmentEditService.edit(
+                self.object.pk, user=self.request.user, changes=changes
+            )
+        except CommitmentRestartRequired as exc:
+            form.add_error(None, str(exc))
+            messages.error(self.request, str(exc))
+            return self.form_invalid(form)
         messages.success(self.request, "Commitment updated successfully")
         if self.object.aggregation_type == "project" and self.object.project_id:
             return redirect("update_project", pk=self.object.project.pk)

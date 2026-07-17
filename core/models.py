@@ -1,4 +1,6 @@
 from datetime import datetime, time, timezone as dt_tz
+import uuid
+
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -61,8 +63,13 @@ class Projects(models.Model):
     name = models.CharField(max_length=255)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
-    total_time = models.FloatField(default=0.0)
     status = models.CharField(max_length=25, choices=status_choices, default='active')
+
+    # Dropped in S12: totals are always derived (core/totals.py). The legacy
+    # creation kwarg is accepted and ignored.
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("total_time", None)
+        super().__init__(*args, **kwargs)
     description = models.TextField(null=True, blank=True)
     context = models.ForeignKey(
         Context,
@@ -93,19 +100,6 @@ class Projects(models.Model):
     def get_end(self):
         return datetime.combine(self.last_updated, time())
 
-    def audit_total_time(self, log=True):
-        # Using select_related to fetch related projects in one query
-        if log:
-            logger.info(f"Auditing total time for project: {self.name}")
-            logger.info(f"Total Time before audit: {self.total_time}")
-
-        self.total_time = sum(
-            session.duration for session in self.sessions.filter(is_active=False) if session.duration is not None)
-        self.save()
-
-        if log:
-            logger.info(f"Total Time after audit: {self.total_time}\n")
-
     def save(self, *args, **kwargs):
         """Ensure projects always have a context.
 
@@ -127,9 +121,13 @@ class SubProjects(models.Model):
     name = models.CharField(max_length=255)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
-    total_time = models.FloatField(default=0.0)
     description = models.TextField(null=True, blank=True)
     parent_project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='subprojects')
+
+    # Dropped in S12: totals are always derived (core/totals.py).
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("total_time", None)
+        super().__init__(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'SubProjects'
@@ -146,18 +144,6 @@ class SubProjects(models.Model):
     def get_end(self):
         return datetime.combine(self.last_updated, time())
 
-    def audit_total_time(self, log=True):
-        if log:
-            logger.info(f"Auditing total time for subproject: {self.name}")
-            logger.info(f"Total Time before audit: {self.total_time}")
-
-        self.total_time = sum(
-            session.duration for session in self.sessions.filter(is_active=False) if session.duration is not None)
-        self.save()
-
-        if log:
-            logger.info(f"Total Time after audit: {self.total_time}\n")
-
     # when a subproject is deleted, remove it from all its sessions
     def delete(self, *args, **kwargs):
         for session in self.sessions.all():
@@ -166,25 +152,101 @@ class SubProjects(models.Model):
         super(SubProjects, self).delete(*args, **kwargs)
 
 
+class SessionSubproject(models.Model):
+    session = models.ForeignKey(
+        'Sessions',
+        on_delete=models.CASCADE,
+        db_column='sessions_id',
+        related_name='subproject_links',
+        # The (session, subproject) unique constraint's prefix covers session
+        # lookups; the PG benchmark showed the standalone index redundant.
+        db_index=False,
+    )
+    subproject = models.ForeignKey(
+        'SubProjects',
+        on_delete=models.CASCADE,
+        db_column='subprojects_id',
+        related_name='session_links',
+    )
+    allocation_bp = models.IntegerField(default=10000, db_default=10000)
+
+    class Meta:
+        db_table = 'core_sessions_subprojects'
+        unique_together = (('session', 'subproject'),)
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(allocation_bp__gte=1) & models.Q(allocation_bp__lte=10000),
+                name='session_subproject_allocation_bp_range',
+            ),
+        ]
+
+
 class Sessions(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    uuid = models.UUIDField(blank=True, editable=False, default=uuid.uuid4)
     project = models.ForeignKey(Projects, on_delete=models.CASCADE, related_name='sessions')
-    subprojects = models.ManyToManyField(SubProjects, related_name='sessions')
+    subprojects = models.ManyToManyField(
+        SubProjects,
+        related_name='sessions',
+        through='SessionSubproject',
+        through_fields=('session', 'subproject'),
+    )
+    allocation_mode = models.CharField(
+        max_length=16,
+        choices=[('legacy_full', 'legacy_full'), ('partitioned', 'partitioned')],
+        default='legacy_full',
+        db_default='legacy_full',
+    )
     start_time = models.DateTimeField(default=timezone.now)
     end_time = models.DateTimeField(null=True, blank=True)
     auto_stop_at = models.DateTimeField(null=True, blank=True)
     note = models.TextField(null=True, blank=True)
-    is_active = models.BooleanField(default=True)
-    crosses_dst_transition = models.BooleanField(default=False)
+    version = models.IntegerField(default=1, db_default=1)
+
+    # Dropped in S12: is_active and crosses_dst_transition became derived
+    # properties (below). Legacy creation kwargs are accepted and ignored so
+    # long-standing call sites keep working.
+    _LEGACY_INIT_KWARGS = ("is_active", "crosses_dst_transition")
+
+    def __init__(self, *args, **kwargs):
+        for legacy in self._LEGACY_INIT_KWARGS:
+            kwargs.pop(legacy, None)
+        super().__init__(*args, **kwargs)
 
     class Meta:
         verbose_name_plural = 'Sessions'
         ordering = ['-end_time']
 
         indexes = [
-            models.Index(fields=['is_active', 'end_time']),  # Optimizes queries that filter active/completed sessions
-            models.Index(fields=['user', 'project']),  # Optimizes lookups by user and project
-            models.Index(fields=['user', 'is_active', 'end_time']),  # Dashboard/tallies/charts: user + completed + date range
+            # (user, project) dropped after the PG benchmark: the S5
+            # (user, end_time) indexes cover the hot paths within ~0.5ms.
+            models.Index(
+                fields=['user', 'start_time', 'id'],
+                name='sess_active_user_start_idx',
+                condition=models.Q(end_time__isnull=True),
+            ),
+            models.Index(
+                fields=['user', 'auto_stop_at', 'id'],
+                name='sess_autostop_partial_idx',
+                condition=models.Q(
+                    end_time__isnull=True,
+                    auto_stop_at__isnull=False,
+                ),
+            ),
+            models.Index(
+                fields=['user', 'end_time', 'id'],
+                name='sess_completed_user_end_idx',
+            ),
+            models.Index(
+                fields=['user', 'project', 'end_time', 'id'],
+                name='sess_completed_proj_end_idx',
+            ),
+        ]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'uuid'], name='unique_session_uuid_per_user'
+            ),
         ]
 
     def __str__(self):
@@ -266,11 +328,14 @@ class Sessions(models.Model):
         end_local = timezone.localtime(end_aware, default_tz)
         return start_local.utcoffset() != end_local.utcoffset()
 
-    def save(self, *args, **kwargs):
-        self.crosses_dst_transition = self._compute_crosses_dst_transition(
-            self.start_time, self.end_time
-        )
-        super().save(*args, **kwargs)
+    @property
+    def is_active(self):
+        """Derived timer state: a session is active until it has an end."""
+        return self.end_time is None
+
+    @property
+    def crosses_dst_transition(self):
+        return self._compute_crosses_dst_transition(self.start_time, self.end_time)
 
 
 period_choices = (
@@ -364,6 +429,10 @@ class Commitment(models.Model):
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_reconciled = models.DateTimeField(null=True, blank=True)
+    needs_recompute = models.BooleanField(default=False, db_default=False)
+    ledger_start_at = models.DateTimeField(null=True, blank=True)
+    generation = models.IntegerField(default=1, db_default=1)
+    version = models.IntegerField(default=1, db_default=1)
 
     class Meta:
         verbose_name = 'Commitment'
@@ -409,3 +478,101 @@ class Commitment(models.Model):
         target = targets[self.aggregation_type]
         if getattr(target, 'user_id', None) != self.user_id:
             raise ValidationError('Commitment target must belong to the same user.')
+
+
+class CommitmentRevision(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_ACTIVE = 'active'
+    STATUS_CHOICES = (
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_ACTIVE, 'Active'),
+    )
+
+    commitment = models.ForeignKey(
+        Commitment,
+        on_delete=models.CASCADE,
+        related_name='revisions',
+    )
+    generation = models.IntegerField(default=1, db_default=1)
+    effective_from_instant = models.DateTimeField()
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    aggregation_type = models.CharField(max_length=20, choices=aggregation_type_choices)
+    target_id = models.BigIntegerField(null=True, blank=True)
+    target_name = models.CharField(max_length=255, default='', db_default='')
+    filters_snapshot = models.JSONField(default=dict)
+    commitment_type = models.CharField(max_length=10, choices=commitment_type_choices)
+    cadence = models.CharField(max_length=15, choices=period_choices)
+    target_value = models.PositiveIntegerField()
+    banking_enabled = models.BooleanField(default=True, db_default=True)
+    max_balance = models.IntegerField(default=600, db_default=600)
+    min_balance = models.IntegerField(default=-600, db_default=-600)
+    start_date = models.DateField()
+    timezone = models.CharField(max_length=64, default='Europe/Prague', db_default='Europe/Prague')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['commitment'],
+                condition=models.Q(status='pending'),
+                name='one_pending_revision_per_commitment',
+            ),
+        ]
+
+
+class CommitmentPeriod(models.Model):
+    commitment = models.ForeignKey(
+        Commitment,
+        on_delete=models.CASCADE,
+        related_name='period_rows',
+    )
+    generation = models.IntegerField(default=1, db_default=1)
+    revision = models.ForeignKey(
+        CommitmentRevision,
+        on_delete=models.PROTECT,
+        related_name='period_rows',
+    )
+    period_start = models.DateTimeField()
+    period_end = models.DateTimeField()
+    accrued_numerator = models.BigIntegerField(default=0, db_default=0)
+    session_count = models.IntegerField(default=0, db_default=0)
+    carryover_in = models.IntegerField(default=0, db_default=0)
+    balance_out = models.IntegerField(default=0, db_default=0)
+    closed_at = models.DateTimeField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['commitment', 'generation', 'period_start'],
+                name='unique_commitment_generation_period_start',
+            ),
+        ]
+
+
+class CommitmentAdjustment(models.Model):
+    KIND_OPENING = 'opening'
+    KIND_RESTART_CARRY = 'restart_carry'
+    KIND_MANUAL = 'manual'
+    KIND_CHOICES = (
+        (KIND_OPENING, 'Opening'),
+        (KIND_RESTART_CARRY, 'Restart carry'),
+        (KIND_MANUAL, 'Manual'),
+    )
+
+    commitment = models.ForeignKey(
+        Commitment,
+        on_delete=models.CASCADE,
+        related_name='adjustments',
+    )
+    seq = models.IntegerField()
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES)
+    amount = models.IntegerField()
+    effective_at = models.DateTimeField()
+    reason = models.TextField(default='', db_default='')
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['commitment', 'seq'],
+                name='unique_commitment_adjustment_seq',
+            ),
+        ]

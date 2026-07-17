@@ -1,0 +1,3158 @@
+openapi: 3.0.3
+info:
+  title: Autumn API v2
+  version: 2.0.0
+paths:
+  /api/v2/commitments/:
+    get:
+      operationId: commitments_list
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentListResponse'
+          description: ''
+    post:
+      operationId: commitments_create
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommitmentCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommitmentCreateRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
+  /api/v2/commitments/{commitment_id}:
+    get:
+      operationId: commitments_retrieve
+      parameters:
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
+    patch:
+      operationId: commitments_partial_update
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer commitment version.
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCommitmentChangesRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCommitmentChangesRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCommitmentChangesRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
+    delete:
+      operationId: commitments_destroy
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer commitment version.
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Commitment deleted.
+  /api/v2/commitments/{commitment_id}/adjustments/:
+    post:
+      operationId: commitments_adjustments_create
+      parameters:
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentAdjustmentRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommitmentAdjustmentRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommitmentAdjustmentRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentAdjustmentResponse'
+          description: ''
+  /api/v2/commitments/{commitment_id}/periods/:
+    get:
+      operationId: commitments_periods_list
+      parameters:
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      - in: query
+        name: generation
+        schema:
+          type: integer
+          minimum: 1
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      tags:
+      - commitments
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentPeriodListResponse'
+          description: ''
+  /api/v2/commitments/{commitment_id}/restart/:
+    post:
+      operationId: commitments_restart
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer commitment version.
+      - in: path
+        name: commitment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - commitments
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitmentRestartRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CommitmentRestartRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CommitmentRestartRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentResource'
+          description: ''
+  /api/v2/contexts/:
+    get:
+      operationId: contexts_list
+      tags:
+      - contexts
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextListResponse'
+          description: ''
+    post:
+      operationId: contexts_create
+      tags:
+      - contexts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContextWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ContextWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ContextWriteRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResource'
+          description: ''
+  /api/v2/contexts/{context_id}:
+    patch:
+      operationId: contexts_partial_update
+      parameters:
+      - in: path
+        name: context_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - contexts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedContextWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedContextWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedContextWriteRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContextResource'
+          description: ''
+    delete:
+      operationId: contexts_destroy
+      parameters:
+      - in: path
+        name: context_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - contexts
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Context deleted.
+  /api/v2/export/:
+    get:
+      operationId: export_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: boolean
+      - in: query
+        name: autumn_compatible
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: compress
+        schema:
+          type: boolean
+          default: false
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: export_format
+        schema:
+          enum:
+          - '1'
+          - '2'
+          type: string
+          default: '2'
+          minLength: 1
+        description: |-
+          * `1` - 1
+          * `2` - 2
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      tags:
+      - export
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Format2Document'
+          description: ''
+  /api/v2/import/:
+    post:
+      operationId: import_create
+      tags:
+      - import
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSummary'
+          description: ''
+  /api/v2/me/:
+    get:
+      operationId: me_retrieve
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+          description: ''
+  /api/v2/projects/:
+    get:
+      operationId: projects_list
+      parameters:
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - name
+          - id
+          type: string
+          default: name
+          minLength: 1
+        description: |-
+          * `name` - name
+          * `id` - id
+      - in: query
+        name: search
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - paused
+          - complete
+          - archived
+          type: string
+          minLength: 1
+        description: |-
+          * `active` - active
+          * `paused` - paused
+          * `complete` - complete
+          * `archived` - archived
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+          description: ''
+    post:
+      operationId: projects_create
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectCreateRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResource'
+          description: ''
+  /api/v2/projects/{project_id}:
+    get:
+      operationId: projects_retrieve
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetailResource'
+          description: ''
+    patch:
+      operationId: projects_partial_update
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedProjectPatchRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResource'
+          description: ''
+    delete:
+      operationId: projects_destroy
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Project deleted.
+  /api/v2/projects/{project_id}/subprojects/:
+    get:
+      operationId: project_subprojects_list
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectListResponse'
+          description: ''
+    post:
+      operationId: project_subprojects_create
+      parameters:
+      - in: path
+        name: project_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubprojectCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubprojectCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubprojectCreateRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
+  /api/v2/projects/merge/:
+    post:
+      operationId: projects_merge
+      tags:
+      - projects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectMergeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ProjectMergeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ProjectMergeRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResource'
+          description: ''
+  /api/v2/reports/charts/:
+    get:
+      operationId: reports_charts_list
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: chart_type
+        schema:
+          type: string
+          enum:
+          - calendar
+          - cumulative
+          - heatmap
+          - histogram
+          - line
+          - scatter
+          - stacked_area
+          - wordcloud
+        required: true
+      - in: query
+        name: context
+        schema:
+          type: integer
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_projects
+        schema:
+          type: array
+          items:
+            type: integer
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: project_name
+        schema:
+          type: string
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      - in: query
+        name: tags
+        schema:
+          type: array
+          items:
+            type: integer
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChartPayloadRow'
+          description: ''
+  /api/v2/reports/hierarchy/:
+    get:
+      operationId: reports_hierarchy_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportHierarchy'
+          description: ''
+  /api/v2/reports/tallies/:
+    get:
+      operationId: reports_tallies_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: by
+        schema:
+          type: string
+          enum:
+          - context
+          - project
+          - status
+          - subproject
+          - tag
+        required: true
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTallies'
+          description: ''
+  /api/v2/reports/totals/:
+    get:
+      operationId: reports_totals_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: string
+        description: Filter by active state (true or false).
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+        description: Comma-separated context IDs.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs to exclude.
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs to exclude.
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs to exclude.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+        description: Case-insensitive note substring.
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+        description: Comma-separated project IDs.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+        description: Inclusive local date in YYYY-MM-DD format.
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+        description: Comma-separated subproject IDs.
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+        description: Comma-separated tag IDs.
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTotals'
+          description: ''
+  /api/v2/sessions/:
+    get:
+      operationId: sessions_list
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: boolean
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: include
+        schema:
+          enum:
+          - note
+          type: string
+          minLength: 1
+        description: '* `note` - note'
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 500
+          minimum: 1
+          default: 100
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - sessions
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionListResponse'
+          description: ''
+    post:
+      operationId: sessions_create
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionTrackRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SessionTrackRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SessionTrackRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+  /api/v2/sessions/{session_id}:
+    get:
+      operationId: sessions_retrieve
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sessions
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+    patch:
+      operationId: sessions_partial_update
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sessions
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionPatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionPatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSessionPatchRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+    delete:
+      operationId: sessions_destroy
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - sessions
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommitmentHistoryWarning'
+          description: ''
+        '204':
+          description: Session deleted.
+  /api/v2/subprojects/{subproject_id}:
+    get:
+      operationId: subprojects_retrieve
+      parameters:
+      - in: path
+        name: subproject_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subprojects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
+    patch:
+      operationId: subprojects_partial_update
+      parameters:
+      - in: path
+        name: subproject_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subprojects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSubprojectPatchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSubprojectPatchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSubprojectPatchRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
+    delete:
+      operationId: subprojects_destroy
+      parameters:
+      - in: path
+        name: subproject_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - subprojects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Subproject deleted.
+  /api/v2/subprojects/merge/:
+    post:
+      operationId: subprojects_merge
+      tags:
+      - subprojects
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubprojectMergeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SubprojectMergeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SubprojectMergeRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubprojectResource'
+          description: ''
+  /api/v2/tags/:
+    get:
+      operationId: tags_list
+      tags:
+      - tags
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagListResponse'
+          description: ''
+    post:
+      operationId: tags_create
+      tags:
+      - tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TagWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TagWriteRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResource'
+          description: ''
+  /api/v2/tags/{tag_id}:
+    patch:
+      operationId: tags_partial_update
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tags
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTagWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTagWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTagWriteRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagResource'
+          description: ''
+    delete:
+      operationId: tags_destroy
+      parameters:
+      - in: path
+        name: tag_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - tags
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Tag deleted.
+  /api/v2/timers/:
+    get:
+      operationId: timers_retrieve
+      tags:
+      - timers
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimerListResponse'
+          description: ''
+    post:
+      operationId: timers_create
+      tags:
+      - timers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimerStartRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimerStartRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimerStartRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+  /api/v2/timers/{session_id}:
+    delete:
+      operationId: timers_destroy
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Timer deleted.
+  /api/v2/timers/{session_id}/restart/:
+    post:
+      operationId: timers_restart_create
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimerRestartRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimerRestartRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimerRestartRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+  /api/v2/timers/{session_id}/stop/:
+    post:
+      operationId: timers_stop_create
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TimerStopRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TimerStopRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TimerStopRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
+components:
+  schemas:
+    AggregationTypeEnum:
+      enum:
+      - project
+      - subproject
+      - context
+      - tag
+      type: string
+      description: |-
+        * `project` - project
+        * `subproject` - subproject
+        * `context` - context
+        * `tag` - tag
+    AllocationModeEnum:
+      enum:
+      - legacy_full
+      - partitioned
+      type: string
+      description: |-
+        * `legacy_full` - legacy_full
+        * `partitioned` - partitioned
+    ByEnum:
+      enum:
+      - project
+      - subproject
+      - context
+      - status
+      - tag
+      type: string
+      description: |-
+        * `project` - project
+        * `subproject` - subproject
+        * `context` - context
+        * `status` - status
+        * `tag` - tag
+    ChartPayloadRow:
+      type: object
+      properties:
+        x:
+          type: string
+          format: date-time
+        y:
+          type: number
+          format: double
+        series:
+          type: string
+        date:
+          type: string
+          format: date
+        hours:
+          type: number
+          format: double
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        label:
+          type: string
+        count:
+          type: integer
+        text:
+          type: string
+        weight:
+          type: integer
+    CommitmentAdjustmentRequest:
+      type: object
+      properties:
+        amount:
+          type: integer
+        reason:
+          type: string
+          default: ''
+      required:
+      - amount
+    CommitmentAdjustmentResponse:
+      type: object
+      properties:
+        seq:
+          type: integer
+        amount:
+          type: integer
+        effective_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        reason:
+          type: string
+        balance:
+          type: number
+          format: double
+      required:
+      - amount
+      - balance
+      - effective_at
+      - reason
+      - seq
+    CommitmentChangesRequest:
+      type: object
+      properties:
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_id:
+          type: integer
+          minimum: 1
+        context_id:
+          type: integer
+          minimum: 1
+        tag_id:
+          type: integer
+          minimum: 1
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+          maxLength: 64
+        target_value:
+          type: integer
+          minimum: 1
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: integer
+        min_balance:
+          type: integer
+        active:
+          type: boolean
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+    CommitmentCreateRequest:
+      type: object
+      properties:
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_id:
+          type: integer
+          minimum: 1
+        context_id:
+          type: integer
+          minimum: 1
+        tag_id:
+          type: integer
+          minimum: 1
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+          maxLength: 64
+        target_value:
+          type: integer
+          minimum: 1
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: integer
+        min_balance:
+          type: integer
+        active:
+          type: boolean
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - aggregation_type
+      - target_value
+    CommitmentCurrentPeriod:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        accrued:
+          type: number
+          format: double
+        target:
+          type: number
+          format: double
+        met:
+          type: boolean
+        percentage:
+          type: number
+          format: double
+          nullable: true
+        status:
+          type: string
+          nullable: true
+      required:
+      - accrued
+      - end
+      - met
+      - percentage
+      - start
+      - status
+      - target
+    CommitmentFilters:
+      type: object
+      properties:
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+      required:
+      - exclude_context_ids
+      - exclude_project_ids
+      - exclude_subproject_ids
+      - exclude_tag_ids
+      - include_context_ids
+      - include_project_ids
+      - include_subproject_ids
+      - include_tag_ids
+    CommitmentHistoryWarning:
+      type: object
+      properties:
+        commitment_history_unaffected:
+          type: boolean
+      required:
+      - commitment_history_unaffected
+    CommitmentListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        commitments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommitmentResource'
+      required:
+      - commitments
+      - count
+    CommitmentPendingRevision:
+      type: object
+      properties:
+        effective_from:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        changes:
+          type: object
+          additionalProperties: {}
+      required:
+      - changes
+      - effective_from
+    CommitmentPeriod:
+      type: object
+      properties:
+        generation:
+          type: integer
+        period_start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        period_end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        accrued:
+          type: number
+          format: double
+        session_count:
+          type: integer
+        carryover_in:
+          type: number
+          format: double
+        balance_out:
+          type: number
+          format: double
+        closed_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        revision_id:
+          type: integer
+      required:
+      - accrued
+      - balance_out
+      - carryover_in
+      - closed_at
+      - generation
+      - period_end
+      - period_start
+      - revision_id
+      - session_count
+    CommitmentPeriodListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        total:
+          type: integer
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommitmentPeriod'
+      required:
+      - count
+      - periods
+      - total
+    CommitmentResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        version:
+          type: integer
+        active:
+          type: boolean
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        target:
+          $ref: '#/components/schemas/CommitmentTarget'
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+        generation:
+          type: integer
+        target_value:
+          type: number
+          format: double
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: number
+          format: double
+        min_balance:
+          type: number
+          format: double
+        balance:
+          type: number
+          format: double
+        filters:
+          $ref: '#/components/schemas/CommitmentFilters'
+        current_period:
+          $ref: '#/components/schemas/CommitmentCurrentPeriod'
+        pending_revision:
+          allOf:
+          - $ref: '#/components/schemas/CommitmentPendingRevision'
+          nullable: true
+        ledger_start_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        streak:
+          type: object
+          additionalProperties: {}
+      required:
+      - active
+      - aggregation_type
+      - balance
+      - banking_enabled
+      - commitment_type
+      - current_period
+      - filters
+      - generation
+      - id
+      - ledger_start_at
+      - max_balance
+      - min_balance
+      - pending_revision
+      - period
+      - start_date
+      - target
+      - target_value
+      - timezone
+      - version
+    CommitmentRestartRequest:
+      type: object
+      properties:
+        keep_balance:
+          type: boolean
+        changes:
+          $ref: '#/components/schemas/CommitmentChangesRequest'
+      required:
+      - keep_balance
+    CommitmentTarget:
+      type: object
+      properties:
+        kind:
+          type: string
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - kind
+      - name
+    CommitmentTypeEnum:
+      enum:
+      - time
+      - sessions
+      type: string
+      description: |-
+        * `time` - time
+        * `sessions` - sessions
+    ContextListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        contexts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ContextResource'
+      required:
+      - contexts
+      - count
+    ContextResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        project_count:
+          type: integer
+      required:
+      - description
+      - id
+      - name
+      - project_count
+    ContextWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+    Format2Document:
+      type: object
+      properties:
+        format:
+          type: integer
+          maximum: 2
+          minimum: 2
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Project'
+      required:
+      - format
+      - projects
+    Format2Link:
+      type: object
+      properties:
+        subproject:
+          type: string
+        allocation_bp:
+          type: integer
+          maximum: 10000
+          minimum: 1
+      required:
+      - allocation_bp
+      - subproject
+    Format2Project:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        description:
+          type: string
+        context:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        start_date:
+          type: string
+          format: date-time
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Subproject'
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Session'
+      required:
+      - context
+      - description
+      - name
+      - sessions
+      - start_date
+      - status
+      - subprojects
+      - tags
+    Format2Session:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+          nullable: true
+        allocation_mode:
+          $ref: '#/components/schemas/AllocationModeEnum'
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        note:
+          type: string
+          nullable: true
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/Format2Link'
+      required:
+      - allocation_mode
+      - end
+      - links
+      - note
+      - start
+    Format2Subproject:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+      required:
+      - description
+      - name
+    ImportRequest:
+      type: object
+      properties:
+        data: {}
+        data_compressed:
+          type: string
+        force:
+          type: boolean
+          default: false
+        merge:
+          type: boolean
+          default: false
+        tolerance:
+          type: integer
+          minimum: 0
+          default: 2
+        autumn_import:
+          type: boolean
+          default: false
+        context:
+          type: string
+    ImportSummary:
+      type: object
+      properties:
+        projects_created:
+          type: integer
+        projects_updated:
+          type: integer
+        sessions_imported:
+          type: integer
+        sessions_skipped:
+          type: integer
+        conflicts:
+          type: array
+          items:
+            type: string
+      required:
+      - conflicts
+      - projects_created
+      - projects_updated
+      - sessions_imported
+      - sessions_skipped
+    KindEnum:
+      enum:
+      - subproject
+      - residual
+      type: string
+      description: |-
+        * `subproject` - subproject
+        * `residual` - residual
+    Me:
+      type: object
+      properties:
+        api_version:
+          type: integer
+        capabilities:
+          type: array
+          items:
+            type: string
+        user:
+          $ref: '#/components/schemas/MeUser'
+      required:
+      - api_version
+      - capabilities
+      - user
+    MeUser:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        timezone:
+          type: string
+      required:
+      - id
+      - timezone
+      - username
+    NamedResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    PatchedCommitmentChangesRequest:
+      type: object
+      properties:
+        aggregation_type:
+          $ref: '#/components/schemas/AggregationTypeEnum'
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_id:
+          type: integer
+          minimum: 1
+        context_id:
+          type: integer
+          minimum: 1
+        tag_id:
+          type: integer
+          minimum: 1
+        commitment_type:
+          $ref: '#/components/schemas/CommitmentTypeEnum'
+        period:
+          $ref: '#/components/schemas/PeriodEnum'
+        start_date:
+          type: string
+          format: date
+        timezone:
+          type: string
+          maxLength: 64
+        target_value:
+          type: integer
+          minimum: 1
+        banking_enabled:
+          type: boolean
+        max_balance:
+          type: integer
+        min_balance:
+          type: integer
+        active:
+          type: boolean
+        include_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_project_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_context_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        include_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        exclude_tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+    PatchedContextWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+    PatchedProjectPatchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        context_id:
+          type: integer
+          minimum: 1
+          nullable: true
+        tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        start_date:
+          type: string
+          format: date
+    PatchedSessionPatchRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        note:
+          type: string
+          nullable: true
+        allocation_mode:
+          $ref: '#/components/schemas/AllocationModeEnum'
+        subproject_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectAllocationWrite'
+    PatchedSubprojectPatchRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+    PatchedTagWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        color:
+          type: string
+          nullable: true
+          maxLength: 20
+    PeriodEnum:
+      enum:
+      - daily
+      - weekly
+      - fortnightly
+      - monthly
+      - quarterly
+      - yearly
+      type: string
+      description: |-
+        * `daily` - daily
+        * `weekly` - weekly
+        * `fortnightly` - fortnightly
+        * `monthly` - monthly
+        * `quarterly` - quarterly
+        * `yearly` - yearly
+    ProjectCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          default: active
+        context_id:
+          type: integer
+          minimum: 1
+          nullable: true
+        tag_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+      required:
+      - name
+    ProjectDetailResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        description:
+          type: string
+          readOnly: true
+        context:
+          allOf:
+          - $ref: '#/components/schemas/NamedResource'
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/NamedResource'
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          readOnly: true
+        last_activity:
+          type: string
+          format: date
+          nullable: true
+          readOnly: true
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        session_count:
+          type: integer
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectResource'
+          readOnly: true
+      required:
+      - context
+      - description
+      - id
+      - last_activity
+      - name
+      - session_count
+      - start_date
+      - status
+      - subprojects
+      - tags
+      - total_minutes
+    ProjectListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        total:
+          type: integer
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectResource'
+      required:
+      - count
+      - projects
+      - total
+    ProjectMergeRequest:
+      type: object
+      properties:
+        source_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 2
+          minItems: 2
+        new_name:
+          type: string
+          maxLength: 255
+      required:
+      - new_name
+      - source_ids
+    ProjectResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        description:
+          type: string
+          readOnly: true
+        context:
+          allOf:
+          - $ref: '#/components/schemas/NamedResource'
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/NamedResource'
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          readOnly: true
+        last_activity:
+          type: string
+          format: date
+          nullable: true
+          readOnly: true
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        session_count:
+          type: integer
+      required:
+      - context
+      - description
+      - id
+      - last_activity
+      - name
+      - session_count
+      - start_date
+      - status
+      - tags
+      - total_minutes
+    ProjectSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    ReportHierarchy:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportHierarchyProject'
+      required:
+      - projects
+    ReportHierarchyChild:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        project_id:
+          type: integer
+        id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        total_minutes:
+          type: number
+          format: double
+      required:
+      - id
+      - kind
+      - name
+      - total_minutes
+    ReportHierarchyProject:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        total_minutes:
+          type: number
+          format: double
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportHierarchyChild'
+        legacy_overallocated:
+          type: boolean
+      required:
+      - children
+      - id
+      - legacy_overallocated
+      - name
+      - total_minutes
+    ReportTallies:
+      type: object
+      properties:
+        by:
+          $ref: '#/components/schemas/ByEnum'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportTallyEntry'
+      required:
+      - by
+      - entries
+    ReportTallyEntry:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/KindEnum'
+        project_id:
+          type: integer
+        id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+        total_minutes:
+          type: number
+          format: double
+        session_count:
+          type: integer
+        legacy_overallocated:
+          type: boolean
+      required:
+      - id
+      - name
+      - total_minutes
+    ReportTotals:
+      type: object
+      properties:
+        total_minutes:
+          type: number
+          format: double
+        session_count:
+          type: integer
+      required:
+      - session_count
+      - total_minutes
+    SessionListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        total:
+          type: integer
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResource'
+      required:
+      - count
+      - sessions
+      - total
+    SessionResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+        project:
+          $ref: '#/components/schemas/ProjectSummary'
+        allocation_mode:
+          $ref: '#/components/schemas/AllocationModeEnum'
+        subproject_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectAllocation'
+          readOnly: true
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        active:
+          type: boolean
+          readOnly: true
+        auto_stop_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        duration_minutes:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        elapsed_minutes:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        note:
+          type: string
+          nullable: true
+        commitment_history_unaffected:
+          type: boolean
+      required:
+      - active
+      - allocation_mode
+      - auto_stop_at
+      - duration_minutes
+      - elapsed_minutes
+      - end
+      - id
+      - project
+      - start
+      - subproject_allocations
+      - uuid
+      - version
+    SessionTrackRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        note:
+          type: string
+          nullable: true
+        uuid:
+          type: string
+          format: uuid
+        allocation_mode:
+          $ref: '#/components/schemas/AllocationModeEnum'
+        subproject_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectAllocationWrite'
+      required:
+      - end
+      - project_id
+      - start
+    StatusEnum:
+      enum:
+      - active
+      - paused
+      - complete
+      - archived
+      type: string
+      description: |-
+        * `active` - active
+        * `paused` - paused
+        * `complete` - complete
+        * `archived` - archived
+    SubprojectAllocation:
+      type: object
+      properties:
+        subproject_id:
+          type: integer
+        name:
+          type: string
+        allocation_bp:
+          type: integer
+      required:
+      - allocation_bp
+      - name
+      - subproject_id
+    SubprojectAllocationWrite:
+      type: object
+      properties:
+        subproject_id:
+          type: integer
+          minimum: 1
+        allocation_bp:
+          type: integer
+          maximum: 10000
+          minimum: 1
+      required:
+      - allocation_bp
+      - subproject_id
+    SubprojectCreateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        description:
+          type: string
+      required:
+      - name
+    SubprojectListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectResource'
+      required:
+      - count
+      - subprojects
+    SubprojectMergeRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        source_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+          maxItems: 2
+          minItems: 2
+        new_name:
+          type: string
+          maxLength: 255
+      required:
+      - new_name
+      - project_id
+      - source_ids
+    SubprojectResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          readOnly: true
+        project_id:
+          type: integer
+        last_activity:
+          type: string
+          format: date
+          nullable: true
+          readOnly: true
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        session_count:
+          type: integer
+      required:
+      - description
+      - id
+      - last_activity
+      - name
+      - project_id
+      - session_count
+      - total_minutes
+    TagListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagResource'
+      required:
+      - count
+      - tags
+    TagResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+        project_count:
+          type: integer
+      required:
+      - color
+      - id
+      - name
+      - project_count
+    TagWriteRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        color:
+          type: string
+          nullable: true
+          maxLength: 20
+    TimerListResponse:
+      type: object
+      properties:
+        count:
+          type: integer
+        timers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResource'
+      required:
+      - count
+      - timers
+    TimerRestartRequest:
+      type: object
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+    TimerStartRequest:
+      type: object
+      properties:
+        project_id:
+          type: integer
+          minimum: 1
+        subproject_ids:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        note:
+          type: string
+          nullable: true
+        stop_after_minutes:
+          type: number
+          format: double
+          maximum: 10080
+          minimum: 1.0e-06
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        uuid:
+          type: string
+          format: uuid
+      required:
+      - project_id
+    TimerStopRequest:
+      type: object
+      properties:
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        note:
+          type: string
+          nullable: true
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"

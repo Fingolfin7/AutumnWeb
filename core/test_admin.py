@@ -15,7 +15,7 @@ class AdminRegistrationTests(TestCase):
         for column in ("project_count", "session_count", "commitment_count", "total_logged_minutes"):
             self.assertIn(column, user_admin.list_display)
 
-    def test_user_admin_has_audit_action(self):
+    def test_user_admin_has_no_retired_audit_action(self):
         user_admin = admin.site._registry[User]
         action_names = [getattr(action, "__name__", str(action)) for action in user_admin.actions]
-        self.assertIn("run_audit_for_selected_users", action_names)
+        self.assertNotIn("run_audit_for_selected_users", action_names)

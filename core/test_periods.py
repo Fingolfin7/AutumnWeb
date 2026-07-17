@@ -24,22 +24,4 @@ class LogPeriodSemanticsTests(TestCase):
             is_active=False,
         )
 
-    def test_week_is_trailing_7_days(self):
-        # 2 days ago should be included
-        self._create_session_ended(minutes_ago=2 * 24 * 60)
 
-        self.client.force_login(self.user)
-        resp = self.client.get("/api/log/?period=week&compact=true")
-        self.assertEqual(resp.status_code, 200)
-        payload = resp.json()
-        self.assertGreaterEqual(payload.get("count", 0), 1)
-
-    def test_week_excludes_older_than_7_days(self):
-        # 8 days ago should be excluded
-        self._create_session_ended(minutes_ago=8 * 24 * 60)
-
-        self.client.force_login(self.user)
-        resp = self.client.get("/api/log/?period=week&compact=true")
-        self.assertEqual(resp.status_code, 200)
-        payload = resp.json()
-        self.assertEqual(payload.get("count", 0), 0)

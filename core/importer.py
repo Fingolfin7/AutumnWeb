@@ -4,7 +4,10 @@ from datetime import datetime, timedelta
 
 from django.utils import timezone
 
-from .models import Projects, Sessions, SubProjects, status_choices
+from .models import Commitment, Projects, Sessions, SubProjects, status_choices
+from .services import DestructiveMutationService
+from .totals import derived_project_last_updated, derived_project_totals
+from .importer2 import import_format2
 from .utils import (
     apply_context_and_tags_to_project,
     session_exists,
@@ -12,7 +15,7 @@ from .utils import (
 )
 
 
-def iter_import(
+def _iter_import_format1(
     user,
     data: dict,
     *,
@@ -48,7 +51,9 @@ def iter_import(
                 )
                 # Only delete projects belonging to the current user to avoid
                 # removing other users' projects.
-                Projects.objects.filter(name=project_name, user=user).delete()
+                DestructiveMutationService.delete_project(
+                    user=user, project_name=project_name
+                )
                 project = None
             elif merge:
                 projects_updated += 1
@@ -71,7 +76,6 @@ def iter_import(
                 last_updated=timezone.make_aware(
                     datetime.strptime(project_data["Last Updated"], "%m-%d-%Y")
                 ),
-                total_time=0.0,
                 description=project_data["Description"]
                 if "Description" in project_data
                 else "",
@@ -94,7 +98,7 @@ def iter_import(
                     project.status = status_tuple[0]
                 else:
                     raise ValueError(f"Invalid status: {project_data['Status']}")
-            project.save()
+            project.save(update_fields=["status"])
 
         # Apply context/tags (backwards compatible). If importing into a
         # context, don't let the file override it.
@@ -124,6 +128,9 @@ def iter_import(
 
         # Process subprojects.
         total_subprojects = len(project_data["Sub Projects"])
+        project_latest_activity = derived_project_last_updated(
+            user, [project.pk]
+        )[project.pk]
 
         if verbose and total_subprojects > 0:
             yield (f"Processing {total_subprojects} subprojects for {project_name}")
@@ -137,7 +144,7 @@ def iter_import(
                     parent_project=project,
                     defaults={
                         "start_date": project.start_date,
-                        "last_updated": project.last_updated,
+                        "last_updated": project_latest_activity,
                         "total_time": 0.0,
                         "description": "",
                     },
@@ -245,20 +252,16 @@ def iter_import(
 
             session.full_clean()
             session.save()
+            Commitment.objects.filter(user=user).update(needs_recompute=True)
 
         yield ("\n\n")
-
-        project.audit_total_time()
-        for subproject in project.subprojects.all():
-            subproject.audit_total_time()
 
         sessions = Sessions.objects.filter(project=project, user=user)
         earliest_start, latest_end = sessions_get_earliest_latest(sessions)
 
         if merge and earliest_start and latest_end:
             project.start_date = earliest_start
-            project.last_updated = latest_end
-            project.save()
+            project.save(update_fields=["start_date"])
 
             for subproject in project.subprojects.all():
                 earliest_start, latest_end = sessions_get_earliest_latest(
@@ -267,16 +270,19 @@ def iter_import(
                 subproject.start_date = (
                     earliest_start if earliest_start else project.start_date
                 )
-                subproject.last_updated = (
-                    latest_end if latest_end else project.last_updated
-                )
-                subproject.save()
+                subproject.save(update_fields=["start_date"])
+
+        # Imports may also change project/context metadata without writing a
+        # session, so conservatively invalidate every commitment for the user.
+        Commitment.objects.filter(user=user).update(needs_recompute=True)
 
         if not merge:
-            mismatch = abs(project.total_time - project_data["Total Time"])
+            tally = derived_project_totals(user, [project.pk])[project.pk]
+            mismatch = abs(tally - project_data["Total Time"])
             if mismatch > tolerance:
-                tally = project.total_time
-                project.delete()
+                DestructiveMutationService.delete_project(
+                    user=user, project_name=project.name
+                )
                 yield (
                     f"Error: Total time mismatch for project '{project_name}': "
                     f"expected {project_data['Total Time']}, got {tally}. "
@@ -302,6 +308,42 @@ def iter_import(
         "sessions_imported": sessions_imported,
         "skipped": skipped,
     }
+
+
+def iter_import(
+    user,
+    data: dict,
+    *,
+    force=False,
+    merge=False,
+    tolerance=2,
+    verbose=False,
+    autumn_import=False,
+    import_into_context=None,
+):
+    """Detect the portable envelope while preserving legacy format-1 behavior."""
+    if isinstance(data, dict) and data.get("format") == 2:
+        yield "Validating format-2 import batch"
+        summary = import_format2(
+            user,
+            data,
+            force=force,
+            import_into_context=import_into_context,
+        )
+        yield "Import completed successfully!"
+        return summary
+    return (
+        yield from _iter_import_format1(
+            user,
+            data,
+            force=force,
+            merge=merge,
+            tolerance=tolerance,
+            verbose=verbose,
+            autumn_import=autumn_import,
+            import_into_context=import_into_context,
+        )
+    )
 
 
 def run_import(

@@ -1,6 +1,8 @@
 from django.core.management.base import BaseCommand, CommandError
 from django.contrib.auth.models import User
+from django.db import transaction
 from core.models import Projects
+from core.services import DestructiveMutationService
 
 
 class Command(BaseCommand):
@@ -10,16 +12,22 @@ class Command(BaseCommand):
         parser.add_argument('--username', type=str, help='Username of the user to import the data for')
 
     def handle(self, *args, **options):
-        if options['username']:
-            # check if the user exists
-            try:
-                user = User.objects.get(username=options['username'])
-                self.stdout.write(f'Clearing all project data for user: {user.username}...')
-                Projects.objects.filter(user=user).delete()
-            except User.DoesNotExist:
-                raise CommandError(f'User not found: {options["username"]}')
-        else:
-            self.stdout.write('Clearing project data for all users...')
-            Projects.objects.all().delete()
+        with transaction.atomic():
+            if options['username']:
+                # check if the user exists
+                try:
+                    user = User.objects.get(username=options['username'])
+                    self.stdout.write(f'Clearing all project data for user: {user.username}...')
+                    projects = list(Projects.objects.filter(user=user))
+                except User.DoesNotExist:
+                    raise CommandError(f'User not found: {options["username"]}')
+            else:
+                self.stdout.write('Clearing project data for all users...')
+                projects = list(Projects.objects.select_related("user").all())
+
+            for project in projects:
+                DestructiveMutationService.delete_project(
+                    user=project.user, project_name=project.name
+                )
 
         self.stdout.write(self.style.SUCCESS('All data has been cleared'))

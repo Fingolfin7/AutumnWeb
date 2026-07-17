@@ -4,8 +4,11 @@ from datetime import datetime
 from django.utils import timezone
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Prefetch
 from AutumnWeb import settings
-from core.models import Projects, Context, Tag
+from core.models import Projects, SubProjects, Context, Tag, Sessions
+from core.export2 import build_format2_export
+from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.utils import json_compress
 
 
@@ -18,6 +21,13 @@ class Command(BaseCommand):
         parser.add_argument('--project', type=str, help='Project name to export')
         parser.add_argument('--compress', action='store_true', help='Compress the output JSON file')
         parser.add_argument('--autumn_compatible', action='store_true', help='Print verbose output')
+        parser.add_argument(
+            '--format',
+            type=int,
+            choices=(1, 2),
+            default=2,
+            help='Export format version (default: 2)',
+        )
         parser.add_argument(
             '--context',
             type=str,
@@ -37,9 +47,14 @@ class Command(BaseCommand):
             raise CommandError(f"User '{options['username']}' does not exist")
 
         # Build base queryset with related data to avoid N+1 queries
-        base_qs = Projects.objects.filter(user=user).select_related("context").prefetch_related(
+        annotated_subprojects = annotate_subproject_totals(
+            SubProjects.objects.filter(user=user)
+        )
+        base_qs = annotate_project_totals(
+            Projects.objects.filter(user=user)
+        ).select_related("context").prefetch_related(
             "tags",
-            "subprojects",
+            Prefetch("subprojects", queryset=annotated_subprojects),
             "sessions",
         )
 
@@ -110,16 +125,26 @@ class Command(BaseCommand):
 
         project_data = {}
 
+        if options['format'] == 2:
+            project_data = build_format2_export(
+                Sessions.objects.filter(
+                    user=user,
+                    project_id__in=projects.values('id'),
+                    end_time__isnull=False,
+                )
+            )
+            projects = []
+
         for project in projects:
             # For each project, collect its details
-            project.audit_total_time()  # Ensure the total time is up-to-date
             project_name = project.name
+            # start_date remains stored, mutable legacy metadata.
             start_date = timezone.localtime(project.start_date)
-            last_updated = timezone.localtime(project.last_updated)
+            last_updated = timezone.localtime(project.derived_last_updated)
             project_obj = {
                 'Start Date': start_date.strftime('%m-%d-%Y'),
                 'Last Updated': last_updated.strftime('%m-%d-%Y'),
-                'Total Time': project.total_time,
+                'Total Time': project.derived_total_time,
                 'Status': project.status,
                 'Description': project.description if project.description else '',
                 'Sub Projects': {},
@@ -133,24 +158,24 @@ class Command(BaseCommand):
             # Fetch related subprojects
             subprojects = project.subprojects.all()
             for subproject in subprojects:
-                subproject.audit_total_time()
                 subproject_name = subproject.name
 
                 if autumn_compatible:
-                    project_obj['Sub Projects'][subproject_name] = subproject.total_time
+                    project_obj['Sub Projects'][subproject_name] = subproject.derived_total_time
                 else:
+                    # start_date remains stored, mutable legacy metadata.
                     start_date = timezone.localtime(subproject.start_date)
-                    last_updated = timezone.localtime(subproject.last_updated)
+                    last_updated = timezone.localtime(subproject.derived_last_updated)
                     subproject_obj = {
                         'Start Date': start_date.strftime('%m-%d-%Y'),
                         'Last Updated': last_updated.strftime('%m-%d-%Y'),
-                        'Total Time': subproject.total_time,
+                        'Total Time': subproject.derived_total_time,
                         'Description': subproject.description if subproject.description else '',
                     }
                     project_obj['Sub Projects'][subproject_name] = subproject_obj
 
             # Fetch related sessions
-            project_sessions = project.sessions.filter(is_active=False).all()
+            project_sessions = project.sessions.filter(end_time__isnull=False).all()
             for session in reversed(project_sessions):  # oldest to newest
                 start_time = timezone.localtime(session.start_time)
                 end_time = timezone.localtime(session.end_time)

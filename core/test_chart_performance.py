@@ -130,12 +130,12 @@ class ChartApiRegressionTests(TestCase):
 
     def _get_chart(self, chart_type, **params):
         return self.client.get(
-            "/api/chart_data/",
+            "/api/v2/reports/charts/",
             {"chart_type": chart_type, **params},
         )
 
     def test_tally_endpoints_are_correct_without_m2m_fanout(self):
-        project_rows = self.client.get("/api/tally_by_sessions/").json()
+        project_rows = self.client.get("/api/v2/reports/charts/", {"chart_type": "pie"}).json()
         self.assertEqual(
             {row["name"]: row["total_time"] for row in project_rows},
             {"Alpha": 90.0, "Beta": 120.0},
@@ -143,7 +143,7 @@ class ChartApiRegressionTests(TestCase):
 
         # Alpha matches both selected tags. Its sessions still count only once.
         filtered_rows = self.client.get(
-            "/api/tally_by_sessions/",
+            "/api/v2/reports/charts/", {"chart_type": "pie"},
             {"tags": [self.focus.id, self.shared.id]},
         ).json()
         self.assertEqual(
@@ -151,19 +151,19 @@ class ChartApiRegressionTests(TestCase):
             {"Alpha": 90.0, "Beta": 120.0},
         )
 
-        subproject_rows = self.client.get("/api/tally_by_subprojects/").json()
+        subproject_rows = self.client.get("/api/v2/reports/charts/", {"chart_type": "pie", "project_name": "Alpha"}).json()
         self.assertEqual(
             {row["name"]: row["total_time"] for row in subproject_rows},
-            {"Design": 60.0, "Build": 60.0, "no subproject": 150.0},
+            {"Design": 60.0, "Build": 60.0, "no subproject": 30.0},
         )
 
-        context_rows = self.client.get("/api/tally_by_context/").json()
+        context_rows = self.client.get("/api/v2/reports/charts/", {"chart_type": "context"}).json()
         self.assertEqual(
             {row["name"]: row["total_time"] for row in context_rows},
             {"Work": 90.0, "Personal": 120.0},
         )
 
-        status_rows = self.client.get("/api/tally_by_status/").json()
+        status_rows = self.client.get("/api/v2/reports/charts/", {"chart_type": "status"}).json()
         self.assertEqual(
             {
                 row["status"]: (row["count"], row["total_time"])
@@ -176,7 +176,7 @@ class ChartApiRegressionTests(TestCase):
             },
         )
 
-        tag_rows = self.client.get("/api/tally_by_tags/").json()
+        tag_rows = self.client.get("/api/v2/reports/charts/", {"chart_type": "bubble"}).json()
         self.assertEqual(
             {
                 row["name"]: (
@@ -296,14 +296,25 @@ class ChartApiRegressionTests(TestCase):
     def test_invalid_chart_type_returns_400(self):
         response = self._get_chart("not-a-chart")
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json(), {"detail": "Unsupported chart_type"})
+        self.assertEqual(
+            response.json(),
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Invalid input.",
+                    "details": {
+                        "chart_type": ["Unsupported chart_type."]
+                    },
+                }
+            },
+        )
 
     def test_empty_histogram_preserves_empty_chart_state(self):
         Sessions.objects.filter(user=self.user).delete()
         self.assertEqual(self._get_chart("histogram").json(), [])
 
     def test_list_sessions_queries_remain_constant_as_session_count_grows(self):
-        endpoint = "/api/list_sessions/"
+        endpoint = "/api/v2/sessions/"
         self.client.get(endpoint)
         with CaptureQueriesContext(connection) as queries:
             response = self.client.get(endpoint)
@@ -377,11 +388,10 @@ class ChartApiRegressionTests(TestCase):
 
     def test_tally_queries_remain_constant_as_session_count_grows(self):
         endpoints = (
-            "/api/tally_by_sessions/",
-            "/api/tally_by_subprojects/",
-            "/api/tally_by_context/",
-            "/api/tally_by_status/",
-            "/api/tally_by_tags/",
+            "/api/v2/reports/charts/?chart_type=pie",
+            "/api/v2/reports/charts/?chart_type=context",
+            "/api/v2/reports/charts/?chart_type=status",
+            "/api/v2/reports/charts/?chart_type=bubble",
         )
         baseline_counts = {}
         for endpoint in endpoints:

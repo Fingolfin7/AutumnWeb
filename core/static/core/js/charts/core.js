@@ -56,10 +56,10 @@ function getChartUnit(endDate, startDate, defaultUnit = 'week') {
 }
 
 function format_date(date) {
-    let month = date.getMonth() + 1;
-    let day = date.getDate();
-    let year = date.getFullYear();
-    return `${month}-${day}-${year}`;
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${year}-${month}-${day}`;
 }
 
 function countWeekdays(startDate, endDate) {
@@ -137,40 +137,15 @@ function consolidateTopN(data, topN = getProjectLimit(), timeKey = 'total_time')
 const chartDataCache = new Map();
 
 function get_project_data(type, start_date = "", end_date = "", project_name = "", context_id = "", tag_ids = [], exclude_ids = []) {
-    let url = "";
-
-    const wantSubprojects = project_name && (type === 'pie' || type === 'bar');
-
-    // Map chart types to their data sources
-    const chartDataCharts = ['scatter', 'calendar', 'heatmap', 'line', 'stacked_area', 'cumulative', 'histogram', 'wordcloud'];
-    const hierarchyCharts = ['treemap'];
-    const contextCharts = ['context'];
-    const statusCharts = ['status'];
-    const tagCharts = ['bubble'];
-    const radarCharts = ['radar'];
-
-    if (wantSubprojects) {
-        url = $('#subprojects_tally_link').val();
-    } else if (chartDataCharts.includes(type)) {
-        url = $('#chart_data_link').val();
-    } else if (hierarchyCharts.includes(type)) {
-        url = $('#hierarchy_link').val();
-    } else if (contextCharts.includes(type)) {
-        url = $('#context_tally_link').val();
-    } else if (statusCharts.includes(type)) {
-        url = $('#status_tally_link').val();
-    } else if (tagCharts.includes(type)) {
-        url = $('#tags_tally_link').val();
-    } else if (radarCharts.includes(type)) {
-        // Radar uses project stats endpoint
-        url = $('#projects_stats_link').val();
-    } else {
-        url = $('#projects_link').val();
-    }
+    // Every chart type is served by the v2 charts endpoint; the server picks
+    // the payload shape from chart_type (legacy tally/hierarchy shapes for
+    // pie/bar/context/status/bubble/treemap/radar).
+    const url_base = $('#chart_data_link').val();
+    let url = url_base;
 
     // Build query string safely
     const qs = new URLSearchParams();
-    if (chartDataCharts.includes(type)) qs.set('chart_type', type);
+    qs.set('chart_type', type);
     if (project_name) qs.set('project_name', project_name);
     if (start_date) qs.set('start_date', start_date);
     if (end_date) qs.set('end_date', end_date);
@@ -275,8 +250,9 @@ function render() {
     let start_date = $('#start_date').val();
     let end_date = $('#end_date').val();
 
-    start_date = start_date ? format_date(new Date(start_date)) : "";
-    end_date = end_date ? format_date(new Date(end_date)) : "";
+    // Date inputs already expose the canonical YYYY-MM-DD value expected by v2.
+    start_date = start_date || "";
+    end_date = end_date || "";
 
     let project_name = ($('#project-search').val() || '').trim();
 

@@ -1,4 +1,5 @@
 from django import forms
+from django.urls import reverse_lazy
 from django.utils import timezone
 from .models import Projects, SubProjects, Sessions, Context, Tag, Commitment
 from typing import cast
@@ -11,7 +12,7 @@ class SearchProjectForm(forms.Form):
             attrs={
                 'placeholder': 'Projects',
                 'id': 'project-search',
-                'data-ajax_url': '/api/search_projects/',
+                'data-ajax_url': reverse_lazy('api_v2:projects'),
                 'autocomplete': 'off',
             }
         ),
@@ -183,7 +184,7 @@ class UpdateSessionForm(forms.ModelForm):
         attrs={
             'placeholder': 'Projects',
             'id': 'project-search',
-            'data-ajax_url': '/api/search_projects/',
+            'data-ajax_url': reverse_lazy('api_v2:projects'),
             'class': 'half-width',
             'autocomplete': 'off'
         })
@@ -325,7 +326,7 @@ class ExportJSONForm(forms.Form):
             attrs={
                 'placeholder': 'Projects (leave blank to export all)',
                 'id': 'project-search',
-                'data-ajax_url': '/api/search_projects/',
+                'data-ajax_url': reverse_lazy('api_v2:projects'),
                 'class': 'half-width',
                 'autocomplete': 'off',
             }
@@ -399,6 +400,7 @@ class ExportJSONForm(forms.Form):
         )
     )
     autumn_compatible = forms.BooleanField(required=False, initial=False)
+    legacy_format = forms.BooleanField(required=False, initial=False)
     compress = forms.BooleanField(required=False, initial=False)
 
     def __init__(self, *args, **kwargs):
@@ -441,7 +443,6 @@ class MergeProjectsForm(forms.Form):
             attrs={
                 'placeholder': 'Select first project',
                 'id': 'project1-search',
-                'data-ajax_url': '/api/search_projects/',
                 'class': 'half-width',
                 'autocomplete': 'off',
             }
@@ -454,7 +455,6 @@ class MergeProjectsForm(forms.Form):
             attrs={
                 'placeholder': 'Select second project',
                 'id': 'project2-search',
-                'data-ajax_url': '/api/search_projects/',
                 'class': 'half-width',
                 'autocomplete': 'off',
             }
@@ -491,7 +491,6 @@ class MergeSubProjectsForm(forms.Form):
             attrs={
                 'placeholder': 'Select first subproject',
                 'id': 'subproject1-search',
-                'data-ajax_url': '/api/search_subprojects/',
                 'class': 'half-width',
                 'autocomplete': 'off',
             }
@@ -504,7 +503,6 @@ class MergeSubProjectsForm(forms.Form):
             attrs={
                 'placeholder': 'Select second subproject',
                 'id': 'subproject2-search',
-                'data-ajax_url': '/api/search_subprojects/',
                 'class': 'half-width',
                 'autocomplete': 'off',
             }

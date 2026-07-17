@@ -138,16 +138,8 @@
 
     <section id="chart_section" class="card">
         <!-- API endpoint URLs -->
-        <input type="hidden" id="projects_link" value="{% url 'api_tally_by_sessions' %}">
-        <input type="hidden" id="subprojects_tally_link" value="{% url 'api_tally_by_subprojects' %}">
-        <input type="hidden" id="subprojects_link" value="{% url 'api_list_subprojects_param' %}">
-        <input type="hidden" id="chart_data_link" value="{% url 'api_chart_data' %}">
+        <input type="hidden" id="chart_data_link" value="{% url 'api_v2:report-charts' %}">
         <!-- New API endpoints for additional charts -->
-        <input type="hidden" id="hierarchy_link" value="{% url 'api_hierarchy' %}">
-        <input type="hidden" id="context_tally_link" value="{% url 'api_tally_by_context' %}">
-        <input type="hidden" id="status_tally_link" value="{% url 'api_tally_by_status' %}">
-        <input type="hidden" id="tags_tally_link" value="{% url 'api_tally_by_tags' %}">
-        <input type="hidden" id="projects_stats_link" value="{% url 'api_projects_with_stats' %}">
 
         <!-- Shown while charts are loading / rendering (covers only this card) -->
         <div id="chart-loading" class="loading-overlay" aria-live="polite" aria-busy="false" style="display:none;">

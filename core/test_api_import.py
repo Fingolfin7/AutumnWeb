@@ -6,6 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from core.models import Context, Projects, Sessions, SubProjects
+from core.totals import derived_project_totals
 from core.utils import json_compress
 
 
@@ -13,7 +14,7 @@ class ImportJsonApiTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="api-import", password="password")
         self.client.force_login(self.user)
-        self.url = reverse("api_import_json")
+        self.url = reverse("api_v2:import")
 
     def payload(self):
         return {
@@ -56,16 +57,15 @@ class ImportJsonApiTests(TestCase):
         response = self.post({"data": self.payload(), "context": "Focused Work"})
 
         self.assertEqual(response.status_code, 200)
-        summary = response.json()["summary"]
-        self.assertEqual(summary["projects_processed"], 1)
+        summary = response.json()
         self.assertEqual(summary["projects_created"], 1)
         self.assertEqual(summary["sessions_imported"], 1)
-        self.assertEqual(summary["skipped"], [])
+        self.assertEqual(summary.get("skipped", []), [])
 
         context = Context.objects.get(user=self.user, name="Focused Work")
         project = Projects.objects.get(user=self.user, name="Client Work")
         self.assertEqual(project.context, context)
-        self.assertEqual(project.total_time, 60.0)
+        self.assertEqual(derived_project_totals(self.user)[project.pk], 60.0)
         subproject = SubProjects.objects.get(user=self.user, parent_project=project, name="planning")
         session = Sessions.objects.get(user=self.user, project=project)
         self.assertEqual(list(session.subprojects.all()), [subproject])
@@ -82,7 +82,7 @@ class ImportJsonApiTests(TestCase):
 
         response = self.post({"data": self.payload()})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["summary"]["skipped"], ["Client Work"])
+        self.assertEqual(response.json()["skipped"], ["Client Work"])
 
         payload = copy.deepcopy(self.payload())
         project_data = payload["Client Work"]
@@ -105,7 +105,7 @@ class ImportJsonApiTests(TestCase):
 
         response = self.post({"data": payload, "merge": True})
         self.assertEqual(response.status_code, 200)
-        summary = response.json()["summary"]
+        summary = response.json()
         self.assertEqual(summary["projects_updated"], 1)
         self.assertEqual(summary["sessions_imported"], 1)
         self.assertEqual(Sessions.objects.filter(user=self.user).count(), 2)
@@ -122,7 +122,7 @@ class ImportJsonApiTests(TestCase):
 
         response = self.post({"data": payload, "merge": True, "tolerance": 2})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["summary"]["sessions_imported"], 0)
+        self.assertEqual(response.json()["sessions_imported"], 0)
         self.assertEqual(Sessions.objects.filter(user=self.user).count(), 1)
 
     def test_compressed_payload_and_malformed_payloads(self):
@@ -133,8 +133,8 @@ class ImportJsonApiTests(TestCase):
 
         response = self.post({"data": ["not", "an", "object"]})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("object", response.json()["error"])
+        self.assertEqual(response.json()["error"]["code"], "validation_error")
 
         response = self.post({"data": self.payload(), "data_compressed": compressed})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("exactly one", response.json()["error"])
+        self.assertIn("exactly one", str(response.json()["error"]["details"]))

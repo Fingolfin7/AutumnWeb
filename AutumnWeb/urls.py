@@ -27,6 +27,7 @@ from users.forms import UserLoginForm
 
 
 urlpatterns = [
+    path("api/v2/", include("core.api_v2.urls")),
     path("admin/", admin.site.urls),
     path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),
     path("service-worker.js", pwa.service_worker, name="service_worker"),

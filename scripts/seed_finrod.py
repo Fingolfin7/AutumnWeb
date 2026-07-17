@@ -238,11 +238,6 @@ def reset_finrod():
         active=True,
     )
 
-    for project in projects.values():
-        project.audit_total_time(log=False)
-    for subproject in subs.values():
-        subproject.audit_total_time(log=False)
-
     profile = user.profile
     background_path = Path(settings.MEDIA_ROOT) / "background_pics" / "readme_demo_background.png"
     make_background(background_path)

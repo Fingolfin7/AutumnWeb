@@ -2,7 +2,7 @@ from core.forms import *
 from core.utils import *
 from core.models import Context, Tag
 from django.contrib import messages
-from django.db.models import Sum
+from core.totals import derived_project_totals
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, redirect, reverse
@@ -16,6 +16,10 @@ from core.commitments import (
     commitment_applies_to_tag,
 )
 from core.models import Projects, Sessions, Commitment
+from core.services import (
+    CommitmentTargetProtectedError,
+    DestructiveMutationService,
+)
 
 
 @login_required
@@ -127,8 +131,10 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
         projects_qs = filter_by_active_context(projects_qs, self.request)
 
         total_projects = projects_qs.count()
-        agg = projects_qs.aggregate(total_time=Sum("total_time"))
-        total_time = agg.get("total_time") or 0
+        project_ids = list(projects_qs.values_list("pk", flat=True))
+        total_time = sum(
+            derived_project_totals(self.request.user, project_ids).values()
+        )
 
         # Per-status counts
         sidebar_status_counts = {
@@ -139,7 +145,9 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
         }
 
         sessions_qs = Sessions.objects.filter(
-            user=self.request.user, project__in=projects_qs, is_active=False
+            user=self.request.user,
+            project__in=projects_qs,
+            end_time__isnull=False,
         )
         session_count = sessions_qs.count()
         average_session_duration = (
@@ -208,6 +216,16 @@ class DeleteContextView(LoginRequiredMixin, DeleteView):
         messages.success(self.request, "Context deleted successfully")
         return reverse("contexts")
 
+    def form_valid(self, form):
+        try:
+            DestructiveMutationService.delete_context(
+                user=self.request.user, context_name=self.object.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            messages.error(self.request, str(exc))
+            return redirect("contexts")
+        return redirect(self.get_success_url())
+
 
 class UpdateTagView(LoginRequiredMixin, UpdateView):
     model = Tag
@@ -235,8 +253,9 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
         )
 
         total_projects = projects_qs.count()
-        total_time = (
-            projects_qs.aggregate(total_time=Sum("total_time")).get("total_time") or 0
+        project_ids = list(projects_qs.values_list("pk", flat=True))
+        total_time = sum(
+            derived_project_totals(self.request.user, project_ids).values()
         )
 
         # Per-status counts
@@ -248,7 +267,9 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
         }
 
         sessions_qs = Sessions.objects.filter(
-            user=self.request.user, project__in=projects_qs, is_active=False
+            user=self.request.user,
+            project__in=projects_qs,
+            end_time__isnull=False,
         )
         session_count = sessions_qs.count()
         average_session_duration = (
@@ -315,3 +336,13 @@ class DeleteTagView(LoginRequiredMixin, DeleteView):
     def get_success_url(self):
         messages.success(self.request, "Tag deleted successfully")
         return reverse("tags")
+
+    def form_valid(self, form):
+        try:
+            DestructiveMutationService.delete_tag(
+                user=self.request.user, tag_name=self.object.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            messages.error(self.request, str(exc))
+            return redirect("tags")
+        return redirect(self.get_success_url())

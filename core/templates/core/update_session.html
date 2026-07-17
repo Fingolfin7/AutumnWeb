@@ -59,7 +59,7 @@
             <br>
 
             <div class="grid-rows" id="subproject_options">
-                <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_list_subprojects_param' %}">
+                <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_v2:project-subprojects' project_id=0 %}">
                 <!-- list the subprojects of the parent project and show the ones that are selected for the session -->
                 {% for item in filtered_subs %}
                     <span>
@@ -70,6 +70,10 @@
                     </span>
                 {% endfor %}
             </div>
+            <span>
+                <input type="checkbox" id="partition-evenly" name="partition_evenly">
+                <label for="partition-evenly">Split time evenly across subprojects</label>
+            </span>
         </section>
 
         <section id="submit-row">

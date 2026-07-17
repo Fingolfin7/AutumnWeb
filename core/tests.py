@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from core.models import Projects, SubProjects, Sessions, Commitment, Tag
-from core.session_ledger import create_session as ledger_create_session
+from core.services import SessionMutationService
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
 from django.core.management import call_command
@@ -24,6 +24,15 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.templatetags.markdown_render import markdown
+from core.totals import derived_project_totals, derived_subproject_totals
+
+
+def derived_project_total(user, project):
+    return derived_project_totals(user, [project.pk])[project.pk]
+
+
+def derived_subproject_total(user, subproject):
+    return derived_subproject_totals(user, [subproject.pk])[subproject.pk]
 
 
 class MarkdownRenderTests(TestCase):
@@ -138,7 +147,7 @@ class UpdateSessionTests(TestCase):
         )
 
         # Create an initial session
-        self.session = ledger_create_session(
+        self.session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             start_time=timezone.now() - timedelta(hours=2),
@@ -150,15 +159,16 @@ class UpdateSessionTests(TestCase):
     def test_update_session_updates_total_time(self):
         original_session_id = self.session.id
 
-        # Verify initial total times
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
+        # Verify initial derived total times.
         self.assertAlmostEqual(
-            self.project.total_time, 60.0, places=2
+            derived_project_total(self.user, self.project), 60.0, places=2
         )  # 1 hour, with 2 decimal precision
-        self.assertAlmostEqual(self.subproject1.total_time, 60.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 0.0, places=2)
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 0.0, places=2
+        )
 
         # Prepare data for updating the session
         new_start_time = timezone.now() - timedelta(hours=3)
@@ -184,64 +194,39 @@ class UpdateSessionTests(TestCase):
         updated_session = Sessions.objects.get(pk=original_session_id)
         self.assertEqual(updated_session.note, "Updated session")
 
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
+        # Verify updated derived total times.
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 90.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 90.0, places=2
+        )
 
-        # Verify updated total times
-        self.assertAlmostEqual(self.project.total_time, 90.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 90.0, places=2)
+    def test_session_is_reachable_by_uuid(self):
+        # The uuid survives export/re-import, so the uuid URL is a stable
+        # external link even when the integer pk changes.
+        by_uuid = reverse("update_session", args=[self.session.uuid])
+        self.assertIn(str(self.session.uuid), by_uuid)
+
+        response = self.client.get(by_uuid)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.project.name)
 
     def test_repeated_save_of_completed_session_is_idempotent(self):
         self.session.note = "Only the note changed"
         self.session.save()
 
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 60.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 60.0, places=2)
-
-    def test_api_edit_preserves_id_and_reassigns_project_totals(self):
-        other_project = Projects.objects.create(user=self.user, name="Other Project")
-        other_subproject = SubProjects.objects.create(
-            user=self.user, name="Other Subproject", parent_project=other_project
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 60.0, places=2
         )
-        original_session_id = self.session.id
-        new_start_time = timezone.now() - timedelta(minutes=45)
-        new_end_time = new_start_time + timedelta(minutes=30)
-
-        response = self.client.patch(
-            reverse("api_edit_session", args=[original_session_id]),
-            data={
-                "project": other_project.name,
-                "subprojects": [other_subproject.name],
-                "start": new_start_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "end": new_end_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "note": "Moved in place",
-            },
-            content_type="application/json",
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["session"]["id"], original_session_id)
-        self.assertEqual(Sessions.objects.filter(user=self.user).count(), 1)
-
-        updated_session = Sessions.objects.get(pk=original_session_id)
-        self.assertEqual(updated_session.project, other_project)
-        self.assertEqual(
-            list(updated_session.subprojects.values_list("id", flat=True)),
-            [other_subproject.id],
-        )
-
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        other_project.refresh_from_db()
-        other_subproject.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
-        self.assertAlmostEqual(other_project.total_time, 30.0, places=2)
-        self.assertAlmostEqual(other_subproject.total_time, 30.0, places=2)
 
 
 class StopTimerTests(TestCase):
@@ -275,10 +260,14 @@ class StopTimerTests(TestCase):
         self.assertFalse(self.session.is_active)
         self.assertIsNotNone(self.session.end_time)
 
-        # Check that audit has updated total time; assume the duration is computed correctly.
+        # Derived totals follow the stopped session.
         expected_duration = self.session.duration
-        self.assertAlmostEqual(self.project.total_time, expected_duration, places=2)
-        self.assertAlmostEqual(self.subproject.total_time, expected_duration, places=2)
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), expected_duration, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject), expected_duration, places=2
+        )
 
 
 class StopAfterTimerTests(TestCase):
@@ -307,23 +296,6 @@ class StopAfterTimerTests(TestCase):
             delta=2,
         )
 
-    def test_api_start_timer_accepts_stop_after_duration(self):
-        response = self.client.post(
-            "/api/timer/start/?compact=false",
-            data=json.dumps({"project": self.project.name, "stop_after": "1.5 hours"}),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 201)
-        payload = response.json()
-        self.assertIsNotNone(payload["session"]["auto_stop_at"])
-
-        session = Sessions.objects.get(id=payload["session"]["id"])
-        self.assertAlmostEqual(
-            (session.auto_stop_at - session.start_time).total_seconds(),
-            90 * 60,
-            delta=2,
-        )
 
     def test_expired_stop_after_timer_is_closed_before_listing_active_timers(self):
         start = timezone.now() - timedelta(minutes=45)
@@ -342,9 +314,15 @@ class StopAfterTimerTests(TestCase):
         session.refresh_from_db()
         self.project.refresh_from_db()
         self.assertFalse(session.is_active)
-        self.assertEqual(session.end_time, auto_stop_at)
+        floored_auto_stop_at = auto_stop_at.replace(microsecond=0)
+        self.assertEqual(session.end_time, floored_auto_stop_at)
         self.assertIsNone(session.auto_stop_at)
-        self.assertAlmostEqual(self.project.total_time, 30.0, places=2)
+        expected_duration = round(
+            (floored_auto_stop_at - start).total_seconds() / 60.0, 4
+        )
+        self.assertEqual(
+            derived_project_total(self.user, self.project), expected_duration
+        )
         self.assertEqual(len(response.context["timers"]), 0)
 
 
@@ -361,7 +339,7 @@ class DeleteSessionTests(TestCase):
             user=self.user, name="Subproject 2", parent_project=self.project
         )
 
-        self.session = ledger_create_session(
+        self.session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             start_time=timezone.now() - timedelta(hours=2),
@@ -371,16 +349,16 @@ class DeleteSessionTests(TestCase):
         )
 
     def test_delete_session(self):
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
-
-        # Verify initial total times
+        # Verify initial derived total times.
         self.assertAlmostEqual(
-            self.project.total_time, 60.0, places=2
+            derived_project_total(self.user, self.project), 60.0, places=2
         )  # 1 hour, with 2 decimal precision
-        self.assertAlmostEqual(self.subproject1.total_time, 60.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 60.0, places=2)
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 60.0, places=2
+        )
 
         response = self.client.post(reverse("delete_session", args=[self.session.id]))
         self.assertEqual(response.status_code, 302)  # Expecting a redirect
@@ -389,14 +367,16 @@ class DeleteSessionTests(TestCase):
         session_exists = Sessions.objects.filter(id=self.session.id).exists()
         self.assertFalse(session_exists)
 
-        self.project.refresh_from_db()
-        self.subproject1.refresh_from_db()
-        self.subproject2.refresh_from_db()
-
-        # Verify the project's and subprojects' total time is updated after deletion
-        self.assertAlmostEqual(self.project.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject1.total_time, 0.0, places=2)
-        self.assertAlmostEqual(self.subproject2.total_time, 0.0, places=2)
+        # Derived totals fall to zero after deletion.
+        self.assertAlmostEqual(
+            derived_project_total(self.user, self.project), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
+        )
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, self.subproject2), 0.0, places=2
+        )
 
 
 class MergeProjectsTests(TestCase):
@@ -498,9 +478,11 @@ class MergeProjectsTests(TestCase):
         self.assertIn("Development", subproject_names)
         self.assertIn("Testing", subproject_names)
 
-        # Check total time was recalculated (based on actual session durations)
+        # Check the derived total based on actual session durations.
         # Each session is 1 hour (60 minutes), so 2 sessions = 120 minutes
-        self.assertAlmostEqual(merged_project.total_time, 120.0, places=2)
+        self.assertAlmostEqual(
+            derived_project_total(self.user, merged_project), 120.0, places=2
+        )
 
     def test_merge_projects_duplicate_name(self):
         """Test merge fails when new project name already exists"""
@@ -628,9 +610,13 @@ class MergeSubProjectsTests(TestCase):
         self.assertIn(self.session1, merged_subproject.sessions.all())
         self.assertIn(self.session2, merged_subproject.sessions.all())
 
-        # Check total time was recalculated (based on actual session durations)
+        # Check the derived total based on actual session durations.
         # Each session is 1 hour (60 minutes), so 2 sessions = 120 minutes
-        self.assertAlmostEqual(merged_subproject.total_time, 120.0, places=2)
+        self.assertAlmostEqual(
+            derived_subproject_total(self.user, merged_subproject),
+            120.0,
+            places=2,
+        )
 
     def test_merge_subprojects_duplicate_name(self):
         """Test merge fails when new subproject name already exists"""
@@ -704,59 +690,8 @@ class MergeProjectsAPITests(TestCase):
             total_time=180.0,
         )
 
-    def test_merge_projects_api_success(self):
-        """Test successful project merge via API"""
-        response = self.client.post(
-            "/api/merge_projects/",
-            {
-                "project1": "Project A",
-                "project2": "Project B",
-                "new_project_name": "Merged Project",
-            },
-            content_type="application/json",
-        )
 
-        self.assertEqual(response.status_code, 201)
-        data = response.json()
-        self.assertIn("Successfully merged", data["message"])
-        self.assertEqual(data["project"]["name"], "Merged Project")
 
-        # Check that original projects are deleted
-        self.assertFalse(Projects.objects.filter(name="Project A").exists())
-        self.assertFalse(Projects.objects.filter(name="Project B").exists())
-
-    def test_merge_projects_api_missing_parameters(self):
-        """Test API fails with missing parameters"""
-        response = self.client.post(
-            "/api/merge_projects/",
-            {
-                "project1": "Project A",
-                # Missing project2 and new_project_name
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("required", data["error"])
-
-    def test_merge_projects_api_duplicate_name(self):
-        """Test API fails when new project name already exists"""
-        Projects.objects.create(user=self.user, name="Merged Project")
-
-        response = self.client.post(
-            "/api/merge_projects/",
-            {
-                "project1": "Project A",
-                "project2": "Project B",
-                "new_project_name": "Merged Project",
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("already exists", data["error"])
 
 
 class MergeSubProjectsAPITests(TestCase):
@@ -783,63 +718,8 @@ class MergeSubProjectsAPITests(TestCase):
             total_time=120.0,
         )
 
-    def test_merge_subprojects_api_success(self):
-        """Test successful subproject merge via API"""
-        response = self.client.post(
-            "/api/merge_subprojects/",
-            {
-                "subproject1": "Design",
-                "subproject2": "UI",
-                "new_subproject_name": "Design & UI",
-                "project_id": self.parent_project.id,
-            },
-            content_type="application/json",
-        )
 
-        self.assertEqual(response.status_code, 201)
-        data = response.json()
-        self.assertIn("Successfully merged", data["message"])
-        self.assertEqual(data["subproject"]["name"], "Design & UI")
 
-        # Check that original subprojects are deleted
-        self.assertFalse(SubProjects.objects.filter(name="Design").exists())
-        self.assertFalse(SubProjects.objects.filter(name="UI").exists())
-
-    def test_merge_subprojects_api_missing_parameters(self):
-        """Test API fails with missing parameters"""
-        response = self.client.post(
-            "/api/merge_subprojects/",
-            {
-                "subproject1": "Design",
-                # Missing other parameters
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("required", data["error"])
-
-    def test_merge_subprojects_api_duplicate_name(self):
-        """Test API fails when new subproject name already exists"""
-        SubProjects.objects.create(
-            user=self.user, name="Design & UI", parent_project=self.parent_project
-        )
-
-        response = self.client.post(
-            "/api/merge_subprojects/",
-            {
-                "subproject1": "Design",
-                "subproject2": "UI",
-                "new_subproject_name": "Design & UI",
-                "project_id": self.parent_project.id,
-            },
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        data = response.json()
-        self.assertIn("already exists", data["error"])
 
 
 class ImportIntoContextCLITests(TestCase):
@@ -1030,23 +910,6 @@ class ProjectsGroupedApiTests(TestCase):
         # DRF token auth for API endpoints
         self.token = Token.objects.create(user=self.user)
 
-    def test_projects_grouped_includes_archived_and_returns_200(self):
-        Projects.objects.create(user=self.user, name="Active Project", status="active")
-        Projects.objects.create(
-            user=self.user, name="Archived Project", status="archived"
-        )
-
-        url = reverse("api_projects_grouped")
-        response = self.client.get(url, HTTP_AUTHORIZATION=f"Token {self.token.key}")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-
-        self.assertIn("projects", payload)
-        self.assertIn("archived", payload["projects"])
-        self.assertIn("Archived Project", payload["projects"]["archived"])
-        self.assertIn("summary", payload)
-        self.assertEqual(payload["summary"]["archived"], 1)
 
 
 class TrackApiRegressionTests(TestCase):
@@ -1057,43 +920,6 @@ class TrackApiRegressionTests(TestCase):
 
         self.project = Projects.objects.create(user=self.user, name="Track Project")
 
-    def test_track_session_does_not_double_count_project_total(self):
-        sp1 = SubProjects.objects.create(
-            user=self.user,
-            name="SP1",
-            parent_project=self.project,
-        )
-        sp2 = SubProjects.objects.create(
-            user=self.user,
-            name="SP2",
-            parent_project=self.project,
-        )
-
-        start = timezone.now().replace(microsecond=0) - timedelta(minutes=9)
-        end = start + timedelta(minutes=9)
-
-        resp = self.client.post(
-            reverse("api_track"),
-            data={
-                "project": self.project.name,
-                # core.utils.parse_date_or_datetime does not accept full ISO with timezone
-                # (e.g. 2026-01-28T10:00:00+00:00), so use a supported format.
-                "start": start.strftime("%Y-%m-%d %H:%M:%S"),
-                "end": end.strftime("%Y-%m-%d %H:%M:%S"),
-                "subprojects": [sp1.name, sp2.name],
-            },
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-
-        self.assertEqual(resp.status_code, 201)
-        self.project.refresh_from_db()
-        self.assertAlmostEqual(self.project.total_time, 9.0, places=2)
-
-        sp1.refresh_from_db()
-        sp2.refresh_from_db()
-        self.assertAlmostEqual(sp1.total_time, 9.0, places=2)
-        self.assertAlmostEqual(sp2.total_time, 9.0, places=2)
 
 
 class CreateSubprojectApiCompatTests(TestCase):
@@ -1105,37 +931,7 @@ class CreateSubprojectApiCompatTests(TestCase):
         self.token = Token.objects.create(user=self.user)
         self.project = Projects.objects.create(user=self.user, name="API Parent")
 
-    def test_create_subproject_accepts_parent_project_name(self):
-        resp = self.client.post(
-            reverse("api_create_subproject"),
-            data={"parent_project": self.project.name, "name": "from-name"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(
-            SubProjects.objects.filter(
-                user=self.user,
-                parent_project=self.project,
-                name="from-name",
-            ).exists()
-        )
 
-    def test_create_subproject_accepts_parent_project_pk_without_user(self):
-        resp = self.client.post(
-            reverse("api_create_subproject"),
-            data={"parent_project": self.project.id, "name": "from-id"},
-            content_type="application/json",
-            HTTP_AUTHORIZATION=f"Token {self.token.key}",
-        )
-        self.assertEqual(resp.status_code, 200)
-        self.assertTrue(
-            SubProjects.objects.filter(
-                user=self.user,
-                parent_project=self.project,
-                name="from-id",
-            ).exists()
-        )
 
 
 # =============================================================================
@@ -1555,11 +1351,12 @@ class CommitmentViewTests(TestCase):
                 'active': True,
             }
         )
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.status_code, 200)
 
         commitment.refresh_from_db()
-        self.assertEqual(commitment.period, 'daily')
-        self.assertEqual(commitment.target, 60)
+        self.assertEqual(commitment.period, 'weekly')
+        self.assertEqual(commitment.target, 300)
+        self.assertContains(response, 'requires the restart operation')
 
     def test_delete_commitment_view_get(self):
         """Test GET request to delete commitment page."""
@@ -2551,26 +2348,6 @@ class DstTransitionSessionTests(TestCase):
         self.assertEqual(session.duration, 180.0)
         self.assertTrue(session.crosses_dst_transition)
 
-    def test_api_surfaces_crosses_dst_transition_flag(self):
-        start = timezone.make_aware(datetime(2026, 3, 29, 1, 30, 0))
-        end = timezone.make_aware(datetime(2026, 3, 29, 3, 30, 0))
-        Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=end,
-            is_active=False,
-        )
-
-        logs_resp = self.client.get("/api/log/?compact=true")
-        self.assertEqual(logs_resp.status_code, 200)
-        logs_payload = logs_resp.json()
-        self.assertTrue(logs_payload["logs"][0]["crosses_dst_transition"])
-
-        list_resp = self.client.get("/api/list_sessions/")
-        self.assertEqual(list_resp.status_code, 200)
-        list_payload = list_resp.json()
-        self.assertTrue(list_payload[0]["crosses_dst_transition"])
 
 
 class McpApiContractTests(TestCase):
@@ -2579,99 +2356,8 @@ class McpApiContractTests(TestCase):
         self.client.login(username="mcpuser", password="password")
         self.project = Projects.objects.create(user=self.user, name="MCP Project")
 
-    def test_create_project_infers_user_from_auth(self):
-        response = self.client.post(
-            "/api/create_project/",
-            data=json.dumps({"name": "Created From MCP", "description": "No user field"}),
-            content_type="application/json",
-        )
 
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(payload["name"], "Created From MCP")
-        self.assertEqual(payload["user"], self.user.id)
 
-    def test_negative_session_ids_return_json_errors(self):
-        edit_response = self.client.patch(
-            "/api/session/-1/",
-            data=json.dumps({"note": "impossible"}),
-            content_type="application/json",
-        )
-        delete_response = self.client.delete("/api/delete_session/-1/")
 
-        self.assertEqual(edit_response.status_code, 404)
-        self.assertEqual(edit_response.json(), {"ok": False, "error": "Session not found"})
-        self.assertEqual(delete_response.status_code, 404)
-        self.assertEqual(
-            delete_response.json(), {"ok": False, "error": "Session not found"}
-        )
 
-    def test_search_subprojects_accepts_project_alias(self):
-        SubProjects.objects.create(
-            user=self.user,
-            parent_project=self.project,
-            name="MCP Subproject",
-        )
-
-        response = self.client.get(
-            "/api/search_subprojects/",
-            {"project": "MCP Project", "search_term": "Subproject"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertEqual(len(payload), 1)
-        self.assertEqual(payload[0]["name"], "MCP Subproject")
-
-    def test_audit_can_dry_run_and_report_changed_projects(self):
-        start = timezone.make_aware(datetime(2026, 5, 1, 9, 0, 0))
-        end = timezone.make_aware(datetime(2026, 5, 1, 10, 0, 0))
-        Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=end,
-            is_active=False,
-        )
-        self.project.total_time = 999
-        self.project.save(update_fields=["total_time"])
-
-        response = self.client.post(
-            "/api/audit/",
-            data=json.dumps({"dry_run": True}),
-            content_type="application/json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertTrue(payload["dry_run"])
-        self.assertEqual(payload["projects"]["changed"], 1)
-        self.assertEqual(payload["changed_projects"][0]["name"], "MCP Project")
-        self.assertEqual(payload["changed_projects"][0]["before"], 999)
-        self.assertEqual(payload["changed_projects"][0]["after"], 60)
-
-        self.project.refresh_from_db()
-        self.assertEqual(self.project.total_time, 999)
-
-    def test_projects_with_stats_exposes_computed_and_persisted_totals(self):
-        start = timezone.make_aware(datetime(2026, 5, 1, 9, 0, 0))
-        end = timezone.make_aware(datetime(2026, 5, 1, 10, 0, 0))
-        Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=end,
-            is_active=False,
-        )
-        self.project.total_time = 999
-        self.project.save(update_fields=["total_time"])
-
-        response = self.client.get("/api/projects_with_stats/")
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        project_payload = next(p for p in payload if p["name"] == "MCP Project")
-        self.assertEqual(project_payload["total_time"], 60)
-        self.assertEqual(project_payload["computed_total_time"], 60)
-        self.assertEqual(project_payload["persisted_total_time"], 999)
 

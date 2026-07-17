@@ -35,6 +35,10 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
+AUTUMN_PARTITIONED_ATTRIBUTION = env.bool(
+    "AUTUMN_PARTITIONED_ATTRIBUTION", default=True
+)
+
 # Gemini API Key
 GEMINI_API_KEY = env("GEMINI_API_KEY")
 # NASA API Key (for Astronomy Picture of the Day, optional)
@@ -89,6 +93,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",  # for JWT token authentication
+    "drf_spectacular",
     "crispy_forms",
     "crispy_bootstrap4",
     "storages",
@@ -107,6 +112,13 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Autumn API v2",
+    "VERSION": "2.0.0",
+    "PREPROCESSING_HOOKS": ["core.api_v2.schema.v2_endpoints_only"],
 }
 
 
@@ -123,6 +135,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "users.middleware.UserTimezoneMiddleware",
+    "core.api_v2.middleware.V2ErrorEnvelopeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -202,6 +216,9 @@ else:
                 "NAME": BASE_DIR / "db.sqlite3",
             }
         }
+
+if os.environ.get("AUTUMN_CHZ_DB"):
+    DATABASES["default"].setdefault("TEST", {})["NAME"] = os.environ["AUTUMN_CHZ_DB"]
 
 # Keep DB connections open a bit (helps in production). Set to 0 to disable.
 CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)

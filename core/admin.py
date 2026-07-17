@@ -1,13 +1,28 @@
 from django.contrib import admin, messages
-from django.db.models import Count, Sum
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Count
 
-from .models import Commitment, Context, Projects, Sessions, SubProjects, Tag
-from .session_ledger import (
-    advance_last_updated,
-    apply_contribution_change,
-    snapshot_contribution,
-    delete_session as ledger_delete_session,
+from .models import (
+    Commitment,
+    Context,
+    Projects,
+    Sessions,
+    SessionSubproject,
+    SubProjects,
+    Tag,
 )
+from .services import (
+    CommitmentTargetProtectedError,
+    DestructiveMutationService,
+    SessionMutationService,
+)
+from .services.sessions import (
+    _floor_instant,
+    _mark_commitments_dirty,
+    _validate_allocations,
+)
+from .totals import annotate_project_totals, annotate_subproject_totals
 
 
 @admin.action(description="Mark selected projects as active")
@@ -34,30 +49,6 @@ def mark_projects_archived(modeladmin, request, queryset):
     modeladmin.message_user(request, f"Updated {updated} project(s) to archived.", messages.SUCCESS)
 
 
-@admin.action(description="Activate selected commitments")
-def activate_commitments(modeladmin, request, queryset):
-    updated = queryset.update(active=True)
-    modeladmin.message_user(request, f"Activated {updated} commitment(s).", messages.SUCCESS)
-
-
-@admin.action(description="Deactivate selected commitments")
-def deactivate_commitments(modeladmin, request, queryset):
-    updated = queryset.update(active=False)
-    modeladmin.message_user(request, f"Deactivated {updated} commitment(s).", messages.SUCCESS)
-
-
-@admin.action(description="Enable banking for selected commitments")
-def enable_banking(modeladmin, request, queryset):
-    updated = queryset.update(banking_enabled=True)
-    modeladmin.message_user(request, f"Enabled banking for {updated} commitment(s).", messages.SUCCESS)
-
-
-@admin.action(description="Disable banking for selected commitments")
-def disable_banking(modeladmin, request, queryset):
-    updated = queryset.update(banking_enabled=False)
-    modeladmin.message_user(request, f"Disabled banking for {updated} commitment(s).", messages.SUCCESS)
-
-
 @admin.register(Projects)
 class ProjectsAdmin(admin.ModelAdmin):
     list_display = (
@@ -66,15 +57,16 @@ class ProjectsAdmin(admin.ModelAdmin):
         "user",
         "context",
         "status",
-        "total_time",
+        "derived_total_time",
         "user_project_count",
         "user_total_project_minutes",
-        "last_updated",
+        "derived_last_updated",
     )
     list_filter = ("status", "context", "tags", "user")
     search_fields = ("name", "description", "user__username", "user__email", "context__name", "tags__name")
     autocomplete_fields = ("user", "context", "tags")
     list_editable = ("status", "context")
+    readonly_fields = ("last_updated",)
     actions = (
         mark_projects_active,
         mark_projects_paused,
@@ -82,19 +74,56 @@ class ProjectsAdmin(admin.ModelAdmin):
         mark_projects_archived,
     )
 
+    def save_model(self, request, obj, form, change):
+        if not change:
+            return super().save_model(request, obj, form, change)
+        update_fields = [
+            field
+            for field in form.changed_data
+            if field not in {"tags", "last_updated"}
+        ]
+        if update_fields:
+            obj.save(update_fields=update_fields)
+
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("user", "context").prefetch_related("tags").annotate(
+        queryset = super().get_queryset(request).select_related("user", "context").prefetch_related("tags").annotate(
             _user_project_count=Count("user__projects", distinct=True),
-            _user_total_project_minutes=Sum("user__projects__total_time"),
         )
+        return annotate_project_totals(queryset, include_user_total=True)
+
+    @admin.display(description="Total time", ordering="derived_total_time")
+    def derived_total_time(self, obj):
+        return round(obj.derived_total_time or 0, 4)
+
+    @admin.display(description="Last updated", ordering="derived_last_updated")
+    def derived_last_updated(self, obj):
+        return obj.derived_last_updated
 
     @admin.display(description="User project count", ordering="_user_project_count")
     def user_project_count(self, obj):
         return obj._user_project_count or 0
 
-    @admin.display(description="User total project minutes", ordering="_user_total_project_minutes")
+    @admin.display(description="User total project minutes", ordering="derived_user_total_time")
     def user_total_project_minutes(self, obj):
-        return round(obj._user_total_project_minutes or 0, 2)
+        return round(obj.derived_user_total_time or 0, 2)
+
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_project(
+                user=obj.user, project_name=obj.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for project in list(queryset):
+                    DestructiveMutationService.delete_project(
+                        user=project.user, project_name=project.name
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
 
 
 @admin.register(SubProjects)
@@ -104,9 +133,9 @@ class SubProjectsAdmin(admin.ModelAdmin):
         "name",
         "user",
         "parent_project",
-        "total_time",
+        "derived_total_time",
         "user_subproject_count",
-        "last_updated",
+        "derived_last_updated",
     )
     list_filter = ("user", "parent_project")
     search_fields = (
@@ -117,15 +146,64 @@ class SubProjectsAdmin(admin.ModelAdmin):
         "user__email",
     )
     autocomplete_fields = ("user", "parent_project")
+    readonly_fields = ("last_updated",)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            return super().save_model(request, obj, form, change)
+        update_fields = [
+            field
+            for field in form.changed_data
+            if field not in {"total_time", "last_updated"}
+        ]
+        if update_fields:
+            obj.save(update_fields=update_fields)
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related("user", "parent_project").annotate(
+        queryset = super().get_queryset(request).select_related("user", "parent_project").annotate(
             _user_subproject_count=Count("user__subprojects", distinct=True)
         )
+        return annotate_subproject_totals(queryset)
+
+    @admin.display(description="Total time", ordering="derived_total_time")
+    def derived_total_time(self, obj):
+        return round(obj.derived_total_time or 0, 4)
+
+    @admin.display(description="Last updated", ordering="derived_last_updated")
+    def derived_last_updated(self, obj):
+        return obj.derived_last_updated
 
     @admin.display(description="User subproject count", ordering="_user_subproject_count")
     def user_subproject_count(self, obj):
         return obj._user_subproject_count or 0
+
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_subproject(
+                user=obj.user,
+                project_name=obj.parent_project.name,
+                subproject_name=obj.name,
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for subproject in list(queryset):
+                    DestructiveMutationService.delete_subproject(
+                        user=subproject.user,
+                        project_name=subproject.parent_project.name,
+                        subproject_name=subproject.name,
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+
+class SessionSubprojectInline(admin.TabularInline):
+    model = SessionSubproject
+    extra = 0
+    autocomplete_fields = ("subproject",)
 
 
 @admin.register(Sessions)
@@ -140,10 +218,11 @@ class SessionsAdmin(admin.ModelAdmin):
         "duration_minutes",
         "user_session_count",
     )
-    list_filter = ("is_active", "crosses_dst_transition", "project", "user", "project__status")
+    list_filter = ("project", "user", "project__status")
     search_fields = ("note", "project__name", "subprojects__name", "user__username", "user__email")
-    autocomplete_fields = ("user", "project", "subprojects")
-    readonly_fields = ("crosses_dst_transition",)
+    autocomplete_fields = ("user", "project")
+    readonly_fields = ("uuid",)
+    inlines = (SessionSubprojectInline,)
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("project", "user").prefetch_related("subprojects").annotate(
@@ -151,27 +230,45 @@ class SessionsAdmin(admin.ModelAdmin):
         )
 
     def save_model(self, request, obj, form, change):
-        obj._ledger_before = (
-            snapshot_contribution(Sessions.objects.select_for_update().get(pk=obj.pk))
-            if change
-            else None
-        )
+        # Admin edits bypass SessionMutationService, so replicate its integrity
+        # guarantees: floor instants to whole seconds, version the row, and mark
+        # the user's commitments for recompute.
+        obj.start_time = _floor_instant(obj.start_time)
+        obj.end_time = _floor_instant(obj.end_time)
+        obj.auto_stop_at = _floor_instant(obj.auto_stop_at)
+        obj.version = (obj.version or 1) + 1
         super().save_model(request, obj, form, change)
+        _mark_commitments_dirty(obj.user_id)
 
-    def save_related(self, request, form, formsets, change):
-        super().save_related(request, form, formsets, change)
-        after = snapshot_contribution(form.instance)
-        apply_contribution_change(
-            getattr(form.instance, "_ledger_before", None), after
+    def save_formset(self, request, form, formset, change):
+        super().save_formset(request, form, formset, change)
+        if formset.model is not SessionSubproject:
+            return
+        formset_changed = bool(
+            formset.new_objects
+            or formset.changed_objects
+            or formset.deleted_objects
         )
-        advance_last_updated(form.instance)
+        if not formset_changed:
+            return
+        session = form.instance
+        session.version = (session.version or 1) + 1
+        session.save(update_fields=["version"])
+        _mark_commitments_dirty(session.user_id)
+        # Validate the resulting allocation set; raising rolls back the whole
+        # admin edit (save_formset runs inside admin's transaction).
+        allocations = [
+            (link.subproject, link.allocation_bp)
+            for link in session.subproject_links.select_related("subproject")
+        ]
+        _validate_allocations(session, allocations)
 
     def delete_model(self, request, obj):
-        ledger_delete_session(obj.pk, user=obj.user)
+        SessionMutationService.delete_session(obj.pk, user=obj.user)
 
     def delete_queryset(self, request, queryset):
         for session_id in queryset.values_list("pk", flat=True):
-            ledger_delete_session(session_id)
+            SessionMutationService.delete_session(session_id)
 
     @admin.display(description="Duration (minutes)")
     def duration_minutes(self, obj):
@@ -215,9 +312,41 @@ class CommitmentAdmin(admin.ModelAdmin):
         "context__name",
         "tag__name",
     )
-    autocomplete_fields = ("user", "project", "subproject", "context", "tag")
-    list_editable = ("active", "banking_enabled", "target", "max_balance", "min_balance")
-    actions = (activate_commitments, deactivate_commitments, enable_banking, disable_banking)
+    readonly_fields = (
+        "user",
+        "aggregation_type",
+        "project",
+        "subproject",
+        "context",
+        "tag",
+        "include_projects",
+        "exclude_projects",
+        "include_subprojects",
+        "exclude_subprojects",
+        "include_contexts",
+        "exclude_contexts",
+        "include_tags",
+        "exclude_tags",
+        "commitment_type",
+        "period",
+        "start_date",
+        "target",
+        "banking_enabled",
+        "max_balance",
+        "min_balance",
+        "active",
+        "balance",
+        "last_reconciled",
+        "needs_recompute",
+        "ledger_start_at",
+        "generation",
+        "version",
+    )
+    list_editable = ()
+    actions = ()
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(Context)
@@ -234,6 +363,24 @@ class ContextAdmin(admin.ModelAdmin):
     def project_count(self, obj):
         return obj._project_count or 0
 
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_context(
+                user=obj.user, context_name=obj.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for context in list(queryset):
+                    DestructiveMutationService.delete_context(
+                        user=context.user, context_name=context.name
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
 
 @admin.register(Tag)
 class TagAdmin(admin.ModelAdmin):
@@ -248,3 +395,21 @@ class TagAdmin(admin.ModelAdmin):
     @admin.display(description="Projects", ordering="_project_count")
     def project_count(self, obj):
         return obj._project_count or 0
+
+    def delete_model(self, request, obj):
+        try:
+            DestructiveMutationService.delete_tag(
+                user=obj.user, tag_name=obj.name
+            )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)
+
+    def delete_queryset(self, request, queryset):
+        try:
+            with transaction.atomic():
+                for tag in list(queryset):
+                    DestructiveMutationService.delete_tag(
+                        user=tag.user, tag_name=tag.name
+                    )
+        except CommitmentTargetProtectedError as exc:
+            self.message_user(request, str(exc), messages.ERROR)

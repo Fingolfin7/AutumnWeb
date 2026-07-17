@@ -1,8 +1,10 @@
 import os
 from datetime import date, datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import InMemoryUploadedFile
@@ -30,6 +32,13 @@ DEFAULT_FILTER_UNIT_CHOICES = (
     ('year_to_date', 'Year to date'),
 )
 
+
+def validate_iana_timezone(value):
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, KeyError):
+        raise ValidationError("Enter a valid IANA timezone.")
+
 def get_fernet():
     global _DEF_FERNET
     if _DEF_FERNET is None:
@@ -44,6 +53,12 @@ def get_fernet():
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     image = models.ImageField(default='default.jpg', upload_to='profile_pics')
+    timezone = models.CharField(
+        max_length=64,
+        default="Europe/Prague",
+        db_default="Europe/Prague",
+        validators=[validate_iana_timezone],
+    )
     background_image = models.ImageField(upload_to='background_pics', null=True, blank=True)
     background_dimming = models.PositiveSmallIntegerField(default=55)
     automatic_background = models.BooleanField(default=False)  # Automatically set background image
