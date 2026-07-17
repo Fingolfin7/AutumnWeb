@@ -120,13 +120,6 @@ def _version_conflict(session):
     )
 
 
-def _check_version(request, session):
-    expected = _parse_if_match(request)
-    if expected is not None and expected != session.version:
-        return _version_conflict(session)
-    return None
-
-
 def _commitment_history_unaffected(user, instants):
     commitments = list(Commitment.objects.filter(user=user, active=True))
     touched = [instant for instant in instants if instant is not None]
@@ -793,10 +786,13 @@ class TimerDetailView(V2APIView):
                 ),
                 status=status.HTTP_409_CONFLICT,
             )
-        conflict = _check_version(request, session)
-        if conflict is not None:
-            return conflict
-        SessionMutationService.delete_session(session.pk, user=request.user)
+        expected_version = _parse_if_match(request)
+        try:
+            SessionMutationService.delete_session(
+                session.pk, user=request.user, expected_version=expected_version
+            )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

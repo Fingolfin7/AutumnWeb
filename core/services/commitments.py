@@ -291,13 +291,22 @@ class CommitmentEditService:
 
     @staticmethod
     @transaction.atomic
-    def restart(commitment_id, *, user, keep_balance: bool, changes: dict | None):
+    def restart(
+        commitment_id,
+        *,
+        user,
+        keep_balance: bool,
+        changes: dict | None,
+        expected_version=None,
+    ):
         from core.commitments import recompute_commitment
 
         changes = _normalize_changes(changes)
         commitment = Commitment.objects.select_for_update().get(
             pk=commitment_id, user=user
         )
+        if expected_version is not None and commitment.version != expected_version:
+            raise StaleVersionError(commitment)
         now = timezone.now()
         prior_generation = commitment.generation
         current_revision = (

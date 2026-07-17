@@ -299,13 +299,6 @@ def _version_conflict(commitment):
     )
 
 
-def _check_version(request, commitment):
-    expected = _parse_if_match(request)
-    if expected is not None and expected != commitment.version:
-        return _version_conflict(commitment)
-    return None
-
-
 def _resolve_owned_ids(user, ids, *, api_field, model):
     requested = set(ids)
     objects = list(model.objects.filter(user=user, pk__in=requested).order_by("pk"))
@@ -493,13 +486,21 @@ class CommitmentDetailView(V2APIView):
         responses={204: OpenApiResponse(description="Commitment deleted.")},
     )
     def delete(self, request, commitment_id):
-        commitment = _commitment_queryset(request.user).filter(pk=commitment_id).first()
-        if commitment is None:
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        conflict = _check_version(request, commitment)
-        if conflict is not None:
-            return conflict
-        commitment.delete()
+        expected_version = _parse_if_match(request)
+        with transaction.atomic():
+            commitment = (
+                Commitment.objects.select_for_update()
+                .filter(pk=commitment_id, user=request.user)
+                .first()
+            )
+            if commitment is None:
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            if (
+                expected_version is not None
+                and expected_version != commitment.version
+            ):
+                return _version_conflict(commitment)
+            commitment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -514,9 +515,7 @@ class CommitmentRestartView(V2APIView):
     )
     def post(self, request, commitment_id):
         commitment = _get_commitment(request.user, commitment_id)
-        conflict = _check_version(request, commitment)
-        if conflict is not None:
-            return conflict
+        expected_version = _parse_if_match(request)
         serializer = CommitmentRestartRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -534,7 +533,10 @@ class CommitmentRestartView(V2APIView):
                 user=request.user,
                 keep_balance=data["keep_balance"],
                 changes=changes,
+                expected_version=expected_version,
             )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
         except IntegrityError as exc:
             return Response(
                 _envelope(
