@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.views.decorators.http import require_POST
 from django.views.generic import View
 from django.contrib import messages
 from django.http import StreamingHttpResponse
@@ -326,7 +327,10 @@ async def perform_llm_analysis_stream(
 
 
 @login_required
+@require_POST
 def delete_chat(request, chat_id):
+    # POST-only: a GET-reachable delete can be triggered by link prefetching
+    # or a cross-site <img> request.
     if not user_has_ai_features(request.user):
         return ai_features_disabled_response(request)
     chat = get_object_or_404(LLMChat, id=chat_id, user=request.user)

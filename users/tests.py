@@ -85,6 +85,10 @@ class ProfileSaveTests(TestCase):
             email="profile@example.com",
             password="test-pass-123",
         )
+        # AI features are off by default since the hardening slice; these
+        # tests exercise API-key and insights flows, which are gated on it.
+        self.user.profile.ai_features_enabled = True
+        self.user.profile.save(update_fields=["ai_features_enabled"])
         self.client.login(username="profile-user", password="test-pass-123")
 
     def tearDown(self):

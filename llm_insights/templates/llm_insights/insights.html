@@ -322,7 +322,7 @@
                         <a href="{% url 'insights_detail' chat.id %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
                             <span class="chat-title" title="{{ chat.title }}">{{ chat.title }}</span>
                         </a>
-                        <a href="{% url 'delete_chat' chat.id %}" class="delete-chat-btn" onclick="return confirm('Delete this chat?')">
+                        <a href="#" class="delete-chat-btn" onclick="return deleteChat('{% url 'delete_chat' chat.id %}')">
                             <i class="fa fa-trash"></i>
                         </a>
                     </div>

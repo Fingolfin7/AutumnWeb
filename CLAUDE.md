@@ -108,6 +108,8 @@ DATABASE_URL=postgres://...  # Falls back to SQLite
 NASA_API_KEY=<key>
 SERVE_MEDIA=TRUE  # For PaaS deployments
 RUN_AUDIT_SCHEDULER=FALSE
+ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *
+ALLOW_REGISTRATION=FALSE  # Registration is closed unless explicitly enabled
 ```
 
 ## Database Notes

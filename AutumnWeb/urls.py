@@ -33,12 +33,6 @@ urlpatterns = [
     path("service-worker.js", pwa.service_worker, name="service_worker"),
     path("", include("core.urls")),
     path("get-auth-token/", obtain_auth_token, name="get-auth-token"),
-    path(
-        "check-auth-token/<token>/",
-        user_views.check_auth_token,
-        name="check-auth-token",
-    ),
-    path("debug-session/", user_views.debug_session, name="debug_session"),
     path("insights/", include("llm_insights.urls")),
     path("register/", user_views.register, name="register"),
     path(

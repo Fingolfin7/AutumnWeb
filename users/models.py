@@ -70,7 +70,9 @@ class Profile(models.Model):
     openai_chatgpt_token_enc = models.BinaryField(null=True, blank=True, editable=False)
     claude_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     ai_features_enabled = models.BooleanField(
-        default=True,
+        # Off by default: Gemini can fall back to the server's API key, so a
+        # fresh account must not get AI access until the operator grants it.
+        default=False,
         verbose_name="AI features",
         help_text="Allow this account to use Insights and configure AI provider credentials.",
     )

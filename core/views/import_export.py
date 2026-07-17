@@ -10,7 +10,7 @@ from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
 from django.utils import timezone
 from datetime import datetime, time
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_GET
 from django.shortcuts import render
 from core.models import Sessions
 from core.export2 import build_format2_export
@@ -72,8 +72,12 @@ def import_view(request):
     return render(request, "core/import.html", context)
 
 
-@csrf_exempt
+@login_required
+@require_GET
 def import_stream(request):
+    # EventSource GET: safe methods carry no CSRF requirement, and the import
+    # parameters come from this user's own session (set by the import form
+    # POST), so authentication is the required gate here.
     def event_stream():
         # Get data from the session.
         file_path = request.session.get("file_path")

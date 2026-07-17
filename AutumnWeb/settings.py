@@ -80,7 +80,12 @@ STORAGES = {
 DEFAULT_FILE_STORAGE = STORAGES["default"]["BACKEND"]
 
 
-ALLOWED_HOSTS = ["*"]
+# Comma-separated host allowlist, e.g. "autumn.example.com,localhost".
+# Defaults to "*" so existing deployments keep working; set it on the PaaS.
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
+
+# Single-user install: registration is closed unless explicitly enabled.
+ALLOW_REGISTRATION = env.bool("ALLOW_REGISTRATION", default=False)
 
 # Application definition
 

@@ -1,3 +1,20 @@
+// Global: referenced by inline onclick handlers in insights.html.
+// Chat deletion is POST-only server-side, so anchors post via fetch with the
+// page's CSRF token instead of navigating a GET link.
+function deleteChat(url) {
+    if (!confirm('Delete this chat?')) {
+        return false;
+    }
+    const csrfInput = document.querySelector('input[name=csrfmiddlewaretoken]');
+    fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfInput ? csrfInput.value : '' },
+    }).then((response) => {
+        window.location.href = response.url || '/insights/';
+    });
+    return false;
+}
+
 (function () {
     function parseSseEvent(rawEvent) {
         const event = { type: 'message', data: '' };
@@ -183,10 +200,10 @@
             deleteUrl.pathname = deleteUrl.pathname.replace(/[^/]+\/$/, `delete/${payload.chat_id}/`);
 
             const deleteLink = document.createElement('a');
-            deleteLink.href = deleteUrl.pathname;
+            deleteLink.href = '#';
             deleteLink.className = 'delete-chat-btn';
             deleteLink.onclick = function () {
-                return confirm('Delete this chat?');
+                return deleteChat(deleteUrl.pathname);
             };
             deleteLink.innerHTML = '<i class="fa fa-trash"></i>';
 
