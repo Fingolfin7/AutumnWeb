@@ -1,4 +1,5 @@
 from django.contrib import admin, messages
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Count
 
@@ -15,6 +16,11 @@ from .services import (
     CommitmentTargetProtectedError,
     DestructiveMutationService,
     SessionMutationService,
+)
+from .services.sessions import (
+    _floor_instant,
+    _mark_commitments_dirty,
+    _validate_allocations,
 )
 from .totals import annotate_project_totals, annotate_subproject_totals
 
@@ -222,6 +228,40 @@ class SessionsAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related("project", "user").prefetch_related("subprojects").annotate(
             _user_session_count=Count("user__sessions", distinct=True)
         )
+
+    def save_model(self, request, obj, form, change):
+        # Admin edits bypass SessionMutationService, so replicate its integrity
+        # guarantees: floor instants to whole seconds, version the row, and mark
+        # the user's commitments for recompute.
+        obj.start_time = _floor_instant(obj.start_time)
+        obj.end_time = _floor_instant(obj.end_time)
+        obj.auto_stop_at = _floor_instant(obj.auto_stop_at)
+        obj.version = (obj.version or 1) + 1
+        super().save_model(request, obj, form, change)
+        _mark_commitments_dirty(obj.user_id)
+
+    def save_formset(self, request, form, formset, change):
+        super().save_formset(request, form, formset, change)
+        if formset.model is not SessionSubproject:
+            return
+        formset_changed = bool(
+            formset.new_objects
+            or formset.changed_objects
+            or formset.deleted_objects
+        )
+        if not formset_changed:
+            return
+        session = form.instance
+        session.version = (session.version or 1) + 1
+        session.save(update_fields=["version"])
+        _mark_commitments_dirty(session.user_id)
+        # Validate the resulting allocation set; raising rolls back the whole
+        # admin edit (save_formset runs inside admin's transaction).
+        allocations = [
+            (link.subproject, link.allocation_bp)
+            for link in session.subproject_links.select_related("subproject")
+        ]
+        _validate_allocations(session, allocations)
 
     def delete_model(self, request, obj):
         SessionMutationService.delete_session(obj.pk, user=obj.user)
