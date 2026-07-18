@@ -68,9 +68,6 @@ class SessionResourceSerializer(serializers.Serializer):
     uuid = serializers.UUIDField(allow_null=True)
     version = serializers.IntegerField()
     project = ProjectSummarySerializer()
-    allocation_mode = serializers.ChoiceField(
-        choices=("legacy_full", "partitioned")
-    )
     subproject_allocations = serializers.SerializerMethodField()
     start = UTCDateTimeField(source="start_time")
     end = UTCDateTimeField(source="end_time", allow_null=True)
@@ -142,6 +139,13 @@ class TimerStartRequestSerializer(serializers.Serializer):
 class TimerStopRequestSerializer(serializers.Serializer):
     end = UTCDateTimeField(required=False)
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    subproject_allocations = SubprojectAllocationWriteSerializer(
+        many=True, required=False
+    )
+
+
+class TimerNoteRequestSerializer(serializers.Serializer):
+    note = serializers.CharField(allow_blank=True, allow_null=True)
 
 
 class TimerRestartRequestSerializer(serializers.Serializer):
@@ -157,26 +161,9 @@ class SessionTrackRequestSerializer(serializers.Serializer):
     )
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     uuid = serializers.UUIDField(required=False)
-    allocation_mode = serializers.ChoiceField(
-        required=False, choices=("legacy_full", "partitioned")
-    )
     subproject_allocations = SubprojectAllocationWriteSerializer(
         many=True, required=False
     )
-
-    def validate(self, attrs):
-        if (
-            "subproject_allocations" in attrs
-            and attrs.get("allocation_mode") != "partitioned"
-        ):
-            raise serializers.ValidationError(
-                {
-                    "subproject_allocations": [
-                        "subproject_allocations requires allocation_mode=partitioned."
-                    ]
-                }
-            )
-        return attrs
 
 
 class SessionPatchRequestSerializer(serializers.Serializer):
@@ -187,26 +174,9 @@ class SessionPatchRequestSerializer(serializers.Serializer):
         child=serializers.IntegerField(min_value=1), required=False
     )
     note = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    allocation_mode = serializers.ChoiceField(
-        required=False, choices=("legacy_full", "partitioned")
-    )
     subproject_allocations = SubprojectAllocationWriteSerializer(
         many=True, required=False
     )
-
-    def validate(self, attrs):
-        if (
-            "subproject_allocations" in attrs
-            and attrs.get("allocation_mode") != "partitioned"
-        ):
-            raise serializers.ValidationError(
-                {
-                    "subproject_allocations": [
-                        "subproject_allocations requires allocation_mode=partitioned."
-                    ]
-                }
-            )
-        return attrs
 
 
 class TimerListResponseSerializer(serializers.Serializer):
@@ -702,7 +672,6 @@ class ReportTallyEntrySerializer(serializers.Serializer):
     name = serializers.CharField(allow_null=True)
     total_minutes = serializers.FloatField()
     session_count = serializers.IntegerField(required=False)
-    legacy_overallocated = serializers.BooleanField(required=False)
 
 
 class ReportTalliesSerializer(serializers.Serializer):
@@ -725,7 +694,6 @@ class ReportHierarchyProjectSerializer(serializers.Serializer):
     name = serializers.CharField()
     total_minutes = serializers.FloatField()
     children = ReportHierarchyChildSerializer(many=True)
-    legacy_overallocated = serializers.BooleanField()
 
 
 class ReportHierarchySerializer(serializers.Serializer):

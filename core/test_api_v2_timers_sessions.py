@@ -4,6 +4,7 @@ from uuid import uuid4
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from freezegun import freeze_time
 from rest_framework.test import APIClient
 
@@ -343,7 +344,7 @@ class V2TimersSessionsTests(TestCase):
         )
         self.assertEqual(future_track.status_code, 400)
 
-    def test_multi_link_resource_has_stable_allocations_and_legacy_mode(self):
+    def test_multi_link_resource_has_stable_even_allocations(self):
         session = self._create_completed(
             end=datetime(2026, 7, 16, 10, 0, tzinfo=UTC),
             subprojects=[self.subproject_b, self.subproject_a],
@@ -353,19 +354,88 @@ class V2TimersSessionsTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["allocation_mode"], "legacy_full")
+        self.assertNotIn("allocation_mode", response.json())
         self.assertEqual(
             response.json()["subproject_allocations"],
             [
                 {
                     "subproject_id": self.subproject_a.id,
                     "name": "Alpha",
-                    "allocation_bp": 10000,
+                    "allocation_bp": 5000,
                 },
                 {
                     "subproject_id": self.subproject_b.id,
                     "name": "Beta",
-                    "allocation_bp": 10000,
+                    "allocation_bp": 5000,
                 },
             ],
         )
+
+    @freeze_time("2026-07-16 12:00:00")
+    def test_timer_stop_accepts_explicit_allocations(self):
+        timer = SessionMutationService.create_session(
+            user=self.user,
+            project=self.project,
+            subprojects=[self.subproject_a, self.subproject_b],
+            start_time=datetime(2026, 7, 16, 10, 0, tzinfo=UTC),
+        )
+
+        response = self.client.post(
+            reverse("api_v2:timer-stop", args=[timer.pk]),
+            {
+                "end": "2026-07-16T11:00:00Z",
+                "subproject_allocations": [
+                    {"subproject_id": self.subproject_a.pk, "allocation_bp": 2500},
+                    {"subproject_id": self.subproject_b.pk, "allocation_bp": 6500},
+                ],
+            },
+            format="json",
+            HTTP_IF_MATCH="1",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["version"], 3)
+        self.assertEqual(
+            [item["allocation_bp"] for item in response.json()["subproject_allocations"]],
+            [2500, 6500],
+        )
+
+    def test_timer_note_patch_is_active_only_owned_and_clearable(self):
+        timer = SessionMutationService.create_session(
+            user=self.user, project=self.project, note="before"
+        )
+        response = self.client.patch(
+            reverse("api_v2:timer-detail", args=[timer.pk]),
+            {"note": "in progress"},
+            format="json",
+            HTTP_IF_MATCH="1",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["note"], "in progress")
+
+        cleared = self.client.patch(
+            reverse("api_v2:timer-detail", args=[timer.pk]),
+            {"note": ""},
+            format="json",
+            HTTP_IF_MATCH="2",
+        )
+        self.assertEqual(cleared.status_code, 200)
+        self.assertIsNone(cleared.json()["note"])
+
+        SessionMutationService.mutate_session(timer.pk, user=self.user, end_time=timezone.now())
+        completed = self.client.patch(
+            reverse("api_v2:timer-detail", args=[timer.pk]),
+            {"note": "too late"},
+            format="json",
+        )
+        self.assertEqual(completed.status_code, 409)
+
+        foreign = SessionMutationService.create_session(
+            user=self.other_user, project=self.foreign_project
+        )
+        missing = self.client.patch(
+            reverse("api_v2:timer-detail", args=[foreign.pk]),
+            {"note": "not mine"},
+            format="json",
+        )
+        self.assertEqual(missing.status_code, 404)

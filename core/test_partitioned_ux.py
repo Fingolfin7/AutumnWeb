@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone as datetime_timezone
 
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
@@ -57,7 +57,6 @@ class PartitionedSessionApiTests(TestCase):
         response = self.client.post(
             reverse("api_v2:sessions"),
             self.payload(
-                allocation_mode="partitioned",
                 subproject_allocations=[
                     {"subproject_id": self.sub_a.pk, "allocation_bp": 2500},
                     {"subproject_id": self.sub_b.pk, "allocation_bp": 6000},
@@ -67,7 +66,7 @@ class PartitionedSessionApiTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.json()["allocation_mode"], "partitioned")
+        self.assertNotIn("allocation_mode", response.json())
         self.assertEqual(
             [
                 (item["subproject_id"], item["allocation_bp"])
@@ -80,7 +79,6 @@ class PartitionedSessionApiTests(TestCase):
         response = self.client.post(
             reverse("api_v2:sessions"),
             self.payload(
-                allocation_mode="partitioned",
                 subproject_ids=[self.sub_c.pk, self.sub_a.pk, self.sub_b.pk],
             ),
             format="json",
@@ -99,7 +97,6 @@ class PartitionedSessionApiTests(TestCase):
         response = self.client.post(
             reverse("api_v2:sessions"),
             self.payload(
-                allocation_mode="partitioned",
                 subproject_allocations=[
                     {"subproject_id": self.sub_a.pk, "allocation_bp": 6000},
                     {"subproject_id": self.sub_b.pk, "allocation_bp": 5000},
@@ -112,11 +109,10 @@ class PartitionedSessionApiTests(TestCase):
         self.assertEqual(response.json()["error"]["code"], "validation_error")
         self.assertFalse(Sessions.objects.filter(user=self.user).exists())
 
-    def test_mode_switch_back_to_legacy_forces_full_credit(self):
+    def test_patch_bare_subproject_ids_re_even_splits(self):
         created = self.client.post(
             reverse("api_v2:sessions"),
             self.payload(
-                allocation_mode="partitioned",
                 subproject_allocations=[
                     {"subproject_id": self.sub_a.pk, "allocation_bp": 3000},
                     {"subproject_id": self.sub_b.pk, "allocation_bp": 7000},
@@ -127,33 +123,32 @@ class PartitionedSessionApiTests(TestCase):
 
         response = self.client.patch(
             reverse("api_v2:session-detail", args=[created["id"]]),
-            {"allocation_mode": "legacy_full"},
+            {"subproject_ids": [self.sub_c.pk, self.sub_a.pk, self.sub_b.pk]},
             format="json",
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["allocation_mode"], "legacy_full")
         self.assertEqual(
-            [item["allocation_bp"] for item in response.json()["subproject_allocations"]],
-            [10000, 10000],
+            {
+                item["subproject_id"]: item["allocation_bp"]
+                for item in response.json()["subproject_allocations"]
+            },
+            {self.sub_a.pk: 3334, self.sub_b.pk: 3333, self.sub_c.pk: 3333},
         )
 
-    @override_settings(AUTUMN_PARTITIONED_ATTRIBUTION=False)
-    def test_disabled_flag_returns_validation_error(self):
-        response = self.client.post(
-            reverse("api_v2:sessions"),
-            self.payload(
-                allocation_mode="partitioned",
-                subproject_ids=[self.sub_a.pk],
+    def test_create_service_three_subprojects_defaults_to_even_split(self):
+        session = SessionMutationService.create_session(
+            user=self.user,
+            project=self.project,
+            subprojects=[self.sub_c, self.sub_a, self.sub_b],
+        )
+        self.assertEqual(
+            dict(
+                session.subproject_links.values_list(
+                    "subproject_id", "allocation_bp"
+                )
             ),
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
-        self.assertIn(
-            "partitioned attribution is disabled",
-            str(response.json()["error"]["details"]),
+            {self.sub_a.pk: 3334, self.sub_b.pk: 3333, self.sub_c.pk: 3333},
         )
 
 
@@ -174,7 +169,6 @@ class PartitionedMergeAndReadTests(TestCase):
         return Sessions.objects.create(
             user=self.user,
             project=self.project,
-            allocation_mode="partitioned",
             start_time=start,
             end_time=start + timedelta(seconds=seconds),
             is_active=False,

@@ -13,15 +13,12 @@ from datetime import timedelta, timezone as datetime_timezone
 from django.db.models import (
     BigIntegerField,
     Case,
-    CharField,
-    DurationField,
     ExpressionWrapper,
     F,
     Func,
     IntegerField,
     Max,
     OuterRef,
-    Q,
     Subquery,
     Sum,
     Value,
@@ -29,7 +26,7 @@ from django.db.models import (
 )
 from django.db.models.functions import Cast, Coalesce, TruncDate
 
-from core.models import Sessions, SessionSubproject, SubProjects
+from core.models import Sessions, SessionSubproject
 
 
 BASIS_POINTS = 10000
@@ -57,12 +54,6 @@ class _ElapsedMicroseconds(Func):
             f"({end_sql} - {start_sql})) * 1000000 AS bigint)",
             [*end_params, *start_params],
         )
-
-
-def _duration_expression():
-    return ExpressionWrapper(
-        F("end_time") - F("start_time"), output_field=DurationField()
-    )
 
 
 def _elapsed_microseconds():
@@ -96,10 +87,6 @@ def _reanchor(sessions_qs):
     ).order_by()
 
 
-def _is_pure_legacy(sessions):
-    return not sessions.filter(allocation_mode="partitioned").exists()
-
-
 def _with_allocation_total(sessions):
     allocation_totals = (
         SessionSubproject.objects.filter(session_id=OuterRef("pk"))
@@ -118,22 +105,10 @@ def _with_allocation_total(sessions):
 
 def _with_link_numerator(sessions):
     return (
-        _with_allocation_total(sessions)
-        .filter(subproject_links__isnull=False)
-        .annotate(
-            _effective_bp=Case(
-                When(
-                    Q(allocation_mode="legacy_full")
-                    | Q(_allocation_total__gt=BASIS_POINTS),
-                    then=Value(BASIS_POINTS),
-                ),
-                default=F("subproject_links__allocation_bp"),
-                output_field=IntegerField(),
-            )
-        )
+        sessions.filter(subproject_links__isnull=False)
         .annotate(
             _weighted_numerator=ExpressionWrapper(
-                _elapsed_microseconds() * F("_effective_bp"),
+                _elapsed_microseconds() * F("subproject_links__allocation_bp"),
                 output_field=BigIntegerField(),
             )
         )
@@ -147,8 +122,7 @@ def _with_residual_numerator(sessions):
             _residual_bp=Case(
                 When(_allocation_total=0, then=Value(BASIS_POINTS)),
                 When(
-                    Q(allocation_mode="partitioned")
-                    & Q(_allocation_total__lt=BASIS_POINTS),
+                    _allocation_total__lt=BASIS_POINTS,
                     then=Value(BASIS_POINTS) - F("_allocation_total"),
                 ),
                 default=Value(0),
@@ -184,60 +158,6 @@ def subproject_tally(sessions_qs, *, group_by_id=False):
     """
 
     sessions = _reanchor(sessions_qs)
-    if _is_pure_legacy(sessions):
-        if group_by_id:
-            raw_rows = list(
-                sessions.values("subprojects")
-                .annotate(
-                    total=Sum(_duration_expression()),
-                    latest_end_time=Max("end_time"),
-                )
-                .order_by("-latest_end_time", "subprojects")
-            )
-            subproject_ids = [
-                row["subprojects"]
-                for row in raw_rows
-                if row["subprojects"] is not None
-            ]
-            names = dict(
-                SubProjects.objects.filter(id__in=subproject_ids).values_list(
-                    "id", "name"
-                )
-            )
-            return [
-                {
-                    "subproject_id": row["subprojects"],
-                    "name": (
-                        NO_SUBPROJECT
-                        if row["subprojects"] is None
-                        else names[row["subprojects"]]
-                    ),
-                    "total": row["total"],
-                    "total_numerator": _duration_numerator(row["total"]),
-                    "latest_end_time": row["latest_end_time"],
-                }
-                for row in raw_rows
-            ]
-
-        raw_rows = list(
-            sessions.annotate(
-                name=Coalesce(
-                    "subprojects__name",
-                    Value(NO_SUBPROJECT),
-                    output_field=CharField(),
-                )
-            )
-            .values("name")
-            .annotate(
-                total=Sum(_duration_expression()),
-                latest_end_time=Max("end_time"),
-            )
-            .order_by("-latest_end_time", "name")
-        )
-        for row in raw_rows:
-            row["total_numerator"] = _duration_numerator(row["total"])
-        return raw_rows
-
     link_sessions = _with_link_numerator(sessions)
     if group_by_id:
         link_rows = list(
@@ -307,25 +227,6 @@ def subproject_session_points(sessions_qs):
     """Return one weighted scatter point per session/subproject bucket."""
 
     sessions = _reanchor(sessions_qs)
-    if _is_pure_legacy(sessions):
-        rows = list(
-            sessions.annotate(
-                series=Coalesce(
-                    "subprojects__name",
-                    Value(NO_SUBPROJECT),
-                    output_field=CharField(),
-                ),
-                duration_value=_duration_expression(),
-            )
-            .values("end_time", "series", "duration_value")
-            .order_by("-end_time", "series")
-        )
-        for row in rows:
-            row["duration_numerator"] = _duration_numerator(
-                row["duration_value"]
-            )
-        return rows
-
     link_rows = list(
         _with_link_numerator(sessions)
         .annotate(series=F("subproject_links__subproject__name"))
@@ -371,24 +272,6 @@ def subproject_daily_series(sessions_qs):
     date_expression = TruncDate(
         "start_time", tzinfo=datetime_timezone.utc
     )
-    if _is_pure_legacy(sessions):
-        rows = list(
-            sessions.annotate(
-                date=date_expression,
-                series=Coalesce(
-                    "subprojects__name",
-                    Value(NO_SUBPROJECT),
-                    output_field=CharField(),
-                ),
-            )
-            .values("date", "series")
-            .annotate(total=Sum(_duration_expression()))
-            .order_by("date", "series")
-        )
-        for row in rows:
-            row["total_numerator"] = _duration_numerator(row["total"])
-        return rows
-
     link_rows = list(
         _with_link_numerator(sessions)
         .annotate(
@@ -437,22 +320,6 @@ def hierarchy_child_credit(sessions_qs):
     """Return weighted link credit by subproject ID, with no residual row."""
 
     sessions = _reanchor(sessions_qs)
-    if _is_pure_legacy(sessions):
-        rows = list(
-            sessions.values("subprojects")
-            .annotate(total=Sum(_duration_expression()))
-            .order_by()
-        )
-        return [
-            {
-                "subproject_id": row["subprojects"],
-                "total": row["total"],
-                "total_numerator": _duration_numerator(row["total"]),
-            }
-            for row in rows
-            if row["subprojects"] is not None
-        ]
-
     rows = list(
         _with_link_numerator(sessions)
         .annotate(subproject_id=F("subproject_links__subproject_id"))
@@ -473,9 +340,7 @@ def report_attribution(sessions_qs):
     """Partition filtered sessions into per-project link and residual credit.
 
     Values stay as integer ``duration microseconds * basis points`` numerators
-    until report views convert them to minutes.  This also preserves the
-    legacy rule: legacy-full links, and any historical allocation whose basis
-    points exceed 10000, each receive full session credit.
+    until report views convert them to minutes.
     """
 
     projects = {}
@@ -504,35 +369,23 @@ def report_attribution(sessions_qs):
 
         links = list(session.subproject_links.all())
         allocation_total = sum(link.allocation_bp for link in links)
-        full_credit_links = (
-            session.allocation_mode == "legacy_full"
-            or allocation_total > BASIS_POINTS
-        )
         for link in links:
-            effective_bp = BASIS_POINTS if full_credit_links else link.allocation_bp
             child = project["children"][link.subproject_id]
             child["id"] = link.subproject_id
             child["name"] = link.subproject.name
             child["total_numerator"] += (
-                duration_numerator * effective_bp // BASIS_POINTS
+                duration_numerator * link.allocation_bp // BASIS_POINTS
             )
 
         residual_bp = 0
         if not links:
             residual_bp = BASIS_POINTS
-        elif (
-            session.allocation_mode == "partitioned"
-            and allocation_total < BASIS_POINTS
-        ):
+        elif allocation_total < BASIS_POINTS:
             residual_bp = BASIS_POINTS - allocation_total
         project["residual_numerator"] += (
             duration_numerator * residual_bp // BASIS_POINTS
         )
 
     for project in projects.values():
-        child_total = sum(
-            child["total_numerator"] for child in project["children"].values()
-        )
-        project["legacy_overallocated"] = child_total > project["total_numerator"]
         project["children"] = dict(project["children"])
     return projects

@@ -156,8 +156,6 @@ class ReportTalliesView(V2APIView):
                         child["total_numerator"]
                     ),
                 }
-                if project["legacy_overallocated"]:
-                    entry["legacy_overallocated"] = True
                 entries.append(entry)
             if project["residual_numerator"] > 0:
                 entry = {
@@ -169,8 +167,6 @@ class ReportTalliesView(V2APIView):
                         project["residual_numerator"]
                     ),
                 }
-                if project["legacy_overallocated"]:
-                    entry["legacy_overallocated"] = True
                 entries.append(entry)
         return entries
 
@@ -251,7 +247,6 @@ class ReportHierarchyView(V2APIView):
                         project["total_numerator"]
                     ),
                     "children": children,
-                    "legacy_overallocated": project["legacy_overallocated"],
                 }
             )
         projects = _ordered(projects)

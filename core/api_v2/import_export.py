@@ -67,7 +67,6 @@ class Format2LinkSerializer(serializers.Serializer):
 
 class Format2SessionSerializer(serializers.Serializer):
     uuid = serializers.UUIDField(required=False, allow_null=True)
-    allocation_mode = serializers.ChoiceField(choices=("legacy_full", "partitioned"))
     start = serializers.DateTimeField()
     end = serializers.DateTimeField()
     note = serializers.CharField(allow_blank=True, allow_null=True)

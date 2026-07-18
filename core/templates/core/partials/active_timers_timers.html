@@ -41,6 +41,23 @@
                         </button>
                     </span>
                 </div>
+                <div class="timer-note-editor" data-timer-note-editor data-dirty="false"
+                     data-save-url="{% url 'update_timer_note' timer.id %}">
+                    <label for="timer-note-{{ timer.id }}">Session note</label>
+                    <div class="timer-note-toolbar">
+                        <button type="button" class="attr-mini-btn" data-timer-note-stamp>
+                            <i class="fa fa-clock" aria-hidden="true"></i> Insert timestamp
+                        </button>
+                    </div>
+                    <textarea id="timer-note-{{ timer.id }}" data-timer-note-input
+                              placeholder="Jot down progress while this timer runs.">{{ timer.note|default_if_none:"" }}</textarea>
+                    <div class="timer-note-footer">
+                        <small class="timer-note-status saved" data-timer-note-status>Saved</small>
+                        <button type="button" class="attr-mini-btn timer-note-save" data-timer-note-save>
+                            <i class="fa fa-save" aria-hidden="true"></i> Save note
+                        </button>
+                    </div>
+                </div>
             </div>
         {% endfor %}
     {% else %}

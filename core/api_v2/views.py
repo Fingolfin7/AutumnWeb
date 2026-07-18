@@ -42,6 +42,7 @@ from core.api_v2.serializers import (
     TagResourceSerializer,
     TagWriteRequestSerializer,
     TimerListResponseSerializer,
+    TimerNoteRequestSerializer,
     TimerRestartRequestSerializer,
     TimerStartRequestSerializer,
     TimerStopRequestSerializer,
@@ -177,13 +178,12 @@ def _canonical_existing(session):
     return canonical_existing_session(session)
 
 
-def _canonical_track_payload(project, allocation_mode, allocations, data):
+def _canonical_track_payload(project, allocations, data):
     return canonical_session_content(
         project.name,
         data["start"],
         data["end"],
         data.get("note") or "",
-        allocation_mode,
         [(subproject.name, bp) for subproject, bp in allocations],
     )
 
@@ -214,13 +214,6 @@ def _explicit_allocation_pairs(user, project, items):
 def _even_allocation_pairs(subprojects):
     split = even_split_bps(subproject.id for subproject in subprojects)
     return [(subproject, split[subproject.id]) for subproject in subprojects]
-
-
-def _check_partitioned_writes_enabled():
-    if not settings.AUTUMN_PARTITIONED_ATTRIBUTION:
-        raise ValidationError(
-            {"allocation_mode": ["partitioned attribution is disabled"]}
-        )
 
 
 def _subproject_queryset(user):
@@ -709,16 +702,28 @@ class TimerStopView(V2APIView):
             raise ValidationError(
                 {"end": ["End must be on or after the session start."]}
             )
-        try:
-            session = SessionMutationService.mutate_session(
-                session.pk,
-                user=request.user,
-                end_time=end_time,
-                is_active=False,
-                auto_stop_at=None,
-                note=data["note"] if "note" in data else UNSET,
-                expected_version=expected_version,
+        allocations = None
+        if "subproject_allocations" in data:
+            allocations = _explicit_allocation_pairs(
+                request.user, session.project, data["subproject_allocations"]
             )
+        try:
+            with transaction.atomic():
+                session = SessionMutationService.mutate_session(
+                    session.pk,
+                    user=request.user,
+                    end_time=end_time,
+                    is_active=False,
+                    auto_stop_at=None,
+                    note=data["note"] if "note" in data else UNSET,
+                    expected_version=expected_version,
+                )
+                if allocations is not None:
+                    session = SessionMutationService.set_allocations(
+                        session.pk,
+                        user=request.user,
+                        allocations=allocations,
+                    )
         except StaleVersionError as exc:
             return _version_conflict(exc.current)
         return Response(_serialize(session), status=status.HTTP_200_OK)
@@ -767,6 +772,35 @@ class TimerRestartView(V2APIView):
 
 class TimerDetailView(V2APIView):
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=TimerNoteRequestSerializer,
+        parameters=[IF_MATCH_PARAMETER],
+        responses={200: SessionResourceSerializer},
+    )
+    def patch(self, request, session_id):
+        session = _get_session(request.user, session_id)
+        if session.end_time is not None:
+            return Response(
+                _envelope(
+                    "conflict",
+                    f"Session {session_id} is completed; its timer note can no longer be changed.",
+                ),
+                status=status.HTTP_409_CONFLICT,
+            )
+        serializer = TimerNoteRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        expected_version = _parse_if_match(request)
+        try:
+            session = SessionMutationService.mutate_session(
+                session.pk,
+                user=request.user,
+                note=serializer.validated_data["note"] or None,
+                expected_version=expected_version,
+            )
+        except StaleVersionError as exc:
+            return _version_conflict(exc.current)
+        return Response(_serialize(session), status=status.HTTP_200_OK)
 
     @extend_schema(
         request=None,
@@ -846,9 +880,6 @@ class SessionsView(V2APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         project = _resolve_project(request.user, data["project_id"])
-        allocation_mode = data.get("allocation_mode", "legacy_full")
-        if allocation_mode == "partitioned":
-            _check_partitioned_writes_enabled()
         if "subproject_allocations" in data:
             allocations = _explicit_allocation_pairs(
                 request.user, project, data["subproject_allocations"]
@@ -858,11 +889,7 @@ class SessionsView(V2APIView):
             subprojects = _resolve_subprojects(
                 request.user, project, data.get("subproject_ids", [])
             )
-            allocations = (
-                _even_allocation_pairs(subprojects)
-                if allocation_mode == "partitioned"
-                else [(subproject, 10000) for subproject in subprojects]
-            )
+            allocations = _even_allocation_pairs(subprojects)
         if data["end"] < data["start"]:
             raise ValidationError({"end": ["End must be on or after start."]})
         _validate_not_future(data["end"], "end")
@@ -871,7 +898,7 @@ class SessionsView(V2APIView):
             existing = _session_queryset(request.user).filter(uuid=data["uuid"]).first()
             if existing is not None:
                 if _canonical_existing(existing) == _canonical_track_payload(
-                    project, allocation_mode, allocations, data
+                    project, allocations, data
                 ):
                     return Response(_serialize(existing), status=status.HTTP_200_OK)
                 return Response(
@@ -886,7 +913,7 @@ class SessionsView(V2APIView):
         fields = {
             "user": request.user,
             "project": project,
-            "subprojects": subprojects,
+            "allocations": allocations,
             "start_time": data["start"],
             "end_time": data["end"],
             "is_active": False,
@@ -894,15 +921,7 @@ class SessionsView(V2APIView):
         }
         if "uuid" in data:
             fields["uuid"] = data["uuid"]
-        with transaction.atomic():
-            session = SessionMutationService.create_session(**fields)
-            if allocation_mode == "partitioned":
-                session = SessionMutationService.set_allocations(
-                    session.pk,
-                    user=request.user,
-                    allocations=allocations,
-                    allocation_mode="partitioned",
-                )
+        session = SessionMutationService.create_session(**fields)
         return Response(_serialize(session), status=status.HTTP_201_CREATED)
 
 
@@ -930,66 +949,22 @@ class SessionDetailView(V2APIView):
             if "project_id" in data
             else session.project
         )
-        subprojects = (
-            []
-            if "subproject_allocations" in data
-            else _resolve_subprojects(request.user, project, data["subproject_ids"])
-            if "subproject_ids" in data
-            else list(session.subprojects.all())
-        )
-        if (
-            "project_id" in data
-            and "subproject_ids" not in data
-            and "subproject_allocations" not in data
-        ):
-            subprojects = _resolve_subprojects(
-                request.user, project, [subproject.id for subproject in subprojects]
-            )
-
-        allocation_mode = data.get("allocation_mode", session.allocation_mode)
-        partitioned_relation_write = allocation_mode == "partitioned" and any(
-            field in data
-            for field in (
-                "allocation_mode",
-                "subproject_ids",
-                "subproject_allocations",
-                "project_id",
-            )
-        )
-        if partitioned_relation_write:
-            _check_partitioned_writes_enabled()
-
+        allocations = UNSET
         if "subproject_allocations" in data:
             allocations = _explicit_allocation_pairs(
                 request.user, project, data["subproject_allocations"]
             )
-            subprojects = [subproject for subproject, _ in allocations]
-        elif allocation_mode == "partitioned" and (
-            "subproject_ids" in data
-            or "project_id" in data
-            or session.allocation_mode != "partitioned"
-        ):
-            allocations = _even_allocation_pairs(subprojects)
-        elif allocation_mode == "partitioned":
-            current_bps = {
-                link.subproject_id: link.allocation_bp
-                for link in session.subproject_links.all()
-            }
-            allocations = [
-                (subproject, current_bps[subproject.id])
-                for subproject in subprojects
-            ]
-        else:
-            allocations = [(subproject, 10000) for subproject in subprojects]
-
-        replace_allocations = (
-            "subproject_allocations" in data
-            or "allocation_mode" in data
-            or (
-                session.allocation_mode == "partitioned"
-                and ("subproject_ids" in data or "project_id" in data)
+        elif "subproject_ids" in data:
+            subprojects = _resolve_subprojects(
+                request.user, project, data["subproject_ids"]
             )
-        )
+            allocations = _even_allocation_pairs(subprojects)
+        elif "project_id" in data:
+            _resolve_subprojects(
+                request.user,
+                project,
+                [link.subproject_id for link in session.subproject_links.all()],
+            )
 
         start_time = data.get("start", session.start_time)
         end_time = data.get("end", session.end_time)
@@ -1001,44 +976,19 @@ class SessionDetailView(V2APIView):
             request.user,
             (session.start_time, session.end_time, start_time, end_time),
         )
-        base_fields_touched = any(
-            field in data for field in ("project_id", "start", "end", "note")
-        )
         try:
-            with transaction.atomic():
-                # Validate the supplied version against the first locked write in
-                # this transaction; once it bumps the version, later writes in the
-                # same transaction skip the check (allocation_expected_version).
-                allocation_expected_version = expected_version
-                if base_fields_touched or not replace_allocations:
-                    session = SessionMutationService.mutate_session(
-                        session.pk,
-                        user=request.user,
-                        project=project if "project_id" in data else UNSET,
-                        subprojects=(
-                            []
-                            if replace_allocations and "project_id" in data
-                            else subprojects
-                            if not replace_allocations
-                            and ("project_id" in data or "subproject_ids" in data)
-                            else UNSET
-                        ),
-                        start_time=data["start"] if "start" in data else UNSET,
-                        end_time=data["end"] if "end" in data else UNSET,
-                        is_active=False if "end" in data else UNSET,
-                        auto_stop_at=None if "end" in data else UNSET,
-                        note=data["note"] if "note" in data else UNSET,
-                        expected_version=expected_version,
-                    )
-                    allocation_expected_version = None
-                if replace_allocations:
-                    session = SessionMutationService.set_allocations(
-                        session.pk,
-                        user=request.user,
-                        allocations=allocations,
-                        allocation_mode=allocation_mode,
-                        expected_version=allocation_expected_version,
-                    )
+            session = SessionMutationService.mutate_session(
+                session.pk,
+                user=request.user,
+                project=project if "project_id" in data else UNSET,
+                start_time=data["start"] if "start" in data else UNSET,
+                end_time=data["end"] if "end" in data else UNSET,
+                is_active=False if "end" in data else UNSET,
+                auto_stop_at=None if "end" in data else UNSET,
+                note=data["note"] if "note" in data else UNSET,
+                allocations=allocations,
+                expected_version=expected_version,
+            )
         except StaleVersionError as exc:
             return _version_conflict(exc.current)
         payload = _serialize(session)

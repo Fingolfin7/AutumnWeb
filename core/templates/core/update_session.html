@@ -7,11 +7,13 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
     <script src="{% static 'core/js/timer_search_projects.js' %}?v={{ static_version.timer_search_projects }}" type="text/javascript"></script>
     <script src="{% static 'core/js/session_note_editor.js' %}?v={{ static_version.session_note_editor }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/allocation_editor.js' %}?v={{ static_version.allocation_editor }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        {{ form.non_field_errors }}
         <section id="input-fields" class="card stacked">
            <div class="session-top-grid">
                 <span class="label-input session-field">
@@ -65,15 +67,15 @@
                     <span>
                         <input type="checkbox" id="subproject-{{ item.subproject.id }}"
                                name="subprojects" value="{{ item.subproject.name }}"
+                               data-allocation-choice data-subproject-id="{{ item.subproject.id }}"
+                               data-subproject-name="{{ item.subproject.name }}"
+                               data-initial-bp="{{ item.allocation_bp }}"
                         {% if item.is_selected %} checked {% endif %}>
                         <label for="subproject-{{ item.subproject.id }}">{{ item.subproject.name }}</label>
                     </span>
                 {% endfor %}
             </div>
-            <span>
-                <input type="checkbox" id="partition-evenly" name="partition_evenly">
-                <label for="partition-evenly">Split time evenly across subprojects</label>
-            </span>
+            <div data-allocation-editor data-checkbox-selector="[data-allocation-choice]"></div>
         </section>
 
         <section id="submit-row">

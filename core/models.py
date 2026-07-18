@@ -191,12 +191,6 @@ class Sessions(models.Model):
         through='SessionSubproject',
         through_fields=('session', 'subproject'),
     )
-    allocation_mode = models.CharField(
-        max_length=16,
-        choices=[('legacy_full', 'legacy_full'), ('partitioned', 'partitioned')],
-        default='legacy_full',
-        db_default='legacy_full',
-    )
     start_time = models.DateTimeField(default=timezone.now)
     end_time = models.DateTimeField(null=True, blank=True)
     auto_stop_at = models.DateTimeField(null=True, blank=True)

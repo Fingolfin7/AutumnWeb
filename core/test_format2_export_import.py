@@ -68,7 +68,6 @@ class Format2ExportImportTests(TestCase):
         self.partitioned = Sessions.objects.create(
             user=self.source,
             project=self.project,
-            allocation_mode="partitioned",
             start_time=self.at(2024, 1, 2, 11),
             end_time=self.at(2024, 1, 2, 12),
             is_active=False,
@@ -163,7 +162,6 @@ class Format2ExportImportTests(TestCase):
         }
         self.assertEqual(set(imported), {str(self.legacy.uuid), str(self.partitioned.uuid)})
         split = imported[str(self.partitioned.uuid)]
-        self.assertEqual(split.allocation_mode, "partitioned")
         self.assertEqual(
             list(
                 split.subproject_links.order_by("subproject__name").values_list(
@@ -173,10 +171,9 @@ class Format2ExportImportTests(TestCase):
             [("Planning", 3000), ("Review", 7000)],
         )
         legacy = imported[str(self.legacy.uuid)]
-        self.assertEqual(legacy.allocation_mode, "legacy_full")
         self.assertEqual(
             set(legacy.subproject_links.values_list("allocation_bp", flat=True)),
-            {10000},
+            {5000},
         )
 
     def test_idempotent_reimport_skips_every_session_and_creates_no_rows(self):
@@ -243,7 +240,7 @@ class Format2ExportImportTests(TestCase):
                 split = next(
                     session
                     for session in invalid["projects"][0]["sessions"]
-                    if session["allocation_mode"] == "partitioned"
+                    if session["note"] is None
                 )
                 split["links"][0]["allocation_bp"] = first_bp
                 split["links"][1]["allocation_bp"] = second_bp
@@ -254,6 +251,41 @@ class Format2ExportImportTests(TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertEqual(response.json()["error"]["code"], "validation_error")
                 self.assertEqual(self.owned_counts(), before)
+
+    def test_old_legacy_full_format2_session_is_coerced_to_even_split(self):
+        old_document = copy.deepcopy(self.document)
+        session = old_document["projects"][0]["sessions"][0]
+        session["allocation_mode"] = "legacy_full"
+        session["links"][0]["allocation_bp"] = 6000
+        session["links"][1]["allocation_bp"] = 4000
+
+        response = self.post_import(old_document)
+
+        self.assertEqual(response.status_code, 200)
+        imported = Sessions.objects.get(user=self.target, uuid=session["uuid"])
+        self.assertEqual(
+            list(
+                imported.subproject_links.order_by("subproject__name").values_list(
+                    "allocation_bp", flat=True
+                )
+            ),
+            [5000, 5000],
+        )
+
+    def test_old_multilink_without_mode_and_full_links_is_coerced_evenly(self):
+        old_document = copy.deepcopy(self.document)
+        session = old_document["projects"][0]["sessions"][0]
+        session["links"][0]["allocation_bp"] = 10000
+        session["links"][1]["allocation_bp"] = 10000
+
+        response = self.post_import(old_document)
+
+        self.assertEqual(response.status_code, 200)
+        imported = Sessions.objects.get(user=self.target, uuid=session["uuid"])
+        self.assertEqual(
+            set(imported.subproject_links.values_list("allocation_bp", flat=True)),
+            {5000},
+        )
 
     def test_legacy_format1_payload_imports_through_v2_endpoint(self):
         payload = {
@@ -290,7 +322,6 @@ class Format2ExportImportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["sessions_imported"], 1)
         session = Sessions.objects.get(user=self.target)
-        self.assertEqual(session.allocation_mode, "legacy_full")
         self.assertEqual(
             session.subproject_links.get().allocation_bp,
             10000,

@@ -171,8 +171,6 @@ class DestructiveMutationService:
         )
         offending_session_ids = []
         for session in affected_sessions:
-            if session.allocation_mode != "partitioned":
-                continue
             links = list(session.subproject_links.all())
             allocation_total = sum(link.allocation_bp for link in links)
             merged_bp = sum(
@@ -223,14 +221,10 @@ class DestructiveMutationService:
                 for link in links
                 if link.subproject_id not in source_ids
             ]
-            merged_bp = (
-                sum(
-                    link.allocation_bp
-                    for link in links
-                    if link.subproject_id in source_ids
-                )
-                if session.allocation_mode == "partitioned"
-                else 10000
+            merged_bp = sum(
+                link.allocation_bp
+                for link in links
+                if link.subproject_id in source_ids
             )
             allocations = [*retained, (merged_subproject, merged_bp)]
             SessionSubproject.objects.filter(session=session).delete()

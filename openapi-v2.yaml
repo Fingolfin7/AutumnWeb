@@ -1519,6 +1519,43 @@ paths:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
   /api/v2/timers/{session_id}:
+    patch:
+      operationId: timers_partial_update
+      parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer session version.
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTimerNoteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTimerNoteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTimerNoteRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResource'
+          description: ''
     delete:
       operationId: timers_destroy
       parameters:
@@ -1631,14 +1668,6 @@ components:
         * `subproject` - subproject
         * `context` - context
         * `tag` - tag
-    AllocationModeEnum:
-      enum:
-      - legacy_full
-      - partitioned
-      type: string
-      description: |-
-        * `legacy_full` - legacy_full
-        * `partitioned` - partitioned
     ByEnum:
       enum:
       - project
@@ -2258,8 +2287,6 @@ components:
           type: string
           format: uuid
           nullable: true
-        allocation_mode:
-          $ref: '#/components/schemas/AllocationModeEnum'
         start:
           type: string
           format: date-time
@@ -2274,7 +2301,6 @@ components:
           items:
             $ref: '#/components/schemas/Format2Link'
       required:
-      - allocation_mode
       - end
       - links
       - note
@@ -2510,8 +2536,6 @@ components:
         note:
           type: string
           nullable: true
-        allocation_mode:
-          $ref: '#/components/schemas/AllocationModeEnum'
         subproject_allocations:
           type: array
           items:
@@ -2534,6 +2558,12 @@ components:
           type: string
           nullable: true
           maxLength: 20
+    PatchedTimerNoteRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          nullable: true
     PeriodEnum:
       enum:
       - daily
@@ -2758,12 +2788,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ReportHierarchyChild'
-        legacy_overallocated:
-          type: boolean
       required:
       - children
       - id
-      - legacy_overallocated
       - name
       - total_minutes
     ReportTallies:
@@ -2796,8 +2823,6 @@ components:
           format: double
         session_count:
           type: integer
-        legacy_overallocated:
-          type: boolean
       required:
       - id
       - name
@@ -2841,8 +2866,6 @@ components:
           type: integer
         project:
           $ref: '#/components/schemas/ProjectSummary'
-        allocation_mode:
-          $ref: '#/components/schemas/AllocationModeEnum'
         subproject_allocations:
           type: array
           items:
@@ -2885,7 +2908,6 @@ components:
           type: boolean
       required:
       - active
-      - allocation_mode
       - auto_stop_at
       - duration_minutes
       - elapsed_minutes
@@ -2923,8 +2945,6 @@ components:
         uuid:
           type: string
           format: uuid
-        allocation_mode:
-          $ref: '#/components/schemas/AllocationModeEnum'
         subproject_allocations:
           type: array
           items:
@@ -3143,6 +3163,10 @@ components:
         note:
           type: string
           nullable: true
+        subproject_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectAllocationWrite'
   securitySchemes:
     basicAuth:
       type: http

@@ -14,7 +14,8 @@ from django.views.generic import (
     DeleteView,
 )
 from core.models import Projects, SubProjects, Sessions
-from core.services import SessionMutationService, even_split_bps
+from core.services import SessionMutationService, UNSET
+from core.views.allocations import parse_allocation_post
 
 
 def remove_ambiguous_time_error(time_value):
@@ -100,39 +101,31 @@ def update_session(request, session_id: int = None, session_uuid=None):
                     Projects, name=project_name, user=request.user
                 )
 
-                subprojects = SubProjects.objects.filter(
+                subprojects = list(SubProjects.objects.filter(
                     name__in=subproject_names, parent_project=project, user=request.user
-                )
+                ))
 
-                if not subprojects.exists() and subproject_names:
+                if not subprojects and subproject_names:
                     raise ValueError("No subprojects found for the selected project")
+
+                try:
+                    allocations = parse_allocation_post(request.POST, subprojects)
+                except ValueError as exc:
+                    form.add_error(None, str(exc))
+                    raise
 
                 candidate = form.save(commit=False)
                 updated_session = SessionMutationService.mutate_session(
                     current_session.pk,
                     user=request.user,
                     project=project,
-                    subprojects=list(subprojects),
+                    subprojects=subprojects if allocations is None else UNSET,
+                    allocations=allocations if allocations is not None else UNSET,
                     start_time=candidate.start_time,
                     end_time=candidate.end_time,
                     note=candidate.note,
                     is_active=False,
                 )
-                if request.POST.get("partition_evenly"):
-                    selected = list(subprojects)
-                    split = even_split_bps(
-                        subproject.id for subproject in selected
-                    )
-                    updated_session = SessionMutationService.set_allocations(
-                        updated_session.pk,
-                        user=request.user,
-                        allocations=[
-                            (subproject, split[subproject.id])
-                            for subproject in selected
-                        ],
-                        allocation_mode="partitioned",
-                    )
-
                 messages.success(request, "Updated session")
                 return redirect("update_session", session_id=updated_session.id)
 
@@ -155,9 +148,19 @@ def update_session(request, session_id: int = None, session_uuid=None):
         )
 
     subprojects = SubProjects.objects.filter(parent_project=current_session.project)
-    session_subs = current_session.subprojects.all()
+    session_links = {
+        link.subproject_id: link
+        for link in current_session.subproject_links.select_related("subproject")
+    }
     filtered_subs = [
-        {"subproject": sp, "is_selected": sp in session_subs} for sp in subprojects
+        {
+            "subproject": sp,
+            "is_selected": sp.pk in session_links,
+            "allocation_bp": session_links[sp.pk].allocation_bp
+            if sp.pk in session_links
+            else 0,
+        }
+        for sp in subprojects
     ]
 
     context = {"title": "Update Session", "filtered_subs": filtered_subs, "form": form}

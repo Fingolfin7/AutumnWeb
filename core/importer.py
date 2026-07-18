@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.utils import timezone
 
 from .models import Commitment, Projects, Sessions, SubProjects, status_choices
-from .services import DestructiveMutationService
+from .services import DestructiveMutationService, SessionMutationService
 from .totals import derived_project_last_updated, derived_project_totals
 from .importer2 import import_format2
 from .utils import (
@@ -227,32 +227,29 @@ def _iter_import_format1(
                     f"{session_data['Start Time']} to {session_data['End Time']}..."
                 )
 
-            session = Sessions.objects.create(
-                user=user,
-                project=project,
-                start_time=start_time,
-                end_time=end_time,
-                is_active=False,
-                note=note,
-            )
-            sessions_imported += 1
-
+            session_subprojects = []
             for subproject_name in subproject_names:
                 try:
                     subproject = SubProjects.objects.get(
                         user=user, name=subproject_name, parent_project=project
                     )
-                    session.subprojects.add(subproject)
+                    session_subprojects.append(subproject)
                 except SubProjects.DoesNotExist:
                     yield (
                         f"Warning: Subproject not found: {subproject_name}. Subproject "
                         f"will not be added to session."
                     )
                     continue
-
-            session.full_clean()
-            session.save()
-            Commitment.objects.filter(user=user).update(needs_recompute=True)
+            SessionMutationService.create_session(
+                user=user,
+                project=project,
+                start_time=start_time,
+                end_time=end_time,
+                is_active=False,
+                note=note,
+                subprojects=session_subprojects,
+            )
+            sessions_imported += 1
 
         yield ("\n\n")
 

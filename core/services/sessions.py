@@ -75,8 +75,7 @@ def _set_allocations(session, allocations):
     )
 
 
-def _validate_allocations(session, allocations, allocation_mode=None):
-    allocation_mode = allocation_mode or session.allocation_mode
+def _validate_allocations(session, allocations):
     subproject_ids = [subproject.pk for subproject, _ in allocations]
     if len(subproject_ids) != len(set(subproject_ids)):
         raise ValidationError("Session allocations must have unique subprojects.")
@@ -91,15 +90,8 @@ def _validate_allocations(session, allocations, allocation_mode=None):
     ]
     if invalid_bp:
         raise ValidationError("Session allocations must be from 1 to 10000 basis points.")
-    if allocation_mode == "legacy_full" and any(
-        allocation_bp != 10000 for _, allocation_bp in allocations
-    ):
-        raise ValidationError("legacy_full session allocations must equal 10000.")
-    if (
-        allocation_mode == "partitioned"
-        and sum(allocation_bp for _, allocation_bp in allocations) > 10000
-    ):
-        raise ValidationError("Partitioned session allocations must not exceed 10000.")
+    if sum(allocation_bp for _, allocation_bp in allocations) > 10000:
+        raise ValidationError("Session allocations must not exceed 10000 basis points.")
 
 
 class SessionMutationService:
@@ -125,9 +117,9 @@ class SessionMutationService:
         session.full_clean()
         session.save()
         if allocations is None:
-            session.subprojects.set(subprojects)
-        else:
-            _set_allocations(session, allocations)
+            split = even_split_bps(subproject.pk for subproject in subprojects)
+            allocations = [(subproject, split[subproject.pk]) for subproject in subprojects]
+        _set_allocations(session, allocations)
         _mark_commitments_dirty(session.user_id)
         return session
 
@@ -144,7 +136,6 @@ class SessionMutationService:
         auto_stop_at=UNSET,
         note=UNSET,
         is_active=UNSET,
-        allocation_mode=UNSET,
         allocations=UNSET,
         expected_version=None,
     ):
@@ -163,7 +154,6 @@ class SessionMutationService:
             "end_time": _floor_instant(end_time),
             "auto_stop_at": _floor_instant(auto_stop_at),
             "note": note,
-            "allocation_mode": allocation_mode,
         }
         for field, value in updates.items():
             if value is not UNSET:
@@ -187,7 +177,11 @@ class SessionMutationService:
         if allocations is not UNSET:
             _set_allocations(session, allocations)
         elif subprojects is not UNSET:
-            session.subprojects.set(final_subprojects)
+            split = even_split_bps(subproject.pk for subproject in final_subprojects)
+            _set_allocations(
+                session,
+                [(subproject, split[subproject.pk]) for subproject in final_subprojects],
+            )
 
         _mark_commitments_dirty(session.user_id)
         return session
@@ -210,10 +204,8 @@ class SessionMutationService:
 
     @staticmethod
     @transaction.atomic
-    def set_allocations(
-        session_id, *, user, allocations, allocation_mode, expected_version=None
-    ):
-        """Replace the complete allocation set and mode for one session."""
+    def set_allocations(session_id, *, user, allocations, expected_version=None):
+        """Replace the complete allocation set for one session."""
         session = (
             Sessions.objects.select_for_update()
             .select_related("project")
@@ -223,17 +215,14 @@ class SessionMutationService:
             raise StaleVersionError(session)
         allocations = list(allocations)
 
-        if allocation_mode not in {"legacy_full", "partitioned"}:
-            raise ValidationError("Invalid session allocation mode.")
         subprojects = [subproject for subproject, _ in allocations]
         _validate_buckets(session, subprojects)
-        _validate_allocations(session, allocations, allocation_mode)
+        _validate_allocations(session, allocations)
 
-        session.allocation_mode = allocation_mode
         session.version = (session.version or 1) + 1
         session.full_clean()
         _set_allocations(session, allocations)
-        session.save(update_fields=["allocation_mode", "version"])
+        session.save(update_fields=["version"])
         _mark_commitments_dirty(session.user_id)
         return session
 

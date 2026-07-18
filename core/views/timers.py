@@ -2,8 +2,9 @@ from collections import Counter
 from core.forms import *
 from core.utils import *
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Prefetch
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
 from datetime import timedelta
@@ -13,6 +14,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import (
     ListView,
 )
+from django.views.decorators.http import require_POST
 from core.commitments import (
     commitment_applies_to_project,
     commitment_applies_to_subproject,
@@ -21,6 +23,7 @@ from core.commitments import (
 )
 from core.models import Projects, SubProjects, Sessions, Commitment
 from core.services import SessionMutationService
+from core.views.allocations import parse_allocation_post
 
 
 ACTIVE_TIMER_FRAGMENT_TEMPLATES = {
@@ -56,6 +59,8 @@ def active_timers_fragment(request):
             "start_time",
             "end_time",
             "auto_stop_at",
+            "note",
+            "version",
         )
         .order_by("-start_time")
     )
@@ -154,18 +159,31 @@ def stop_timer(request, session_id: int):
 
         form = StopTimerForm(post_data, instance=timer)
         if form.is_valid():
-            candidate = form.save(commit=False)
-            timer = SessionMutationService.mutate_session(
-                timer.pk,
-                user=request.user,
-                start_time=candidate.start_time,
-                end_time=candidate.end_time,
-                note=candidate.note,
-                is_active=False,
-                auto_stop_at=None,
-            )
-            messages.success(request, "Stopped timer")
-            return redirect("timers")
+            try:
+                allocations = parse_allocation_post(
+                    request.POST, list(timer.subprojects.all())
+                )
+                candidate = form.save(commit=False)
+                with transaction.atomic():
+                    timer = SessionMutationService.mutate_session(
+                        timer.pk,
+                        user=request.user,
+                        start_time=candidate.start_time,
+                        end_time=candidate.end_time,
+                        note=candidate.note,
+                        is_active=False,
+                        auto_stop_at=None,
+                    )
+                    if allocations is not None:
+                        timer = SessionMutationService.set_allocations(
+                            timer.pk,
+                            user=request.user,
+                            allocations=allocations,
+                        )
+                messages.success(request, "Stopped timer")
+                return redirect("timers")
+            except ValueError as exc:
+                form.add_error(None, str(exc))
 
         messages.error(request, "Please correct the errors below.")
     else:
@@ -179,6 +197,22 @@ def stop_timer(request, session_id: int):
     context = {"title": "Stop Timer", "timer": timer, "form": form}
 
     return render(request, "core/stop_timer.html", context)
+
+
+@login_required
+@require_POST
+def update_timer_note(request, session_id: int):
+    timer = get_object_or_404(Sessions, id=session_id, user=request.user)
+    if timer.end_time is not None:
+        return JsonResponse(
+            {"error": "Only active timer notes can be updated."}, status=409
+        )
+    timer = SessionMutationService.mutate_session(
+        timer.pk,
+        user=request.user,
+        note=request.POST.get("note") or None,
+    )
+    return JsonResponse({"note": timer.note or "", "version": timer.version})
 
 
 @login_required

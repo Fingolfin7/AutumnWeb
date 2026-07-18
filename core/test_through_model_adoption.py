@@ -21,7 +21,7 @@ class SessionSubprojectAdoptionTests(TestCase):
             parent_project=self.project,
         )
 
-    def test_service_creation_uses_legacy_mode_and_full_allocation(self):
+    def test_service_creation_uses_even_allocation(self):
         session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
@@ -30,14 +30,13 @@ class SessionSubprojectAdoptionTests(TestCase):
         )
 
         session.refresh_from_db()
-        self.assertEqual(session.allocation_mode, 'legacy_full')
         self.assertEqual(
             list(
                 SessionSubproject.objects.filter(session=session)
                 .order_by('subproject_id')
                 .values_list('allocation_bp', flat=True)
             ),
-            [10000, 10000],
+            [5000, 5000],
         )
 
     def test_add_uses_full_allocation_and_check_rejects_out_of_range_values(self):

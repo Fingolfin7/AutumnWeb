@@ -225,14 +225,18 @@ $(document).ready(function() {
                     return;
                 }
 
-                let options = subprojects.map(({name}, index) => {
+                let options = subprojects.map(({id, name}, index) => {
                     let optionId = `subproject-option-${index}`;
                     return $('<span>', {class: 'subproject-option'}).append(
                         $('<input>', {
                             type: 'checkbox',
                             name: 'subprojects',
                             value: name,
-                            id: optionId
+                            id: optionId,
+                            'data-allocation-choice': '',
+                            'data-subproject-id': id,
+                            'data-subproject-name': name,
+                            'data-initial-bp': 0
                         }),
                         $('<label>', {
                             for: optionId,

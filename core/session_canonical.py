@@ -18,7 +18,6 @@ def canonical_session_content(
     start,
     end,
     note,
-    allocation_mode,
     allocations,
 ):
     """Return the portable equality tuple for a completed session."""
@@ -27,7 +26,6 @@ def canonical_session_content(
         canonical_instant(start),
         canonical_instant(end),
         note or "",
-        allocation_mode,
         tuple(sorted(set(allocations))),
     )
 
@@ -42,6 +40,5 @@ def canonical_existing_session(session):
         session.start_time,
         session.end_time,
         session.note,
-        session.allocation_mode,
         allocations,
     )

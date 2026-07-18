@@ -184,7 +184,7 @@ def _validate_document(user, document, *, force):
                     seen_uuids.add(session_uuid)
 
             allocation_mode = raw_session.get("allocation_mode")
-            if allocation_mode not in ("legacy_full", "partitioned"):
+            if allocation_mode not in (None, "legacy_full", "partitioned"):
                 errors.append(
                     f"{session_path}.allocation_mode: expected legacy_full or partitioned"
                 )
@@ -223,10 +223,6 @@ def _validate_document(user, document, *, force):
                     errors.append(f"{link_path}.allocation_bp: must be an integer from 1 to 10000")
                 else:
                     total_bp += allocation_bp
-                    if allocation_mode == "legacy_full" and allocation_bp != 10000:
-                        errors.append(
-                            f"{link_path}.allocation_bp: legacy_full links must equal 10000"
-                        )
                 if subproject_name in link_names:
                     errors.append(
                         f"{link_path}.subproject: duplicate link {subproject_name!r}"
@@ -238,14 +234,26 @@ def _validate_document(user, document, *, force):
                         f"does not exist in project {name!r}"
                     )
                 links.append((subproject_name, allocation_bp))
-            if allocation_mode == "partitioned" and total_bp > 10000:
+            coerce_even = allocation_mode == "legacy_full" or (
+                allocation_mode is None
+                and len(links) > 1
+                and all(allocation_bp == 10000 for _, allocation_bp in links)
+            )
+            if coerce_even and links:
+                quotient, remainder = divmod(10000, len(links))
+                first_name = min(name for name, _ in links)
+                links = [
+                    (name, quotient + (remainder if name == first_name else 0))
+                    for name, _ in links
+                ]
+                total_bp = 10000
+            if total_bp > 10000:
                 errors.append(
-                    f"{session_path}.links: partitioned allocation sum must not exceed 10000"
+                    f"{session_path}.links: allocation sum must not exceed 10000"
                 )
 
             session = {
                 "uuid": session_uuid,
-                "allocation_mode": allocation_mode,
                 "start": start,
                 "end": end,
                 "note": note,
@@ -286,7 +294,6 @@ def _validate_document(user, document, *, force):
                 session["start"],
                 session["end"],
                 session["note"],
-                session["allocation_mode"],
                 session["links"],
             )
             if canonical_existing_session(existing) != incoming:
@@ -375,7 +382,6 @@ def import_format2(user, document, *, force=False, import_into_context=None):
                     session_data["start"],
                     session_data["end"],
                     session_data["note"],
-                    session_data["allocation_mode"],
                     session_data["links"],
                 )
                 if canonical_existing_session(existing) == incoming:
@@ -390,7 +396,6 @@ def import_format2(user, document, *, force=False, import_into_context=None):
                     auto_stop_at=None,
                     note=session_data["note"],
                     is_active=False,
-                    allocation_mode=session_data["allocation_mode"],
                     allocations=allocations,
                 )
                 sessions_imported += 1
@@ -403,7 +408,6 @@ def import_format2(user, document, *, force=False, import_into_context=None):
                 "end_time": session_data["end"],
                 "is_active": False,
                 "note": session_data["note"],
-                "allocation_mode": session_data["allocation_mode"],
             }
             if session_data["uuid"] is not None:
                 fields["uuid"] = session_data["uuid"]

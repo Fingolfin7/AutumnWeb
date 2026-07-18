@@ -5,11 +5,13 @@
 {% block head_includes %}
     <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
     <script src="{% static 'core/js/session_note_editor.js' %}?v={{ static_version.session_note_editor }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/allocation_editor.js' %}?v={{ static_version.allocation_editor }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
+        {{ form.non_field_errors }}
 
         <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
             <table class="timer-row">
@@ -62,6 +64,14 @@
                 </div>
                 <small data-note-status></small>
                 {{ form.note.errors }}
+            </div>
+
+            <div data-allocation-editor data-collapsible="true">
+                {% for link in timer.subproject_links.all %}
+                    <span data-allocation-item data-subproject-id="{{ link.subproject_id }}"
+                          data-subproject-name="{{ link.subproject.name }}"
+                          data-initial-bp="{{ link.allocation_bp }}"></span>
+                {% endfor %}
             </div>
         </section>
 

@@ -2,8 +2,7 @@ import random
 from datetime import datetime, timedelta, timezone as datetime_timezone
 
 from django.contrib.auth import get_user_model
-from django.db.models import CharField, DurationField, ExpressionWrapper, F, Max, Sum, Value
-from django.db.models.functions import Coalesce
+from django.db.models import DurationField, ExpressionWrapper, F
 from django.test import TestCase
 from django.utils import timezone
 
@@ -14,6 +13,7 @@ from core.attribution import (
     subproject_tally,
 )
 from core.models import Projects, Sessions, SessionSubproject, SubProjects
+from core.services import even_split_bps
 from core.utils import stop_expired_timers
 
 
@@ -44,14 +44,13 @@ class AttributionFormulaTests(TestCase):
             user=self.user, parent_project=self.project, name="C"
         )
 
-    def _session(self, offset_seconds, duration_seconds, *, mode="legacy_full"):
+    def _session(self, offset_seconds, duration_seconds):
         start = datetime(2026, 1, 1, 9, tzinfo=UTC) + timedelta(
             seconds=offset_seconds
         )
         return Sessions.objects.create(
             user=self.user,
             project=self.project,
-            allocation_mode=mode,
             start_time=start,
             end_time=start + timedelta(seconds=duration_seconds),
             is_active=False,
@@ -64,7 +63,7 @@ class AttributionFormulaTests(TestCase):
             allocation_bp=allocation_bp,
         )
 
-    def test_legacy_full_credit_zero_link_bucket_and_shadow_query(self):
+    def test_weighted_credit_and_zero_link_residual_bucket(self):
         rng = random.Random(20260716)
         subprojects = (self.sub_a, self.sub_b, self.sub_c)
         expected_numerators = {sub.name: 0 for sub in subprojects}
@@ -75,10 +74,11 @@ class AttributionFormulaTests(TestCase):
             session = self._session(index * 20000, duration_seconds)
             link_count = rng.randint(0, len(subprojects))
             linked = rng.sample(subprojects, link_count)
+            split = even_split_bps(subproject.pk for subproject in linked)
             for subproject in linked:
-                self._link(session, subproject, BASIS_POINTS)
+                self._link(session, subproject, split[subproject.pk])
                 expected_numerators[subproject.name] += (
-                    duration_seconds * 1000000 * BASIS_POINTS
+                    duration_seconds * 1000000 * split[subproject.pk]
                 )
             if not linked:
                 expected_numerators["no subproject"] += (
@@ -101,38 +101,12 @@ class AttributionFormulaTests(TestCase):
             expected_numerators,
         )
 
-        old_inline = list(
-            sessions.annotate(
-                name=Coalesce(
-                    "subprojects__name",
-                    Value("no subproject"),
-                    output_field=CharField(),
-                )
-            )
-            .values("name")
-            .annotate(
-                total=Sum(_duration_expression()),
-                latest_end_time=Max("end_time"),
-            )
-            .order_by("-latest_end_time", "name")
-        )
-        self.assertEqual(
-            [
-                (row["name"], row["total"], row["latest_end_time"])
-                for row in actual
-            ],
-            [
-                (row["name"], row["total"], row["latest_end_time"])
-                for row in old_inline
-            ],
-        )
-
-    def test_partitioned_numerators_are_additive_and_legacy_overage_is_full(self):
-        split = self._session(0, 100, mode="partitioned")
+    def test_numerators_are_additive_and_include_residual(self):
+        split = self._session(0, 100)
         self._link(split, self.sub_a, 3000)
         self._link(split, self.sub_b, 7000)
 
-        residual = self._session(200, 40, mode="partitioned")
+        residual = self._session(200, 40)
         self._link(residual, self.sub_a, 2500)
 
         split_rows = {
@@ -169,25 +143,8 @@ class AttributionFormulaTests(TestCase):
             40 * 1000000 * BASIS_POINTS,
         )
 
-        overallocated = self._session(400, 25, mode="legacy_full")
-        self._link(overallocated, self.sub_a, BASIS_POINTS)
-        self._link(overallocated, self.sub_b, BASIS_POINTS)
-        self._link(overallocated, self.sub_c, BASIS_POINTS)
-        overage_rows = {
-            row["name"]: row["total_numerator"]
-            for row in subproject_tally(
-                Sessions.objects.filter(pk=overallocated.pk)
-            )
-        }
-        full_numerator = 25 * 1000000 * BASIS_POINTS
-        self.assertEqual(
-            overage_rows,
-            {"A": full_numerator, "B": full_numerator, "C": full_numerator},
-        )
-        self.assertNotIn("no subproject", overage_rows)
-
     def test_hierarchy_children_receive_link_credit_without_residual(self):
-        session = self._session(0, 40, mode="partitioned")
+        session = self._session(0, 40)
         self._link(session, self.sub_a, 2500)
 
         rows = hierarchy_child_credit(Sessions.objects.filter(pk=session.pk))
@@ -204,10 +161,10 @@ class AttributionFormulaTests(TestCase):
         )
 
     def test_partitioned_api_consumers_share_weighted_semantics(self):
-        split = self._session(0, 120, mode="partitioned")
+        split = self._session(0, 120)
         self._link(split, self.sub_a, 3000)
         self._link(split, self.sub_b, 7000)
-        residual = self._session(200, 40, mode="partitioned")
+        residual = self._session(200, 40)
         self._link(residual, self.sub_a, 2500)
         self.client.force_login(self.user)
 

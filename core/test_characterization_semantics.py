@@ -11,6 +11,7 @@ from freezegun import freeze_time
 from core.commitments import reconcile_commitment
 from core.importer import run_import
 from core.models import Commitment, Projects, Sessions, SubProjects
+from core.services import SessionMutationService
 from core.totals import derived_project_totals, derived_subproject_totals
 
 
@@ -22,20 +23,17 @@ class CurrentAttributionSemanticsTests(TestCase):
         self.sub_a = SubProjects.objects.create(user=self.user, parent_project=self.project, name="A")
         self.sub_b = SubProjects.objects.create(user=self.user, parent_project=self.project, name="B")
         start = timezone.make_aware(datetime(2025, 1, 1, 9, 0))
-        self.linked = Sessions.objects.create(
+        self.linked = SessionMutationService.create_session(
             user=self.user, project=self.project, start_time=start,
             end_time=start + timedelta(minutes=60), is_active=False,
+            subprojects=[self.sub_a, self.sub_b],
         )
-        self.linked.subprojects.add(self.sub_a, self.sub_b)
         self.unlinked = Sessions.objects.create(
             user=self.user, project=self.project, start_time=start + timedelta(hours=2),
             end_time=start + timedelta(hours=2, minutes=30), is_active=False,
         )
 
-    def test_full_credit_and_no_subproject_bucket(self):
-        # characterizes current behavior (ported to v2 after v1 removal; the
-        # semantics are version-independent: legacy full credit per link and a
-        # residual bucket for zero-link sessions)
+    def test_even_credit_and_no_subproject_bucket(self):
         tally = self.client.get(
             "/api/v2/reports/tallies/", {"by": "subproject"}
         ).json()
@@ -44,7 +42,7 @@ class CurrentAttributionSemanticsTests(TestCase):
                 entry["total_minutes"]
             for entry in tally["entries"]
         }
-        self.assertEqual(buckets, {"A": 60.0, "B": 60.0, "no subproject": 30.0})
+        self.assertEqual(buckets, {"A": 30.0, "B": 30.0, "no subproject": 30.0})
         projects = self.client.get(
             "/api/v2/reports/tallies/", {"by": "project"}
         ).json()
@@ -53,21 +51,15 @@ class CurrentAttributionSemanticsTests(TestCase):
             [("Project", 90.0)],
         )
 
-    def test_hierarchy_children_keep_legacy_full_credit(self):
-        # characterizes current behavior: legacy sessions with multiple links
-        # keep full credit per child (children sum above the parent) and the
-        # v2 hierarchy flags the project as legacy_overallocated instead of
-        # emitting a residual child.
+    def test_hierarchy_children_are_additive(self):
         hierarchy = self.client.get("/api/v2/reports/hierarchy/").json()
         project = hierarchy["projects"][0]
         self.assertEqual(project["total_minutes"], 90.0)
         children = {
             child["name"]: child["total_minutes"] for child in project["children"]
         }
-        # A and B keep legacy full credit; the zero-link session appears as
-        # the residual child (name None).
-        self.assertEqual(children, {"A": 60.0, "B": 60.0, None: 30.0})
-        self.assertEqual(sum(children.values()), 150.0)
+        self.assertEqual(children, {"A": 30.0, "B": 30.0, None: 30.0})
+        self.assertEqual(sum(children.values()), 90.0)
 
 
 class CurrentMergeSemanticsTests(TestCase):
@@ -81,11 +73,11 @@ class CurrentMergeSemanticsTests(TestCase):
         sub_a = SubProjects.objects.create(user=self.user, parent_project=project, name="A")
         sub_b = SubProjects.objects.create(user=self.user, parent_project=project, name="B")
         start = timezone.make_aware(datetime(2025, 1, 1, 9, 0))
-        session = Sessions.objects.create(
+        session = SessionMutationService.create_session(
             user=self.user, project=project, start_time=start,
             end_time=start + timedelta(minutes=60), is_active=False,
+            subprojects=[sub_a, sub_b],
         )
-        session.subprojects.add(sub_a, sub_b)
         response = self.client.post(
             "/api/v2/subprojects/merge/",
             data={"project_id": project.id, "source_ids": [sub_a.id, sub_b.id], "new_name": "M"},

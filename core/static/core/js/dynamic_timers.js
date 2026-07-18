@@ -1,7 +1,7 @@
 $(document).ready(function() {
     const ACTIVE_TIMERS_SELECTOR = '#active-timers';
     const TIMER_CARD_SELECTOR = `${ACTIVE_TIMERS_SELECTOR} [data-timer-id]`;
-    const SYNC_INTERVAL_MS = 30000;
+    const SYNC_INTERVAL_MS = 5000;
 
     function updateDurations() {
         $(TIMER_CARD_SELECTOR).each(function() {
@@ -63,11 +63,25 @@ $(document).ready(function() {
             return;
         }
 
+        const activeEditor = document.activeElement && document.activeElement.closest
+            ? document.activeElement.closest('[data-timer-note-editor]')
+            : null;
+        if (activeEditor || timersContainer.find('[data-timer-note-editor][data-dirty="true"]').length) {
+            return;
+        }
+
         refreshInFlight = true;
         $.get(refreshUrl, { surface: surface })
             .done(function(html) {
+                const focusedEditor = document.activeElement && document.activeElement.closest
+                    ? document.activeElement.closest('[data-timer-note-editor]')
+                    : null;
+                if (focusedEditor || timersContainer.find('[data-timer-note-editor][data-dirty="true"]').length) {
+                    return;
+                }
                 timersContainer.replaceWith(html);
                 updateDurations();
+                document.dispatchEvent(new CustomEvent('autumn:timers-refreshed'));
             })
             .always(function() {
                 refreshInFlight = false;

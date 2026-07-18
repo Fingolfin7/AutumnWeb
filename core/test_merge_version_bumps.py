@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from core.models import Projects, Sessions, SessionSubproject, SubProjects
+from core.services import SessionMutationService
 from core.services.destructive import DestructiveMutationService
 
 
@@ -63,13 +64,13 @@ class MergeSubprojectsVersionBumpTests(TestCase):
         )
 
         now = timezone.now()
-        self.session = Sessions.objects.create(
+        self.session = SessionMutationService.create_session(
             user=self.user,
             project=self.project,
             start_time=now - timedelta(hours=2),
             end_time=now - timedelta(hours=1),
+            subprojects=[self.subproject1, self.subproject2],
         )
-        self.session.subprojects.add(self.subproject1, self.subproject2)
 
     def test_merge_subprojects_bumps_version_and_repoints_allocations(self):
         original_version = self.session.version

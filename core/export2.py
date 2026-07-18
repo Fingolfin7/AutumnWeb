@@ -63,7 +63,6 @@ def build_format2_export(sessions_queryset):
                 "sessions": [
                     {
                         "uuid": str(session.uuid) if session.uuid else None,
-                        "allocation_mode": session.allocation_mode,
                         "start": _utc_seconds(session.start_time),
                         "end": _utc_seconds(session.end_time),
                         "note": session.note,

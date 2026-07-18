@@ -111,8 +111,6 @@ class AdminSaveFormsetTests(_RequestFactoryMixin, TestCase):
 
         # Simulate an inline allocation edit having been applied.
         SessionSubproject.objects.filter(session=session).update(allocation_bp=5000)
-        session.allocation_mode = "partitioned"
-        session.save(update_fields=["allocation_mode"])
 
         admin = SessionsAdmin(Sessions, AdminSite())
         formset = _FakeFormset(SessionSubproject, session, changed=[object()])
@@ -143,9 +141,7 @@ class AdminSaveFormsetTests(_RequestFactoryMixin, TestCase):
         from core.models import SessionSubproject
 
         session = self._make_session()
-        # Over-allocate a partitioned session; validation must reject it.
-        session.allocation_mode = "partitioned"
-        session.save(update_fields=["allocation_mode"])
+        # Over-allocate a session; validation must reject it.
         second_sub = SubProjects.objects.create(
             name="Sub2", user=self.user, parent_project=self.project
         )
@@ -179,7 +175,6 @@ class AdminChangePostTests(_RequestFactoryMixin, TestCase):
         return {
             "user": session.user_id,
             "project": session.project_id,
-            "allocation_mode": session.allocation_mode,
             "start_time_0": local_start.strftime("%Y-%m-%d"),
             "start_time_1": local_start.strftime("%H:%M:%S"),
             "end_time_0": local_end.strftime("%Y-%m-%d"),
