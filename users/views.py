@@ -12,9 +12,8 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
-from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view
-from django.http import JsonResponse, HttpResponse, FileResponse
+from django.conf import settings
+from django.http import HttpResponse, FileResponse
 import logging
 import mimetypes
 import os
@@ -22,32 +21,13 @@ import requests
 
 logger = logging.getLogger('main')
 
-def debug_session(request):
-    return JsonResponse({
-        "is_authenticated": request.user.is_authenticated,
-        "user": str(request.user),
-        "backend": request.session.get('_auth_user_backend'),
-    })
-
-@api_view(['GET'])
-def check_auth_token(request, token):
-    try:
-        # Retrieve the token object from the database
-        token_obj = Token.objects.get(key=token)
-        return JsonResponse({
-            'is_valid': bool(token_obj),
-            'username': token_obj.user.username,
-            'email': token_obj.user.email,
-        })
-    except Token.DoesNotExist:
-        return JsonResponse({
-            'is_valid': False,
-            'error': 'Invalid token'
-        })
-
-
 # Create your views here.
 def register(request):
+    if not settings.ALLOW_REGISTRATION:
+        # Single-user install: registration stays closed unless explicitly
+        # enabled via the ALLOW_REGISTRATION env var.
+        messages.error(request, 'Registration is disabled on this server.')
+        return redirect('login')
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
