@@ -1,6 +1,6 @@
 const CACHE_PREFIX = "autumn-pwa";
-const PRECACHE = `${CACHE_PREFIX}-precache-v1`;
-const RUNTIME = `${CACHE_PREFIX}-runtime-v1`;
+const PRECACHE = `${CACHE_PREFIX}-precache-v2`;
+const RUNTIME = `${CACHE_PREFIX}-runtime-v2`;
 const OFFLINE_URL = "/static/core/pwa/offline.html";
 
 const PRECACHE_URLS = [
@@ -49,6 +49,16 @@ self.addEventListener("fetch", function (event) {
 
     const requestUrl = new URL(event.request.url);
     if (requestUrl.origin !== self.location.origin) {
+        return;
+    }
+
+    // Django-served assets (admin, DRF) have no ?v= cache-buster, so caching
+    // them here would serve stale styles forever after a Django upgrade.
+    if (
+        requestUrl.pathname.startsWith("/admin/")
+        || requestUrl.pathname.startsWith("/static/admin/")
+        || requestUrl.pathname.startsWith("/static/rest_framework/")
+    ) {
         return;
     }
 
