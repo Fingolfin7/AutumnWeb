@@ -3,6 +3,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import NoReverseMatch, reverse
+from django.utils.crypto import get_random_string
 
 from core.templatetags.markdown_render import markdown as render_markdown
 from llm_insights.models import LLMChat
@@ -31,7 +32,7 @@ class MarkdownSanitizationTests(TestCase):
 
 class DeleteChatMethodTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="chat-user", password="x")
+        self.user = User.objects.create_user(username="chat-user", password=None)
         self.user.profile.ai_features_enabled = True
         self.user.profile.save(update_fields=["ai_features_enabled"])
         self.chat = LLMChat.objects.create(user=self.user, title="t")
@@ -55,7 +56,7 @@ class ImportStreamAuthTests(TestCase):
         self.assertIn("login", response.url)
 
     def test_non_get_is_rejected(self):
-        user = User.objects.create_user(username="import-user", password="x")
+        user = User.objects.create_user(username="import-user", password=None)
         self.client.force_login(user)
         response = self.client.post(reverse("import_stream"))
         self.assertEqual(response.status_code, 405)
@@ -78,9 +79,14 @@ class RegistrationGateTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("login", response.url)
 
+        registration_password = get_random_string(24)
         self.client.post(
             reverse("register"),
-            {"username": "intruder", "password1": "xyzXYZ123!", "password2": "xyzXYZ123!"},
+            {
+                "username": "intruder",
+                "password1": registration_password,
+                "password2": registration_password,
+            },
         )
         self.assertFalse(User.objects.filter(username="intruder").exists())
 
@@ -92,5 +98,5 @@ class RegistrationGateTests(TestCase):
 
 class AiFeaturesDefaultTests(TestCase):
     def test_new_accounts_get_no_ai_access(self):
-        user = User.objects.create_user(username="fresh-user", password="x")
+        user = User.objects.create_user(username="fresh-user", password=None)
         self.assertFalse(user.profile.ai_features_enabled)

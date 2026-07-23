@@ -1,3 +1,4 @@
+import os
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
@@ -13,7 +14,6 @@ from llm_insights.models import LLMChat, LLMMessage
 
 USERNAME = "Finrod"
 EMAIL = "finrod.felagund@houseoffinwe.ea"
-PASSWORD = "autumnweb"
 
 
 def aware(day_offset, start_hour, start_minute, duration_minutes):
@@ -58,12 +58,18 @@ def make_background(path):
 
 
 def reset_finrod():
+    password = os.environ.get("FINROD_PASSWORD")
+    if not password:
+        raise RuntimeError(
+            "Set FINROD_PASSWORD to the demo account password before seeding."
+        )
+
     user, _ = User.objects.get_or_create(
         username=USERNAME,
         defaults={"email": EMAIL},
     )
     user.email = EMAIL
-    user.set_password(PASSWORD)
+    user.set_password(password)
     user.save()
 
     Commitment.objects.filter(user=user).delete()

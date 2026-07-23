@@ -17,7 +17,7 @@ Use this demo account to explore the features:
 
 - **Username**: `Finrod`
 - or **Email**: `finrod.felagund@houseoffinwe.ea`
-- **Password**: `autumnweb`
+- **Password**: supplied privately by the instance owner
 
 The instance runs on Render and may sleep between requests.
 
@@ -88,6 +88,7 @@ python -m venv venv
 source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 python manage.py migrate
+# Set FINROD_PASSWORD in your shell before running the seed command.
 python manage.py shell -c "exec(open('scripts/seed_finrod.py', 'r', encoding='utf-8').read())"
 python manage.py runserver
 ```

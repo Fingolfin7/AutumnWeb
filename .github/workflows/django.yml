@@ -25,7 +25,7 @@ jobs:
         image: ${{ matrix.db-image }}
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}
           POSTGRES_DB: autumn
         ports:
           - 5432:5432
@@ -60,7 +60,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           echo "" >> AutumnWeb/.env
-          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/autumn" >> AutumnWeb/.env
+          echo "DATABASE_URL=postgres://postgres:ci-${{ github.run_id }}@localhost:5432/autumn" >> AutumnWeb/.env
 
       # No migrate step needed: the test runner creates its own database
       # and applies migrations to it automatically.
@@ -88,7 +88,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ci-${{ github.run_id }}
           POSTGRES_DB: autumn_bench
         ports:
           - 5432:5432
@@ -116,7 +116,7 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE_CONTENTS }}" > AutumnWeb/.env
           echo "" >> AutumnWeb/.env
-          echo "DATABASE_URL=postgres://postgres:postgres@localhost:5432/autumn_bench" >> AutumnWeb/.env
+          echo "DATABASE_URL=postgres://postgres:ci-${{ github.run_id }}@localhost:5432/autumn_bench" >> AutumnWeb/.env
 
       - name: Migrate benchmark database
         env:
