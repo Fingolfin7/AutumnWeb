@@ -1331,7 +1331,7 @@ class CommitmentViewTests(TestCase):
         self.assertTemplateUsed(response, 'core/update_commitment.html')
 
     def test_update_commitment_view_post(self):
-        """Test POST request to update commitment."""
+        """Restart-only changes show a confirmation instead of a raw error."""
         commitment = Commitment.objects.create(
             user=self.user,
             project=self.project,
@@ -1356,7 +1356,58 @@ class CommitmentViewTests(TestCase):
         commitment.refresh_from_db()
         self.assertEqual(commitment.period, 'weekly')
         self.assertEqual(commitment.target, 300)
-        self.assertContains(response, 'requires the restart operation')
+        self.assertContains(
+            response, 'Restart this commitment to apply these changes'
+        )
+        self.assertContains(response, 'Restart and keep balance')
+        self.assertContains(response, 'Restart and reset balance')
+        self.assertNotContains(
+            response,
+            '[&#x27;Changing period requires the restart operation.&#x27;]',
+        )
+        self.assertNotContains(response, 'requires the restart operation')
+
+    def test_update_commitment_view_can_restart_with_new_scope(self):
+        """The UI restart action applies scope changes as a new generation."""
+        new_context = Context.objects.create(user=self.user, name='Exercise')
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type='time',
+            period='weekly',
+            target=300,
+            balance=-60,
+            active=False,
+        )
+
+        response = self.client.post(
+            reverse('update_commitment', kwargs={'pk': commitment.pk}),
+            {
+                'aggregation_type': 'context',
+                'context': new_context.pk,
+                'commitment_type': 'time',
+                'period': 'weekly',
+                'start_date': commitment.start_date.isoformat(),
+                'target': 300,
+                'banking_enabled': True,
+                'max_balance': 600,
+                'min_balance': -600,
+                'restart_action': 'keep',
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse('home'))
+        commitment.refresh_from_db()
+        self.assertEqual(commitment.generation, 2)
+        self.assertEqual(commitment.aggregation_type, 'context')
+        self.assertEqual(commitment.context, new_context)
+        self.assertIsNone(commitment.project)
+        self.assertEqual(commitment.balance, -60)
+        self.assertContains(
+            response,
+            'Commitment restarted. The existing bank balance was carried forward.',
+        )
 
     def test_delete_commitment_view_get(self):
         """Test GET request to delete commitment page."""

@@ -2369,6 +2369,81 @@ body.light-mode .collapse-toggle {
   color: #fff !important;
 }
 
+.commitment-restart-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  margin: 0.5rem 0 1rem;
+  padding: 1rem;
+  border: 1px solid var(--accent-color);
+  border-left-width: 4px;
+  background: rgba(211, 139, 58, 0.08);
+}
+
+.commitment-restart-marker {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--accent-color);
+  border: 1px solid var(--accent-color);
+  font-size: 1rem;
+}
+
+.commitment-restart-panel h4 {
+  margin: 0.15rem 0 0.5rem;
+}
+
+.commitment-restart-panel p {
+  margin: 0 0 0.65rem;
+}
+
+.commitment-restart-eyebrow {
+  color: var(--accent-color);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.commitment-restart-reason {
+  color: var(--main-muted);
+  font-size: 0.88rem;
+}
+
+.commitment-restart-question {
+  font-weight: 700;
+}
+
+.commitment-restart-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.commitment-restart-cancel {
+  padding: 0.6rem;
+  color: var(--main-muted);
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.commitment-restart-cancel:hover {
+  color: var(--accent-color);
+}
+
+@media (max-width: 600px) {
+  .commitment-restart-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .commitment-restart-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
 .cobalt-blue {
   background: var(--main-blue) !important;
   color: #101214 !important;

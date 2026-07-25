@@ -111,9 +111,15 @@ class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
         context["commitment_scope_meta_json"] = json.dumps(
             build_commitment_scope_meta(self.request.user)
         )
-        # Reconcile and get progress
-        reconcile_commitment(self.object)
-        context["progress"] = get_commitment_progress(self.object)
+        context["restart_required"] = getattr(self, "restart_required", False)
+
+        # A bound ModelForm mutates its in-memory instance before form_valid runs.
+        # Always calculate the sidebar from the persisted definition.
+        persisted = Commitment.objects.get(pk=self.object.pk, user=self.request.user)
+        reconcile_commitment(persisted)
+        persisted.refresh_from_db()
+        context["commitment"] = persisted
+        context["progress"] = get_commitment_progress(persisted)
         return context
 
     def get_form_kwargs(self):
@@ -128,13 +134,34 @@ class UpdateCommitmentView(LoginRequiredMixin, UpdateView):
             for field in form.changed_data
             if field in form.cleaned_data
         }
+
+        restart_action = self.request.POST.get("restart_action")
+        if restart_action in {"keep", "reset"}:
+            self.object = CommitmentEditService.restart(
+                self.object.pk,
+                user=self.request.user,
+                keep_balance=restart_action == "keep",
+                changes=changes,
+            )
+            balance_result = (
+                "The existing bank balance was carried forward."
+                if restart_action == "keep"
+                else "The bank balance was reset to zero."
+            )
+            messages.success(
+                self.request,
+                f"Commitment restarted. {balance_result}",
+            )
+            if self.object.aggregation_type == "project" and self.object.project_id:
+                return redirect("update_project", pk=self.object.project.pk)
+            return redirect("home")
+
         try:
             self.object = CommitmentEditService.edit(
                 self.object.pk, user=self.request.user, changes=changes
             )
-        except CommitmentRestartRequired as exc:
-            form.add_error(None, str(exc))
-            messages.error(self.request, str(exc))
+        except CommitmentRestartRequired:
+            self.restart_required = True
             return self.form_invalid(form)
         messages.success(self.request, "Commitment updated successfully")
         if self.object.aggregation_type == "project" and self.object.project_id:

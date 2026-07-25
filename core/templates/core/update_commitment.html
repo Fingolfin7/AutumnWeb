@@ -214,17 +214,55 @@
                 {{ form.active.errors }}
             </span>
 
-            {% if form.non_field_errors %}
+            {% if form.non_field_errors and not restart_required %}
                 <div class="error-list">
                     {{ form.non_field_errors }}
                 </div>
             {% endif %}
 
+            {% if restart_required %}
+                <aside class="commitment-restart-panel" role="alert" aria-labelledby="restart-heading">
+                    <div class="commitment-restart-marker" aria-hidden="true">
+                        <i class="fa fa-code-branch"></i>
+                    </div>
+                    <div>
+                        <p class="commitment-restart-eyebrow">New tracking chapter</p>
+                        <h4 id="restart-heading">Restart this commitment to apply these changes</h4>
+                        <p>
+                            Its completed history stays intact. The updated scope and settings
+                            begin now as a new generation.
+                        </p>
+                        <p class="commitment-restart-reason">
+                            These settings define which activity counts or when tracking periods
+                            begin. Applying them to earlier progress would rewrite its history.
+                        </p>
+                        <p class="commitment-restart-question">
+                            What should happen to the current bank balance?
+                        </p>
+                        <div class="commitment-restart-actions">
+                            <button type="submit" name="restart_action" value="keep" class="primary-button">
+                                <i class="fa fa-arrow-right"></i>
+                                Restart and keep balance
+                            </button>
+                            <button type="submit" name="restart_action" value="reset" class="secondary-button">
+                                <i class="fa fa-undo"></i>
+                                Restart and reset balance
+                            </button>
+                            <a class="commitment-restart-cancel" href="{% url 'update_commitment' commitment.id %}">
+                                Discard these changes
+                            </a>
+                        </div>
+                    </div>
+                </aside>
+            {% endif %}
+
             <span>
-                <button type="submit" class="primary-button">
-                    <i class="fa fa-check-circle"></i>
-                    Update Commitment
-                </button>
+                {% if not restart_required %}
+                    <button type="submit" class="primary-button">
+                        <i class="fa fa-check-circle"></i>
+                        Update Commitment
+                    </button>
+                {% endif %}
 
                 <button type="button" class="primary-button dark-red"
                 onclick="window.location.href = '{% url 'delete_commitment' commitment.id %}' ">
