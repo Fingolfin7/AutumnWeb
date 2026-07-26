@@ -18,6 +18,7 @@ from core.views.timers import (
 )
 from core.views.dashboard import (
     DashboardView,
+    timeline_fragment,
 )
 from core.views.sessions import (
     remove_ambiguous_time_error,

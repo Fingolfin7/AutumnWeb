@@ -483,10 +483,13 @@ body.bg-active .app { position: relative; z-index: 2; }
   line-height: .95; letter-spacing: -.03em;
   display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .45rem;
 }
+/* A number and its unit are one indivisible thing. Without this the two
+   halves wrap independently and you get "43 minutes / 21 / seconds". */
+.focus-time-part { display: inline-flex; align-items: baseline; gap: .35rem; }
 .focus-time .num { font-size: var(--fs-hero); font-weight: 600; }
 .focus-time .unit {
   font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 500;
-  color: var(--muted); letter-spacing: .02em;
+  color: var(--muted); letter-spacing: .02em; white-space: nowrap;
 }
 .focus-autostop {
   margin-top: var(--s4);
@@ -1049,37 +1052,6 @@ body.light-mode {
   /* ── sections stay open; the disclosure head becomes a plain title ──────*/
   .desk .disclose-chevron { opacity: .45; }
 
-  /* ── 4 · sessions become aligned rows ──────────────────────────────────
-     Keyed on .session-list, not .desk: this is a property of the LIST, and
-     the Sessions page shows the same rows at full width with no desk around
-     them. Any slab whose bands are session rows opts in with .session-list. */
-  .session-list .swipe-track { display: block; overflow: visible; scroll-snap-type: none; }
-  .session-list .swipe-face { flex: initial; }
-  .session-list .swipe-hint { display: none; }
-  .session-list .swipe-actions {
-    position: absolute; top: 50%; right: var(--s4); transform: translateY(-50%);
-    padding: 0; gap: .3rem;
-    opacity: 0; pointer-events: none;
-    background: linear-gradient(to right, rgba(18,21,24,0) 0, rgba(20,24,27,.96) 18%);
-    padding-left: var(--s5);
-    transition: opacity .16s var(--ease);
-  }
-  .session-list .swipe:hover .swipe-actions,
-  .session-list .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
-
-  .session-list .session {
-    display: grid;
-    grid-template-columns: 11.5rem minmax(9rem, 14rem) minmax(0, 1fr) 6rem;
-    align-items: baseline; gap: var(--s4);
-    padding: var(--s3) var(--s4);
-  }
-  .session-list .session-top   { order: 2; display: block; }
-  .session-list .session-mid   { order: 1; margin-top: 0; }
-  .session-list .session-note  { order: 3; margin-top: 0; }
-  .session-list .session-dur   { order: 4; text-align: right; justify-self: end; }
-
-  /* keep the day header aligned with the new grid */
-  .session-list .day-head { padding-left: var(--s4); padding-right: var(--s4); }
 }
 
 /* Very wide: let the ambient track breathe rather than stretching the rows. */
@@ -1088,18 +1060,61 @@ body.light-mode {
   .desk { grid-template-columns: minmax(0, 2fr) minmax(22rem, .85fr); }
 }
 
-/* ----------------------------------------------------------------------------
-   PHONE FALLBACK for the hoisted duration.
-   In the desktop grid .session-dur is a direct child of .session so it can own
-   its own column. Below the desk breakpoint we put it back on the project line,
-   top-right, exactly where the mobile-first design had it.
-   --------------------------------------------------------------------------*/
-@media (max-width: 999.98px) {
-  .session { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--s3); }
-  .session-top  { grid-column: 1; grid-row: 1; }
-  .session-dur  { grid-column: 2; grid-row: 1; text-align: right; }
-  .session-mid  { grid-column: 1 / -1; }
-  .session-note { grid-column: 1 / -1; }
+/* ============================================================================
+   SESSION ROWS — two shapes, chosen by the LIST's width
+   ----------------------------------------------------------------------------
+   The same list is ~860px wide inside the dashboard's desk and ~1370px on the
+   Sessions page. A viewport media query asks the wrong question: at 1100px the
+   window is "desktop" but the desk's primary track is still narrow, and the
+   four-column row squeezed the note down to about ninety pixels of ellipsis.
+
+   So the shape is chosen by a CONTAINER query on .session-list. Below the
+   threshold the row is the stacked mobile card; above it, aligned columns.
+   ==========================================================================*/
+
+.session-list { container-type: inline-size; }
+
+/* Default: stacked. Project and duration share the top line, times and note
+   run full width beneath — the mobile-first shape. */
+.session {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--s3);
+}
+.session-top  { grid-column: 1; grid-row: 1; }
+.session-dur  { grid-column: 2; grid-row: 1; text-align: right; }
+.session-mid  { grid-column: 1 / -1; }
+.session-note { grid-column: 1 / -1; }
+
+@container (min-width: 46rem) {
+  .session-list .swipe-track { display: block; overflow: visible; scroll-snap-type: none; }
+  .session-list .swipe-face { flex: initial; }
+  .session-list .swipe-hint { display: none; }
+  .session-list .swipe-actions {
+    position: absolute; top: 50%; right: var(--s4); transform: translateY(-50%);
+    padding: 0 0 0 var(--s5); gap: .3rem;
+    opacity: 0; pointer-events: none;
+    background: linear-gradient(to right, rgba(18,21,24,0) 0, rgba(20,24,27,.96) 18%);
+    transition: opacity .16s var(--ease);
+  }
+  .session-list .swipe:hover .swipe-actions,
+  .session-list .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
+
+  .session-list .session {
+    grid-template-columns: 10.5rem minmax(7rem, 11rem) minmax(0, 1fr) 5.5rem;
+    align-items: baseline; gap: var(--s4);
+    padding: var(--s3) var(--s4);
+  }
+  /* Columns are assigned EXPLICITLY, not left to auto-placement. A session
+     with no note renders no .session-note element at all, and auto-placement
+     would then slide the duration left into the empty note column — so the
+     right-hand figures only lined up on rows that happened to have notes. */
+  .session-list .session-mid   { grid-column: 1; grid-row: 1; margin-top: 0; }
+  .session-list .session-top   { grid-column: 2; grid-row: 1; display: block; }
+  .session-list .session-note  { grid-column: 3; grid-row: 1; margin-top: 0; }
+  .session-list .session-dur   { grid-column: 4; grid-row: 1; text-align: right; justify-self: end; }
+
+  /* keep the day header aligned with the new grid */
+  .session-list .day-head { padding-left: var(--s4); padding-right: var(--s4); }
 }
 
 /* ============================================================================
@@ -1145,6 +1160,11 @@ body.light-mode {
   display: block; font-family: var(--font-ui);
   font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
   color: var(--muted); font-weight: 600;
+}
+/* Tracked total above, range tabs below — both right-aligned against the
+   title on the left. */
+.fd-tl-head-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--s2);
 }
 
 .fd-tl { --fd-gutter: 12rem; }
@@ -1195,12 +1215,14 @@ body.light-mode {
   background: var(--sunken);
   box-shadow: inset 0 1px 0 rgba(0,0,0,.18);
 }
-/* faint hour marks, soft enough to stay ambient */
+/* Faint gridlines, soft enough to stay ambient. --tick is the axis period as
+   a percentage — one hour on the day view, one day on the multi-day views —
+   so the marks always land on the labels above them. */
 .fd-tl-track::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit;
   pointer-events: none; opacity: .5;
   background-image: repeating-linear-gradient(
-    to right, var(--hairline) 0 1px, transparent 1px 6.25%);
+    to right, var(--hairline) 0 1px, transparent 1px var(--tick, 6.25%));
 }
 
 /* ── blocks ────────────────────────────────────────────────────────────── */
@@ -1238,6 +1260,11 @@ body.light-mode {
   background: color-mix(in srgb, var(--duration) 26%, transparent);
   box-shadow: var(--edge), var(--e1), var(--glow-live);
   animation: fd-breath 3.2s ease-in-out infinite;
+  /* Anchored by its END, not its start. A live block always ends at "now",
+     and min-width would otherwise push a just-started timer to the RIGHT of
+     the now-marker — drawing time that has not happened yet. Pinning the
+     right edge makes the minimum width grow backwards instead. */
+  left: auto; right: calc(100% - var(--end));
 }
 .fd-tl-block.is-live .fd-tl-b-dur { color: var(--duration); }
 @keyframes fd-breath {

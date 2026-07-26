@@ -44,8 +44,13 @@
         </div>
         {% endif %}
 
+        {% comment %}
+          Each number and its unit are one .focus-time-part so they can never
+          be split across a line break — "43 minutes / 21 / seconds" is what
+          you get without it. The pairs wrap as wholes instead.
+        {% endcomment %}
         <p class="focus-time" data-timer-elapsed>
-            {% for part in timer.duration|hero_duration %}<span class="num">{{ part.value }}</span><span class="unit">{{ part.unit }}</span>{% endfor %}
+            {% for part in timer.duration|hero_duration %}<span class="focus-time-part"><span class="num">{{ part.value }}</span><span class="unit">{{ part.unit }}</span></span>{% endfor %}
         </p>
 
         <div class="focus-autostop">

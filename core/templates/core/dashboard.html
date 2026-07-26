@@ -101,98 +101,11 @@
 </section>
 
 {% comment %}
-  The timeline reads its geometry from CSS custom properties (--x, --start,
-  --w, --proj) fed straight from build_day_timeline's percentages — that is
-  the sanctioned data-in-style channel, not page styling. {% localize off %}
-  keeps decimal points as points: a comma here would silently break every
-  position.
+  The timeline is a standalone partial because it is also re-fetched on its
+  own — by the range tabs, and whenever the set of running timers changes.
+  See core.views.timeline_fragment and dashboard_desk.js.
 {% endcomment %}
-{% localize off %}
-<section class="slab fd-tl-slab" aria-label="Today's timeline">
-    <header class="fd-tl-head">
-        <div>
-            <p class="page-eyebrow">Today</p>
-            {% with last_hour=timeline.hours|last %}
-            <h2 class="fd-tl-title">{{ timeline.hours.0.label }}:00 &ndash; {{ last_hour.label }}:00</h2>
-            {% endwith %}
-        </div>
-        <p class="fd-tl-total">
-            <span class="fd-tl-total-label">Tracked today</span>
-            {{ today_total|duration_formatter }}
-        </p>
-    </header>
-
-    <div class="fd-tl">
-        <div class="fd-tl-axis" aria-hidden="true">
-            {% for hour in timeline.hours %}
-            <span class="fd-tl-lab{% if not forloop.counter0|divisibleby:2 %} fd-tl-lab--minor{% endif %}" style="--x: {{ hour.x_pct }}%">{{ hour.label }}</span>
-            {% endfor %}
-        </div>
-
-        {% if timeline.lanes %}
-        <div class="fd-tl-plot">
-            {% for lane in timeline.lanes %}
-            <div class="fd-tl-lane" style="--proj: {{ lane.colour }}">
-                <div class="fd-tl-head-cell">
-                    <a class="fd-tl-name" href="{% url 'update_project' lane.project.id %}">{{ lane.project.name }}</a>
-                    <span class="fd-tl-fig">
-                        {% if lane.total_label %}{{ lane.total_label }}{% endif %}
-                        {% if lane.live_label %}<span class="muted">{% if lane.total_label %}+ {% endif %}{{ lane.live_label }} live</span>{% endif %}
-                    </span>
-                </div>
-                <div class="fd-tl-track">
-                    {% comment %}
-                      The block is not itself a link: session notes render
-                      markdown and may contain anchors, and an <a> inside an
-                      <a> is invalid. The tooltip carries the link instead,
-                      and stays open on :focus-within so it can be reached
-                      from the keyboard.
-                    {% endcomment %}
-                    {% for block in lane.blocks %}
-                    <div class="fd-tl-block{% if block.is_live %} is-live{% endif %}"
-                         style="--start: {{ block.start_pct }}%; --w: {{ block.width_pct }}%"
-                         tabindex="0">
-                        {% if block.label %}<span class="fd-tl-b-lab">{{ block.label }}</span>{% endif %}
-                        <span class="fd-tl-b-dur">{{ block.duration_label }}</span>
-                        <div class="fd-tl-tip{% if block.start_pct > 55 %} fd-tl-tip--flip{% endif %}">
-                            <p>
-                                <span class="mono text-cyan">{{ block.start_local|time_formatter }} &rarr; {% if block.is_live %}running{% else %}{{ block.end_local|time_formatter }}{% endif %}</span>
-                                <span class="mono text-green">{{ block.duration_label }}</span>
-                            </p>
-                            <p>
-                                <span class="text-red">{{ lane.project.name }}</span>
-                                {% if block.label %}<span class="text-blue">[{{ block.label }}]</span>{% endif %}
-                            </p>
-                            {% if block.session.note %}
-                            <div class="fd-tl-tip-note">{{ block.session.note|markdown|safe }}</div>
-                            {% endif %}
-                            <a class="fd-tl-tip-link" href="{% url 'update_session' block.session.id %}">Edit session</a>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endfor %}
-
-            <div class="fd-tl-nowlayer" aria-hidden="true">
-                {% if timeline.now_label %}
-                <div class="fd-tl-now" style="--x: {{ timeline.now_pct }}%">
-                    <span class="fd-tl-now-flag mono">{{ timeline.now_label }}</span>
-                </div>
-                {% endif %}
-                {% for gap in timeline.gaps %}
-                <div class="fd-tl-gap" style="--start: {{ gap.start_pct }}%; --w: {{ gap.width_pct }}%"><span>{{ gap.label }}</span></div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <p class="fd-tl-caption">Empty track is untracked time &mdash; the backdrop shows through it.</p>
-        {% else %}
-        <p class="fd-tl-empty">Nothing tracked today yet. <a href="{% url 'start_timer' %}">Start a timer</a> and this fills in as you go.</p>
-        {% endif %}
-    </div>
-</section>
-{% endlocalize %}
+{% include 'core/partials/day_timeline.html' %}
 
 {# ============================================================== THE DESK == #}
 

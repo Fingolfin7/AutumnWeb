@@ -188,3 +188,61 @@ class DashboardRendersFocusDeskTests(DashboardTestCase):
         )
         self.assertContains(response, 'name="project" value="Atlas API"')
         self.assertContains(response, 'name="subprojects" value="auth"')
+
+
+class TimelineFragmentTests(DashboardTestCase):
+    """The fragment endpoint serves both the range tabs and the live poll."""
+
+    def test_fragment_requires_login(self):
+        self.client.logout()
+        response = self.client.get(reverse("timeline_fragment"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_fragment_renders_the_timeline_alone(self):
+        self._session(self.atlas, 10, subs=["auth"])
+
+        response = self.client.get(reverse("timeline_fragment"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Cache-Control"], "no-store")
+        self.assertContains(response, "data-timeline")
+        self.assertContains(response, "Atlas API")
+        # a fragment, not a page
+        self.assertNotContains(response, "<html")
+        self.assertNotContains(response, "desk-head")
+
+    def test_the_range_parameter_selects_the_window(self):
+        response = self.client.get(reverse("timeline_fragment"), {"range": "wk"})
+
+        self.assertContains(response, 'data-timeline-range="wk"')
+        self.assertContains(response, 'data-tlrange="wk"')
+
+    def test_a_junk_range_falls_back_rather_than_failing(self):
+        response = self.client.get(reverse("timeline_fragment"), {"range": "nonsense"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'data-timeline-range="today"')
+
+    def test_the_fragment_carries_the_window_the_client_ticks_against(self):
+        """dashboard_desk.js grows live blocks locally; without absolute
+        window bounds it would have to poll instead."""
+        response = self.client.get(reverse("timeline_fragment"))
+
+        self.assertContains(response, "data-timeline-window")
+
+    def test_a_running_timer_is_marked_for_client_side_ticking(self):
+        self._timer(self.atlas, subs=["auth"])
+
+        response = self.client.get(reverse("timeline_fragment"))
+
+        self.assertContains(response, "data-live-block")
+        self.assertContains(response, "data-start-iso")
+        self.assertContains(response, "data-live-dur")
+
+    def test_the_dashboard_and_the_fragment_render_the_same_partial(self):
+        self._session(self.atlas, 10)
+
+        page = self.client.get(reverse("home"))
+
+        self.assertTemplateUsed(page, "core/partials/day_timeline.html")

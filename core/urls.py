@@ -3,6 +3,7 @@ from django.urls import path, re_path
 from django.http import JsonResponse
 from core.views import (
     DashboardView,
+    timeline_fragment,
     ProjectsListView,
     TimerListView,
     start_timer,
@@ -46,6 +47,7 @@ urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     # pages
     path("", DashboardView.as_view(), name="home"),
+    path("timeline/fragment/", timeline_fragment, name="timeline_fragment"),
     path("projects/", ProjectsListView.as_view(), name="projects"),
     path("timers/", TimerListView.as_view(), name="timers"),
     path(

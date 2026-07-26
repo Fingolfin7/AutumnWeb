@@ -1,5 +1,8 @@
 from core.forms import *
 from core.utils import *
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
+from django.template.loader import render_to_string
 from django.utils import timezone
 from datetime import datetime, timedelta, time
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -12,7 +15,7 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.models import Sessions, Commitment
-from core.timeline import build_day_timeline
+from core.timeline import DEFAULT_RANGE, build_timeline
 
 
 #: How many "pick up where you left off" chips the start card offers, and how
@@ -58,6 +61,37 @@ def build_quick_starts(recent_sessions, active_timers):
             break
 
     return quick_starts
+
+
+TIMELINE_FRAGMENT_TEMPLATE = "core/partials/day_timeline.html"
+
+
+@login_required
+def timeline_fragment(request):
+    """Render the timeline on its own, for the range tabs and the live poll.
+
+    Two callers, one renderer:
+
+    * the range tabs, which need a different window;
+    * dashboard_desk.js, when the set of running timers changes underneath it.
+
+    The client grows live blocks and walks the now-marker by itself between
+    polls, so this is only fetched when the *shape* of the chart can have
+    changed — not once a second.
+
+    Like the active-timer fragment, this is rendered without context
+    processors: the partial needs `timeline` and nothing else.
+
+    Deliberately no ``stop_expired_timers`` call: the five-second timer poll
+    already runs it, and this endpoint should not write on a GET to repeat
+    work that has just been done.
+    """
+    timeline = build_timeline(request.user, request.GET.get("range", DEFAULT_RANGE))
+    response = HttpResponse(
+        render_to_string(TIMELINE_FRAGMENT_TEMPLATE, {"timeline": timeline})
+    )
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -150,8 +184,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         active_timers = list(active_timers[:5])
         context["active_timers"] = active_timers
 
-        # 6. Day timeline for the hero zone (see core/timeline.py)
-        context["timeline"] = build_day_timeline(user)
+        # 6. Timeline for the hero zone (see core/timeline.py). The range tabs
+        # re-fetch it from timeline_fragment; the first paint comes from here.
+        context["timeline"] = build_timeline(user, DEFAULT_RANGE)
 
         # 7. Quick-start chips on the "start something" focus card. Drawn from a
         # wider slice than the three sessions the recent list shows, so the

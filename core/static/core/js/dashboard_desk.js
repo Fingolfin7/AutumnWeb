@@ -44,8 +44,10 @@
 
   function paintElapsed(el, totalSeconds) {
     el.innerHTML = heroParts(totalSeconds).map(function (part) {
-      return '<span class="num">' + part[0] + '</span>' +
-             '<span class="unit">' + plural(part[0], part[1]) + '</span>';
+      return '<span class="focus-time-part">' +
+             '<span class="num">' + part[0] + '</span>' +
+             '<span class="unit">' + plural(part[0], part[1]) + '</span>' +
+             '</span>';
     }).join("");
   }
 
@@ -140,6 +142,128 @@
     track.scrollTo({ left: index * (track.clientWidth + 12), behavior: "smooth" });
   });
 
+  /* ---------------------------------------------------------- timeline ---
+     Network budget. The chart changes for two different reasons and they
+     deserve different treatment:
+
+       the live block grows      every second, but it is pure geometry — the
+                                 client already knows the window and the start
+                                 instant, so it is recomputed locally and costs
+                                 nothing. TIMELINE_TICK_MS.
+
+       the chart's SHAPE changes a timer started or stopped, a session was
+                                 edited elsewhere. Only then is a refetch
+                                 worth a request, and the five-second timer
+                                 poll already tells us when the running set
+                                 changed. TIMELINE_HEARTBEAT_MS is the slow
+                                 backstop for changes made outside this tab
+                                 (CLI, API, another device).
+
+     So: one cheap local tick, and a request only when something structural
+     actually happened. */
+  var TIMELINE_TICK_MS = 30 * 1000;
+  var TIMELINE_HEARTBEAT_MS = 5 * 60 * 1000;
+
+  var timelineFetchInFlight = false;
+  var lastRunningSignature = null;
+
+  function compactMinutes(minutes) {
+    var whole = Math.round(minutes);
+    var hours = Math.floor(whole / 60);
+    var mins = whole % 60;
+    return hours ? hours + "h " + pad(mins) + "m" : mins + "m";
+  }
+
+  function clockLabel(stamp) {
+    var d = new Date(stamp);
+    return pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  /* Mirrors build_timeline's percentages: the server draws the first frame,
+     this walks it forward. Both map the same absolute window onto 0-100%. */
+  function tickTimeline() {
+    var root = document.querySelector("[data-timeline]");
+    if (!root) { return; }
+
+    var bounds = (root.getAttribute("data-timeline-window") || "").split("|");
+    var windowStart = Date.parse(bounds[0]);
+    var windowEnd = Date.parse(bounds[1]);
+    if (isNaN(windowStart) || isNaN(windowEnd) || windowEnd <= windowStart) { return; }
+
+    var now = Date.now();
+    function pct(stamp) {
+      var value = (stamp - windowStart) / (windowEnd - windowStart) * 100;
+      return Math.max(0, Math.min(100, value));
+    }
+
+    var marker = root.querySelector("[data-now-marker]");
+    if (marker && now >= windowStart && now <= windowEnd) {
+      marker.style.setProperty("--x", pct(now).toFixed(4) + "%");
+      var label = marker.querySelector("[data-now-label]");
+      if (label) { label.textContent = clockLabel(now); }
+    }
+
+    root.querySelectorAll("[data-live-block]").forEach(function (block) {
+      var started = Date.parse(block.getAttribute("data-start-iso"));
+      if (isNaN(started)) { return; }
+      var from = Math.max(started, windowStart);
+      var startPct = pct(from);
+      var endPct = pct(now);
+
+      block.style.setProperty("--start", startPct.toFixed(4) + "%");
+      block.style.setProperty("--end", endPct.toFixed(4) + "%");
+      block.style.setProperty("--w", Math.max(0, endPct - startPct).toFixed(4) + "%");
+
+      var duration = block.querySelector("[data-live-dur]");
+      if (duration) { duration.textContent = compactMinutes((now - from) / 60000); }
+    });
+  }
+
+  function currentRange() {
+    var root = document.querySelector("[data-timeline]");
+    return (root && root.getAttribute("data-timeline-range")) || "today";
+  }
+
+  function refetchTimeline(range) {
+    var root = document.querySelector("[data-timeline]");
+    if (!root || timelineFetchInFlight) { return; }
+    var url = root.getAttribute("data-timeline-url");
+    if (!url) { return; }
+
+    timelineFetchInFlight = true;
+    fetch(url + "?range=" + encodeURIComponent(range || currentRange()), {
+      credentials: "same-origin",
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    })
+      .then(function (response) {
+        return response.ok ? response.text() : Promise.reject(response.status);
+      })
+      .then(function (html) {
+        var current = document.querySelector("[data-timeline]");
+        if (current) { current.outerHTML = html; }
+        /* The replacement is a fresh server frame; walk it to this instant so
+           it does not sit a poll-interval stale. */
+        tickTimeline();
+      })
+      .catch(function () { /* a dropped poll is not worth surfacing */ })
+      .then(function () { timelineFetchInFlight = false; });
+  }
+
+  /* Which timers are running, as a comparable string. */
+  function runningSignature() {
+    var ids = [];
+    document.querySelectorAll(".focus-card[data-timer-id]").forEach(function (card) {
+      ids.push(card.getAttribute("data-timer-id"));
+    });
+    return ids.sort().join(",");
+  }
+
+  document.addEventListener("click", function (event) {
+    var tab = event.target.closest("[data-tlrange]");
+    if (!tab) { return; }
+    refetchTimeline(tab.getAttribute("data-tlrange"));
+  });
+
   /* ---------------------------------------------------- activity range ---
      All 30 days are rendered server-side; narrowing the range hides the
      leading cells rather than refetching. The first visible cell is pushed to
@@ -182,13 +306,26 @@
     tickCards();
     syncDots();
     setActivityRange(14);
+    tickTimeline();
+    lastRunningSignature = runningSignature();
+
     setInterval(tickCards, 1000);
+    setInterval(tickTimeline, TIMELINE_TICK_MS);
+    setInterval(function () { refetchTimeline(); }, TIMELINE_HEARTBEAT_MS);
 
     document.addEventListener("autumn:timers-refreshed", function () {
       var deck = document.querySelector("[data-focus-track]");
       if (deck) { localiseTimes(deck); }
       tickCards();
       syncDots();
+
+      /* A timer appeared or disappeared, so the chart has a new shape — this
+         is the one moment a refetch actually buys something. */
+      var signature = runningSignature();
+      if (signature !== lastRunningSignature) {
+        lastRunningSignature = signature;
+        refetchTimeline();
+      }
     });
 
     /* Card widths change at the desk breakpoint, which moves the dot the

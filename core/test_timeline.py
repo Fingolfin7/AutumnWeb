@@ -13,7 +13,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from core.models import Projects, Sessions, SubProjects
-from core.timeline import MIN_GAP_MINUTES, build_day_timeline
+from core.timeline import MIN_GAP_MINUTES, build_day_timeline, build_timeline
 
 DAY = date(2026, 7, 25)
 
@@ -79,14 +79,14 @@ class GeometryTests(TimelineTestCase):
     def test_hour_ticks_span_the_full_axis(self):
         self._session(self.atlas, _at(9), _at(10))
         tl = build_day_timeline(self.user, DAY)
-        self.assertAlmostEqual(tl["hours"][0]["x_pct"], 0.0)
-        self.assertAlmostEqual(tl["hours"][-1]["x_pct"], 100.0)
-        self.assertEqual(tl["hours"][0]["label"], "06")
+        self.assertAlmostEqual(tl["ticks"][0]["x_pct"], 0.0)
+        self.assertAlmostEqual(tl["ticks"][-1]["x_pct"], 100.0)
+        self.assertEqual(tl["ticks"][0]["label"], "06")
 
     def test_midnight_hour_label_wraps_to_00(self):
         self._session(self.atlas, _at(23), _at(23, 59))
         tl = build_day_timeline(self.user, DAY)
-        self.assertEqual(tl["hours"][-1]["label"], "00")
+        self.assertEqual(tl["ticks"][-1]["label"], "00")
 
 
 class ClippingTests(TimelineTestCase):
@@ -199,7 +199,7 @@ class LaneTests(TimelineTestCase):
         self.assertEqual(tl["lanes"], [])
         self.assertEqual(tl["gaps"], [])
         self.assertEqual(tl["window_start_hour"], 6)
-        self.assertTrue(tl["hours"])
+        self.assertTrue(tl["ticks"])
 
 
 class DurationLabelTests(TimelineTestCase):
@@ -241,3 +241,85 @@ class DurationLabelTests(TimelineTestCase):
         lane = build_day_timeline(self.user)["lanes"][0]
         self.assertIsNone(lane["total_label"])
         self.assertEqual(lane["live_label"], "20m")
+
+
+class RangeTests(TimelineTestCase):
+    """The 3-day and week views share the geometry engine but not the axis."""
+
+    def test_a_multi_day_range_spans_whole_days(self):
+        tl = build_timeline(self.user, "d3", end_day=DAY)
+        self.assertEqual(tl["start_day"], DAY - timedelta(days=2))
+        self.assertEqual(tl["date"], DAY)
+        self.assertTrue(tl["is_multi_day"])
+        self.assertIsNone(tl["window_start_hour"])
+
+    def test_day_labels_are_centred_over_their_own_day(self):
+        """A label sitting on midnight belongs to neither day it separates."""
+        ticks = build_timeline(self.user, "d3", end_day=DAY)["ticks"]
+        self.assertEqual(len(ticks), 3)
+        self.assertAlmostEqual(ticks[0]["x_pct"], 100 / 3 / 2, places=2)
+        self.assertAlmostEqual(ticks[-1]["x_pct"], 100 - 100 / 3 / 2, places=2)
+
+    def test_sessions_from_earlier_days_appear_in_a_multi_day_range(self):
+        self._session(self.atlas, _at(9, day=DAY - timedelta(days=2)),
+                      _at(10, day=DAY - timedelta(days=2)))
+        self._session(self.autumn, _at(9), _at(10))
+
+        day_only = build_timeline(self.user, "today", end_day=DAY)
+        three_days = build_timeline(self.user, "d3", end_day=DAY)
+
+        self.assertEqual([l["project"].name for l in day_only["lanes"]], ["Autumn"])
+        self.assertEqual(
+            sorted(l["project"].name for l in three_days["lanes"]),
+            ["Atlas API", "Autumn"],
+        )
+
+    def test_a_session_two_days_back_sits_in_the_first_third(self):
+        self._session(self.atlas, _at(12, day=DAY - timedelta(days=2)),
+                      _at(13, day=DAY - timedelta(days=2)))
+        block = build_timeline(self.user, "d3", end_day=DAY)["lanes"][0]["blocks"][0]
+        # 12:00 on day 1 of 3 == half a day into a three-day window
+        self.assertAlmostEqual(block["start_pct"], 100 * 12 / 72, places=1)
+
+    def test_overnight_is_not_reported_as_a_gap(self):
+        """Nights are not untracked time worth labelling."""
+        self._session(self.atlas, _at(9), _at(10))
+        self._session(self.atlas, _at(9, day=DAY - timedelta(days=1)),
+                      _at(10, day=DAY - timedelta(days=1)))
+        self.assertEqual(build_timeline(self.user, "d3", end_day=DAY)["gaps"], [])
+
+    def test_an_unknown_range_falls_back_to_today(self):
+        """The range arrives from a query string and can be anything."""
+        tl = build_timeline(self.user, "../etc/passwd", end_day=DAY)
+        self.assertEqual(tl["range_key"], "today")
+        self.assertFalse(tl["is_multi_day"])
+
+    def test_tracked_total_matches_the_lanes_drawn(self):
+        self._session(self.atlas, _at(9), _at(10))
+        self._session(self.autumn, _at(11), _at(11, 30))
+        tl = build_timeline(self.user, "today", end_day=DAY)
+        self.assertAlmostEqual(tl["tracked_minutes"], 90.0)
+
+
+class LiveBlockGeometryTests(TimelineTestCase):
+    def test_a_live_block_ends_at_now_and_never_beyond(self):
+        """Nothing may be drawn to the right of the now-marker: that is time
+        which has not happened."""
+        now = timezone.now()
+        Sessions.objects.create(
+            user=self.user, project=self.atlas, start_time=now - timedelta(seconds=20)
+        )
+
+        tl = build_timeline(self.user, "today")
+        block = tl["lanes"][0]["blocks"][0]
+
+        self.assertTrue(block["is_live"])
+        self.assertAlmostEqual(block["end_pct"], tl["now_pct"], places=2)
+        self.assertLessEqual(block["end_pct"], tl["now_pct"] + 0.01)
+
+    def test_end_pct_is_start_plus_width(self):
+        self._session(self.atlas, _at(9), _at(10))
+        block = build_timeline(self.user, "today", end_day=DAY)["lanes"][0]["blocks"][0]
+        self.assertAlmostEqual(
+            block["end_pct"], block["start_pct"] + block["width_pct"], places=3
+        )
