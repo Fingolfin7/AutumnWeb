@@ -75,7 +75,7 @@ Status: `TODO` / `WIP` / `DONE`
 | 7 | Commitments | `create_commitment`, `update_commitment`, `delete_commitment`, `partials/commitments_panel` | TODO |
 | 8 | Contexts & Tags | `contexts`, `update_context`, `delete_context`, `tags`, `update_tag`, `delete_tag` | **DONE** |
 | 9 | Charts | `charts` | **DONE** |
-| 10 | Import / Export / Home | `import`, `export`, `home` | TODO |
+| 10 | Import / Export | `import`, `export` (`home` was dead — deleted) | TODO |
 | 11 | Users | `users/base`, `login`, `logout`, `register`, `password_reset`, `profile` | TODO |
 | 12 | Insights | `llm_insights/insights` | TODO |
 | 13 | Cutover: delete legacy shell + `style.css`, rename `base_fd` → `base` | — | TODO |
@@ -92,8 +92,6 @@ Status: `TODO` / `WIP` / `DONE`
   (`dynamic_timers`, `search_projects`, `timer_search_projects`,
   `session_sliders`, `charts/*`), so it likely stays — confirm rather than
   assume.
-- `core/templates/core/home.html` appears unused: `/` routes to
-  `DashboardView` → `dashboard.html`. Confirm and delete if dead.
 - `dynamic_timers.js` is now only used for its five-second fragment poll; its
   `updateDurations()` half targets legacy `.timer-duration` markup and matches
   nothing on the ported dashboard. Once chunks 6 and 10 land, split the poll
@@ -102,8 +100,10 @@ Status: `TODO` / `WIP` / `DONE`
   timeline tooltips can escape upward. If another page needs the same, make it
   a modifier rather than changing `.slab`.
 - `session_sliders.js` is no longer loaded by any ported page (notes clamp and
-  expand instead of sliding). Delete it once chunks 6 and 10 stop referencing
-  it, along with the `.session-note-slider` / `.project-name-slider` markup.
+  expand instead of sliding). Delete it once chunk 10 stops referencing it,
+  along with the `.session-note-slider` / `.project-name-slider` markup.
+- DONE early: `home.html`, `partials/active_timers_home.html` and the "home"
+  timer surface were dead and are deleted.
 
 ## Chunk 12 (Insights) — read this before starting
 
