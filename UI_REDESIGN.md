@@ -73,7 +73,7 @@ Status: `TODO` / `WIP` / `DONE`
 | 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | **DONE** |
 | 6 | Timers | `timers`, `start_timer`, `stop_timer`, `remove_timer`, `partials/active_timers_timers`, `partials/timer_suggestion_card` | **DONE** (see note: `active_timers_home` left for chunk 13) |
 | 7 | Commitments | `create_commitment`, `update_commitment`, `delete_commitment`, `partials/commitments_panel` | TODO |
-| 8 | Contexts & Tags | `contexts`, `update_context`, `delete_context`, `tags`, `update_tag`, `delete_tag` | TODO |
+| 8 | Contexts & Tags | `contexts`, `update_context`, `delete_context`, `tags`, `update_tag`, `delete_tag` | **DONE** |
 | 9 | Charts | `charts` | **DONE** |
 | 10 | Import / Export / Home | `import`, `export`, `home` | TODO |
 | 11 | Users | `users/base`, `login`, `logout`, `register`, `password_reset`, `profile` | TODO |
