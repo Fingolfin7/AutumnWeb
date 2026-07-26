@@ -107,33 +107,33 @@ Status: `TODO` / `WIP` / `DONE`
 
 ## Chunk 12 (Insights) — read this before starting
 
-Not a shell swap. `llm_insights/insights.html` is ~270 lines of markup plus
-~210 of inline script, and it loads its own `core/css/chat_style.css`, which
-reads **fourteen variables that only exist in `style.css`/`colours.css`**:
+The biggest remaining job, and NOT a shell swap. Three separate problems:
 
-```
---border-dark --dark-text --accent-color --main-red --light-text
---dark-background --card-bg-dark-alpha --card-background-dark --border-light
---main-muted --color-text-light --color-dodgerblue --color-blue-grey
---card-background-light
-```
+1. **It is a full-height app view built on the LEGACY SHELL'S layout.**
+   `chat_style.css` turns `.container` into a `100dvh` flex column, makes
+   `.main-body` the internal scroller, and anchors `.left-panel` under the
+   ribbon at `top: 4.25rem`. None of `.container`, `.main-body`, `.left-panel`
+   or `.ribbon` exist in `base_fd.html`, so switching the extends silently
+   drops the whole layout — the sidebar, the internal scroll, and the composer
+   pinned to the bottom. This is the real work: rebuild that shell-height
+   layout on `.app` / `.screen`, probably as a page-level modifier that lets
+   `<main>` own the scroll.
 
-None are defined in `focus_desk.css`, so switching the extends alone gives a
-chat UI with no colours. Two ways out, and they are not equal:
+2. **Fourteen legacy CSS variables.** `chat_style.css` reads
+   `--border-dark --dark-text --accent-color --main-red --light-text
+   --dark-background --card-bg-dark-alpha --card-background-dark
+   --border-light --main-muted --color-text-light --color-dodgerblue
+   --color-blue-grey --card-background-light`, none of which exist in
+   `focus_desk.css`. Map them onto Focus Desk tokens as part of restyling, not
+   as a permanent bridge.
 
-1. **Bridge the variables** — define those fourteen names in `focus_desk.css`
-   in terms of Focus Desk tokens. Cheap and reversible, but the chat then
-   keeps the old system's square corners and spacing inside the new shell, so
-   it reads as a foreign page.
-2. **Port `chat_style.css`** (594 lines) into the system properly — message
-   bubbles become slabs/bands, the composer becomes `.fields`.
+3. **~210 lines of inline `<script>` in the template.** Move it to a static
+   file FIRST, before touching markup — it is impossible to review in place,
+   and it is what makes the diff unreadable.
 
-Prefer 2. Use 1 only as an explicitly temporary step, recorded here, and only
-if the page must ship before there is time for 2.
-
-Either way the inline `<script>` block should move to a real static file
-first; it is the only page still carrying that much script inline, and it is
-impossible to review inside a template.
+Suggested order: extract the script, rebuild the height/layout on the new
+shell, then restyle `chat_style.css` component by component (bubbles become
+slabs/bands, the composer becomes `.fields`). Do not attempt it as one patch.
 
 ## Chunk 3 notes (Sessions)
 
