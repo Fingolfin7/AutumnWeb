@@ -1,4 +1,4 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_fd.html' %}
 {% load static %}
 {% load time_formats %}
 
@@ -7,43 +7,51 @@
 {% endblock %}
 
 {% block content %}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        <h3>Are you sure you want to remove this timer?</h3>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Remove timer</p>
+        <h1 class="page-title">Are you sure?</h1>
+    </div>
+</div>
 
-        <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
-                <table class="timer-row">
-                    <tr>
-                        <td class="text-red">
-                            <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
-                                {{ timer.project.name }}
-                            </a>
+<form method="post">
+    {% csrf_token %}
 
-                        </td>
-                        <td>
-                            [
-                            {% for subproject in timer.subprojects.all %}
-                                '<span class="text-cyan">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                            {% endfor %}
-                            ]
-                        </td>
-                        <td>
-                            started <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
-                        </td>
-                    </tr>
-                </table>
-            </div>
-
-        <div class="button-row">
-            <button type="button" class="timer-button" onclick="window.location.href='{% url 'timers' %}'">
-                 <i class="fa fa-arrow-left"></i>
-                Back
-            </button>
-            <button type="submit" id="start-timer" class="timer-button">
-                <i class="fa fa-trash"></i>
-                Delete
-            </button>
+    <section class="slab slab-pad" id="timer-{{ timer.id }}"
+             data-timer-id="{{ timer.id }}"
+             data-project-id="{{ timer.project.id }}"
+             data-start-time="{{ timer.start_time|utc_time_formatter }}">
+        <div class="project-top">
+            <a class="project-name" href="{% url 'update_project' timer.project.id %}">{{ timer.project.name }}</a>
         </div>
-    </form>
+        {% if timer.subprojects.all %}
+        <div class="project-subs">
+            {% for subproject in timer.subprojects.all %}
+            <span class="sub-chip">{{ subproject.name }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <p class="project-total">
+            <span class="timer-duration">{{ timer.duration|min_formatter_two }}</span>
+            <span class="muted">running</span>
+        </p>
+    </section>
+
+    <p class="confirm-warn">
+        <i class="fas fa-exclamation-triangle"></i>
+        Removing discards this timer without recording a session. To keep the
+        time, <a href="{% url 'stop_timer' timer.id %}">stop it</a> instead.
+    </p>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'timers' %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <button class="btn btn--stop btn--spacer" type="submit">
+            <i class="fas fa-trash"></i> Remove timer
+        </button>
+    </div>
+</form>
+
 {% endblock %}

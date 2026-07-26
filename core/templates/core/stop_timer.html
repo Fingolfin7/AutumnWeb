@@ -1,6 +1,20 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_fd.html' %}
 {% load static %}
 {% load time_formats %}
+
+{% comment %}
+  ============================================================================
+  STOP TIMER — Focus Desk (UI_REDESIGN.md chunk 6)
+  ----------------------------------------------------------------------------
+  What is about to be written down, then the chance to correct it: the times,
+  the note, and how the time splits across subprojects.
+
+  allocation_editor.js builds the .attr-* subtree from the [data-allocation-item]
+  spans; session_note_editor.js owns the toolbar and [data-note-status].
+  Neither set of hooks may be renamed. data-timer-id / data-start-time keep
+  dynamic_timers.js ticking the elapsed figure.
+  ============================================================================
+{% endcomment %}
 
 {% block head_includes %}
     <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
@@ -9,81 +23,88 @@
 {% endblock %}
 
 {% block content %}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        {{ form.non_field_errors }}
 
-        <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
-            <table class="timer-row">
-                <tr>
-                    <td>
-                        Stopping <span class="text-red">{{ timer.project.name }}</span>
-                    </td>
-                    <td>
-                        [
-                        {% for subproject in timer.subprojects.all %}
-                            '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                        {% endfor %}
-                        ]
-                    </td>
-                    <td>
-                        started <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
-                    </td>
-                </tr>
-            </table>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Stopping</p>
+        <h1 class="page-title text-red">{{ timer.project.name }}</h1>
+    </div>
+</div>
+
+<form method="post" class="fields">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <section class="slab slab-pad" id="timer-{{ timer.id }}"
+             data-timer-id="{{ timer.id }}"
+             data-project-id="{{ timer.project.id }}"
+             data-start-time="{{ timer.start_time|utc_time_formatter }}">
+        <div class="project-top">
+            <span class="project-name">{{ timer.project.name }}</span>
+        </div>
+        {% if timer.subprojects.all %}
+        <div class="project-subs">
+            {% for subproject in timer.subprojects.all %}
+            <span class="sub-chip">{{ subproject.name }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <p class="project-total">
+            <span class="timer-duration">{{ timer.duration|min_formatter_two }}</span>
+            <span class="muted">so far</span>
+        </p>
+    </section>
+
+    <section class="slab slab-pad">
+        <div class="two-up">
+            <div class="field">
+                {{ form.start_time.label_tag }}
+                {{ form.start_time }}
+                {{ form.start_time.errors }}
+            </div>
+            <div class="field">
+                {{ form.end_time.label_tag }}
+                {{ form.end_time }}
+                {{ form.end_time.errors }}
+            </div>
         </div>
 
-        <section id="input-fields" class="card stacked">
-            <div class="session-datetime-grid">
-                <span class="label-input session-field">
-                    {{ form.start_time.label_tag }}
-                    {{ form.start_time }}
-                    {{ form.start_time.errors }}
-                </span>
-                <span class="label-input session-field">
-                    {{ form.end_time.label_tag }}
-                    {{ form.end_time }}
-                    {{ form.end_time.errors }}
-                </span>
-            </div>
-
-            <div class="label-input note-editor-field" data-note-editor>
-                <label for="{{ form.note.id_for_label }}">Note:</label>
-                <div class="note-editor-shell">
-                    <div class="note-editor-toolbar">
-                        <button type="button" class="note-tool-button" data-note-action="bold"><b>B</b></button>
-                        <button type="button" class="note-tool-button" data-note-action="italic"><i>I</i></button>
-                        <button type="button" class="note-tool-button" data-note-action="link"><i class="fa fa-link"></i></button>
-                        <span class="note-toolbar-divider" aria-hidden="true"></span>
-                        <button type="button" class="note-tool-button dictate-button" data-note-action="dictate">
-                            <i class="fa fa-microphone"></i>
-                            <span data-dictate-label>Dictate</span>
-                        </button>
-                    </div>
-                    {{ form.note }}
+        <div class="field note-editor-field" data-note-editor>
+            <label for="{{ form.note.id_for_label }}">Note</label>
+            <div class="note-editor-shell">
+                <div class="note-editor-toolbar">
+                    <button type="button" class="note-tool-button" data-note-action="bold" title="Bold"><b>B</b></button>
+                    <button type="button" class="note-tool-button" data-note-action="italic" title="Italic"><i>I</i></button>
+                    <button type="button" class="note-tool-button" data-note-action="link" title="Link"><i class="fas fa-link"></i></button>
+                    <span class="note-toolbar-divider" aria-hidden="true"></span>
+                    <button type="button" class="note-tool-button dictate-button" data-note-action="dictate">
+                        <i class="fas fa-microphone"></i>
+                        <span data-dictate-label>Dictate</span>
+                    </button>
                 </div>
-                <small data-note-status></small>
-                {{ form.note.errors }}
+                {{ form.note }}
             </div>
-
-            <div data-allocation-editor data-collapsible="true">
-                {% for link in timer.subproject_links.all %}
-                    <span data-allocation-item data-subproject-id="{{ link.subproject_id }}"
-                          data-subproject-name="{{ link.subproject.name }}"
-                          data-initial-bp="{{ link.allocation_bp }}"></span>
-                {% endfor %}
-            </div>
-        </section>
-
-        <div class="button-row">
-            <button type="button" class="timer-button" onclick="window.location.href='{% url 'timers' %}'">
-                 <i class="fa fa-arrow-left"></i>
-                Back
-            </button>
-            <button type="submit" id="start-timer" class="timer-button">
-                <i class="fa fa-stopwatch"></i>
-                Stop
-            </button>
+            <small data-note-status></small>
+            {{ form.note.errors }}
         </div>
-    </form>
+
+        <div data-allocation-editor data-collapsible="true">
+            {% for link in timer.subproject_links.all %}
+            <span data-allocation-item data-subproject-id="{{ link.subproject_id }}"
+                  data-subproject-name="{{ link.subproject.name }}"
+                  data-initial-bp="{{ link.allocation_bp }}"></span>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'timers' %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <button class="btn btn--stop btn--lg btn--spacer" type="submit">
+            <i class="fas fa-stopwatch"></i> Stop timer
+        </button>
+    </div>
+</form>
+
 {% endblock %}

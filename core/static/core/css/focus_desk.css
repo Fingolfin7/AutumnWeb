@@ -1834,3 +1834,144 @@ img.brand-mark {
 }
 #commitment-section .primary-button:hover { background: var(--brand-hover); }
 .text-muted { color: var(--muted); }
+
+/* ============================================================================
+   TIMERS                                                            (chunk 6)
+   ----------------------------------------------------------------------------
+   The Timers page is the Focus Deck given the whole width: the running cards
+   are the content, not a hero above it. What the dashboard's cards do not
+   have is the notes-as-you-go editor, which belongs here — this is the page
+   you sit on while the timer runs.
+
+   timer_notes.js owns [data-timer-note-*] and the data-dirty flag;
+   timer_search_projects.js owns the start form's ids. Neither may be renamed.
+   ==========================================================================*/
+
+/* Notes-as-you-go, inside a focus card. Quiet until you use it. */
+.timer-note-editor { margin-top: var(--s4); }
+.timer-note-editor > label {
+  display: block; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted); font-weight: 600;
+  margin-bottom: .35rem;
+}
+.timer-note-toolbar {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: .35rem .4rem;
+  background: var(--raised);
+  border: 1px solid var(--hairline); border-bottom: 0;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+.timer-note-editor textarea {
+  width: 100%; min-height: 5.5rem; resize: vertical;
+  padding: .6rem .75rem;
+  color: var(--ink); background: var(--sunken);
+  border: 1px solid var(--hairline); border-radius: 0 0 var(--r-sm) var(--r-sm);
+  font-family: inherit; font-size: var(--fs-sm); line-height: 1.5;
+}
+.timer-note-editor textarea::placeholder { color: var(--muted); }
+.timer-note-editor textarea:focus-visible {
+  outline: none; border-color: var(--brand-deep); box-shadow: var(--focus-ring);
+}
+.timer-note-footer {
+  display: flex; align-items: center; gap: var(--s2); margin-top: .45rem;
+}
+.timer-note-status { font-size: var(--fs-xs); color: var(--muted); }
+.timer-note-status.saved { color: var(--duration); }
+.timer-note-status.error { color: var(--project); }
+.timer-note-save { margin-left: auto; }
+
+/* --------------------------------------------------------- suggestions ----
+   "What you might start." Ambient, so bands rather than cards, with the one
+   action — start it — on the right. */
+.suggest-group + .suggest-group { border-top: 1px solid var(--hairline); }
+.suggest-head {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  background: var(--sunken);
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.suggest {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3) var(--s4);
+}
+.suggest-main { min-width: 0; flex: 1 1 auto; }
+.suggest-project {
+  font-size: var(--fs-md); font-weight: 650; color: var(--project);
+  overflow-wrap: anywhere;
+}
+.suggest-subs { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
+.suggest-detail { display: block; margin-top: .25rem; font-size: var(--fs-xs); color: var(--muted); }
+.suggest-metric {
+  display: inline-block; margin-top: .25rem;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); color: var(--note);
+}
+.suggest-start {
+  flex: 0 0 auto; width: 2.5rem; height: 2.5rem;
+  border-radius: var(--r-pill); display: grid; place-items: center;
+  background: var(--brand-deep); color: var(--ink-invert); font-size: .85rem;
+  box-shadow: var(--edge);
+  transition: transform .16s var(--ease), background .16s var(--ease);
+}
+.suggest-start:hover { background: var(--brand-hover); transform: scale(1.06); }
+
+/* ------------------------------------------------------- start-timer form -
+   "Stop after" is an optional constraint, so the presets lead and the exact
+   fields sit under them for the case a preset does not cover. */
+.preset-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.timer-preset-button {
+  padding: .45rem .9rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); font-weight: 600; box-shadow: var(--edge);
+  transition: background .16s var(--ease);
+}
+.timer-preset-button:hover { background: var(--raised-2); }
+.timer-preset-button.is-active,
+.timer-preset-button[aria-pressed="true"] {
+  background: var(--brand-deep); color: var(--ink-invert);
+}
+
+/* The submit button starts disabled until a project is chosen. Say so
+   visually rather than letting it look clickable and do nothing. */
+.btn[disabled], .btn:disabled {
+  opacity: .45; cursor: not-allowed; box-shadow: var(--edge);
+}
+.btn[disabled]:hover, .btn:disabled:hover { background: var(--brand-deep); }
+
+/* The running total that the start form keeps up to date. */
+.start-summary {
+  font-size: var(--fs-sm); color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* The select-all control sits beside the Subprojects label, not in the grid. */
+.field-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s3); margin-bottom: .35rem;
+}
+.field-head .field-label { margin-bottom: 0; }
+.select-all-row { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); }
+.select-all-row label { display: inline; text-transform: none; letter-spacing: normal; margin: 0; color: var(--ink); }
+
+/* An hourglass that actually turns over, kept from the legacy start button.
+   It was defined in a <style> block inside that template; design system
+   components belong here. */
+.hourglass-icon::before {
+  font-family: "Font Awesome 5 Free"; font-weight: 900;
+  display: inline-block; font-size: 1em;
+  content: "\f251";
+  animation: hourglass-flip 4s ease-in-out infinite,
+             hourglass-cycle 4s steps(1) infinite;
+}
+@keyframes hourglass-cycle {
+  0%   { content: "\f251"; }
+  33%  { content: "\f252"; }
+  66%  { content: "\f253"; }
+  100% { content: "\f251"; }
+}
+@keyframes hourglass-flip {
+  0%, 70%   { transform: rotate(0deg); }
+  80%, 100% { transform: rotate(180deg); }
+}
