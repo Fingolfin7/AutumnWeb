@@ -1797,12 +1797,15 @@ class ActiveTimersFragmentTests(TestCase):
         build_timer_suggestions.assert_not_called()
 
     def test_dashboard_fragment_exists_when_empty_and_appears_with_timer(self):
+        # The Focus Desk deck no longer hides itself when nothing is running:
+        # the "start something" card sits beside these cards and is always on
+        # screen, so an idle fragment is simply an empty container.
         empty_response = self.client.get(
             reverse("active_timers_fragment"),
             {"surface": "dashboard"},
         )
         self.assertContains(empty_response, 'id="active-timers"')
-        self.assertContains(empty_response, "display: none")
+        self.assertNotContains(empty_response, "data-timer-id")
 
         self.create_active_session()
         active_response = self.client.get(
@@ -1812,7 +1815,7 @@ class ActiveTimersFragmentTests(TestCase):
 
         self.assertContains(active_response, 'data-timer-surface="dashboard"')
         self.assertContains(active_response, "Fragment Project")
-        self.assertNotContains(active_response, "display: none")
+        self.assertContains(active_response, "data-timer-id")
 
     def test_dashboard_and_home_fragments_limit_to_five_timers(self):
         now = timezone.now()

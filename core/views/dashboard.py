@@ -12,6 +12,52 @@ from core.commitments import (
     reconcile_commitment,
 )
 from core.models import Sessions, Commitment
+from core.timeline import build_day_timeline
+
+
+#: How many "pick up where you left off" chips the start card offers, and how
+#: far back to look for them. Small on purpose: the card is an invitation, not
+#: a second projects list.
+QUICK_START_LIMIT = 3
+QUICK_START_LOOKBACK = 40
+
+
+def greeting_for(moment):
+    """Time-of-day greeting for the dashboard title, in the user's timezone."""
+    hour = timezone.localtime(moment).hour
+    if hour < 12:
+        return "Good morning"
+    if hour < 18:
+        return "Good afternoon"
+    return "Good evening"
+
+
+def _combo_key(session):
+    """Identity of a timer combination: one project plus its subprojects."""
+    return (session.project_id, frozenset(sub.id for sub in session.subprojects.all()))
+
+
+def build_quick_starts(recent_sessions, active_timers):
+    """Distinct recent project/subproject combinations that aren't running.
+
+    Restarting the thing you were just doing is the overwhelmingly common
+    case, so the start card leads with it. Combinations already on the clock
+    are dropped — offering to start a timer that is already running is noise.
+    """
+    running = {_combo_key(timer) for timer in active_timers}
+    seen = set()
+    quick_starts = []
+
+    for session in recent_sessions:
+        key = _combo_key(session)
+        if key in running or key in seen:
+            continue
+        seen.add(key)
+        quick_starts.append(session)
+        if len(quick_starts) >= QUICK_START_LIMIT:
+            break
+
+    return quick_starts
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
@@ -73,6 +119,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # 4. Quick stats
         now = timezone.now()
+        context["greeting"] = greeting_for(now)
         today_start = timezone.make_aware(datetime.combine(now.date(), time.min))
         week_start = today_start - timedelta(days=now.weekday())
 
@@ -91,11 +138,30 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context["week_total"] = week_total
 
         # Active timers count
-        active_timers = Sessions.objects.filter(user=user, end_time__isnull=True)
+        active_timers = (
+            Sessions.objects.filter(user=user, end_time__isnull=True)
+            .select_related("project")
+            .prefetch_related("subprojects")
+        )
         active_timers = filter_by_active_context(active_timers, self.request)
         context["active_timers_count"] = active_timers.count()
 
         # 5. Active timers (up to 5)
-        context["active_timers"] = active_timers[:5]
+        active_timers = list(active_timers[:5])
+        context["active_timers"] = active_timers
+
+        # 6. Day timeline for the hero zone (see core/timeline.py)
+        context["timeline"] = build_day_timeline(user)
+
+        # 7. Quick-start chips on the "start something" focus card. Drawn from a
+        # wider slice than the three sessions the recent list shows, so the
+        # chips still offer three distinct combinations after de-duplication.
+        quick_start_source = (
+            Sessions.objects.filter(user=user, end_time__isnull=False)
+            .select_related("project")
+            .prefetch_related("subprojects")
+            .order_by("-end_time")[:QUICK_START_LOOKBACK]
+        )
+        context["quick_starts"] = build_quick_starts(quick_start_source, active_timers)
 
         return context

@@ -96,6 +96,38 @@ def duration_formatter(td: timedelta | float | int):
 
 
 @register.filter
+def hero_duration(td: timedelta | float | int):
+    """Split a duration into the two units the Focus Desk hero timer shows.
+
+    Returns a list of ``{"value": int, "unit": str}`` so the template can wrap
+    each half in its own span (big mono numeral, small muted word). The unit
+    pair steps up with the magnitude: days+hours, hours+minutes, then
+    minutes+seconds. ``dashboard_desk.js`` repaints the same shape every
+    second, so the two must stay in step.
+    """
+    if isinstance(td, (float, int)):
+        td = timedelta(minutes=td)
+    if td is None:
+        td = timedelta()
+
+    days = td.days
+    hrs, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    plural_form = lambda counter: "s"[: counter ^ 1]
+
+    if days > 0:
+        parts = [(days, "day"), (hrs, "hour")]
+    elif hrs > 0:
+        parts = [(hrs, "hour"), (minutes, "minute")]
+    else:
+        parts = [(minutes, "minute"), (seconds, "second")]
+
+    return [
+        {"value": value, "unit": f"{unit}{plural_form(value)}"} for value, unit in parts
+    ]
+
+
+@register.filter
 def date_formatter(date: datetime | str):
     """
     Converts datetime objects into formatted date strings. E.g. 12 June 2021

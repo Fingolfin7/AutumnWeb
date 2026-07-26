@@ -66,6 +66,17 @@ def _pct(moment, window_start, window_minutes):
     return round(max(0.0, min(100.0, offset / window_minutes * 100.0)), 4)
 
 
+def _compact_minutes(minutes):
+    """Short duration label for a gap, e.g. "45m" or "1h 08m".
+
+    Gap labels are centred inside the gap they annotate, which can be a few
+    dozen pixels wide, so they get their own tighter format than the app's
+    general duration filters produce.
+    """
+    hours, mins = divmod(int(round(minutes)), 60)
+    return f"{hours}h {mins:02d}m" if hours else f"{mins}m"
+
+
 def _collect_gaps(spans, window_start, window_minutes):
     """Untracked stretches between the first and last activity of the day.
 
@@ -90,6 +101,7 @@ def _collect_gaps(spans, window_start, window_minutes):
         start_pct = _pct(prev_end, window_start, window_minutes)
         gaps.append({
             "minutes": int(round(minutes)),
+            "label": _compact_minutes(minutes),
             "start_pct": start_pct,
             "width_pct": round(_pct(next_start, window_start, window_minutes) - start_pct, 4),
         })
@@ -154,6 +166,7 @@ def build_day_timeline(user, day=None):
             "session": session,
             "is_live": running,
             "minutes": minutes,
+            "duration_label": _compact_minutes(minutes),
             "start_pct": start_pct,
             "width_pct": round(_pct(block_end, window_start, window_minutes) - start_pct, 4),
             "label": ", ".join(sub.name for sub in session.subprojects.all()),
@@ -172,6 +185,11 @@ def build_day_timeline(user, day=None):
     )
     for index, lane in enumerate(lanes):
         lane["colour"] = LANE_COLOURS[index % len(LANE_COLOURS)]
+        # A lane head reads "03h 11m + 43m live". The completed figure is
+        # omitted when a lane is nothing but a running timer, so a fresh timer
+        # doesn't announce itself as "0m".
+        lane["total_label"] = _compact_minutes(lane["total_minutes"]) if lane["total_minutes"] else None
+        lane["live_label"] = _compact_minutes(lane["live_minutes"]) if lane["live_minutes"] else None
 
     now_pct = None
     if is_today and window_start <= now <= window_end:

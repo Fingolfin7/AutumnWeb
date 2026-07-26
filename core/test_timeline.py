@@ -200,3 +200,44 @@ class LaneTests(TimelineTestCase):
         self.assertEqual(tl["gaps"], [])
         self.assertEqual(tl["window_start_hour"], 6)
         self.assertTrue(tl["hours"])
+
+
+class DurationLabelTests(TimelineTestCase):
+    """The chart labels its own figures, so they are part of its contract.
+
+    Gap and block labels are drawn inside boxes a few dozen pixels wide, hence
+    the compact "1h 08m" / "45m" form rather than the app's general duration
+    filters.
+    """
+
+    def test_block_carries_a_compact_duration_label(self):
+        self._session(self.atlas, _at(9), _at(10, 8))
+        block = build_day_timeline(self.user, DAY)["lanes"][0]["blocks"][0]
+        self.assertEqual(block["duration_label"], "1h 08m")
+
+    def test_sub_hour_durations_drop_the_hour_component(self):
+        self._session(self.atlas, _at(9), _at(9, 45))
+        block = build_day_timeline(self.user, DAY)["lanes"][0]["blocks"][0]
+        self.assertEqual(block["duration_label"], "45m")
+
+    def test_gap_carries_a_compact_label(self):
+        self._session(self.atlas, _at(9), _at(10))
+        self._session(self.atlas, _at(12), _at(13))
+        self.assertEqual(build_day_timeline(self.user, DAY)["gaps"][0]["label"], "2h 00m")
+
+    def test_lane_totals_are_labelled_and_live_time_is_kept_separate(self):
+        self._session(self.atlas, _at(9), _at(10, 30))
+        tl = build_day_timeline(self.user, DAY)
+        lane = tl["lanes"][0]
+        self.assertEqual(lane["total_label"], "1h 30m")
+        self.assertIsNone(lane["live_label"])
+
+    def test_a_lane_with_only_a_running_timer_has_no_completed_total(self):
+        """A fresh timer must not announce itself as "0m" tracked."""
+        now = timezone.now()
+        Sessions.objects.create(
+            user=self.user, project=self.atlas, start_time=now - timedelta(minutes=20)
+        )
+        lane = build_day_timeline(self.user)["lanes"][0]
+        self.assertIsNone(lane["total_label"])
+        self.assertEqual(lane["live_label"], "20m")

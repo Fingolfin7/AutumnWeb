@@ -56,6 +56,15 @@
    DESK CLASSES (added on top of the v1 index below)
      .desk  .desk-main  .desk-side  .desk-head
 
+   TIMELINE     .fd-tl-slab .fd-tl-head .fd-tl-title .fd-tl-total
+                .fd-tl .fd-tl-axis .fd-tl-lab .fd-tl-lab--minor
+                .fd-tl-plot .fd-tl-lane .fd-tl-head-cell .fd-tl-name
+                .fd-tl-fig .fd-tl-track .fd-tl-block .fd-tl-block.is-live
+                .fd-tl-b-lab .fd-tl-b-dur
+                .fd-tl-tip .fd-tl-tip--flip .fd-tl-tip-note .fd-tl-tip-link
+                .fd-tl-nowlayer .fd-tl-now .fd-tl-now-flag .fd-tl-gap
+                .fd-tl-caption .fd-tl-empty
+
    TYPE SCALE  (root 16px; body runs 17px — large type is part of the thesis)
    ----------
      --fs-hero    clamp(3.25rem, 15vw, 4.75rem)  mono, 600, tabular  live timer
@@ -79,7 +88,7 @@
                 .tab--overflow .tab--overflow.is-inline   (phone-hidden tabs)
                 .sheet .sheet.is-open .sheet-scrim .sheet-panel .sheet-grab
                 .sheet-title .sheet-list .sheet-item .sheet-item-icon
-   Surfaces     .slab  .slab--focus  .slab-pad
+   Surfaces     .slab  .slab--focus  .slab-pad  .slab-foot  .empty
                 .band  .band-list  .band--tap
                 (RULE: containers are slabs, rows are bands. Never nest a slab
                  in a slab. Bands have no border, no shadow, no radius — they
@@ -87,13 +96,17 @@
    Disclosure   .disclose .disclose.is-closed .disclose-head .disclose-icon
                 .disclose-title .disclose-summary .disclose-chevron
                 .disclose-body
-   Focus card   .focus-deck .focus-track .focus-card .focus-card--start
-                .focus-eyebrow .live-dot .focus-project .focus-subs
+   Focus card   .focus-deck .focus-track .focus-cards .focus-card
+                .focus-card--start
+                .focus-eyebrow .live-dot .focus-project .focus-project--plain
+                .focus-subs .focus-lede .focus-quick
                 .focus-time .focus-time .num .focus-time .unit
                 .focus-autostop .focus-autostop-bar .focus-autostop-fill
-                .focus-actions .focus-secondary
+                .focus-actions .focus-secondary .focus-stop
                 .focus-dots .focus-dot .focus-dot.is-active
                 .quick-chip
+                (.focus-cards is `display: contents` — it is the polled
+                 fragment's wrapper, not a box.)
    Stats        .stat-strip .stat .stat-label .stat-value
    Commitments  .commit .commit-head .commit-target .commit-kind .commit-period
                 .commit-figures .commit-actual .commit-goal .commit-pct
@@ -291,6 +304,11 @@ body.bg-active .app { position: relative; z-index: 2; }
 }
 .page-title { font-size: var(--fs-xxl); font-weight: 650; line-height: 1.15; letter-spacing: -.01em; }
 
+/* Below the desk breakpoint the head simply stacks: title, then the strip.
+   At >=1000px they share one line (see the desktop layer). */
+.desk-head { margin-bottom: var(--s5); }
+.desk-head .stat-strip { margin-top: var(--s4); }
+
 /* -------------------------------------------------------------- TABBAR --- */
 .tabbar {
   position: fixed; z-index: 40;
@@ -388,6 +406,13 @@ body.bg-active .app { position: relative; z-index: 2; }
 .band--tap { transition: background .16s var(--ease); }
 .band--tap:hover { background: var(--raised); }
 
+/* An empty slab still says something. One quiet line plus the action that
+   fills it — never a bare "no data" and never a blank box. */
+.empty { padding: var(--s5) var(--s4); font-size: var(--fs-sm); color: var(--muted); }
+.empty a { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+/* Full-width action parked at the foot of a slab ("View all …"). */
+.slab-foot { padding: var(--s4); }
+
 /* ----------------------------------------------------------- DISCLOSURE -- */
 .disclose { }
 .disclose-head {
@@ -477,6 +502,8 @@ body.bg-active .app { position: relative; z-index: 2; }
 .focus-autostop-fill { height: 100%; background: var(--time-deep); border-radius: var(--r-pill); }
 .focus-actions { margin-top: var(--s5); display: flex; gap: var(--s2); align-items: center; }
 .focus-secondary { display: flex; gap: var(--s2); }
+/* Stop is the one primary action on a running card; it takes the leftovers. */
+.focus-stop { flex: 1 1 auto; }
 
 .focus-card--start {
   display: flex; flex-direction: column; justify-content: center;
@@ -493,6 +520,18 @@ body.bg-active .app { position: relative; z-index: 2; }
 }
 .quick-chip:hover { background: var(--raised-2); }
 
+/* The running-timer cards are re-rendered by the 5s polling fragment, so they
+   arrive wrapped in the fragment's own container. `display: contents` lets
+   that wrapper carry the polling data-attributes without becoming a box —
+   the cards stay direct children of .focus-track and keep their layout. */
+.focus-cards { display: contents; }
+
+.focus-project--plain { color: var(--ink); }
+.focus-lede { margin-top: var(--s2); font-size: var(--fs-sm); color: var(--muted); }
+.focus-quick { margin-top: var(--s4); gap: .4rem; }
+/* each chip posts its own start form; the form must not become a flex item */
+.focus-quick form { display: contents; }
+
 .focus-dots { display: flex; justify-content: center; gap: .4rem; margin-top: var(--s1); }
 .focus-dot {
   width: .4rem; height: .4rem; border-radius: var(--r-pill);
@@ -504,6 +543,10 @@ body.bg-active .app { position: relative; z-index: 2; }
    Four numbers, ONE slab, hairline-divided. Not four cards.                */
 .stat-strip {
   display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--slab);
+  border-radius: var(--r-lg);
+  box-shadow: var(--edge), var(--e1);
+  overflow: hidden;
 }
 .stat {
   padding: var(--s4);
@@ -691,6 +734,17 @@ body.bg-active .app { position: relative; z-index: 2; }
 .session-note.is-open { -webkit-line-clamp: unset; display: block; }
 .session-note a { color: var(--time); text-decoration: underline; text-underline-offset: 2px; }
 .session-note strong { color: var(--note); font-weight: 700; }
+/* Notes render through the markdown filter, so their real content is block
+   elements. Flatten the first paragraph so a one-line note still sits on the
+   baseline the clamp expects. */
+.session-note p { margin: 0; }
+.session-note p + p { margin-top: .35rem; }
+.session-note ul, .session-note ol { padding-left: 1.1rem; list-style: disc; }
+.session-note code {
+  font-family: var(--font-mono); font-size: .9em;
+  padding: .05rem .3rem; border-radius: var(--r-xs); background: var(--sunken);
+}
+.session-note pre { overflow-x: auto; }
 .note-more {
   font-size: var(--fs-xs); color: var(--muted); margin-top: .2rem;
   text-decoration: underline; text-underline-offset: 2px;
@@ -965,8 +1019,7 @@ body.light-mode {
   }
   .desk-head .stat-strip {
     grid-template-columns: repeat(4, minmax(8.5rem, 1fr));
-    background: var(--slab); border-radius: var(--r-lg);
-    box-shadow: var(--edge), var(--e1); overflow: hidden;
+    margin-top: 0;
   }
   .desk-head .stat:first-child { border-left: 0; }
   .desk-head .stat { border-top: 0; }
@@ -1062,7 +1115,10 @@ body.light-mode {
    Geometry contract is unchanged: --start / --w are percentages of 06:00–22:00.
    ==========================================================================*/
 
-.fd-tl-slab { padding: var(--s4) var(--s5) var(--s5); }
+/* .slab clips its children so bands can't poke out of the rounded corners.
+   The timeline has no bands and does have tooltips that must escape upward,
+   so this one slab opts out. */
+.fd-tl-slab { padding: var(--s4) var(--s5) var(--s5); overflow: visible; }
 
 .fd-tl-head {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -1072,6 +1128,19 @@ body.light-mode {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   font-size: var(--fs-lg); font-weight: 600; color: var(--time);
   letter-spacing: .01em;
+}
+/* The mockup put demo range tabs here. The real chart is one day, so the
+   right-hand slot carries the day's tracked total instead — a fact, not a
+   control that does nothing. */
+.fd-tl-total {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-lg); font-weight: 600; color: var(--duration);
+  text-align: right;
+}
+.fd-tl-total .fd-tl-total-label {
+  display: block; font-family: var(--font-ui);
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
 }
 
 .fd-tl { --fd-gutter: 12rem; }
@@ -1137,11 +1206,13 @@ body.light-mode {
   border-radius: var(--r-xs);
   background: color-mix(in srgb, var(--proj, var(--project)) 34%, transparent);
   box-shadow: var(--edge), var(--e1);
-  padding: .4rem .55rem; overflow: hidden; cursor: pointer;
+  padding: .4rem .55rem; cursor: help;   /* hover/focus reveals the tooltip */
   display: flex; flex-direction: column; justify-content: center; gap: .1rem;
   transition: transform .16s var(--ease), background .16s var(--ease),
               box-shadow .16s var(--ease);
 }
+/* The block does NOT clip: its tooltip is a child and has to escape upward.
+   Each text line clips itself instead (see .fd-tl-b-lab / .fd-tl-b-dur). */
 .fd-tl-block:hover,
 .fd-tl-block:focus-visible {
   background: color-mix(in srgb, var(--proj, var(--project)) 62%, transparent);
@@ -1155,6 +1226,7 @@ body.light-mode {
 .fd-tl-b-dur {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   font-size: var(--fs-xs); color: var(--duration);
+  white-space: nowrap; overflow: hidden;
 }
 
 /* running — the system already has a language for "alive": glow + breath */
@@ -1181,10 +1253,28 @@ body.light-mode {
   padding: var(--s3) var(--s4);
   font-size: var(--fs-sm); line-height: 1.5; white-space: normal; cursor: default;
 }
+/* Transparent bridge across the .6rem gap. Without it the pointer leaves the
+   block on the way to the tooltip and the tooltip vanishes mid-reach — which
+   also puts the "Edit session" link out of the mouse's reach entirely. */
+.fd-tl-tip::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: .6rem;
+}
+/* Blocks in the right half of the axis anchor their tooltip to the right edge
+   instead, so a late-afternoon session can't push the page sideways. The
+   template sets this from the block's own start percentage. */
+.fd-tl-tip--flip { left: auto; right: 0; }
+/* :focus-within, not :focus-visible — the tooltip contains a link, and the
+   tooltip must survive focus moving into it. */
 .fd-tl-block:hover .fd-tl-tip,
-.fd-tl-block:focus-visible .fd-tl-tip { display: block; }
-.fd-tl-tip p { margin-top: .35rem; }
+.fd-tl-block:focus-within .fd-tl-tip { display: block; }
+.fd-tl-tip p + p, .fd-tl-tip-note, .fd-tl-tip-link { margin-top: .35rem; }
 .fd-tl-tip-note { color: var(--note); }
+.fd-tl-tip-note p { margin: 0; }
+.fd-tl-tip-note p + p { margin-top: .35rem; }
+.fd-tl-tip-link {
+  display: inline-block; font-size: var(--fs-xs); color: var(--brand);
+  text-decoration: underline; text-underline-offset: 3px;
+}
 
 /* ── now line + gaps ───────────────────────────────────────────────────── */
 .fd-tl-nowlayer {
@@ -1214,11 +1304,23 @@ body.light-mode {
   font-size: var(--fs-xs); color: var(--muted);
 }
 
+/* A day with nothing on it. The axis is still drawn — an empty chart with a
+   scale reads as "nothing yet", a missing chart reads as "broken". */
+.fd-tl-empty {
+  margin-top: var(--s4); margin-left: var(--fd-gutter);
+  padding: var(--s5) var(--s4); text-align: center;
+  border-radius: var(--r-sm); background: var(--sunken);
+  font-size: var(--fs-sm); color: var(--muted);
+}
+.fd-tl-empty a { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+
 /* ── narrow: gutter shrinks, then the lane head sits above its track ───── */
 @media (max-width: 1100px) { .fd-tl { --fd-gutter: 9rem; } }
 @media (max-width: 780px) {
   .fd-tl { --fd-gutter: 0rem; }
-  .fd-tl-axis, .fd-tl-nowlayer, .fd-tl-caption { margin-left: 0; }
+  .fd-tl-axis, .fd-tl-nowlayer, .fd-tl-caption, .fd-tl-empty { margin-left: 0; }
+  /* 17 hour labels will not fit on a phone — thin them to every second one */
+  .fd-tl-lab--minor { display: none; }
   .fd-tl-lane { grid-template-columns: 1fr; }
   .fd-tl-head-cell {
     flex-direction: row; align-items: baseline; justify-content: space-between;

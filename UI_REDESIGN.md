@@ -67,7 +67,7 @@ Status: `TODO` / `WIP` / `DONE`
 |---|-------|-----------|--------|
 | 1 | Foundation: `focus_desk.css` + `base_fd.html` shell | — | **DONE** |
 | 2a | Timeline backend (`core/timeline.py` + 21 tests) | — | **DONE** |
-| 2b | Dashboard page port | `dashboard.html`, `partials/active_timers_dashboard.html` | TODO |
+| 2b | Dashboard page port | `dashboard.html`, `partials/active_timers_dashboard.html` | **DONE** |
 | 3 | Sessions | `list_sessions`, `update_session`, `delete_session` | TODO |
 | 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | TODO |
 | 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | TODO |
@@ -94,6 +94,13 @@ Status: `TODO` / `WIP` / `DONE`
   assume.
 - `core/templates/core/home.html` appears unused: `/` routes to
   `DashboardView` → `dashboard.html`. Confirm and delete if dead.
+- `dynamic_timers.js` is now only used for its five-second fragment poll; its
+  `updateDurations()` half targets legacy `.timer-duration` markup and matches
+  nothing on the ported dashboard. Once chunks 6 and 10 land, split the poll
+  out and drop the rest (it is also the last jQuery dependency on this page).
+- The dashboard's `.fd-tl-slab` opts out of `.slab`'s `overflow: hidden` so
+  timeline tooltips can escape upward. If another page needs the same, make it
+  a modifier rather than changing `.slab`.
 
 44 templates total.
 
@@ -115,35 +122,47 @@ Status: `TODO` / `WIP` / `DONE`
 5. Update this file's status table.
 6. Commit with the chunk number in the subject.
 
-## Next up (chunk 2b) — how the dashboard should be assembled
+## How the dashboard was assembled (chunk 2b, reference for later chunks)
 
 `build_day_timeline(user, day=None)` in `core/timeline.py` returns everything
-the chart needs, already as percentages:
+the chart needs, already as percentages and already labelled:
 
 ```
 {date, window_start_hour, window_end_hour,
  hours: [{hour, label, x_pct}],
  lanes: [{project, colour, total_minutes, live_minutes,
-          blocks: [{session, is_live, minutes, start_pct, width_pct,
-                    label, start_local, end_local}]}],
- gaps:  [{minutes, start_pct, width_pct}],
+          total_label, live_label,          # None when the figure is zero
+          blocks: [{session, is_live, minutes, duration_label,
+                    start_pct, width_pct, label, start_local, end_local}]}],
+ gaps:  [{minutes, label, start_pct, width_pct}],
  now_pct, now_label}
 ```
 
-`DashboardView.get_context_data` needs `context["timeline"] =
-build_day_timeline(user)`. Everything else it already supplies.
+Geometry reaches CSS through custom properties (`--x`, `--start`, `--w`,
+`--proj`) set from those percentages. That is the ONE sanctioned use of a
+`style=` attribute in this design system — data, never styling. The whole
+timeline is wrapped in `{% localize off %}`: a locale that renders `20,007`
+instead of `20.007` would silently break every position.
 
-Page structure, per the mockup (`design_concepts_v2/focus-desk/dashboard.html`):
+Things worth copying into the remaining chunks:
 
-1. `.desk-head` — eyebrow + title on the left, `.stat-strip` on the right.
-2. **Hero, full width** — `.focus-deck` (one `.focus-card` per running timer,
-   plus a `.focus-card--start`), then the timeline slab.
-3. `.desk` — `.desk-main` holds recent sessions; `.desk-side` holds
-   commitments then activity.
-
-CSS classes for the timeline already exist in `focus_desk.css`
-(`.fd-tl-slab`, `.fd-tl-lane`, `.fd-tl-block`, `.fd-tl-now`, …). Lane colour
-comes from the data: `style="--proj: {{ lane.colour }}"`.
+- **Polled fragments and `display: contents`.** `partials/active_timers_dashboard.html`
+  is swapped in wholesale every five seconds by `dynamic_timers.js` and is
+  rendered WITHOUT context processors, so it may only use its `timers` arg.
+  Its wrapper is `.focus-cards { display: contents }`, which lets it carry the
+  polling data-attributes while its cards stay layout children of
+  `.focus-track` — that is how the "start something" card, which needs page
+  context, sits beside them.
+- **Server renders the first frame.** The hero timer's opening value comes from
+  the `hero_duration` filter; `dashboard_desk.js` repaints the identical shape
+  every second. `core/test_dashboard_desk.py` pins the format so the two
+  cannot drift into a visible jump on the first tick.
+- **Page JS goes in its own file.** `dashboard_desk.js` owns live cards, deck
+  dots and the activity range; `focus_desk.js` stays shell-only.
+- **Empty states are content.** `.empty` / `.fd-tl-empty` say what is missing
+  and link to the action that fills it. The timeline still draws its axis on a
+  blank day — an empty chart reads as "nothing yet", a missing one reads as
+  "broken".
 
 ## Gotchas found so far
 
