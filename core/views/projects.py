@@ -95,6 +95,11 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         context["exclude_project_meta_json"] = json.dumps(
             build_exclude_project_meta(self.request.user)
         )
+        # Echoed back on the page because the controls themselves live in a
+        # sheet — see summarise_search_filters.
+        context["active_filters"] = summarise_search_filters(
+            self.request, self.request.user
+        )
 
         return context
 

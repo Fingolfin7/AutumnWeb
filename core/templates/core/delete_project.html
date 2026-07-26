@@ -1,60 +1,44 @@
-{% extends 'core/base.html' %}
-{% load static %}
+{% extends 'core/base_fd.html' %}
 {% load time_formats %}
 
-{% block head_includes %}
-    <script src="{% static 'core/js/dynamic_timers.js' %}v?={{ static_version.dynamic_timers }}" type="text/javascript"></script>
-{% endblock %}
-
 {% block content %}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        <h3>Are you sure you want to delete this project?</h3>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Delete project</p>
+        <h1 class="page-title">Are you sure?</h1>
+    </div>
+</div>
 
-        <div class="card" id="project-{{ project.id }}">
-            <table>
-                <tr>
-                    <td class="text-red">
-                        <h3>{{ project.name }}</h3>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <em>{{ project.status }}</em>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <p>{{ project.description }}</p>
-                    </td>
-                </tr>
-                <tr>
-                    <td class="text-green">
-                        {{ project.total_time|min_formatter }}
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <span class="text-cyan">{{ project.start_date|date_formatter }}</span>
+<form method="post">
+    {% csrf_token %}
 
-                        ->
-
-                        <span class="text-cyan">{{ project.last_updated|date_formatter }}</span>
-                    </td>
-                </tr>
-            </table>
+    <section class="slab slab-pad">
+        <div class="project-top">
+            <span class="project-name">{{ project.name }}</span>
+            <span class="muted">{{ project.status }}</span>
         </div>
+        {% if project.description %}
+        <p class="focus-lede">{{ project.description }}</p>
+        {% endif %}
+        <p class="project-total">{{ project.total_time|min_formatter_two }}</p>
+        <p class="project-dates">{{ project.start_date|date_formatter }} &rarr; {{ project.last_updated|date_formatter }}</p>
+    </section>
 
-        <div class="button-row">
-            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'projects' %}'">
-                 <i class="fa fa-arrow-left"></i>
-                Back
-            </button>
-            <button type="submit" id="start-timer" class="primary-button dark-red">
-                <i class="fa fa-trash"></i>
-                Delete
-            </button>
-        </div>
-    </form>
+    <p class="confirm-warn">
+        <i class="fas fa-exclamation-triangle"></i>
+        This deletes the project, its subprojects and every session recorded
+        against them. It cannot be undone.
+    </p>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'projects' %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <button class="btn btn--stop btn--spacer" type="submit">
+            <i class="fas fa-trash"></i> Delete project
+        </button>
+    </div>
+</form>
+
 {% endblock %}

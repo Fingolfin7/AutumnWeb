@@ -299,6 +299,53 @@ def filter_sessions_by_params(
     return sessions
 
 
+#: Free-text search params, in the order their pills should read.
+_TEXT_FILTER_LABELS = (
+    ("project_name", "Project"),
+    ("start_date", "From"),
+    ("end_date", "To"),
+    ("note_snippet", "Note"),
+)
+
+
+def summarise_search_filters(request, user) -> list[dict]:
+    """Label/value pairs for the filters currently narrowing a list page.
+
+    The Focus Desk nav model puts filters behind a sheet, so the page itself
+    has to say what is being hidden — otherwise a filtered list that comes
+    back empty looks broken rather than narrow. Ids are resolved to names,
+    scoped to ``user``: a pill reading "Context 3" tells nobody anything, and
+    another user's id must resolve to nothing at all.
+    """
+
+    def names_for(model, ids):
+        wanted = _numeric_ids(ids)
+        if not wanted:
+            return ""
+        return ", ".join(
+            model.objects.filter(id__in=wanted, user=user)
+            .order_by("name")
+            .values_list("name", flat=True)
+        )
+
+    params = request.GET
+    summary = [
+        {"label": label, "value": params[key]}
+        for key, label in _TEXT_FILTER_LABELS
+        if params.get(key)
+    ]
+
+    for label, names in (
+        ("Context", names_for(Context, [params.get("context") or ""])),
+        ("Tags", names_for(Tag, params.getlist("tags"))),
+        ("Excluding", names_for(Projects, params.getlist("exclude_projects"))),
+    ):
+        if names:
+            summary.append({"label": label, "value": names})
+
+    return summary
+
+
 def _numeric_ids(values) -> list[int]:
     """Keep only the values that can be primary keys.
 

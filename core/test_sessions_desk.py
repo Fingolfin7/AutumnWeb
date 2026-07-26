@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.models import Context, Projects, Sessions, SubProjects, Tag
-from core.views.sessions import summarise_session_filters
+from core.utils import summarise_search_filters
 
 
 class SessionsPageTestCase(TestCase):
@@ -82,7 +82,7 @@ class FilterSummaryTests(SessionsPageTestCase):
         )
         theirs = Context.objects.create(user=other, name="Forge")
 
-        summary = summarise_session_filters(
+        summary = summarise_search_filters(
             self._request_with({"context": str(theirs.id)}), self.user
         )
 

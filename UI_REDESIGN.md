@@ -69,7 +69,7 @@ Status: `TODO` / `WIP` / `DONE`
 | 2a | Timeline backend (`core/timeline.py` + 21 tests) | — | **DONE** |
 | 2b | Dashboard page port | `dashboard.html`, `partials/active_timers_dashboard.html` | **DONE** |
 | 3 | Sessions | `list_sessions`, `update_session`, `delete_session` | **DONE** |
-| 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | TODO |
+| 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | **DONE** |
 | 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | TODO |
 | 6 | Timers | `timers`, `start_timer`, `stop_timer`, `remove_timer`, `partials/active_timers_home`, `partials/active_timers_timers`, `partials/timer_suggestion_card` | TODO |
 | 7 | Commitments | `create_commitment`, `update_commitment`, `delete_commitment`, `partials/commitments_panel` | TODO |
@@ -126,6 +126,25 @@ Status: `TODO` / `WIP` / `DONE`
   (`.attr-*`), `session_note_editor.js` and jQuery UI's autocomplete all build
   their own subtrees; focus_desk.css now has a Focus Desk dialect for each,
   under its own heading. Do not rename their classes.
+
+## Chunk 4 notes (Projects)
+
+- **`summarise_search_filters` now lives in `core/utils.py`** and is shared by
+  the Sessions and Projects lists. Reuse it for any future filtered list rather
+  than growing a second copy.
+- **Shared partials cannot change design system alone.**
+  `partials/commitments_panel.html` is included by update_project (4),
+  update_subproject (5), update_context and update_tag (8). Its markup is
+  untouched; focus_desk.css restyles its existing class names under
+  "COMMITMENTS PANEL — compatibility dialect". **Chunk 7 rewrites the partial
+  in native components and deletes that block** — do not let the compat rules
+  outlive it.
+- **Collapsed-by-default is markup, not script.** The legacy page collapsed
+  Paused/Complete/Archived with jQuery after load, which flashed them open
+  first. `.disclose.is-closed` is now rendered server-side.
+- **`create_project` is routed at `path("create_subproject/")`** in
+  `core/urls.py` — an existing naming mix-up, harmless but confusing. Worth
+  fixing in chunk 13 along with the other cleanups.
 
 44 templates total.
 
