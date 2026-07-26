@@ -282,6 +282,7 @@ def filter_sessions_by_params(
     if note_snippet:
         sessions = sessions.filter(note__icontains=note_snippet)
 
+    tags = _numeric_ids(tags)
     if tags:
         sessions = sessions.filter(project__tags__id__in=tags).distinct()
 
@@ -291,10 +292,28 @@ def filter_sessions_by_params(
         exclude_ids = params.get("exclude_projects") or []
         if isinstance(exclude_ids, str):
             exclude_ids = [exclude_ids]
+    exclude_ids = _numeric_ids(exclude_ids)
     if exclude_ids:
         sessions = sessions.exclude(project__id__in=exclude_ids)
 
     return sessions
+
+
+def _numeric_ids(values) -> list[int]:
+    """Keep only the values that can be primary keys.
+
+    Every filter here comes from a query string, so any of it can be junk.
+    Unparseable dates are already ignored rather than fatal; id lists get the
+    same treatment, because `?tags=abc` reaching the ORM raises ValueError and
+    turns a typo in the URL bar into a 500.
+    """
+    ids = []
+    for value in values or []:
+        try:
+            ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return ids
 
 
 def group_sessions_by_date(sessions):

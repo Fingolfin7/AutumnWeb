@@ -1,62 +1,70 @@
-{% extends 'core/base.html' %}
-{% load static %}
+{% extends 'core/base_fd.html' %}
 {% load time_formats %}
+{% load markdown_render %}
 
-{% block head_includes %}
-    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
-    <script src="{% static 'core/js/session_sliders.js' %}?v={{ static_version.session_sliders }}" type="text/javascript"></script>
-{% endblock %}
+{% comment %}
+  ============================================================================
+  DELETE SESSION — Focus Desk (UI_REDESIGN.md chunk 3)
+  ----------------------------------------------------------------------------
+  A confirm page shows the thing about to disappear, in the same shape the
+  lists show it, so there is no doubt which session this is. The two buttons
+  are deliberately unequal: Back is the quiet default, Delete is the one that
+  wears the destructive colour.
+  ============================================================================
+{% endcomment %}
 
 {% block content %}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        <h3>
-            Are you sure you want to delete this session?
-        </h3>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Delete session</p>
+        <h1 class="page-title">Are you sure?</h1>
+    </div>
+</div>
 
-        <div class="card" id="session-{{ session.id }}">
-            <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-            to
-            <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
+<form method="post">
+    {% csrf_token %}
 
-            {{ session.duration|duration_formatter }}
-
-            <span class="text-red project-name-slider" id="project-name">
-                <a class="plain-link" href="{% url 'update_project' session.project.id %}">
-                    {{ session.project.name }}
-                </a>
-            </span>
-
-            <span>
-                {% for subproject in session.subprojects.all %}
-                    <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                        {% if forloop.first %}[{% endif %}
-                        '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                        {% if forloop.last %}] {% endif %}
-                    </a>
-                {% endfor %}
-                {% if session.note|length > 0 %}->{% endif %}
-            </span>
-
-            {% if session.note %}
-                <div class="session-note-slider">
-                    <span class="text-yellow session-note" id="note-{{ session.id }}">
-                        {{ session.note }}
-                    </span>
+    <section class="slab session-list">
+        <ul class="band-list">
+            <li class="band">
+                <div class="session">
+                    <div class="session-mid">
+                        <span class="session-time">{{ session.start_time|time_formatter }}</span>
+                        <span class="session-arrow">&rarr;</span>
+                        <span class="session-time">{{ session.end_time|time_formatter }}</span>
+                        {% if session.crosses_dst_transition %}
+                        <span class="badge-dst" title="Session crosses a daylight savings transition">DST</span>
+                        {% endif %}
+                    </div>
+                    <div class="session-top">
+                        <a class="session-project" href="{% url 'update_project' session.project.id %}">{{ session.project.name }}</a>
+                        {% for subproject in session.subprojects.all %}
+                        <a class="sub-chip" href="{% url 'update_subproject' subproject.id %}">{{ subproject.name }}</a>
+                        {% endfor %}
+                    </div>
+                    {% if session.note %}
+                    <div class="session-note is-open">{{ session.note|markdown|safe }}</div>
+                    {% endif %}
+                    <span class="session-dur">{{ session.duration|duration_formatter }}</span>
                 </div>
-            {% endif %}
-        </div>
+            </li>
+        </ul>
+    </section>
 
-        <div class="button-row">
-            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'sessions' %}'">
-                 <i class="fa fa-arrow-left"></i>
-                Back
-            </button>
-            <button type="submit" id="start-timer" class="primary-button dark-red">
-                <i class="fa fa-trash"></i>
-                Delete
-            </button>
-        </div>
-    </form>
+    <p class="confirm-warn">
+        <i class="fas fa-exclamation-triangle"></i>
+        This removes the session and its time from every total. It cannot be undone.
+    </p>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'sessions' %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <button class="btn btn--stop btn--spacer" type="submit">
+            <i class="fas fa-trash"></i> Delete session
+        </button>
+    </div>
+</form>
+
 {% endblock %}

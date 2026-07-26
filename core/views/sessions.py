@@ -13,9 +13,50 @@ from django.views.generic import (
     ListView,
     DeleteView,
 )
-from core.models import Projects, SubProjects, Sessions
+from core.models import Context, Projects, SubProjects, Sessions, Tag
 from core.services import SessionMutationService, UNSET
 from core.views.allocations import parse_allocation_post
+
+
+def summarise_session_filters(request, user):
+    """Label/value pairs for the filters currently narrowing the session list.
+
+    The Focus Desk nav model puts filters behind a sheet, so the page itself
+    has to say what is being hidden — otherwise a filtered list that comes
+    back empty looks broken rather than narrow.
+    """
+
+    def _names(model, ids):
+        clean = [value for value in ids if str(value).isdigit()]
+        if not clean:
+            return ""
+        return ", ".join(
+            model.objects.filter(id__in=clean, user=user)
+            .order_by("name")
+            .values_list("name", flat=True)
+        )
+
+    params = request.GET
+    summary = []
+
+    for key, label in (
+        ("project_name", "Project"),
+        ("start_date", "From"),
+        ("end_date", "To"),
+        ("note_snippet", "Note"),
+    ):
+        if params.get(key):
+            summary.append({"label": label, "value": params[key]})
+
+    for label, names in (
+        ("Context", _names(Context, [params.get("context") or ""])),
+        ("Tags", _names(Tag, params.getlist("tags"))),
+        ("Excluding", _names(Projects, params.getlist("exclude_projects"))),
+    ):
+        if names:
+            summary.append({"label": label, "value": names})
+
+    return summary
 
 
 def remove_ambiguous_time_error(time_value):
@@ -196,14 +237,17 @@ class SessionsListView(LoginRequiredMixin, ListView):
 
         context["grouped_sessions"] = group_sessions_by_date(paginated_sessions)
 
-        # Check if any search-related query parameters are present. we only want to display the message on a search
-        if (
-            self.request.GET.get("project_name")
-            or self.request.GET.get("start_date")
-            or self.request.GET.get("end_date")
-            or self.request.GET.get("note_snippet")
-        ):
-            messages.success(self.request, f"Found {len(self.get_queryset())} results")
+        # What the filter sheet is currently hiding, echoed back onto the page.
+        # This replaces the old "Found N results" flash: the count now lives
+        # beside the list where it stays readable, instead of in a banner that
+        # cost a second full run of the unpaginated query to produce.
+        context["active_filters"] = summarise_session_filters(
+            self.request, self.request.user
+        )
+        page = context.get("page_obj")
+        context["result_count"] = (
+            page.paginator.count if page else len(context["object_list"])
+        )
 
         context["exclude_project_meta_json"] = json.dumps(
             build_exclude_project_meta(self.request.user)

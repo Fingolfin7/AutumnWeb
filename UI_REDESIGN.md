@@ -68,7 +68,7 @@ Status: `TODO` / `WIP` / `DONE`
 | 1 | Foundation: `focus_desk.css` + `base_fd.html` shell | — | **DONE** |
 | 2a | Timeline backend (`core/timeline.py` + 21 tests) | — | **DONE** |
 | 2b | Dashboard page port | `dashboard.html`, `partials/active_timers_dashboard.html` | **DONE** |
-| 3 | Sessions | `list_sessions`, `update_session`, `delete_session` | TODO |
+| 3 | Sessions | `list_sessions`, `update_session`, `delete_session` | **DONE** |
 | 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | TODO |
 | 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | TODO |
 | 6 | Timers | `timers`, `start_timer`, `stop_timer`, `remove_timer`, `partials/active_timers_home`, `partials/active_timers_timers`, `partials/timer_suggestion_card` | TODO |
@@ -101,6 +101,31 @@ Status: `TODO` / `WIP` / `DONE`
 - The dashboard's `.fd-tl-slab` opts out of `.slab`'s `overflow: hidden` so
   timeline tooltips can escape upward. If another page needs the same, make it
   a modifier rather than changing `.slab`.
+- `session_sliders.js` is no longer loaded by any ported page (notes clamp and
+  expand instead of sliding). Delete it once chunks 6 and 10 stop referencing
+  it, along with the `.session-note-slider` / `.project-name-slider` markup.
+
+## Chunk 3 notes (Sessions)
+
+- **Row layout is a property of the LIST, not the page.** The `.desk .session`
+  rules from chunk 1 became `.session-list .session`, and both the dashboard's
+  recent-sessions slab and the Sessions page opt in with that class. Any future
+  page showing session rows does the same.
+- **Filters live in a sheet, per the nav model.** One search field plus a
+  `.filter-launcher`; the sheet's controls are part of the same GET form, so
+  Apply is an ordinary submit. Because the controls are hidden, the page echoes
+  them back as `.filter-pill`s with a result count — otherwise a narrowed list
+  that returns nothing is indistinguishable from a broken one. The old
+  "Found N results" flash is gone; it also cost a second full run of the
+  unpaginated query on every search.
+- **`.fields` styles Django widgets by element.** `core/forms.py` sets widget
+  attrs shared with pages still on the legacy shell, so classes cannot be added
+  there without restyling un-ported pages. Wrap the form in `.fields` instead.
+  Use this for every remaining form chunk.
+- **Third-party markup is restyled, never renamed.** `allocation_editor.js`
+  (`.attr-*`), `session_note_editor.js` and jQuery UI's autocomplete all build
+  their own subtrees; focus_desk.css now has a Focus Desk dialect for each,
+  under its own heading. Do not rename their classes.
 
 44 templates total.
 

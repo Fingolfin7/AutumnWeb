@@ -1048,11 +1048,14 @@ body.light-mode {
   /* ── sections stay open; the disclosure head becomes a plain title ──────*/
   .desk .disclose-chevron { opacity: .45; }
 
-  /* ── 4 · sessions become aligned rows ──────────────────────────────────*/
-  .desk .swipe-track { display: block; overflow: visible; scroll-snap-type: none; }
-  .desk .swipe-face { flex: initial; }
-  .desk .swipe-hint { display: none; }
-  .desk .swipe-actions {
+  /* ── 4 · sessions become aligned rows ──────────────────────────────────
+     Keyed on .session-list, not .desk: this is a property of the LIST, and
+     the Sessions page shows the same rows at full width with no desk around
+     them. Any slab whose bands are session rows opts in with .session-list. */
+  .session-list .swipe-track { display: block; overflow: visible; scroll-snap-type: none; }
+  .session-list .swipe-face { flex: initial; }
+  .session-list .swipe-hint { display: none; }
+  .session-list .swipe-actions {
     position: absolute; top: 50%; right: var(--s4); transform: translateY(-50%);
     padding: 0; gap: .3rem;
     opacity: 0; pointer-events: none;
@@ -1060,22 +1063,22 @@ body.light-mode {
     padding-left: var(--s5);
     transition: opacity .16s var(--ease);
   }
-  .desk .swipe:hover .swipe-actions,
-  .desk .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
+  .session-list .swipe:hover .swipe-actions,
+  .session-list .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
 
-  .desk .session {
+  .session-list .session {
     display: grid;
     grid-template-columns: 11.5rem minmax(9rem, 14rem) minmax(0, 1fr) 6rem;
     align-items: baseline; gap: var(--s4);
     padding: var(--s3) var(--s4);
   }
-  .desk .session-top   { order: 2; display: block; }
-  .desk .session-mid   { order: 1; margin-top: 0; }
-  .desk .session-note  { order: 3; margin-top: 0; }
-  .desk .session-dur   { order: 4; text-align: right; justify-self: end; }
+  .session-list .session-top   { order: 2; display: block; }
+  .session-list .session-mid   { order: 1; margin-top: 0; }
+  .session-list .session-note  { order: 3; margin-top: 0; }
+  .session-list .session-dur   { order: 4; text-align: right; justify-self: end; }
 
   /* keep the day header aligned with the new grid */
-  .desk .day-head { padding-left: var(--s4); padding-right: var(--s4); }
+  .session-list .day-head { padding-left: var(--s4); padding-right: var(--s4); }
 }
 
 /* Very wide: let the ambient track breathe rather than stretching the rows. */
@@ -1380,3 +1383,314 @@ img.brand-mark {
    break the sheet list's hairline rhythm or the item's full-bleed hit area. */
 .sheet-list form { display: block; }
 .sheet-list form .sheet-item { border-radius: var(--r-sm); }
+
+/* ============================================================================
+   FORMS  — Django-rendered controls                                 (chunk 3)
+   ----------------------------------------------------------------------------
+   .input / .select above style markup we write by hand. Django renders its own
+   widgets with attrs set in core/forms.py, and those attrs are shared with
+   pages still on the legacy shell — so we cannot add classes there without
+   restyling un-ported pages. Instead a .fields REGION styles the controls by
+   element. Anything inside .fields gets the system's input look for free.
+   ==========================================================================*/
+
+.fields input[type="text"],
+.fields input[type="search"],
+.fields input[type="number"],
+.fields input[type="date"],
+.fields input[type="time"],
+.fields input[type="datetime-local"],
+.fields input[type="password"],
+.fields input[type="email"],
+.fields select,
+.fields textarea {
+  width: 100%; padding: .7rem .85rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink);
+  font-family: inherit; font-size: var(--fs-md);
+}
+.fields textarea { min-height: 7rem; resize: vertical; line-height: 1.5; }
+.fields input::placeholder, .fields textarea::placeholder { color: var(--muted); }
+.fields input:focus-visible,
+.fields select:focus-visible,
+.fields textarea:focus-visible {
+  outline: none; border-color: var(--brand-deep); box-shadow: var(--focus-ring);
+}
+/* Django labels are plain <label>; give them the eyebrow treatment. */
+.fields label {
+  display: block; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted); margin-bottom: .35rem;
+}
+/* …except beside a checkbox, where the label is the option's name. */
+.fields .check-row label, .fields .check-grid label {
+  display: inline; text-transform: none; letter-spacing: normal;
+  font-size: var(--fs-sm); color: var(--ink); margin: 0;
+}
+.fields input[type="checkbox"], .fields input[type="radio"] {
+  width: auto; accent-color: var(--brand-deep); margin: 0;
+}
+/* Django renders field errors as <ul class="errorlist">. */
+.fields .errorlist {
+  margin-top: .35rem; font-size: var(--fs-xs); color: var(--project);
+}
+
+/* A wrapped set of checkboxes — subproject pickers, tag pickers. */
+.check-grid {
+  display: grid; gap: .35rem var(--s4);
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+.check-grid > * { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.check-grid label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* CheckboxSelectMultiple renders a <ul>; flatten it into the same grid. */
+.check-grid ul { display: contents; }
+.subproject-empty-state { color: var(--muted); font-size: var(--fs-sm); }
+
+/* Two fields that belong together on one line once there is room — start and
+   end times, from and to dates. */
+.two-up { display: grid; gap: 0 var(--s4); }
+@media (min-width: 560px) { .two-up { grid-template-columns: 1fr 1fr; } }
+
+/* Buttons parked at the end of a form. */
+.form-actions {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  margin-top: var(--s5);
+}
+.form-actions .btn--spacer { margin-left: auto; }
+
+/* ------------------------------------------------------ jQuery UI menu -----
+   search_projects.js and timer_search_projects.js attach jQuery UI
+   autocomplete and append its menu to #project-search-results. The widget owns
+   those class names, so they are restyled here rather than renamed.          */
+.ui-autocomplete {
+  position: absolute; z-index: 50;
+  max-height: 18rem; overflow-y: auto;
+  padding: .3rem; margin: .25rem 0 0;
+  background: var(--slab-solid); border-radius: var(--r-md);
+  box-shadow: var(--edge), var(--e3);
+  list-style: none;
+}
+.ui-menu-item { margin: 0; padding: 0; }
+.ui-menu-item-wrapper, .ui-menu-item a {
+  display: block; padding: .55rem .7rem;
+  border-radius: var(--r-sm);
+  color: var(--ink); font-size: var(--fs-sm); cursor: pointer;
+}
+.ui-menu-item-wrapper.ui-state-active, .ui-menu-item a.ui-state-active,
+.ui-menu-item-wrapper:hover, .ui-menu-item a:hover {
+  background: var(--raised-2); color: var(--ink);
+}
+.ui-helper-hidden-accessible {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ============================================================================
+   NOTE EDITOR
+   session_note_editor.js toggles .listening on the dictate button and writes
+   into [data-note-status]; the rest is presentation. Toolbar and textarea read
+   as ONE control, so the shell owns the border and the textarea inside is bare.
+   ==========================================================================*/
+
+.note-editor-shell {
+  border: 1px solid var(--hairline); border-radius: var(--r-sm);
+  background: var(--sunken); overflow: hidden;
+}
+.note-editor-shell:focus-within { border-color: var(--brand-deep); box-shadow: var(--focus-ring); }
+.note-editor-toolbar {
+  display: flex; align-items: center; gap: .25rem;
+  padding: .35rem .4rem;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--raised);
+}
+.note-tool-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  min-width: 2rem; height: 2rem; padding: 0 .55rem;
+  border-radius: var(--r-xs);
+  color: var(--muted); font-size: var(--fs-sm);
+}
+.note-tool-button:hover { color: var(--ink); background: var(--raised-2); }
+.note-toolbar-divider {
+  width: 1px; height: 1.25rem; margin: 0 .25rem; background: var(--hairline-2);
+}
+.dictate-button.listening { color: var(--project); background: rgba(190,103,95,.16); }
+.fields .note-editor-shell textarea {
+  border: 0; border-radius: 0; background: transparent; min-height: 8rem;
+}
+.fields .note-editor-shell textarea:focus-visible { box-shadow: none; }
+[data-note-status] {
+  display: block; margin-top: .35rem; font-size: var(--fs-xs); color: var(--muted);
+}
+
+/* ============================================================================
+   ALLOCATION EDITOR  (.attr-*)
+   allocation_editor.js builds this whole subtree and owns every class name and
+   state class (.open, .collapsed, .embedded, .locked, .custom, .remainder), so
+   the names are fixed here and only their looks change. It splits a session's
+   time across its subprojects, so it speaks the semantic palette: subproject
+   names BLUE, locks and thumbs BRAND.
+   ==========================================================================*/
+
+.attr { border-radius: var(--r-sm); background: var(--sunken); }
+.attr.embedded { background: transparent; }
+.attr-head {
+  display: flex; align-items: center; gap: .6rem; width: 100%;
+  padding: .65rem .75rem; text-align: left; border-radius: var(--r-sm);
+}
+.attr-head:hover { background: var(--raised); }
+.attr-chevron {
+  width: .9rem; color: var(--muted); font-size: .7rem;
+  transition: transform .18s var(--ease);
+}
+.attr.open .attr-chevron { transform: rotate(90deg); }
+.attr-head-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.attr-head-summary { font-size: var(--fs-sm); color: var(--ink-2); }
+.attr-head-bar { margin-left: auto; width: 9rem; flex: 0 0 auto; }
+.attr-body { padding: .85rem .9rem .9rem; border-top: 1px solid var(--hairline); }
+.attr.embedded .attr-body { padding: var(--s3) 0 0; border-top: 0; }
+.attr.collapsed .attr-body { display: none; }
+
+.attr-bar-top { display: flex; align-items: center; gap: .75rem; margin-bottom: .8rem; }
+.attr-state-tag {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted);
+}
+.attr-state-tag .dot {
+  width: .5rem; height: .5rem; border-radius: var(--r-pill); background: var(--duration);
+}
+.attr-state-tag.custom .dot { background: var(--note); }
+.attr-actions { margin-left: auto; }
+.attr-mini-btn {
+  padding: .35rem .7rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink);
+  font-size: var(--fs-xs); font-weight: 600; box-shadow: var(--edge);
+}
+.attr-mini-btn:hover { background: var(--raised-2); }
+
+.attr-rows { display: flex; flex-direction: column; gap: .5rem; }
+.attr-row {
+  display: grid; grid-template-columns: 7rem 1fr 4.4rem 2.5rem;
+  align-items: center; gap: .75rem;
+  padding: .2rem .3rem .2rem .55rem;
+  border-radius: var(--r-xs);
+  border-left: 2px solid transparent;
+}
+.attr-row.locked { background: rgba(209,139,76,.07); border-left-color: var(--brand-deep); }
+.attr-name {
+  color: var(--sub); font-size: var(--fs-sm);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.attr-slider {
+  appearance: none; width: 100%; height: 5px;
+  border: 0; border-radius: var(--r-pill); outline: 0; cursor: pointer;
+  background: var(--raised-2);
+}
+.attr-slider::-webkit-slider-thumb {
+  appearance: none; width: 15px; height: 15px; margin-top: -5px;
+  border: 0; border-radius: var(--r-pill);
+  background: var(--brand-deep); box-shadow: var(--e1); cursor: pointer;
+}
+.attr-slider::-moz-range-thumb {
+  width: 14px; height: 14px; border: 0; border-radius: var(--r-pill);
+  background: var(--brand-deep); cursor: pointer;
+}
+.attr-slider:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
+.attr-row.locked .attr-slider { opacity: .55; cursor: not-allowed; }
+
+.attr-num {
+  display: flex; align-items: center;
+  border: 1px solid var(--hairline); border-radius: var(--r-xs);
+  background: var(--sunken);
+}
+.attr-num input, .fields .attr-num input {
+  width: 2.7rem; padding: .35rem .15rem .35rem .45rem;
+  color: var(--ink); background: transparent; border: 0; border-radius: 0;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); text-align: right;
+}
+.attr-num input:focus, .fields .attr-num input:focus-visible { outline: 0; box-shadow: none; }
+.attr-num .pct { padding-right: .4rem; color: var(--muted); font-size: var(--fs-xs); }
+.attr-num:focus-within { border-color: var(--brand-deep); box-shadow: var(--focus-ring); }
+.attr-num input::-webkit-outer-spin-button,
+.attr-num input::-webkit-inner-spin-button { margin: 0; appearance: none; }
+
+.attr-lock {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.25rem; height: 2.25rem; border-radius: var(--r-pill);
+  color: var(--muted); background: var(--raised);
+}
+.attr-lock:hover { color: var(--ink); background: var(--raised-2); }
+.attr-row.locked .attr-lock { color: var(--ink-invert); background: var(--brand-deep); }
+
+.attr-segbar {
+  display: flex; width: 100%; height: 9px; margin-top: .85rem;
+  overflow: hidden; border-radius: var(--r-pill);
+  background: var(--sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+.attr-segbar.mini { height: 7px; margin-top: 0; }
+.attr-seg { height: 100%; transition: width .18s var(--ease); }
+.attr-seg.remainder {
+  background: repeating-linear-gradient(45deg,
+    rgba(139,148,143,.35) 0 4px, transparent 4px 8px);
+}
+.attr-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; margin-top: .55rem;
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.attr-foot .total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.attr-foot .total b { color: var(--ink); }
+.attr-foot .rem-note { color: var(--note); }
+.attr-foot .rem-note.zero { color: var(--muted); }
+
+@media (max-width: 620px) {
+  .attr-row { grid-template-columns: 5.5rem 1fr 4rem 2.5rem; gap: .5rem; }
+  .attr-head-bar { display: none; }
+}
+
+/* ============================================================================
+   SESSIONS PAGE
+   The list itself reuses .session-list / .day-group / .band / .swipe from the
+   dashboard. What is new here is the filter surface: per the nav model, a
+   page never wears an eight-control filter row. One search field plus a
+   launcher that opens the filter .sheet.
+   ==========================================================================*/
+
+.filter-sheet .sheet-panel { max-height: 88vh; }
+.filter-sheet .sheet-foot {
+  display: flex; gap: var(--s3); margin-top: var(--s5);
+}
+.filter-sheet .sheet-foot .btn { flex: 1 1 0; }
+
+/* The search field sits in a pill, not a box: .fields would otherwise give it
+   the full input treatment and put a second border inside the searchbar. */
+.fields .searchbar input {
+  padding: .7rem 0; background: none; border: 0; border-radius: 0;
+}
+.fields .searchbar input:focus-visible { box-shadow: none; }
+/* jQuery UI positions its menu against the nearest positioned ancestor. */
+#project-search-results { position: relative; }
+
+/* Active filters, echoed on the page so a filtered list never looks empty
+   for no visible reason. */
+.filter-summary {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  margin-bottom: var(--s4);
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.filter-pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .2rem .6rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink-2);
+}
+.filter-pill b { color: var(--ink); font-weight: 600; }
+.result-count { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* The confirm pages (delete session, delete project, …) are one slab holding
+   the thing about to go, and two clearly unequal buttons. */
+.confirm-lede { font-size: var(--fs-lg); font-weight: 650; margin-bottom: var(--s4); }
+.confirm-warn { margin-top: var(--s3); font-size: var(--fs-sm); color: var(--note); }
