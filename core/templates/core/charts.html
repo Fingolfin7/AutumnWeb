@@ -1,13 +1,25 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_fd.html' %}
 {% load static %}
-{% load time_formats %}
-{% load param_replace %}
+
+{% comment %}
+  ============================================================================
+  CHARTS — Focus Desk (UI_REDESIGN.md chunk 9)
+  ----------------------------------------------------------------------------
+  The chart-type picker and Draw stay on the page: they are what this page is
+  FOR. Only the narrowing controls — dates, context, tags, exclusions — go in
+  the filter sheet, same as Sessions and Projects, with the applied ones
+  echoed back as pills.
+
+  charts/core.js owns these and they must not be renamed:
+    #chart_data_link  #chart-loading  #chart-empty  #canvas_container  #chart
+    #draw  #chart_type (and its data-selected)
+  It also toggles .chart-circular on #canvas_container for the square charts.
+  ============================================================================
+{% endcomment %}
 
 {% block head_includes %}
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!--chart js-->
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -32,134 +44,152 @@
 {% endblock %}
 
 {% block content %}
-    <section id="search_options">
-        <form method="get" id="search_form" class="card flex-row" enctype="multipart/form-data">
-            <div id="search_projects">
-                <span class="label-input">
-                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
-                    {{ search_form.project_name }}
-                    {{ search_form.project_name.errors }}
-                </span>
-                <span id="project-search-results"></span>
-            </div>
 
-            <span class="label-input" id="filter_start">
-                <label for="start_date"><i class="fa fa-calendar"></i> Start Date</label>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Where the time went</p>
+        <h1 class="page-title">Charts</h1>
+    </div>
+</div>
+
+<form method="get" class="fields" id="search_form">
+    <div class="searchbar">
+        <i class="fas fa-search muted" aria-hidden="true"></i>
+        <label class="sr-only" for="project-search">Search projects</label>
+        {{ search_form.project_name }}
+        <button class="filter-launcher" type="button" data-sheet-open="filterSheet" aria-haspopup="dialog">
+            <i class="fas fa-sliders-h"></i> Filters
+            {% if active_filters %}<span class="filter-count">{{ active_filters|length }}</span>{% endif %}
+        </button>
+    </div>
+    <div id="project-search-results"></div>
+
+    {% if active_filters %}
+    <p class="filter-summary">
+        {% for item in active_filters %}
+        <span class="filter-pill">{{ item.label }} <b>{{ item.value }}</b></span>
+        {% endfor %}
+        <a class="btn btn--quiet" href="{% url 'charts' %}">Clear</a>
+    </p>
+    {% endif %}
+
+    <div class="chart-bar">
+        <div class="field">
+            <label for="chart_type">Chart</label>
+            <select id="chart_type" name="chart_type" data-selected="{{ request.GET.chart_type|default:'pie' }}">
+                <optgroup label="Basic">
+                    <option value="pie">Pie</option>
+                    <option value="bar">Bar</option>
+                    <option value="scatter">Scatter</option>
+                    <option value="line">Line</option>
+                </optgroup>
+                <optgroup label="Time">
+                    <option value="calendar">Calendar</option>
+                    <option value="heatmap">Heatmap</option>
+                </optgroup>
+                <optgroup label="Trends">
+                    <option value="stacked_area">Stacked Area</option>
+                    <option value="cumulative">Cumulative</option>
+                </optgroup>
+                <optgroup label="Hierarchy">
+                    <option value="treemap">Treemap</option>
+                </optgroup>
+                <optgroup label="Summary">
+                    <option value="status">Status</option>
+                    <option value="context">Context</option>
+                </optgroup>
+                <optgroup label="Analysis">
+                    <option value="histogram">Session Histogram</option>
+                    <option value="radar">Radar</option>
+                    <option value="bubble">Tag Bubble</option>
+                </optgroup>
+                <optgroup label="Other">
+                    <option value="wordcloud">Wordcloud</option>
+                </optgroup>
+            </select>
+        </div>
+        <button type="button" class="btn btn--primary" id="draw">
+            <i class="fas fa-chart-line"></i> Draw
+        </button>
+    </div>
+
+    <div class="sheet filter-sheet" id="filterSheet" role="dialog" aria-modal="true" aria-label="Filter chart data">
+        <div class="sheet-scrim" data-close></div>
+        <div class="sheet-panel">
+            <div class="sheet-grab"></div>
+            <p class="sheet-title">Filter chart data</p>
+
+            <div class="field">
+                <label for="start_date">Start date</label>
                 {{ search_form.start_date }}
                 {{ search_form.start_date.errors }}
-            </span>
+            </div>
 
-            <span class="label-input" id="filter_end">
-                <label for="end_date"><i class="fa fa-calendar"></i> End Date</label>
+            <div class="field">
+                <label for="end_date">End date</label>
                 {{ search_form.end_date }}
                 {{ search_form.end_date.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
-                <label for="context-filter"><i class="fa fa-layer-group"></i> Context</label>
+            <div class="field">
+                <label for="context-filter">Context</label>
                 {{ search_form.context }}
                 {{ search_form.context.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
-                <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
-                <details class="tag-dropdown">
-                    <summary class="tag-summary">Select tags</summary>
-                    <div class="tag-options">
-                        {% for cb in search_form.tags %}
-                            <label class="tag-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
+            {% if search_form.tags|length %}
+            <div class="field">
+                <span class="field-label">Tags</span>
+                <div class="check-grid">
+                    {% for cb in search_form.tags %}
+                    <span>{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
+                    {% endfor %}
+                </div>
                 {{ search_form.tags.errors }}
-            </span>
+            </div>
+            {% endif %}
 
-            <span class="label-input">
-                <label for="exclude-projects-filter"><i class="fa fa-ban"></i> Exclude Projects</label>
-                <details class="tag-dropdown exclude-dropdown">
-                    <summary class="tag-summary">Select projects to exclude</summary>
-                    <div class="tag-options exclude-options">
-                        <input type="text" class="exclude-search-input" placeholder="Search projects..." autocomplete="off">
-                        {% for cb in search_form.exclude_projects %}
-                            <label class="tag-option exclude-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
+            {% if search_form.exclude_projects|length %}
+            <div class="field">
+                <span class="field-label">Exclude projects</span>
+                <input type="text" class="exclude-search-input input" placeholder="Search projects…" autocomplete="off">
+                <div class="check-grid exclude-options u-mt-4">
+                    {% for cb in search_form.exclude_projects %}
+                    <span class="exclude-option">{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
+                    {% endfor %}
+                </div>
                 {{ search_form.exclude_projects.errors }}
-            </span>
+            </div>
+            {% endif %}
 
-             <span class="label-input">
-                <label for="chart_type"><i class="fa fa-chart-bar"></i>Type</label>
-                <select id="chart_type" name="chart_type" data-selected="{{ request.GET.chart_type|default:'pie' }}">
-                    <optgroup label="Basic">
-                        <option value="pie">Pie</option>
-                        <option value="bar">Bar</option>
-                        <option value="scatter">Scatter</option>
-                        <option value="line">Line</option>
-                    </optgroup>
-                    <optgroup label="Time">
-                        <option value="calendar">Calendar</option>
-                        <option value="heatmap">Heatmap</option>
-                    </optgroup>
-                    <optgroup label="Trends">
-                        <option value="stacked_area">Stacked Area</option>
-                        <option value="cumulative">Cumulative</option>
-                    </optgroup>
-                    <optgroup label="Hierarchy">
-                        <option value="treemap">Treemap</option>
-                    </optgroup>
-                    <optgroup label="Summary">
-                        <option value="status">Status</option>
-                        <option value="context">Context</option>
-                    </optgroup>
-                    <optgroup label="Analysis">
-                        <option value="histogram">Session Histogram</option>
-                        <option value="radar">Radar</option>
-                        <option value="bubble">Tag Bubble</option>
-                    </optgroup>
-                    <optgroup label="Other">
-                        <option value="wordcloud">Wordcloud</option>
-                    </optgroup>
-                </select>
-            </span>
-
-            <span>
-                <button type="button" class="primary-button" id="draw">
-                    <i class="fa fa-chart-line"></i>
-                    Draw
-                </button>
-            </span>
-        </form>
-    </section>
-
-    <section id="chart_section" class="card">
-        <!-- API endpoint URLs -->
-        <input type="hidden" id="chart_data_link" value="{% url 'api_v2:report-charts' %}">
-        <!-- New API endpoints for additional charts -->
-
-        <!-- Shown while charts are loading / rendering (covers only this card) -->
-        <div id="chart-loading" class="loading-overlay" aria-live="polite" aria-busy="false" style="display:none;">
-            <div class="loading-card">
-                <span class="loading-leaf" aria-hidden="true">
-                    <img src="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" alt="">
-                </span>
-                <div class="loading-text">Loading chart…</div>
+            <div class="sheet-foot">
+                <a class="btn btn--ghost" href="{% url 'charts' %}">Clear all</a>
+                <button class="btn btn--primary" type="submit">Apply filters</button>
             </div>
         </div>
+    </div>
+</form>
 
-        <!-- Empty state shown when the API returns no data -->
-        <div id="chart-empty" class="full-width centered-pic" style="display:none;">
-            <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}" alt="No data found">
-        </div>
+<section class="slab slab-pad" id="chart_section">
+    <input type="hidden" id="chart_data_link" value="{% url 'api_v2:report-charts' %}">
 
-        <!-- display the graph using chart js -->
-        <div id="canvas_container">
-            <canvas id="chart"></canvas>
+    <div id="chart-loading" class="loading-overlay" aria-live="polite" aria-busy="false" style="display:none;">
+        <div class="loading-card">
+            <span class="loading-leaf" aria-hidden="true">
+                <img src="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" alt="">
+            </span>
+            <div class="loading-text">Loading chart…</div>
         </div>
-    </section>
+    </div>
+
+    <p id="chart-empty" class="empty" style="display:none;">
+        Nothing to chart for these filters. Widen the range, or
+        <a href="{% url 'sessions' %}">check what you have tracked</a>.
+    </p>
+
+    <div id="canvas_container">
+        <canvas id="chart"></canvas>
+    </div>
+</section>
 
 {% endblock %}

@@ -1975,3 +1975,95 @@ img.brand-mark {
   0%, 70%   { transform: rotate(0deg); }
   80%, 100% { transform: rotate(180deg); }
 }
+
+/* ============================================================================
+   LOADING OVERLAYS                                                  (chunk 9)
+   ----------------------------------------------------------------------------
+   Two overlays share one look:
+
+     .page-loading-overlay  injected by page_loading.js, which base_fd.html
+                            loads for EVERY page. Its markup only existed in
+                            style.css, so until now it rendered unstyled on
+                            every ported page — a stray leaf and a line of text
+                            in the document flow.
+     .loading-overlay       scoped to the chart slab while a chart is fetched.
+
+   page_loading.js builds .loading-card / .loading-leaf / .loading-text itself;
+   those names are its, not ours.
+   ==========================================================================*/
+
+.page-loading-overlay,
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 10, 12, .55);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.page-loading-overlay {
+  opacity: 0; visibility: hidden;
+  transition: opacity .2s var(--ease), visibility .2s var(--ease);
+}
+.page-loading-overlay.visible { opacity: 1; visibility: visible; }
+
+/* The chart's overlay covers its own slab, not the window. */
+.loading-overlay { position: absolute; z-index: 20; border-radius: var(--r-lg); }
+
+.loading-card {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  background: var(--slab-solid); border-radius: var(--r-md);
+  box-shadow: var(--edge), var(--e3);
+  color: var(--ink);
+}
+.loading-text { font-size: var(--fs-sm); }
+.loading-leaf {
+  width: 44px; height: 60px;
+  display: flex; align-items: center; justify-content: center;
+}
+.loading-leaf img { width: 30px; height: auto; animation: leaf-fall 2.4s ease-in-out infinite; }
+
+@keyframes leaf-fall {
+  0%   { transform: translate(-14px, -22px) rotate(-35deg); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(12px, 4px) rotate(30deg); }
+  85%  { opacity: 1; }
+  100% { transform: translate(-12px, 26px) rotate(-25deg); opacity: 0; }
+}
+@keyframes leaf-pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .loading-leaf img { animation: leaf-pulse 2s ease-in-out infinite; }
+}
+
+/* ============================================================================
+   CHARTS                                                            (chunk 9)
+   ----------------------------------------------------------------------------
+   A chart wants width and a settled height — Chart.js sizes to its container,
+   so the container must not size to the chart or the canvas grows on every
+   redraw. charts/core.js toggles #chart-loading, #chart-empty and the
+   .chart-circular class on #canvas_container; those ids are its contract.
+   ==========================================================================*/
+
+#chart_section { position: relative; }
+
+#canvas_container {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: min(40rem, 66vh);
+}
+/* Pie, radar and friends are square: cap the width so they do not stretch
+   into ovals on a wide desk. */
+#canvas_container.chart-circular {
+  width: min(100%, 44rem);
+  height: min(44rem, calc(100vh - 15rem));
+  min-height: 26rem;
+  margin-inline: auto;
+}
+#canvas_container.chart-circular canvas { max-width: 100%; max-height: 100%; }
+
+/* The chart-type picker is this page's primary control, so it stays on the
+   page rather than going in the filter sheet with the narrowing controls. */
+.chart-bar {
+  display: flex; align-items: flex-end; gap: var(--s3); flex-wrap: wrap;
+  margin-bottom: var(--s4);
+}
+.chart-bar .field { margin-bottom: 0; flex: 1 1 14rem; min-width: 0; }
+.chart-bar .btn { flex: 0 0 auto; }
