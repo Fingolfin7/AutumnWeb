@@ -65,7 +65,7 @@ Status: `TODO` / `WIP` / `DONE`
 
 | # | Chunk | Templates | Status |
 |---|-------|-----------|--------|
-| 1 | Foundation: `focus_desk.css` + `base_fd.html` shell | — | TODO |
+| 1 | Foundation: `focus_desk.css` + `base_fd.html` shell | — | **DONE** |
 | 2 | Dashboard + timeline backend | `dashboard.html`, `partials/active_timers_dashboard.html` | TODO |
 | 3 | Sessions | `list_sessions`, `update_session`, `delete_session` | TODO |
 | 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | TODO |
@@ -78,6 +78,21 @@ Status: `TODO` / `WIP` / `DONE`
 | 11 | Users | `users/base`, `login`, `logout`, `register`, `password_reset`, `profile` | TODO |
 | 12 | Insights | `llm_insights/insights` | TODO |
 | 13 | Cutover: delete legacy shell + `style.css`, rename `base_fd` → `base` | — | TODO |
+
+### Chunk 13 cutover checklist (add to as you go)
+
+- Delete `core/templates/core/base.html`, rename `base_fd.html` → `base.html`,
+  drop the `{% extends %}` churn.
+- Delete `core/static/core/css/style.css` and `colours.css` once nothing
+  references them (`grep -rn "style.css\|colours.css" core users llm_insights`).
+- Split `core/static/core/js/script.js`: the `[data-utc-time]` conversion is
+  still needed, the burger-menu half is dead once the legacy shell goes.
+- Re-check whether jQuery is still required. Several page scripts use it
+  (`dynamic_timers`, `search_projects`, `timer_search_projects`,
+  `session_sliders`, `charts/*`), so it likely stays — confirm rather than
+  assume.
+- `core/templates/core/home.html` appears unused: `/` routes to
+  `DashboardView` → `dashboard.html`. Confirm and delete if dead.
 
 44 templates total.
 
