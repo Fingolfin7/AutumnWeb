@@ -1,62 +1,45 @@
-{% extends 'core/base.html' %}
-{% load static %}
+{% extends 'core/base_fd.html' %}
 {% load time_formats %}
 
 {% block content %}
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        <h3>
-            Are you sure you want to delete this subproject of
-           <span class="text-red" id="project-name">
-                <a class="plain-link" href="{% url 'update_project' subproject.parent_project.id %}">
-                    {{ subproject.parent_project.name }}
-                </a>
-            </span>?
-        </h3>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">
+            Delete subproject of
+            <a class="text-red" href="{% url 'update_project' subproject.parent_project.id %}">{{ subproject.parent_project.name }}</a>
+        </p>
+        <h1 class="page-title">Are you sure?</h1>
+    </div>
+</div>
 
-        <div class="card" id="subproject-{{ subproject.id }}">
-            <table>
-                <tr>
-                    <td class="text-blue">
-                        <h3>{{ subproject.name }}</h3>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        {% if subproject.description %}
-                            <p>{{ subproject.description }}</p>
-                        {% else %}
-                            <p>No description available.</p>
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <td class="text-green">
-                        {{ subproject.total_time|min_formatter }}
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <span class="text-cyan">{{ subproject.start_date|date_formatter }}</span>
+<form method="post">
+    {% csrf_token %}
 
-                        ->
-
-                        <span class="text-cyan">{{ subproject.last_updated|date_formatter }}</span>
-                    </td>
-                </tr>
-            </table>
+    <section class="slab slab-pad">
+        <div class="project-top">
+            <span class="project-name text-blue">{{ subproject.name }}</span>
         </div>
+        {% if subproject.description %}
+        <p class="focus-lede">{{ subproject.description }}</p>
+        {% endif %}
+        <p class="project-total">{{ subproject.total_time|min_formatter_two }}</p>
+        <p class="project-dates">{{ subproject.start_date|date_formatter }} &rarr; {{ subproject.last_updated|date_formatter }}</p>
+    </section>
 
-        <div class="button-row">
-            <button type="button" class="secondary-button" onclick="window.location.href='{% url 'projects' %}'">
-                 <i class="fa fa-arrow-left"></i>
-                Back
-            </button>
-            <button type="submit" id="start-timer" class="primary-button dark-red">
-                <i class="fa fa-trash"></i>
-                Delete
-            </button>
-        </div>
-    </form>
+    <p class="confirm-warn">
+        <i class="fas fa-exclamation-triangle"></i>
+        Sessions recorded against this subproject lose it. It cannot be undone.
+    </p>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'update_project' subproject.parent_project.id %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <button class="btn btn--stop btn--spacer" type="submit">
+            <i class="fas fa-trash"></i> Delete subproject
+        </button>
+    </div>
+</form>
+
 {% endblock %}

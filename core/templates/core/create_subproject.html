@@ -1,49 +1,62 @@
-{% extends 'core/base.html' %}
-{% load static %}
-{% load crispy_forms_tags %}
+{% extends 'core/base_fd.html' %}
+
+{% comment %}
+  form.parent_project is a hidden input carrying the project this subproject
+  belongs to; it is rendered outside any .field so it stays invisible.
+{% endcomment %}
+
 {% block content %}
-    <form class="card" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        {{ form.parent_project }}
-        {{ form.parent_project.errors }}
+{% with project=form.instance.parent_project|default:form.initial.parent_project %}
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">New subproject{% if project %} in {{ project.name }}{% endif %}</p>
+        <h1 class="page-title">Break the work down</h1>
+    </div>
+</div>
 
-        <span class="label-input">
+<form method="post" class="fields">
+    {% csrf_token %}
+    {{ form.parent_project }}
+    {{ form.parent_project.errors }}
+
+    <section class="slab slab-pad">
+        <div class="field">
             {{ form.name.label_tag }}
             {{ form.name }}
             {{ form.name.errors }}
-        </span>
+        </div>
 
-        <br> <br>
-
-        <span class="label-input">
+        <div class="field">
+            <label for="{{ form.description.id_for_label }}">Description</label>
             {{ form.description }}
             {{ form.description.errors }}
-        </span>
+        </div>
 
-        <br><br>
+        {% if project.context or project.tags.all %}
+        <div class="field">
+            <span class="field-label">Inherited from {{ project.name }}</span>
+            <div class="project-meta">
+                {% if project.context %}
+                <span class="context-chip">{{ project.context.name }}</span>
+                {% endif %}
+                {% for tag in project.tags.all %}
+                <span class="tag-chip"{% if tag.color %} style="--tag: {{ tag.color }}"{% endif %}>{{ tag.name }}</span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
 
-        <span class="label-input">
-            <strong>Project Context & Tags</strong><br>
-            {% if form.instance.parent_project or form.initial.parent_project %}
-                {% with project=form.instance.parent_project|default:form.initial.parent_project %}
-                    {% if project.context %}
-                        <span class="badge text-cyan">Context: {{ project.context.name }}</span>
-                    {% endif %}
-                    {% if project.tags.all %}
-                        {% for tag in project.tags.all %}
-                            <span class="badge text-blue">{{ tag.name }}</span>
-                        {% endfor %}
-                    {% endif %}
-                {% endwith %}
-            {% endif %}
-        </span>
-
-        <br> <br>
-
-        <button type="submit" id="create-subproject" class="primary-button">
-            <i class="fa fa-check-circle"></i>
-            Create Subproject
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% if project %}{% url 'update_project' project.id %}{% else %}{% url 'projects' %}{% endif %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <button class="btn btn--primary btn--spacer" type="submit" id="create-subproject">
+            <i class="fas fa-check-circle"></i> Create subproject
         </button>
-    </form>
+    </div>
+</form>
+{% endwith %}
+
 {% endblock %}

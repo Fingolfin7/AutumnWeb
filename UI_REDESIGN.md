@@ -70,7 +70,7 @@ Status: `TODO` / `WIP` / `DONE`
 | 2b | Dashboard page port | `dashboard.html`, `partials/active_timers_dashboard.html` | **DONE** |
 | 3 | Sessions | `list_sessions`, `update_session`, `delete_session` | **DONE** |
 | 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | **DONE** |
-| 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | TODO |
+| 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | **DONE** |
 | 6 | Timers | `timers`, `start_timer`, `stop_timer`, `remove_timer`, `partials/active_timers_home`, `partials/active_timers_timers`, `partials/timer_suggestion_card` | TODO |
 | 7 | Commitments | `create_commitment`, `update_commitment`, `delete_commitment`, `partials/commitments_panel` | TODO |
 | 8 | Contexts & Tags | `contexts`, `update_context`, `delete_context`, `tags`, `update_tag`, `delete_tag` | TODO |

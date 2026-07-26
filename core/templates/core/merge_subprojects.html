@@ -1,57 +1,62 @@
-{% extends 'core/base.html' %}
-{% load static %}
-{% load crispy_forms_tags %}
+{% extends 'core/base_fd.html' %}
+
 {% block content %}
-    <div class="card">
-        <h2>Merge Subprojects</h2>
 
-        <br>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">
+            Merge subprojects in
+            <a class="text-red" href="{% url 'update_project' parent_project.id %}">{{ parent_project.name }}</a>
+        </p>
+        <h1 class="page-title">Combine two subprojects</h1>
+    </div>
+</div>
 
-        <form method="post">
-            {% csrf_token %}
+<form method="post" class="fields">
+    {% csrf_token %}
 
-            <span class="label-input">
-                <label for="{{ form.subproject1.id_for_label }}">First Subproject:</label>
+    <section class="slab slab-pad">
+        <p class="focus-lede">
+            Every session attached to either subproject ends up under one name.
+            The originals are removed.
+        </p>
+
+        {% if form.non_field_errors %}
+        <div class="msg msg--error u-mt-4" role="alert">
+            <i class="fas fa-exclamation-circle msg-icon"></i>
+            <span>{{ form.non_field_errors }}</span>
+        </div>
+        {% endif %}
+
+        <div class="two-up u-mt-4">
+            <div class="field">
+                <label for="{{ form.subproject1.id_for_label }}">First subproject</label>
                 {{ form.subproject1 }}
                 {{ form.subproject1.errors }}
-            </span>
+            </div>
 
-            <br><br>
-
-            <span class="label-input">
-                <label for="{{ form.subproject2.id_for_label }}">Second Subproject:</label>
+            <div class="field">
+                <label for="{{ form.subproject2.id_for_label }}">Second subproject</label>
                 {{ form.subproject2 }}
                 {{ form.subproject2.errors }}
-            </span>
-
-            <br><br>
-
-            <span class="label-input">
-                <label for="{{ form.new_subproject_name.id_for_label }}">New Subproject Name:</label>
-                {{ form.new_subproject_name }}
-                {{ form.new_subproject_name.errors }}
-            </span>
-
-            <br><br>
-
-            {% if form.non_field_errors %}
-                <div class="error-message">
-                    {{ form.non_field_errors }}
-                </div>
-                <br>
-            {% endif %}
-
-            <div class="button-row">
-                <button type="button" class="secondary-button" onclick="window.location.href='{% url 'update_project' parent_project.id %}'">
-                     <i class="fa fa-arrow-left"></i>
-                    Back
-                </button>
-
-                <button type="submit" class="primary-button">
-                    <i class="fa fa-code-branch"></i>
-                    Merge Subprojects
-                </button>
             </div>
-        </form>
+        </div>
+
+        <div class="field">
+            <label for="{{ form.new_subproject_name.id_for_label }}">Name for the merged subproject</label>
+            {{ form.new_subproject_name }}
+            {{ form.new_subproject_name.errors }}
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'update_project' parent_project.id %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <button class="btn btn--primary btn--spacer" type="submit">
+            <i class="fas fa-code-branch"></i> Merge subprojects
+        </button>
     </div>
+</form>
+
 {% endblock %}
