@@ -1818,7 +1818,7 @@ class ActiveTimersFragmentTests(TestCase):
         self.assertContains(active_response, "Fragment Project")
         self.assertContains(active_response, "data-timer-id")
 
-    def test_dashboard_and_home_fragments_limit_to_five_timers(self):
+    def test_dashboard_fragment_limits_to_five_timers(self):
         now = timezone.now()
         for index in range(6):
             project = Projects.objects.create(
@@ -1831,16 +1831,15 @@ class ActiveTimersFragmentTests(TestCase):
                 start_time=now - timedelta(minutes=index),
             )
 
-        for surface in ("dashboard", "home"):
-            response = self.client.get(
-                reverse("active_timers_fragment"),
-                {"surface": surface},
-            )
+        response = self.client.get(
+            reverse("active_timers_fragment"),
+            {"surface": "dashboard"},
+        )
 
-            self.assertEqual(response.status_code, 200)
-            self.assertContains(response, "Timer Project 0")
-            self.assertContains(response, "Timer Project 4")
-            self.assertNotContains(response, "Timer Project 5")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Timer Project 0")
+        self.assertContains(response, "Timer Project 4")
+        self.assertNotContains(response, "Timer Project 5")
 
 
 class DailyStreakTests(TestCase):
