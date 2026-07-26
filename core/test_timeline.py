@@ -323,3 +323,26 @@ class LiveBlockGeometryTests(TimelineTestCase):
         self.assertAlmostEqual(
             block["end_pct"], block["start_pct"] + block["width_pct"], places=3
         )
+
+
+class PeriodBoundsTimezoneTests(TestCase):
+    """get_period_bounds must read the date in the USER'S timezone.
+
+    Reading .date() off a UTC-aware now() put anyone east of UTC in the
+    previous period between local midnight and UTC midnight, which zeroed
+    every commitment's progress for those hours.
+    """
+
+    def test_local_date_decides_the_period_not_the_utc_date(self):
+        from django.utils import timezone as djtz
+        from core.utils import get_period_bounds
+
+        # 00:30 Monday in Prague is still 22:30 Sunday in UTC.
+        just_after_local_midnight = djtz.make_aware(
+            datetime(2026, 7, 27, 0, 30), djtz.get_default_timezone()
+        )
+        with mock.patch("django.utils.timezone.now", return_value=just_after_local_midnight):
+            start, end = get_period_bounds("weekly")
+
+        self.assertEqual(djtz.localtime(start).date(), date(2026, 7, 27))
+        self.assertEqual(djtz.localtime(end).date(), date(2026, 8, 3))

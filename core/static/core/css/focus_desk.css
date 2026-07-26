@@ -1756,84 +1756,24 @@ img.brand-mark {
   .split > .slab { margin-bottom: 0; }
 }
 
-/* ============================================================================
-   COMMITMENTS PANEL — compatibility dialect                         (chunk 4)
-   ----------------------------------------------------------------------------
-   partials/commitments_panel.html is included by update_project (chunk 4),
-   update_subproject (5), update_context and update_tag (8). A shared partial
-   cannot be in two design systems at once, so its MARKUP is left alone and its
-   existing class names are restyled here — the same tactic used for the
-   allocation editor. Chunk 7 rewrites the partial in native components and
-   deletes this block.
-   ==========================================================================*/
-
-#commitment-section {
-  background: var(--slab); border-radius: var(--r-lg);
-  box-shadow: var(--edge), var(--e1);
-  padding: var(--s4); margin-bottom: var(--s4);
-}
-.commitments-toolbar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--s3); flex-wrap: wrap;
-}
-.commitments-toolbar h3 {
-  font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.005em;
-  display: flex; align-items: center; gap: var(--s2);
-}
-.commitments-toolbar h3 .fa-bullseye { color: var(--time); font-size: 1rem; }
-.commitments-toolbar-actions { display: flex; align-items: center; gap: var(--s2); }
-.collapse-toggle {
-  width: 2.25rem; height: 2.25rem; border-radius: var(--r-pill);
-  display: grid; place-items: center; color: var(--muted); font-size: .8rem;
-}
-.collapse-toggle:hover { color: var(--ink); background: var(--raised); }
-.commitments-collapsible-body { margin-top: var(--s4); }
-.commitments-collapsible-body.is-collapsed { display: none; }
-.commitments-local-list { display: grid; gap: var(--s3); }
-
-.commitment-card { padding: var(--s4); border-radius: var(--r-md); background: var(--sunken); }
-.commitment-header {
-  display: flex; align-items: baseline; justify-content: space-between;
-  gap: var(--s3); flex-wrap: wrap;
-}
-.commitment-project { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
-.commitment-metrics-row {
-  margin-top: var(--s3); display: flex; gap: var(--s4); flex-wrap: wrap;
-  font-size: var(--fs-sm); color: var(--ink-2);
-}
-.commitment-metrics-row strong { color: var(--duration); }
-.progress-bar-container {
-  margin-top: var(--s3); height: 10px; border-radius: var(--r-pill);
-  background: var(--sunken); overflow: hidden;
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
-}
-.progress-bar { height: 100%; border-radius: var(--r-pill); transition: width .4s var(--ease); }
-.progress-bar.complete    { background: var(--status-complete); }
-.progress-bar.approaching { background: var(--status-approaching); }
-.progress-bar.on-track    { background: var(--status-on-track); }
-.progress-bar.warning     { background: var(--status-warning); }
-.progress-bar.behind      { background: var(--status-behind); }
-
-.commitment-rules { margin-top: var(--s4); }
-.commitment-rules-title {
+/* --------------------------------------------- commitment panel extras ----
+   The panel reuses the dashboard's .commit components. These are the two
+   things only it shows: the plain-English rule composition, and a paused
+   marker for a commitment that is no longer counting.
+   (This replaces the chunk-4 compatibility block that restyled the panel's
+   old class names while it was shared with un-ported pages.)                */
+.commit-rules { margin-top: var(--s4); }
+.commit-rules-title {
   font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
   color: var(--muted); font-weight: 600; margin-bottom: .35rem;
 }
-.commitment-rule-line { font-size: var(--fs-sm); color: var(--ink-2); }
-.commitment-footer { margin-top: var(--s4); }
-.commitments-empty { margin-top: var(--s4); font-size: var(--fs-sm); color: var(--muted); }
-
-/* The partial's buttons still carry the legacy .primary-button class. Give it
-   the system's primary look so the panel does not sprout naked buttons. */
-#commitment-section .primary-button {
-  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
-  padding: .55rem 1rem; border-radius: var(--r-pill);
-  font-size: var(--fs-sm); font-weight: 600;
-  background: var(--brand-deep); color: var(--ink-invert);
-  box-shadow: var(--edge), var(--e1);
+.commit-rule-line { font-size: var(--fs-sm); color: var(--ink-2); }
+.commit-foot { margin-top: var(--s4); }
+.badge-paused {
+  font-size: .625rem; letter-spacing: .08em; text-transform: uppercase;
+  padding: .1rem .4rem; border-radius: var(--r-xs);
+  color: var(--note); background: rgba(185,166,106,.16);
 }
-#commitment-section .primary-button:hover { background: var(--brand-hover); }
-.text-muted { color: var(--muted); }
 
 /* ============================================================================
    TIMERS                                                            (chunk 6)

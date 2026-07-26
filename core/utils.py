@@ -709,8 +709,12 @@ def get_period_bounds(
     if timezone.is_naive(reference_date):
         reference_date = timezone.make_aware(reference_date)
 
-    # Get the start of the day for reference
-    ref_date = reference_date.date()
+    # Periods are boundaries in the USER'S day, so the date has to be read in
+    # the active timezone. Reading .date() off a UTC-aware `timezone.now()`
+    # meant that between local midnight and UTC midnight — every night for
+    # anyone east of UTC — this returned the PREVIOUS period, and every
+    # commitment reported zero progress until the offset had passed.
+    ref_date = timezone.localtime(reference_date).date()
 
     if period == "daily":
         start_date = ref_date

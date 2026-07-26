@@ -1501,8 +1501,9 @@ class UpdateProjectViewCommitmentTests(TestCase):
             reverse('update_project', kwargs={'pk': self.project.pk})
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'No commitments currently apply to this project.')
-        self.assertContains(response, 'Add Commitment')
+        # Chunk 7 reworded the empty state to say what to do about it.
+        self.assertContains(response, 'No commitments apply to this project yet.')
+        self.assertContains(response, 'Add commitment')
 
     def test_project_page_shows_commitment(self):
         """Test project page when commitment exists."""
@@ -1518,7 +1519,7 @@ class UpdateProjectViewCommitmentTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '300')
-        self.assertContains(response, 'Edit Commitment')
+        self.assertContains(response, 'Edit commitment')
 
 
 class ProjectsListViewCommitmentTests(TestCase):
