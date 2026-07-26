@@ -74,7 +74,7 @@ Status: `TODO` / `WIP` / `DONE`
 | 6 | Timers | `timers`, `start_timer`, `stop_timer`, `remove_timer`, `partials/active_timers_timers`, `partials/timer_suggestion_card` | **DONE** (see note: `active_timers_home` left for chunk 13) |
 | 7 | Commitments | `create_commitment`, `update_commitment`, `delete_commitment`, `partials/commitments_panel` | TODO |
 | 8 | Contexts & Tags | `contexts`, `update_context`, `delete_context`, `tags`, `update_tag`, `delete_tag` | TODO |
-| 9 | Charts | `charts` | TODO |
+| 9 | Charts | `charts` | **DONE** |
 | 10 | Import / Export / Home | `import`, `export`, `home` | TODO |
 | 11 | Users | `users/base`, `login`, `logout`, `register`, `password_reset`, `profile` | TODO |
 | 12 | Insights | `llm_insights/insights` | TODO |
@@ -104,6 +104,36 @@ Status: `TODO` / `WIP` / `DONE`
 - `session_sliders.js` is no longer loaded by any ported page (notes clamp and
   expand instead of sliding). Delete it once chunks 6 and 10 stop referencing
   it, along with the `.session-note-slider` / `.project-name-slider` markup.
+
+## Chunk 12 (Insights) — read this before starting
+
+Not a shell swap. `llm_insights/insights.html` is ~270 lines of markup plus
+~210 of inline script, and it loads its own `core/css/chat_style.css`, which
+reads **fourteen variables that only exist in `style.css`/`colours.css`**:
+
+```
+--border-dark --dark-text --accent-color --main-red --light-text
+--dark-background --card-bg-dark-alpha --card-background-dark --border-light
+--main-muted --color-text-light --color-dodgerblue --color-blue-grey
+--card-background-light
+```
+
+None are defined in `focus_desk.css`, so switching the extends alone gives a
+chat UI with no colours. Two ways out, and they are not equal:
+
+1. **Bridge the variables** — define those fourteen names in `focus_desk.css`
+   in terms of Focus Desk tokens. Cheap and reversible, but the chat then
+   keeps the old system's square corners and spacing inside the new shell, so
+   it reads as a foreign page.
+2. **Port `chat_style.css`** (594 lines) into the system properly — message
+   bubbles become slabs/bands, the composer becomes `.fields`.
+
+Prefer 2. Use 1 only as an explicitly temporary step, recorded here, and only
+if the page must ship before there is time for 2.
+
+Either way the inline `<script>` block should move to a real static file
+first; it is the only page still carrying that much script inline, and it is
+impossible to review inside a template.
 
 ## Chunk 3 notes (Sessions)
 
