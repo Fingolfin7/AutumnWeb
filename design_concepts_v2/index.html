@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autumn — UI Alternatives (Round 2b)</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:"Aptos","Segoe UI","Helvetica Neue",Arial,sans-serif}
+  :root{
+    --bg:#101214; --ink:#d9dedb; --muted:#848d88; --accent:#c98245;
+    --surface:#171a1d; --surface-2:#1d2225; --line:#2b3135;
+    --red:#be675f; --blue:#7896b8; --green:#7ca36a; --cyan:#4e9a8e; --yellow:#b9a66a;
+  }
+  body{background:var(--bg);color:var(--ink);line-height:1.55;padding:3rem 1.5rem 5rem}
+  .wrap{max-width:1180px;margin:0 auto}
+  header{border-bottom:1px solid var(--line);padding-bottom:1.75rem;margin-bottom:2.5rem}
+  .eyebrow{font-size:.6875rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:600}
+  h1{font-size:2rem;font-weight:650;letter-spacing:-.02em;margin:.4rem 0 .6rem}
+  .lede{color:var(--muted);max-width:70ch;font-size:.9375rem}
+  .lede b{color:var(--ink);font-weight:600}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:1.25rem}
+  .concept{background:var(--surface);border:1px solid var(--line);border-top:2px solid var(--accent);display:flex;flex-direction:column}
+  .concept-hd{padding:1.1rem 1.25rem .9rem}
+  .concept h2{font-size:1.1875rem;font-weight:650;letter-spacing:-.01em}
+  .nav-model{font-size:.75rem;color:var(--muted);margin-top:.3rem}
+  .thesis{padding:0 1.25rem 1rem;font-size:.875rem;color:#b9c0bc}
+  .sig{padding:.8rem 1.25rem;margin:0 1.25rem 1rem;background:var(--surface-2);border-left:2px solid var(--cyan);font-size:.8125rem}
+  .sig strong{color:var(--cyan);font-weight:600;display:block;font-size:.6875rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:.25rem}
+  .pages{margin-top:auto;border-top:1px solid var(--line);display:flex}
+  .pg{flex:1;padding:.85rem .5rem;text-align:center;font-size:.8125rem;text-decoration:none;color:var(--ink);border-right:1px solid var(--line);transition:background .12s}
+  .pg:last-child{border-right:0}
+  .pg:hover{background:var(--surface-2);color:var(--accent)}
+  .pg.missing{color:#5a615d;pointer-events:none}
+  .pg small{display:block;font-size:.625rem;letter-spacing:.08em;text-transform:uppercase;margin-top:.2rem;color:var(--muted)}
+  .pg.missing small{color:var(--red)}
+
+  .round-hd{font-size:.8125rem;font-weight:650;letter-spacing:.02em;margin:2.75rem 0 1rem;padding-bottom:.5rem;border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+  .round-hd:first-of-type{margin-top:0}
+  .round-hd span{font-weight:400;font-size:.8125rem;color:var(--muted)}
+  .concept.is-new{border-top-color:var(--cyan);background:linear-gradient(180deg,rgba(78,154,142,.06),transparent 40%),var(--surface)}
+  .flag{display:inline-block;font-size:.625rem;letter-spacing:.1em;text-transform:uppercase;font-weight:650;color:var(--cyan);background:rgba(78,154,142,.12);border:1px solid rgba(78,154,142,.3);padding:.1rem .4rem;margin-bottom:.45rem}
+  .concept.is-new .sig{border-left-color:var(--accent)}
+  .concept.is-new .sig strong{color:var(--accent)}
+
+  .note{margin-top:2.5rem;background:var(--surface);border:1px solid var(--line);border-left:2px solid var(--yellow);padding:1.25rem 1.5rem}
+  .note h3{font-size:.9375rem;font-weight:650;margin-bottom:.5rem}
+  .note p{font-size:.875rem;color:#b9c0bc;max-width:80ch}
+  .note ul{margin:.6rem 0 0 1.1rem;font-size:.875rem;color:#b9c0bc}
+  .note li{margin-bottom:.2rem}
+  code{font-family:"Cascadia Mono",Consolas,monospace;font-size:.8125em;background:var(--surface-2);padding:.1rem .35rem;color:var(--accent)}
+  footer{margin-top:2rem;font-size:.8125rem;color:var(--muted)}
+  footer a{color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Autumn · Round 2b</div>
+    <h1>Six UI alternatives</h1>
+    <p class="lede">Each direction moves <b>layout &amp; density</b>, <b>visual style</b> and <b>navigation</b> together — not a re-skin. All six use <b>identical sample data</b> so they're comparable side by side, keep the semantic colour convention (project&nbsp;<span style="color:var(--red)">red</span> / subproject&nbsp;<span style="color:var(--blue)">blue</span> / duration&nbsp;<span style="color:var(--green)">green</span>), stay dark-first, and each makes deliberate use of the backdrop-image layer. Frosted glass, terminal chrome, kanban and paper textures are all off the table from round 1.</p>
+  </header>
+
+  <h2 class="round-hd">Round 2b — built from your picks <span>both carry the timeline, so the only variable left is temperament: warm &amp; calm vs dense &amp; keyboard</span></h2>
+
+  <div class="grid">
+
+    <article class="concept is-new">
+      <div class="concept-hd">
+        <span class="flag">New</span>
+        <h2>Focus Desk</h2>
+        <div class="nav-model">Same pill nav — bottom on phones, sticky top pill on desktop</div>
+      </div>
+      <p class="thesis">Focus Card's feel kept intact — soft translucent slabs, big radii, real depth, large calm type — but the width is now <em>used</em>. At ≥1000px: a full-width <b>hero zone</b> (focus deck + timeline, both wide objects) above a two-track <b>desk</b> — sessions in the wide primary track, commitments&nbsp;+&nbsp;activity in the narrow ambient one.</p>
+      <div class="sig"><strong>Now with the timeline</strong>Same lane chart, spoken in this accent: soft rounded blocks with real depth, 68px lanes, readable labels, and no hatching — the running block breathes with the system's own live-glow instead.</div>
+      <div class="pages">
+        <a class="pg" href="focus-desk/dashboard.html">Dashboard<small>ready</small></a>
+        <span class="pg missing">Projects<small>not built</small></span>
+        <span class="pg missing">Sessions<small>not built</small></span>
+      </div>
+    </article>
+
+    <article class="concept is-new">
+      <div class="concept-hd">
+        <span class="flag">New</span>
+        <h2>Deck + Timeline</h2>
+        <div class="nav-model">56px icon rail + ⌘K palette + deckbar · unchanged</div>
+      </div>
+      <p class="thesis">Command Deck exactly as you saw it — the session rows you liked are byte-identical — with Timeline First's lane chart added as a panel between Active&nbsp;Timers and Commitments. The chart is redrawn in Deck's idiom: hairlines instead of fills, square corners, no gradients or blur, same 4px grid and tabular numerals.</p>
+      <div class="sig"><strong>What changed</strong>You get the day's <em>shape</em> and the day's <em>ledger</em> on one page. Empty track stays unpainted, so untracked time still reads as backdrop.</div>
+      <div class="pages">
+        <a class="pg" href="deck-timeline/dashboard.html">Dashboard<small>ready</small></a>
+        <a class="pg" href="deck-timeline/projects.html">Projects<small>ready</small></a>
+        <span class="pg missing">Sessions<small>not built</small></span>
+      </div>
+    </article>
+
+  </div>
+
+  <h2 class="round-hd">Round 2 — the original four <span>kept for reference</span></h2>
+
+  <div class="grid">
+
+    <article class="concept">
+      <div class="concept-hd">
+        <h2>Command Deck</h2>
+        <div class="nav-model">56px icon rail + ⌘K palette + 44px deckbar · no sidebar</div>
+      </div>
+      <p class="thesis">A tool you <em>operate</em>, not a dashboard you visit. Exactly one container treatment and one row treatment — nothing nests, a row is never a card. 4px grid, 13px body, tabular mono numerals with fixed column widths so times align down the whole page. Higher contrast than production because density needs it.</p>
+      <div class="sig"><strong>Signature move</strong>The command palette <em>is</em> the navigation and the timer control. Rail is the mouse fallback.</div>
+      <div class="pages">
+        <a class="pg" href="command-deck/dashboard.html">Dashboard<small>ready</small></a>
+        <a class="pg" href="command-deck/projects.html">Projects<small>ready</small></a>
+        <span class="pg missing">Sessions<small>not built</small></span>
+      </div>
+    </article>
+
+    <article class="concept">
+      <div class="concept-hd">
+        <h2>Timeline First</h2>
+        <div class="nav-model">Top segmented control · full width to the timeline</div>
+      </div>
+      <p class="thesis">Time is the organising axis, not lists. Sessions are proportional blocks on an hour ruler in per-project lanes; gaps are left genuinely empty; the running timer is a live hatched block bleeding into a NOW line. Colour encodes identity only — every block is a shade of project red, so "red = project" is taken literally.</p>
+      <div class="sig"><strong>Signature move</strong>Unworked time isn't grey fill — it's a hole in the UI showing your wallpaper. Every gap in your day is a window.</div>
+      <div class="pages">
+        <a class="pg" href="timeline-first/dashboard.html">Dashboard<small>ready</small></a>
+        <span class="pg missing">Projects<small>not built</small></span>
+        <span class="pg missing">Sessions<small>not built</small></span>
+      </div>
+    </article>
+
+    <article class="concept">
+      <div class="concept-hd">
+        <h2>Ledger Table</h2>
+        <div class="nav-model">40px top bar + sticky subbar · global timer well pinned everywhere</div>
+      </div>
+      <p class="thesis">A book of accounts kept in time instead of money. Real <code>&lt;table&gt;</code>s: sticky headers, sortable columns, right-aligned tabular numerals, running totals, bottom summary rule. Two surface tiers only — pane and zebra row. Square corners, hairlines, no shadow, no blur. The 14.5rem the sidebar ate is given back to columns.</p>
+      <div class="sig"><strong>Signature move</strong>Density is the feature — forty things visible at once, with a global timer well so the daily loop never needs a page change.</div>
+      <div class="pages">
+        <a class="pg" href="ledger-table/dashboard.html">Dashboard<small>ready</small></a>
+        <span class="pg missing">Projects<small>not built</small></span>
+        <span class="pg missing">Sessions<small>not built</small></span>
+      </div>
+    </article>
+
+    <article class="concept">
+      <div class="concept-hd">
+        <h2>Focus Card</h2>
+        <div class="nav-model">Floating bottom tabbar → desktop pill · zero width spent on nav</div>
+      </div>
+      <p class="thesis">The deliberate opposite: calm, mobile-first, one thing at a time. One question above the fold — "what am I working on right now" — as a giant focus card with one primary Stop button. Everything else progressively disclosed below. Designed at 390px first; desktop is the <em>same</em> layout widened, never a second column.</p>
+      <div class="sig"><strong>Signature move</strong>One primary action per screen. On desktop the narrow column floats in your backdrop photo — the image becomes the room.</div>
+      <div class="pages">
+        <a class="pg" href="focus-card/dashboard.html">Dashboard<small>ready</small></a>
+        <span class="pg missing">Projects<small>not built</small></span>
+        <span class="pg missing">Sessions<small>not built</small></span>
+      </div>
+    </article>
+
+  </div>
+
+  <div class="note">
+    <h3>State of play</h3>
+    <p>The round-2 workflow hit the monthly agent spend limit partway through, so only <b>5 of its 12 pages</b> were built — all four dashboards plus Command Deck's Projects. The two round-2b concepts above were then built directly, without agents.</p>
+    <ul>
+      <li>Every concept's <code>concept.css</code> is complete. The design systems are fully specified; only extra <em>page</em> mockups are missing.</li>
+      <li><b>Deck + Timeline</b> reuses Command Deck's stylesheet verbatim and appends the timeline, so the session rows are byte-identical to what you saw.</li>
+      <li><b>Focus Desk</b> reuses Focus Card's stylesheet and appends a desktop layer — the phone layout is untouched.</li>
+      <li>Known, pre-existing: Command Deck's <code>.runbadge</code> and <code>.row-actions</code> overflow horizontally below ~430px. That came from the original concept, not the timeline splice, and it's inherited by Deck&nbsp;+&nbsp;Timeline.</li>
+    </ul>
+  </div>
+
+  <footer>
+    Shared briefs: <a href="_brief_content.md">_brief_content.md</a> (sample data + per-page content inventory) · <a href="_brief_constraints.md">_brief_constraints.md</a> (palette, non-negotiables, rejected prior art)
+  </footer>
+</div>
+</body>
+</html>

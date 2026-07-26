@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autumn — Projects · Command Deck</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="concept.css">
+</head>
+
+<!-- Same shell as dashboard.html: 56px rail, 44px deckbar, ⌘K palette, live
+     dim slider. --workspace-bg-image is the pure-CSS stand-in for the user's
+     backdrop photo so the file stays asset-free. -->
+<body class="dark-mode bg-active" style="
+  --workspace-bg-image:
+    radial-gradient(60% 42% at 74% 16%, rgba(232,168,96,.62), transparent 68%),
+    radial-gradient(48% 34% at 74% 16%, rgba(255,214,150,.55), transparent 60%),
+    radial-gradient(120% 60% at 12% 8%, rgba(38,64,86,.85), transparent 70%),
+    radial-gradient(90% 40% at 30% 108%, rgba(6,9,11,.98), transparent 72%),
+    radial-gradient(70% 30% at 88% 104%, rgba(8,12,14,.96), transparent 70%),
+    linear-gradient(180deg,#101d28 0%,#1d2c38 26%,#3c3b34 47%,#5a3f2a 60%,#2a1d16 76%,#0c0b0a 100%);
+  --background-dim-opacity:.58;">
+
+<!-- ═══════════════════════════ ICON RAIL (56px) ═══════════════════════════ -->
+<nav class="rail" aria-label="Primary">
+  <a class="rail-brand" href="dashboard.html" data-tip="Autumn" aria-label="Autumn"><i class="fas fa-leaf"></i></a>
+
+  <div class="rail-nav">
+    <a class="rail-btn" href="dashboard.html" data-tip="Home"><i class="fas fa-home"></i></a>
+    <a class="rail-btn is-on" href="#" data-tip="Manage Projects"><i class="fas fa-layer-group"></i></a>
+    <a class="rail-btn" href="#" data-tip="Timers"><i class="fas fa-stopwatch"></i></a>
+    <a class="rail-btn" href="#" data-tip="Session Logs"><i class="fas fa-history"></i></a>
+    <a class="rail-btn" href="#" data-tip="Insights"><i class="fas fa-brain"></i></a>
+    <a class="rail-btn" href="#" data-tip="Charts"><i class="fas fa-chart-line"></i></a>
+    <div class="rail-sep"></div>
+    <a class="rail-btn" href="#" data-tip="Import"><i class="fas fa-file-import"></i></a>
+    <a class="rail-btn" href="#" data-tip="Export"><i class="fas fa-file-export"></i></a>
+  </div>
+
+  <div class="rail-foot">
+    <button class="rail-btn" data-tip="Command palette  ⌘K" id="railCmd"><i class="fas fa-bolt"></i></button>
+    <a class="rail-btn" href="#" data-tip="finrod — Profile"><span class="rail-avatar">F</span></a>
+    <a class="rail-btn" href="#" data-tip="Log out"><i class="fas fa-sign-out-alt"></i></a>
+  </div>
+</nav>
+
+<div class="deck">
+
+  <!-- ═══════════════════════════ DECKBAR (44px) ══════════════════════════ -->
+  <header class="deckbar">
+    <h1 class="page-title">Projects</h1>
+    <span class="page-sub num">7 projects · 750 sessions</span>
+
+    <span class="deckbar-spacer"></span>
+
+    <button class="cmdk-trigger" id="cmdkTrigger">
+      <i class="fas fa-search"></i>
+      <span>Run a command or jump anywhere…</span>
+      <span class="kbd">⌘K</span>
+    </button>
+
+    <button class="btn btn-primary" id="newProjectBtn"><i class="fas fa-plus"></i> New project</button>
+
+    <span class="runbadge" title="2 timers running — Atlas API, Rust by Example">
+      <i class="fas fa-circle fa-xs"></i> 2 RUNNING
+      <span class="num" data-elapsed="2598">00:43:18</span>
+    </span>
+
+    <label class="dimctl" title="User backdrop dim — the design holds from 0.10 to 0.90">
+      Dim <input type="range" id="dimRange" min="10" max="90" value="58">
+    </label>
+
+    <a class="userchip" href="#"><span>finrod</span><span class="rail-avatar">F</span></a>
+  </header>
+
+  <main class="page">
+  <div class="page-inner">
+
+    <!-- ══════════ A · PORTFOLIO STATS — no panel, straight on the photo ═══ -->
+    <section class="strip" aria-label="Portfolio stats">
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-layer-group"></i> Projects</span>
+        <span class="stat-value t-project">7</span>
+        <span class="stat-sub">4 active · 1 paused · 1 complete · 1 archived</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-hourglass-half"></i> Tracked all-time</span>
+        <span class="stat-value t-dur">35<span class="stat-unit">d</span> 13<span class="stat-unit">h</span></span>
+        <span class="stat-sub num">51,220 minutes · 750 sessions</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-bullseye"></i> Under commitment</span>
+        <span class="stat-value t-time">2</span>
+        <span class="stat-sub">Atlas API 78% · Autumn 100%</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-bolt"></i> Touched today</span>
+        <span class="stat-value t-note">3</span>
+        <span class="stat-sub">Atlas API · Autumn · Rust by Example</span>
+      </div>
+    </section>
+
+    <!-- ═════════════════════════ B · FILTERS + ACTIONS ═══════════════════ -->
+    <!-- Every filter is live: typing, picking a context, ticking a tag or
+         excluding a project re-filters the table without a page load. The
+         Search button is kept because the production form has one. -->
+    <section class="panel" id="panel-filter">
+      <div class="panel-head">
+        <span class="panel-title"><i class="fas fa-filter t-brand"></i> Filter</span>
+        <span class="panel-tools">
+          <span class="row-meta" id="filterSummary">no filters — showing everything</span>
+          <button class="collapse-btn" aria-expanded="true" data-collapse="filter-body"><i class="fas fa-chevron-down"></i></button>
+        </span>
+      </div>
+
+      <div id="filter-body">
+        <div class="filterbar">
+          <div class="field disclosure">
+            <label class="field-label" for="pSearch">Search projects</label>
+            <input class="input" id="pSearch" type="search" placeholder="Projects" autocomplete="off" spellcheck="false">
+            <div class="disclosure-body" id="acList" hidden></div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="fFrom">Start date</label>
+            <input class="input" id="fFrom" type="date">
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="fTo">End date</label>
+            <input class="input" id="fTo" type="date">
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="fContext">Context</label>
+            <select class="select" id="fContext">
+              <option value="all">All contexts</option>
+              <option value="Work">Work</option>
+              <option value="Personal">Personal</option>
+              <option value="Study">Study</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Tags</span>
+            <details class="disclosure" id="tagBox">
+              <summary>Select tags</summary>
+              <div class="disclosure-body">
+                <label class="checkline"><input type="checkbox" data-tag="client"><span class="chip chip-tag is-coloured" style="--tag-color:#e0a458">client</span></label>
+                <label class="checkline"><input type="checkbox" data-tag="deep-work"><span class="chip chip-tag is-coloured" style="--tag-color:#38bdf8">deep-work</span></label>
+                <label class="checkline"><input type="checkbox" data-tag="oss"><span class="chip chip-tag is-coloured" style="--tag-color:#4ade80">oss</span></label>
+                <label class="checkline"><input type="checkbox" data-tag="maintenance"><span class="chip chip-tag is-coloured" style="--tag-color:#a78bfa">maintenance</span></label>
+                <label class="checkline"><input type="checkbox" data-tag="writing"><span class="chip chip-tag is-coloured" style="--tag-color:#f472b6">writing</span></label>
+              </div>
+            </details>
+          </div>
+
+          <div class="field">
+            <span class="field-label">Exclude projects</span>
+            <details class="disclosure" id="excludeBox">
+              <summary>Select projects to exclude</summary>
+              <div class="disclosure-body">
+                <input class="input" id="excludeFilter" type="search" placeholder="Search projects…" autocomplete="off">
+                <div class="u-mt2" id="excludeList">
+                  <label class="checkline"><input type="checkbox" data-ex="1"><span class="t-project">Atlas API</span></label>
+                  <label class="checkline"><input type="checkbox" data-ex="2"><span class="t-project">Autumn</span></label>
+                  <label class="checkline"><input type="checkbox" data-ex="3"><span class="t-project">Rust by Example</span></label>
+                  <label class="checkline"><input type="checkbox" data-ex="4"><span class="t-project">Newsletter</span></label>
+                  <label class="checkline"><input type="checkbox" data-ex="5"><span class="t-project">Homelab</span></label>
+                  <label class="checkline"><input type="checkbox" data-ex="6"><span class="t-project">Portfolio Site</span></label>
+                  <label class="checkline"><input type="checkbox" data-ex="7"><span class="t-project">Thesis Notes</span></label>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <button class="btn" id="searchBtn"><i class="fas fa-search"></i> Search</button>
+          <button class="btn btn-ghost" id="resetBtn"><i class="fas fa-times"></i> Reset</button>
+        </div>
+
+        <!-- the four management actions the projects page owns -->
+        <div class="toolbar">
+          <button class="btn btn-primary" id="createBtn"><i class="fas fa-plus"></i> Create project</button>
+          <a class="btn" href="#"><i class="fas fa-code-branch"></i> Merge projects</a>
+          <a class="btn" href="#"><i class="fas fa-layer-group"></i> Manage contexts</a>
+          <a class="btn" href="#"><i class="fas fa-tags"></i> Manage tags</a>
+          <span class="u-right row-meta">4 contexts · 5 tags · <span class="t-faint">⌘K does all of this too</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════ C · PROJECT TABLE ═══════════════════════ -->
+    <!-- Production groups projects into four collapsed status headings and
+         shows only name / tags / total / dates. Here status is a filter and a
+         sortable column, and the four things the view already computes but
+         never rendered — context, subprojects, session count, commitment
+         progress — are finally on the row. -->
+    <section class="panel" id="panel-projects">
+      <div class="panel-head">
+        <span class="panel-title"><i class="fas fa-layer-group t-project"></i> All projects</span>
+        <span class="panel-tools">
+          <span class="segmented" id="statusFilter">
+            <button class="seg is-on" data-status="all">All 7</button>
+            <button class="seg" data-status="active">Active 4</button>
+            <button class="seg" data-status="paused">Paused 1</button>
+            <button class="seg" data-status="complete">Complete 1</button>
+            <button class="seg" data-status="archived">Archived 1</button>
+          </span>
+          <span class="row-meta num" id="shownCount">7 / 7</span>
+          <button class="collapse-btn" aria-expanded="true" data-collapse="projects-body"><i class="fas fa-chevron-down"></i></button>
+        </span>
+      </div>
+
+      <div class="panel-body" id="projects-body">
+        <table class="dtable dtable--sticky">
+          <thead>
+            <tr>
+              <th class="sortable" data-key="rank" data-type="num">Project</th>
+              <th class="col-opt2">Subprojects</th>
+              <th class="sortable u-right col-opt" data-key="sessions" data-type="num">Sessions</th>
+              <th class="sortable" data-key="commit" data-type="num">Commitment</th>
+              <th class="sortable" data-key="total" data-type="num">Tracked</th>
+              <th class="sortable" data-key="iso" data-type="text">Last worked</th>
+              <th><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+
+          <tbody id="pRows">
+
+            <!-- 1 · Atlas API ─────────────────────────────────────────────── -->
+            <tr class="st-active" data-id="1" data-rank="0" data-status="active" data-context="Work"
+                data-name="Atlas API" data-tags="client,deep-work"
+                data-subs="auth billing migrations code-review"
+                data-sessions="214" data-commit="78" data-total="18742" data-iso="2026-07-25">
+              <td>
+                <div class="p-name">
+                  <a class="p-title t-project" href="#">Atlas API</a>
+                  <span class="chip chip-status chip-status--active">Active</span>
+                </div>
+                <div class="p-meta">
+                  <span class="chip chip-ctx">Work</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#e0a458">client</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#38bdf8">deep-work</span>
+                </div>
+              </td>
+              <td class="col-opt2">
+                <div class="p-subs">
+                  <a class="chip chip-sub" href="#">auth</a>
+                  <a class="chip chip-sub" href="#">billing</a>
+                  <a class="chip chip-sub" href="#">migrations</a>
+                  <a class="chip chip-sub" href="#">code-review</a>
+                </div>
+              </td>
+              <td class="u-right num col-opt">214</td>
+              <td>
+                <div class="p-commit">
+                  <div class="u-flex u-gap2">
+                    <span class="num meter-num"><span class="t-dur">468m</span> <span class="t-faint">/</span> 600m</span>
+                    <span class="meter-pct num">78%</span>
+                  </div>
+                  <div class="meter"><div class="meter-fill approaching" style="width:78%"></div></div>
+                  <span class="row-meta">weekly · 132m to go</span>
+                </div>
+              </td>
+              <td class="num t-dur u-nowrap">13 days 22 minutes</td>
+              <td>
+                <div class="p-dates">
+                  <span class="num t-time">25 July 2026</span>
+                  <span class="row-meta num">today · since 14 Jan 2026</span>
+                </div>
+              </td>
+              <td class="u-right">
+                <span class="row-actions">
+                  <button class="btn-icon is-go" title="Start an Atlas API timer"><i class="fas fa-play"></i></button>
+                  <a class="btn-icon" href="#" title="Sessions for Atlas API"><i class="fas fa-history"></i></a>
+                  <a class="btn-icon" href="#" title="Edit project"><i class="fas fa-pen"></i></a>
+                  <button class="btn-icon is-del" title="Delete project"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <!-- 2 · Autumn ────────────────────────────────────────────────── -->
+            <tr class="st-active" data-id="2" data-rank="0" data-status="active" data-context="Personal"
+                data-name="Autumn" data-tags="oss,deep-work"
+                data-subs="ui-redesign mcp-server docs"
+                data-sessions="168" data-commit="100" data-total="9468" data-iso="2026-07-25">
+              <td>
+                <div class="p-name">
+                  <a class="p-title t-project" href="#">Autumn</a>
+                  <span class="chip chip-status chip-status--active">Active</span>
+                </div>
+                <div class="p-meta">
+                  <span class="chip chip-ctx">Personal</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#4ade80">oss</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#38bdf8">deep-work</span>
+                </div>
+              </td>
+              <td class="col-opt2">
+                <div class="p-subs">
+                  <a class="chip chip-sub" href="#">ui-redesign</a>
+                  <a class="chip chip-sub" href="#">mcp-server</a>
+                  <a class="chip chip-sub" href="#">docs</a>
+                </div>
+              </td>
+              <td class="u-right num col-opt">168</td>
+              <td>
+                <div class="p-commit">
+                  <div class="u-flex u-gap2">
+                    <span class="num meter-num"><span class="t-dur">6</span> <span class="t-faint">/</span> 5</span>
+                    <span class="meter-pct num">100%</span>
+                  </div>
+                  <div class="meter"><div class="meter-fill complete" style="width:100%"></div></div>
+                  <span class="row-meta t-dur"><i class="fas fa-check"></i> weekly · sessions met</span>
+                </div>
+              </td>
+              <td class="num t-dur u-nowrap">6 days 13 hours 48 minutes</td>
+              <td>
+                <div class="p-dates">
+                  <span class="num t-time">25 July 2026</span>
+                  <span class="row-meta num">today · since 03 Sep 2025</span>
+                </div>
+              </td>
+              <td class="u-right">
+                <span class="row-actions">
+                  <button class="btn-icon is-go" title="Start an Autumn timer"><i class="fas fa-play"></i></button>
+                  <a class="btn-icon" href="#" title="Sessions for Autumn"><i class="fas fa-history"></i></a>
+                  <a class="btn-icon" href="#" title="Edit project"><i class="fas fa-pen"></i></a>
+                  <button class="btn-icon is-del" title="Delete project"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <!-- 3 · Rust by Example ───────────────────────────────────────── -->
+            <tr class="st-active" data-id="3" data-rank="0" data-status="active" data-context="Study"
+                data-name="Rust by Example" data-tags="deep-work"
+                data-subs="ownership async exercises"
+                data-sessions="47" data-commit="-1" data-total="3215" data-iso="2026-07-25">
+              <td>
+                <div class="p-name">
+                  <a class="p-title t-project" href="#">Rust by Example</a>
+                  <span class="chip chip-status chip-status--active">Active</span>
+                </div>
+                <div class="p-meta">
+                  <span class="chip chip-ctx">Study</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#38bdf8">deep-work</span>
+                </div>
+              </td>
+              <td class="col-opt2">
+                <div class="p-subs">
+                  <a class="chip chip-sub" href="#">ownership</a>
+                  <a class="chip chip-sub" href="#">async</a>
+                  <a class="chip chip-sub" href="#">exercises</a>
+                </div>
+              </td>
+              <td class="u-right num col-opt">47</td>
+              <td>
+                <div class="p-commit">
+                  <span class="row-meta t-faint">no commitment</span>
+                  <button class="btn btn-sm btn-ghost"><i class="fas fa-bullseye"></i> Set one</button>
+                </div>
+              </td>
+              <td class="num t-dur u-nowrap">2 days 5 hours 35 minutes</td>
+              <td>
+                <div class="p-dates">
+                  <span class="num t-time">25 July 2026</span>
+                  <span class="row-meta num">today · since 11 May 2026</span>
+                </div>
+              </td>
+              <td class="u-right">
+                <span class="row-actions">
+                  <button class="btn-icon is-go" title="Start a Rust by Example timer"><i class="fas fa-play"></i></button>
+                  <a class="btn-icon" href="#" title="Sessions for Rust by Example"><i class="fas fa-history"></i></a>
+                  <a class="btn-icon" href="#" title="Edit project"><i class="fas fa-pen"></i></a>
+                  <button class="btn-icon is-del" title="Delete project"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <!-- 4 · Newsletter ────────────────────────────────────────────── -->
+            <tr class="st-active" data-id="4" data-rank="0" data-status="active" data-context="Personal"
+                data-name="Newsletter" data-tags="writing"
+                data-subs="drafting editing"
+                data-sessions="23" data-commit="-1" data-total="1290" data-iso="2026-07-24">
+              <td>
+                <div class="p-name">
+                  <a class="p-title t-project" href="#">Newsletter</a>
+                  <span class="chip chip-status chip-status--active">Active</span>
+                </div>
+                <div class="p-meta">
+                  <span class="chip chip-ctx">Personal</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#f472b6">writing</span>
+                </div>
+              </td>
+              <td class="col-opt2">
+                <div class="p-subs">
+                  <a class="chip chip-sub" href="#">drafting</a>
+                  <a class="chip chip-sub" href="#">editing</a>
+                </div>
+              </td>
+              <td class="u-right num col-opt">23</td>
+              <td>
+                <div class="p-commit">
+                  <span class="row-meta t-faint">no commitment</span>
+                  <button class="btn btn-sm btn-ghost"><i class="fas fa-bullseye"></i> Set one</button>
+                </div>
+              </td>
+              <td class="num t-dur u-nowrap">21 hours 30 minutes</td>
+              <td>
+                <div class="p-dates">
+                  <span class="num t-time">24 July 2026</span>
+                  <span class="row-meta num">yesterday · since 02 Mar 2026</span>
+                </div>
+              </td>
+              <td class="u-right">
+                <span class="row-actions">
+                  <button class="btn-icon is-go" title="Start a Newsletter timer"><i class="fas fa-play"></i></button>
+                  <a class="btn-icon" href="#" title="Sessions for Newsletter"><i class="fas fa-history"></i></a>
+                  <a class="btn-icon" href="#" title="Edit project"><i class="fas fa-pen"></i></a>
+                  <button class="btn-icon is-del" title="Delete project"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <!-- 5 · Homelab ───────────────────────────────────────────────── -->
+            <tr class="st-paused" data-id="5" data-rank="1" data-status="paused" data-context="Personal"
+                data-name="Homelab" data-tags="maintenance"
+                data-subs="proxmox backups networking"
+                data-sessions="41" data-commit="-1" data-total="2455" data-iso="2026-07-23">
+              <td>
+                <div class="p-name">
+                  <a class="p-title t-project" href="#">Homelab</a>
+                  <span class="chip chip-status chip-status--paused">Paused</span>
+                </div>
+                <div class="p-meta">
+                  <span class="chip chip-ctx">Personal</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#a78bfa">maintenance</span>
+                </div>
+              </td>
+              <td class="col-opt2">
+                <div class="p-subs">
+                  <a class="chip chip-sub" href="#">proxmox</a>
+                  <a class="chip chip-sub" href="#">backups</a>
+                  <a class="chip chip-sub" href="#">networking</a>
+                </div>
+              </td>
+              <td class="u-right num col-opt">41</td>
+              <td>
+                <div class="p-commit">
+                  <span class="row-meta t-faint">no commitment</span>
+                  <button class="btn btn-sm btn-ghost"><i class="fas fa-bullseye"></i> Set one</button>
+                </div>
+              </td>
+              <td class="num t-dur u-nowrap">1 day 16 hours 55 minutes</td>
+              <td>
+                <div class="p-dates">
+                  <span class="num t-time">23 July 2026</span>
+                  <span class="row-meta num">2 days ago · since 19 Oct 2025</span>
+                </div>
+              </td>
+              <td class="u-right">
+                <span class="row-actions">
+                  <button class="btn-icon is-go" title="Resume — start a Homelab timer"><i class="fas fa-play"></i></button>
+                  <a class="btn-icon" href="#" title="Sessions for Homelab"><i class="fas fa-history"></i></a>
+                  <a class="btn-icon" href="#" title="Edit project"><i class="fas fa-pen"></i></a>
+                  <button class="btn-icon is-del" title="Delete project"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <!-- 6 · Portfolio Site ────────────────────────────────────────── -->
+            <tr class="st-complete" data-id="6" data-rank="2" data-status="complete" data-context="Personal"
+                data-name="Portfolio Site" data-tags="oss,writing"
+                data-subs="design deploy"
+                data-sessions="66" data-commit="-1" data-total="4120" data-iso="2026-02-28">
+              <td>
+                <div class="p-name">
+                  <a class="p-title t-project" href="#">Portfolio Site</a>
+                  <span class="chip chip-status chip-status--complete">Complete</span>
+                </div>
+                <div class="p-meta">
+                  <span class="chip chip-ctx">Personal</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#4ade80">oss</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#f472b6">writing</span>
+                </div>
+              </td>
+              <td class="col-opt2">
+                <div class="p-subs">
+                  <a class="chip chip-sub" href="#">design</a>
+                  <a class="chip chip-sub" href="#">deploy</a>
+                </div>
+              </td>
+              <td class="u-right num col-opt">66</td>
+              <td>
+                <div class="p-commit">
+                  <span class="row-meta t-faint">no commitment</span>
+                  <button class="btn btn-sm btn-ghost"><i class="fas fa-bullseye"></i> Set one</button>
+                </div>
+              </td>
+              <td class="num t-dur u-nowrap">2 days 20 hours 40 minutes</td>
+              <td>
+                <div class="p-dates">
+                  <span class="num t-time">28 February 2026</span>
+                  <span class="row-meta num">5 months ago · since 07 Jun 2025</span>
+                </div>
+              </td>
+              <td class="u-right">
+                <span class="row-actions">
+                  <button class="btn-icon is-go" title="Start a Portfolio Site timer"><i class="fas fa-play"></i></button>
+                  <a class="btn-icon" href="#" title="Sessions for Portfolio Site"><i class="fas fa-history"></i></a>
+                  <a class="btn-icon" href="#" title="Edit project"><i class="fas fa-pen"></i></a>
+                  <button class="btn-icon is-del" title="Delete project"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <!-- 7 · Thesis Notes ──────────────────────────────────────────── -->
+            <tr class="st-archived" data-id="7" data-rank="3" data-status="archived" data-context="Study"
+                data-name="Thesis Notes" data-tags="writing"
+                data-subs="lit-review drafting"
+                data-sessions="191" data-commit="-1" data-total="11930" data-iso="2025-12-12">
+              <td>
+                <div class="p-name">
+                  <a class="p-title t-project" href="#">Thesis Notes</a>
+                  <span class="chip chip-status chip-status--archived">Archived</span>
+                </div>
+                <div class="p-meta">
+                  <span class="chip chip-ctx">Study</span>
+                  <span class="chip chip-tag is-coloured" style="--tag-color:#f472b6">writing</span>
+                </div>
+              </td>
+              <td class="col-opt2">
+                <div class="p-subs">
+                  <a class="chip chip-sub" href="#">lit-review</a>
+                  <a class="chip chip-sub" href="#">drafting</a>
+                </div>
+              </td>
+              <td class="u-right num col-opt">191</td>
+              <td>
+                <div class="p-commit">
+                  <span class="row-meta t-faint">no commitment</span>
+                  <button class="btn btn-sm btn-ghost"><i class="fas fa-bullseye"></i> Set one</button>
+                </div>
+              </td>
+              <td class="num t-dur u-nowrap">8 days 6 hours 50 minutes</td>
+              <td>
+                <div class="p-dates">
+                  <span class="num t-time">12 December 2025</span>
+                  <span class="row-meta num">7 months ago · since 21 Sep 2024</span>
+                </div>
+              </td>
+              <td class="u-right">
+                <span class="row-actions">
+                  <button class="btn-icon is-go" title="Start a Thesis Notes timer"><i class="fas fa-play"></i></button>
+                  <a class="btn-icon" href="#" title="Sessions for Thesis Notes"><i class="fas fa-history"></i></a>
+                  <a class="btn-icon" href="#" title="Edit project"><i class="fas fa-pen"></i></a>
+                  <button class="btn-icon is-del" title="Delete project"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+
+          <tfoot>
+            <tr>
+              <td><span id="footProjects">7 projects</span></td>
+              <td class="col-opt2"><span class="t-faint" id="footSubs">19 subprojects</span></td>
+              <td class="u-right num col-opt" id="footSessions">750</td>
+              <td><span class="t-faint">2 commitments</span></td>
+              <td class="num t-dur u-nowrap" id="footTotal">35 days 13 hours 40 minutes</td>
+              <td colspan="2"><span class="t-faint">sorted by status, then last worked</span></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="empty" id="emptyState" hidden>
+          Nothing matches these filters. <button class="btn btn-sm btn-ghost" id="emptyReset">Clear them</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  </main>
+</div>
+
+<!-- ══════════════════ COMMAND PALETTE — closed here (⌘K opens) ═══════════ -->
+<div class="cmdk-scrim" id="cmdkScrim" hidden>
+  <div class="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="cmdk-field">
+      <i class="fas fa-bolt"></i>
+      <input class="cmdk-input" id="cmdkInput" placeholder="start a timer, stop one, or jump somewhere…" autocomplete="off" spellcheck="false">
+      <span class="cmdk-esc"><span class="kbd">esc</span></span>
+    </div>
+    <div class="cmdk-list" id="cmdkList"></div>
+    <div class="cmdk-foot">
+      <span class="cmdk-syntax"><b>start</b> project sub · <b>stop</b> · <b>go</b> sessions · <b>new</b> project</span>
+      <span class="u-right"><span class="kbd">↑</span><span class="kbd">↓</span> move · <span class="kbd">⏎</span> run · <span class="kbd">esc</span> close</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────── COMMAND PALETTE ─────────────────────────── */
+const COMMANDS = [
+  {g:'Start a timer', i:'fa-play', html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Atlas API</span> <span class="chip chip-sub">billing</span>', hint:'last used 15:20', s:'start timer atlas api billing'},
+  {g:'Start a timer', i:'fa-play', html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Autumn</span> <span class="chip chip-sub">ui-redesign</span>', hint:'', s:'start timer autumn ui-redesign'},
+  {g:'Start a timer', i:'fa-play', html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Newsletter</span> <span class="chip chip-sub">drafting</span>', hint:'', s:'start timer newsletter drafting'},
+  {g:'Start a timer', i:'fa-play', html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Homelab</span> <span class="cmdk-dim">paused project</span>', hint:'', s:'start timer homelab paused'},
+
+  {g:'Running now', i:'fa-stopwatch', html:'Stop <span class="cmdk-dim">·</span> <span class="t-project">Atlas API</span> <span class="chip chip-sub">auth</span> <span class="num t-dur">43 minutes 18 seconds</span>', hint:'⏎', s:'stop atlas api auth running'},
+  {g:'Running now', i:'fa-stopwatch', html:'Stop <span class="cmdk-dim">·</span> <span class="t-project">Rust by Example</span> <span class="chip chip-sub">exercises</span> <span class="num t-dur">49 minutes 40 seconds</span>', hint:'', s:'stop rust by example exercises running'},
+
+  {g:'This page', i:'fa-filter', html:'Filter <span class="cmdk-dim">·</span> status <span class="t-dur">active</span>', hint:'', s:'filter status active this page', act:()=>setStatus('active')},
+  {g:'This page', i:'fa-filter', html:'Filter <span class="cmdk-dim">·</span> status <span class="t-note">paused</span>', hint:'', s:'filter status paused this page', act:()=>setStatus('paused')},
+  {g:'This page', i:'fa-filter', html:'Filter <span class="cmdk-dim">·</span> context <span class="t-ctx">Work</span>', hint:'', s:'filter context work this page', act:()=>{document.getElementById('fContext').value='Work';state.context='Work';apply();}},
+  {g:'This page', i:'fa-sort-amount-down', html:'Sort by <span class="t-dur">tracked time</span>, longest first', hint:'', s:'sort tracked time longest this page', act:()=>sortBy('total','num',-1)},
+  {g:'This page', i:'fa-undo', html:'Clear all filters', hint:'', s:'clear reset filters this page', act:()=>resetFilters()},
+
+  {g:'Projects', i:'fa-folder-open', html:'Open <span class="t-project">Atlas API</span> <span class="num t-dur">13 days 22 minutes</span>', hint:'', s:'open project atlas api'},
+  {g:'Projects', i:'fa-folder-open', html:'Open <span class="t-project">Thesis Notes</span> <span class="num t-dur">8 days 6 hours 50 minutes</span>', hint:'archived', s:'open project thesis notes archived'},
+  {g:'Projects', i:'fa-code-branch', html:'Merge projects…', hint:'', s:'merge projects'},
+  {g:'Projects', i:'fa-plus', html:'New project…', hint:'', s:'new create project'},
+  {g:'Projects', i:'fa-bullseye', html:'New commitment…', hint:'', s:'new create commitment'},
+
+  {g:'Go to', i:'fa-home',        html:'Dashboard', hint:'G then H', s:'go to dashboard home'},
+  {g:'Go to', i:'fa-history',     html:'Session Logs', hint:'G then S', s:'go to session logs sessions'},
+  {g:'Go to', i:'fa-layer-group', html:'Manage contexts', hint:'', s:'go to manage contexts'},
+  {g:'Go to', i:'fa-tags',        html:'Manage tags', hint:'', s:'go to manage tags'},
+  {g:'Go to', i:'fa-chart-line',  html:'Charts', hint:'G then C', s:'go to charts'}
+];
+const GROUP_ORDER = ['Start a timer','Running now','This page','Projects','Go to'];
+
+const scrim = document.getElementById('cmdkScrim');
+const input = document.getElementById('cmdkInput');
+const list  = document.getElementById('cmdkList');
+let sel = 0, visible = [];
+
+function render(){
+  const q = input.value.toLowerCase().trim();
+  const toks = q ? q.split(/\s+/) : [];
+  visible = COMMANDS.filter(c => toks.every(t => c.s.includes(t)));
+  if (sel >= visible.length) sel = Math.max(0, visible.length - 1);
+
+  let html = '';
+  GROUP_ORDER.forEach(g => {
+    const items = visible.filter(c => c.g === g);
+    if (!items.length) return;
+    html += '<div class="cmdk-group">' + g + '</div>';
+    items.forEach(c => {
+      const idx = visible.indexOf(c);
+      html += '<div class="cmdk-item' + (idx === sel ? ' is-selected' : '') + '" data-i="' + idx + '">'
+            +   '<span class="cmdk-ico"><i class="fas ' + c.i + '"></i></span>'
+            +   '<span class="cmdk-label">' + c.html + '</span>'
+            +   '<span class="cmdk-hint">' + (idx === sel ? '⏎ run' : c.hint) + '</span>'
+            + '</div>';
+    });
+  });
+  list.innerHTML = html || '<div class="empty">No command matches “' + input.value + '”</div>';
+}
+function openPalette(prefill){
+  scrim.hidden = false;
+  if (typeof prefill === 'string') input.value = prefill;
+  sel = 0; render(); input.focus(); input.select();
+}
+function closePalette(){ scrim.hidden = true; }
+function runSelected(){
+  const c = visible[sel];
+  closePalette();
+  if (c && typeof c.act === 'function') c.act();
+}
+document.getElementById('cmdkTrigger').addEventListener('click', () => openPalette(''));
+document.getElementById('railCmd').addEventListener('click', () => openPalette(''));
+document.getElementById('newProjectBtn').addEventListener('click', () => openPalette('new project'));
+document.getElementById('createBtn').addEventListener('click', () => openPalette('new project'));
+scrim.addEventListener('mousedown', e => { if (e.target === scrim) closePalette(); });
+input.addEventListener('input', () => { sel = 0; render(); });
+list.addEventListener('click', e => {
+  const it = e.target.closest('.cmdk-item');
+  if (it) { sel = +it.dataset.i; render(); setTimeout(runSelected, 90); }
+});
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); scrim.hidden ? openPalette() : closePalette(); return; }
+  if (scrim.hidden) return;
+  if (e.key === 'Escape') closePalette();
+  else if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, visible.length - 1); render(); }
+  else if (e.key === 'ArrowUp')   { e.preventDefault(); sel = Math.max(sel - 1, 0); render(); }
+  else if (e.key === 'Enter')     { e.preventDefault(); runSelected(); }
+});
+render();
+
+/* ────────────────────────── COLLAPSE TOGGLES ─────────────────────────── */
+document.querySelectorAll('[data-collapse]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!open));
+    const target = document.getElementById(btn.dataset.collapse);
+    if (target) target.style.display = open ? 'none' : '';
+  });
+});
+
+/* ───────────────── FILTER + SORT — the whole page is live ─────────────── */
+const tbody = document.getElementById('pRows');
+const rows  = Array.from(tbody.querySelectorAll('tr'));
+const state = { q:'', status:'all', context:'all', tags:new Set(), exclude:new Set(), from:'', to:'' };
+
+function minFmt(m){
+  const d = Math.floor(m/1440), h = Math.floor((m%1440)/60), mm = Math.round(m%60), out = [];
+  if (d)  out.push(d + (d === 1 ? ' day' : ' days'));
+  if (h)  out.push(h + (h === 1 ? ' hour' : ' hours'));
+  if (mm || !out.length) out.push(mm + (mm === 1 ? ' minute' : ' minutes'));
+  return out.join(' ');
+}
+function matches(tr){
+  const d = tr.dataset;
+  if (state.status !== 'all' && d.status !== state.status) return false;
+  if (state.context !== 'all' && d.context !== state.context) return false;
+  if (state.exclude.has(d.id)) return false;
+  if (state.tags.size && !d.tags.split(',').some(t => state.tags.has(t))) return false;
+  if (state.from && d.iso < state.from) return false;
+  if (state.to && d.iso > state.to) return false;
+  if (state.q){
+    const hay = (d.name + ' ' + d.subs + ' ' + d.tags + ' ' + d.context).toLowerCase();
+    if (!state.q.toLowerCase().split(/\s+/).every(t => hay.includes(t))) return false;
+  }
+  return true;
+}
+function apply(){
+  let shown = 0, mins = 0, sess = 0, subs = 0, commits = 0;
+  rows.forEach(tr => {
+    const ok = matches(tr);
+    tr.classList.toggle('is-hidden', !ok);
+    if (!ok) return;
+    shown++;
+    mins += +tr.dataset.total;
+    sess += +tr.dataset.sessions;
+    subs += tr.dataset.subs.split(' ').length;
+    if (+tr.dataset.commit >= 0) commits++;
+  });
+  document.getElementById('shownCount').textContent = shown + ' / ' + rows.length;
+  document.getElementById('footProjects').textContent = shown + (shown === 1 ? ' project' : ' projects');
+  document.getElementById('footSubs').textContent = subs + ' subprojects';
+  document.getElementById('footSessions').textContent = sess;
+  document.getElementById('footTotal').textContent = mins ? minFmt(mins) : '0 minutes';
+  document.querySelector('tfoot td:nth-child(4) span').textContent = commits + (commits === 1 ? ' commitment' : ' commitments');
+  document.getElementById('emptyState').hidden = shown > 0;
+
+  const bits = [];
+  if (state.q) bits.push('“' + state.q + '”');
+  if (state.status !== 'all') bits.push(state.status);
+  if (state.context !== 'all') bits.push(state.context);
+  if (state.tags.size) bits.push(state.tags.size + ' tag' + (state.tags.size === 1 ? '' : 's'));
+  if (state.exclude.size) bits.push(state.exclude.size + ' excluded');
+  if (state.from || state.to) bits.push((state.from || '…') + ' → ' + (state.to || '…'));
+  document.getElementById('filterSummary').textContent =
+    bits.length ? bits.join(' · ') : 'no filters — showing everything';
+}
+
+/* sorting — click a column head, click again to flip */
+let sortKey = 'rank', sortDir = 1;
+function sortBy(key, type, dir){
+  if (dir === undefined) dir = (sortKey === key) ? -sortDir : (type === 'num' ? -1 : 1);
+  if (key === 'rank') dir = 1;
+  sortKey = key; sortDir = dir;
+  const cmp = (a, b) => {
+    let av = a.dataset[key], bv = b.dataset[key];
+    if (type === 'num'){ av = +av; bv = +bv; }
+    if (av < bv) return -dir;
+    if (av > bv) return dir;
+    return b.dataset.iso.localeCompare(a.dataset.iso); /* tiebreak: newest first */
+  };
+  rows.slice().sort(cmp).forEach(tr => tbody.appendChild(tr));
+  document.querySelectorAll('.dtable th.sortable').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.key === key) th.classList.add(dir === 1 ? 'sort-asc' : 'sort-desc');
+  });
+}
+document.querySelectorAll('.dtable th.sortable').forEach(th => {
+  th.addEventListener('click', () => sortBy(th.dataset.key, th.dataset.type));
+});
+
+/* status segmented filter */
+function setStatus(s){
+  state.status = s;
+  document.querySelectorAll('#statusFilter .seg').forEach(b => b.classList.toggle('is-on', b.dataset.status === s));
+  apply();
+}
+document.getElementById('statusFilter').addEventListener('click', e => {
+  const b = e.target.closest('.seg'); if (b) setStatus(b.dataset.status);
+});
+
+/* search + autocomplete (stands in for the production AJAX project lookup) */
+const search = document.getElementById('pSearch');
+const acList = document.getElementById('acList');
+function drawAC(){
+  const q = search.value.toLowerCase().trim();
+  if (!q){ acList.hidden = true; return; }
+  const hits = rows.filter(tr => tr.dataset.name.toLowerCase().includes(q));
+  if (!hits.length){ acList.hidden = true; return; }
+  acList.innerHTML = hits.map(tr =>
+    '<button class="ac-item" data-name="' + tr.dataset.name + '">' +
+      '<span class="t-project">' + tr.dataset.name + '</span>' +
+      '<span class="chip chip-status chip-status--' + tr.dataset.status + '">' + tr.dataset.status + '</span>' +
+      '<span class="u-right num t-dur">' + minFmt(+tr.dataset.total) + '</span>' +
+    '</button>').join('');
+  acList.hidden = false;
+}
+search.addEventListener('input', () => { state.q = search.value; drawAC(); apply(); });
+search.addEventListener('blur', () => setTimeout(() => { acList.hidden = true; }, 140));
+acList.addEventListener('click', e => {
+  const b = e.target.closest('.ac-item'); if (!b) return;
+  search.value = state.q = b.dataset.name; acList.hidden = true; apply();
+});
+
+/* context, tags, exclusions, dates */
+document.getElementById('fContext').addEventListener('change', e => { state.context = e.target.value; apply(); });
+document.querySelectorAll('#tagBox input[data-tag]').forEach(cb => {
+  cb.addEventListener('change', () => { cb.checked ? state.tags.add(cb.dataset.tag) : state.tags.delete(cb.dataset.tag); apply(); });
+});
+document.querySelectorAll('#excludeBox input[data-ex]').forEach(cb => {
+  cb.addEventListener('change', () => { cb.checked ? state.exclude.add(cb.dataset.ex) : state.exclude.delete(cb.dataset.ex); apply(); });
+});
+document.getElementById('excludeFilter').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#excludeList .checkline').forEach(l => {
+    l.style.display = l.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+document.getElementById('fFrom').addEventListener('change', e => { state.from = e.target.value; apply(); });
+document.getElementById('fTo').addEventListener('change', e => { state.to = e.target.value; apply(); });
+document.getElementById('searchBtn').addEventListener('click', apply);
+
+function resetFilters(){
+  state.q = ''; state.context = 'all'; state.from = ''; state.to = '';
+  state.tags.clear(); state.exclude.clear();
+  search.value = ''; acList.hidden = true;
+  document.getElementById('fContext').value = 'all';
+  document.getElementById('fFrom').value = '';
+  document.getElementById('fTo').value = '';
+  document.querySelectorAll('#tagBox input, #excludeBox input[data-ex]').forEach(cb => cb.checked = false);
+  setStatus('all');
+}
+document.getElementById('resetBtn').addEventListener('click', resetFilters);
+document.getElementById('emptyReset').addEventListener('click', resetFilters);
+
+sortBy('rank','num',1);
+apply();
+
+/* ─────────────────────────── LIVE TIMER TICK ─────────────────────────── */
+function hms(s){
+  const p = n => String(n).padStart(2,'0');
+  return p(Math.floor(s/3600)) + ':' + p(Math.floor(s/60)%60) + ':' + p(s%60);
+}
+setInterval(() => {
+  document.querySelectorAll('[data-elapsed]').forEach(el => {
+    const v = +el.dataset.elapsed + 1; el.dataset.elapsed = v; el.textContent = hms(v);
+  });
+}, 1000);
+
+/* ──────────────── LIVE BACKDROP DIM — proves §2.2 legibility ─────────── */
+document.getElementById('dimRange').addEventListener('input', e => {
+  document.body.style.setProperty('--background-dim-opacity', (e.target.value / 100).toFixed(2));
+});
+</script>
+</body>
+</html>

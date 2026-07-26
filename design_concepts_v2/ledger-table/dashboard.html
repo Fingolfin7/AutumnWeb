@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autumn — Ledger Table concept — Dashboard</title>
+<link rel="stylesheet" href="concept.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<style>
+  /* stand-in for the user's backdrop photo (base.html sets this per user) */
+  body {
+    --workspace-bg-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'%3E%3Cdefs%3E%3Cfilter id='b' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeGaussianBlur stdDeviation='95'/%3E%3C/filter%3E%3C/defs%3E%3Crect width='1600' height='900' fill='rgb(26,21,17)'/%3E%3Cg filter='url(%23b)'%3E%3Ccircle cx='300' cy='190' r='270' fill='rgb(128,64,28)'/%3E%3Ccircle cx='1160' cy='170' r='300' fill='rgb(92,62,30)'/%3E%3Ccircle cx='690' cy='690' r='350' fill='rgb(44,50,38)'/%3E%3Ccircle cx='1420' cy='740' r='260' fill='rgb(150,92,40)'/%3E%3Ccircle cx='120' cy='830' r='230' fill='rgb(62,40,24)'/%3E%3Ccircle cx='860' cy='330' r='190' fill='rgb(70,46,26)'/%3E%3C/g%3E%3C/svg%3E");
+    --background-dim-opacity: 0.62;
+  }
+</style>
+</head>
+<body class="dark-mode bg-active">
+
+<!-- ============================ TOP BAR ============================ -->
+<header class="topbar">
+  <button class="nav-toggle" id="burger" aria-label="Menu"><i class="fas fa-bars"></i></button>
+
+  <a class="brand" href="#"><i class="fas fa-leaf"></i> Autumn <span class="brand-sub">/ ledger</span></a>
+
+  <nav class="topnav">
+    <a class="topnav-link is-active" href="#"><i class="fas fa-table"></i> Home</a>
+    <a class="topnav-link" href="projects.html"><i class="fas fa-folder"></i> Projects</a>
+    <a class="topnav-link" href="#"><i class="fas fa-stopwatch"></i> Timers</a>
+    <a class="topnav-link" href="sessions.html"><i class="fas fa-list-ul"></i> Sessions</a>
+    <a class="topnav-link" href="#"><i class="fas fa-chart-bar"></i> Charts</a>
+    <span class="nav-menu" id="navmore">
+      <a class="topnav-link" href="#" id="navmore-btn"><i class="fas fa-ellipsis-h"></i> More</a>
+      <div class="nav-menu-panel">
+        <a href="#"><i class="fas fa-brain"></i> Insights</a>
+        <a href="#"><i class="fas fa-file-import"></i> Import</a>
+        <a href="#"><i class="fas fa-file-export"></i> Export</a>
+        <a href="#"><i class="fas fa-user-cog"></i> Profile</a>
+        <button type="button"><i class="fas fa-sign-out-alt"></i> Log out</button>
+      </div>
+    </span>
+  </nav>
+
+  <!-- GLOBAL TIMER WELL — present on every page of this concept -->
+  <div class="timerwell" id="timerwell">
+    <span class="tw-dot"></span>
+    <span class="tw-proj">Atlas API</span>
+    <span class="tw-sub">auth</span>
+    <span class="tw-elapsed" id="tw-elapsed" data-seconds="2598">43:18</span>
+    <span class="tw-auto">stops in <span id="tw-auto">01:16:42</span></span>
+    <button class="tw-stop" title="Stop this timer"><i class="fas fa-stop"></i></button>
+    <button class="tw-count" id="tw-count" title="Show all running timers">2 running <i class="fas fa-caret-down"></i></button>
+
+    <div class="tw-panel">
+      <div class="tw-row">
+        <span class="tw-dot"></span>
+        <span class="tw-proj">Atlas API</span>
+        <span class="tw-sub">auth</span>
+        <span class="tw-elapsed" data-seconds="2598">43:18</span>
+        <span class="tw-actions">
+          <button class="iconbtn" title="Restart"><i class="fas fa-redo"></i></button>
+          <button class="iconbtn is-danger" title="Stop"><i class="fas fa-stopwatch"></i></button>
+          <button class="iconbtn is-danger" title="Remove"><i class="fas fa-trash"></i></button>
+        </span>
+      </div>
+      <div class="tw-row">
+        <span class="tw-dot"></span>
+        <span class="tw-proj">Rust by Example</span>
+        <span class="tw-sub">exercises</span>
+        <span class="tw-elapsed" data-seconds="2980">49:40</span>
+        <span class="tw-actions">
+          <button class="iconbtn" title="Restart"><i class="fas fa-redo"></i></button>
+          <button class="iconbtn is-danger" title="Stop"><i class="fas fa-stopwatch"></i></button>
+          <button class="iconbtn is-danger" title="Remove"><i class="fas fa-trash"></i></button>
+        </span>
+      </div>
+      <div class="tw-row">
+        <span class="pane-title">Start a new timer</span>
+        <span class="tw-actions"><button class="btn btn--primary btn--xs"><i class="fas fa-play"></i> Start</button></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="userchip">
+    <span class="avatar">F</span>
+    <span class="uname">finrod</span>
+  </div>
+</header>
+
+<nav class="nav-drawer" id="drawer">
+  <a href="#"><i class="fas fa-table"></i> Home</a>
+  <a href="projects.html"><i class="fas fa-folder"></i> Projects</a>
+  <a href="#"><i class="fas fa-stopwatch"></i> Timers</a>
+  <a href="sessions.html"><i class="fas fa-list-ul"></i> Sessions</a>
+  <a href="#"><i class="fas fa-brain"></i> Insights</a>
+  <a href="#"><i class="fas fa-chart-bar"></i> Charts</a>
+  <a href="#"><i class="fas fa-file-import"></i> Import</a>
+  <a href="#"><i class="fas fa-file-export"></i> Export</a>
+  <button type="button"><i class="fas fa-sign-out-alt"></i> Log out</button>
+</nav>
+
+<!-- ============================ SUB BAR ============================ -->
+<div class="subbar">
+  <nav class="crumbs">
+    <span class="crumb">finrod</span>
+    <span class="crumb-sep">/</span>
+    <span class="crumb is-current">Dashboard</span>
+  </nav>
+
+  <div class="subbar-tools">
+    <span class="pane-title">Period</span>
+    <span class="seg">
+      <button class="seg-btn is-active">Day</button>
+      <button class="seg-btn">Week</button>
+      <button class="seg-btn">Month</button>
+    </span>
+  </div>
+
+  <div class="subbar-right">
+    <span class="clock">Sat 25 Jul 2026 &nbsp;<b>17:47:09</b>&nbsp; Europe/Prague</span>
+    <span class="btn-group">
+      <button class="btn"><i class="fas fa-plus"></i> Log session</button>
+      <button class="btn btn--primary"><i class="fas fa-play"></i> Start timer</button>
+    </span>
+  </div>
+</div>
+
+<!-- ============================ SHEET ============================ -->
+<main class="app-shell">
+<div class="sheet">
+
+  <div class="msgstrip">
+    <div class="msg msg--info"><i class="fas fa-info-circle t-time"></i>
+      Auto-stop is armed on <span class="t-proj">Atlas API</span> — it will close at
+      <span class="t-time mono">19:04:22</span>.</div>
+  </div>
+
+  <!-- ---------------------- NUMERIC PANEL STRIP ---------------------- -->
+  <section class="statgrid">
+    <div class="stat stat--dur stat--hero">
+      <div class="stat-label">Today <span class="muted">closed</span></div>
+      <div class="stat-value">5<span class="stat-unit">h</span> 12<span class="stat-unit">m</span></div>
+      <div class="stat-sub">4 sessions &middot; 312.0 min</div>
+    </div>
+
+    <div class="stat stat--dur">
+      <div class="stat-label">This week</div>
+      <div class="stat-value">1<span class="stat-unit">d</span> 17<span class="stat-unit">h</span></div>
+      <div class="stat-sub">Mon 20 &rarr; Sat 25 &middot; 2486 min</div>
+      <div class="stat-spark">
+        <div class="spark" title="Mon 402 · Tue 515 · Wed 442 · Thu 365 · Fri 450 · Sat 312 min">
+          <span class="spark-col" style="height:78%"></span>
+          <span class="spark-col" style="height:100%"></span>
+          <span class="spark-col" style="height:86%"></span>
+          <span class="spark-col" style="height:71%"></span>
+          <span class="spark-col" style="height:87%"></span>
+          <span class="spark-col is-now" style="height:61%"></span>
+          <span class="spark-col is-empty" style="height:6%"></span>
+        </div>
+        <div class="spark-scale"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+      </div>
+    </div>
+
+    <div class="stat stat--count">
+      <div class="stat-label">Avg / day <span class="muted">wk</span></div>
+      <div class="stat-value">6<span class="stat-unit">h</span> 54<span class="stat-unit">m</span></div>
+      <div class="stat-sub">6 days elapsed</div>
+    </div>
+
+    <div class="stat stat--warn">
+      <div class="stat-label">Active timers</div>
+      <div class="stat-value">2</div>
+      <div class="stat-sub">oldest 49m 40s</div>
+    </div>
+
+    <div class="stat stat--streak">
+      <div class="stat-label">Current streak</div>
+      <div class="stat-value">23<span class="stat-unit">days</span></div>
+      <div class="stat-sub">unbroken since 03 Jul</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-label">Projected today</div>
+      <div class="stat-value">6<span class="stat-unit">h</span> 45<span class="stat-unit">m</span></div>
+      <div class="stat-sub">closed + 2 open timers</div>
+    </div>
+  </section>
+
+  <div class="grid-2col">
+
+    <!-- ======================= LEFT: THE LEDGER ======================= -->
+    <section class="col-main">
+      <div class="pane pane--accent pane--flush">
+        <div class="pane-head">
+          <span class="pane-title"><i class="fas fa-book t-brand"></i> Day ledger</span>
+          <span class="tabs" id="ledger-tabs">
+            <button class="tab is-active" data-tab="today">Today <span class="n">6</span></button>
+            <button class="tab" data-tab="three">Last 3 days <span class="n">15</span></button>
+          </span>
+          <span class="pane-tools">
+            <span class="pane-title">Group</span>
+            <span class="seg" id="groupby">
+              <button class="seg-btn is-active" data-group="date">Date</button>
+              <button class="seg-btn" data-group="project">Project</button>
+              <button class="seg-btn" data-group="none">Flat</button>
+            </span>
+            <button class="pane-collapse" title="Collapse"><i class="fas fa-chevron-down"></i></button>
+          </span>
+        </div>
+
+        <!-- filter bar with chips -->
+        <div class="filterbar">
+          <label class="filter-search">
+            <i class="fas fa-search"></i>
+            <input class="filter-input" id="q" type="text" placeholder="Filter rows — project, subproject, note…">
+          </label>
+          <div class="chipset">
+            <span class="chip chip--ctx"><span class="chip-key">ctx</span><b>Work</b><button class="chip-x" aria-label="Remove"><i class="fas fa-times"></i></button></span>
+            <span class="chip chip--tag"><span class="chip-key">tag</span><b style="color:#38bdf8">deep-work</b><button class="chip-x" aria-label="Remove"><i class="fas fa-times"></i></button></span>
+            <span class="chip chip--date"><span class="chip-key">from</span><b>23 Jul 2026</b><button class="chip-x" aria-label="Remove"><i class="fas fa-times"></i></button></span>
+            <span style="position:relative">
+              <button class="chip-add" id="addfilter"><i class="fas fa-plus"></i> filter</button>
+              <div class="filter-pop" id="filterpop">
+                <label><input type="checkbox"> Context: Personal</label>
+                <label><input type="checkbox"> Context: Study</label>
+                <label><input type="checkbox" checked> Tag: deep-work</label>
+                <label><input type="checkbox"> Tag: client</label>
+                <label><input type="checkbox"> Tag: oss</label>
+                <label><input type="checkbox"> Exclude: Homelab</label>
+                <label><input type="checkbox"> Note contains…</label>
+              </div>
+            </span>
+          </div>
+          <div class="filter-actions">
+            <span class="filter-count" id="count">6 rows &middot; <b>05h 12m</b> closed</span>
+            <button class="btn btn--xs"><i class="fas fa-file-export"></i> CSV</button>
+          </div>
+        </div>
+
+        <!-- ---------- TODAY LEDGER ---------- -->
+        <div id="tab-today">
+        <table class="ledger" id="tbl-today">
+          <thead class="lg-head">
+            <tr>
+              <th class="col-idx">#</th>
+              <th class="col-time sortable is-sorted-asc" data-col="1" data-type="text">Start <i class="fas sort-ind"></i></th>
+              <th class="col-time col-end sortable" data-col="2" data-type="text">End <i class="fas sort-ind"></i></th>
+              <th class="col-dur lg-th--num sortable" data-col="3" data-type="num">Dur <i class="fas sort-ind"></i></th>
+              <th class="col-run lg-th--num">Run. total</th>
+              <th class="col-proj sortable" data-col="5" data-type="text">Project <i class="fas sort-ind"></i></th>
+              <th class="col-subs">Subprojects</th>
+              <th class="col-note">Note</th>
+              <th class="col-act lg-th--num">&nbsp;</th>
+            </tr>
+          </thead>
+
+          <tbody data-runsum="1">
+            <tr class="lg-row is-cursor" data-nav data-min="96.45">
+              <td class="col-idx">01</td>
+              <td class="col-time"><span class="cell-view">09:12:04</span><span class="cell-edit"><input class="mono" value="09:12:04"></span></td>
+              <td class="col-time col-end"><span class="cell-view">10:48:31</span><span class="cell-edit"><input class="mono" value="10:48:31"></span></td>
+              <td class="col-dur">01h 36m</td>
+              <td class="col-run runsum">01h 36m</td>
+              <td class="col-proj"><span class="cell-view"><a class="projref" href="#">Atlas API</a></span><span class="cell-edit"><input value="Atlas API"></span></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">auth</a></span></td>
+              <td class="col-note">
+                <span class="cell-view"><span class="note note--clamp">Rate-limiter tests green; token refresh still flaky under load</span></span>
+                <span class="cell-edit"><input value="Rate-limiter tests green; token refresh still flaky under load"></span>
+              </td>
+              <td class="col-act">
+                <span class="rowacts">
+                  <button class="iconbtn" title="Restart this project+subs"><i class="fas fa-redo"></i></button>
+                  <button class="iconbtn js-edit" title="Edit inline (Enter)"><i class="fas fa-pen"></i></button>
+                  <button class="iconbtn is-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                </span>
+                <span class="editbar">
+                  <button class="iconbtn is-go js-save" title="Save"><i class="fas fa-check"></i></button>
+                  <button class="iconbtn is-danger js-cancel" title="Cancel (Esc)"><i class="fas fa-times"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <tr class="lg-row" data-nav data-min="87.3">
+              <td class="col-idx">02</td>
+              <td class="col-time"><span class="cell-view">11:05:00</span><span class="cell-edit"><input class="mono" value="11:05:00"></span></td>
+              <td class="col-time col-end"><span class="cell-view">12:32:18</span><span class="cell-edit"><input class="mono" value="12:32:18"></span></td>
+              <td class="col-dur">01h 27m</td>
+              <td class="col-run runsum">03h 03m</td>
+              <td class="col-proj"><span class="cell-view"><a class="projref" href="#">Autumn</a></span><span class="cell-edit"><input value="Autumn"></span></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">ui-redesign</a></span></td>
+              <td class="col-note">
+                <span class="cell-view"><span class="note note--clamp"><strong>Sketching</strong> the new session card — 3 columns feels cramped on mobile</span></span>
+                <span class="cell-edit"><input value="**Sketching** the new session card — 3 columns feels cramped on mobile"></span>
+              </td>
+              <td class="col-act">
+                <span class="rowacts">
+                  <button class="iconbtn" title="Restart"><i class="fas fa-redo"></i></button>
+                  <button class="iconbtn js-edit" title="Edit inline"><i class="fas fa-pen"></i></button>
+                  <button class="iconbtn is-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                </span>
+                <span class="editbar">
+                  <button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button>
+                  <button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <tr class="lg-row" data-nav data-min="32.75">
+              <td class="col-idx">03</td>
+              <td class="col-time"><span class="cell-view">13:40:00</span><span class="cell-edit"><input class="mono" value="13:40:00"></span></td>
+              <td class="col-time col-end"><span class="cell-view">14:12:45</span><span class="cell-edit"><input class="mono" value="14:12:45"></span></td>
+              <td class="col-dur">32m 45s</td>
+              <td class="col-run runsum">03h 36m</td>
+              <td class="col-proj"><span class="cell-view"><a class="projref" href="#">Rust by Example</a></span><span class="cell-edit"><input value="Rust by Example"></span></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">async</a></span></td>
+              <td class="col-note">
+                <span class="cell-view"><span class="note note--clamp">Pinning chapter — re-read it twice</span></span>
+                <span class="cell-edit"><input value="Pinning chapter — re-read it twice"></span>
+              </td>
+              <td class="col-act">
+                <span class="rowacts">
+                  <button class="iconbtn" title="Restart"><i class="fas fa-redo"></i></button>
+                  <button class="iconbtn js-edit" title="Edit inline"><i class="fas fa-pen"></i></button>
+                  <button class="iconbtn is-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                </span>
+                <span class="editbar">
+                  <button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button>
+                  <button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <tr class="lg-row" data-nav data-min="95.5">
+              <td class="col-idx">04</td>
+              <td class="col-time"><span class="cell-view">15:20:00</span><span class="cell-edit"><input class="mono" value="15:20:00"></span></td>
+              <td class="col-time col-end"><span class="cell-view">16:55:30</span><span class="cell-edit"><input class="mono" value="16:55:30"></span></td>
+              <td class="col-dur">01h 35m</td>
+              <td class="col-run runsum">05h 12m</td>
+              <td class="col-proj"><span class="cell-view"><a class="projref" href="#">Atlas API</a></span><span class="cell-edit"><input value="Atlas API"></span></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">billing</a><a class="subref" href="#">migrations</a></span></td>
+              <td class="col-note">
+                <span class="cell-view">
+                  <span class="note note--clamp">Stripe webhook backfill; wrote the idempotency-key migration so the replayed events collapse onto one row instead of double-charging the customer on retry</span>
+                  <button class="note-toggle js-expand" title="Expand note (x)"><i class="fas fa-angle-down"></i></button>
+                </span>
+                <span class="cell-edit"><input value="Stripe webhook backfill; wrote the idempotency-key migration"></span>
+              </td>
+              <td class="col-act">
+                <span class="rowacts">
+                  <button class="iconbtn" title="Restart"><i class="fas fa-redo"></i></button>
+                  <button class="iconbtn js-edit" title="Edit inline"><i class="fas fa-pen"></i></button>
+                  <button class="iconbtn is-danger" title="Delete"><i class="fas fa-trash"></i></button>
+                </span>
+                <span class="editbar">
+                  <button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button>
+                  <button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <!-- live rows: the two running timers, in the same ledger -->
+            <tr class="lg-row lg-row--running" data-nav data-open="1">
+              <td class="col-idx">&mdash;</td>
+              <td class="col-time">16:58:00</td>
+              <td class="col-time col-end"><span class="badge badge--live"><i class="fas fa-circle" style="font-size:5px"></i> live</span></td>
+              <td class="col-dur mono" data-seconds="2980">49m 40s</td>
+              <td class="col-run muted">open</td>
+              <td class="col-proj"><a class="projref" href="#">Rust by Example</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">exercises</a></span></td>
+              <td class="col-note"><span class="note-empty">no auto-stop set &middot; started 49m ago</span></td>
+              <td class="col-act">
+                <span class="rowacts">
+                  <button class="iconbtn" title="Restart"><i class="fas fa-redo"></i></button>
+                  <button class="iconbtn is-go" title="Stop"><i class="fas fa-stopwatch"></i></button>
+                  <button class="iconbtn is-danger" title="Remove"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+
+            <tr class="lg-row lg-row--running" data-nav data-open="1">
+              <td class="col-idx">&mdash;</td>
+              <td class="col-time">17:04:22</td>
+              <td class="col-time col-end"><span class="badge badge--live"><i class="fas fa-circle" style="font-size:5px"></i> live</span></td>
+              <td class="col-dur mono" data-seconds="2598">43m 18s</td>
+              <td class="col-run muted">open</td>
+              <td class="col-proj"><a class="projref" href="#">Atlas API</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">auth</a></span></td>
+              <td class="col-note"><span class="note-empty">auto-stop <span class="t-time mono">19:04:22</span> &middot; stops in <span class="mono t-note" id="row-auto">01:16:42</span></span></td>
+              <td class="col-act">
+                <span class="rowacts">
+                  <button class="iconbtn" title="Restart"><i class="fas fa-redo"></i></button>
+                  <button class="iconbtn is-go" title="Stop"><i class="fas fa-stopwatch"></i></button>
+                  <button class="iconbtn is-danger" title="Remove"><i class="fas fa-trash"></i></button>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+
+          <tfoot>
+            <tr class="lg-foot">
+              <td colspan="3" class="lg-foot-label">Subtotal &mdash; closed (4)</td>
+              <td class="col-dur">05h 12m</td>
+              <td class="col-run runsum">312.0m</td>
+              <td colspan="4" class="muted" style="font-family:var(--font-ui);font-size:var(--fs-xs)">
+                Atlas API <span class="t-dur">03h 11m</span> &middot;
+                Autumn <span class="t-dur">01h 27m</span> &middot;
+                Rust by Example <span class="t-dur">32m 45s</span>
+              </td>
+            </tr>
+            <tr class="lg-foot">
+              <td colspan="3" class="lg-foot-label">Open timers (2)</td>
+              <td class="col-dur">01h 32m</td>
+              <td class="col-run muted">&mdash;</td>
+              <td colspan="4" class="muted" style="font-family:var(--font-ui);font-size:var(--fs-xs)">running as of 17:47:09</td>
+            </tr>
+            <tr class="lg-foot lg-foot--total">
+              <td colspan="3" class="lg-foot-label t-brand">Projected today</td>
+              <td class="col-dur">06h 45m</td>
+              <td class="col-run runsum">404.9m</td>
+              <td colspan="4" class="muted" style="font-family:var(--font-ui);font-size:var(--fs-xs)">
+                Daily average this week <span class="t-dur">06h 54m</span> &middot; you are <span class="t-dur">9m</span> under pace
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+        </div>
+
+        <!-- ---------- LAST 3 DAYS (grouped) ---------- -->
+        <div id="tab-three" hidden>
+        <table class="ledger" id="tbl-three">
+          <thead class="lg-head">
+            <tr>
+              <th class="col-idx">#</th>
+              <th class="col-time sortable is-sorted-asc" data-col="1" data-type="text">Start <i class="fas sort-ind"></i></th>
+              <th class="col-time col-end sortable" data-col="2" data-type="text">End <i class="fas sort-ind"></i></th>
+              <th class="col-dur lg-th--num sortable" data-col="3" data-type="num">Dur <i class="fas sort-ind"></i></th>
+              <th class="col-run lg-th--num">Run. total</th>
+              <th class="col-proj sortable" data-col="5" data-type="text">Project <i class="fas sort-ind"></i></th>
+              <th class="col-subs">Subprojects</th>
+              <th class="col-note">Note</th>
+              <th class="col-act lg-th--num">&nbsp;</th>
+            </tr>
+          </thead>
+
+          <tbody data-runsum="1">
+            <tr class="lg-row--group"><td colspan="9">
+              <span class="lg-group-label">Saturday 25 Jul 2026</span>
+              <span class="lg-group-meta">4 sessions &middot; <span class="lg-group-total">05h 12m</span> &middot; 2 open</span>
+            </td></tr>
+            <tr class="lg-row" data-nav data-min="96.45">
+              <td class="col-idx">01</td><td class="col-time">09:12:04</td><td class="col-time col-end">10:48:31</td>
+              <td class="col-dur">01h 36m</td><td class="col-run runsum">01h 36m</td>
+              <td class="col-proj"><a class="projref" href="#">Atlas API</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">auth</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Rate-limiter tests green; token refresh still flaky under load</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="87.3">
+              <td class="col-idx">02</td><td class="col-time">11:05:00</td><td class="col-time col-end">12:32:18</td>
+              <td class="col-dur">01h 27m</td><td class="col-run runsum">03h 03m</td>
+              <td class="col-proj"><a class="projref" href="#">Autumn</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">ui-redesign</a></span></td>
+              <td class="col-note"><span class="note note--clamp"><strong>Sketching</strong> the new session card — 3 columns feels cramped on mobile</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="32.75">
+              <td class="col-idx">03</td><td class="col-time">13:40:00</td><td class="col-time col-end">14:12:45</td>
+              <td class="col-dur">32m 45s</td><td class="col-run runsum">03h 36m</td>
+              <td class="col-proj"><a class="projref" href="#">Rust by Example</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">async</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Pinning chapter — re-read it twice</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="95.5">
+              <td class="col-idx">04</td><td class="col-time">15:20:00</td><td class="col-time col-end">16:55:30</td>
+              <td class="col-dur">01h 35m</td><td class="col-run runsum">05h 12m</td>
+              <td class="col-proj"><a class="projref" href="#">Atlas API</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">billing</a><a class="subref" href="#">migrations</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Stripe webhook backfill; wrote the idempotency-key migration so the replayed events collapse onto one row instead of double-charging the customer on retry</span><button class="note-toggle js-expand"><i class="fas fa-angle-down"></i></button></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+          </tbody>
+
+          <tbody data-runsum="1">
+            <tr class="lg-row--group"><td colspan="9">
+              <span class="lg-group-label">Friday 24 Jul 2026</span>
+              <span class="lg-group-meta">6 sessions &middot; <span class="lg-group-total">07h 30m</span></span>
+            </td></tr>
+            <tr class="lg-row" data-nav data-min="45">
+              <td class="col-idx">05</td><td class="col-time">08:35:00</td><td class="col-time col-end">09:20:00</td>
+              <td class="col-dur">45m 00s</td><td class="col-run runsum">45m 00s</td>
+              <td class="col-proj"><a class="projref" href="#">Autumn</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">mcp-server</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Added the <code>tally_by_tags</code> tool; docstrings still thin</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="105">
+              <td class="col-idx">06</td><td class="col-time">09:45:00</td><td class="col-time col-end">11:30:00</td>
+              <td class="col-dur">01h 45m</td><td class="col-run runsum">02h 30m</td>
+              <td class="col-proj"><a class="projref" href="#">Atlas API</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">auth</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Pairing with Dana on the OAuth device flow</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="35">
+              <td class="col-idx">07</td><td class="col-time">12:15:00</td><td class="col-time col-end">12:50:00</td>
+              <td class="col-dur">35m 00s</td><td class="col-run runsum">03h 05m</td>
+              <td class="col-proj"><a class="projref" href="#">Newsletter</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">drafting</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Issue #14 outline: “why your time tracker lies to you”</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="95">
+              <td class="col-idx">08</td><td class="col-time">13:30:00</td><td class="col-time col-end">15:05:00</td>
+              <td class="col-dur">01h 35m</td><td class="col-run runsum">04h 40m</td>
+              <td class="col-proj"><a class="projref" href="#">Atlas API</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">code-review</a></span></td>
+              <td class="col-note"><span class="note-empty">no note</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="82">
+              <td class="col-idx">09</td><td class="col-time">16:00:00</td><td class="col-time col-end">17:22:00</td>
+              <td class="col-dur">01h 22m</td><td class="col-run runsum">06h 02m</td>
+              <td class="col-proj"><a class="projref" href="#">Rust by Example</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">ownership</a><a class="subref" href="#">exercises</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Borrow checker finally clicked on ex. 12</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="88">
+              <td class="col-idx">10</td><td class="col-time">20:10:00</td><td class="col-time col-end">21:38:00</td>
+              <td class="col-dur">01h 28m</td><td class="col-run runsum">07h 30m</td>
+              <td class="col-proj"><a class="projref" href="#">Autumn</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">ui-redesign</a><a class="subref" href="#">docs</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Dark-mode contrast pass. See <a href="#">issue #41</a></span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+          </tbody>
+
+          <tbody data-runsum="1">
+            <tr class="lg-row--group"><td colspan="9">
+              <span class="lg-group-label">Thursday 23 Jul 2026</span>
+              <span class="lg-group-meta">5 sessions &middot; <span class="lg-group-total">06h 05m</span></span>
+            </td></tr>
+            <tr class="lg-row" data-nav data-min="75">
+              <td class="col-idx">11</td><td class="col-time">08:50:00</td><td class="col-time col-end">10:05:00</td>
+              <td class="col-dur">01h 15m</td><td class="col-run runsum">01h 15m</td>
+              <td class="col-proj"><a class="projref" href="#">Atlas API</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">migrations</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Zero-downtime column-drop rehearsal on staging</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="40">
+              <td class="col-idx">12</td><td class="col-time">10:20:00</td><td class="col-time col-end">11:00:00</td>
+              <td class="col-dur">40m 00s</td><td class="col-run runsum">01h 55m</td>
+              <td class="col-proj"><a class="projref" href="#">Homelab</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">backups</a></span></td>
+              <td class="col-note"><span class="note note--clamp">restic prune took forever; 4 snapshots pruned</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="92">
+              <td class="col-idx">13</td><td class="col-time">11:15:00</td><td class="col-time col-end">12:47:00</td>
+              <td class="col-dur">01h 32m</td><td class="col-run runsum">03h 27m</td>
+              <td class="col-proj"><a class="projref" href="#">Autumn</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">mcp-server</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Session allocation editor — basis points everywhere</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="72">
+              <td class="col-idx">14</td><td class="col-time">14:00:00</td><td class="col-time col-end">15:12:00</td>
+              <td class="col-dur">01h 12m</td><td class="col-run runsum">04h 39m</td>
+              <td class="col-proj"><a class="projref" href="#">Newsletter</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">editing</a></span></td>
+              <td class="col-note"><span class="note note--clamp">Cut 400 words. Still too long.</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+            <tr class="lg-row" data-nav data-min="86">
+              <td class="col-idx">15</td><td class="col-time">19:30:00</td><td class="col-time col-end">20:56:00</td>
+              <td class="col-dur">01h 26m</td><td class="col-run runsum">06h 05m</td>
+              <td class="col-proj"><a class="projref" href="#">Rust by Example</a></td>
+              <td class="col-subs"><span class="subs"><a class="subref" href="#">async</a></span></td>
+              <td class="col-note"><span class="note-empty">no note</span></td>
+              <td class="col-act"><span class="rowacts"><button class="iconbtn"><i class="fas fa-redo"></i></button><button class="iconbtn js-edit"><i class="fas fa-pen"></i></button><button class="iconbtn is-danger"><i class="fas fa-trash"></i></button></span><span class="editbar"><button class="iconbtn is-go js-save"><i class="fas fa-check"></i></button><button class="iconbtn is-danger js-cancel"><i class="fas fa-times"></i></button></span></td>
+            </tr>
+          </tbody>
+
+          <tfoot>
+            <tr class="lg-foot lg-foot--total">
+              <td colspan="3" class="lg-foot-label t-brand">Total &mdash; 3 days (15 sessions)</td>
+              <td class="col-dur">18h 47m</td>
+              <td class="col-run runsum">1127m</td>
+              <td colspan="4" class="muted" style="font-family:var(--font-ui);font-size:var(--fs-xs)">
+                Atlas API <span class="t-dur">08h 08m</span> &middot;
+                Autumn <span class="t-dur">05h 12m</span> &middot;
+                Rust by Example <span class="t-dur">04h 05m</span> &middot;
+                Newsletter <span class="t-dur">01h 47m</span> &middot;
+                Homelab <span class="t-dur">40m</span>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+        </div>
+
+        <div class="pane-foot">
+          <span class="hintbar">
+            <span><span class="kbd">j</span><span class="kbd">k</span> move</span>
+            <span><span class="kbd">↵</span> edit row</span>
+            <span><span class="kbd">x</span> expand note</span>
+            <span><span class="kbd">/</span> filter</span>
+            <span><span class="kbd">esc</span> cancel</span>
+          </span>
+          <span class="spacer"></span>
+          <a class="btn btn--xs" href="sessions.html">Open full session ledger <i class="fas fa-arrow-right"></i></a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= RIGHT: SIDE PANES ======================= -->
+    <aside class="col-side stack">
+
+      <!-- ACTIVITY -->
+      <div class="pane">
+        <div class="pane-head">
+          <span class="pane-title"><i class="fas fa-calendar-alt t-dur"></i> Activity</span>
+          <span class="pane-tools">
+            <span class="seg" id="calrange">
+              <button class="seg-btn" data-range="7">7d</button>
+              <button class="seg-btn is-active" data-range="14">14d</button>
+              <button class="seg-btn" data-range="30">30d</button>
+            </span>
+          </span>
+        </div>
+        <div class="pane-body">
+          <div class="cal" id="cal">
+            <div class="cal-wd"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+            <div class="cal-grid" id="calgrid">
+              <span class="cal-cell is-pad" data-pad="1"></span>
+              <span class="cal-cell is-pad" data-pad="2"></span>
+              <span class="cal-cell is-pad" data-pad="3"></span>
+              <span class="cal-cell is-pad" data-pad="4"></span>
+              <span class="cal-cell is-pad" data-pad="5"></span>
+              <span class="cal-cell is-pad" data-pad="6"></span>
+              <span class="cal-cell is-active is-hidden" data-age="29" title="Jun 26 — active">26</span>
+              <span class="cal-cell is-active is-hidden" data-age="28" title="Jun 27 — active">27</span>
+              <span class="cal-cell is-inactive is-hidden" data-age="27" title="Jun 28 — no sessions">28</span>
+              <span class="cal-cell is-active is-hidden" data-age="26" title="Jun 29 — active">29</span>
+              <span class="cal-cell is-active is-hidden" data-age="25" title="Jun 30 — active">30</span>
+              <span class="cal-cell is-active is-hidden" data-age="24" title="Jul 1 — active">1</span>
+              <span class="cal-cell is-inactive is-hidden" data-age="23" title="Jul 2 — no sessions">2</span>
+              <span class="cal-cell is-active is-hidden" data-age="22" title="Jul 3 — active · streak starts">3</span>
+              <span class="cal-cell is-active is-hidden" data-age="21" title="Jul 4 — active">4</span>
+              <span class="cal-cell is-active is-hidden" data-age="20" title="Jul 5 — active">5</span>
+              <span class="cal-cell is-active is-hidden" data-age="19" title="Jul 6 — active">6</span>
+              <span class="cal-cell is-active is-hidden" data-age="18" title="Jul 7 — active">7</span>
+              <span class="cal-cell is-active is-hidden" data-age="17" title="Jul 8 — active">8</span>
+              <span class="cal-cell is-active is-hidden" data-age="16" title="Jul 9 — active">9</span>
+              <span class="cal-cell is-active is-hidden" data-age="15" title="Jul 10 — active">10</span>
+              <span class="cal-cell is-active is-hidden" data-age="14" title="Jul 11 — active">11</span>
+              <span class="cal-cell is-active" data-age="13" title="Jul 12 — active">12</span>
+              <span class="cal-cell is-active" data-age="12" title="Jul 13 — active">13</span>
+              <span class="cal-cell is-active" data-age="11" title="Jul 14 — active">14</span>
+              <span class="cal-cell is-active" data-age="10" title="Jul 15 — active">15</span>
+              <span class="cal-cell is-active" data-age="9" title="Jul 16 — active">16</span>
+              <span class="cal-cell is-active" data-age="8" title="Jul 17 — active">17</span>
+              <span class="cal-cell is-active" data-age="7" title="Jul 18 — active">18</span>
+              <span class="cal-cell is-active" data-age="6" title="Jul 19 — active">19</span>
+              <span class="cal-cell is-active" data-age="5" title="Jul 20 — active">20</span>
+              <span class="cal-cell is-active" data-age="4" title="Jul 21 — active">21</span>
+              <span class="cal-cell is-active" data-age="3" title="Jul 22 — active">22</span>
+              <span class="cal-cell is-active" data-age="2" title="Jul 23 — 06h 05m">23</span>
+              <span class="cal-cell is-active" data-age="1" title="Jul 24 — 07h 30m">24</span>
+              <span class="cal-cell is-active is-today" data-age="0" title="Jul 25 — 05h 12m (today)">25</span>
+            </div>
+            <div class="cal-caption" id="calcaption">Last 14 days &middot; 14 active &middot; 0 missed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMMITMENTS -->
+      <div class="pane pane--flush">
+        <div class="pane-head">
+          <span class="pane-title"><i class="fas fa-bullseye t-time"></i> Commitments</span>
+          <span class="pane-meta">3 active &middot; most behind first</span>
+          <span class="pane-tools"><button class="btn btn--xs"><i class="fas fa-plus"></i> New</button></span>
+        </div>
+
+        <table class="ledger ledger--compact">
+          <thead class="lg-head lg-head--static">
+            <tr>
+              <th>Target</th>
+              <th class="lg-th--num">Actual / target</th>
+              <th class="lg-th--num">%</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            <tr class="lg-row">
+              <td><a class="t-ctx" href="#" style="font-weight:650">Study</a> <span class="muted" style="font-size:var(--fs-micro)">(Context)</span><div class="muted" style="font-size:var(--fs-micro)">weekly &middot; time</div></td>
+              <td class="col-num t-dur">195 / 480<span class="muted">m</span></td>
+              <td class="col-num">40.6</td>
+            </tr>
+            <tr class="lg-row--sub">
+              <td colspan="3">
+                <div class="barpair"><div class="mbar warning"><div class="mbar-fill" style="width:40.6%"></div></div><span class="barpct">40.6%</span></div>
+                <div class="split" style="margin-top:6px">
+                  <span class="bankcell">bank <span class="neg">&minus;60m</span> &middot; unbanked <span class="neg">&minus;285m</span></span>
+                  <span class="streakcell"><i class="fas fa-fire flame is-cold"></i><span class="n">0 periods</span></span>
+                </div>
+                <div class="periods" style="margin-top:6px">
+                  <span class="period period--met" title="512/480"><i class="fas fa-check"></i></span>
+                  <span class="period period--missed" title="300/480"><i class="fas fa-times"></i></span>
+                  <span class="period period--met" title="496/480"><i class="fas fa-check"></i></span>
+                  <span class="period period--missed" title="210/480"><i class="fas fa-times"></i></span>
+                  <span class="period period--met" title="520/480"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="488/480"><i class="fas fa-check"></i></span>
+                  <span class="period period--missed" title="344/480"><i class="fas fa-times"></i></span>
+                  <span class="period period--current" title="195/480 — current period"><i class="fas fa-hourglass-half"></i></span>
+                </div>
+              </td>
+            </tr>
+
+            <tr class="lg-row">
+              <td><a class="projref" href="#">Atlas API</a> <span class="muted" style="font-size:var(--fs-micro)">(Project)</span><div class="muted" style="font-size:var(--fs-micro)">weekly &middot; time</div></td>
+              <td class="col-num t-dur">468 / 600<span class="muted">m</span></td>
+              <td class="col-num">78.0</td>
+            </tr>
+            <tr class="lg-row--sub">
+              <td colspan="3">
+                <div class="barpair"><div class="mbar approaching"><div class="mbar-fill" style="width:78%"></div></div><span class="barpct">78.0%</span></div>
+                <div class="split" style="margin-top:6px">
+                  <span class="bankcell">bank <span class="pos">+145m</span> &middot; unbanked <span class="neg">&minus;132m</span></span>
+                  <span class="streakcell"><i class="fas fa-fire flame"></i><span class="n">6 periods</span></span>
+                </div>
+                <div class="periods" style="margin-top:6px">
+                  <span class="period period--missed" title="402/600"><i class="fas fa-times"></i></span>
+                  <span class="period period--met" title="655/600"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="612/600"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="705/600"><i class="fas fa-check"></i></span>
+                  <span class="period period--banked" title="548/600 (bank covered deficit)"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="690/600"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="601/600"><i class="fas fa-check"></i></span>
+                  <span class="period period--current" title="468/600 — current period"><i class="fas fa-hourglass-half"></i></span>
+                </div>
+              </td>
+            </tr>
+
+            <tr class="lg-row">
+              <td><a class="projref" href="#">Autumn</a> <span class="muted" style="font-size:var(--fs-micro)">(Project)</span><div class="muted" style="font-size:var(--fs-micro)">weekly &middot; sessions</div></td>
+              <td class="col-num t-dur">6 / 5</td>
+              <td class="col-num">100</td>
+            </tr>
+            <tr class="lg-row--sub">
+              <td colspan="3">
+                <div class="barpair"><div class="mbar complete"><div class="mbar-fill" style="width:100%"></div></div><span class="barpct">100%</span></div>
+                <div class="split" style="margin-top:6px">
+                  <span class="bankcell muted">no time banking</span>
+                  <span class="streakcell"><i class="fas fa-fire flame"></i><span class="n">11 periods</span></span>
+                </div>
+                <div class="periods" style="margin-top:6px">
+                  <span class="period period--met" title="6/5"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="7/5"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="5/5"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="8/5"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="6/5"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="5/5"><i class="fas fa-check"></i></span>
+                  <span class="period period--met" title="9/5"><i class="fas fa-check"></i></span>
+                  <span class="period period--current" title="6/5 — current period, already met"><i class="fas fa-hourglass-half"></i></span>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- TODAY BY PROJECT -->
+      <div class="pane pane--flush">
+        <div class="pane-head">
+          <span class="pane-title"><i class="fas fa-stream t-proj"></i> Today by project</span>
+          <span class="pane-meta">closed only</span>
+        </div>
+        <table class="ledger ledger--compact">
+          <thead class="lg-head lg-head--static">
+            <tr><th>Project</th><th>Share</th><th class="lg-th--num">Time</th><th class="lg-th--num">Sess.</th></tr>
+          </thead>
+          <tbody>
+            <tr class="lg-row">
+              <td class="col-proj"><a class="projref" href="#">Atlas API</a></td>
+              <td class="col-bar"><div class="pbar"><div class="mbar"><div class="mbar-fill" style="width:61.5%"></div></div></div></td>
+              <td class="col-num t-dur">03h 11m</td><td class="col-num muted">2</td>
+            </tr>
+            <tr class="lg-row">
+              <td class="col-proj"><a class="projref" href="#">Autumn</a></td>
+              <td class="col-bar"><div class="pbar"><div class="mbar"><div class="mbar-fill" style="width:28.0%"></div></div></div></td>
+              <td class="col-num t-dur">01h 27m</td><td class="col-num muted">1</td>
+            </tr>
+            <tr class="lg-row">
+              <td class="col-proj"><a class="projref" href="#">Rust by Example</a></td>
+              <td class="col-bar"><div class="pbar"><div class="mbar"><div class="mbar-fill" style="width:10.5%"></div></div></div></td>
+              <td class="col-num t-dur">32m 45s</td><td class="col-num muted">1</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="lg-foot lg-foot--total">
+              <td class="lg-foot-label">Total</td><td></td>
+              <td class="col-num t-dur">05h 12m</td><td class="col-num muted">4</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+    </aside>
+  </div>
+</div>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- tiny helpers ---------- */
+  var $  = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+
+  function fmtDur(min) {                      /* mirrors duration_formatter */
+    var total = Math.round(min * 60);
+    var d = Math.floor(total / 86400); total -= d * 86400;
+    var h = Math.floor(total / 3600);  total -= h * 3600;
+    var m = Math.floor(total / 60);
+    var s = total - m * 60;
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    if (d) return p(d) + "d " + p(h) + "h " + p(m) + "m";
+    if (h) return p(h) + "h " + p(m) + "m";
+    return p(m) + "m " + p(s) + "s";
+  }
+  function clockFromSeconds(sec) {
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    var p = function (n) { return (n < 10 ? "0" : "") + n; };
+    return (h ? h + ":" + p(m) : p(m)) + ":" + p(s);
+  }
+
+  /* ---------- menus ---------- */
+  var more = $("#navmore");
+  $("#navmore-btn").addEventListener("click", function (e) { e.preventDefault(); more.classList.toggle("is-open"); });
+  var well = $("#timerwell");
+  $("#tw-count").addEventListener("click", function () { well.classList.toggle("is-open"); });
+  $("#burger").addEventListener("click", function () { $("#drawer").classList.toggle("is-open"); });
+  var pop = $("#filterpop");
+  $("#addfilter").addEventListener("click", function () { pop.classList.toggle("is-open"); });
+  document.addEventListener("click", function (e) {
+    if (!more.contains(e.target)) more.classList.remove("is-open");
+    if (!well.contains(e.target)) well.classList.remove("is-open");
+    if (!pop.contains(e.target) && e.target.id !== "addfilter") pop.classList.remove("is-open");
+  });
+  $$(".chip-x").forEach(function (b) {
+    b.addEventListener("click", function () { b.closest(".chip").remove(); });
+  });
+  $$(".pane-collapse").forEach(function (b) {
+    b.addEventListener("click", function () { b.closest(".pane").classList.toggle("is-collapsed"); });
+  });
+
+  /* ---------- live timers (topbar well + live ledger rows) ---------- */
+  var autoStopLeft = 4602; /* 01:16:42 */
+  setInterval(function () {
+    $$("[data-seconds]").forEach(function (el) {
+      var s = parseInt(el.getAttribute("data-seconds"), 10) + 1;
+      el.setAttribute("data-seconds", s);
+      if (el.classList.contains("col-dur")) {
+        el.textContent = fmtDur(s / 60);
+      } else {
+        el.textContent = clockFromSeconds(s);
+      }
+    });
+    autoStopLeft = Math.max(0, autoStopLeft - 1);
+    var a = clockFromSeconds(autoStopLeft);
+    $("#tw-auto").textContent = a;
+    if ($("#row-auto")) $("#row-auto").textContent = a;
+  }, 1000);
+
+  /* ---------- tabs ---------- */
+  $$("#ledger-tabs .tab").forEach(function (t) {
+    t.addEventListener("click", function () {
+      $$("#ledger-tabs .tab").forEach(function (x) { x.classList.remove("is-active"); });
+      t.classList.add("is-active");
+      var today = t.getAttribute("data-tab") === "today";
+      $("#tab-today").hidden = !today;
+      $("#tab-three").hidden = today;
+      $("#count").innerHTML = today
+        ? '6 rows &middot; <b>05h 12m</b> closed'
+        : '15 rows &middot; <b>18h 47m</b> closed';
+    });
+  });
+
+  /* ---------- group-by (visual: hide the date group rows) ---------- */
+  $$("#groupby .seg-btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      $$("#groupby .seg-btn").forEach(function (x) { x.classList.remove("is-active"); });
+      b.classList.add("is-active");
+      var flat = b.getAttribute("data-group") === "none";
+      $$(".lg-row--group").forEach(function (r) { r.style.display = flat ? "none" : ""; });
+    });
+  });
+
+  /* ---------- running totals: recomputed after any sort ---------- */
+  function recomputeRunning(tbody) {
+    if (!tbody.hasAttribute("data-runsum")) return;
+    var acc = 0;
+    $$("tr.lg-row", tbody).forEach(function (r) {
+      var cell = $(".col-run", r);
+      if (!cell) return;
+      if (r.hasAttribute("data-open")) { cell.textContent = "open"; return; }
+      acc += parseFloat(r.getAttribute("data-min") || "0");
+      cell.textContent = fmtDur(acc);
+    });
+  }
+
+  /* ---------- column sorting (per tbody, so day groups stay intact) ---------- */
+  $$(".lg-th.sortable, th.sortable").forEach(function (th) {
+    th.addEventListener("click", function () {
+      var table = th.closest("table");
+      var idx   = parseInt(th.getAttribute("data-col"), 10);
+      var type  = th.getAttribute("data-type");
+      var desc  = th.classList.contains("is-sorted-asc");
+      $$("th", table).forEach(function (x) { x.classList.remove("is-sorted-asc", "is-sorted-desc"); });
+      th.classList.add(desc ? "is-sorted-desc" : "is-sorted-asc");
+
+      $$("tbody", table).forEach(function (tb) {
+        var rows = $$("tr.lg-row", tb);
+        rows.sort(function (a, b) {
+          var av, bv;
+          /* running timers are always pinned to the bottom of the ledger */
+          var ao = a.hasAttribute("data-open"), bo = b.hasAttribute("data-open");
+          if (ao !== bo) return ao ? 1 : -1;
+          if (type === "num") {
+            av = parseFloat(a.getAttribute("data-min") || "0");
+            bv = parseFloat(b.getAttribute("data-min") || "0");
+          } else {
+            av = a.children[idx].textContent.trim().toLowerCase();
+            bv = b.children[idx].textContent.trim().toLowerCase();
+          }
+          if (av < bv) return desc ? 1 : -1;
+          if (av > bv) return desc ? -1 : 1;
+          return 0;
+        });
+        rows.forEach(function (r) { tb.appendChild(r); });
+        recomputeRunning(tb);
+      });
+    });
+  });
+
+  /* ---------- inline row editing ---------- */
+  function ensureEditors(row) {
+    $$(".col-time, .col-proj, .col-note", row).forEach(function (cell) {
+      if ($(".cell-edit", cell)) return;
+      var view = $(".cell-view", cell);
+      if (!view) {                                  /* wrap the existing content once */
+        view = document.createElement("span");
+        view.className = "cell-view";
+        while (cell.firstChild) view.appendChild(cell.firstChild);
+        cell.appendChild(view);
+      }
+      var ed = document.createElement("span");
+      ed.className = "cell-edit";
+      var input = document.createElement("input");
+      if (cell.classList.contains("col-time")) input.className = "mono";
+      input.value = view.textContent.trim();
+      ed.appendChild(input);
+      cell.appendChild(ed);
+    });
+  }
+  function startEdit(row) {
+    if (!row || row.hasAttribute("data-open")) return;
+    $$(".lg-row.is-editing").forEach(function (r) { r.classList.remove("is-editing"); });
+    ensureEditors(row);
+    row.classList.add("is-editing");
+    var first = $(".cell-edit input", row);
+    if (first) { first.focus(); first.select(); }
+  }
+  function stopEdit() { $$(".lg-row.is-editing").forEach(function (r) { r.classList.remove("is-editing"); }); }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest ? e.target.closest(".js-edit, .js-save, .js-cancel, .js-expand") : null;
+    if (!t) return;
+    var row = t.closest("tr");
+    if (t.classList.contains("js-edit"))   { setCursor(row); startEdit(row); }
+    if (t.classList.contains("js-save"))   { stopEdit(); }
+    if (t.classList.contains("js-cancel")) { stopEdit(); }
+    if (t.classList.contains("js-expand")) { row.classList.toggle("is-expanded"); }
+  });
+
+  /* ---------- keyboard row navigation ---------- */
+  function visibleRows() {
+    var host = $("#tab-today").hidden ? $("#tab-three") : $("#tab-today");
+    return $$("tr.lg-row[data-nav]", host).filter(function (r) { return r.offsetParent !== null; });
+  }
+  function setCursor(row) {
+    $$(".lg-row.is-cursor").forEach(function (r) { r.classList.remove("is-cursor"); });
+    if (row) { row.classList.add("is-cursor"); row.scrollIntoView({ block: "nearest" }); }
+  }
+  document.addEventListener("keydown", function (e) {
+    var typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if (e.key === "Escape") { stopEdit(); document.activeElement.blur(); return; }
+    if (typing) return;
+    if (e.key === "/") { e.preventDefault(); $("#q").focus(); return; }
+    var rows = visibleRows();
+    var cur  = rows.indexOf($(".lg-row.is-cursor"));
+    if (e.key === "j") { e.preventDefault(); setCursor(rows[Math.min(rows.length - 1, cur + 1)] || rows[0]); }
+    if (e.key === "k") { e.preventDefault(); setCursor(rows[Math.max(0, cur - 1)] || rows[0]); }
+    if (e.key === "Enter" || e.key === "e") { e.preventDefault(); startEdit(rows[cur]); }
+    if (e.key === "x" && rows[cur]) { rows[cur].classList.toggle("is-expanded"); }
+  });
+  $$("tr.lg-row[data-nav]").forEach(function (r) {
+    r.addEventListener("click", function (e) { if (!e.target.closest("button, a")) setCursor(r); });
+  });
+
+  /* ---------- activity range ---------- */
+  var PADS = { 7: 6, 14: 6, 30: 4 };
+  var STATS = { 7: "Last 7 days &middot; 7 active &middot; 0 missed",
+                14: "Last 14 days &middot; 14 active &middot; 0 missed",
+                30: "Last 30 days &middot; 28 active &middot; 2 missed (28 Jun, 2 Jul)" };
+  $$("#calrange .seg-btn").forEach(function (b) {
+    b.addEventListener("click", function () {
+      $$("#calrange .seg-btn").forEach(function (x) { x.classList.remove("is-active"); });
+      b.classList.add("is-active");
+      var n = parseInt(b.getAttribute("data-range"), 10);
+      $$("#calgrid .cal-cell[data-age]").forEach(function (c) {
+        c.classList.toggle("is-hidden", parseInt(c.getAttribute("data-age"), 10) >= n);
+      });
+      var padsWanted = PADS[n];
+      $$("#calgrid .cal-cell[data-pad]").forEach(function (p) {
+        var i = parseInt(p.getAttribute("data-pad"), 10);   /* keep the LAST n pads */
+        p.classList.toggle("is-hidden", i <= (6 - padsWanted));
+      });
+      $("#calcaption").innerHTML = STATS[n];
+    });
+  });
+  /* initial state = 14 days */
+  $$("#calgrid .cal-cell[data-pad]").forEach(function (p) { p.classList.remove("is-hidden"); });
+
+  /* ---------- filter box (live row filter) ---------- */
+  $("#q").addEventListener("input", function () {
+    var v = this.value.trim().toLowerCase();
+    var host = $("#tab-today").hidden ? $("#tab-three") : $("#tab-today");
+    var shown = 0, mins = 0;
+    $$("tr.lg-row", host).forEach(function (r) {
+      var hit = !v || r.textContent.toLowerCase().indexOf(v) > -1;
+      r.style.display = hit ? "" : "none";
+      if (hit) { shown++; mins += parseFloat(r.getAttribute("data-min") || "0"); }
+    });
+    $("#count").innerHTML = shown + " rows &middot; <b>" + fmtDur(mins) + "</b> closed";
+  });
+})();
+</script>
+</body>
+</html>
