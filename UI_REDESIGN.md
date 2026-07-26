@@ -66,7 +66,8 @@ Status: `TODO` / `WIP` / `DONE`
 | # | Chunk | Templates | Status |
 |---|-------|-----------|--------|
 | 1 | Foundation: `focus_desk.css` + `base_fd.html` shell | — | **DONE** |
-| 2 | Dashboard + timeline backend | `dashboard.html`, `partials/active_timers_dashboard.html` | TODO |
+| 2a | Timeline backend (`core/timeline.py` + 21 tests) | — | **DONE** |
+| 2b | Dashboard page port | `dashboard.html`, `partials/active_timers_dashboard.html` | TODO |
 | 3 | Sessions | `list_sessions`, `update_session`, `delete_session` | TODO |
 | 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | TODO |
 | 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | TODO |
@@ -113,6 +114,36 @@ Status: `TODO` / `WIP` / `DONE`
    overflow (`document.documentElement.scrollWidth <= innerWidth`).
 5. Update this file's status table.
 6. Commit with the chunk number in the subject.
+
+## Next up (chunk 2b) — how the dashboard should be assembled
+
+`build_day_timeline(user, day=None)` in `core/timeline.py` returns everything
+the chart needs, already as percentages:
+
+```
+{date, window_start_hour, window_end_hour,
+ hours: [{hour, label, x_pct}],
+ lanes: [{project, colour, total_minutes, live_minutes,
+          blocks: [{session, is_live, minutes, start_pct, width_pct,
+                    label, start_local, end_local}]}],
+ gaps:  [{minutes, start_pct, width_pct}],
+ now_pct, now_label}
+```
+
+`DashboardView.get_context_data` needs `context["timeline"] =
+build_day_timeline(user)`. Everything else it already supplies.
+
+Page structure, per the mockup (`design_concepts_v2/focus-desk/dashboard.html`):
+
+1. `.desk-head` — eyebrow + title on the left, `.stat-strip` on the right.
+2. **Hero, full width** — `.focus-deck` (one `.focus-card` per running timer,
+   plus a `.focus-card--start`), then the timeline slab.
+3. `.desk` — `.desk-main` holds recent sessions; `.desk-side` holds
+   commitments then activity.
+
+CSS classes for the timeline already exist in `focus_desk.css`
+(`.fd-tl-slab`, `.fd-tl-lane`, `.fd-tl-block`, `.fd-tl-now`, …). Lane colour
+comes from the data: `style="--proj: {{ lane.colour }}"`.
 
 ## Gotchas found so far
 
