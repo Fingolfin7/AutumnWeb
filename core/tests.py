@@ -846,6 +846,65 @@ class ImportIntoContextUITests(TestCase):
             Context.objects.filter(user=self.user, name="FileContext").exists()
         )
 
+    def test_ui_imports_with_same_filename_keep_uploads_isolated(self):
+        other_client = Client()
+        self.assertTrue(other_client.login(username="importui", password="password"))
+        first_ctx = Context.objects.create(user=self.user, name="FirstDest")
+        second_ctx = Context.objects.create(user=self.user, name="SecondDest")
+
+        def payload(project_name):
+            return {
+                project_name: {
+                    "Start Date": "03-01-2024",
+                    "Last Updated": "03-02-2024",
+                    "Total Time": 0.0,
+                    "Description": "",
+                    "Status": "active",
+                    "Context": "FileContext",
+                    "Tags": [],
+                    "Sub Projects": {},
+                    "Session History": [],
+                }
+            }
+
+        first_response = self.client.post(
+            reverse("import"),
+            data={
+                "file": self._make_upload_file(payload("First Upload")),
+                "merge": "on",
+                "tolerance": "0.5",
+                "import_context": str(first_ctx.id),
+            },
+        )
+        second_response = other_client.post(
+            reverse("import"),
+            data={
+                "file": self._make_upload_file(payload("Second Upload")),
+                "merge": "on",
+                "tolerance": "0.5",
+                "import_context": str(second_ctx.id),
+            },
+        )
+        self.assertEqual(first_response.status_code, 200)
+        self.assertEqual(second_response.status_code, 200)
+
+        first_stream = self._consume_event_stream(
+            self.client.get(reverse("import_stream"))
+        )
+        second_stream = self._consume_event_stream(
+            other_client.get(reverse("import_stream"))
+        )
+        self.assertIn("Import completed successfully", first_stream)
+        self.assertIn("Import completed successfully", second_stream)
+        self.assertEqual(
+            Projects.objects.get(user=self.user, name="First Upload").context_id,
+            first_ctx.id,
+        )
+        self.assertEqual(
+            Projects.objects.get(user=self.user, name="Second Upload").context_id,
+            second_ctx.id,
+        )
+
     def test_ui_import_new_context_wins_over_dropdown_and_shows_notification(self):
         dropdown_ctx = Context.objects.create(user=self.user, name="DropdownCtx")
 

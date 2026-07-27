@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 from AutumnWeb import settings
 from core.forms import *
 from core.importer import iter_import
@@ -32,17 +33,22 @@ def import_view(request):
             uploaded_file = request.FILES.get("file")
 
             if uploaded_file:
-                # Save to disk in media/temp
-                file_path = os.path.join(
-                    settings.MEDIA_ROOT, "temp", uploaded_file.name
-                )
-
-                if not os.path.exists(os.path.dirname(file_path)):
-                    os.makedirs(os.path.dirname(file_path))
-
-                with open(file_path, "wb+") as destination:
+                # Each pending import needs its own path: another request may
+                # upload a file with the same client-provided filename before
+                # this session starts streaming.
+                temp_dir = os.path.join(settings.MEDIA_ROOT, "temp")
+                os.makedirs(temp_dir, exist_ok=True)
+                suffix = os.path.splitext(uploaded_file.name)[1] or ".json"
+                with tempfile.NamedTemporaryFile(
+                    mode="wb",
+                    prefix="import_",
+                    suffix=suffix,
+                    dir=temp_dir,
+                    delete=False,
+                ) as destination:
                     for chunk in uploaded_file.chunks():
                         destination.write(chunk)
+                    file_path = destination.name
 
                 # Store file path in session for later processing
                 request.session["file_path"] = file_path
