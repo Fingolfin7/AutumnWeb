@@ -245,7 +245,14 @@
 
 /* ------------------------------------------------------------ RESET/BASE -- */
 *, *::before, *::after { box-sizing: border-box; }
-html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+/* color-scheme is what tells the BROWSER this is a dark UI, and it is the only
+   way to reach the parts of a control the page cannot style. A <select>'s open
+   dropdown is drawn by the OS, not by us: without this it renders on the light
+   grey system popup while our CSS colours the text pale, which is why the
+   chart picker's options were unreadable. It also fixes the scrollbars, the
+   date-picker panel, and the default checkbox and radio glyphs. Setting it
+   here rather than on <body> matters — the scrollbar belongs to the root. */
+html { font-size: 16px; -webkit-text-size-adjust: 100%; color-scheme: dark; }
 body {
   margin: 0;
   min-height: 100vh;
@@ -311,6 +318,30 @@ body.bg-active .app { position: relative; z-index: 2; }
   font-family: var(--font-mono); font-size: var(--fs-xs);
   color: var(--muted); letter-spacing: .02em;
 }
+/* Backdrop dimming, parked in the header beside the avatar. Hidden unless a
+   photo actually resolved — with no backdrop there is nothing to dim, and an
+   inert control in the chrome of every page is worse than no control. The
+   markup is rendered unconditionally and revealed here, so the shell does not
+   have to restate its three-way background resolution. */
+.dim-control {
+  display: none; align-items: center; gap: .5rem;
+  padding: .3rem .7rem;
+  background: rgba(16, 19, 22, .55);
+  border-radius: var(--r-pill);
+  box-shadow: var(--edge);
+}
+body.bg-active .dim-control { display: flex; }
+.dim-icon { font-size: .75rem; color: var(--muted); }
+.dim-control input[type="range"] {
+  width: 6rem; height: 1rem; margin: 0;
+  /* accent-color plus the root's color-scheme: dark is the whole styling
+     budget here — a native range renders correctly dark with an orange thumb,
+     and a hand-built one would be worse at every browser and input type. */
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+@media (max-width: 560px) { .dim-control input[type="range"] { width: 4rem; } }
+
 .avatar {
   width: 2rem; height: 2rem; border-radius: var(--r-pill);
   background: linear-gradient(150deg, #5d6b4d, #3d4a55);
@@ -1593,6 +1624,31 @@ img.brand-mark {
 }
 .fields textarea { min-height: 7rem; resize: vertical; line-height: 1.5; }
 .fields input::placeholder, .fields textarea::placeholder { color: var(--muted); }
+
+/* File inputs are the one widget the browser draws itself, and left alone the
+   raw "Choose File | No file chosen" control sits in the page looking like a
+   1998 form. It also has a wide intrinsic size that ignores its container: in
+   the profile avatar panel it measured 253px inside a 208px content box,
+   blowing the grid column out past the card and shoving the centred avatar
+   23px off-centre with it. min-width: 0 is what lets it actually shrink. */
+.fields input[type="file"] {
+  width: 100%; min-width: 0;
+  padding: .45rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--muted);
+  font-family: inherit; font-size: var(--fs-xs);
+}
+.fields input[type="file"]::file-selector-button {
+  font: inherit; font-weight: 650;
+  margin-right: .6rem; padding: .4rem .8rem;
+  border: 0; border-radius: var(--r-pill);
+  background: var(--raised-2); color: var(--ink);
+  cursor: pointer;
+  transition: background .16s var(--ease), color .16s var(--ease);
+}
+.fields input[type="file"]::file-selector-button:hover {
+  background: var(--brand-deep); color: var(--ink-invert);
+}
 .fields input:focus-visible,
 .fields select:focus-visible,
 .fields textarea:focus-visible {
@@ -2235,13 +2291,22 @@ img.brand-mark {
 }
 .profile-avatar-panel {
   display: grid;
+  /* minmax(0, 1fr), not the implicit `auto`: an auto column is sized by its
+     widest item, so one unshrinkable child (the file input, before the rule
+     in FORMS gave it min-width: 0) widened the column past the card and took
+     the centred avatar with it. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--s3);
   justify-items: center;
   padding: var(--s4);
   border-radius: var(--r-md);
   background: var(--sunken);
 }
-.profile-avatar-panel .field { width: 100%; margin-bottom: 0; }
+.profile-avatar-panel .field { width: 100%; min-width: 0; margin-bottom: 0; }
+/* The label and filename read as captions under the portrait, so they centre
+   with it rather than hanging off the left edge of the card. */
+.profile-avatar-panel .field > label,
+.profile-avatar-panel .field > small { display: block; text-align: center; }
 .profile-avatar-large {
   width: 8rem;
   height: 8rem;

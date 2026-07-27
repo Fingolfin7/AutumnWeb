@@ -43,6 +43,7 @@
     {# — so it can move page-by-page as those scripts are rewritten.           #}
     <script type="text/javascript" src="{% static 'core/js/jquery-3.6.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'core/js/local_times.js' %}?v={{ static_version.local_times }}"></script>
+    <script type="text/javascript" src="{% static 'core/js/background_dim.js' %}?v={{ static_version.background_dim }}" defer></script>
     <script type="text/javascript" src="{% static 'core/js/pwa.js' %}?v={{ static_version.pwa }}"></script>
     <script type="text/javascript" src="{% static 'core/js/page_loading.js' %}?v={{ static_version.page_loading }}"></script>
     <script type="text/javascript" src="{% static 'core/js/focus_desk.js' %}?v={{ static_version.focus_desk }}" defer></script>
@@ -86,6 +87,23 @@
                     <a class="context-chip" href="{% url 'contexts' %}" title="Active context">{{ active_context.name }}</a>
                 {% endif %}
                 {% if user.is_authenticated %}
+                    {% comment %}
+                      Backdrop dimming, at hand rather than buried in Profile —
+                      it is a viewing comfort you adjust against the photo you
+                      are actually looking at. CSS reveals it only when a photo
+                      resolved (body.bg-active); rendering it unconditionally
+                      here avoids restating the shell's three-way background
+                      resolution. The csrf token is for the debounced save in
+                      background_dim.js; there is no form to carry it.
+                    {% endcomment %}
+                    <div class="dim-control" title="Backdrop dimming">
+                        <i class="fas fa-adjust dim-icon" aria-hidden="true"></i>
+                        <label class="sr-only" for="header-dimming">Backdrop dimming</label>
+                        <input type="range" id="header-dimming" min="0" max="85" step="5"
+                               value="{{ user.profile.background_dimming }}"
+                               data-dim-url="{% url 'set_background_dimming' %}">
+                        {% csrf_token %}
+                    </div>
                     <a class="avatar" href="{% url 'profile' %}" title="{{ user.username }}">
                         <img src="{{ user.profile.image_url }}" alt="{{ user.username }}">
                     </a>

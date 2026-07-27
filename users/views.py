@@ -13,7 +13,8 @@ from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse, FileResponse, HttpResponseBadRequest
+from django.views.decorators.http import require_POST
 import logging
 import mimetypes
 import os
@@ -179,6 +180,31 @@ def profile(request):
         'openai_chatgpt_summary': token_bundle_summary(openai_chatgpt_bundle),
     }
     return render(request, 'users/profile.html', context)
+
+@login_required
+@require_POST
+def set_background_dimming(request):
+    """Persist the header's backdrop-dimming slider.
+
+    The slider lives in the app header, so it fires on every drag. It writes
+    one integer and returns no body: the page has already applied the value to
+    --background-dim-opacity locally, and this is only catching up the server
+    so the choice survives a reload and follows the user to another device.
+
+    Clamped to the same 0-85 the profile form enforces rather than trusted,
+    and saved with update_fields so a rapid drag cannot race the rest of the
+    profile out from under a form the user may have open in another tab.
+    """
+    try:
+        value = int(request.POST.get("value", ""))
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest("value must be an integer")
+
+    profile = request.user.profile
+    profile.background_dimming = max(0, min(85, value))
+    profile.save(update_fields=["background_dimming"])
+    return HttpResponse(status=204)
+
 
 @login_required
 def download_background(request):
