@@ -1260,7 +1260,22 @@ body.bg-active .app { position: relative; z-index: 2; }
    and the width comes from --w / min-width, so padding never sized it.) */
 .fd-tl-block {
   position: absolute; top: .5rem; bottom: .5rem;
-  left: var(--start); width: var(--w); min-width: 1.5rem;
+  /* WIDTH IS THE DATA. --w is the session's share of the window, and a floor
+     that overrides it is a lie about duration, not a nicety. This was 1.5rem
+     (24px) and it flattened the whole week view: on a 977px track spanning
+     7 days the real widths ran 0.6px (a 6m session) to 8px (1h 23m), a 13x
+     range, and every single block rendered at exactly 24px. Gym at 2h 38m and
+     Speech at 7m became the same mark.
+
+     2px is the floor now — small enough that anything above ~16 minutes at
+     week scale keeps its true proportion, big enough that a very short
+     session is still a visible tick rather than a sub-pixel ghost. Below
+     that the differences are not worth drawing anyway.
+
+     Hour-scale sessions on a week axis are only ever going to be a few pixels
+     wide. That is honest: the ::before below makes them hoverable despite it,
+     and the tooltip carries the detail the width cannot. */
+  left: var(--start); width: var(--w); min-width: 2px;
   container-type: inline-size;
   border-radius: var(--r-xs);
   background: color-mix(in srgb, var(--proj, var(--project)) 34%, transparent);
@@ -1270,6 +1285,14 @@ body.bg-active .app { position: relative; z-index: 2; }
   transition: transform .16s var(--ease), background .16s var(--ease),
               box-shadow .16s var(--ease);
 }
+/* The pointer target, held apart from the drawn mark. A 2px block is honest
+   but unhittable, so this pads the hit area out to ~14px without touching the
+   width the eye reads. It is a child of the block, so :hover and the tooltip
+   below fire from it exactly as they would from the block itself. */
+.fd-tl-block::before {
+  content: ""; position: absolute; inset: -.35rem -6px;
+}
+
 /* The block does NOT clip: its tooltip is a child and has to escape upward.
    Each text line clips itself instead (see .fd-tl-b-lab / .fd-tl-b-dur). */
 .fd-tl-block:hover,
