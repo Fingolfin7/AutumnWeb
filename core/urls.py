@@ -60,7 +60,10 @@ urlpatterns = [
     path("timers/<int:session_id>/note/", update_timer_note, name="update_timer_note"),
     path("restart_timer/<int:session_id>/", restart_timer, name="restart_timer"),
     path("remove_timer/<int:session_id>/", remove_timer, name="remove_timer"),
-    path("create_subproject/", CreateProjectView.as_view(), name="create_project"),
+    # Was served at "create_subproject/" — a copy-paste slip. Only the URL name
+    # is ever used to build links, so nothing referenced the wrong path, but it
+    # made the address bar lie on the create-project page.
+    path("create_project/", CreateProjectView.as_view(), name="create_project"),
     path(
         "create_subproject/<int:pk>/",
         CreateSubProjectView.as_view(),

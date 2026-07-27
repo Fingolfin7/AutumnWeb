@@ -1,4 +1,4 @@
-{% extends 'core/base_fd.html' %}
+{% extends 'core/base.html' %}
 {% load static %}
 {% load time_formats %}
 
@@ -11,13 +11,16 @@
 
   allocation_editor.js builds the .attr-* subtree from the [data-allocation-item]
   spans; session_note_editor.js owns the toolbar and [data-note-status].
-  Neither set of hooks may be renamed. data-timer-id / data-start-time keep
-  dynamic_timers.js ticking the elapsed figure.
+  Neither set of hooks may be renamed.
+
+  The elapsed figure below is STATIC — server-rendered at page load. An earlier
+  comment here claimed dynamic_timers.js ticked it; it never did, because that
+  script scoped its selector to inside #active-timers and this page has no such
+  container. Chunk 13 dropped the dead script rather than leave the claim.
   ============================================================================
 {% endcomment %}
 
 {% block head_includes %}
-    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
     <script src="{% static 'core/js/session_note_editor.js' %}?v={{ static_version.session_note_editor }}" type="text/javascript"></script>
     <script src="{% static 'core/js/allocation_editor.js' %}?v={{ static_version.allocation_editor }}" type="text/javascript"></script>
 {% endblock %}

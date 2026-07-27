@@ -15,7 +15,7 @@
                            calendar cells.
 
    The running-timer cards are re-rendered server-side every five seconds by
-   dynamic_timers.js, which fires `autumn:timers-refreshed` afterwards. Nothing
+   timer_poll.js, which fires `autumn:timers-refreshed` afterwards. Nothing
    here holds a reference to a card across that swap: every tick re-queries.
    ==========================================================================*/
 (function () {
@@ -86,7 +86,7 @@
   }
 
   /* Times rendered by the `time_formatter` filter carry their UTC instant and
-     are converted to the browser's clock by script.js on load. Cards that
+     are converted to the browser's clock by local_times.js on load. Cards that
      arrive later, via the poll, never saw that pass — so redo it for them. */
   function localiseTimes(root) {
     root.querySelectorAll("[data-utc-time]").forEach(function (el) {
@@ -203,18 +203,21 @@
       if (label) { label.textContent = clockLabel(now); }
     }
 
-    root.querySelectorAll("[data-live-block]").forEach(function (block) {
-      var started = Date.parse(block.getAttribute("data-start-iso"));
+    /* This is the .fd-tl-mark wrapper, not the .fd-tl-block itself: the block
+       and its tooltip are siblings under it and both read the geometry by
+       inheritance, so writing the three properties here moves the pair. */
+    root.querySelectorAll("[data-live-block]").forEach(function (mark) {
+      var started = Date.parse(mark.getAttribute("data-start-iso"));
       if (isNaN(started)) { return; }
       var from = Math.max(started, windowStart);
       var startPct = pct(from);
       var endPct = pct(now);
 
-      block.style.setProperty("--start", startPct.toFixed(4) + "%");
-      block.style.setProperty("--end", endPct.toFixed(4) + "%");
-      block.style.setProperty("--w", Math.max(0, endPct - startPct).toFixed(4) + "%");
+      mark.style.setProperty("--start", startPct.toFixed(4) + "%");
+      mark.style.setProperty("--end", endPct.toFixed(4) + "%");
+      mark.style.setProperty("--w", Math.max(0, endPct - startPct).toFixed(4) + "%");
 
-      var duration = block.querySelector("[data-live-dur]");
+      var duration = mark.querySelector("[data-live-dur]");
       if (duration) { duration.textContent = compactMinutes((now - from) / 60000); }
     });
   }

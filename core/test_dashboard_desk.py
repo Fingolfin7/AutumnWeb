@@ -145,7 +145,7 @@ class DashboardRendersFocusDeskTests(DashboardTestCase):
         """No page may load both stylesheets — that is the whole migration."""
         response = self.client.get(reverse("home"))
 
-        self.assertTemplateUsed(response, "core/base_fd.html")
+        self.assertTemplateUsed(response, "core/base.html")
         self.assertContains(response, "core/css/focus_desk.css")
         self.assertNotContains(response, "core/css/style.css")
 

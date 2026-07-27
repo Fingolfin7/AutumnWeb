@@ -1,4 +1,4 @@
-{% extends 'core/base_fd.html' %}
+{% extends 'core/base.html' %}
 {% load static %}
 
 {% comment %}
@@ -16,7 +16,7 @@
 {% endcomment %}
 
 {% block head_includes %}
-    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/timer_poll.js' %}?v={{ static_version.timer_poll }}" type="text/javascript"></script>
     <script src="{% static 'core/js/timer_notes.js' %}?v={{ static_version.timer_notes }}" type="text/javascript"></script>
     <script src="{% static 'core/js/dashboard_desk.js' %}?v={{ static_version.dashboard_desk }}" type="text/javascript" defer></script>
 {% endblock %}

@@ -101,6 +101,61 @@ class PortedPagesSmokeTests(TestCase):
                 self.assertIn("core/css/focus_desk.css", body)
                 self.assertNotIn("core/css/style.css", body)
 
+    def test_every_referenced_static_file_exists(self):
+        """A <script src> or <link href> pointing at a deleted file fails
+        silently: the page still renders 200 and the behaviour just stops.
+
+        Chunk 13 deleted style.css, colours.css, script.js, dynamic_timers.js,
+        session_sliders.js, home_timers.js and charts.js, so this sweeps every
+        local static URL the pages actually emit and checks it is on disk.
+        """
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+
+        pattern = re.compile(r'(?:src|href)="(/static/[^"?]+)')
+        seen = set()
+        for url in self.ported_urls():
+            seen.update(pattern.findall(self.client.get(url).content.decode()))
+
+        self.assertTrue(seen, "no static references found — is the regex stale?")
+        root = Path(settings.BASE_DIR)
+        for ref in sorted(seen):
+            with self.subTest(static=ref):
+                # /static/core/js/x.js -> core/static/core/js/x.js
+                relative = ref[len("/static/"):]
+                app_dir = relative.split("/", 1)[0]
+                self.assertTrue(
+                    (root / app_dir / "static" / relative).is_file(),
+                    f"{ref} is referenced but does not exist on disk",
+                )
+
+    def test_service_worker_precaches_only_files_that_exist(self):
+        """cache.addAll is all-or-nothing: one 404 rejects the install and the
+        service worker never activates, taking offline support with it."""
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+
+        root = Path(settings.BASE_DIR)
+        source = (
+            root / "core" / "static" / "core" / "pwa" / "service-worker.js"
+        ).read_text(encoding="utf-8")
+        block = source.split("PRECACHE_URLS = [", 1)[1].split("]", 1)[0]
+        urls = re.findall(r'"(/static/[^"]+)"', block)
+
+        self.assertTrue(urls, "precache list is empty — did the format change?")
+        for ref in urls:
+            with self.subTest(static=ref):
+                relative = ref[len("/static/"):]
+                app_dir = relative.split("/", 1)[0]
+                self.assertTrue(
+                    (root / app_dir / "static" / relative).is_file(),
+                    f"{ref} is precached but does not exist on disk",
+                )
+
     def test_no_ported_page_reloads_a_second_jquery(self):
         """The shell ships jQuery 3.6; the legacy pages pulled 1.7.1 in after
         it, silently downgrading every script that followed."""

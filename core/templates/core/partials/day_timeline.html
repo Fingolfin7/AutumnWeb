@@ -77,13 +77,23 @@
                       stays open on :focus-within so it is reachable by
                       keyboard.
                     {% endcomment %}
+                    {% comment %}
+                      .fd-tl-mark draws nothing (display: contents). It exists
+                      to own the geometry once: the block and its tooltip are
+                      SIBLINGS, both positioned against the track, and both
+                      inherit --start/--w/--end from here. The tooltip cannot
+                      live inside the block — the block is absolutely
+                      positioned and as narrow as 24px, so a tooltip anchored
+                      to it hangs off the side of a phone screen.
+                    {% endcomment %}
                     {% for block in lane.blocks %}
-                    <div class="fd-tl-block{% if block.is_live %} is-live{% endif %}"
+                    <div class="fd-tl-mark"
                          style="--start: {{ block.start_pct }}%; --w: {{ block.width_pct }}%; --end: {{ block.end_pct }}%"
-                         {% if block.is_live %}data-live-block data-start-iso="{{ block.session.start_time|utc_time_formatter }}"{% endif %}
-                         tabindex="0">
-                        {% if block.label %}<span class="fd-tl-b-lab">{{ block.label }}</span>{% endif %}
-                        <span class="fd-tl-b-dur" {% if block.is_live %}data-live-dur{% endif %}>{{ block.duration_label }}</span>
+                         {% if block.is_live %}data-live-block data-start-iso="{{ block.session.start_time|utc_time_formatter }}"{% endif %}>
+                        <div class="fd-tl-block{% if block.is_live %} is-live{% endif %}" tabindex="0">
+                            {% if block.label %}<span class="fd-tl-b-lab">{{ block.label }}</span>{% endif %}
+                            <span class="fd-tl-b-dur" {% if block.is_live %}data-live-dur{% endif %}>{{ block.duration_label }}</span>
+                        </div>
                         <div class="fd-tl-tip{% if block.start_pct > 55 %} fd-tl-tip--flip{% endif %}">
                             <p>
                                 <span class="mono text-cyan">{{ block.start_local|time_formatter }} &rarr; {% if block.is_live %}running{% else %}{{ block.end_local|time_formatter }}{% endif %}</span>

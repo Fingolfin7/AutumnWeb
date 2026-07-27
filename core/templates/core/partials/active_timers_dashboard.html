@@ -4,7 +4,7 @@
   FOCUS DECK — running timers (dashboard surface)
   ----------------------------------------------------------------------------
   One .focus-card per running timer. This fragment is re-fetched every five
-  seconds by dynamic_timers.js and swapped in wholesale, so it must stay
+  seconds by timer_poll.js and swapped in wholesale, so it must stay
   self-contained: it is rendered WITHOUT context processors (see
   core.views.timers.active_timers_fragment) and may only use `timers`.
 

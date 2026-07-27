@@ -1,10 +1,12 @@
-{% extends 'core/base_fd.html' %}
+{% extends 'core/base.html' %}
 {% load static %}
 {% load time_formats %}
 
-{% block head_includes %}
-    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
-{% endblock %}
+{% comment %}
+  The elapsed figure below is server-rendered and static. This page used to
+  load dynamic_timers.js for it, but that script only ticked `.timer-duration`
+  inside #active-timers, which this page does not have — see stop_timer.html.
+{% endcomment %}
 
 {% block content %}
 

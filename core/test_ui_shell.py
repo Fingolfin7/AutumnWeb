@@ -1,4 +1,4 @@
-"""Smoke tests for the Focus Desk shell (core/templates/core/base_fd.html).
+"""Smoke tests for the Focus Desk shell (core/templates/core/base.html).
 
 The shell is pure template, so the realistic failure mode is a typo'd
 ``{% url %}`` name or a tag that blows up for a given user state. Rendering it
@@ -24,7 +24,7 @@ class FocusDeskShellTests(TestCase):
         # the active_context processor reads request.session, which
         # RequestFactory does not attach
         request.session = SessionStore()
-        return render_to_string("core/base_fd.html", {"user": user}, request=request)
+        return render_to_string("core/base.html", {"user": user}, request=request)
 
     def test_renders_for_authenticated_user(self):
         html = self._render(self.user)

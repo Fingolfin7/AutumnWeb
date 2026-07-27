@@ -46,7 +46,7 @@ class InsightsDeskTests(TestCase):
     def test_renders_on_the_new_shell_only(self):
         response = self.client.get(reverse("insights"))
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "core/base_fd.html")
+        self.assertTemplateUsed(response, "core/base.html")
         body = response.content.decode()
         self.assertIn("core/css/focus_desk.css", body)
         self.assertNotIn("core/css/style.css", body)

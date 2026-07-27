@@ -7,13 +7,13 @@
   belongs here: the notes-as-you-go editor. This is the page you leave open
   while a timer runs.
 
-  Re-fetched every five seconds by dynamic_timers.js and swapped in wholesale,
+  Re-fetched every five seconds by timer_poll.js and swapped in wholesale,
   so it must stand alone: rendered WITHOUT context processors, `timers` is the
   only variable available. The wrapper is `display: contents` (.focus-cards)
   so its cards stay layout children of the .focus-track in timers.html.
 
   timer_notes.js owns every [data-timer-note-*] hook and the data-dirty flag
-  that tells dynamic_timers.js not to swap the fragment out from under an
+  that tells timer_poll.js not to swap the fragment out from under an
   unsaved note. Do not rename them.
   ============================================================================
 {% endcomment %}

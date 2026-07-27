@@ -77,10 +77,13 @@ Status: `TODO` / `WIP` / `DONE`
 | 9 | Charts | `charts` | **DONE** |
 | 10 | Import / Export | `import`, `export` (`home` was dead — deleted) | **DONE** |
 | 11 | Users | `users/base`, `login`, `logout`, `register`, `password_reset`, `profile` | **DONE** |
-| 12 | Insights | `llm_insights/insights` | TODO |
-| 13 | Cutover: delete legacy shell + `style.css`, rename `base_fd` → `base` | — | TODO |
+| 12 | Insights | `llm_insights/insights` | **DONE** |
+| 13 | Cutover: delete legacy shell + `style.css`, rename `base_fd` → `base` | — | **DONE** |
 
-### Chunk 13 cutover checklist (add to as you go)
+**The migration is complete.** Every template extends `core/base.html`, which
+is the Focus Desk shell, and `focus_desk.css` is the only stylesheet.
+
+### Chunk 13 cutover checklist — all done
 
 - Delete `core/templates/core/base.html`, rename `base_fd.html` → `base.html`,
   drop the `{% extends %}` churn.
@@ -105,7 +108,44 @@ Status: `TODO` / `WIP` / `DONE`
 - DONE early: `home.html`, `partials/active_timers_home.html` and the "home"
   timer surface were dead and are deleted.
 
-## Chunk 12 (Insights) — read this before starting
+### What chunk 13 actually did
+
+- Deleted the legacy `core/base.html`, renamed `base_fd.html` onto its name,
+  and repointed 32 templates and 12 test modules.
+- Deleted `style.css` and `colours.css`. Nothing referenced them.
+- `script.js` → `local_times.js`. Only the `[data-utc-time]` conversion was
+  live; the burger menu drove a sidebar this shell does not have, the
+  background code duplicated what the shell already does server-side, and the
+  scroll-to-bottom duplicated insights_page.js. Rewritten without jQuery.
+- `dynamic_timers.js` → `timer_poll.js`, also without jQuery. Its
+  `updateDurations()` was entirely dead: the selector was scoped inside
+  `#active-timers`, but `.timer-duration` only appears on the stop/remove
+  confirm pages, which have no such container — and the polled partials carry
+  no `.timer-duration` at all. Those two pages stopped loading it.
+- Deleted `session_sliders.js`, `home_timers.js` and `charts.js` (the
+  pre-split monolith). All three were unreferenced.
+- **The service worker was precaching `style.css`, `colours.css` and
+  `script.js`.** `cache.addAll` is all-or-nothing, so once those were deleted
+  the install would have rejected and the worker would never have activated,
+  silently taking offline support with it. Precache list corrected and the
+  cache keys bumped to v3, since installed clients hold the old list until the
+  name changes.
+- `create_project` was routed at `path("create_subproject/")`. Only the URL
+  name is ever used to build links, so nothing was broken, but the address bar
+  lied. Now `create_project/`.
+- Two new smoke tests guard this class of mistake: every `/static/` URL the
+  pages actually emit must exist on disk, and so must every entry in the
+  service worker's precache list.
+
+### Still open
+
+- `body.light-mode` in `focus_desk.css` is unreachable — nothing sets that
+  class any more. It is a complete token set for a light theme, so it was left
+  in place rather than deleted; wire it up or drop it deliberately.
+- The elapsed figure on `stop_timer` and `remove_timer` is static. It reads
+  like it should tick, and the markup already carries `data-start-time`.
+
+## Chunk 12 (Insights) — how it went
 
 The biggest remaining job, and NOT a shell swap. Three separate problems:
 

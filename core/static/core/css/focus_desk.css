@@ -1353,8 +1353,30 @@ body.light-mode {
 }
 
 /* ── tooltip ───────────────────────────────────────────────────────────── */
+
+/* The tooltip is a SIBLING of the block, not a child, and is positioned
+   against .fd-tl-track. It has to be. .fd-tl-block is absolutely positioned
+   and bottoms out at min-width 1.5rem, so a tooltip inside it resolves its
+   offsets against a 24px box sitting somewhere along the axis — and a tooltip
+   is an order of magnitude wider than that. Anchored to either edge of that
+   box it leaves the screen: on a 375px viewport every block on the Week range
+   lost its left side, which is exactly where the start time and the project
+   name are. Anchored to the track it has the whole width to work with, and on
+   a phone it simply spans it (see the narrow rules at the end of the file).
+
+   .fd-tl-mark is the seam that makes this possible. display:contents means it
+   draws no box of its own — the block and the tooltip are laid out as though
+   they were both direct children of the track — while --start/--w/--end are
+   declared once on it and inherit to the pair. dashboard_desk.js therefore
+   still writes a live block's geometry to a single element and both halves
+   follow. */
+.fd-tl-mark { display: contents; }
+
 .fd-tl-tip {
-  display: none; position: absolute; bottom: calc(100% + .6rem); left: 0;
+  display: none; position: absolute; left: var(--start);
+  /* The block sits .5rem inside the track, so .1rem clear of the track's top
+     edge leaves exactly the .6rem gap the bridge below has to span. */
+  bottom: calc(100% + .1rem);
   min-width: 18rem; max-width: 24rem; z-index: 30;
   background: var(--slab-solid); border-radius: var(--r-sm);
   box-shadow: var(--edge), var(--e3);
@@ -1369,12 +1391,18 @@ body.light-mode {
 }
 /* Blocks in the right half of the axis anchor their tooltip to the right edge
    instead, so a late-afternoon session can't push the page sideways. The
-   template sets this from the block's own start percentage. */
-.fd-tl-tip--flip { left: auto; right: 0; }
-/* :focus-within, not :focus-visible — the tooltip contains a link, and the
-   tooltip must survive focus moving into it. */
-.fd-tl-block:hover .fd-tl-tip,
-.fd-tl-block:focus-within .fd-tl-tip { display: block; }
+   template sets this from the block's own start percentage. --end is the
+   block's right edge as a percentage of the track, the same value .is-live
+   pins itself by. */
+.fd-tl-tip--flip { left: auto; right: calc(100% - var(--end)); }
+/* The tooltip is no longer inside the block, so the block's own :focus-within
+   can no longer hold it open for the link it contains — the tooltip keeps
+   itself open instead, on hover and on focus-within. Tab order still runs
+   block → link, because they are adjacent in the DOM. */
+.fd-tl-block:hover + .fd-tl-tip,
+.fd-tl-block:focus + .fd-tl-tip,
+.fd-tl-tip:hover,
+.fd-tl-tip:focus-within { display: block; }
 .fd-tl-tip p + p, .fd-tl-tip-note, .fd-tl-tip-link { margin-top: .35rem; }
 .fd-tl-tip-note { color: var(--note); }
 .fd-tl-tip-note p { margin: 0; }
@@ -1435,7 +1463,15 @@ body.light-mode {
     padding: 0 0 .35rem;
   }
   .fd-tl-track { height: 3.5rem; }
-  .fd-tl-tip { left: auto; right: 0; min-width: 0; width: min(20rem, 82vw); }
+  /* Now that the tooltip is anchored to the track it can just span it: no
+     edge of a 24px block to hang off, and the track is the full content width
+     here because the gutter has collapsed to 0. Both min-width and max-width
+     have to give way — 18rem is wider than the content box of a 375px phone,
+     and it was that min-width, pushed off the left of a narrow block, that
+     put the start time and project name off-screen. */
+  .fd-tl-tip, .fd-tl-tip--flip {
+    left: 0; right: 0; min-width: 0; max-width: none;
+  }
 }
 
 /* ============================================================================

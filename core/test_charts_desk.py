@@ -24,7 +24,7 @@ class ChartsPageTests(TestCase):
         response = self.client.get(reverse("charts"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "core/base_fd.html")
+        self.assertTemplateUsed(response, "core/base.html")
         self.assertContains(response, "core/css/focus_desk.css")
         self.assertNotContains(response, "core/css/style.css")
 

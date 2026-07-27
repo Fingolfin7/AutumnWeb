@@ -1,13 +1,17 @@
 const CACHE_PREFIX = "autumn-pwa";
-const PRECACHE = `${CACHE_PREFIX}-precache-v2`;
-const RUNTIME = `${CACHE_PREFIX}-runtime-v2`;
+/* Bumped to v3 in chunk 13: the precache list below changed, and installed
+   clients hold the old list under the old key until the name changes. */
+const PRECACHE = `${CACHE_PREFIX}-precache-v3`;
+const RUNTIME = `${CACHE_PREFIX}-runtime-v3`;
 const OFFLINE_URL = "/static/core/pwa/offline.html";
 
+/* cache.addAll is all-or-nothing: one 404 rejects the install and the worker
+   never activates. So every entry here must exist. style.css, colours.css and
+   script.js were removed with the legacy shell. */
 const PRECACHE_URLS = [
     OFFLINE_URL,
-    "/static/core/css/style.css",
-    "/static/core/css/colours.css",
-    "/static/core/js/script.js",
+    "/static/core/css/focus_desk.css",
+    "/static/core/js/local_times.js",
     "/static/core/js/pwa.js",
     "/static/core/js/page_loading.js",
     "/static/core/images/icons/autumn-icon-192.png",
