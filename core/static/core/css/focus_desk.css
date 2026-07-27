@@ -331,6 +331,33 @@ body.bg-active .app { position: relative; z-index: 2; }
   font-family: var(--font-mono); font-size: var(--fs-xs);
   color: var(--muted); letter-spacing: .02em;
 }
+/* Active-context switcher in the header. Styled as a chip rather than a form
+   control because that is what it reads as — a statement of what you are
+   currently looking at, which happens to be changeable. It borrows the
+   --context orange the context chips use everywhere else so the connection to
+   Contexts is not something you have to learn. */
+.context-switch { display: flex; align-items: center; }
+.context-switch select {
+  appearance: none;
+  padding: .2rem 1.5rem .2rem .6rem;
+  border: 0; border-radius: var(--r-pill);
+  font-family: inherit; font-size: var(--fs-xs);
+  color: var(--context); background: rgba(224, 164, 88, .13);
+  box-shadow: inset 0 0 0 1px rgba(224, 164, 88, .24);
+  cursor: pointer;
+  /* the chevron, drawn rather than shipped as an asset */
+  background-image: linear-gradient(45deg, transparent 50%, var(--context) 50%),
+                    linear-gradient(135deg, var(--context) 50%, transparent 50%);
+  background-position: calc(100% - .75rem) 55%, calc(100% - .5rem) 55%;
+  background-size: .25rem .25rem, .25rem .25rem;
+  background-repeat: no-repeat;
+}
+.context-switch select:hover { background-color: rgba(224, 164, 88, .2); }
+@media (max-width: 560px) {
+  /* the header has the brand, the dimmer and the avatar to fit as well */
+  .context-switch select { max-width: 7rem; text-overflow: ellipsis; }
+}
+
 /* Backdrop dimming, parked in the header beside the avatar. Hidden unless a
    photo actually resolved — with no backdrop there is nothing to dim, and an
    inert control in the chrome of every page is worse than no control. The
@@ -885,6 +912,37 @@ body.bg-active .dim-control { display: flex; }
   color: var(--ink); font-size: var(--fs-md); padding: .7rem 0;
 }
 .searchbar input::placeholder { color: var(--muted); }
+/* Charts and Insights lead with a date range rather than a search box: both
+   pages answer a question about a PERIOD, and on Insights the range decides
+   which sessions the model is even shown. The fields open on the user's
+   default-filter settings, so they read as "this is the window" rather than
+   as an empty form. Wraps to two lines before it squeezes the inputs. */
+.searchbar--range { flex-wrap: wrap; padding-right: .3rem; }
+.range-fields {
+  display: flex; align-items: center; gap: .5rem;
+  /* Sized to the fields, not to the bar. Left to grow they split the whole
+     width and you get two 561px date inputs holding ten characters each;
+     margin-right: auto keeps the launcher and Apply against the right edge
+     without the fields having to stretch to reach them. */
+  flex: 0 1 auto; min-width: 0; margin-right: auto;
+}
+.range-fields input[type="date"] {
+  flex: 0 1 11rem; min-width: 0;
+  padding: .5rem .6rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink);
+  font-family: inherit; font-size: var(--fs-sm);
+}
+.range-fields input[type="date"]:focus-visible {
+  outline: none; border-color: var(--brand-deep); box-shadow: var(--focus-ring);
+}
+.range-sep { flex: 0 0 auto; font-size: var(--fs-sm); }
+@media (max-width: 560px) {
+  /* The bar wraps here; the leading icon would take a whole row to itself and
+     the two date fields already say what this is. */
+  .searchbar--range > .fas { display: none; }
+}
+
 .filter-launcher {
   display: inline-flex; align-items: center; gap: .4rem;
   padding: .55rem .9rem; border-radius: var(--r-pill);
@@ -2467,10 +2525,10 @@ img.brand-mark {
    insights.html before renaming any of them.
    ==========================================================================*/
 .chat-layout {
-  /* Phone/tablet, measured at 375x812: 225px above the slab (header, page
-     title, searchbar) and ~130px below (its own margin, screen-pad, and the
-     body padding that keeps the fixed tabbar off the content). */
-  --chat-h: clamp(26rem, calc(100dvh - 21.5rem), 58rem);
+  /* Phone/tablet, re-measured at 375x812 after the date range replaced the
+     search box above: that bar wraps to ~106px here, against ~54px before,
+     so the chrome above the slab grew by about 46px. */
+  --chat-h: clamp(26rem, calc(100dvh - 24.5rem), 58rem);
   display: flex;
   height: var(--chat-h);
   margin-bottom: var(--s4);
@@ -2732,4 +2790,50 @@ img.brand-mark {
   .assistant-message { max-width: 92%; }
   .composer-note { display: none; }
   .chat-header-tokens { display: none; }
+}
+
+/* ============================================================================
+   PROJECTS — running badge, and the desktop column grid
+   ==========================================================================*/
+
+/* A project that already has a timer going. The row's start button does not
+   refuse a second one — two sessions can legitimately cover different
+   subprojects — so this is a statement of fact rather than a warning, and it
+   borrows the green live-dot the focus deck already uses for "alive". Without
+   it the start button was a silent double-start. */
+.project-running {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .1rem .55rem; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: 600;
+  color: var(--duration);
+  background: color-mix(in srgb, var(--duration) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--duration) 26%, transparent);
+  white-space: nowrap;
+}
+/* Quieter than a plain start button: a second concurrent timer is a deliberate
+   choice, so its affordance should not read as the obvious next step. */
+.project-start.is-running { background: var(--raised-2); color: var(--duration); }
+
+@media (min-width: 1000px) {
+  /* One project per full-width row is a lot of scrolling — this account has 79
+     of them, which at roughly four rows a screen is twenty screens to the
+     bottom. The row component is unchanged; it just stops being asked to span
+     1400px, and the list becomes columns. Multiplies what is visible without
+     inventing a second component, and phones are untouched.
+
+     auto-fill, not auto-fit: auto-fit collapses empty tracks, so a status
+     group holding one project would stretch that single row across the full
+     width and break alignment with the groups above it. */
+  .band-list--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(24rem, 1fr));
+    /* Bands are separated by hairlines, not borders (see the SURFACES rule).
+       A per-row top border in a grid would draw a line across the top of the
+       whole block, so the separator becomes a 1px gap over a hairline
+       background with each band painting its own surface back in. */
+    gap: 1px;
+    background: var(--hairline);
+  }
+  .band-list--grid > .band { background: var(--slab); }
+  .band-list--grid > .band + .band { border-top: 0; }
 }

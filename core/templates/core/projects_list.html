@@ -133,12 +133,23 @@
         </button>
 
         <div class="disclose-body">
-            <ul class="band-list">
+            {# --grid: columns from 1000px up. Scoped, because .band-list is #}
+            {# also the sessions, timers, tags and commitments list shape.   #}
+            <ul class="band-list band-list--grid">
                 {% for project in status_group.projects %}
                 <li class="band project" id="project-{{ project.id }}">
                     <div class="u-grow">
                         <div class="project-top">
                             <a class="project-name" href="{% url 'update_project' project.id %}">{{ project.name }}</a>
+                            {% if project.id in running_project_ids %}
+                            {# Starting a second timer on the same project is #}
+                            {# allowed, so this is a statement of fact rather #}
+                            {# than a warning — it just stops the start       #}
+                            {# button being a silent double-start.            #}
+                            <a class="project-running" href="{% url 'timers' %}" title="A timer is already running on this project">
+                                <span class="live-dot"></span> running
+                            </a>
+                            {% endif %}
                         </div>
 
                         {% if project.context or project.tags.all %}
@@ -169,8 +180,9 @@
                     <form method="post" action="{% url 'start_timer' %}">
                         {% csrf_token %}
                         <input type="hidden" name="project" value="{{ project.name }}">
-                        <button class="project-start" type="submit" title="Start a timer on {{ project.name }}">
-                            <i class="fas fa-play"></i><span class="sr-only">Start a timer on {{ project.name }}</span>
+                        <button class="project-start{% if project.id in running_project_ids %} is-running{% endif %}" type="submit"
+                                title="{% if project.id in running_project_ids %}Start ANOTHER timer on {{ project.name }} — one is already running{% else %}Start a timer on {{ project.name }}{% endif %}">
+                            <i class="fas fa-play"></i><span class="sr-only">{% if project.id in running_project_ids %}Start another timer on {{ project.name }}, one is already running{% else %}Start a timer on {{ project.name }}{% endif %}</span>
                         </button>
                     </form>
                 </li>

@@ -83,8 +83,30 @@
                 <span class="brand-word">Autumn</span>
             </a>
             <div class="header-right">
-                {% if active_context %}
-                    <a class="context-chip" href="{% url 'contexts' %}" title="Active context">{{ active_context.name }}</a>
+                {% comment %}
+                  Active context switcher. This narrows the dashboard,
+                  projects, sessions, timers, Insights and the charts API, so
+                  it belongs in the shell rather than on one page. Until now
+                  the header only DISPLAYED a chip when a context was set and
+                  nothing in the app could set one — the endpoint existed but
+                  raised TypeError, so it was unreachable in practice.
+
+                  Rendered only when the user actually has contexts: with none
+                  defined the control could only ever say "All contexts".
+                {% endcomment %}
+                {% if user.is_authenticated and user_contexts %}
+                    <form class="context-switch" method="post" action="{% url 'set_active_context' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <label class="sr-only" for="context-switch">Active context</label>
+                        <select id="context-switch" name="context_id" data-autosubmit>
+                            <option value="all" {% if not active_context %}selected{% endif %}>All contexts</option>
+                            {% for ctx in user_contexts %}
+                                <option value="{{ ctx.id }}" {% if active_context.id == ctx.id %}selected{% endif %}>{{ ctx.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <noscript><button class="btn btn--quiet" type="submit">Go</button></noscript>
+                    </form>
                 {% endif %}
                 {% if user.is_authenticated %}
                     {% comment %}

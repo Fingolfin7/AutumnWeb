@@ -66,4 +66,15 @@
     if (!note || event.target.closest("a")) { return; }
     note.classList.toggle("is-open");
   });
+
+  /* --------------------------------------------- self-submitting selects ---
+     A <select> that navigates on change, for controls where picking IS the
+     action and a separate Go button would only be a second click — currently
+     the header's context switcher. The form still works without JS (there is
+     a <noscript> submit), which is why this is a listener rather than an
+     inline onchange.                                                        */
+  document.addEventListener("change", function (event) {
+    var select = event.target.closest("select[data-autosubmit]");
+    if (select && select.form) { select.form.submit(); }
+  });
 })();

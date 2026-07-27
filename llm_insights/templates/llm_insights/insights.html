@@ -49,22 +49,33 @@
 </div>
 
 <form method="get" class="fields" id="search_form" enctype="multipart/form-data">
-    <div class="searchbar">
-        <i class="fas fa-search muted" aria-hidden="true"></i>
-        <label class="sr-only" for="project-search">Search projects</label>
-        {{ search_form.project_name }}
+    {% comment %}
+      The date range is the most consequential control on this page: it defines
+      the session set the model is given, so it is the answer's scope, not a
+      refinement. It opens on the profile's Insights default range (a separate
+      setting from the app-wide one). Project search moved into the sheet.
+
+      "Select sessions" is distinct from the "Filters" launcher beside it —
+      that opens the sheet, this re-selects the sessions the chat is grounded
+      in, and name="filter" is what makes the view confirm the new selection.
+    {% endcomment %}
+    <div class="searchbar searchbar--range">
+        <i class="fas fa-calendar-alt muted" aria-hidden="true"></i>
+        <span class="range-fields">
+            <label class="sr-only" for="start_date">Start date</label>
+            {{ search_form.start_date }}
+            <span class="range-sep muted" aria-hidden="true">&rarr;</span>
+            <label class="sr-only" for="end_date">End date</label>
+            {{ search_form.end_date }}
+        </span>
         <button class="filter-launcher" type="button" data-sheet-open="filterSheet" aria-haspopup="dialog">
             <i class="fas fa-sliders-h"></i> Filters
             {% if active_filters %}<span class="filter-count">{{ active_filters|length }}</span>{% endif %}
         </button>
-        {# Distinct from the "Filters" launcher beside it: that opens the      #}
-        {# sheet, this re-selects the session set the chat is grounded in.     #}
-        {# name="filter" is what makes the view confirm the new selection.     #}
         <button type="submit" class="btn btn--primary" id="search_button" name="filter" value="true">
             <i class="fa fa-check"></i> Select sessions
         </button>
     </div>
-    <div id="project-search-results"></div>
 
     {% if active_filters %}
     <p class="filter-summary">
@@ -88,15 +99,10 @@
             <p class="sheet-title">Filter sessions</p>
 
             <div class="field">
-                <label for="start_date">Start date</label>
-                {{ search_form.start_date }}
-                {{ search_form.start_date.errors }}
-            </div>
-
-            <div class="field">
-                <label for="end_date">End date</label>
-                {{ search_form.end_date }}
-                {{ search_form.end_date.errors }}
+                <label for="project-search">Project name</label>
+                {{ search_form.project_name }}
+                {{ search_form.project_name.errors }}
+                <div id="project-search-results"></div>
             </div>
 
             <div class="field">

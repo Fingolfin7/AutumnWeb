@@ -27,7 +27,7 @@ from core.views import (
     export_view,
     merge_projects,
     merge_subprojects,
-    set_active_context,
+    switch_context,
     manage_contexts,
     manage_tags,
     UpdateContextView,
@@ -109,7 +109,7 @@ urlpatterns = [
     ),
     path("contexts/", manage_contexts, name="contexts"),
     path("tags/", manage_tags, name="tags"),
-    path("set-context/", set_active_context, name="set_active_context"),
+    path("set-context/", switch_context, name="set_active_context"),
     # context/tag update/delete
     path(
         "update_context/<int:pk>/", UpdateContextView.as_view(), name="update_context"
