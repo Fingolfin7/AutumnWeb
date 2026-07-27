@@ -49,6 +49,11 @@ urlpatterns = [
     ),
     path("profile/", user_views.profile, name="profile"),
     path(
+        "profile/background-dimming/",
+        user_views.set_background_dimming,
+        name="set_background_dimming",
+    ),
+    path(
         "profile/download-background/",
         user_views.download_background,
         name="download_background",

@@ -4,198 +4,220 @@
 {% load markdown_render %}
 {% load param_replace %}
 
+{% comment %}
+  ============================================================================
+  SESSIONS — Focus Desk (UI_REDESIGN.md chunk 3)
+  ----------------------------------------------------------------------------
+  The list is the same object the dashboard shows, at full width: day groups of
+  .band rows inside one .session-list slab.
+
+  The eight filters do NOT sit on the page. Per the nav model in
+  focus_desk.css, a page gets ONE search field plus a launcher that opens the
+  filter .sheet; the applied filters are then echoed back as pills so a
+  narrowed list never reads as an empty one. Everything is inside a single GET
+  form — the sheet is fixed-position, so its markup can live wherever the form
+  needs it.
+
+  session_sliders.js is deliberately not loaded: long notes clamp and expand
+  on click (focus_desk.js) rather than sliding past on hover.
+  ============================================================================
+{% endcomment %}
+
 {% block head_includes %}
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
-    <script src="{% static 'core/js/session_sliders.js' %}?v={{ static_version.session_sliders }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
-    <section id="search_options">
-        <form method="get" id="search_form" class="card flex-row" enctype="multipart/form-data">
-            <div id="search_projects">
-                <span class="label-input">
-                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
-                    {{ search_form.project_name }}
-                    {{ search_form.project_name.errors }}
-                </span>
-                <span id="project-search-results"></span>
-            </div>
 
-            <span class="label-input" id="filter_start">
-                <label for="start_date"><i class="fa fa-calendar"></i> Start Date</label>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Everything you have tracked</p>
+        <h1 class="page-title">Sessions</h1>
+    </div>
+</div>
+
+<form method="get" class="fields" id="search_form">
+    <div class="searchbar">
+        <i class="fas fa-search muted" aria-hidden="true"></i>
+        <label class="sr-only" for="project-search">Search by project</label>
+        {{ search_form.project_name }}
+        <button class="filter-launcher" type="button" data-sheet-open="filterSheet" aria-haspopup="dialog">
+            <i class="fas fa-sliders-h"></i> Filters
+            {% if active_filters %}<span class="filter-count">{{ active_filters|length }}</span>{% endif %}
+        </button>
+    </div>
+    <div id="project-search-results"></div>
+
+    <p class="filter-summary">
+        <span class="result-count">{{ result_count }}</span> session{{ result_count|pluralize }}
+        {% for item in active_filters %}
+        <span class="filter-pill">{{ item.label }} <b>{{ item.value }}</b></span>
+        {% endfor %}
+        {% if active_filters %}
+        <a class="btn btn--quiet" href="{% url 'sessions' %}">Clear</a>
+        {% endif %}
+    </p>
+
+    {% comment %}
+      The filter sheet. Its controls are part of this same GET form, so
+      "Apply" is an ordinary submit and the browser carries every value.
+    {% endcomment %}
+    <div class="sheet filter-sheet" id="filterSheet" role="dialog" aria-modal="true" aria-label="Filter sessions">
+        <div class="sheet-scrim" data-close></div>
+        <div class="sheet-panel">
+            <div class="sheet-grab"></div>
+            <p class="sheet-title">Filter sessions</p>
+
+            <div class="field">
+                <label for="start_date">Start date</label>
                 {{ search_form.start_date }}
                 {{ search_form.start_date.errors }}
-            </span>
+            </div>
 
-            <span class="label-input" id="filter_end">
-                <label for="end_date"><i class="fa fa-calendar"></i> End Date</label>
+            <div class="field">
+                <label for="end_date">End date</label>
                 {{ search_form.end_date }}
                 {{ search_form.end_date.errors }}
-            </span>
+            </div>
 
-            <span class="label-input" id="context-filter">
-                <label for="context-filter"><i class="fa fa-layer-group"></i> Context</label>
+            <div class="field">
+                <label for="context-filter">Context</label>
                 {{ search_form.context }}
                 {{ search_form.context.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
-                <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
-                <details class="tag-dropdown">
-                    <summary class="tag-summary">Select tags</summary>
-                    <div class="tag-options">
-                        {% for cb in search_form.tags %}
-                            <label class="tag-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                {{ search_form.tags.errors }}
-            </span>
-
-            <span class="label-input">
-                <label for="exclude-projects-filter"><i class="fa fa-ban"></i> Exclude Projects</label>
-                <details class="tag-dropdown exclude-dropdown">
-                    <summary class="tag-summary">Select projects to exclude</summary>
-                    <div class="tag-options exclude-options">
-                        <input type="text" class="exclude-search-input" placeholder="Search projects..." autocomplete="off">
-                        {% for cb in search_form.exclude_projects %}
-                            <label class="tag-option exclude-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                {{ search_form.exclude_projects.errors }}
-            </span>
-
-            <span class="label-input">
-                <label for="note_snippet"><i class="fa fa-sticky-note"></i> Note</label>
+            <div class="field">
+                <label for="note_snippet">Note contains</label>
                 {{ search_form.note_snippet }}
                 {{ search_form.note_snippet.errors }}
-            </span>
-
-            <span>
-                <button type="submit" class="primary-button" id="search_button">
-                    <i class="fa fa-search"></i>
-                    Search
-                </button>
-            </span>
-        </form>
-    </section>
-
-    <section id="sessions-list">
-        {% if not sessions %}
-            <div class="full-width centered-pic">
-                <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}"
-                 alt="No sessions found">
             </div>
-        {% else %}
-            <h2 class="text-center">Sessions</h2>
-            <br>
-        {% endif %}
 
-        {% for date, data in grouped_sessions.items %}
-            <h3>
-                <u>{{ date|day_date_formatter }}</u>
-                <span class="text-green">
-                    ({{ data.total_duration|duration_formatter }})
-                </span>
-            </h3>
+            {% if search_form.tags|length %}
+            <div class="field">
+                <span class="field-label">Tags</span>
+                <div class="check-grid">
+                    {% for cb in search_form.tags %}
+                    <span>{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
+                    {% endfor %}
+                </div>
+                {{ search_form.tags.errors }}
+            </div>
+            {% endif %}
 
-            <br>
+            {% if search_form.exclude_projects|length %}
+            <div class="field">
+                <span class="field-label">Exclude projects</span>
+                <input type="text" class="exclude-search-input input" placeholder="Search projects…" autocomplete="off">
+                <div class="check-grid exclude-options u-mt-4">
+                    {% for cb in search_form.exclude_projects %}
+                    <span class="exclude-option">{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
+                    {% endfor %}
+                </div>
+                {{ search_form.exclude_projects.errors }}
+            </div>
+            {% endif %}
 
+            <div class="sheet-foot">
+                <a class="btn btn--ghost" href="{% url 'sessions' %}">Clear all</a>
+                <button class="btn btn--primary" type="submit">Apply filters</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% if grouped_sessions %}
+<section class="slab session-list" aria-label="Sessions">
+    {% for date, data in grouped_sessions.items %}
+    <div class="day-group">
+        <header class="day-head">
+            <span class="day-date">{{ date|day_date_formatter }}</span>
+            <span class="day-total">{{ data.total_duration|duration_formatter }}</span>
+            <span class="day-note">{{ data.sessions|length }} session{{ data.sessions|length|pluralize }}</span>
+        </header>
+
+        <ul class="band-list">
             {% for session in data.sessions %}
-                <div class="card" id="session-{{ session.id }}">
-                    <div class="session-row">
-                        <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-                        <span>to</span>
-                        <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
-
-                        <span class="session-duration">{{ session.duration|duration_formatter }}</span>
-                        {% if session.crosses_dst_transition %}
-                            <span class="text-yellow" title="Session crosses a daylight savings transition">DST</span>
-                        {% endif %}
-
-                        <span class="text-red project-name-slider" id="project-name">
-                            <a class="plain-link" href="{% url 'update_project' session.project.id %}">
-                                {{ session.project.name }}
-                            </a>
-                        </span>
-
-                        <span class="session-subprojects">
+            <li class="band swipe" id="session-{{ session.id }}">
+                <div class="swipe-track">
+                    <div class="swipe-face session">
+                        <div class="session-mid">
+                            <span class="session-time">{{ session.start_time|time_formatter }}</span>
+                            <span class="session-arrow">&rarr;</span>
+                            <span class="session-time">{{ session.end_time|time_formatter }}</span>
+                            {% if session.crosses_dst_transition %}
+                            <span class="badge-dst" title="Session crosses a daylight savings transition">DST</span>
+                            {% endif %}
+                        </div>
+                        <div class="session-top">
+                            <a class="session-project" href="{% url 'update_project' session.project.id %}">{{ session.project.name }}</a>
                             {% for subproject in session.subprojects.all %}
-                                <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                                    {% if forloop.first %}[{% endif %}
-                                    '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                                    {% if forloop.last %}] {% endif %}
-                                </a>
+                            <a class="sub-chip" href="{% url 'update_subproject' subproject.id %}">{{ subproject.name }}</a>
                             {% endfor %}
-                            {% if session.note|length > 0 %} ->{% endif %}
-                        </span>
-
+                        </div>
                         {% if session.note %}
-                        <span class="session-note-slider">
-                            <span class="text-yellow session-note" id="note-{{ session.id }}">
-                                {{ session.note | markdown | safe }} <!-- safe is used to render html -->
-                            </span>
-                        </span>
+                        <div class="session-note" id="note-{{ session.id }}">{{ session.note|markdown|safe }}</div>
                         {% endif %}
-
-                        <span class="session-actions">
-                            <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
-                                <i class="fa fa-pen"></i>
+                        <span class="session-dur">{{ session.duration|duration_formatter }}</span>
+                    </div>
+                    <div class="swipe-actions">
+                        <form method="post" action="{% url 'start_timer' %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="project" value="{{ session.project.name }}">
+                            {% for sub in session.subprojects.all %}
+                            <input type="hidden" name="subprojects" value="{{ sub.name }}">
+                            {% endfor %}
+                            <button class="btn-icon" type="submit" title="Restart this project + subprojects">
+                                <i class="fas fa-redo"></i><span class="sr-only">Restart</span>
                             </button>
-                            <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'">
-                                <i class="fa fa-trash"></i>
-                            </button>
-                        </span>
+                        </form>
+                        <a class="btn-icon" href="{% url 'update_session' session.id %}" title="Edit session">
+                            <i class="fas fa-pen"></i><span class="sr-only">Edit session</span>
+                        </a>
+                        <a class="btn-icon btn-icon--danger" href="{% url 'delete_session' session.id %}" title="Delete session">
+                            <i class="fas fa-trash"></i><span class="sr-only">Delete session</span>
+                        </a>
                     </div>
                 </div>
+                <span class="swipe-hint"></span>
+            </li>
             {% endfor %}
-        {% endfor %}
-    </section>
+        </ul>
+    </div>
+    {% endfor %}
+</section>
+{% else %}
+<section class="slab">
+    {% if active_filters %}
+    <p class="empty">No sessions match these filters. <a href="{% url 'sessions' %}">Clear them</a> to see everything.</p>
+    {% else %}
+    <p class="empty">No sessions yet. <a href="{% url 'start_timer' %}">Start a timer</a> to begin tracking.</p>
+    {% endif %}
+</section>
+{% endif %}
 
-    <section id="pagination">
-        {% if is_paginated %}
-            <div class="flex-row full-width">
-                {% if page_obj.has_previous %}
-                    <button type="button" onclick="window.location.href='?{% param_replace page=1 %}'" class="secondary-button">
-                        <i class="fa fa-angle-double-left"></i>
-                    </button>
-                    <button type="button" onclick="window.location.href='?{% param_replace page=page_obj.previous_page_number %}'" class="secondary-button">
-                        <i class="fa fa-angle-left"></i>
-                    </button>
-                {% endif %}
+{% if is_paginated %}
+<nav class="pager" aria-label="Pages">
+    {% if page_obj.has_previous %}
+    <a class="pager-btn" href="?{% param_replace page=1 %}" aria-label="First page"><i class="fas fa-angle-double-left"></i></a>
+    <a class="pager-btn" href="?{% param_replace page=page_obj.previous_page_number %}" aria-label="Previous page"><i class="fas fa-angle-left"></i></a>
+    {% endif %}
 
-                {% for num in page_obj.paginator.page_range %}
-                    {% if page_obj.number == num %}
-                        <button type="button" onclick="window.location.href='?{% param_replace page=num %}'" class="secondary-button">
-                            <span style="font-size: 18px; padding:0.4rem;">{{num}}</span>
-                        </button>
-                    {% elif  num > page_obj.number|add:'-2' and num < page_obj.number|add:'2' %}
-                        <button type="button" onclick="window.location.href='?{% param_replace page=num %}'" class="secondary-button">
-                            <span style="font-size: 18px; padding:0.4rem;">{{num}}</span>
-                        </button>
-                    {% endif %}
-                {% endfor %}
-
-                {% if page_obj.has_next %}
-                    <button type="button" onclick="window.location.href='?{% param_replace page=page_obj.next_page_number %}'" class="secondary-button">
-                        <i class="fa fa-angle-right"></i>
-                    </button>
-                    <button type="button" onclick="window.location.href='?{% param_replace page=page_obj.paginator.num_pages %}'" class="secondary-button">
-                        <i class="fa fa-angle-double-right"></i>
-                    </button>
-                {% endif %}
-            </div>
+    {% for num in page_obj.paginator.page_range %}
+        {% if page_obj.number == num %}
+        <a class="pager-btn is-current" href="?{% param_replace page=num %}" aria-current="page">{{ num }}</a>
+        {% elif num > page_obj.number|add:'-2' and num < page_obj.number|add:'2' %}
+        <a class="pager-btn" href="?{% param_replace page=num %}">{{ num }}</a>
         {% endif %}
-    </section>
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <a class="pager-btn" href="?{% param_replace page=page_obj.next_page_number %}" aria-label="Next page"><i class="fas fa-angle-right"></i></a>
+    <a class="pager-btn" href="?{% param_replace page=page_obj.paginator.num_pages %}" aria-label="Last page"><i class="fas fa-angle-double-right"></i></a>
+    {% endif %}
+</nav>
+{% endif %}
 
 {% endblock %}

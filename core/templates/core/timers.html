@@ -1,68 +1,106 @@
 {% extends 'core/base.html' %}
 {% load static %}
-{% load time_formats %}
+
+{% comment %}
+  ============================================================================
+  TIMERS — Focus Desk (UI_REDESIGN.md chunk 6)
+  ----------------------------------------------------------------------------
+  The deck given the whole page rather than a hero strip: on this page the
+  running timers ARE the content. Suggestions sit in the ambient track — they
+  are what you might start, not what you are doing.
+
+  The cards come from partials/active_timers_timers.html, swapped in by the
+  five-second poll. The "start something" card lives here because the polled
+  fragment has no page context.
+  ============================================================================
+{% endcomment %}
 
 {% block head_includes %}
-    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/timer_poll.js' %}?v={{ static_version.timer_poll }}" type="text/javascript"></script>
     <script src="{% static 'core/js/timer_notes.js' %}?v={{ static_version.timer_notes }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/dashboard_desk.js' %}?v={{ static_version.dashboard_desk }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
-    <section id="options">
-        <button id="start-timer" class="timer-button" onclick="window.location.href='{% url 'start_timer' %}'">
-            <i class="fa fa-plus"></i>
-            New Timer
-        </button>
-    </section>
 
-    <div class="timers-layout">
-        <section class="timer-suggestions-column">
-            <h2>Suggestions</h2>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">On the clock</p>
+        <h1 class="page-title">Timers</h1>
+    </div>
+</div>
 
-            <div class="timer-suggestions card">
+<div class="desk">
+    <div class="desk-main">
+        <section class="focus-deck" aria-label="Running timers">
+            <div class="focus-track" data-focus-track>
+                {% include 'core/partials/active_timers_timers.html' with timers=timers %}
 
-            {% if timer_suggestions.commitments or timer_suggestions.habits or timer_suggestions.recent %}
-                {% if timer_suggestions.commitments %}
-                    <div class="timer-suggestion-group">
-                        <h3><i class="fa fa-bullseye text-yellow"></i> Commitment Push</h3>
-                        <div class="timer-suggestion-list">
-                            {% for suggestion in timer_suggestions.commitments %}
-                                {% include 'core/partials/timer_suggestion_card.html' %}
-                            {% endfor %}
-                        </div>
+                <article class="focus-card focus-card--start" aria-label="Start a new timer">
+                    <p class="focus-eyebrow">{% if timers %}Nothing else running{% else %}Nothing running{% endif %}</p>
+                    <h2 class="focus-project focus-project--plain">Start something</h2>
+                    <p class="focus-lede">Choose a project, and optionally a limit to stop it at.</p>
+                    <div class="focus-actions">
+                        <a class="btn btn--primary btn--lg btn--block" href="{% url 'start_timer' %}">
+                            <i class="fas fa-play"></i> New timer
+                        </a>
                     </div>
+                </article>
+            </div>
+            <div class="focus-dots" data-focus-dots aria-hidden="true"></div>
+        </section>
+    </div>
+
+    <aside class="desk-side">
+        <section class="slab disclose" data-disclose>
+            <button class="disclose-head" type="button" aria-expanded="true">
+                <i class="fas fa-seedling disclose-icon text-green"></i>
+                <span class="disclose-title">Suggestions</span>
+                <i class="fas fa-chevron-down disclose-chevron"></i>
+            </button>
+
+            <div class="disclose-body">
+                {% if timer_suggestions.commitments or timer_suggestions.habits or timer_suggestions.recent %}
+
+                {% if timer_suggestions.commitments %}
+                <div class="suggest-group">
+                    <p class="suggest-head"><i class="fas fa-bullseye text-yellow"></i> Commitment Push</p>
+                    <div class="band-list">
+                        {% for suggestion in timer_suggestions.commitments %}
+                        {% include 'core/partials/timer_suggestion_card.html' %}
+                        {% endfor %}
+                    </div>
+                </div>
                 {% endif %}
 
                 {% if timer_suggestions.habits %}
-                    <div class="timer-suggestion-group">
-                        <h3><i class="fa fa-calendar-day text-blue"></i> Usually Now</h3>
-                        <div class="timer-suggestion-list">
-                            {% for suggestion in timer_suggestions.habits %}
-                                {% include 'core/partials/timer_suggestion_card.html' %}
-                            {% endfor %}
-                        </div>
+                <div class="suggest-group">
+                    <p class="suggest-head"><i class="fas fa-calendar-day text-blue"></i> Usually Now</p>
+                    <div class="band-list">
+                        {% for suggestion in timer_suggestions.habits %}
+                        {% include 'core/partials/timer_suggestion_card.html' %}
+                        {% endfor %}
                     </div>
+                </div>
                 {% endif %}
 
                 {% if timer_suggestions.recent %}
-                    <div class="timer-suggestion-group">
-                        <h3><i class="fa fa-history text-green"></i> Recent Presets</h3>
-                        <div class="timer-suggestion-list">
-                            {% for suggestion in timer_suggestions.recent %}
-                                {% include 'core/partials/timer_suggestion_card.html' %}
-                            {% endfor %}
-                        </div>
+                <div class="suggest-group">
+                    <p class="suggest-head"><i class="fas fa-history text-green"></i> Recent Presets</p>
+                    <div class="band-list">
+                        {% for suggestion in timer_suggestions.recent %}
+                        {% include 'core/partials/timer_suggestion_card.html' %}
+                        {% endfor %}
                     </div>
-                {% endif %}
-            {% else %}
-                <div class="timer-suggestions-empty">
-                    <i class="fa fa-seedling"></i>
-                    <span>No suggestions yet.</span>
                 </div>
-            {% endif %}
+                {% endif %}
+
+                {% else %}
+                <p class="empty">No suggestions yet. They appear once you have a few sessions to learn from.</p>
+                {% endif %}
             </div>
         </section>
+    </aside>
+</div>
 
-        {% include 'core/partials/active_timers_timers.html' %}
-    </div>
 {% endblock %}

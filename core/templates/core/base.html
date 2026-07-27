@@ -1,109 +1,225 @@
+{% comment %}
+  ============================================================================
+  FOCUS DESK SHELL
+  ----------------------------------------------------------------------------
+  The app shell. Every page extends this.
+
+  It was base_fd.html for the length of the migration, coexisting with a legacy
+  shell so that the two design systems could share class names without
+  colliding — no page ever loaded both stylesheets. Chunk 13 deleted the legacy
+  shell along with style.css and colours.css, and this took its name back.
+  focus_desk.css is now the only stylesheet in the project.
+
+  Blocks:
+    title          page <title> (falls back to the `title` context var)
+    head_includes  extra <link>/<script> for the page
+    content        the page body, inside <main class="screen screen-pad">
+    scripts        page-specific JS, after the shell's own
+  ============================================================================
+{% endcomment %}
 <!DOCTYPE html>
 {% load static %}
 {% load background_images %}
-<html lang="en-US">
-    <head>
-        {% if title %}
-            <title>{{ title }}</title>
-        {% else %}
-            <title>Autumn</title>
-        {% endif %}
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="description" content="Autumn is a time management application">
-        <meta name="theme-color" content="#8f3f24">
-        <meta name="mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-title" content="Autumn">
-        <link rel="manifest" href="{% url 'pwa_manifest' %}">
-        <link rel="apple-touch-icon" href="{% static 'core/images/icons/autumn-icon-192.png' %}">
-        <link rel="stylesheet" type="text/css" href="{% static 'core/css/style.css' %}?v={{ static_version.style }}">
-        <link rel="stylesheet" type="text/css" href="{% static 'core/css/colours.css' %}?v={{ static_version.colours }}">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-        <script type="text/javascript" src="{% static 'core/js/jquery-3.6.0.min.js' %}"></script>
-        <script type="text/javascript" src="{% static 'core/js/script.js' %}?v={{ static_version.script }}"></script>
-        <script type="text/javascript" src="{% static 'core/js/pwa.js' %}?v={{ static_version.pwa }}"></script>
-        <script type="text/javascript" src="{% static 'core/js/page_loading.js' %}?v={{ static_version.page_loading }}"></script>
-        {% block head_includes %}
-        {% endblock %}
+<html lang="en-US" class="dark">
+<head>
+    <title>{% block title %}{% if title %}{{ title }}{% else %}Autumn{% endif %}{% endblock %}</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="Autumn is a time management application">
+    <meta name="theme-color" content="#101214">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Autumn">
+    <link rel="manifest" href="{% url 'pwa_manifest' %}">
+    <link rel="apple-touch-icon" href="{% static 'core/images/icons/autumn-icon-192.png' %}">
+    <link rel="shortcut icon" href="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" type="image/png">
 
-        <link rel="shortcut icon" href="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" type="image/png">
-    </head>
-    {% if user.is_authenticated %}
-        {% if user.profile.background_image and not user.profile.automatic_background %}
-            <body class="dark-mode bg-active" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; --workspace-bg-image: url('{{ user.profile.background_image.url }}');" data-bg-url="{{ user.profile.background_image.url }}">
-        {% elif user.profile.automatic_background and user.profile.bing_background %}
-            {% bing_background as bing_bg_url %}
-            <body class="dark-mode{% if bing_bg_url %} bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if bing_bg_url %}--workspace-bg-image: url('{{ bing_bg_url }}');{% endif %}" data-bg-url="{{ bing_bg_url }}">
-        {% elif user.profile.automatic_background and user.profile.nasa_apod_background %}
-            {% nasa_apod_background as nasa_bg_url %}
-            <body class="dark-mode{% if nasa_bg_url %} bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if nasa_bg_url %}--workspace-bg-image: url('{{ nasa_bg_url }}');{% endif %}" data-bg-url="{{ nasa_bg_url }}">
-        {% else %}
-            <body class="dark-mode" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }};">
-        {% endif %}
+    <link rel="stylesheet" type="text/css" href="{% static 'core/css/focus_desk.css' %}?v={{ static_version.focus_desk }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+
+    {# jQuery is still shell-wide because most page scripts depend on it       #}
+    {# (search_projects, timer_search_projects, charts/*, insights_*). Nothing #}
+    {# the SHELL itself does needs it — local_times.js is deliberately vanilla #}
+    {# — so it can move page-by-page as those scripts are rewritten.           #}
+    <script type="text/javascript" src="{% static 'core/js/jquery-3.6.0.min.js' %}"></script>
+    <script type="text/javascript" src="{% static 'core/js/local_times.js' %}?v={{ static_version.local_times }}"></script>
+    <script type="text/javascript" src="{% static 'core/js/background_dim.js' %}?v={{ static_version.background_dim }}" defer></script>
+    <script type="text/javascript" src="{% static 'core/js/pwa.js' %}?v={{ static_version.pwa }}"></script>
+    <script type="text/javascript" src="{% static 'core/js/page_loading.js' %}?v={{ static_version.page_loading }}"></script>
+    <script type="text/javascript" src="{% static 'core/js/focus_desk.js' %}?v={{ static_version.focus_desk }}" defer></script>
+
+    {% block head_includes %}{% endblock %}
+</head>
+
+{% comment %}
+  Backdrop: identical resolution order to the legacy shell — explicit upload,
+  else Bing daily, else NASA APOD. .bg-active is added ONLY when a photo
+  actually resolved, so the ::before/::after layers stay off otherwise.
+{% endcomment %}
+{% if user.is_authenticated %}
+    {% if user.profile.background_image and not user.profile.automatic_background %}
+        <body class="bg-active" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; --workspace-bg-image: url('{{ user.profile.background_image.url }}');" data-bg-url="{{ user.profile.background_image.url }}">
+    {% elif user.profile.automatic_background and user.profile.bing_background %}
+        {% bing_background as bing_bg_url %}
+        <body class="{% if bing_bg_url %}bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if bing_bg_url %}--workspace-bg-image: url('{{ bing_bg_url }}');{% endif %}" data-bg-url="{{ bing_bg_url }}">
+    {% elif user.profile.automatic_background and user.profile.nasa_apod_background %}
+        {% nasa_apod_background as nasa_bg_url %}
+        <body class="{% if nasa_bg_url %}bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if nasa_bg_url %}--workspace-bg-image: url('{{ nasa_bg_url }}');{% endif %}" data-bg-url="{{ nasa_bg_url }}">
     {% else %}
-        <body class="dark-mode">
+        <body style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }};">
     {% endif %}
-        <div class="container">
-            <div class="ribbon"> <!-- ribbon at the top of the page -->
-                <a href="{% url 'home' %}" class="plain-link flex-row thirds-width align-center">
-                    <img src="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}?v={{ static_version.style }}" class="ribbon-logo">
-                    <h1 class="main-title">Autumn</h1>
-                </a>
-                <div class="ribbon-buttons">
-                    <i class="fas fa-bars burger-menu" id="burger-menu"></i> <!-- Added burger menu icon -->
-                    <a href="{% url 'profile' %}" class="plain-link flex-row thirds-width align-center">
-                        <b>{{ user.username }}</b>
-                        <img class="profile-pic" src="{{ user.profile.image_url }}" alt="profile picture">
-                    </a>
-                </div>
-            </div>
+{% else %}
+    <body>
+{% endif %}
 
-            <nav class="left-panel">
-                <a href="{% url 'home' %}" class="main-link"><i class="fas fa-home"></i> Home</a>
-                <a href="{% url 'projects' %}" class="main-link"><i class="fas fa-project-diagram"></i> Manage Projects</a>
-                <a href="{% url 'timers' %}" class="main-link"><i class="fas fa-clock"></i> Timers</a>
-                <a href="{% url 'sessions' %}" class="main-link"><i class="fas fa-book"></i> Session Logs</a>
-                {% if user.profile.ai_features_enabled %}
-                    <a href="{% url 'insights' %}" class="main-link" id="insights-link"><i class="fas fa-robot"></i> Insights</a>
+<div class="app">
+
+    {% with un=request.resolver_match.url_name %}
+
+    <header class="app-header">
+        <div class="screen">
+            <a class="brand" href="{% url 'home' %}">
+                <img class="brand-mark" src="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}?v={{ static_version.focus_desk }}" alt="">
+                <span class="brand-word">Autumn</span>
+            </a>
+            <div class="header-right">
+                {% comment %}
+                  Active context switcher. This narrows the dashboard,
+                  projects, sessions, timers, Insights and the charts API, so
+                  it belongs in the shell rather than on one page. Until now
+                  the header only DISPLAYED a chip when a context was set and
+                  nothing in the app could set one — the endpoint existed but
+                  raised TypeError, so it was unreachable in practice.
+
+                  Rendered only when the user actually has contexts: with none
+                  defined the control could only ever say "All contexts".
+                {% endcomment %}
+                {% if user.is_authenticated and user_contexts %}
+                    <form class="context-switch" method="post" action="{% url 'set_active_context' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <label class="sr-only" for="context-switch">Active context</label>
+                        <select id="context-switch" name="context_id" data-autosubmit>
+                            <option value="all" {% if not active_context %}selected{% endif %}>All contexts</option>
+                            {% for ctx in user_contexts %}
+                                <option value="{{ ctx.id }}" {% if active_context.id == ctx.id %}selected{% endif %}>{{ ctx.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <noscript><button class="btn btn--quiet" type="submit">Go</button></noscript>
+                    </form>
                 {% endif %}
-                <a href="{% url 'charts' %}" class="main-link"><i class="fas fa-chart-bar"></i> Charts</a>
-                <a href="{% url 'import' %}" class="main-link"><i class="fas fa-file-import"></i> Import</a>
-                <a href="{% url 'export' %}" class="main-link"><i class="fas fa-file-export"></i> Export</a>
+                {% if user.is_authenticated %}
+                    {% comment %}
+                      Backdrop dimming, at hand rather than buried in Profile —
+                      it is a viewing comfort you adjust against the photo you
+                      are actually looking at. CSS reveals it only when a photo
+                      resolved (body.bg-active); rendering it unconditionally
+                      here avoids restating the shell's three-way background
+                      resolution. The csrf token is for the debounced save in
+                      background_dim.js; there is no form to carry it.
+                    {% endcomment %}
+                    <div class="dim-control" title="Backdrop dimming">
+                        <i class="fas fa-adjust dim-icon" aria-hidden="true"></i>
+                        <label class="sr-only" for="header-dimming">Backdrop dimming</label>
+                        <input type="range" id="header-dimming" min="0" max="85" step="5"
+                               value="{{ user.profile.background_dimming }}"
+                               data-dim-url="{% url 'set_background_dimming' %}">
+                        {% csrf_token %}
+                    </div>
+                    <a class="avatar" href="{% url 'profile' %}" title="{{ user.username }}">
+                        <img src="{{ user.profile.image_url }}" alt="{{ user.username }}">
+                    </a>
+                {% else %}
+                    <a class="btn btn--quiet" href="{% url 'login' %}">Log in</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    {% if user.is_authenticated %}
+    {% comment %}
+      One nav element at every width: fixed bottom bar on phones, sticky
+      floating pill at the top from 1000px up. Insights and Charts are hidden
+      on phones (.tab--overflow) and live in the sheet instead.
+    {% endcomment %}
+    <nav class="tabbar" aria-label="Primary">
+        <div class="tabbar-inner">
+            <a class="tab {% if un == 'home' %}is-active{% endif %}" href="{% url 'home' %}" {% if un == 'home' %}aria-current="page"{% endif %}>
+                <i class="fas fa-home tab-icon"></i><span class="tab-label">Home</span>
+            </a>
+            <a class="tab {% if un == 'projects' or un == 'create_project' or un == 'update_project' or un == 'delete_project' or un == 'merge_projects' or un == 'create_subproject' or un == 'update_subproject' or un == 'delete_subproject' or un == 'merge_subprojects' %}is-active{% endif %}" href="{% url 'projects' %}">
+                <i class="fas fa-folder-open tab-icon"></i><span class="tab-label">Projects</span>
+            </a>
+            <a class="tab {% if un == 'timers' or un == 'start_timer' or un == 'stop_timer' or un == 'remove_timer' %}is-active{% endif %}" href="{% url 'timers' %}">
+                <i class="fas fa-stopwatch tab-icon"></i><span class="tab-label">Timers</span>
+            </a>
+            <a class="tab {% if un == 'sessions' or un == 'update_session' or un == 'delete_session' %}is-active{% endif %}" href="{% url 'sessions' %}">
+                <i class="fas fa-list-ul tab-icon"></i><span class="tab-label">Sessions</span>
+            </a>
+            {% if user.profile.ai_features_enabled %}
+            <a class="tab tab--overflow {% if un == 'insights' or un == 'insights_detail' %}is-active{% endif %}" href="{% url 'insights' %}">
+                <i class="fas fa-brain tab-icon"></i><span class="tab-label">Insights</span>
+            </a>
+            {% endif %}
+            <a class="tab tab--overflow {% if un == 'charts' %}is-active{% endif %}" href="{% url 'charts' %}">
+                <i class="fas fa-chart-pie tab-icon"></i><span class="tab-label">Charts</span>
+            </a>
+            <button class="tab" type="button" data-sheet-open="moreSheet" aria-haspopup="dialog">
+                <i class="fas fa-ellipsis-h tab-icon"></i><span class="tab-label">More</span>
+            </button>
+        </div>
+    </nav>
+    {% endif %}
+
+    <main class="screen screen-pad">
+        {% if messages %}
+        <section class="messages" aria-label="Notifications">
+            {% for message in messages %}
+                {% if message.tags == 'error' %}
+                    <div class="msg msg--error" role="alert"><i class="fas fa-exclamation-circle msg-icon"></i><span>{{ message }}</span></div>
+                {% elif message.tags == 'warning' %}
+                    <div class="msg msg--warning" role="alert"><i class="fas fa-exclamation-triangle msg-icon"></i><span>{{ message }}</span></div>
+                {% elif message.tags == 'info' %}
+                    <div class="msg msg--info"><i class="fas fa-info-circle msg-icon"></i><span>{{ message }}</span></div>
+                {% else %}
+                    <div class="msg msg--success"><i class="fas fa-check-circle msg-icon"></i><span>{{ message }}</span></div>
+                {% endif %}
+            {% endfor %}
+        </section>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    {% endwith %}
+
+    {% if user.is_authenticated %}
+    <div class="sheet" id="moreSheet" role="dialog" aria-modal="true" aria-label="More">
+        <div class="sheet-scrim" data-close></div>
+        <div class="sheet-panel">
+            <div class="sheet-grab"></div>
+            <p class="sheet-title">{{ user.username }}</p>
+            <div class="sheet-list">
+                {% if user.profile.ai_features_enabled %}
+                <a class="sheet-item" href="{% url 'insights' %}"><i class="fas fa-brain sheet-item-icon"></i> Insights</a>
+                {% endif %}
+                <a class="sheet-item" href="{% url 'charts' %}"><i class="fas fa-chart-pie sheet-item-icon"></i> Charts</a>
+                <a class="sheet-item" href="{% url 'contexts' %}"><i class="fas fa-layer-group sheet-item-icon"></i> Contexts</a>
+                <a class="sheet-item" href="{% url 'tags' %}"><i class="fas fa-tags sheet-item-icon"></i> Tags</a>
+                <a class="sheet-item" href="{% url 'import' %}"><i class="fas fa-file-import sheet-item-icon"></i> Import</a>
+                <a class="sheet-item" href="{% url 'export' %}"><i class="fas fa-file-export sheet-item-icon"></i> Export</a>
+                <a class="sheet-item" href="{% url 'profile' %}"><i class="fas fa-user-circle sheet-item-icon"></i> Profile &amp; backdrop</a>
                 <form method="POST" action="{% url 'logout' %}">
                     {% csrf_token %}
-                    <button type="submit" class="plain-link" style="background:none;border:none;
-                    padding:0;margin:0;cursor:pointer; font-size: inherit;">
-                        <i class="fas fa-sign-out-alt"></i> Log out
-                    </button>
+                    <button class="sheet-item" type="submit"><i class="fas fa-sign-out-alt sheet-item-icon"></i> Log out</button>
                 </form>
-            </nav>
-
-
-            <div class="main-body">
-                <section id="messages">
-                {% if messages %}
-                    {% for message in messages%}
-                        {% if message.tags == 'error'%}
-                            <div class="card cadmium-red ">
-                                <em> {{ message }} </em>
-                            </div>
-                        {% elif message.tags == 'info'%}
-                            <div class="card cobalt-blue">
-                                <em> {{ message }} </em>
-                            </div>
-                        {% else %}
-                            <div class="card lincolngreen">
-                                <em> {{ message }} </em>
-                            </div>
-                        {% endif %}
-                    {% endfor %}
-                {% endif %}
-            </section>
-                {% block content %}
-                {% endblock %}
             </div>
-
         </div>
-    </body>
+    </div>
+    {% endif %}
+
+</div>
+
+{% block scripts %}{% endblock %}
+</body>
 </html>

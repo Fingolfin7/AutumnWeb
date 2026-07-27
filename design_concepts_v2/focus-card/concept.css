@@ -1,0 +1,896 @@
+/* ============================================================================
+   AUTUMN — CONCEPT "FOCUS CARD"                                   concept.css
+   Shared design system. dashboard.html / projects.html / sessions.html all
+   consume this file verbatim. Do not fork it — add classes here instead.
+   ============================================================================
+
+   THESIS
+   ------
+   Calm, mobile-first, one thing at a time. The product answers exactly one
+   question above the fold — "what am I working on right now" — with a single
+   large FOCUS CARD: giant elapsed time, project, subprojects, one primary
+   Stop button. Everything else (stats, commitments, activity, sessions) is
+   progressively disclosed underneath in collapsible sections. Every screen has
+   exactly ONE primary action. Designed at 390px first; desktop is the SAME
+   layout widened — never a different grid, never a second column of panels.
+
+   Because the column stays narrow and centred, the user's backdrop photo is
+   not merely tolerated: on desktop it becomes the room the app floats in.
+   That is the deliberate use of the backdrop feature. Surfaces are soft dark
+   SLABS with big radii and real shadow — physical depth, not frosted glass,
+   not terminal panes, not paper, not kanban.
+
+   NAV MODEL
+   ---------
+   No sidebar at all. Zero horizontal width is spent on navigation. A floating
+   rounded TABBAR is fixed to the bottom of the viewport at every breakpoint:
+     - <=560px : full-width-inset bar, 5 icon tabs (Home / Projects / Timers /
+                 Sessions / More).
+     - >560px  : the identical element shrinks to a centred PILL, icons gain
+                 labels, and Insights + Charts surface inline.
+   The remaining nav items (Insights, Charts, Import, Export, Log out) live in
+   a bottom SHEET opened by the "More" tab. The sheet is also reused for
+   filters on Projects / Sessions — never put an 8-control filter row on the
+   page; put a search field plus a "Filters" launcher that opens `.sheet`.
+
+   TYPE SCALE  (root 16px; body runs 17px — large type is part of the thesis)
+   ----------
+     --fs-hero    clamp(3.25rem, 15vw, 4.75rem)  mono, 600, tabular  live timer
+     --fs-xxl     2rem      big numbers (commitment actuals, project totals)
+     --fs-xl      1.5rem    focus-card project name
+     --fs-lg      1.1875rem section titles, project names in lists
+     --fs-md      1.0625rem body / session project names
+     --fs-sm      0.9375rem secondary rows, notes
+     --fs-xs      0.8125rem metadata, chips
+     --fs-label   0.6875rem uppercase 0.12em tracking, muted — eyebrow labels
+   Mono (--font-mono) is confined to numerals: durations, clock times, counts,
+   percentages. Never mono for prose.
+
+   CLASS INDEX (grouped by component)
+   ----------------------------------
+   Shell        .app  .app-header  .brand .brand-mark .brand-word
+                .header-right .avatar .header-clock
+                .dim-control .dim-control input        (mockup-only demo)
+                .screen  .screen-pad  .page-eyebrow .page-title
+   Nav          .tabbar .tabbar-inner .tab .tab.is-active .tab-icon .tab-label
+                .tab--overflow .tab--overflow.is-inline   (phone-hidden tabs)
+                .sheet .sheet.is-open .sheet-scrim .sheet-panel .sheet-grab
+                .sheet-title .sheet-list .sheet-item .sheet-item-icon
+   Surfaces     .slab  .slab--focus  .slab-pad
+                .band  .band-list  .band--tap
+                (RULE: containers are slabs, rows are bands. Never nest a slab
+                 in a slab. Bands have no border, no shadow, no radius — they
+                 are separated by hairlines.)
+   Disclosure   .disclose .disclose.is-closed .disclose-head .disclose-icon
+                .disclose-title .disclose-summary .disclose-chevron
+                .disclose-body
+   Focus card   .focus-deck .focus-track .focus-card .focus-card--start
+                .focus-eyebrow .live-dot .focus-project .focus-subs
+                .focus-time .focus-time .num .focus-time .unit
+                .focus-autostop .focus-autostop-bar .focus-autostop-fill
+                .focus-actions .focus-secondary
+                .focus-dots .focus-dot .focus-dot.is-active
+                .quick-chip
+   Stats        .stat-strip .stat .stat-label .stat-value
+   Commitments  .commit .commit-head .commit-target .commit-kind .commit-period
+                .commit-figures .commit-actual .commit-goal .commit-pct
+                .meter .meter-fill  (+ .complete .approaching .on-track
+                                       .warning .behind)
+                .bank-row .bank-cell .bank-label .bank-value
+                .streak-row .streak-flame .streak-count
+                .period-strip .period-cell (+ .met .banked .missed .current)
+   Activity     .activity .range-tabs .range-tab .range-tab.is-active
+                .cal .cal-head .cal-head span .cal-grid .cal-cell
+                .cal-cell.is-active .cal-cell.is-inactive .cal-caption
+   Sessions     .day-group .day-head .day-date .day-total .day-note
+                .swipe .swipe-track .swipe-face .swipe-actions .swipe-hint
+                .session .session-top .session-project .session-dur
+                .session-mid .session-time .session-arrow
+                .sub-chip .session-note .session-note.is-open .note-more
+                .badge-dst
+   Projects     .project .project-top .project-name .project-status-dot
+                .project-meta .context-chip .tag-chip .project-total
+                .project-dates .project-subs .project-commit
+                .project-start  (the big per-card primary start button)
+                .group-head .group-title .group-count
+   Filters      .searchbar .searchbar input .filter-launcher .filter-count
+                .field .field-label .input .select .check-row
+   Buttons      .btn .btn--primary .btn--stop .btn--ghost .btn--quiet
+                .btn--block .btn--lg .btn-icon .btn-icon--danger
+   Pager        .pager .pager-btn .pager-btn.is-current
+   Utilities    .text-red .text-blue .text-green .text-cyan .text-yellow
+                .text-orange .muted .mono .tnum
+                .u-row .u-between .u-wrap .u-gap-2 .u-gap-3 .u-mt-4 .sr-only
+   ============================================================================ */
+
+/* ---------------------------------------------------------------- TOKENS -- */
+:root {
+  /* --- semantic hues (LOAD-BEARING — meanings are fixed) ---------------- */
+  --project:        #d0796f;   /* PROJECT names        (from #be675f, +L)   */
+  --project-deep:   #be675f;   /* canonical, for small text / borders       */
+  --sub:            #8aabce;   /* SUBPROJECT names     (from #7896b8)       */
+  --sub-deep:       #7896b8;
+  --duration:       #8dbc75;   /* DURATIONS / totals   (from #7ca36a)       */
+  --duration-deep:  #7ca36a;
+  --time:           #58b1a3;   /* CLOCK times          (from #4e9a8e)       */
+  --time-deep:      #4e9a8e;
+  --note:           #c6b276;   /* session NOTES        (from #b9a66a)       */
+  --note-deep:      #b9a66a;
+  --brand:          #d18b4c;   /* BRAND / accent       (from #c98245)       */
+  --brand-deep:     #c98245;
+  --brand-hover:    #e0a05f;
+  --magenta:        #9b83a7;
+  --context:        #e0a458;   /* commitment target: context = orange       */
+
+  /* --- progress / status (were literal hexes in v1) --------------------- */
+  --status-complete:    #7ca36a;
+  --status-approaching: #84cc16;
+  --status-on-track:    #b9a66a;
+  --status-warning:     #f97316;
+  --status-behind:      #be675f;
+
+  /* --- ink -------------------------------------------------------------- */
+  --ink:        #e4e8e5;
+  --ink-2:      #b9c1bc;
+  --muted:      #8b948f;
+  --ink-invert: #101214;
+
+  /* --- surfaces (translucent so the backdrop always reads through) ------ */
+  --base:        #101214;
+  --slab:        rgba(18, 21, 24, 0.80);
+  --slab-focus:  rgba(21, 25, 28, 0.88);
+  --slab-solid:  #15181b;
+  --raised:      rgba(255, 255, 255, 0.045);
+  --raised-2:    rgba(255, 255, 255, 0.075);
+  --sunken:      rgba(0, 0, 0, 0.26);
+  --hairline:    rgba(228, 232, 229, 0.085);
+  --hairline-2:  rgba(228, 232, 229, 0.16);
+  --scrim:       rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
+
+  /* --- depth (soft, wide, low-contrast — "physical", never glassy) ------ */
+  --e1: 0 1px 2px rgba(0,0,0,.30), 0 6px 18px rgba(0,0,0,.26);
+  --e2: 0 2px 4px rgba(0,0,0,.32), 0 14px 34px rgba(0,0,0,.34);
+  --e3: 0 2px 6px rgba(0,0,0,.36), 0 26px 60px rgba(0,0,0,.46);
+  --edge: inset 0 1px 0 rgba(255,255,255,.055);   /* top highlight rim      */
+  --glow-live: 0 0 0 1px rgba(141,188,117,.16), 0 18px 60px rgba(124,163,106,.13);
+  --focus-ring: 0 0 0 3px rgba(209,139,76,.30);
+
+  /* --- radii (big and soft — the anti-thesis of v1's square corners) ---- */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 24px;
+  --r-xl: 30px;
+  --r-pill: 999px;
+
+  /* --- spacing ---------------------------------------------------------- */
+  --s1: .25rem; --s2: .5rem;  --s3: .75rem; --s4: 1rem;
+  --s5: 1.5rem; --s6: 2rem;   --s7: 2.75rem; --s8: 4rem;
+
+  /* --- type ------------------------------------------------------------- */
+  --font-ui:   "Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --fs-hero:  clamp(3.25rem, 15vw, 4.75rem);
+  --fs-xxl:   2rem;
+  --fs-xl:    1.5rem;
+  --fs-lg:    1.1875rem;
+  --fs-md:    1.0625rem;
+  --fs-sm:    .9375rem;
+  --fs-xs:    .8125rem;
+  --fs-label: .6875rem;
+
+  /* --- layout ----------------------------------------------------------- */
+  --col:        clamp(20rem, 100%, 40rem);  /* the one content column       */
+  --tabbar-h:   4.25rem;
+  --header-h:   3.5rem;
+  --ease: cubic-bezier(.22,.61,.36,1);
+}
+
+/* ------------------------------------------------------------ RESET/BASE -- */
+*, *::before, *::after { box-sizing: border-box; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--base);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(var(--tabbar-h) + var(--s6));
+}
+h1,h2,h3,h4,p,ul,ol,figure { margin: 0; }
+ul,ol { list-style: none; padding: 0; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+img { max-width: 100%; display: block; }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-sm); }
+
+/* ---------------------------------------------- BACKDROP (non-negotiable) --
+   Mirrors base.html: body.bg-active::before = photo, ::after = dim scrim,
+   content lifted to z-index 2. --workspace-bg-image is set by Django; the
+   fallback below is a pure-CSS stand-in so the mockup needs no asset.        */
+body.bg-active::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0;
+  background-image: var(--workspace-bg-image, var(--demo-photo));
+  background-size: cover;
+  background-position: center;
+}
+body.bg-active::after {
+  content: "";
+  position: fixed; inset: 0; z-index: 1;
+  background: var(--scrim);
+  pointer-events: none;
+}
+:root {
+  --demo-photo:
+    radial-gradient(70% 45% at 74% 14%, rgba(255,196,124,.92) 0%, rgba(255,170,90,0) 60%),
+    radial-gradient(90% 55% at 18% 6%,  rgba(126,164,206,.55) 0%, rgba(126,164,206,0) 62%),
+    radial-gradient(150% 95% at 50% 112%, rgba(12,20,18,.98) 0%, rgba(12,20,18,0) 58%),
+    linear-gradient(176deg, #3c4a63 0%, #6c5f55 28%, #b2764a 48%, #7d5a3a 62%, #2c2f2c 82%, #14171a 100%);
+}
+.app { position: relative; z-index: 2; }
+
+/* ------------------------------------------------------------- APP SHELL -- */
+.screen {
+  width: var(--col);
+  margin: 0 auto;
+  padding: 0 var(--s4);
+}
+.screen-pad { padding-top: var(--s5); }
+
+.app-header {
+  /* Deliberately NOT sticky and NOT filled: navigation lives at the bottom,
+     so the top of the screen can be given back to the backdrop photo.      */
+  position: relative; z-index: 30;
+  height: var(--header-h);
+  display: flex; align-items: center;
+  background: none;
+}
+.app-header > .screen { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.brand { display: flex; align-items: center; gap: .55rem; }
+.brand-mark { color: var(--brand); font-size: 1.15rem; }
+.brand-word { font-weight: 650; letter-spacing: .01em; font-size: var(--fs-md); }
+.header-right { display: flex; align-items: center; gap: var(--s3); }
+.header-clock {
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--muted); letter-spacing: .02em;
+}
+.avatar {
+  width: 2rem; height: 2rem; border-radius: var(--r-pill);
+  background: linear-gradient(150deg, #5d6b4d, #3d4a55);
+  box-shadow: inset 0 0 0 1px var(--hairline-2);
+  display: grid; place-items: center;
+  font-size: var(--fs-xs); font-weight: 650; color: var(--ink);
+}
+
+/* Mockup-only: proves legibility across the full backdrop dim range.
+   Real app reads --background-dim-opacity from the profile. Safe to omit. */
+.dim-control {
+  display: flex; align-items: center; gap: .45rem;
+  padding: .3rem .6rem;
+  background: rgba(18,21,24,.7); border-radius: var(--r-pill);
+  box-shadow: var(--edge), var(--e1);
+  font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .1em; color: var(--muted);
+}
+.dim-control input { width: 5rem; accent-color: var(--brand); }
+
+.page-eyebrow {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.page-title { font-size: var(--fs-xxl); font-weight: 650; line-height: 1.15; letter-spacing: -.01em; }
+
+/* -------------------------------------------------------------- TABBAR --- */
+.tabbar {
+  position: fixed; z-index: 40;
+  left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: center;
+  padding: 0 var(--s3) calc(var(--s3) + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+.tabbar-inner {
+  pointer-events: auto;
+  display: flex; align-items: stretch; gap: 2px;
+  width: 100%; max-width: 30rem;
+  padding: .3rem;
+  background: rgba(16,19,22,.90);
+  border-radius: var(--r-pill);
+  box-shadow: var(--edge), var(--e3);
+}
+.tab {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .18rem; padding: .5rem .2rem;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  transition: color .18s var(--ease), background .18s var(--ease);
+}
+.tab:hover { color: var(--ink-2); background: var(--raised); }
+.tab.is-active { color: var(--ink); background: var(--raised-2); box-shadow: var(--edge); }
+.tab.is-active .tab-icon { color: var(--brand); }
+.tab-icon { font-size: 1.0625rem; line-height: 1; }
+.tab-label { font-size: .625rem; letter-spacing: .04em; white-space: nowrap; }
+/* Insights + Charts are hidden on phones (they live in the More sheet) and
+   surface inline once the pill has room. */
+.tab--overflow { display: none; }
+
+/* ---------------------------------------------------------------- SHEET -- */
+.sheet { position: fixed; inset: 0; z-index: 60; visibility: hidden; }
+.sheet.is-open { visibility: visible; }
+.sheet-scrim {
+  position: absolute; inset: 0;
+  background: rgba(6,8,10,.62);
+  opacity: 0; transition: opacity .22s var(--ease);
+}
+.sheet.is-open .sheet-scrim { opacity: 1; }
+.sheet-panel {
+  position: absolute; left: 50%; bottom: 0;
+  transform: translate(-50%, 100%);
+  width: min(30rem, 100%);
+  padding: var(--s3) var(--s4) calc(var(--s6) + env(safe-area-inset-bottom, 0px));
+  background: var(--slab-solid);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--edge), var(--e3);
+  transition: transform .26s var(--ease);
+  max-height: 82vh; overflow-y: auto;
+}
+.sheet.is-open .sheet-panel { transform: translate(-50%, 0); }
+.sheet-grab {
+  width: 2.5rem; height: 4px; border-radius: var(--r-pill);
+  background: var(--hairline-2); margin: 0 auto var(--s4);
+}
+.sheet-title {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); margin-bottom: var(--s2);
+}
+.sheet-list > * + * { border-top: 1px solid var(--hairline); }
+.sheet-item {
+  display: flex; align-items: center; gap: var(--s3); width: 100%;
+  padding: var(--s4) var(--s2); font-size: var(--fs-md); text-align: left;
+  border-radius: var(--r-sm);
+}
+.sheet-item:hover { background: var(--raised); }
+.sheet-item-icon { width: 1.5rem; text-align: center; color: var(--muted); }
+.sheet-item:hover .sheet-item-icon { color: var(--brand); }
+
+/* ------------------------------------------------- SURFACES: SLAB / BAND --
+   TWO TIERS ONLY.
+   .slab = container. Radius, shadow, translucent fill, top rim.
+   .band = row inside a slab. No fill, no border, no radius; hairline
+           separator + hover tint. Rows must never become cards.            */
+.slab {
+  background: var(--slab);
+  border-radius: var(--r-lg);
+  box-shadow: var(--edge), var(--e1);
+  margin-bottom: var(--s4);
+  overflow: hidden;
+}
+.slab--focus {
+  background: var(--slab-focus);
+  border-radius: var(--r-xl);
+  box-shadow: var(--edge), var(--e2), var(--glow-live);
+}
+.slab-pad { padding: var(--s4); }
+
+.band-list > .band + .band { border-top: 1px solid var(--hairline); }
+.band { padding: var(--s4); position: relative; }
+.band--tap { transition: background .16s var(--ease); }
+.band--tap:hover { background: var(--raised); }
+
+/* ----------------------------------------------------------- DISCLOSURE -- */
+.disclose { }
+.disclose-head {
+  display: flex; align-items: center; gap: var(--s3);
+  width: 100%; padding: var(--s4);
+  text-align: left;
+}
+.disclose-head:hover { background: var(--raised); }
+.disclose-icon { font-size: 1rem; width: 1.25rem; text-align: center; }
+.disclose-title { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.005em; }
+.disclose-summary {
+  margin-left: auto; font-size: var(--fs-xs); color: var(--muted);
+  font-family: var(--font-mono); white-space: nowrap;
+}
+.disclose-chevron { color: var(--muted); font-size: .8rem; transition: transform .22s var(--ease); }
+.disclose.is-closed .disclose-chevron { transform: rotate(-90deg); }
+.disclose-body { border-top: 1px solid var(--hairline); }
+.disclose.is-closed .disclose-body { display: none; }
+
+/* ------------------------------------------------------------ FOCUS CARD --
+   The signature component. A horizontally swipeable deck: one card per
+   running timer, plus a trailing "start something new" card. One card is
+   visible at a time at ANY width — the card widens, the deck never becomes
+   a grid. This is "one thing at a time" made literal.                       */
+.focus-deck { margin-bottom: var(--s4); }
+.focus-track {
+  display: flex; gap: var(--s3);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: var(--s2);
+}
+.focus-track::-webkit-scrollbar { display: none; }
+.focus-card {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  padding: var(--s5) var(--s5) var(--s4);
+  background: var(--slab-focus);
+  border-radius: var(--r-xl);
+  box-shadow: var(--edge), var(--e2), var(--glow-live);
+}
+.focus-eyebrow {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .14em;
+  color: var(--muted); font-weight: 600;
+}
+.live-dot {
+  width: .5rem; height: .5rem; border-radius: var(--r-pill);
+  background: var(--duration);
+  box-shadow: 0 0 0 0 rgba(141,188,117,.55);
+  animation: pulse 2.4s var(--ease) infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(141,188,117,.5); }
+  70%  { box-shadow: 0 0 0 .55rem rgba(141,188,117,0); }
+  100% { box-shadow: 0 0 0 0 rgba(141,188,117,0); }
+}
+.focus-project {
+  font-size: var(--fs-xl); font-weight: 650; letter-spacing: -.015em;
+  color: var(--project); margin-top: var(--s2);
+  overflow-wrap: anywhere;      /* long project names wrap. No marquee. */
+}
+.focus-subs { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: var(--s2); }
+.focus-time {
+  margin-top: var(--s4);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--duration);
+  line-height: .95; letter-spacing: -.03em;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .45rem;
+}
+.focus-time .num { font-size: var(--fs-hero); font-weight: 600; }
+.focus-time .unit {
+  font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 500;
+  color: var(--muted); letter-spacing: .02em;
+}
+.focus-autostop {
+  margin-top: var(--s4);
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s3); flex-wrap: wrap;
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.focus-autostop .mono { color: var(--time); }
+.focus-autostop-bar {
+  margin-top: .5rem; height: 3px; border-radius: var(--r-pill);
+  background: var(--sunken); overflow: hidden;
+}
+.focus-autostop-fill { height: 100%; background: var(--time-deep); border-radius: var(--r-pill); }
+.focus-actions { margin-top: var(--s5); display: flex; gap: var(--s2); align-items: center; }
+.focus-secondary { display: flex; gap: var(--s2); }
+
+.focus-card--start {
+  display: flex; flex-direction: column; justify-content: center;
+  background: rgba(18,21,24,.72);
+  box-shadow: var(--edge), var(--e1), inset 0 0 0 1px var(--hairline);
+  text-align: left;
+}
+.focus-card--start .focus-time { color: var(--muted); }
+.quick-chip {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem .8rem; border-radius: var(--r-pill);
+  background: var(--raised); font-size: var(--fs-sm);
+  box-shadow: var(--edge);
+}
+.quick-chip:hover { background: var(--raised-2); }
+
+.focus-dots { display: flex; justify-content: center; gap: .4rem; margin-top: var(--s1); }
+.focus-dot {
+  width: .4rem; height: .4rem; border-radius: var(--r-pill);
+  background: var(--hairline-2); transition: all .2s var(--ease);
+}
+.focus-dot.is-active { background: var(--brand); width: 1.35rem; }
+
+/* ----------------------------------------------------------- STAT STRIP --
+   Four numbers, ONE slab, hairline-divided. Not four cards.                */
+.stat-strip {
+  display: grid; grid-template-columns: 1fr 1fr;
+}
+.stat {
+  padding: var(--s4);
+  border-top: 1px solid var(--hairline);
+  border-left: 1px solid var(--hairline);
+}
+.stat:nth-child(-n+2) { border-top: 0; }
+.stat:nth-child(odd) { border-left: 0; }
+.stat-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.stat-value {
+  margin-top: .3rem; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: var(--fs-md);
+  font-weight: 600; letter-spacing: -.02em;
+  text-wrap: balance;              /* "5 hours / 12 minutes", never orphaned */
+}
+
+/* --------------------------------------------------------- COMMITMENTS --- */
+.commit { padding: var(--s4); }
+.commit-head { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.commit-target { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
+.commit-kind { font-size: var(--fs-xs); color: var(--muted); }
+.commit-period {
+  margin-left: auto; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted);
+}
+.commit-figures {
+  margin-top: var(--s3);
+  display: flex; align-items: baseline; gap: .4rem;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.commit-actual { font-size: var(--fs-xxl); font-weight: 600; color: var(--duration); letter-spacing: -.02em; }
+.commit-goal { font-size: var(--fs-sm); color: var(--muted); }
+.commit-pct { margin-left: auto; font-size: var(--fs-sm); color: var(--ink-2); }
+
+.meter {
+  margin-top: var(--s3); height: 10px; border-radius: var(--r-pill);
+  background: var(--sunken); overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+.meter-fill { height: 100%; border-radius: var(--r-pill); transition: width .4s var(--ease); }
+.meter-fill.complete    { background: var(--status-complete); }
+.meter-fill.approaching { background: var(--status-approaching); }
+.meter-fill.on-track    { background: var(--status-on-track); }
+.meter-fill.warning     { background: var(--status-warning); }
+.meter-fill.behind      { background: var(--status-behind); }
+
+.bank-row {
+  margin-top: var(--s3); display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2);
+}
+.bank-cell {
+  padding: .55rem .7rem; border-radius: var(--r-sm);
+  background: var(--sunken);
+}
+.bank-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); display: block;
+}
+.bank-value {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); font-weight: 600;
+}
+
+.streak-row { margin-top: var(--s4); display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.streak-flame { font-size: .95rem; color: var(--muted); }
+.streak-flame.is-hot { color: var(--project-deep); }
+.streak-count { font-size: var(--fs-xs); color: var(--muted); }
+.period-strip { display: flex; gap: .3rem; margin-left: auto; }
+.period-cell {
+  width: 1.35rem; height: 1.35rem; border-radius: 6px;
+  display: grid; place-items: center;
+  font-size: .6rem; color: var(--ink-invert);
+  background: var(--raised); cursor: help;
+}
+.period-cell.met     { background: var(--duration-deep); }
+.period-cell.banked  { background: var(--time-deep); }
+.period-cell.missed  { background: var(--project-deep); }
+.period-cell.current { background: var(--note-deep); }
+
+/* ------------------------------------------------------------- ACTIVITY -- */
+.activity { padding: var(--s4); }
+.range-tabs {
+  display: inline-flex; padding: 3px; gap: 2px;
+  background: var(--sunken); border-radius: var(--r-pill);
+}
+.range-tab {
+  padding: .35rem .8rem; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.range-tab.is-active { background: var(--raised-2); color: var(--ink); box-shadow: var(--edge); }
+.cal { margin-top: var(--s4); }
+.cal-head, .cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: .35rem;
+}
+.cal-head span {
+  text-align: center; font-size: var(--fs-label); color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.cal-grid { margin-top: .35rem; }
+.cal-cell {
+  aspect-ratio: 1 / 1; border-radius: var(--r-xs);
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums; cursor: help;
+}
+.cal-cell.is-active   { background: rgba(124,163,106,.32); color: var(--duration); box-shadow: inset 0 0 0 1px rgba(124,163,106,.35); }
+.cal-cell.is-inactive { background: var(--sunken); color: var(--muted); }
+.cal-caption { margin-top: var(--s3); font-size: var(--fs-xs); color: var(--muted); }
+
+/* ------------------------------------------------------- SESSIONS / DAYS -- */
+.day-group + .day-group { border-top: 1px solid var(--hairline); }
+.day-head {
+  display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap;
+  padding: var(--s3) var(--s4);
+  background: var(--sunken);
+}
+.day-date { font-size: var(--fs-sm); font-weight: 650; }
+.day-total {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); color: var(--duration); margin-left: auto;
+}
+.day-note { flex-basis: 100%; font-size: var(--fs-label); color: var(--muted); letter-spacing: .04em; }
+
+/* Swipe-to-reveal row actions. CSS-only on touch (scroll-snap); on pointer
+   devices the actions simply sit at the right and fade in on hover.        */
+.swipe { position: relative; }
+.swipe-track {
+  display: flex; overflow-x: auto;
+  scroll-snap-type: x mandatory; scrollbar-width: none;
+}
+.swipe-track::-webkit-scrollbar { display: none; }
+.swipe-face { flex: 0 0 100%; scroll-snap-align: start; min-width: 0; }
+.swipe-actions {
+  flex: 0 0 auto; scroll-snap-align: end;
+  display: flex; align-items: center; gap: .35rem;
+  padding: var(--s3) var(--s4) var(--s3) var(--s2);
+}
+/* right-edge cue: "there is more here, drag me" */
+.swipe-hint {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 2.5rem;
+  pointer-events: none;
+  display: grid; place-items: center;
+  background: linear-gradient(to right, rgba(18,21,24,0), rgba(18,21,24,.92));
+}
+.swipe-hint::after {
+  content: "\2039\2039";                /* ‹‹ */
+  font-size: .95rem; color: var(--muted); opacity: .75;
+}
+
+.session { padding: var(--s4); }
+.session-top { display: flex; align-items: baseline; gap: var(--s3); }
+.session-project {
+  font-size: var(--fs-md); font-weight: 650; color: var(--project);
+  overflow-wrap: anywhere;
+}
+.session-dur {
+  margin-left: auto; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: var(--fs-md);
+  font-weight: 600; color: var(--duration); white-space: nowrap;
+}
+.session-mid {
+  margin-top: .35rem; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  font-size: var(--fs-xs);
+}
+.session-time {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--time); letter-spacing: -.01em;
+}
+.session-arrow { color: var(--muted); }
+.sub-chip {
+  display: inline-flex; align-items: center;
+  padding: .12rem .5rem; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); color: var(--sub);
+  background: rgba(120,150,184,.14);
+  box-shadow: inset 0 0 0 1px rgba(120,150,184,.22);
+}
+.session-note {
+  margin-top: .5rem; font-size: var(--fs-sm); color: var(--note);
+  line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;                 /* clamp, never marquee */
+}
+.session-note.is-open { -webkit-line-clamp: unset; display: block; }
+.session-note a { color: var(--time); text-decoration: underline; text-underline-offset: 2px; }
+.session-note strong { color: var(--note); font-weight: 700; }
+.note-more {
+  font-size: var(--fs-xs); color: var(--muted); margin-top: .2rem;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.badge-dst {
+  font-size: .625rem; letter-spacing: .08em; text-transform: uppercase;
+  padding: .1rem .4rem; border-radius: var(--r-xs);
+  color: var(--note); background: rgba(185,166,106,.16);
+}
+
+/* -------------------------------------------------------------- PROJECTS -- */
+.group-head {
+  display: flex; align-items: center; gap: .5rem; width: 100%;
+  padding: var(--s4) var(--s2) var(--s2);
+}
+.group-title { font-size: var(--fs-lg); font-weight: 650; }
+.group-count { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted); }
+
+.project { display: flex; align-items: flex-start; gap: var(--s4); padding: var(--s4); }
+.project-top { display: flex; align-items: center; gap: .5rem; }
+.project-name {
+  font-size: var(--fs-lg); font-weight: 650; color: var(--project);
+  overflow-wrap: anywhere;
+}
+.project-status-dot { width: .45rem; height: .45rem; border-radius: var(--r-pill); background: var(--duration); }
+.project-meta { margin-top: .4rem; display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.context-chip {
+  padding: .12rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  color: var(--context); background: rgba(224,164,88,.13);
+  box-shadow: inset 0 0 0 1px rgba(224,164,88,.24);
+}
+.tag-chip {
+  padding: .12rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  color: var(--tag, var(--muted));
+  background: color-mix(in srgb, var(--tag, #888) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tag, #888) 30%, transparent);
+}
+.project-total {
+  margin-top: .5rem; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: var(--fs-md);
+  color: var(--duration); font-weight: 600;
+}
+.project-dates { margin-top: .2rem; font-size: var(--fs-xs); color: var(--time); font-family: var(--font-mono); }
+.project-subs { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; }
+.project-commit { margin-top: var(--s3); }
+.project-start {
+  flex: 0 0 auto; width: 3.25rem; height: 3.25rem;
+  border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  background: var(--brand-deep); color: var(--ink-invert);
+  font-size: 1.05rem;
+  box-shadow: var(--edge), var(--e1);
+  transition: transform .16s var(--ease), background .16s var(--ease);
+}
+.project-start:hover { background: var(--brand-hover); transform: scale(1.04); }
+
+/* --------------------------------------------------------------- FILTERS -- */
+.searchbar {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: .2rem .3rem .2rem var(--s4);
+  background: var(--slab); border-radius: var(--r-pill);
+  box-shadow: var(--edge), var(--e1);
+  margin-bottom: var(--s4);
+}
+.searchbar input {
+  flex: 1 1 auto; min-width: 0; background: none; border: 0;
+  color: var(--ink); font-size: var(--fs-md); padding: .7rem 0;
+}
+.searchbar input::placeholder { color: var(--muted); }
+.filter-launcher {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .55rem .9rem; border-radius: var(--r-pill);
+  background: var(--raised); font-size: var(--fs-sm); white-space: nowrap;
+}
+.filter-launcher:hover { background: var(--raised-2); }
+.filter-count {
+  min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem;
+  border-radius: var(--r-pill); background: var(--brand-deep); color: var(--ink-invert);
+  font-size: .625rem; font-weight: 700; display: grid; place-items: center;
+}
+.field { margin-bottom: var(--s4); }
+.field-label {
+  display: block; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted); margin-bottom: .35rem;
+}
+.input, .select {
+  width: 100%; padding: .7rem .85rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink); font-size: var(--fs-md);
+}
+.check-row { display: flex; align-items: center; gap: var(--s3); padding: .55rem 0; }
+
+/* --------------------------------------------------------------- BUTTONS -- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  padding: .7rem 1.15rem; border-radius: var(--r-pill);
+  font-size: var(--fs-sm); font-weight: 600;
+  background: var(--raised); color: var(--ink);
+  box-shadow: var(--edge);
+  transition: background .16s var(--ease), transform .12s var(--ease);
+}
+.btn:hover { background: var(--raised-2); }
+.btn:active { transform: translateY(1px); }
+.btn--primary { background: var(--brand-deep); color: var(--ink-invert); box-shadow: var(--edge), var(--e1); }
+.btn--primary:hover { background: var(--brand-hover); }
+.btn--stop { background: var(--project-deep); color: #17110f; box-shadow: var(--edge), var(--e1); }
+.btn--stop:hover { background: var(--project); }
+.btn--ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-2); }
+.btn--ghost:hover { background: var(--raised); }
+.btn--quiet { background: transparent; color: var(--muted); box-shadow: none; padding: .4rem .6rem; }
+.btn--quiet:hover { color: var(--ink); background: var(--raised); }
+.btn--block { width: 100%; }
+.btn--lg { padding: 1rem 1.5rem; font-size: var(--fs-md); border-radius: var(--r-pill); }
+.btn-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: var(--r-pill);
+  display: grid; place-items: center; color: var(--muted);
+  background: var(--raised); font-size: .9rem;
+  transition: color .16s var(--ease), background .16s var(--ease);
+}
+.btn-icon:hover { color: var(--ink); background: var(--raised-2); }
+.btn-icon--danger:hover { color: var(--project); background: rgba(190,103,95,.16); }
+
+/* ---------------------------------------------------------------- PAGER --- */
+.pager { display: flex; justify-content: center; gap: .35rem; flex-wrap: wrap; padding: var(--s4) 0 0; }
+.pager-btn {
+  min-width: 2.5rem; height: 2.5rem; padding: 0 .6rem;
+  border-radius: var(--r-pill); display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  color: var(--muted); background: var(--raised);
+}
+.pager-btn:hover { color: var(--ink); background: var(--raised-2); }
+.pager-btn.is-current { background: var(--brand-deep); color: var(--ink-invert); font-weight: 700; }
+
+/* ------------------------------------------------------------- UTILITIES -- */
+.text-red    { color: var(--project); }
+.text-blue   { color: var(--sub); }
+.text-green  { color: var(--duration); }
+.text-cyan   { color: var(--time); }
+.text-yellow { color: var(--note); }
+.text-orange { color: var(--brand); }
+.muted { color: var(--muted); }
+.mono  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tnum  { font-variant-numeric: tabular-nums; }
+.u-row { display: flex; align-items: center; }
+.u-between { display: flex; align-items: center; justify-content: space-between; }
+.u-wrap { flex-wrap: wrap; }
+.u-gap-2 { gap: var(--s2); }
+.u-gap-3 { gap: var(--s3); }
+.u-mt-4 { margin-top: var(--s4); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ============================ WIDENING ======================================
+   Desktop is not a different design. The column grows, the tabbar contracts
+   into a pill, a few numbers get more room. Nothing reflows into a new grid. */
+@media (min-width: 560px) {
+  .stat-strip { grid-template-columns: repeat(4, 1fr); }
+  .stat, .stat:nth-child(odd) { border-top: 0; border-left: 1px solid var(--hairline); }
+  .stat:first-child { border-left: 0; }
+  .tabbar-inner { width: auto; max-width: none; padding: .35rem; }
+  .tab { flex: 0 0 auto; flex-direction: row; gap: .5rem; padding: .6rem 1rem; }
+  .tab-label { font-size: var(--fs-xs); }
+  .tab--overflow.is-inline { display: flex; }   /* Insights/Charts inline */
+}
+
+@media (min-width: 900px) {
+  :root {
+    --col: clamp(20rem, 100%, 46rem);
+    --fs-md: 1.09375rem;
+  }
+  .screen { padding: 0 var(--s5); }
+  .slab { margin-bottom: var(--s5); }
+  .stat-value { font-size: var(--fs-lg); }
+  /* pointer devices: no swiping needed, actions live at the right edge */
+  .swipe-track { overflow: visible; }
+  .swipe-face { flex: 1 1 auto; }
+  .swipe-actions { opacity: 0; pointer-events: none; transition: opacity .16s var(--ease); }
+  .swipe:hover .swipe-actions, .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
+  .swipe-hint { display: none; }
+}
+
+/* ------------------------------------------------------- REDUCED MOTION -- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------ LIGHT MODE --
+   Secondary. Derived from the dark tokens, never the reverse.               */
+body.light-mode {
+  --ink: #22201c; --ink-2: #4a4f4b; --muted: #6d746f; --ink-invert: #fffdf8;
+  --base: #f4f1ec;
+  --slab: rgba(255,253,248,0.88);
+  --slab-focus: rgba(255,253,248,0.94);
+  --slab-solid: #fffdf8;
+  --raised: rgba(34,32,28,0.05);
+  --raised-2: rgba(34,32,28,0.09);
+  --sunken: rgba(34,32,28,0.06);
+  --hairline: rgba(34,32,28,0.10);
+  --hairline-2: rgba(34,32,28,0.18);
+  --project: #a84f47; --sub: #4f6d92; --duration: #55803f;
+  --time: #327d72; --note: #8a7530; --brand: #a9662d;
+  --edge: inset 0 1px 0 rgba(255,255,255,.7);
+}

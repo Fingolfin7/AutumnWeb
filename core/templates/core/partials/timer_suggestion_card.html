@@ -1,29 +1,31 @@
-<article class="timer-suggestion-row timer-suggestion-{{ suggestion.kind }}">
-    <span class="timer-suggestion-main">
-        <span class="text-red project-name-slider">
-            {{ suggestion.project.name }}
-        </span>
-        <span class="timer-suggestion-subprojects">
+{% comment %}
+  One suggested timer, as a band. Starting it is a POST, so the whole row is
+  not a link — the form's submit button is the action.
+{% endcomment %}
+<article class="band suggest suggest--{{ suggestion.kind }}">
+    <div class="suggest-main">
+        <span class="suggest-project">{{ suggestion.project.name }}</span>
+        {% if suggestion.subprojects %}
+        <div class="suggest-subs">
             {% for subproject in suggestion.subprojects %}
-                {% if forloop.first %}[{% endif %}
-                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                {% if forloop.last %}]{% endif %}
+            <span class="sub-chip">{{ subproject.name }}</span>
             {% endfor %}
-        </span>
-        <span class="timer-suggestion-detail">{{ suggestion.detail }}</span>
-        {% if suggestion.kind == 'commitment' and suggestion.metric %}
-            <span class="timer-suggestion-metric">{{ suggestion.metric }}</span>
+        </div>
         {% endif %}
-    </span>
+        {% if suggestion.detail %}<span class="suggest-detail">{{ suggestion.detail }}</span>{% endif %}
+        {% if suggestion.kind == 'commitment' and suggestion.metric %}
+        <span class="suggest-metric">{{ suggestion.metric }}</span>
+        {% endif %}
+    </div>
 
-    <form method="post" action="{% url 'start_timer' %}" class="timer-suggestion-form">
+    <form method="post" action="{% url 'start_timer' %}">
         {% csrf_token %}
         <input type="hidden" name="project" value="{{ suggestion.project.name }}">
         {% for subproject_name in suggestion.subproject_names %}
-            <input type="hidden" name="subprojects" value="{{ subproject_name }}">
+        <input type="hidden" name="subprojects" value="{{ subproject_name }}">
         {% endfor %}
-        <button type="submit" class="timer-button" title="Start {{ suggestion.project.name }}">
-            <i class="fa fa-play"></i>
+        <button type="submit" class="suggest-start" title="Start {{ suggestion.project.name }}">
+            <i class="fas fa-play"></i><span class="sr-only">Start {{ suggestion.project.name }}</span>
         </button>
     </form>
 </article>

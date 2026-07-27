@@ -1,68 +1,71 @@
 {% extends 'core/base.html' %}
-{% load static %}
 {% load time_formats %}
 
 {% block content %}
-    <form class="flex-row" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        <section class="card stacked half-width">
-            <h2>Update Context</h2>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Context</p>
+        <h1 class="page-title">{{ context_obj.name }}</h1>
+    </div>
+</div>
 
-            <div class="label-input">
+<form method="post" enctype="multipart/form-data" class="fields">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <div class="split">
+        <section class="slab slab-pad">
+            <div class="field">
                 {{ form.name.label_tag }}
                 {{ form.name }}
                 {{ form.name.errors }}
             </div>
 
-            <div class="label-input">
+            <div class="field">
                 {{ form.description.label_tag }}
                 {{ form.description }}
                 {{ form.description.errors }}
             </div>
 
-            <div class="button-row">
-                <button type="submit" class="primary-button">
-                    <i class="fa fa-check-circle"></i>
-                    Update Context
+            <div class="form-actions">
+                <a class="btn btn--ghost" href="{% url 'contexts' %}">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+                <button type="submit" class="btn btn--primary">
+                    <i class="fas fa-check-circle"></i> Save changes
                 </button>
-
-                <button type="button" class="primary-button dark-red" onclick="window.location.href='{% url 'delete_context' context_obj.id %}'">
-                    <i class="fa fa-trash"></i>
-                    Delete Context
-                </button>
-            </div>
-            <div class="button-row">
-                <button type="button" class="secondary-button" onclick="window.location.href='{% url 'contexts' %}'">
-                    <i class="fa fa-arrow-left"></i>
-                    Back
-                </button>
+                <a class="btn btn--ghost btn--spacer" href="{% url 'delete_context' context_obj.id %}">
+                    <i class="fas fa-trash"></i> Delete context
+                </a>
             </div>
         </section>
 
-        <section class="card stacked half-width space-around">
-            <h3>Context Summary</h3>
-
-            <span>
-                Total projects:
-                <span class="text-cyan">{{ sidebar_total_projects }}</span>
-                {{ sidebar_status_counts|project_status_counts_formatter }}
-            </span>
-
-            <span>
-                Total time:
-                <span class="text-green">{{ sidebar_total_time|min_formatter }}</span>
-            </span>
-
-            <span>
-                Average session length:
-                <span class="text-cyan">{{ sidebar_average_session_duration|min_formatter }}</span>
-            </span>
+        <section class="slab slab-pad">
+            <p class="field-label">At a glance</p>
+            <div class="meta-list">
+                <div class="meta-row">
+                    <span class="meta-label">Projects</span>
+                    <span class="meta-value">
+                        {{ sidebar_total_projects }}
+                        {{ sidebar_status_counts|project_status_counts_formatter }}
+                    </span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Total time</span>
+                    <span class="meta-value text-green">{{ sidebar_total_time|min_formatter }}</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Average session</span>
+                    <span class="meta-value text-green">{{ sidebar_average_session_duration|min_formatter }}</span>
+                </div>
+            </div>
         </section>
-
-    </form>
+    </div>
+</form>
 
     {% with commitment_entity_label='context' %}
         {% include 'core/partials/commitments_panel.html' %}
     {% endwith %}
+
 {% endblock %}

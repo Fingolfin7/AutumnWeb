@@ -1,49 +1,69 @@
 {% extends 'core/base.html' %}
-{% load static %}
 
 {% block content %}
-    <section class="card">
-        <h2>Tags</h2>
-        <br>
-        <form method="post">
-            {% csrf_token %}
-            <div class="stacked">
-                <div class="label-input">
-                    <label for="id_name">Name</label>
-                    {{ form.name }}
-                    {{ form.name.errors }}
-                </div>
-                <div class="label-input">
-                    <label for="id_color">Color</label>
-                    {{ form.color }}
-                    {{ form.color.errors }}
-                </div>
-            </div>
-            <br>
-            <button type="submit" class="primary-button" style="width: auto !important;">
-                <i class="fa fa-plus"></i>
-                Create Tag
-            </button>
-        </form>
-    </section>
 
-    <section id="tags-list" class="card stacked">
-        <h3>Existing Tags</h3>
-        {% if not tags %}
-            <p>No tags yet. Use the form above to create one.</p>
-        {% else %}
-            <ul class="stacked">
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Add flexible labels to projects</p>
+        <h1 class="page-title">Tags</h1>
+    </div>
+</div>
+
+<div class="split">
+    <section id="tags-list" class="slab disclose" data-disclose>
+        <button class="disclose-head" type="button" aria-expanded="true">
+            <i class="fas fa-tags disclose-icon text-orange"></i>
+            <span class="disclose-title">Existing tags</span>
+            <span class="disclose-summary">{{ tags|length }}</span>
+            <i class="fas fa-chevron-down disclose-chevron"></i>
+        </button>
+
+        <div class="disclose-body">
+            {% if tags %}
+            <ul class="band-list">
                 {% for tag in tags %}
-                    <li>
-                        <a {% if tag.color %} style="color: {{ tag.color }}"{% endif %}
-                                class="plain-link" href="{% url 'update_tag' tag.id %}">{{ tag.name }}</a>
-                        -
-                        {% with project_count=tag.projects.count %}
-                          {{ project_count }} {% if project_count == 1 or project_count == 0 %}project{% else %}projects{% endif %}
-                        {% endwith %}
-                    </li>
+                <li class="band band--tap u-row u-between u-gap-3">
+                    <a class="tag-chip" href="{% url 'update_tag' tag.id %}"{% if tag.color %} style="--tag: {{ tag.color }}"{% endif %}>{{ tag.name }}</a>
+                    {% with project_count=tag.projects.count %}
+                    <span class="muted mono tnum">
+                        {{ project_count }} {% if project_count == 1 %}project{% else %}projects{% endif %}
+                    </span>
+                    {% endwith %}
+                </li>
                 {% endfor %}
             </ul>
-        {% endif %}
+            {% else %}
+            <p class="empty">No tags yet. <a href="#create-tag">Create one</a> to label related projects.</p>
+            {% endif %}
+        </div>
     </section>
+
+    <form method="post" class="fields" id="create-tag">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <section class="slab slab-pad">
+            <p class="field-label">New tag</p>
+
+            <div class="field">
+                <label for="id_name">Name</label>
+                {{ form.name }}
+                {{ form.name.errors }}
+            </div>
+
+            <div class="field">
+                <label for="id_color">Color</label>
+                {{ form.color }}
+                {{ form.color.errors }}
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn--primary">
+                    <i class="fas fa-plus"></i> Create tag
+                </button>
+            </div>
+        </section>
+    </form>
+</div>
+
 {% endblock %}

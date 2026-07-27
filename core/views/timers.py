@@ -28,7 +28,6 @@ from core.views.allocations import parse_allocation_post
 
 ACTIVE_TIMER_FRAGMENT_TEMPLATES = {
     "dashboard": "core/partials/active_timers_dashboard.html",
-    "home": "core/partials/active_timers_home.html",
     "timers": "core/partials/active_timers_timers.html",
 }
 
@@ -65,7 +64,7 @@ def active_timers_fragment(request):
         .order_by("-start_time")
     )
     timers = filter_by_active_context(timers, request)
-    if surface in {"dashboard", "home"}:
+    if surface == "dashboard":
         timers = timers[:5]
 
     # These partials do not need request context processors. Avoiding them keeps

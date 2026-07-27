@@ -18,6 +18,7 @@ from core.views.timers import (
 )
 from core.views.dashboard import (
     DashboardView,
+    timeline_fragment,
 )
 from core.views.sessions import (
     remove_ambiguous_time_error,
@@ -47,7 +48,7 @@ from core.views.projects import (
     merge_subprojects,
 )
 from core.views.contexts_tags import (
-    set_active_context,
+    switch_context,
     manage_contexts,
     manage_tags,
     UpdateContextView,

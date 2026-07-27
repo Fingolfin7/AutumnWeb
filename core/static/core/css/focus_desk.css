@@ -1,0 +1,2839 @@
+/* ============================================================================
+   AUTUMN — "FOCUS DESK" DESIGN SYSTEM                          focus_desk.css
+   ============================================================================
+   The single stylesheet for every page that extends base_fd.html.
+   Do not fork it, do not add a second stylesheet, do not use inline styles —
+   if a page needs a component that isn't here, APPEND it here in this style.
+
+   During the migration this file coexists with the legacy style.css, but no
+   page ever loads both: legacy pages extend base.html, ported pages extend
+   base_fd.html. That is what lets the two systems share class names
+   (.btn, .stat, .text-red, …) without colliding. See UI_REDESIGN.md.
+   ============================================================================
+
+   THESIS
+   ------
+   Calm, one thing at a time — on a phone AND on a 27" display. The product
+   still answers one question above the fold: "what am I working on right now",
+   as a large FOCUS CARD with giant elapsed time, project, subprojects and one
+   primary Stop button.
+
+   What changed from Focus Card v1: v1 treated desktop as a widened phone —
+   the same single narrow column, everything else stacked and collapsed. That
+   read as calm on 390px and as wasteful on 1440px. So the calm is kept but the
+   width is now used. At >=1000px the page is a HERO ZONE above a DESK:
+
+     HERO (full width)  focus deck — "what am I doing right now"
+                        timeline   — "what has today looked like"
+                        Both are wide objects; neither belongs in a column.
+     DESK (two tracks)  PRIMARY (wide)   sessions — what you act on
+                        AMBIENT (narrow) commitments + activity — what you
+                                         glance at
+
+   Progressive disclosure is for when space is scarce; when it isn't, showing
+   the thing beats hiding it behind a tap.
+
+   Surfaces stay soft dark SLABS with big radii and real shadow — physical
+   depth, not frosted glass, not terminal panes, not paper, not kanban.
+   The backdrop photo still frames the desk: generous gutters, capped measure,
+   translucent slabs so the image reads through everywhere.
+
+   NAV MODEL
+   ---------
+   No sidebar at any width. One .tabbar element that changes station:
+     - <=560px  : full-width-inset bar fixed to the BOTTOM, 5 icon tabs
+                  (Home / Projects / Timers / Sessions / More).
+     - >560px   : shrinks to a centred bottom PILL, icons gain labels.
+     - >=1000px : the same pill unpins from the bottom and becomes a STICKY
+                  FLOATING PILL AT THE TOP, with Insights + Charts inline.
+                  Bottom-anchored nav is a thumb affordance; on a desktop the
+                  pointer is already at the top of the window.
+   Remaining items (Import, Export, Profile, Log out) live in a SHEET opened by
+   the "More" tab. The sheet is also reused for filters on Projects / Sessions
+   — never put an 8-control filter row on the page; put a search field plus a
+   "Filters" launcher that opens `.sheet`.
+
+   DESK CLASSES (added on top of the v1 index below)
+     .desk  .desk-main  .desk-side  .desk-head
+
+   TIMELINE     .fd-tl-slab .fd-tl-head .fd-tl-title .fd-tl-total
+                .fd-tl .fd-tl-axis .fd-tl-lab .fd-tl-lab--minor
+                .fd-tl-plot .fd-tl-lane .fd-tl-head-cell .fd-tl-name
+                .fd-tl-fig .fd-tl-track .fd-tl-block .fd-tl-block.is-live
+                .fd-tl-b-lab .fd-tl-b-dur
+                .fd-tl-tip .fd-tl-tip--flip .fd-tl-tip-note .fd-tl-tip-link
+                .fd-tl-nowlayer .fd-tl-now .fd-tl-now-flag .fd-tl-gap
+                .fd-tl-caption .fd-tl-empty
+
+   TYPE SCALE  (root 16px; body runs 17px — large type is part of the thesis)
+   ----------
+     --fs-hero    clamp(3.25rem, 15vw, 4.75rem)  mono, 600, tabular  live timer
+     --fs-xxl     2rem      big numbers (commitment actuals, project totals)
+     --fs-xl      1.5rem    focus-card project name
+     --fs-lg      1.1875rem section titles, project names in lists
+     --fs-md      1.0625rem body / session project names
+     --fs-sm      0.9375rem secondary rows, notes
+     --fs-xs      0.8125rem metadata, chips
+     --fs-label   0.6875rem uppercase 0.12em tracking, muted — eyebrow labels
+   Mono (--font-mono) is confined to numerals: durations, clock times, counts,
+   percentages. Never mono for prose.
+
+   CLASS INDEX (grouped by component)
+   ----------------------------------
+   Shell        .app  .app-header  .brand .brand-mark .brand-word
+                .header-right .avatar .header-clock
+                .screen  .screen-pad  .page-eyebrow .page-title
+                .messages .msg .msg--error .msg--info .msg--success
+   Nav          .tabbar .tabbar-inner .tab .tab.is-active .tab-icon .tab-label
+                .tab--overflow .tab--overflow.is-inline   (phone-hidden tabs)
+                .sheet .sheet.is-open .sheet-scrim .sheet-panel .sheet-grab
+                .sheet-title .sheet-list .sheet-item .sheet-item-icon
+   Surfaces     .slab  .slab--focus  .slab-pad  .slab-foot  .empty
+                .band  .band-list  .band--tap
+                (RULE: containers are slabs, rows are bands. Never nest a slab
+                 in a slab. Bands have no border, no shadow, no radius — they
+                 are separated by hairlines.)
+   Disclosure   .disclose .disclose.is-closed .disclose-head .disclose-icon
+                .disclose-title .disclose-summary .disclose-chevron
+                .disclose-body
+   Focus card   .focus-deck .focus-track .focus-cards .focus-card
+                .focus-card--start
+                .focus-eyebrow .live-dot .focus-project .focus-project--plain
+                .focus-subs .focus-lede .focus-quick
+                .focus-time .focus-time .num .focus-time .unit
+                .focus-autostop .focus-autostop-bar .focus-autostop-fill
+                .focus-actions .focus-secondary .focus-stop
+                .focus-dots .focus-dot .focus-dot.is-active
+                .quick-chip
+                (.focus-cards is `display: contents` — it is the polled
+                 fragment's wrapper, not a box.)
+   Stats        .stat-strip .stat .stat-label .stat-value
+   Commitments  .commit .commit-head .commit-target .commit-kind .commit-period
+                .commit-figures .commit-actual .commit-goal .commit-pct
+                .meter .meter-fill  (+ .complete .approaching .on-track
+                                       .warning .behind)
+                .bank-row .bank-cell .bank-label .bank-value
+                .streak-row .streak-flame .streak-count
+                .period-strip .period-cell (+ .met .banked .missed .current)
+   Activity     .activity .range-tabs .range-tab .range-tab.is-active
+                .cal .cal-head .cal-head span .cal-grid .cal-cell
+                .cal-cell.is-active .cal-cell.is-inactive .cal-caption
+   Sessions     .day-group .day-head .day-date .day-total .day-note
+                .swipe .swipe-track .swipe-face .swipe-actions .swipe-hint
+                .session .session-top .session-project .session-dur
+                .session-mid .session-time .session-arrow
+                .sub-chip .session-note .session-note.is-open .note-more
+                .badge-dst
+   Projects     .project .project-top .project-name .project-status-dot
+                .project-meta .context-chip .tag-chip .project-total
+                .project-dates .project-subs .project-commit
+                .project-start  (the big per-card primary start button)
+                .group-head .group-title .group-count
+   Filters      .searchbar .searchbar input .filter-launcher .filter-count
+                .field .field-label .input .select .check-row
+   Buttons      .btn .btn--primary .btn--stop .btn--ghost .btn--quiet
+                .btn--block .btn--lg .btn-icon .btn-icon--danger
+   Pager        .pager .pager-btn .pager-btn.is-current
+   Utilities    .text-red .text-blue .text-green .text-cyan .text-yellow
+                .text-orange .muted .mono .tnum
+                .u-row .u-between .u-wrap .u-gap-2 .u-gap-3 .u-mt-4 .sr-only
+   Insights      .chat-layout (--chat-h) .chat-sidebar .chat-sidebar.collapsed
+                 .new-chat-btn .chat-list .chat-list-empty
+                 .chat-item-container .chat-item .chat-title .delete-chat-btn
+                 .chat-main .chat-header .chat-header-meta .chat-header-range
+                 .chat-header-tokens .chat-header-actions .chat-action-btn
+                 .chat-form .conversation-container .conversation-container.selecting
+                 .user-message .assistant-message (+ .streaming .stream-error)
+                 .message-content .assistant-sources .copy-btn .msg-selected
+                 .composer .composer-toolbar .composer-field .composer-note
+                 .composer-input-row .empty-state-container
+                 (These names are a JS contract — insights_stream.js builds
+                  several of them at runtime. Grep before renaming.)
+   Data transfer .stream-output .stream-progress .stream-log .log-entry
+   Users         .auth-card
+                 .profile-page .profile-account-grid .profile-avatar-panel
+                 .profile-avatar-large .profile-background-options
+                 .profile-choice-pill .profile-background-tuning
+                 .profile-background-context .profile-background-upload
+                 .profile-current-background .profile-defaults-grid
+                 .profile-default-item .profile-default-control
+                 .profile-codex-panel .profile-keys-grid .profile-key-item
+   ============================================================================ */
+
+/* ---------------------------------------------------------------- TOKENS -- */
+:root {
+  /* --- semantic hues (LOAD-BEARING — meanings are fixed) ---------------- */
+  --project:        #d0796f;   /* PROJECT names        (from #be675f, +L)   */
+  --project-deep:   #be675f;   /* canonical, for small text / borders       */
+  --sub:            #8aabce;   /* SUBPROJECT names     (from #7896b8)       */
+  --sub-deep:       #7896b8;
+  --duration:       #8dbc75;   /* DURATIONS / totals   (from #7ca36a)       */
+  --duration-deep:  #7ca36a;
+  --time:           #58b1a3;   /* CLOCK times          (from #4e9a8e)       */
+  --time-deep:      #4e9a8e;
+  --note:           #c6b276;   /* session NOTES        (from #b9a66a)       */
+  --note-deep:      #b9a66a;
+  --brand:          #d18b4c;   /* BRAND / accent       (from #c98245)       */
+  --brand-deep:     #c98245;
+  --brand-hover:    #e0a05f;
+  --magenta:        #9b83a7;
+  --context:        #e0a458;   /* commitment target: context = orange       */
+
+  /* --- progress / status (were literal hexes in v1) --------------------- */
+  --status-complete:    #7ca36a;
+  --status-approaching: #84cc16;
+  --status-on-track:    #b9a66a;
+  --status-warning:     #f97316;
+  --status-behind:      #be675f;
+
+  /* --- ink -------------------------------------------------------------- */
+  --ink:        #e4e8e5;
+  --ink-2:      #b9c1bc;
+  --muted:      #8b948f;
+  --ink-invert: #101214;
+
+  /* --- surfaces (translucent so the backdrop always reads through) ------ */
+  --base:        #101214;
+  --slab:        rgba(18, 21, 24, 0.80);
+  --slab-focus:  rgba(21, 25, 28, 0.88);
+  --slab-solid:  #15181b;
+  --raised:      rgba(255, 255, 255, 0.045);
+  --raised-2:    rgba(255, 255, 255, 0.075);
+  --sunken:      rgba(0, 0, 0, 0.26);
+  --hairline:    rgba(228, 232, 229, 0.085);
+  --hairline-2:  rgba(228, 232, 229, 0.16);
+  /* NO --scrim TOKEN HERE. It used to live at this line, as
+       --scrim: rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
+     and it silently never worked. A custom property is substituted at
+     computed-value time ON THE ELEMENT THAT DECLARES IT, so the inner var()
+     resolved against :root — where --background-dim-opacity is never set —
+     and the 0.55 fallback was baked in permanently. The shell sets the real
+     value inline on <body>, which is a descendant, and by then --scrim had
+     already computed. The backdrop sat at 55% for every user regardless of
+     their setting. The substitution now happens where it is used, on the
+     element that actually carries the value: see body.bg-active::after. */
+
+  /* --- depth (soft, wide, low-contrast — "physical", never glassy) ------ */
+  --e1: 0 1px 2px rgba(0,0,0,.30), 0 6px 18px rgba(0,0,0,.26);
+  --e2: 0 2px 4px rgba(0,0,0,.32), 0 14px 34px rgba(0,0,0,.34);
+  --e3: 0 2px 6px rgba(0,0,0,.36), 0 26px 60px rgba(0,0,0,.46);
+  --edge: inset 0 1px 0 rgba(255,255,255,.055);   /* top highlight rim      */
+  --glow-live: 0 0 0 1px rgba(141,188,117,.16), 0 18px 60px rgba(124,163,106,.13);
+  --focus-ring: 0 0 0 3px rgba(209,139,76,.30);
+
+  /* --- radii (big and soft — the anti-thesis of v1's square corners) ---- */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 24px;
+  --r-xl: 30px;
+  --r-pill: 999px;
+
+  /* --- spacing ---------------------------------------------------------- */
+  --s1: .25rem; --s2: .5rem;  --s3: .75rem; --s4: 1rem;
+  --s5: 1.5rem; --s6: 2rem;   --s7: 2.75rem; --s8: 4rem;
+
+  /* --- type ------------------------------------------------------------- */
+  --font-ui:   "Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --fs-hero:  clamp(3.25rem, 15vw, 4.75rem);
+  --fs-xxl:   2rem;
+  --fs-xl:    1.5rem;
+  --fs-lg:    1.1875rem;
+  --fs-md:    1.0625rem;
+  --fs-sm:    .9375rem;
+  --fs-xs:    .8125rem;
+  --fs-label: .6875rem;
+
+  /* --- layout ----------------------------------------------------------- */
+  --col:        clamp(20rem, 100%, 40rem);  /* the one content column       */
+  --tabbar-h:   4.25rem;
+  --header-h:   3.5rem;
+  --ease: cubic-bezier(.22,.61,.36,1);
+}
+
+/* ------------------------------------------------------------ RESET/BASE -- */
+*, *::before, *::after { box-sizing: border-box; }
+/* color-scheme is what tells the BROWSER this is a dark UI, and it is the only
+   way to reach the parts of a control the page cannot style. A <select>'s open
+   dropdown is drawn by the OS, not by us: without this it renders on the light
+   grey system popup while our CSS colours the text pale, which is why the
+   chart picker's options were unreadable. It also fixes the scrollbars, the
+   date-picker panel, and the default checkbox and radio glyphs. Setting it
+   here rather than on <body> matters — the scrollbar belongs to the root. */
+html { font-size: 16px; -webkit-text-size-adjust: 100%; color-scheme: dark; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--base);
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(var(--tabbar-h) + var(--s6));
+}
+h1,h2,h3,h4,p,ul,ol,figure { margin: 0; }
+ul,ol { list-style: none; padding: 0; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+img { max-width: 100%; display: block; }
+:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--r-sm); }
+
+/* ---------------------------------------------- BACKDROP (non-negotiable) --
+   base_fd.html sets --workspace-bg-image and --background-dim-opacity from
+   the user profile (upload / Bing daily / NASA APOD) and adds .bg-active
+   only when a photo actually resolved. ::before = photo, ::after = dim
+   scrim, .app lifted above both.                                            */
+body.bg-active::before {
+  content: "";
+  position: fixed; inset: 0; z-index: 0;
+  background-image: var(--workspace-bg-image);
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+}
+body.bg-active::after {
+  content: "";
+  position: fixed; inset: 0; z-index: 1;
+  /* Written out here rather than behind a token on purpose — see the note
+     where --scrim used to be. This element IS <body>, which is where the
+     shell writes --background-dim-opacity inline and where the header slider
+     updates it, so the var() resolves against a value that actually exists. */
+  background: rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
+  pointer-events: none;
+}
+body.bg-active .app { position: relative; z-index: 2; }
+.app { position: relative; z-index: 2; }
+
+/* ------------------------------------------------------------- APP SHELL -- */
+.screen {
+  width: var(--col);
+  margin: 0 auto;
+  padding: 0 var(--s4);
+}
+.screen-pad { padding-top: var(--s5); }
+
+.app-header {
+  /* Deliberately NOT sticky and NOT filled: navigation lives at the bottom,
+     so the top of the screen can be given back to the backdrop photo.      */
+  position: relative; z-index: 30;
+  height: var(--header-h);
+  display: flex; align-items: center;
+  background: none;
+}
+.app-header > .screen { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.brand { display: flex; align-items: center; gap: .55rem; }
+.brand-mark { color: var(--brand); font-size: 1.15rem; }
+.brand-word { font-weight: 650; letter-spacing: .01em; font-size: var(--fs-md); }
+.header-right { display: flex; align-items: center; gap: var(--s3); }
+.header-clock {
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  color: var(--muted); letter-spacing: .02em;
+}
+/* Active-context switcher in the header. Styled as a chip rather than a form
+   control because that is what it reads as — a statement of what you are
+   currently looking at, which happens to be changeable. It borrows the
+   --context orange the context chips use everywhere else so the connection to
+   Contexts is not something you have to learn. */
+.context-switch { display: flex; align-items: center; }
+.context-switch select {
+  appearance: none;
+  padding: .2rem 1.5rem .2rem .6rem;
+  border: 0; border-radius: var(--r-pill);
+  font-family: inherit; font-size: var(--fs-xs);
+  color: var(--context); background: rgba(224, 164, 88, .13);
+  box-shadow: inset 0 0 0 1px rgba(224, 164, 88, .24);
+  cursor: pointer;
+  /* the chevron, drawn rather than shipped as an asset */
+  background-image: linear-gradient(45deg, transparent 50%, var(--context) 50%),
+                    linear-gradient(135deg, var(--context) 50%, transparent 50%);
+  background-position: calc(100% - .75rem) 55%, calc(100% - .5rem) 55%;
+  background-size: .25rem .25rem, .25rem .25rem;
+  background-repeat: no-repeat;
+}
+.context-switch select:hover { background-color: rgba(224, 164, 88, .2); }
+@media (max-width: 560px) {
+  /* the header has the brand, the dimmer and the avatar to fit as well */
+  .context-switch select { max-width: 7rem; text-overflow: ellipsis; }
+}
+
+/* Backdrop dimming, parked in the header beside the avatar. Hidden unless a
+   photo actually resolved — with no backdrop there is nothing to dim, and an
+   inert control in the chrome of every page is worse than no control. The
+   markup is rendered unconditionally and revealed here, so the shell does not
+   have to restate its three-way background resolution. */
+.dim-control {
+  display: none; align-items: center; gap: .5rem;
+  padding: .3rem .7rem;
+  background: rgba(16, 19, 22, .55);
+  border-radius: var(--r-pill);
+  box-shadow: var(--edge);
+}
+body.bg-active .dim-control { display: flex; }
+.dim-icon { font-size: .75rem; color: var(--muted); }
+.dim-control input[type="range"] {
+  width: 6rem; height: 1rem; margin: 0;
+  /* accent-color plus the root's color-scheme: dark is the whole styling
+     budget here — a native range renders correctly dark with an orange thumb,
+     and a hand-built one would be worse at every browser and input type. */
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+@media (max-width: 560px) { .dim-control input[type="range"] { width: 4rem; } }
+
+.avatar {
+  width: 2rem; height: 2rem; border-radius: var(--r-pill);
+  background: linear-gradient(150deg, #5d6b4d, #3d4a55);
+  box-shadow: inset 0 0 0 1px var(--hairline-2);
+  display: grid; place-items: center;
+  font-size: var(--fs-xs); font-weight: 650; color: var(--ink);
+}
+
+.page-eyebrow {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.page-title { font-size: var(--fs-xxl); font-weight: 650; line-height: 1.15; letter-spacing: -.01em; }
+
+/* Below the desk breakpoint the head simply stacks: title, then the strip.
+   At >=1000px they share one line (see the desktop layer). */
+.desk-head { margin-bottom: var(--s5); }
+.desk-head .stat-strip { margin-top: var(--s4); }
+
+/* -------------------------------------------------------------- TABBAR --- */
+.tabbar {
+  position: fixed; z-index: 40;
+  left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: center;
+  padding: 0 var(--s3) calc(var(--s3) + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+}
+.tabbar-inner {
+  pointer-events: auto;
+  display: flex; align-items: stretch; gap: 2px;
+  width: 100%; max-width: 30rem;
+  padding: .3rem;
+  background: rgba(16,19,22,.90);
+  border-radius: var(--r-pill);
+  box-shadow: var(--edge), var(--e3);
+}
+.tab {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: .18rem; padding: .5rem .2rem;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  transition: color .18s var(--ease), background .18s var(--ease);
+}
+.tab:hover { color: var(--ink-2); background: var(--raised); }
+.tab.is-active { color: var(--ink); background: var(--raised-2); box-shadow: var(--edge); }
+.tab.is-active .tab-icon { color: var(--brand); }
+.tab-icon { font-size: 1.0625rem; line-height: 1; }
+.tab-label { font-size: .625rem; letter-spacing: .04em; white-space: nowrap; }
+/* Insights + Charts are hidden on phones (they live in the More sheet) and
+   surface inline once the pill has room. */
+.tab--overflow { display: none; }
+
+/* ---------------------------------------------------------------- SHEET -- */
+.sheet { position: fixed; inset: 0; z-index: 60; visibility: hidden; }
+.sheet.is-open { visibility: visible; }
+.sheet-scrim {
+  position: absolute; inset: 0;
+  background: rgba(6,8,10,.62);
+  opacity: 0; transition: opacity .22s var(--ease);
+}
+.sheet.is-open .sheet-scrim { opacity: 1; }
+.sheet-panel {
+  position: absolute; left: 50%; bottom: 0;
+  transform: translate(-50%, 100%);
+  width: min(30rem, 100%);
+  padding: var(--s3) var(--s4) calc(var(--s6) + env(safe-area-inset-bottom, 0px));
+  background: var(--slab-solid);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: var(--edge), var(--e3);
+  transition: transform .26s var(--ease);
+  max-height: 82vh; overflow-y: auto;
+}
+.sheet.is-open .sheet-panel { transform: translate(-50%, 0); }
+.sheet-grab {
+  width: 2.5rem; height: 4px; border-radius: var(--r-pill);
+  background: var(--hairline-2); margin: 0 auto var(--s4);
+}
+.sheet-title {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); margin-bottom: var(--s2);
+}
+.sheet-list > * + * { border-top: 1px solid var(--hairline); }
+.sheet-item {
+  display: flex; align-items: center; gap: var(--s3); width: 100%;
+  padding: var(--s4) var(--s2); font-size: var(--fs-md); text-align: left;
+  border-radius: var(--r-sm);
+}
+.sheet-item:hover { background: var(--raised); }
+.sheet-item-icon { width: 1.5rem; text-align: center; color: var(--muted); }
+.sheet-item:hover .sheet-item-icon { color: var(--brand); }
+
+/* ------------------------------------------------- SURFACES: SLAB / BAND --
+   TWO TIERS ONLY.
+   .slab = container. Radius, shadow, translucent fill, top rim.
+   .band = row inside a slab. No fill, no border, no radius; hairline
+           separator + hover tint. Rows must never become cards.            */
+.slab {
+  background: var(--slab);
+  border-radius: var(--r-lg);
+  box-shadow: var(--edge), var(--e1);
+  margin-bottom: var(--s4);
+  overflow: hidden;
+}
+.slab--focus {
+  background: var(--slab-focus);
+  border-radius: var(--r-xl);
+  box-shadow: var(--edge), var(--e2), var(--glow-live);
+}
+.slab-pad { padding: var(--s4); }
+
+.band-list > .band + .band { border-top: 1px solid var(--hairline); }
+.band { padding: var(--s4); position: relative; }
+.band--tap { transition: background .16s var(--ease); }
+.band--tap:hover { background: var(--raised); }
+
+/* An empty slab still says something. One quiet line plus the action that
+   fills it — never a bare "no data" and never a blank box. */
+.empty { padding: var(--s5) var(--s4); font-size: var(--fs-sm); color: var(--muted); }
+.empty a { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+/* Full-width action parked at the foot of a slab ("View all …"). */
+.slab-foot { padding: var(--s4); }
+
+/* ----------------------------------------------------------- DISCLOSURE -- */
+.disclose { }
+.disclose-head {
+  display: flex; align-items: center; gap: var(--s3);
+  width: 100%; padding: var(--s4);
+  text-align: left;
+}
+.disclose-head:hover { background: var(--raised); }
+.disclose-icon { font-size: 1rem; width: 1.25rem; text-align: center; }
+.disclose-title { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.005em; }
+.disclose-summary {
+  margin-left: auto; font-size: var(--fs-xs); color: var(--muted);
+  font-family: var(--font-mono); white-space: nowrap;
+}
+.disclose-chevron { color: var(--muted); font-size: .8rem; transition: transform .22s var(--ease); }
+.disclose.is-closed .disclose-chevron { transform: rotate(-90deg); }
+.disclose-body { border-top: 1px solid var(--hairline); }
+.disclose.is-closed .disclose-body { display: none; }
+
+/* ------------------------------------------------------------ FOCUS CARD --
+   The signature component. A horizontally swipeable deck: one card per
+   running timer, plus a trailing "start something new" card. One card is
+   visible at a time at ANY width — the card widens, the deck never becomes
+   a grid. This is "one thing at a time" made literal.                       */
+.focus-deck { margin-bottom: var(--s4); }
+.focus-track {
+  display: flex; gap: var(--s3);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  padding-bottom: var(--s2);
+}
+.focus-track::-webkit-scrollbar { display: none; }
+.focus-card {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  padding: var(--s5) var(--s5) var(--s4);
+  background: var(--slab-focus);
+  border-radius: var(--r-xl);
+  box-shadow: var(--edge), var(--e2), var(--glow-live);
+}
+.focus-eyebrow {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .14em;
+  color: var(--muted); font-weight: 600;
+}
+.live-dot {
+  width: .5rem; height: .5rem; border-radius: var(--r-pill);
+  background: var(--duration);
+  box-shadow: 0 0 0 0 rgba(141,188,117,.55);
+  animation: pulse 2.4s var(--ease) infinite;
+}
+@keyframes pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(141,188,117,.5); }
+  70%  { box-shadow: 0 0 0 .55rem rgba(141,188,117,0); }
+  100% { box-shadow: 0 0 0 0 rgba(141,188,117,0); }
+}
+.focus-project {
+  font-size: var(--fs-xl); font-weight: 650; letter-spacing: -.015em;
+  color: var(--project); margin-top: var(--s2);
+  overflow-wrap: anywhere;      /* long project names wrap. No marquee. */
+}
+.focus-subs { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: var(--s2); }
+.focus-time {
+  margin-top: var(--s4);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--duration);
+  line-height: .95; letter-spacing: -.03em;
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .45rem;
+}
+/* A number and its unit are one indivisible thing. Without this the two
+   halves wrap independently and you get "43 minutes / 21 / seconds". */
+.focus-time-part { display: inline-flex; align-items: baseline; gap: .35rem; }
+.focus-time .num { font-size: var(--fs-hero); font-weight: 600; }
+.focus-time .unit {
+  font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 500;
+  color: var(--muted); letter-spacing: .02em; white-space: nowrap;
+}
+.focus-autostop {
+  margin-top: var(--s4);
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s3); flex-wrap: wrap;
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.focus-autostop .mono { color: var(--time); }
+.focus-autostop-bar {
+  margin-top: .5rem; height: 3px; border-radius: var(--r-pill);
+  background: var(--sunken); overflow: hidden;
+}
+.focus-autostop-fill { height: 100%; background: var(--time-deep); border-radius: var(--r-pill); }
+.focus-actions { margin-top: var(--s5); display: flex; gap: var(--s2); align-items: center; }
+.focus-secondary { display: flex; gap: var(--s2); }
+/* Stop is the one primary action on a running card; it takes the leftovers. */
+.focus-stop { flex: 1 1 auto; }
+
+.focus-card--start {
+  display: flex; flex-direction: column; justify-content: center;
+  background: rgba(18,21,24,.72);
+  box-shadow: var(--edge), var(--e1), inset 0 0 0 1px var(--hairline);
+  text-align: left;
+}
+.focus-card--start .focus-time { color: var(--muted); }
+.quick-chip {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .45rem .8rem; border-radius: var(--r-pill);
+  background: var(--raised); font-size: var(--fs-sm);
+  box-shadow: var(--edge);
+}
+.quick-chip:hover { background: var(--raised-2); }
+
+/* The running-timer cards are re-rendered by the 5s polling fragment, so they
+   arrive wrapped in the fragment's own container. `display: contents` lets
+   that wrapper carry the polling data-attributes without becoming a box —
+   the cards stay direct children of .focus-track and keep their layout. */
+.focus-cards { display: contents; }
+
+.focus-project--plain { color: var(--ink); }
+.focus-lede { margin-top: var(--s2); font-size: var(--fs-sm); color: var(--muted); }
+.focus-quick { margin-top: var(--s4); gap: .4rem; }
+/* each chip posts its own start form; the form must not become a flex item */
+.focus-quick form { display: contents; }
+
+.focus-dots { display: flex; justify-content: center; gap: .4rem; margin-top: var(--s1); }
+.focus-dot {
+  width: .4rem; height: .4rem; border-radius: var(--r-pill);
+  background: var(--hairline-2); transition: all .2s var(--ease);
+}
+.focus-dot.is-active { background: var(--brand); width: 1.35rem; }
+
+/* ----------------------------------------------------------- STAT STRIP --
+   Four numbers, ONE slab, hairline-divided. Not four cards.                */
+.stat-strip {
+  display: grid; grid-template-columns: 1fr 1fr;
+  background: var(--slab);
+  border-radius: var(--r-lg);
+  box-shadow: var(--edge), var(--e1);
+  overflow: hidden;
+}
+.stat {
+  padding: var(--s4);
+  border-top: 1px solid var(--hairline);
+  border-left: 1px solid var(--hairline);
+}
+.stat:nth-child(-n+2) { border-top: 0; }
+.stat:nth-child(odd) { border-left: 0; }
+.stat-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.stat-value {
+  margin-top: .3rem; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: var(--fs-md);
+  font-weight: 600; letter-spacing: -.02em;
+  text-wrap: balance;              /* "5 hours / 12 minutes", never orphaned */
+}
+
+/* --------------------------------------------------------- COMMITMENTS --- */
+.commit { padding: var(--s4); }
+.commit-head { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.commit-target { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
+.commit-kind { font-size: var(--fs-xs); color: var(--muted); }
+.commit-period {
+  margin-left: auto; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted);
+}
+.commit-figures {
+  margin-top: var(--s3);
+  display: flex; align-items: baseline; gap: .4rem;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.commit-actual { font-size: var(--fs-xxl); font-weight: 600; color: var(--duration); letter-spacing: -.02em; }
+.commit-goal { font-size: var(--fs-sm); color: var(--muted); }
+.commit-pct { margin-left: auto; font-size: var(--fs-sm); color: var(--ink-2); }
+
+.meter {
+  margin-top: var(--s3); height: 10px; border-radius: var(--r-pill);
+  background: var(--sunken); overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+.meter-fill {
+  width: var(--progress, 0%); height: 100%;
+  border-radius: var(--r-pill); transition: width .4s var(--ease);
+}
+.meter-fill.complete    { background: var(--status-complete); }
+.meter-fill.approaching { background: var(--status-approaching); }
+.meter-fill.on-track    { background: var(--status-on-track); }
+.meter-fill.warning     { background: var(--status-warning); }
+.meter-fill.behind      { background: var(--status-behind); }
+
+.bank-row {
+  margin-top: var(--s3); display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2);
+}
+.bank-cell {
+  padding: .55rem .7rem; border-radius: var(--r-sm);
+  background: var(--sunken);
+}
+.bank-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); display: block;
+}
+.bank-value {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); font-weight: 600;
+}
+
+.streak-row { margin-top: var(--s4); display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.streak-flame { font-size: .95rem; color: var(--muted); }
+.streak-flame.is-hot { color: var(--project-deep); }
+.streak-count { font-size: var(--fs-xs); color: var(--muted); }
+.period-strip { display: flex; gap: .3rem; margin-left: auto; }
+.period-cell {
+  width: 1.35rem; height: 1.35rem; border-radius: 6px;
+  display: grid; place-items: center;
+  font-size: .6rem; color: var(--ink-invert);
+  background: var(--raised); cursor: help;
+}
+.period-cell.met     { background: var(--duration-deep); }
+.period-cell.banked  { background: var(--time-deep); }
+.period-cell.missed  { background: var(--project-deep); }
+.period-cell.current { background: var(--note-deep); }
+
+/* ------------------------------------------------------------- ACTIVITY -- */
+.activity { padding: var(--s4); }
+.range-tabs {
+  display: inline-flex; padding: 3px; gap: 2px;
+  background: var(--sunken); border-radius: var(--r-pill);
+}
+.range-tab {
+  padding: .35rem .8rem; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.range-tab.is-active { background: var(--raised-2); color: var(--ink); box-shadow: var(--edge); }
+.cal { margin-top: var(--s4); }
+.cal-head, .cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: .35rem;
+}
+.cal-head span {
+  text-align: center; font-size: var(--fs-label); color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.cal-grid { margin-top: .35rem; }
+.cal-cell {
+  aspect-ratio: 1 / 1; border-radius: var(--r-xs);
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums; cursor: help;
+}
+.cal-cell.is-active   { background: rgba(124,163,106,.32); color: var(--duration); box-shadow: inset 0 0 0 1px rgba(124,163,106,.35); }
+.cal-cell.is-inactive { background: var(--sunken); color: var(--muted); }
+.cal-caption { margin-top: var(--s3); font-size: var(--fs-xs); color: var(--muted); }
+
+/* ------------------------------------------------------- SESSIONS / DAYS -- */
+.day-group + .day-group { border-top: 1px solid var(--hairline); }
+.day-head {
+  display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap;
+  padding: var(--s3) var(--s4);
+  background: var(--sunken);
+}
+.day-date { font-size: var(--fs-sm); font-weight: 650; }
+.day-total {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); color: var(--duration); margin-left: auto;
+}
+.day-note { flex-basis: 100%; font-size: var(--fs-label); color: var(--muted); letter-spacing: .04em; }
+
+/* Swipe-to-reveal row actions. CSS-only on touch (scroll-snap); on pointer
+   devices the actions simply sit at the right and fade in on hover.        */
+.swipe { position: relative; }
+.swipe-track {
+  display: flex; overflow-x: auto;
+  scroll-snap-type: x mandatory; scrollbar-width: none;
+}
+.swipe-track::-webkit-scrollbar { display: none; }
+.swipe-face { flex: 0 0 100%; scroll-snap-align: start; min-width: 0; }
+.swipe-actions {
+  flex: 0 0 auto; scroll-snap-align: end;
+  display: flex; align-items: center; gap: .35rem;
+  padding: var(--s3) var(--s4) var(--s3) var(--s2);
+}
+/* right-edge cue: "there is more here, drag me" */
+.swipe-hint {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 2.5rem;
+  pointer-events: none;
+  display: grid; place-items: center;
+  background: linear-gradient(to right, rgba(18,21,24,0), rgba(18,21,24,.92));
+}
+.swipe-hint::after {
+  content: "\2039\2039";                /* ‹‹ */
+  font-size: .95rem; color: var(--muted); opacity: .75;
+}
+
+.session { padding: var(--s4); }
+.session-top { display: flex; align-items: baseline; gap: var(--s3); }
+.session-project {
+  font-size: var(--fs-md); font-weight: 650; color: var(--project);
+  overflow-wrap: anywhere;
+}
+.session-dur {
+  margin-left: auto; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: var(--fs-md);
+  font-weight: 600; color: var(--duration); white-space: nowrap;
+}
+.session-mid {
+  margin-top: .35rem; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  font-size: var(--fs-xs);
+}
+.session-time {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  color: var(--time); letter-spacing: -.01em;
+}
+.session-arrow { color: var(--muted); }
+.sub-chip {
+  display: inline-flex; align-items: center;
+  padding: .12rem .5rem; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); color: var(--sub);
+  background: rgba(120,150,184,.14);
+  box-shadow: inset 0 0 0 1px rgba(120,150,184,.22);
+}
+.session-note {
+  margin-top: .5rem; font-size: var(--fs-sm); color: var(--note);
+  line-height: 1.45;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;                 /* clamp, never marquee */
+}
+.session-note.is-open { -webkit-line-clamp: unset; display: block; }
+.session-note a { color: var(--time); text-decoration: underline; text-underline-offset: 2px; }
+.session-note strong { color: var(--note); font-weight: 700; }
+/* Notes render through the markdown filter, so their real content is block
+   elements. Flatten the first paragraph so a one-line note still sits on the
+   baseline the clamp expects. */
+.session-note p { margin: 0; }
+.session-note p + p { margin-top: .35rem; }
+.session-note ul, .session-note ol { padding-left: 1.1rem; list-style: disc; }
+.session-note code {
+  font-family: var(--font-mono); font-size: .9em;
+  padding: .05rem .3rem; border-radius: var(--r-xs); background: var(--sunken);
+}
+.session-note pre { overflow-x: auto; }
+.note-more {
+  font-size: var(--fs-xs); color: var(--muted); margin-top: .2rem;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.badge-dst {
+  font-size: .625rem; letter-spacing: .08em; text-transform: uppercase;
+  padding: .1rem .4rem; border-radius: var(--r-xs);
+  color: var(--note); background: rgba(185,166,106,.16);
+}
+
+/* -------------------------------------------------------------- PROJECTS -- */
+.group-head {
+  display: flex; align-items: center; gap: .5rem; width: 100%;
+  padding: var(--s4) var(--s2) var(--s2);
+}
+.group-title { font-size: var(--fs-lg); font-weight: 650; }
+.group-count { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted); }
+
+.project { display: flex; align-items: flex-start; gap: var(--s4); padding: var(--s4); }
+.project-top { display: flex; align-items: center; gap: .5rem; }
+.project-name {
+  font-size: var(--fs-lg); font-weight: 650; color: var(--project);
+  overflow-wrap: anywhere;
+}
+.project-status-dot { width: .45rem; height: .45rem; border-radius: var(--r-pill); background: var(--duration); }
+.project-meta { margin-top: .4rem; display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.context-chip {
+  padding: .12rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  color: var(--context); background: rgba(224,164,88,.13);
+  box-shadow: inset 0 0 0 1px rgba(224,164,88,.24);
+}
+.tag-chip {
+  padding: .12rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs);
+  color: var(--tag, var(--muted));
+  background: color-mix(in srgb, var(--tag, #888) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tag, #888) 30%, transparent);
+}
+.project-total {
+  margin-top: .5rem; font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums; font-size: var(--fs-md);
+  color: var(--duration); font-weight: 600;
+}
+.project-dates { margin-top: .2rem; font-size: var(--fs-xs); color: var(--time); font-family: var(--font-mono); }
+.project-subs { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; }
+.project-commit { margin-top: var(--s3); }
+.project-start {
+  flex: 0 0 auto; width: 3.25rem; height: 3.25rem;
+  border-radius: var(--r-pill);
+  display: grid; place-items: center;
+  background: var(--brand-deep); color: var(--ink-invert);
+  font-size: 1.05rem;
+  box-shadow: var(--edge), var(--e1);
+  transition: transform .16s var(--ease), background .16s var(--ease);
+}
+.project-start:hover { background: var(--brand-hover); transform: scale(1.04); }
+
+/* --------------------------------------------------------------- FILTERS -- */
+.searchbar {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: .2rem .3rem .2rem var(--s4);
+  background: var(--slab); border-radius: var(--r-pill);
+  box-shadow: var(--edge), var(--e1);
+  margin-bottom: var(--s4);
+}
+.searchbar input {
+  flex: 1 1 auto; min-width: 0; background: none; border: 0;
+  color: var(--ink); font-size: var(--fs-md); padding: .7rem 0;
+}
+.searchbar input::placeholder { color: var(--muted); }
+/* Charts and Insights lead with a date range rather than a search box: both
+   pages answer a question about a PERIOD, and on Insights the range decides
+   which sessions the model is even shown. The fields open on the user's
+   default-filter settings, so they read as "this is the window" rather than
+   as an empty form. Wraps to two lines before it squeezes the inputs. */
+.searchbar--range { flex-wrap: wrap; padding-right: .3rem; }
+.range-fields {
+  display: flex; align-items: center; gap: .5rem;
+  /* Sized to the fields, not to the bar. Left to grow they split the whole
+     width and you get two 561px date inputs holding ten characters each;
+     margin-right: auto keeps the launcher and Apply against the right edge
+     without the fields having to stretch to reach them. */
+  flex: 0 1 auto; min-width: 0; margin-right: auto;
+}
+.range-fields input[type="date"] {
+  flex: 0 1 11rem; min-width: 0;
+  padding: .5rem .6rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink);
+  font-family: inherit; font-size: var(--fs-sm);
+}
+.range-fields input[type="date"]:focus-visible {
+  outline: none; border-color: var(--brand-deep); box-shadow: var(--focus-ring);
+}
+.range-sep { flex: 0 0 auto; font-size: var(--fs-sm); }
+@media (max-width: 560px) {
+  /* The bar wraps here; the leading icon would take a whole row to itself and
+     the two date fields already say what this is. */
+  .searchbar--range > .fas { display: none; }
+}
+
+.filter-launcher {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .55rem .9rem; border-radius: var(--r-pill);
+  background: var(--raised); font-size: var(--fs-sm); white-space: nowrap;
+}
+.filter-launcher:hover { background: var(--raised-2); }
+.filter-count {
+  min-width: 1.15rem; height: 1.15rem; padding: 0 .3rem;
+  border-radius: var(--r-pill); background: var(--brand-deep); color: var(--ink-invert);
+  font-size: .625rem; font-weight: 700; display: grid; place-items: center;
+}
+.field { margin-bottom: var(--s4); }
+.field-label {
+  display: block; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted); margin-bottom: .35rem;
+}
+.input, .select {
+  width: 100%; padding: .7rem .85rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink); font-size: var(--fs-md);
+}
+.check-row { display: flex; align-items: center; gap: var(--s3); padding: .55rem 0; }
+
+/* --------------------------------------------------------------- BUTTONS -- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  padding: .7rem 1.15rem; border-radius: var(--r-pill);
+  font-size: var(--fs-sm); font-weight: 600;
+  background: var(--raised); color: var(--ink);
+  box-shadow: var(--edge);
+  transition: background .16s var(--ease), transform .12s var(--ease);
+}
+.btn:hover { background: var(--raised-2); }
+.btn:active { transform: translateY(1px); }
+.btn--primary { background: var(--brand-deep); color: var(--ink-invert); box-shadow: var(--edge), var(--e1); }
+.btn--primary:hover { background: var(--brand-hover); }
+.btn--stop { background: var(--project-deep); color: #17110f; box-shadow: var(--edge), var(--e1); }
+.btn--stop:hover { background: var(--project); }
+.btn--ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-2); }
+.btn--ghost:hover { background: var(--raised); }
+.btn--quiet { background: transparent; color: var(--muted); box-shadow: none; padding: .4rem .6rem; }
+.btn--quiet:hover { color: var(--ink); background: var(--raised); }
+.btn--block { width: 100%; }
+.btn--lg { padding: 1rem 1.5rem; font-size: var(--fs-md); border-radius: var(--r-pill); }
+.btn-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: var(--r-pill);
+  display: grid; place-items: center; color: var(--muted);
+  background: var(--raised); font-size: .9rem;
+  transition: color .16s var(--ease), background .16s var(--ease);
+}
+.btn-icon:hover { color: var(--ink); background: var(--raised-2); }
+.btn-icon--danger:hover { color: var(--project); background: rgba(190,103,95,.16); }
+
+/* ---------------------------------------------------------------- PAGER --- */
+.pager { display: flex; justify-content: center; gap: .35rem; flex-wrap: wrap; padding: var(--s4) 0 0; }
+.pager-btn {
+  min-width: 2.5rem; height: 2.5rem; padding: 0 .6rem;
+  border-radius: var(--r-pill); display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: var(--fs-sm);
+  color: var(--muted); background: var(--raised);
+}
+.pager-btn:hover { color: var(--ink); background: var(--raised-2); }
+.pager-btn.is-current { background: var(--brand-deep); color: var(--ink-invert); font-weight: 700; }
+
+/* ------------------------------------------------------------- UTILITIES -- */
+.text-red    { color: var(--project); }
+.text-blue   { color: var(--sub); }
+.text-green  { color: var(--duration); }
+.text-cyan   { color: var(--time); }
+.text-yellow { color: var(--note); }
+.text-orange { color: var(--brand); }
+.muted { color: var(--muted); }
+.mono  { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tnum  { font-variant-numeric: tabular-nums; }
+.u-row { display: flex; align-items: center; }
+.u-between { display: flex; align-items: center; justify-content: space-between; }
+.u-wrap { flex-wrap: wrap; }
+.u-grow { flex: 1 1 auto; min-width: 0; }
+.u-gap-2 { gap: var(--s2); }
+.u-gap-3 { gap: var(--s3); }
+.u-mt-4 { margin-top: var(--s4); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ============================ WIDENING ======================================
+   Desktop is not a different design. The column grows, the tabbar contracts
+   into a pill, a few numbers get more room. Nothing reflows into a new grid. */
+@media (min-width: 560px) {
+  .stat-strip { grid-template-columns: repeat(4, 1fr); }
+  .stat, .stat:nth-child(odd) { border-top: 0; border-left: 1px solid var(--hairline); }
+  .stat:first-child { border-left: 0; }
+  .tabbar-inner { width: auto; max-width: none; padding: .35rem; }
+  .tab { flex: 0 0 auto; flex-direction: row; gap: .5rem; padding: .6rem 1rem; }
+  .tab-label { font-size: var(--fs-xs); }
+  .tab--overflow.is-inline { display: flex; }   /* Insights/Charts inline */
+}
+
+@media (min-width: 900px) {
+  :root {
+    --col: clamp(20rem, 100%, 46rem);
+    --fs-md: 1.09375rem;
+  }
+  .screen { padding: 0 var(--s5); }
+  .slab { margin-bottom: var(--s5); }
+  .stat-value { font-size: var(--fs-lg); }
+  /* pointer devices: no swiping needed, actions live at the right edge */
+  .swipe-track { overflow: visible; }
+  .swipe-face { flex: 1 1 auto; }
+  .swipe-actions { opacity: 0; pointer-events: none; transition: opacity .16s var(--ease); }
+  .swipe:hover .swipe-actions, .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
+  .swipe-hint { display: none; }
+}
+
+/* ------------------------------------------------------- REDUCED MOTION -- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   ═══  DESKTOP LAYER  —  "FOCUS DESK"  ═══════════════════════════════════════
+   ----------------------------------------------------------------------------
+   Everything above this line is the mobile-first Focus Card system, unchanged.
+   This layer keeps its FEEL — soft translucent slabs, big radii, real physical
+   depth, large calm type, one obvious primary action — but stops pretending a
+   1440px display is a tall phone.
+
+   What changes at >=1000px:
+     1. THE COLUMN BECOMES A DESK.  Two tracks: a wide primary track (focus +
+        sessions, the things you act on) and a narrower ambient track
+        (commitments + activity, the things you glance at). Nothing is hidden
+        behind a tap that the width can simply show.
+     2. THE CAROUSEL BECOMES A ROW.  .focus-track stops snapping and lays the
+        running timers out side by side — on a phone "one at a time" is a
+        kindness, on a desktop it is withheld information. Dots disappear.
+     3. THE PILL GOES UP.  The same .tabbar element unpins from the bottom of
+        the viewport and becomes a sticky floating pill at the top, gaining
+        text labels and surfacing Insights + Charts inline.
+     4. SESSIONS GO HORIZONTAL.  The stacked 3-line card becomes one aligned
+        row — time · project · subprojects · note · duration — with the action
+        cluster revealed on hover instead of by swiping.
+     5. THE BACKDROP GETS ROOM.  Generous gutters and a capped measure so the
+        user's photo still frames the desk rather than being covered by it.
+   ==========================================================================*/
+
+@media (min-width: 1000px) {
+
+  /* ── shell ─────────────────────────────────────────────────────────────*/
+  /* v1 pins .screen to `width: var(--col)` — a fixed single-column measure.
+     The desk needs the real viewport, so release the width and cap with
+     max-width instead. Overriding max-width alone does nothing here. */
+  .screen { width: 100%; max-width: 90rem; padding-left: var(--s5); padding-right: var(--s5); }
+  .screen-pad { padding-bottom: var(--s6); }
+  .app-header { position: sticky; top: 0; z-index: 45; }
+  /* body reserves --tabbar-h at the bottom so the fixed phone tabbar never
+     covers the last row. Up here the tabbar is a sticky pill at the TOP, so
+     that reservation is 100px of dead space at the foot of every page. */
+  body { padding-bottom: var(--s6); }
+
+  /* ── 3 · nav pill moves to the top ─────────────────────────────────────*/
+  .tabbar {
+    position: sticky; top: var(--s3); bottom: auto;
+    z-index: 44; padding: 0;
+    margin: 0 auto var(--s5); justify-content: center;
+  }
+  .tabbar-inner {
+    width: auto; max-width: none;
+    gap: .15rem; padding: .35rem;
+    box-shadow: var(--edge), var(--e2);
+  }
+  .tab {
+    flex: 0 0 auto;
+    flex-direction: row; align-items: center; gap: .5rem;
+    padding: .5rem 1rem;
+  }
+  .tab-icon { font-size: .9375rem; }
+  .tab-label { font-size: var(--fs-xs); letter-spacing: .01em; }
+  .tab--overflow { display: flex; }        /* Insights + Charts inline */
+
+  /* ── page head: title and stats share the top line ─────────────────────*/
+  .desk-head {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: var(--s5); margin-bottom: var(--s4);
+  }
+  .desk-head .stat-strip {
+    grid-template-columns: repeat(4, minmax(8.5rem, 1fr));
+    margin-top: 0;
+  }
+  .desk-head .stat:first-child { border-left: 0; }
+  .desk-head .stat { border-top: 0; }
+
+  /* ── 1 · the desk grid ─────────────────────────────────────────────────*/
+  .desk {
+    display: grid;
+    grid-template-columns: minmax(0, 1.75fr) minmax(20rem, 1fr);
+    gap: var(--s5);
+    align-items: start;
+  }
+  .desk-side { position: sticky; top: 5.5rem; }
+
+  /* ── 2 · focus deck stops being a carousel ─────────────────────────────*/
+  .focus-track {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: var(--s4);
+    overflow: visible; scroll-snap-type: none; padding-bottom: 0;
+  }
+  .focus-card { flex: initial; scroll-snap-align: none; }
+  .focus-dots { display: none; }
+  /* the "start something" card is ambient, not equal — it reads quieter */
+  .focus-card--start { box-shadow: var(--edge), var(--e1); }
+
+  /* ── sections stay open; the disclosure head becomes a plain title ──────*/
+  .desk .disclose-chevron { opacity: .45; }
+
+}
+
+/* Very wide: let the ambient track breathe rather than stretching the rows. */
+@media (min-width: 1600px) {
+  .screen { max-width: 100rem; }
+  .desk { grid-template-columns: minmax(0, 2fr) minmax(22rem, .85fr); }
+}
+
+/* ============================================================================
+   SESSION ROWS — two shapes, chosen by the LIST's width
+   ----------------------------------------------------------------------------
+   The same list is ~860px wide inside the dashboard's desk and ~1370px on the
+   Sessions page. A viewport media query asks the wrong question: at 1100px the
+   window is "desktop" but the desk's primary track is still narrow, and the
+   four-column row squeezed the note down to about ninety pixels of ellipsis.
+
+   So the shape is chosen by a CONTAINER query on .session-list. Below the
+   threshold the row is the stacked mobile card; above it, aligned columns.
+   ==========================================================================*/
+
+.session-list { container-type: inline-size; }
+
+/* Default: stacked. Project and duration share the top line, times and note
+   run full width beneath — the mobile-first shape. */
+.session {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--s3);
+}
+.session-top  { grid-column: 1; grid-row: 1; }
+.session-dur  { grid-column: 2; grid-row: 1; text-align: right; }
+.session-mid  { grid-column: 1 / -1; }
+.session-note { grid-column: 1 / -1; }
+
+@container (min-width: 46rem) {
+  .session-list .swipe-track { display: block; overflow: visible; scroll-snap-type: none; }
+  .session-list .swipe-face { flex: initial; }
+  .session-list .swipe-hint { display: none; }
+  .session-list .swipe-actions {
+    position: absolute; top: 50%; right: var(--s4); transform: translateY(-50%);
+    padding: 0 0 0 var(--s5); gap: .3rem;
+    opacity: 0; pointer-events: none;
+    background: linear-gradient(to right, rgba(18,21,24,0) 0, rgba(20,24,27,.96) 18%);
+    transition: opacity .16s var(--ease);
+  }
+  .session-list .swipe:hover .swipe-actions,
+  .session-list .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
+
+  .session-list .session {
+    grid-template-columns: 10.5rem minmax(7rem, 11rem) minmax(0, 1fr) 5.5rem;
+    align-items: baseline; gap: var(--s4);
+    padding: var(--s3) var(--s4);
+  }
+  /* Columns are assigned EXPLICITLY, not left to auto-placement. A session
+     with no note renders no .session-note element at all, and auto-placement
+     would then slide the duration left into the empty note column — so the
+     right-hand figures only lined up on rows that happened to have notes. */
+  .session-list .session-mid   { grid-column: 1; grid-row: 1; margin-top: 0; }
+  .session-list .session-top   { grid-column: 2; grid-row: 1; display: block; }
+  .session-list .session-note  { grid-column: 3; grid-row: 1; margin-top: 0; }
+  .session-list .session-dur   { grid-column: 4; grid-row: 1; text-align: right; justify-self: end; }
+
+  /* keep the day header aligned with the new grid */
+  .session-list .day-head { padding-left: var(--s4); padding-right: var(--s4); }
+}
+
+/* ============================================================================
+   TIMELINE  — Focus Desk dialect
+   ----------------------------------------------------------------------------
+   The same lane chart as the Deck variant, but spoken in this system's accent:
+   soft rounded blocks with real depth instead of hairline rectangles, 68px
+   lanes instead of 44px, readable label sizes instead of 10px, and NO hatching
+   — the running block breathes with --glow-live because this system already
+   owns a vocabulary for "alive" and doesn't need diagonal stripes.
+
+   It sits in the full-width hero zone rather than the desk's primary track: a
+   16-hour axis squeezed into an 861px column turns a 32-minute session into a
+   23px sliver, which is precisely the cramped result this concept exists to
+   avoid. Charts get the width; columns get the lists.
+
+   Geometry contract is unchanged: --start / --w are percentages of 06:00–22:00.
+   ==========================================================================*/
+
+/* .slab clips its children so bands can't poke out of the rounded corners.
+   The timeline has no bands and does have tooltips that must escape upward,
+   so this one slab opts out. */
+.fd-tl-slab { padding: var(--s4) var(--s5) var(--s5); overflow: visible; }
+
+.fd-tl-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s4);
+}
+.fd-tl-title {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-lg); font-weight: 600; color: var(--time);
+  letter-spacing: .01em;
+}
+/* The mockup put demo range tabs here. The real chart is one day, so the
+   right-hand slot carries the day's tracked total instead — a fact, not a
+   control that does nothing. */
+.fd-tl-total {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-lg); font-weight: 600; color: var(--duration);
+  text-align: right;
+}
+.fd-tl-total .fd-tl-total-label {
+  display: block; font-family: var(--font-ui);
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+/* Tracked total above, range tabs below — both right-aligned against the
+   title on the left. */
+.fd-tl-head-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: var(--s2);
+}
+
+.fd-tl { --fd-gutter: 12rem; }
+
+/* ── axis ──────────────────────────────────────────────────────────────── */
+.fd-tl-axis {
+  position: relative; height: 1.25rem; margin-left: var(--fd-gutter);
+}
+.fd-tl-lab {
+  position: absolute; left: var(--x); top: 0; transform: translateX(-50%);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); color: var(--muted);
+}
+
+/* ── lanes ─────────────────────────────────────────────────────────────── */
+.fd-tl-plot { position: relative; }
+
+.fd-tl-lane {
+  display: grid; grid-template-columns: var(--fd-gutter) 1fr;
+  align-items: center;
+  border-radius: var(--r-sm);
+}
+.fd-tl-lane + .fd-tl-lane { margin-top: var(--s2); }
+.fd-tl-lane:hover { background: var(--raised); }
+
+.fd-tl-head-cell {
+  display: flex; flex-direction: column; gap: .15rem;
+  padding-right: var(--s4); min-width: 0;
+}
+.fd-tl-name {
+  font-size: var(--fs-md); font-weight: 650; color: var(--project);
+  display: inline-flex; align-items: center; gap: .5rem;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fd-tl-name::before {
+  content: ""; width: .5rem; height: .5rem; flex: none;
+  border-radius: var(--r-pill); background: var(--proj, var(--project));
+}
+.fd-tl-fig {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); color: var(--duration);
+}
+
+/* transparent by design — untracked time is where the backdrop reads */
+.fd-tl-track {
+  position: relative; height: 4.25rem;
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+  box-shadow: inset 0 1px 0 rgba(0,0,0,.18);
+}
+/* Faint gridlines, soft enough to stay ambient. --tick is the axis period as
+   a percentage — one hour on the day view, one day on the multi-day views —
+   so the marks always land on the labels above them. */
+.fd-tl-track::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  pointer-events: none; opacity: .5;
+  background-image: repeating-linear-gradient(
+    to right, var(--hairline) 0 1px, transparent 1px var(--tick, 6.25%));
+}
+
+/* ── blocks ────────────────────────────────────────────────────────────── */
+
+/* The block is a CONTAINER, so it can answer the one question this chart
+   needs and CSS cannot otherwise ask: "am I wide enough to hold my own
+   text?" Same technique as .session-list above.
+
+   It has to ask, because --w is a percentage of the window and the window is
+   sometimes a week. A 14-minute session is 0.3% of a 3-day range, so it lands
+   on min-width no matter how wide the viewport gets — and the two nowrap
+   lines inside it then clip to ONE GLYPH EACH ("Revision" → "R", "14m" → "1"),
+   stacked, in a 24px-wide 52px-tall box. A vertical pill of alphabet soup.
+   min-width itself is right and stays: a tiny session must remain visible and
+   hoverable. It is the text that has to go — see the @container steps below.
+
+   Note where the inline padding is NOT. It lives on the text lines rather
+   than here, for two reasons. It keeps the query honest — the block measures
+   its real width instead of its width minus 17.6px of its own padding — and
+   it keeps the collapse rules off any property that feeds back into the size
+   being queried, because zeroing a container's own padding inside its own
+   container query is a layout loop — the padding shrinks the content box, the
+   smaller content box un-matches the query, the padding comes back.
+   (The block's silhouette is unaffected either way: box-sizing is border-box
+   and the width comes from --w / min-width, so padding never sized it.) */
+.fd-tl-block {
+  position: absolute; top: .5rem; bottom: .5rem;
+  /* WIDTH IS THE DATA. --w is the session's share of the window, and a floor
+     that overrides it is a lie about duration, not a nicety. This was 1.5rem
+     (24px) and it flattened the whole week view: on a 977px track spanning
+     7 days the real widths ran 0.6px (a 6m session) to 8px (1h 23m), a 13x
+     range, and every single block rendered at exactly 24px. Gym at 2h 38m and
+     Speech at 7m became the same mark.
+
+     2px is the floor now — small enough that anything above ~16 minutes at
+     week scale keeps its true proportion, big enough that a very short
+     session is still a visible tick rather than a sub-pixel ghost. Below
+     that the differences are not worth drawing anyway.
+
+     Hour-scale sessions on a week axis are only ever going to be a few pixels
+     wide. That is honest: the ::before below makes them hoverable despite it,
+     and the tooltip carries the detail the width cannot. */
+  left: var(--start); width: var(--w); min-width: 2px;
+  container-type: inline-size;
+  border-radius: var(--r-xs);
+  background: color-mix(in srgb, var(--proj, var(--project)) 34%, transparent);
+  box-shadow: var(--edge), var(--e1);
+  padding: .4rem 0; cursor: help;        /* hover/focus reveals the tooltip */
+  display: flex; flex-direction: column; justify-content: center; gap: .1rem;
+  transition: transform .16s var(--ease), background .16s var(--ease),
+              box-shadow .16s var(--ease);
+}
+/* The pointer target, held apart from the drawn mark. A 2px block is honest
+   but unhittable, so this pads the hit area out to ~14px without touching the
+   width the eye reads. It is a child of the block, so :hover and the tooltip
+   below fire from it exactly as they would from the block itself. */
+.fd-tl-block::before {
+  content: ""; position: absolute; inset: -.35rem -6px;
+}
+
+/* The block does NOT clip: its tooltip is a child and has to escape upward.
+   Each text line clips itself instead (see .fd-tl-b-lab / .fd-tl-b-dur). */
+.fd-tl-block:hover,
+.fd-tl-block:focus-visible {
+  background: color-mix(in srgb, var(--proj, var(--project)) 62%, transparent);
+  box-shadow: var(--edge), var(--e2);
+  transform: translateY(-2px); outline: none; z-index: 5;
+}
+/* .55rem each side, carried here rather than on the block — see the note on
+   .fd-tl-block. The text sits exactly where it always did; the difference is
+   only in which box owns the inset. */
+.fd-tl-b-lab {
+  font-size: var(--fs-xs); font-weight: 600; color: var(--sub);
+  padding-inline: .55rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fd-tl-b-dur {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); color: var(--duration);
+  padding-inline: .55rem;
+  /* ellipsis, not a bare clip: in the middle step below the duration is the
+     only line left, and "1h 1" reads as a wrong number where "1h 1…" reads
+     as a truncated one. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* The label pair moves rather than disappears.
+   -------------------------------------------------------------------------
+   A block only holds its own text while it is wide enough: "Revision" needs
+   49px and "1h 17m" 46px at --fs-xs, plus 17.6px of inline padding. Past the
+   day view that is almost never true — a 1h 17m swim is 23px on the 3-day
+   axis and 7px on the week — so hiding the text there left a row of blank
+   marks that could only be read by hovering one at a time.
+
+   So below 5.5rem (88px) the same box hangs just OUTSIDE the block instead,
+   in the empty track beside it, and the mark keeps its meaning at any width.
+   That works because the track is mostly empty at these scales: the marks are
+   hairlines precisely because the sessions are short relative to the window.
+
+   Above 88px nothing moves — the text sits inside, clipped, exactly as the
+   day view has always drawn it.
+
+   Two consequences worth knowing. Labels are painted in DOM order within the
+   lane, so where two sessions fall very close together a label can be crossed
+   by the next mark; hovering lifts the block to z-index 5 and resolves it.
+   And .is-endflip (set by the template above 85% across) swaps the label to
+   the block's left so a late-evening session does not write off the track. */
+.fd-tl-b-text {
+  display: flex; flex-direction: column; gap: .1rem; min-width: 0;
+}
+@container (max-width: 5.5rem) {
+  .fd-tl-b-text {
+    position: absolute; left: 100%; top: 50%;
+    transform: translateY(-50%);
+    margin-left: .4rem; z-index: 2;
+    /* It floats over the track, so it must never intercept a pointer aimed at
+       whatever is under it. Where two sessions fall close together this label
+       can lie across the next mark; without this it would swallow that mark's
+       hover and make it unreachable. Hovering a block lifts it to z-index 5
+       and brings its own label to the front, which is the way out when two
+       labels do overlap each other. */
+    pointer-events: none;
+  }
+  /* Outside the block there is nothing to clip against, and the .55rem inset
+     each line carries for the inside case would only push the text away. */
+  .fd-tl-b-lab,
+  .fd-tl-b-dur { padding-inline: 0; overflow: visible; text-overflow: clip; }
+  .fd-tl-block.is-endflip .fd-tl-b-text {
+    left: auto; right: 100%;
+    margin-left: 0; margin-right: .4rem;
+    align-items: flex-end;
+  }
+}
+
+/* running — the system already has a language for "alive": glow + breath */
+.fd-tl-block.is-live {
+  background: color-mix(in srgb, var(--duration) 26%, transparent);
+  box-shadow: var(--edge), var(--e1), var(--glow-live);
+  animation: fd-breath 3.2s ease-in-out infinite;
+  /* Anchored by its END, not its start. A live block always ends at "now",
+     and min-width would otherwise push a just-started timer to the RIGHT of
+     the now-marker — drawing time that has not happened yet. Pinning the
+     right edge makes the minimum width grow backwards instead. */
+  left: auto; right: calc(100% - var(--end));
+}
+.fd-tl-block.is-live .fd-tl-b-dur { color: var(--duration); }
+@keyframes fd-breath {
+  0%, 100% { box-shadow: var(--edge), var(--e1), 0 0 0 1px rgba(141,188,117,.16), 0 12px 34px rgba(124,163,106,.10); }
+  50%      { box-shadow: var(--edge), var(--e1), 0 0 0 1px rgba(141,188,117,.34), 0 20px 60px rgba(124,163,106,.22); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-tl-block.is-live { animation: none; }
+}
+
+/* ── tooltip ───────────────────────────────────────────────────────────── */
+
+/* The tooltip is a SIBLING of the block, not a child, and is positioned
+   against .fd-tl-track. It has to be. .fd-tl-block is absolutely positioned
+   and bottoms out at min-width 1.5rem, so a tooltip inside it resolves its
+   offsets against a 24px box sitting somewhere along the axis — and a tooltip
+   is an order of magnitude wider than that. Anchored to either edge of that
+   box it leaves the screen: on a 375px viewport every block on the Week range
+   lost its left side, which is exactly where the start time and the project
+   name are. Anchored to the track it has the whole width to work with, and on
+   a phone it simply spans it (see the narrow rules at the end of the file).
+
+   .fd-tl-mark is the seam that makes this possible. display:contents means it
+   draws no box of its own — the block and the tooltip are laid out as though
+   they were both direct children of the track — while --start/--w/--end are
+   declared once on it and inherit to the pair. dashboard_desk.js therefore
+   still writes a live block's geometry to a single element and both halves
+   follow. */
+.fd-tl-mark { display: contents; }
+
+.fd-tl-tip {
+  display: none; position: absolute; left: var(--start);
+  /* The block sits .5rem inside the track, so .1rem clear of the track's top
+     edge leaves exactly the .6rem gap the bridge below has to span. */
+  bottom: calc(100% + .1rem);
+  min-width: 18rem; max-width: 24rem; z-index: 30;
+  background: var(--slab-solid); border-radius: var(--r-sm);
+  box-shadow: var(--edge), var(--e3);
+  padding: var(--s3) var(--s4);
+  font-size: var(--fs-sm); line-height: 1.5; white-space: normal; cursor: default;
+}
+/* Transparent bridge across the .6rem gap. Without it the pointer leaves the
+   block on the way to the tooltip and the tooltip vanishes mid-reach — which
+   also puts the "Edit session" link out of the mouse's reach entirely. */
+.fd-tl-tip::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: .6rem;
+}
+/* Blocks in the right half of the axis anchor their tooltip to the right edge
+   instead, so a late-afternoon session can't push the page sideways. The
+   template sets this from the block's own start percentage. --end is the
+   block's right edge as a percentage of the track, the same value .is-live
+   pins itself by. */
+.fd-tl-tip--flip { left: auto; right: calc(100% - var(--end)); }
+/* The tooltip is no longer inside the block, so the block's own :focus-within
+   can no longer hold it open for the link it contains — the tooltip keeps
+   itself open instead, on hover and on focus-within. Tab order still runs
+   block → link, because they are adjacent in the DOM. */
+.fd-tl-block:hover + .fd-tl-tip,
+.fd-tl-block:focus + .fd-tl-tip,
+.fd-tl-tip:hover,
+.fd-tl-tip:focus-within { display: block; }
+.fd-tl-tip p + p, .fd-tl-tip-note, .fd-tl-tip-link { margin-top: .35rem; }
+.fd-tl-tip-note { color: var(--note); }
+.fd-tl-tip-note p { margin: 0; }
+.fd-tl-tip-note p + p { margin-top: .35rem; }
+.fd-tl-tip-link {
+  display: inline-block; font-size: var(--fs-xs); color: var(--brand);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* ── now line + gaps ───────────────────────────────────────────────────── */
+.fd-tl-nowlayer {
+  position: absolute; inset: 0; margin-left: var(--fd-gutter);
+  pointer-events: none;
+}
+.fd-tl-now {
+  position: absolute; top: -.25rem; bottom: 1.25rem; left: var(--x);
+  width: 2px; border-radius: var(--r-pill); background: var(--brand);
+}
+.fd-tl-now-flag {
+  position: absolute; top: -1.15rem; left: 50%; transform: translateX(-50%);
+  background: var(--brand); color: var(--ink-invert);
+  font-size: var(--fs-xs); font-weight: 650;
+  padding: .05rem .4rem; border-radius: var(--r-pill);
+}
+.fd-tl-gap {
+  position: absolute; bottom: -.1rem; left: var(--start); width: var(--w);
+  text-align: center;
+}
+.fd-tl-gap span {
+  font-size: var(--fs-xs); color: var(--muted); white-space: nowrap;
+}
+
+.fd-tl-caption {
+  margin-top: var(--s4); margin-left: var(--fd-gutter);
+  font-size: var(--fs-xs); color: var(--muted);
+}
+
+/* A day with nothing on it. The axis is still drawn — an empty chart with a
+   scale reads as "nothing yet", a missing chart reads as "broken". */
+.fd-tl-empty {
+  margin-top: var(--s4); margin-left: var(--fd-gutter);
+  padding: var(--s5) var(--s4); text-align: center;
+  border-radius: var(--r-sm); background: var(--sunken);
+  font-size: var(--fs-sm); color: var(--muted);
+}
+.fd-tl-empty a { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── narrow: gutter shrinks, then the lane head sits above its track ───── */
+@media (max-width: 1100px) { .fd-tl { --fd-gutter: 9rem; } }
+@media (max-width: 780px) {
+  .fd-tl { --fd-gutter: 0rem; }
+  .fd-tl-axis, .fd-tl-nowlayer, .fd-tl-caption, .fd-tl-empty { margin-left: 0; }
+  /* 17 hour labels will not fit on a phone — thin them to every second one */
+  .fd-tl-lab--minor { display: none; }
+  .fd-tl-lane { grid-template-columns: 1fr; }
+  .fd-tl-head-cell {
+    flex-direction: row; align-items: baseline; justify-content: space-between;
+    padding: 0 0 .35rem;
+  }
+  .fd-tl-track { height: 3.5rem; }
+  /* The beside-the-mark label keeps its duration here but drops the
+     subproject. The track is only ~295px on a 375px phone, so a two-line
+     label runs about a fifth of the week: with both lines, 4 of 12 labels
+     overlapped a neighbour, with the duration alone, 2. The subproject is
+     still one tap away in the tooltip, which spans the whole track here. */
+  .fd-tl-b-lab { display: none; }
+  /* Now that the tooltip is anchored to the track it can just span it: no
+     edge of a 24px block to hang off, and the track is the full content width
+     here because the gutter has collapsed to 0. Both min-width and max-width
+     have to give way — 18rem is wider than the content box of a 375px phone,
+     and it was that min-width, pushed off the left of a narrow block, that
+     put the start time and project name off-screen. */
+  .fd-tl-tip, .fd-tl-tip--flip {
+    left: 0; right: 0; min-width: 0; max-width: none;
+  }
+}
+
+/* ============================================================================
+   DJANGO MESSAGES
+   The legacy shell rendered these as `.card` colour-class blocks from
+   colours.css. Here they are slabs with a semantic left rule, so they read as
+   part of the system instead of as coloured rectangles.
+   ==========================================================================*/
+
+.messages { display: grid; gap: var(--s3); margin-bottom: var(--s4); }
+
+.msg {
+  display: flex; align-items: flex-start; gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--slab); border-radius: var(--r-md);
+  box-shadow: var(--edge), var(--e1);
+  border-left: 3px solid var(--muted);
+  font-size: var(--fs-sm);
+}
+.msg-icon { flex: none; margin-top: .15rem; color: var(--muted); }
+
+.msg--success { border-left-color: var(--duration); }
+.msg--success .msg-icon { color: var(--duration); }
+.msg--info    { border-left-color: var(--time); }
+.msg--info    .msg-icon { color: var(--time); }
+.msg--warning { border-left-color: var(--note); }
+.msg--warning .msg-icon { color: var(--note); }
+.msg--error   { border-left-color: var(--project); }
+.msg--error   .msg-icon { color: var(--project); }
+
+/* ============================================================================
+   SHELL ADAPTATIONS FOR THE REAL APP
+   The mockup drew the brand as a Font Awesome glyph and the avatar as text
+   initials. The real shell uses the leaf PNG and the user's profile image, so
+   both need real box sizing.
+   ==========================================================================*/
+
+img.brand-mark {
+  width: 1.5rem; height: 1.5rem;
+  object-fit: contain;
+}
+
+.avatar { overflow: hidden; padding: 0; }
+.avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover; border-radius: inherit;
+}
+
+/* The log-out sheet item is a <button> inside a <form>; the form must not
+   break the sheet list's hairline rhythm or the item's full-bleed hit area. */
+.sheet-list form { display: block; }
+.sheet-list form .sheet-item { border-radius: var(--r-sm); }
+
+/* ============================================================================
+   FORMS  — Django-rendered controls                                 (chunk 3)
+   ----------------------------------------------------------------------------
+   .input / .select above style markup we write by hand. Django renders its own
+   widgets with attrs set in core/forms.py, and those attrs are shared with
+   pages still on the legacy shell — so we cannot add classes there without
+   restyling un-ported pages. Instead a .fields REGION styles the controls by
+   element. Anything inside .fields gets the system's input look for free.
+   ==========================================================================*/
+
+.fields input[type="text"],
+.fields input[type="search"],
+.fields input[type="number"],
+.fields input[type="date"],
+.fields input[type="time"],
+.fields input[type="datetime-local"],
+.fields input[type="password"],
+.fields input[type="email"],
+.fields select,
+.fields textarea {
+  width: 100%; padding: .7rem .85rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink);
+  font-family: inherit; font-size: var(--fs-md);
+}
+.fields textarea { min-height: 7rem; resize: vertical; line-height: 1.5; }
+.fields input::placeholder, .fields textarea::placeholder { color: var(--muted); }
+
+/* File inputs are the one widget the browser draws itself, and left alone the
+   raw "Choose File | No file chosen" control sits in the page looking like a
+   1998 form. It also has a wide intrinsic size that ignores its container: in
+   the profile avatar panel it measured 253px inside a 208px content box,
+   blowing the grid column out past the card and shoving the centred avatar
+   23px off-centre with it. min-width: 0 is what lets it actually shrink. */
+.fields input[type="file"] {
+  width: 100%; min-width: 0;
+  padding: .45rem;
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--muted);
+  font-family: inherit; font-size: var(--fs-xs);
+}
+.fields input[type="file"]::file-selector-button {
+  font: inherit; font-weight: 650;
+  margin-right: .6rem; padding: .4rem .8rem;
+  border: 0; border-radius: var(--r-pill);
+  background: var(--raised-2); color: var(--ink);
+  cursor: pointer;
+  transition: background .16s var(--ease), color .16s var(--ease);
+}
+.fields input[type="file"]::file-selector-button:hover {
+  background: var(--brand-deep); color: var(--ink-invert);
+}
+.fields input:focus-visible,
+.fields select:focus-visible,
+.fields textarea:focus-visible {
+  outline: none; border-color: var(--brand-deep); box-shadow: var(--focus-ring);
+}
+/* Django labels are plain <label>; give them the eyebrow treatment. */
+.fields label {
+  display: block; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted); margin-bottom: .35rem;
+}
+/* …except beside a checkbox, where the label is the option's name. */
+.fields .check-row label, .fields .check-grid label {
+  display: inline; text-transform: none; letter-spacing: normal;
+  font-size: var(--fs-sm); color: var(--ink); margin: 0;
+}
+.fields input[type="checkbox"], .fields input[type="radio"] {
+  width: auto; accent-color: var(--brand-deep); margin: 0;
+}
+/* Django renders field errors as <ul class="errorlist">. */
+.fields .errorlist {
+  margin-top: .35rem; font-size: var(--fs-xs); color: var(--project);
+}
+
+/* A wrapped set of checkboxes — subproject pickers, tag pickers. */
+.check-grid {
+  display: grid; gap: .35rem var(--s4);
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+}
+.check-grid > * { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.check-grid label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* CheckboxSelectMultiple renders a <ul>; flatten it into the same grid. */
+.check-grid ul { display: contents; }
+.subproject-empty-state { color: var(--muted); font-size: var(--fs-sm); }
+
+/* Two fields that belong together on one line once there is room — start and
+   end times, from and to dates. */
+.two-up { display: grid; gap: 0 var(--s4); }
+@media (min-width: 560px) { .two-up { grid-template-columns: 1fr 1fr; } }
+
+/* Buttons parked at the end of a form. */
+.form-actions {
+  display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+  margin-top: var(--s5);
+}
+.form-actions .btn--spacer { margin-left: auto; }
+
+/* ------------------------------------------------------ jQuery UI menu -----
+   search_projects.js and timer_search_projects.js attach jQuery UI
+   autocomplete and append its menu to #project-search-results. The widget owns
+   those class names, so they are restyled here rather than renamed.          */
+.ui-autocomplete {
+  position: absolute; z-index: 50;
+  max-height: 18rem; overflow-y: auto;
+  padding: .3rem; margin: .25rem 0 0;
+  background: var(--slab-solid); border-radius: var(--r-md);
+  box-shadow: var(--edge), var(--e3);
+  list-style: none;
+}
+.ui-menu-item { margin: 0; padding: 0; }
+.ui-menu-item-wrapper, .ui-menu-item a {
+  display: block; padding: .55rem .7rem;
+  border-radius: var(--r-sm);
+  color: var(--ink); font-size: var(--fs-sm); cursor: pointer;
+}
+.ui-menu-item-wrapper.ui-state-active, .ui-menu-item a.ui-state-active,
+.ui-menu-item-wrapper:hover, .ui-menu-item a:hover {
+  background: var(--raised-2); color: var(--ink);
+}
+.ui-helper-hidden-accessible {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ============================================================================
+   NOTE EDITOR
+   session_note_editor.js toggles .listening on the dictate button and writes
+   into [data-note-status]; the rest is presentation. Toolbar and textarea read
+   as ONE control, so the shell owns the border and the textarea inside is bare.
+   ==========================================================================*/
+
+.note-editor-shell {
+  border: 1px solid var(--hairline); border-radius: var(--r-sm);
+  background: var(--sunken); overflow: hidden;
+}
+.note-editor-shell:focus-within { border-color: var(--brand-deep); box-shadow: var(--focus-ring); }
+.note-editor-toolbar {
+  display: flex; align-items: center; gap: .25rem;
+  padding: .35rem .4rem;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--raised);
+}
+.note-tool-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  min-width: 2rem; height: 2rem; padding: 0 .55rem;
+  border-radius: var(--r-xs);
+  color: var(--muted); font-size: var(--fs-sm);
+}
+.note-tool-button:hover { color: var(--ink); background: var(--raised-2); }
+.note-toolbar-divider {
+  width: 1px; height: 1.25rem; margin: 0 .25rem; background: var(--hairline-2);
+}
+.dictate-button.listening { color: var(--project); background: rgba(190,103,95,.16); }
+.fields .note-editor-shell textarea {
+  border: 0; border-radius: 0; background: transparent; min-height: 8rem;
+}
+.fields .note-editor-shell textarea:focus-visible { box-shadow: none; }
+[data-note-status] {
+  display: block; margin-top: .35rem; font-size: var(--fs-xs); color: var(--muted);
+}
+
+/* ============================================================================
+   ALLOCATION EDITOR  (.attr-*)
+   allocation_editor.js builds this whole subtree and owns every class name and
+   state class (.open, .collapsed, .embedded, .locked, .custom, .remainder), so
+   the names are fixed here and only their looks change. It splits a session's
+   time across its subprojects, so it speaks the semantic palette: subproject
+   names BLUE, locks and thumbs BRAND.
+   ==========================================================================*/
+
+.attr { border-radius: var(--r-sm); background: var(--sunken); }
+.attr.embedded { background: transparent; }
+.attr-head {
+  display: flex; align-items: center; gap: .6rem; width: 100%;
+  padding: .65rem .75rem; text-align: left; border-radius: var(--r-sm);
+}
+.attr-head:hover { background: var(--raised); }
+.attr-chevron {
+  width: .9rem; color: var(--muted); font-size: .7rem;
+  transition: transform .18s var(--ease);
+}
+.attr.open .attr-chevron { transform: rotate(90deg); }
+.attr-head-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.attr-head-summary { font-size: var(--fs-sm); color: var(--ink-2); }
+.attr-head-bar { margin-left: auto; width: 9rem; flex: 0 0 auto; }
+.attr-body { padding: .85rem .9rem .9rem; border-top: 1px solid var(--hairline); }
+.attr.embedded .attr-body { padding: var(--s3) 0 0; border-top: 0; }
+.attr.collapsed .attr-body { display: none; }
+
+.attr-bar-top { display: flex; align-items: center; gap: .75rem; margin-bottom: .8rem; }
+.attr-state-tag {
+  display: inline-flex; align-items: center; gap: .4rem;
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted);
+}
+.attr-state-tag .dot {
+  width: .5rem; height: .5rem; border-radius: var(--r-pill); background: var(--duration);
+}
+.attr-state-tag.custom .dot { background: var(--note); }
+.attr-actions { margin-left: auto; }
+.attr-mini-btn {
+  padding: .35rem .7rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink);
+  font-size: var(--fs-xs); font-weight: 600; box-shadow: var(--edge);
+}
+.attr-mini-btn:hover { background: var(--raised-2); }
+
+.attr-rows { display: flex; flex-direction: column; gap: .5rem; }
+.attr-row {
+  display: grid; grid-template-columns: 7rem 1fr 4.4rem 2.5rem;
+  align-items: center; gap: .75rem;
+  padding: .2rem .3rem .2rem .55rem;
+  border-radius: var(--r-xs);
+  border-left: 2px solid transparent;
+}
+.attr-row.locked { background: rgba(209,139,76,.07); border-left-color: var(--brand-deep); }
+.attr-name {
+  color: var(--sub); font-size: var(--fs-sm);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.attr-slider {
+  appearance: none; width: 100%; height: 5px;
+  border: 0; border-radius: var(--r-pill); outline: 0; cursor: pointer;
+  background: var(--raised-2);
+}
+.attr-slider::-webkit-slider-thumb {
+  appearance: none; width: 15px; height: 15px; margin-top: -5px;
+  border: 0; border-radius: var(--r-pill);
+  background: var(--brand-deep); box-shadow: var(--e1); cursor: pointer;
+}
+.attr-slider::-moz-range-thumb {
+  width: 14px; height: 14px; border: 0; border-radius: var(--r-pill);
+  background: var(--brand-deep); cursor: pointer;
+}
+.attr-slider:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus-ring); }
+.attr-row.locked .attr-slider { opacity: .55; cursor: not-allowed; }
+
+.attr-num {
+  display: flex; align-items: center;
+  border: 1px solid var(--hairline); border-radius: var(--r-xs);
+  background: var(--sunken);
+}
+.attr-num input, .fields .attr-num input {
+  width: 2.7rem; padding: .35rem .15rem .35rem .45rem;
+  color: var(--ink); background: transparent; border: 0; border-radius: 0;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); text-align: right;
+}
+.attr-num input:focus, .fields .attr-num input:focus-visible { outline: 0; box-shadow: none; }
+.attr-num .pct { padding-right: .4rem; color: var(--muted); font-size: var(--fs-xs); }
+.attr-num:focus-within { border-color: var(--brand-deep); box-shadow: var(--focus-ring); }
+.attr-num input::-webkit-outer-spin-button,
+.attr-num input::-webkit-inner-spin-button { margin: 0; appearance: none; }
+
+.attr-lock {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2.25rem; height: 2.25rem; border-radius: var(--r-pill);
+  color: var(--muted); background: var(--raised);
+}
+.attr-lock:hover { color: var(--ink); background: var(--raised-2); }
+.attr-row.locked .attr-lock { color: var(--ink-invert); background: var(--brand-deep); }
+
+.attr-segbar {
+  display: flex; width: 100%; height: 9px; margin-top: .85rem;
+  overflow: hidden; border-radius: var(--r-pill);
+  background: var(--sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
+}
+.attr-segbar.mini { height: 7px; margin-top: 0; }
+.attr-seg { height: 100%; transition: width .18s var(--ease); }
+.attr-seg.remainder {
+  background: repeating-linear-gradient(45deg,
+    rgba(139,148,143,.35) 0 4px, transparent 4px 8px);
+}
+.attr-foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: .75rem; margin-top: .55rem;
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.attr-foot .total { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.attr-foot .total b { color: var(--ink); }
+.attr-foot .rem-note { color: var(--note); }
+.attr-foot .rem-note.zero { color: var(--muted); }
+
+@media (max-width: 620px) {
+  .attr-row { grid-template-columns: 5.5rem 1fr 4rem 2.5rem; gap: .5rem; }
+  .attr-head-bar { display: none; }
+}
+
+/* ============================================================================
+   SESSIONS PAGE
+   The list itself reuses .session-list / .day-group / .band / .swipe from the
+   dashboard. What is new here is the filter surface: per the nav model, a
+   page never wears an eight-control filter row. One search field plus a
+   launcher that opens the filter .sheet.
+   ==========================================================================*/
+
+.filter-sheet .sheet-panel { max-height: 88vh; }
+.filter-sheet .sheet-foot {
+  display: flex; gap: var(--s3); margin-top: var(--s5);
+}
+.filter-sheet .sheet-foot .btn { flex: 1 1 0; }
+
+/* The search field sits in a pill, not a box: .fields would otherwise give it
+   the full input treatment and put a second border inside the searchbar. */
+.fields .searchbar input {
+  padding: .7rem 0; background: none; border: 0; border-radius: 0;
+}
+.fields .searchbar input:focus-visible { box-shadow: none; }
+/* jQuery UI positions its menu against the nearest positioned ancestor. */
+#project-search-results { position: relative; }
+
+/* Active filters, echoed on the page so a filtered list never looks empty
+   for no visible reason. */
+.filter-summary {
+  display: flex; align-items: center; gap: .4rem; flex-wrap: wrap;
+  margin-bottom: var(--s4);
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.filter-pill {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .2rem .6rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink-2);
+}
+.filter-pill b { color: var(--ink); font-weight: 600; }
+.result-count { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* The confirm pages (delete session, delete project, …) are one slab holding
+   the thing about to go, and two clearly unequal buttons. */
+.confirm-lede { font-size: var(--fs-lg); font-weight: 650; margin-bottom: var(--s4); }
+.confirm-warn { margin-top: var(--s3); font-size: var(--fs-sm); color: var(--note); }
+
+/* ============================================================================
+   PAGE ACTION ROW                                                   (chunk 4)
+   ----------------------------------------------------------------------------
+   The secondary destinations a list page offers — create, merge, manage. One
+   primary button and the rest quiet, so the row reads as "and also" rather
+   than as a toolbar of equals.
+   ==========================================================================*/
+
+.action-row {
+  display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+  margin-bottom: var(--s4);
+}
+
+/* A label/value stack for read-only facts beside a form: totals, dates,
+   counts. Not a slab of its own — it sits inside one. */
+.meta-list { display: grid; gap: var(--s3); }
+.meta-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); }
+.meta-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.meta-value {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-md); font-weight: 600; text-align: right;
+}
+
+/* Two slabs side by side once there is room — form beside its metadata. */
+.split { display: grid; gap: var(--s4); align-items: start; }
+@media (min-width: 900px) {
+  .split { grid-template-columns: minmax(0, 1.6fr) minmax(16rem, 1fr); gap: var(--s5); }
+  .split > .slab { margin-bottom: 0; }
+}
+
+/* --------------------------------------------- commitment panel extras ----
+   The panel reuses the dashboard's .commit components. These are the two
+   things only it shows: the plain-English rule composition, and a paused
+   marker for a commitment that is no longer counting.
+   (This replaces the chunk-4 compatibility block that restyled the panel's
+   old class names while it was shared with un-ported pages.)                */
+.commit-rules { margin-top: var(--s4); }
+.commit-rules-title {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600; margin-bottom: .35rem;
+}
+.commit-rule-line { font-size: var(--fs-sm); color: var(--ink-2); }
+.commit-foot { margin-top: var(--s4); }
+.badge-paused {
+  font-size: .625rem; letter-spacing: .08em; text-transform: uppercase;
+  padding: .1rem .4rem; border-radius: var(--r-xs);
+  color: var(--note); background: rgba(185,166,106,.16);
+}
+
+/* ============================================================================
+   TIMERS                                                            (chunk 6)
+   ----------------------------------------------------------------------------
+   The Timers page is the Focus Deck given the whole width: the running cards
+   are the content, not a hero above it. What the dashboard's cards do not
+   have is the notes-as-you-go editor, which belongs here — this is the page
+   you sit on while the timer runs.
+
+   timer_notes.js owns [data-timer-note-*] and the data-dirty flag;
+   timer_search_projects.js owns the start form's ids. Neither may be renamed.
+   ==========================================================================*/
+
+/* Notes-as-you-go, inside a focus card. Quiet until you use it. */
+.timer-note-editor { margin-top: var(--s4); }
+.timer-note-editor > label {
+  display: block; font-size: var(--fs-label); text-transform: uppercase;
+  letter-spacing: .12em; color: var(--muted); font-weight: 600;
+  margin-bottom: .35rem;
+}
+.timer-note-toolbar {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: .35rem .4rem;
+  background: var(--raised);
+  border: 1px solid var(--hairline); border-bottom: 0;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+}
+.timer-note-editor textarea {
+  width: 100%; min-height: 5.5rem; resize: vertical;
+  padding: .6rem .75rem;
+  color: var(--ink); background: var(--sunken);
+  border: 1px solid var(--hairline); border-radius: 0 0 var(--r-sm) var(--r-sm);
+  font-family: inherit; font-size: var(--fs-sm); line-height: 1.5;
+}
+.timer-note-editor textarea::placeholder { color: var(--muted); }
+.timer-note-editor textarea:focus-visible {
+  outline: none; border-color: var(--brand-deep); box-shadow: var(--focus-ring);
+}
+.timer-note-footer {
+  display: flex; align-items: center; gap: var(--s2); margin-top: .45rem;
+}
+.timer-note-status { font-size: var(--fs-xs); color: var(--muted); }
+.timer-note-status.saved { color: var(--duration); }
+.timer-note-status.error { color: var(--project); }
+.timer-note-save { margin-left: auto; }
+
+/* --------------------------------------------------------- suggestions ----
+   "What you might start." Ambient, so bands rather than cards, with the one
+   action — start it — on the right. */
+.suggest-group + .suggest-group { border-top: 1px solid var(--hairline); }
+.suggest-head {
+  display: flex; align-items: center; gap: var(--s2);
+  padding: var(--s3) var(--s4);
+  background: var(--sunken);
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 600;
+}
+.suggest {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s3) var(--s4);
+}
+.suggest-main { min-width: 0; flex: 1 1 auto; }
+.suggest-project {
+  font-size: var(--fs-md); font-weight: 650; color: var(--project);
+  overflow-wrap: anywhere;
+}
+.suggest-subs { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
+.suggest-detail { display: block; margin-top: .25rem; font-size: var(--fs-xs); color: var(--muted); }
+.suggest-metric {
+  display: inline-block; margin-top: .25rem;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); color: var(--note);
+}
+.suggest-start {
+  flex: 0 0 auto; width: 2.5rem; height: 2.5rem;
+  border-radius: var(--r-pill); display: grid; place-items: center;
+  background: var(--brand-deep); color: var(--ink-invert); font-size: .85rem;
+  box-shadow: var(--edge);
+  transition: transform .16s var(--ease), background .16s var(--ease);
+}
+.suggest-start:hover { background: var(--brand-hover); transform: scale(1.06); }
+
+/* ------------------------------------------------------- start-timer form -
+   "Stop after" is an optional constraint, so the presets lead and the exact
+   fields sit under them for the case a preset does not cover. */
+.preset-row { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.timer-preset-button {
+  padding: .45rem .9rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-sm); font-weight: 600; box-shadow: var(--edge);
+  transition: background .16s var(--ease);
+}
+.timer-preset-button:hover { background: var(--raised-2); }
+.timer-preset-button.is-active,
+.timer-preset-button[aria-pressed="true"] {
+  background: var(--brand-deep); color: var(--ink-invert);
+}
+
+/* The submit button starts disabled until a project is chosen. Say so
+   visually rather than letting it look clickable and do nothing. */
+.btn[disabled], .btn:disabled {
+  opacity: .45; cursor: not-allowed; box-shadow: var(--edge);
+}
+.btn[disabled]:hover, .btn:disabled:hover { background: var(--brand-deep); }
+
+/* The running total that the start form keeps up to date. */
+.start-summary {
+  font-size: var(--fs-sm); color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* The select-all control sits beside the Subprojects label, not in the grid. */
+.field-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: var(--s3); margin-bottom: .35rem;
+}
+.field-head .field-label { margin-bottom: 0; }
+.select-all-row { display: inline-flex; align-items: center; gap: .4rem; font-size: var(--fs-sm); }
+.select-all-row label { display: inline; text-transform: none; letter-spacing: normal; margin: 0; color: var(--ink); }
+
+/* An hourglass that actually turns over, kept from the legacy start button.
+   It was defined in a <style> block inside that template; design system
+   components belong here. */
+.hourglass-icon::before {
+  font-family: "Font Awesome 5 Free"; font-weight: 900;
+  display: inline-block; font-size: 1em;
+  content: "\f251";
+  animation: hourglass-flip 4s ease-in-out infinite,
+             hourglass-cycle 4s steps(1) infinite;
+}
+@keyframes hourglass-cycle {
+  0%   { content: "\f251"; }
+  33%  { content: "\f252"; }
+  66%  { content: "\f253"; }
+  100% { content: "\f251"; }
+}
+@keyframes hourglass-flip {
+  0%, 70%   { transform: rotate(0deg); }
+  80%, 100% { transform: rotate(180deg); }
+}
+
+/* ============================================================================
+   LOADING OVERLAYS                                                  (chunk 9)
+   ----------------------------------------------------------------------------
+   Two overlays share one look:
+
+     .page-loading-overlay  injected by page_loading.js, which base_fd.html
+                            loads for EVERY page. Its markup only existed in
+                            style.css, so until now it rendered unstyled on
+                            every ported page — a stray leaf and a line of text
+                            in the document flow.
+     .loading-overlay       scoped to the chart slab while a chart is fetched.
+
+   page_loading.js builds .loading-card / .loading-leaf / .loading-text itself;
+   those names are its, not ours.
+   ==========================================================================*/
+
+.page-loading-overlay,
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 10, 12, .55);
+  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+}
+.page-loading-overlay {
+  opacity: 0; visibility: hidden;
+  transition: opacity .2s var(--ease), visibility .2s var(--ease);
+}
+.page-loading-overlay.visible { opacity: 1; visibility: visible; }
+
+/* The chart's overlay covers its own slab, not the window. */
+.loading-overlay { position: absolute; z-index: 20; border-radius: var(--r-lg); }
+
+.loading-card {
+  display: flex; align-items: center; gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  background: var(--slab-solid); border-radius: var(--r-md);
+  box-shadow: var(--edge), var(--e3);
+  color: var(--ink);
+}
+.loading-text { font-size: var(--fs-sm); }
+.loading-leaf {
+  width: 44px; height: 60px;
+  display: flex; align-items: center; justify-content: center;
+}
+.loading-leaf img { width: 30px; height: auto; animation: leaf-fall 2.4s ease-in-out infinite; }
+
+@keyframes leaf-fall {
+  0%   { transform: translate(-14px, -22px) rotate(-35deg); opacity: 0; }
+  15%  { opacity: 1; }
+  50%  { transform: translate(12px, 4px) rotate(30deg); }
+  85%  { opacity: 1; }
+  100% { transform: translate(-12px, 26px) rotate(-25deg); opacity: 0; }
+}
+@keyframes leaf-pulse { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .loading-leaf img { animation: leaf-pulse 2s ease-in-out infinite; }
+}
+
+/* ============================================================================
+   CHARTS                                                            (chunk 9)
+   ----------------------------------------------------------------------------
+   A chart wants width and a settled height — Chart.js sizes to its container,
+   so the container must not size to the chart or the canvas grows on every
+   redraw. charts/core.js toggles #chart-loading, #chart-empty and the
+   .chart-circular class on #canvas_container; those ids are its contract.
+   ==========================================================================*/
+
+#chart_section { position: relative; }
+
+#canvas_container {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: min(40rem, 66vh);
+}
+/* Pie, radar and friends are square: cap the width so they do not stretch
+   into ovals on a wide desk. */
+#canvas_container.chart-circular {
+  width: min(100%, 44rem);
+  height: min(44rem, calc(100vh - 15rem));
+  min-height: 26rem;
+  margin-inline: auto;
+}
+#canvas_container.chart-circular canvas { max-width: 100%; max-height: 100%; }
+
+/* The chart-type picker is this page's primary control, so it stays on the
+   page rather than going in the filter sheet with the narrowing controls. */
+.chart-bar {
+  display: flex; align-items: flex-end; gap: var(--s3); flex-wrap: wrap;
+  margin-bottom: var(--s4);
+}
+.chart-bar .field { margin-bottom: 0; flex: 1 1 14rem; min-width: 0; }
+.chart-bar .btn { flex: 0 0 auto; }
+
+/* ============================================================================
+   IMPORT STREAM + AUTH + PROFILE                                  (10 / 11)
+   ----------------------------------------------------------------------------
+   These are the only page-specific shapes the shared vocabulary cannot
+   express by itself:
+
+     - the import script needs three elements hidden until a stream starts;
+     - signed-out forms need a readable measure after the desktop shell widens;
+     - profile owns image previews and compound value/unit controls.
+
+   Form controls still come from .fields, surfaces from .slab, actions from
+   .btn, and status hues from the semantic palette above.
+   ==========================================================================*/
+
+/* ----------------------------------------------------- import stream ------ */
+.stream-output,
+.stream-progress,
+.stream-log { display: none; }
+
+.stream-progress {
+  height: 1.5rem;
+  margin-top: var(--s4);
+}
+.stream-progress .progress {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  color: var(--ink-invert);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stream-log {
+  max-height: 22rem;
+  margin-top: var(--s4);
+  padding: var(--s3);
+  overflow-y: auto;
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+}
+.log-entry {
+  padding: .3rem .45rem;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.log-entry + .log-entry { border-top: 1px solid var(--hairline); }
+.log-entry.error { color: var(--project); }
+.log-entry.warning { color: var(--note); }
+.log-entry.success { color: var(--duration); }
+
+/* ------------------------------------------------------- public auth ------ */
+.auth-card {
+  width: min(100%, 32rem);
+  margin-inline: auto;
+}
+
+/* ----------------------------------------------------------- profile ------ */
+.profile-page {
+  display: grid;
+  gap: var(--s4);
+}
+.profile-page > .slab { margin-bottom: 0; }
+
+.profile-account-grid {
+  display: grid;
+  grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr);
+  gap: var(--s5);
+  align-items: center;
+  margin-top: var(--s4);
+}
+.profile-avatar-panel {
+  display: grid;
+  /* minmax(0, 1fr), not the implicit `auto`: an auto column is sized by its
+     widest item, so one unshrinkable child (the file input, before the rule
+     in FORMS gave it min-width: 0) widened the column past the card and took
+     the centred avatar with it. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--s3);
+  justify-items: center;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-avatar-panel .field { width: 100%; min-width: 0; margin-bottom: 0; }
+/* The label and filename read as captions under the portrait, so they centre
+   with it rather than hanging off the left edge of the card. */
+.profile-avatar-panel .field > label,
+.profile-avatar-panel .field > small { display: block; text-align: center; }
+.profile-avatar-large {
+  width: 8rem;
+  height: 8rem;
+  border-radius: var(--r-pill);
+  object-fit: cover;
+  box-shadow: 0 0 0 3px rgba(209,139,76,.18), var(--e1);
+}
+
+.profile-background-options {
+  display: none;
+  margin-top: var(--s4);
+}
+.fields .profile-choice-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: .55rem .7rem;
+  margin: var(--s2) 0 0;
+  border-radius: var(--r-sm);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.profile-background-tuning,
+.profile-background-context {
+  margin-top: var(--s4);
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.fields .background-dimming-slider {
+  width: 100%;
+  margin: var(--s3) 0;
+  accent-color: var(--brand-deep);
+}
+.profile-background-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr);
+  gap: var(--s4);
+  align-items: center;
+  margin-top: var(--s4);
+}
+.profile-current-background {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-current-background img {
+  width: 7rem;
+  height: 4.5rem;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+}
+
+.profile-defaults-grid,
+.profile-keys-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s3);
+  margin-top: var(--s4);
+}
+.profile-default-item,
+.profile-key-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  min-width: 0;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-default-item > label,
+.profile-key-item > .u-between > label {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.profile-default-control {
+  display: grid;
+  grid-template-columns: minmax(6rem, .7fr) minmax(8rem, 1fr);
+  gap: var(--s2);
+  align-items: center;
+}
+.profile-default-control.to-date-range .profile-default-value { display: none; }
+.profile-default-control.to-date-range .profile-default-unit { grid-column: 1 / -1; }
+.profile-codex-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s4);
+  align-items: center;
+  margin-top: var(--s4);
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-codex-panel .form-actions { margin-top: 0; }
+.profile-key-item .check-row { margin-top: auto; }
+.profile-submit-row { justify-content: flex-end; margin-top: 0; }
+
+@media (max-width: 760px) {
+  .profile-account-grid,
+  .profile-background-upload,
+  .profile-codex-panel,
+  .profile-defaults-grid,
+  .profile-keys-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-codex-panel .form-actions { justify-content: flex-start; }
+}
+
+/* ============================================================================
+   INSIGHTS — the chat page                          (UI_REDESIGN.md chunk 12)
+   ----------------------------------------------------------------------------
+   Everything below was `chat_style.css`, a second stylesheet that only this
+   page loaded. It has been folded in here because it depended on fourteen
+   variables that exist only in the legacy colour file (--border-dark,
+   --dark-text, --card-bg-dark-alpha, …) and on three legacy shell elements
+   (.container, .main-body, .left-panel) that base_fd.html does not have.
+   Porting it meant re-expressing it in the tokens above, at which point
+   keeping it in its own file bought nothing.
+
+   THE ONE STRUCTURAL DIFFERENCE FROM EVERY OTHER PAGE
+   The old page made the whole DOCUMENT a fixed 100dvh app view and scrolled
+   `.main-body` internally. That is not available here: the shell's tabbar is
+   fixed to the bottom on phones and sticky at the TOP from 1000px up, so a
+   document-level height fight would break the nav at one station or the other.
+
+   Instead the page scrolls normally and only the chat SLAB is height-bound,
+   with the transcript scrolling inside it and the composer docked below.
+   --chat-h is that height: 100dvh minus the chrome stacked above and below the
+   slab. There is no way to express that in CSS other than a measured constant,
+   and the values below were read off the live page rather than derived. If you
+   add or remove anything between the page title and the slab, re-measure. The
+   clamp is what keeps a wrong constant from being a disaster — the chat is
+   never shorter than 26rem nor taller than 58rem.
+
+   CLASS NAMES HERE ARE A JAVASCRIPT CONTRACT — see the comment at the top of
+   insights.html before renaming any of them.
+   ==========================================================================*/
+.chat-layout {
+  /* Phone/tablet, re-measured at 375x812 after the date range replaced the
+     search box above: that bar wraps to ~106px here, against ~54px before,
+     so the chrome above the slab grew by about 46px. */
+  --chat-h: clamp(26rem, calc(100dvh - 24.5rem), 58rem);
+  display: flex;
+  height: var(--chat-h);
+  margin-bottom: var(--s4);
+}
+
+/* ── chat list ──────────────────────────────────────────────────────────── */
+/* Appearance only. HOW it collapses is a per-layout decision and lives in the
+   two media queries at the bottom of this section: wide screens shrink a flex
+   column to nothing, phones slide a drawer off the left edge. Neither shape
+   belongs here, and mixing them is what leaves a padding-wide sliver of
+   sidebar sitting over the transcript. */
+.chat-sidebar {
+  display: flex; flex-direction: column;
+  min-height: 0; overflow: hidden;
+  padding: var(--s4);
+  border-right: 1px solid var(--hairline);
+}
+/* Wide: a real column in the flex row, shrunk to nothing. Toggled by
+   insights_page.js, which persists the choice to localStorage. This block
+   stays ABOVE the min-width:1000px one below so that the wider breakpoint can
+   still widen flex-basis — equal specificity, so source order decides. */
+@media (min-width: 701px) {
+  .chat-sidebar {
+    flex: 0 0 15rem;
+    transition: flex-basis .24s var(--ease), padding .24s var(--ease);
+  }
+  .chat-sidebar.collapsed {
+    flex-basis: 0; padding-left: 0; padding-right: 0; border-right: 0;
+  }
+}
+.new-chat-btn { flex-shrink: 0; margin-bottom: var(--s3); white-space: nowrap; }
+
+.chat-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.chat-list-empty { padding: var(--s4) 0; }
+
+.chat-item-container {
+  display: flex; align-items: center;
+  border-radius: var(--r-xs);
+  border-left: 2px solid transparent;
+  transition: background .16s var(--ease);
+}
+.chat-item-container:hover { background: var(--raised); }
+.chat-item-container.active {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border-left-color: var(--brand);
+}
+.chat-item {
+  flex: 1; min-width: 0;
+  padding: .5rem .65rem;
+  font-size: var(--fs-sm);
+}
+.chat-item.active { font-weight: 650; }
+.chat-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delete-chat-btn {
+  padding: .5rem; color: var(--project);
+  opacity: 0; transition: opacity .16s var(--ease);
+}
+/* Keyboard users never hover, so focus has to reveal it too. */
+.chat-item-container:hover .delete-chat-btn,
+.delete-chat-btn:focus-visible { opacity: 1; }
+
+/* ── transcript column ──────────────────────────────────────────────────── */
+.chat-main {
+  flex: 1; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+  padding: var(--s4);
+}
+.chat-header {
+  display: flex; align-items: center; gap: var(--s3);
+  flex-shrink: 0; padding-bottom: var(--s3); margin-bottom: var(--s3);
+  border-bottom: 1px solid var(--hairline);
+}
+.chat-header-meta {
+  display: flex; align-items: baseline; gap: var(--s3);
+  flex-wrap: wrap; min-width: 0;
+}
+.chat-header-meta h3 { font-size: var(--fs-md); font-weight: 650; white-space: nowrap; }
+.chat-header-range,
+.chat-header-tokens { font-size: var(--fs-xs); white-space: nowrap; }
+.chat-header-actions {
+  margin-left: auto; flex-shrink: 0;
+  display: flex; gap: var(--s2); flex-wrap: wrap; justify-content: flex-end;
+}
+.chat-action-btn {
+  padding: .35rem .7rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink-2); font-size: var(--fs-xs);
+  white-space: nowrap;
+  transition: color .16s var(--ease), background .16s var(--ease);
+}
+.chat-action-btn:hover:not(:disabled) { background: var(--raised-2); color: var(--ink); }
+.chat-action-btn:disabled { opacity: .45; cursor: default; }
+
+.chat-form { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.conversation-container {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  padding: var(--s3) var(--s2) var(--s4);
+  display: flex; flex-direction: column; gap: var(--s3);
+}
+
+/* ── messages ───────────────────────────────────────────────────────────── */
+/* Asymmetric on purpose: the user prompt is the brand colour and sits right,
+   the model answer is a neutral raised slab and sits left. Both cap at 80% so
+   long transcripts never lose the left/right cue. */
+.user-message,
+.assistant-message {
+  position: relative;
+  max-width: 80%; min-width: 0;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-sm);
+}
+.user-message {
+  margin-left: auto;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 26%, transparent);
+}
+.assistant-message {
+  margin-right: auto;
+  background: var(--raised);
+  box-shadow: var(--edge);
+}
+.assistant-message.stream-error {
+  box-shadow: inset 0 0 0 1px var(--project);
+}
+
+.message-content { overflow-wrap: anywhere; word-break: break-word; }
+.message-content > :first-child { margin-top: 0; }
+.message-content > :last-child { margin-bottom: 0; }
+.message-content p { margin: 0 0 .6rem; }
+.message-content ul,
+.message-content ol { list-style: revert; padding-left: 1.4rem; margin: 0 0 .6rem; }
+.message-content h1,
+.message-content h2,
+.message-content h3 { font-size: var(--fs-lg); font-weight: 650; margin: .9rem 0 .4rem; }
+.message-content a { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.message-content code {
+  font-family: var(--font-mono); font-size: .9em;
+  background: var(--sunken); padding: .1rem .3rem; border-radius: var(--r-xs);
+}
+.message-content pre {
+  overflow-x: auto; margin: 0 0 .6rem;
+  padding: var(--s3); border-radius: var(--r-sm); background: var(--sunken);
+}
+.message-content pre code { background: none; padding: 0; }
+.message-content table {
+  display: block; width: max-content; max-width: 100%;
+  overflow-x: auto; border-collapse: collapse; margin: .75rem 0;
+}
+.message-content th,
+.message-content td {
+  padding: .45rem .65rem; border: 1px solid var(--hairline);
+  text-align: left; vertical-align: top;
+}
+.message-content th { background: var(--raised); font-weight: 650; }
+.message-content tbody tr:nth-child(even) { background: rgba(255,255,255,.025); }
+
+.assistant-sources {
+  display: block; margin-top: var(--s3); padding-top: var(--s3);
+  border-top: 1px solid var(--hairline);
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.assistant-sources .plain-link { color: var(--sub); text-decoration: underline; text-underline-offset: 3px; }
+
+.copy-btn {
+  position: absolute; top: .35rem; right: .35rem;
+  padding: .35rem; color: var(--muted);
+  opacity: 0; transition: opacity .16s var(--ease), color .16s var(--ease);
+}
+.user-message:hover .copy-btn,
+.assistant-message:hover .copy-btn,
+.copy-btn:focus-visible { opacity: 1; }
+.copy-btn:hover { color: var(--brand); }
+
+/* streaming caret — the system already reads green as "alive" (live timers,
+   durations), so the caret borrows that rather than inventing a colour. */
+.assistant-message.streaming .message-content::after {
+  content: "▍"; color: var(--duration); margin-left: 2px;
+  animation: fd-caret 1s steps(1) infinite;
+}
+@keyframes fd-caret { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .assistant-message.streaming .message-content::after { animation: none; }
+}
+
+/* ── multi-select mode ──────────────────────────────────────────────────── */
+.conversation-container.selecting { user-select: none; }
+.conversation-container.selecting .user-message,
+.conversation-container.selecting .assistant-message { cursor: pointer; }
+.conversation-container.selecting .copy-btn { pointer-events: none; }
+.conversation-container .msg-selected { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ── composer ───────────────────────────────────────────────────────────── */
+.composer { flex-shrink: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.composer-toolbar { display: flex; align-items: center; gap: var(--s4); min-width: 0; }
+.composer-field { display: inline-flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+.composer-field label { font-size: var(--fs-xs); color: var(--muted); }
+/* The chat form is not a `.fields` form — its widgets are hand-placed, so
+   they are styled here rather than by the generic form rules. */
+.composer-field select,
+.composer-input-row textarea {
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink);
+}
+.composer-field select { padding: .35rem .5rem; font-size: var(--fs-xs); }
+.composer-note {
+  flex: 1 1 auto; min-width: 0; text-align: right;
+  font-size: var(--fs-xs); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.composer-input-row { display: flex; align-items: flex-end; gap: var(--s2); }
+.composer-input-row textarea {
+  flex: 1; min-width: 0; resize: none;
+  min-height: 2.9rem; max-height: 11rem; overflow-y: auto;
+  padding: .7rem .85rem; font: inherit; font-size: var(--fs-md);
+}
+.composer-input-row textarea:focus { outline: none; box-shadow: var(--focus-ring); }
+.composer-input-row .btn { flex-shrink: 0; }
+
+/* ── empty states ───────────────────────────────────────────────────────── */
+/* insights_stream.js removes these when the first answer starts streaming. */
+.empty-state-container {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: var(--s3); text-align: center; padding: var(--s5);
+}
+.empty-state-container img { max-width: 11rem; opacity: .55; }
+.empty-state-container .empty { padding: 0; max-width: 26rem; }
+
+@media (min-width: 1000px) {
+  /* Measured at 1440x900: 264px above the slab (sticky header + nav pill +
+     page title + searchbar) and 80px below it (its own margin, screen-pad's
+     bottom, body's bottom). 344px ≈ 21.5rem; 22rem leaves slack for the extra
+     row a filter-pill summary adds. */
+  .chat-layout { --chat-h: clamp(26rem, calc(100dvh - 22rem), 58rem); }
+  .chat-sidebar { flex-basis: 17rem; }
+}
+
+@media (max-width: 700px) {
+  /* Two columns do not fit, so the list becomes a drawer OVER the transcript.
+     It slides out rather than shrinking: a zero-width box still renders its
+     own padding, which is exactly the sliver this avoids. It also starts
+     closed here — see the matching note in insights_page.js. */
+  .chat-layout { position: relative; }
+  .chat-sidebar {
+    position: absolute; z-index: 3; inset: 0 auto 0 0;
+    width: 15rem;
+    background: var(--slab-solid);
+    box-shadow: var(--e2);
+    transition: transform .24s var(--ease), visibility .24s var(--ease);
+  }
+  .chat-sidebar.collapsed {
+    transform: translateX(-100%);
+    /* out of the tab order too, not merely out of sight */
+    visibility: hidden;
+    box-shadow: none;
+  }
+  .user-message,
+  .assistant-message { max-width: 92%; }
+  .composer-note { display: none; }
+  .chat-header-tokens { display: none; }
+}
+
+/* ============================================================================
+   PROJECTS — running badge, and the desktop column grid
+   ==========================================================================*/
+
+/* A project that already has a timer going. The row's start button does not
+   refuse a second one — two sessions can legitimately cover different
+   subprojects — so this is a statement of fact rather than a warning, and it
+   borrows the green live-dot the focus deck already uses for "alive". Without
+   it the start button was a silent double-start. */
+.project-running {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .1rem .55rem; border-radius: var(--r-pill);
+  font-size: var(--fs-xs); font-weight: 600;
+  color: var(--duration);
+  background: color-mix(in srgb, var(--duration) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--duration) 26%, transparent);
+  white-space: nowrap;
+}
+/* Quieter than a plain start button: a second concurrent timer is a deliberate
+   choice, so its affordance should not read as the obvious next step. */
+.project-start.is-running { background: var(--raised-2); color: var(--duration); }
+
+@media (min-width: 1000px) {
+  /* One project per full-width row is a lot of scrolling — this account has 79
+     of them, which at roughly four rows a screen is twenty screens to the
+     bottom. The row component is unchanged; it just stops being asked to span
+     1400px, and the list becomes columns. Multiplies what is visible without
+     inventing a second component, and phones are untouched.
+
+     auto-fill, not auto-fit: auto-fit collapses empty tracks, so a status
+     group holding one project would stretch that single row across the full
+     width and break alignment with the groups above it. */
+  .band-list--grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(24rem, 1fr));
+    /* Bands are separated by hairlines, not borders (see the SURFACES rule).
+       A per-row top border in a grid would draw a line across the top of the
+       whole block, so the separator becomes a 1px gap over a hairline
+       background with each band painting its own surface back in. */
+    gap: 1px;
+    background: var(--hairline);
+  }
+  .band-list--grid > .band { background: var(--slab); }
+  .band-list--grid > .band + .band { border-top: 0; }
+}

@@ -1,110 +1,102 @@
 {% extends 'core/base.html' %}
 {% load static %}
-{% load time_formats %}
+
+{% comment %}
+  ============================================================================
+  START TIMER — Focus Desk (UI_REDESIGN.md chunk 6)
+  ----------------------------------------------------------------------------
+  Two decisions, in the order you make them: what am I working on, and should
+  it stop by itself. The second is optional, so it reads as an option rather
+  than a required field.
+
+  timer_search_projects.js owns all of these and they must not be renamed:
+    #project-search  #project-search-results  #list_subs  #subproject_options
+    #pick-subprojects  #select-all-block  #select-all
+    [data-stop-after-preset]  #stop-after-amount  #stop-after-unit
+    [data-start-timer-summary]  #start-timer  (which it enables/disables)
+
+  The legacy page carried its hourglass keyframes in an inline <style> block;
+  they now live in focus_desk.css with the rest of the system.
+  ============================================================================
+{% endcomment %}
 
 {% block head_includes %}
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
     <script src="{% static 'core/js/timer_search_projects.js' %}?v={{ static_version.timer_search_projects }}" type="text/javascript"></script>
-
-    <style>
-       .hourglass-icon::before {
-            font-family: "Font Awesome 5 Free";
-            font-weight: 900; /* solid style */
-            display: inline-block;
-            font-size: 1em; /* match text size */
-            content: "\f251"; /* initial icon (hourglass-start) */
-            animation:
-                hourglass-flip 4s ease-in-out infinite,
-                hourglass-cycle 4s steps(1) infinite;
-        }
-
-        @keyframes hourglass-cycle {
-            0%   { content: "\f251"; } /* fa-hourglass-start */
-            33%  { content: "\f252"; } /* fa-hourglass-half */
-            66%  { content: "\f253"; } /* fa-hourglass-end */
-            100% { content: "\f251"; }
-        }
-
-        @keyframes hourglass-flip {
-            0%, 70%   { transform: rotate(0deg); }
-            80%, 100% { transform: rotate(180deg); }
-        }
-    </style>
 {% endblock %}
 
 {% block content %}
-    <form class="card start-timer-form" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        <div class="start-timer-header">
-            <h2><i class="fa fa-stopwatch"></i> New Timer</h2>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">New timer</p>
+        <h1 class="page-title">What are you working on?</h1>
+    </div>
+</div>
+
+<form method="post" class="fields">
+    {% csrf_token %}
+
+    <section class="slab slab-pad">
+        <div class="field" id="search-projects">
+            <label for="project-search">Project</label>
+            <input type="text" id="project-search" name="project" placeholder="Start typing a project name…"
+                   autocomplete="off" data-ajax_url="{% url 'api_v2:projects' %}">
+            <div id="project-search-results"></div>
         </div>
 
-        <div class="start-timer-grid">
-            <section class="start-timer-column">
-                <h3 class="timer-panel-title">Project</h3>
+        <section id="pick-subprojects" class="field">
+            <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_v2:project-subprojects' project_id=0 %}">
 
-                <div id="search-projects">
-                    <span class="label-input start-project-field">
-                        <label for="project-search"><i class="fa fa-search"></i> Project</label>
-                        <input type="text" id="project-search" name="project" placeholder="Projects"
-                               autocomplete="off" data-ajax_url="{% url 'api_v2:projects' %}">
-                    </span>
-                    <div id="project-search-results"></div>
-                </div>
+            <div class="field-head" id="select-all-block">
+                <span class="field-label">Subprojects</span>
+                <span class="select-all-row">
+                    <input type="checkbox" id="select-all" class="select-all">
+                    <label for="select-all">All</label>
+                </span>
+            </div>
 
-                <section id="pick-subprojects" class="pick-subprojects">
-                    <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_v2:project-subprojects' project_id=0 %}">
+            <div class="check-grid" id="subproject_options">
+                <span class="subproject-empty-state">Pick a project first.</span>
+            </div>
+        </section>
+    </section>
 
-                    <div class="subproject-header" id="select-all-block">
-                        <h3>Subprojects</h3>
-                        <span class="subproject-select-all">
-                            <input type="checkbox" id="select-all" class="select-all">
-                            <label for="select-all">All</label>
-                        </span>
-                    </div>
+    <section class="slab slab-pad">
+        <p class="field-label"><i class="fas fa-hourglass-half"></i> Stop after <span class="muted">(optional)</span></p>
 
-                    <div id="subproject_options">
-                        <!-- subprojects will be added here -->
-                    </div>
-                </section>
-            </section>
-
-            <section class="start-timer-column timer-stop-after">
-                <h3 class="timer-panel-title"><i class="fa fa-hourglass-half"></i> Stop after</h3>
-
-                <div class="timer-duration-presets" role="group" aria-label="Stop after presets">
-                    <button type="button" class="timer-preset-button" data-stop-after-preset="15">15m</button>
-                    <button type="button" class="timer-preset-button" data-stop-after-preset="25">25m</button>
-                    <button type="button" class="timer-preset-button" data-stop-after-preset="30">30m</button>
-                    <button type="button" class="timer-preset-button" data-stop-after-preset="45">45m</button>
-                    <button type="button" class="timer-preset-button" data-stop-after-preset="60">60m</button>
-                </div>
-
-                <div class="timer-stop-after-controls">
-                    <span class="label-input timer-stop-after-amount">
-                        <label for="stop-after-amount">Duration</label>
-                        <input type="number" id="stop-after-amount" name="stop_after_amount" min="1" step="1" placeholder="No limit">
-                    </span>
-                    <span class="label-input timer-stop-after-unit">
-                        <label for="stop-after-unit">Unit</label>
-                        <select id="stop-after-unit" name="stop_after_unit" class="select-caret">
-                            <option value="minutes" selected>Minutes</option>
-                            <option value="hours">Hours</option>
-                        </select>
-                    </span>
-                </div>
-            </section>
+        <div class="preset-row" role="group" aria-label="Stop after presets">
+            <button type="button" class="timer-preset-button" data-stop-after-preset="15">15m</button>
+            <button type="button" class="timer-preset-button" data-stop-after-preset="25">25m</button>
+            <button type="button" class="timer-preset-button" data-stop-after-preset="30">30m</button>
+            <button type="button" class="timer-preset-button" data-stop-after-preset="45">45m</button>
+            <button type="button" class="timer-preset-button" data-stop-after-preset="60">60m</button>
         </div>
 
-        <footer class="start-timer-footer">
-            <span class="start-timer-summary" data-start-timer-summary>No project selected</span>
-            <button type="submit" id="start-timer" class="timer-button" disabled>
-                <span class="hourglass-icon"></span>
-                Start Timer
-            </button>
-        </footer>
-    </form>
+        <div class="two-up u-mt-4">
+            <div class="field">
+                <label for="stop-after-amount">Duration</label>
+                <input type="number" id="stop-after-amount" name="stop_after_amount" min="1" step="1" placeholder="No limit">
+            </div>
+            <div class="field">
+                <label for="stop-after-unit">Unit</label>
+                <select id="stop-after-unit" name="stop_after_unit">
+                    <option value="minutes" selected>Minutes</option>
+                    <option value="hours">Hours</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'timers' %}">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <span class="start-summary" data-start-timer-summary>No project selected</span>
+        <button type="submit" id="start-timer" class="btn btn--primary btn--lg btn--spacer" disabled>
+            <span class="hourglass-icon"></span> Start timer
+        </button>
+    </div>
+</form>
+
 {% endblock %}

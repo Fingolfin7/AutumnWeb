@@ -31,5 +31,8 @@ def ChartsView(request):
         "search_form": search_form,
         "default_chart_project_count": request.user.profile.default_chart_project_count,
         "exclude_project_meta_json": json.dumps(build_exclude_project_meta(request.user)),
+        # The narrowing controls live in a sheet, so the page echoes back what
+        # is currently applied — see summarise_search_filters.
+        "active_filters": summarise_search_filters(request, request.user),
     }
     return render(request, "core/charts.html", context)

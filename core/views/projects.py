@@ -20,7 +20,7 @@ from core.commitments import (
     get_commitment_progress,
     reconcile_commitment,
 )
-from core.models import Projects, SubProjects, Commitment, status_choices
+from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 from django.db.models import Prefetch
 from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.services import (
@@ -94,6 +94,22 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         context["grouped_projects"] = grouped_projects
         context["exclude_project_meta_json"] = json.dumps(
             build_exclude_project_meta(self.request.user)
+        )
+        # Echoed back on the page because the controls themselves live in a
+        # sheet — see summarise_search_filters.
+        context["active_filters"] = summarise_search_filters(
+            self.request, self.request.user
+        )
+
+        # Which projects already have a timer running. Each row carries a
+        # one-tap start button, and without this it gives no sign that it is
+        # about to start a SECOND concurrent timer on the same project. That
+        # is allowed on purpose — two sessions can cover different
+        # subprojects — but it should be a choice rather than a surprise.
+        context["running_project_ids"] = set(
+            Sessions.objects.filter(
+                user=self.request.user, end_time__isnull=True
+            ).values_list("project_id", flat=True)
         )
 
         return context

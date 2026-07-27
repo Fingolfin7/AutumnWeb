@@ -1,310 +1,306 @@
 {% extends 'core/base.html' %}
 {% load static %}
+{% load l10n %}
 {% load time_formats %}
 {% load markdown_render %}
 
-{% block head_includes %}
-    <script src="{% static 'core/js/session_sliders.js' %}?v={{ static_version.session_sliders }}" type="text/javascript"></script>
-    <script src="{% static 'core/js/dynamic_timers.js' %}?v={{ static_version.dynamic_timers }}" type="text/javascript"></script>
+{% comment %}
+  ============================================================================
+  DASHBOARD — Focus Desk (UI_REDESIGN.md chunk 2b)
+  ----------------------------------------------------------------------------
+  Layout, top to bottom:
 
+    .desk-head   date + greeting on the left, the four quick stats on the
+                 right. One line on the desk, stacked on a phone.
+    HERO         full width, because both halves are wide objects:
+                   .focus-deck  what am I doing right now
+                   timeline     what has today looked like
+    .desk        two tracks below the hero:
+                   .desk-main   recent sessions — what you act on
+                   .desk-side   commitments + activity — what you glance at
+
+  The running-timer cards come from partials/active_timers_dashboard.html,
+  which the five-second poll swaps in and out. The "start something" card sits
+  beside them in this template because it needs page context (quick_starts)
+  that the polled fragment is not rendered with.
+  ============================================================================
+{% endcomment %}
+
+{% block head_includes %}
+    <script src="{% static 'core/js/timer_poll.js' %}?v={{ static_version.timer_poll }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/dashboard_desk.js' %}?v={{ static_version.dashboard_desk }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-page">
-    <!-- Quick Stats -->
-    <section id="quick-stats" style="margin-bottom: 1.5rem;">
-        <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-            <div class="card stat-item" style="margin-bottom: 0; padding: 1rem;">
-                <span class="stat-label">Today</span>
-                <span class="stat-value text-green">{{ today_total|min_formatter_two }}</span>
-            </div>
-            <div class="card stat-item" style="margin-bottom: 0; padding: 1rem;">
-                <span class="stat-label">This Week</span>
-                <span class="stat-value text-cyan">{{ week_total|min_formatter_two }}</span>
-            </div>
-            <div class="card stat-item" style="margin-bottom: 0; padding: 1rem;">
-                <span class="stat-label">Active Timers</span>
-                <span class="stat-value {% if active_timers_count > 0 %}text-yellow{% else %}text-muted{% endif %}">{{ active_timers_count }}</span>
-            </div>
-            <div class="card stat-item" style="margin-bottom: 0; padding: 1rem;">
-                <span class="stat-label">Current Streak</span>
-                <span class="stat-value text-red">{{ daily_streak.current_streak }} day{{ daily_streak.current_streak|pluralize }}</span>
-            </div>
-        </div>
-    </section>
 
-    {% include 'core/partials/active_timers_dashboard.html' with timers=active_timers %}
-
-    
-    <div class="dashboard-grid" style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
-        <div class="sidebar-column" style="flex: 1; min-width: 300px;">
-            <section id="commitments" style="margin-bottom: 1.5rem;">
-                <h2 class="section-header collapsible-header" data-target="commitments-body">
-                    <span><i class="fas fa-bullseye text-cyan"></i> <u>Commitments</u></span>
-                    <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="commitments-body">
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
-                </h2>
-                <div id="commitments-body" class="collapsible-body">
-                {% if commitments_data %}
-                {% for item in commitments_data %}
-                <div class="card" style="background-color: rgba(0, 0, 0, 0.5); border-color: var(--border-dark); padding: 1rem; margin-bottom: 0.75rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <div style="display: inline-flex; align-items: baseline; gap: 0.35rem;">
-                            {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}
-                                <a href="{% url 'update_project' item.commitment.project.id %}" class="plain-link text-red" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</a>
-                            {% elif item.commitment.aggregation_type == 'subproject' and item.commitment.subproject %}
-                                <a href="{% url 'update_subproject' item.commitment.subproject.id %}" class="plain-link text-blue" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</a>
-                            {% elif item.commitment.aggregation_type == 'context' and item.commitment.context %}
-                                <a href="{% url 'update_context' item.commitment.context.id %}" class="plain-link text-orange" style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</a>
-                            {% elif item.commitment.aggregation_type == 'tag' and item.commitment.tag %}
-                                <a href="{% url 'update_tag' item.commitment.tag.id %}" class="plain-link" style="font-weight: bold; font-size: 1.1em; {% if item.commitment.tag.color %}color: {{ item.commitment.tag.color }};{% endif %}">{{ item.commitment.target_name }}</a>
-                            {% else %}
-                                <span style="font-weight: bold; font-size: 1.1em;">{{ item.commitment.target_name }}</span>
-                            {% endif %}
-                            <small class="text-muted">({{ item.commitment.get_aggregation_type_display }})</small>
-                        </div>
-                        <span style="font-size: 0.8em;" class="text-muted">
-                            {{ item.progress.period }}
-                        </span>
-                    </div>
-                    
-                    <div style="display: flex; justify-content: space-between; font-size: 0.85em; margin-bottom: 0.4rem;">
-                        <span class="text-accent">Progress</span>
-                        <span class="text-green">{{ item.progress.actual|floatformat:0 }}{% if item.progress.commitment_type == 'time' %}m{% endif %} / {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
-                    </div>
-
-                    <div class="progress-bar-container commitment-progress-container">
-                        <div class="progress-bar {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%;"></div>
-                    </div>
-
-                    {% if item.commitment.banking_enabled %}
-                    <div style="display: flex; justify-content: space-between; font-size: 0.8em; margin-top: 0.45rem;">
-                        <span>
-                            Bank (reconciled):
-                            <span class="{% if item.progress.balance >= 0 %}text-green{% else %}text-red{% endif %}">
-                                {% if item.progress.balance >= 0 %}+{% endif %}{{ item.progress.balance }}{% if item.progress.commitment_type == 'time' %}m{% endif %}
-                            </span>
-                        </span>
-                        <span>
-                            This period (unbanked):
-                            <span class="{% if item.progress.current_surplus >= 0 %}text-green{% else %}text-red{% endif %}">
-                                {% if item.progress.current_surplus >= 0 %}+{% endif %}{{ item.progress.current_surplus }}{% if item.progress.commitment_type == 'time' %}m{% endif %}
-                            </span>
-                        </span>
-                    </div>
-                    {% endif %}
-
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
-                        <span style="font-size: 0.85em;">
-                            <i class="fas fa-fire {% if item.streak.current_streak > 0 %}text-red{% else %}text-muted{% endif %}"></i>
-                            {{ item.streak.current_streak }} period{{ item.streak.current_streak|pluralize }}
-                        </span>
-                        <div style="display: flex; gap: 0.2rem;">
-                            {% for period in item.streak.periods %}
-                            <span style="width: 1.2rem; height: 1.2rem; display: inline-flex; align-items: center; justify-content: center; border-radius: 2px; font-size: 0.6rem; {% if period.is_current %}background-color: var(--main-yellow); color: var(--dark-background);{% elif period.saved_by_bank %}background-color: var(--main-cyan); color: var(--dark-background);{% elif period.met %}background-color: var(--main-green); color: var(--dark-background);{% else %}background-color: var(--main-red); color: white;{% endif %}" title="{% if period.saved_by_bank %}{{ period.actual|floatformat:0 }}/{{ period.target }} (bank covered deficit){% else %}{{ period.actual|floatformat:0 }}/{{ period.target }}{% endif %}">
-                                {% if period.is_current %}<i class="fas fa-hourglass-half"></i>{% elif period.met %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}
-                            </span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-                {% else %}
-                <div class="card">
-                    <p class="text-muted" style="font-size: 0.9em;">No active commitments. <a href="{% url 'create_commitment_generic' %}">Add one</a>.</p>
-                </div>
-                {% endif %}
-                </div>
-            </section>
-        </div>
-        <div class="sidebar-column" style="flex: 1; min-width: 300px;">
-            <section id="activity-streak-details">
-                <h2 class="section-header collapsible-header" data-target="activity-body">
-                    <span><i class="fas fa-calendar-alt text-green"></i> <u>Activity</u></span>
-                    <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="activity-body">
-                        <i class="fas fa-chevron-down"></i>
-                    </button>
-                </h2>
-                <div id="activity-body" class="collapsible-body">
-                    <div class="card activity-card">
-                    <div class="activity-range-controls">
-                        <button type="button" class="activity-range-button" data-days="7">Week</button>
-                        <button type="button" class="activity-range-button is-active" data-days="14">2 weeks</button>
-                        <button type="button" class="activity-range-button" data-days="30">Month</button>
-                    </div>
-                    <div class="activity-weekdays">
-                        <span>Mon</span>
-                        <span>Tue</span>
-                        <span>Wed</span>
-                        <span>Thu</span>
-                        <span>Fri</span>
-                        <span>Sat</span>
-                        <span>Sun</span>
-                    </div>
-                    <div class="activity-calendar" data-total-days="{{ daily_streak.recent_days|length }}">
-                        {% for day in daily_streak.recent_days %}
-                        <div class="activity-day {% if day.active %}is-active{% else %}is-inactive{% endif %}" data-index="{{ forloop.counter0 }}" data-weekday="{{ day.weekday }}" title="{{ day.date|date:'M d' }}">
-                            {{ day.date|date:'d' }}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <p class="text-muted activity-range-label">Last 14 days activity</p>
-                    </div>
-                </div>
-            </section>
-        </div>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">{{ timeline.date|day_date_formatter }}</p>
+        <h1 class="page-title">{{ greeting }}, {{ user.username }}</h1>
     </div>
 
-    <section id="recent-sessions" style="margin-top: 0.75rem;">
-        <h2 class="section-header collapsible-header" data-target="recent-sessions-body">
-            <span><i class="fas fa-history text-blue"></i> <u>Recent Sessions</u></span>
-            <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="recent-sessions-body">
-                <i class="fas fa-chevron-down"></i>
-            </button>
-        </h2>
-        <div id="recent-sessions-body" class="collapsible-body">
-        {% if grouped_sessions %}
-        {% for date, data in grouped_sessions.items %}
-            <h3>
-                <u>{{ date|day_date_formatter }}</u>
-                <span class="text-green">
-                    ({{ data.total_duration|duration_formatter }})
-                </span>
-            </h3>
-
-            <br>
-
-            {% for session in data.sessions %}
-                <div class="card" id="session-{{ session.id }}">
-                    <div class="session-row">
-                        <span class="text-cyan">{{ session.start_time|time_formatter }}</span>
-                        <span>to</span>
-                        <span class="text-cyan">{{ session.end_time|time_formatter }}</span>
-
-                        <span class="session-duration">{{ session.duration|duration_formatter }}</span>
-                        {% if session.crosses_dst_transition %}
-                            <span class="text-yellow" title="Session crosses a daylight savings transition">DST</span>
-                        {% endif %}
-
-                        <span class="text-red project-name-slider" id="project-name">
-                            <a class="plain-link" href="{% url 'update_project' session.project.id %}">
-                                {{ session.project.name }}
-                            </a>
-                        </span>
-
-                        <span class="session-subprojects">
-                            {% for subproject in session.subprojects.all %}
-                                <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                                    {% if forloop.first %}[{% endif %}
-                                    '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                                    {% if forloop.last %}] {% endif %}
-                                </a>
-                            {% endfor %}
-                            {% if session.note|length > 0 %}->{% endif %}
-                        </span>
-
-                        {% if session.note %}
-                        <span class="session-note-slider">
-                            <span class="text-yellow session-note" id="note-{{ session.id }}">
-                                {{ session.note | markdown | safe }}
-                            </span>
-                        </span>
-                        {% endif %}
-
-                        <span class="session-actions">
-                            <button class="primary-button" onclick="window.location.href='{% url 'update_session' session.id %}'">
-                                <i class="fa fa-pen"></i>
-                            </button>
-                            <button class="primary-button" onclick="window.location.href='{% url 'delete_session' session.id %}'">
-                                <i class="fa fa-trash"></i>
-                            </button>
-                            <form method="post" action="{% url 'start_timer' %}" class="dashboard-restart-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="project" value="{{ session.project.name }}">
-                                {% for sub in session.subprojects.all %}
-                                <input type="hidden" name="subprojects" value="{{ sub.name }}">
-                                {% endfor %}
-                                <button type="submit" class="primary-button" title="Restart">
-                                    <i class="fas fa-redo"></i>
-                                </button>
-                            </form>
-                        </span>
-                    </div>
-                </div>
-            {% endfor %}
-        {% endfor %}
-        <div style="text-align: center; margin-top: 1rem;">
-            <a href="{% url 'sessions' %}" class="plain-link text-muted" style="font-size: 0.9em;">View all sessions <i class="fas fa-arrow-right"></i></a>
+    <section class="stat-strip" aria-label="Quick stats">
+        <div class="stat">
+            <p class="stat-label">Today</p>
+            <p class="stat-value text-green">{{ today_total|duration_formatter }}</p>
         </div>
-        {% else %}
-        <div class="card">
-            <p class="text-muted">No sessions yet. <a href="{% url 'start_timer' %}">Start a timer</a> to begin tracking.</p>
+        <div class="stat">
+            <p class="stat-label">This week</p>
+            <p class="stat-value text-cyan">{{ week_total|duration_formatter }}</p>
         </div>
-        {% endif %}
+        <div class="stat">
+            <p class="stat-label">Active timers</p>
+            <p class="stat-value {% if active_timers_count %}text-yellow{% else %}muted{% endif %}">{{ active_timers_count }}</p>
+        </div>
+        <div class="stat">
+            <p class="stat-label">Current streak</p>
+            <p class="stat-value text-red">{{ daily_streak.current_streak }} day{{ daily_streak.current_streak|pluralize }}</p>
         </div>
     </section>
+</div>
 
-    <script type="text/javascript">
-        document.addEventListener("DOMContentLoaded", function () {
-            const buttons = document.querySelectorAll(".activity-range-button");
-            const days = Array.from(document.querySelectorAll(".activity-day"));
-            const label = document.querySelector(".activity-range-label");
-            if (!buttons.length || !days.length || !label) {
-                return;
-            }
+{# ============================================================ HERO ZONE == #}
 
-            const totalDays = days.length;
+<section class="focus-deck" aria-label="What you are working on right now">
+    <div class="focus-track" data-focus-track>
+        {% include 'core/partials/active_timers_dashboard.html' with timers=active_timers %}
 
-            function setRange(dayCount) {
-                const startIndex = Math.max(0, totalDays - dayCount);
-                days.forEach((day, index) => {
-                    day.style.display = index >= startIndex ? "flex" : "none";
-                    day.style.gridColumnStart = "auto";
-                });
-                const firstVisible = days.find((day) => day.style.display !== "none");
-                if (firstVisible) {
-                    const weekday = parseInt(firstVisible.dataset.weekday || "0", 10);
-                    firstVisible.style.gridColumnStart = String(weekday + 1);
-                }
-                label.textContent = `Last ${dayCount} days activity`;
-            }
+        <article class="focus-card focus-card--start" aria-label="Start a new timer">
+            <p class="focus-eyebrow">{% if active_timers %}Nothing else running{% else %}Nothing running{% endif %}</p>
+            <h2 class="focus-project focus-project--plain">Start something</h2>
+            <p class="focus-lede">Pick up where you left off, or choose any project.</p>
 
-            buttons.forEach((button) => {
-                button.addEventListener("click", () => {
-                    buttons.forEach((btn) => btn.classList.remove("is-active"));
-                    button.classList.add("is-active");
-                    const dayCount = parseInt(button.dataset.days || "14", 10);
-                    setRange(dayCount);
-                });
-            });
+            {% if quick_starts %}
+            <div class="focus-subs focus-quick">
+                {% for session in quick_starts %}
+                <form method="post" action="{% url 'start_timer' %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="project" value="{{ session.project.name }}">
+                    {% for sub in session.subprojects.all %}
+                    <input type="hidden" name="subprojects" value="{{ sub.name }}">
+                    {% endfor %}
+                    <button class="quick-chip" type="submit">
+                        <i class="fas fa-history muted"></i> {{ session.project.name }}
+                        {% if session.subprojects.all %}
+                        <span class="muted">&middot; {% for sub in session.subprojects.all %}{{ sub.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                        {% endif %}
+                    </button>
+                </form>
+                {% endfor %}
+            </div>
+            {% endif %}
 
-            setRange(14);
-        });
-    </script>
-    <script type="text/javascript">
-        document.addEventListener("DOMContentLoaded", function () {
-            document.addEventListener("click", (event) => {
-                const header = event.target.closest(".collapsible-header");
-                if (!header || event.target.closest("a")) {
-                    return;
-                }
-                const targetId = header.getAttribute("data-target");
-                const body = targetId ? document.getElementById(targetId) : null;
-                const button = header.querySelector(".collapse-toggle");
-                if (!body || !button) {
-                    return;
-                }
-                const isCollapsed = body.classList.toggle("is-collapsed");
-                button.setAttribute("aria-expanded", String(!isCollapsed));
-                const icon = button.querySelector("i");
-                if (icon) {
-                    icon.classList.toggle("fa-chevron-down", !isCollapsed);
-                    icon.classList.toggle("fa-chevron-right", isCollapsed);
-                }
-            });
-        });
-    </script>
+            <div class="focus-actions">
+                <a class="btn btn--primary btn--lg btn--block" href="{% url 'start_timer' %}">
+                    <i class="fas fa-play"></i> Start a timer
+                </a>
+            </div>
+        </article>
+    </div>
+    <div class="focus-dots" data-focus-dots aria-hidden="true"></div>
+</section>
+
+{% comment %}
+  The timeline is a standalone partial because it is also re-fetched on its
+  own — by the range tabs, and whenever the set of running timers changes.
+  See core.views.timeline_fragment and dashboard_desk.js.
+{% endcomment %}
+{% include 'core/partials/day_timeline.html' %}
+
+{# ============================================================== THE DESK == #}
+
+<div class="desk">
+
+    <div class="desk-main">
+        <section class="slab disclose session-list" data-disclose>
+            <button class="disclose-head" type="button" aria-expanded="true">
+                <i class="fas fa-history disclose-icon text-blue"></i>
+                <span class="disclose-title">Recent sessions</span>
+                <span class="disclose-summary">last {{ recent_sessions|length }}</span>
+                <i class="fas fa-chevron-down disclose-chevron"></i>
+            </button>
+
+            <div class="disclose-body">
+                {% if grouped_sessions %}
+                {% for date, data in grouped_sessions.items %}
+                <div class="day-group">
+                    <header class="day-head">
+                        <span class="day-date">{{ date|day_date_formatter }}</span>
+                        <span class="day-total">{{ data.total_duration|duration_formatter }}</span>
+                        <span class="day-note">{{ data.sessions|length }} session{{ data.sessions|length|pluralize }}</span>
+                    </header>
+
+                    <ul class="band-list">
+                        {% for session in data.sessions %}
+                        <li class="band swipe" id="session-{{ session.id }}">
+                            <div class="swipe-track">
+                                <div class="swipe-face session">
+                                    <div class="session-mid">
+                                        <span class="session-time">{{ session.start_time|time_formatter }}</span>
+                                        <span class="session-arrow">&rarr;</span>
+                                        <span class="session-time">{{ session.end_time|time_formatter }}</span>
+                                        {% if session.crosses_dst_transition %}
+                                        <span class="badge-dst" title="Session crosses a daylight savings transition">DST</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="session-top">
+                                        <a class="session-project" href="{% url 'update_project' session.project.id %}">{{ session.project.name }}</a>
+                                        {% for subproject in session.subprojects.all %}
+                                        <a class="sub-chip" href="{% url 'update_subproject' subproject.id %}">{{ subproject.name }}</a>
+                                        {% endfor %}
+                                    </div>
+                                    {% if session.note %}
+                                    <div class="session-note" id="note-{{ session.id }}">{{ session.note|markdown|safe }}</div>
+                                    {% endif %}
+                                    <span class="session-dur">{{ session.duration|duration_formatter }}</span>
+                                </div>
+                                <div class="swipe-actions">
+                                    <form method="post" action="{% url 'start_timer' %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="project" value="{{ session.project.name }}">
+                                        {% for sub in session.subprojects.all %}
+                                        <input type="hidden" name="subprojects" value="{{ sub.name }}">
+                                        {% endfor %}
+                                        <button class="btn-icon" type="submit" title="Restart this project + subprojects">
+                                            <i class="fas fa-redo"></i><span class="sr-only">Restart</span>
+                                        </button>
+                                    </form>
+                                    <a class="btn-icon" href="{% url 'update_session' session.id %}" title="Edit session">
+                                        <i class="fas fa-pen"></i><span class="sr-only">Edit session</span>
+                                    </a>
+                                    <a class="btn-icon btn-icon--danger" href="{% url 'delete_session' session.id %}" title="Delete session">
+                                        <i class="fas fa-trash"></i><span class="sr-only">Delete session</span>
+                                    </a>
+                                </div>
+                            </div>
+                            <span class="swipe-hint"></span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endfor %}
+
+                <div class="slab-foot">
+                    <a class="btn btn--ghost btn--block" href="{% url 'sessions' %}">
+                        View all sessions <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
+                {% else %}
+                <p class="empty">No sessions yet. <a href="{% url 'start_timer' %}">Start a timer</a> to begin tracking.</p>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+
+    <aside class="desk-side">
+
+        <section class="slab disclose" data-disclose>
+            <button class="disclose-head" type="button" aria-expanded="true">
+                <i class="fas fa-bullseye disclose-icon text-cyan"></i>
+                <span class="disclose-title">Commitments</span>
+                <span class="disclose-summary">{{ commitments_data|length }} active</span>
+                <i class="fas fa-chevron-down disclose-chevron"></i>
+            </button>
+
+            <div class="disclose-body">
+                {% if commitments_data %}
+                <div class="band-list">
+                    {% for item in commitments_data %}
+                    <article class="band commit">
+                        <header class="commit-head">
+                            {% if item.commitment.aggregation_type == 'project' and item.commitment.project %}
+                            <a class="commit-target text-red" href="{% url 'update_project' item.commitment.project.id %}">{{ item.commitment.target_name }}</a>
+                            {% elif item.commitment.aggregation_type == 'subproject' and item.commitment.subproject %}
+                            <a class="commit-target text-blue" href="{% url 'update_subproject' item.commitment.subproject.id %}">{{ item.commitment.target_name }}</a>
+                            {% elif item.commitment.aggregation_type == 'context' and item.commitment.context %}
+                            <a class="commit-target text-orange" href="{% url 'update_context' item.commitment.context.id %}">{{ item.commitment.target_name }}</a>
+                            {% elif item.commitment.aggregation_type == 'tag' and item.commitment.tag %}
+                            <a class="commit-target tag-chip" href="{% url 'update_tag' item.commitment.tag.id %}"{% if item.commitment.tag.color %} style="--tag: {{ item.commitment.tag.color }}"{% endif %}>{{ item.commitment.target_name }}</a>
+                            {% else %}
+                            <span class="commit-target">{{ item.commitment.target_name }}</span>
+                            {% endif %}
+                            <span class="commit-kind">({{ item.commitment.get_aggregation_type_display }})</span>
+                            <span class="commit-period">{{ item.progress.period }}</span>
+                        </header>
+
+                        <p class="commit-figures">
+                            <span class="commit-actual">{{ item.progress.actual|floatformat:0 }}</span>
+                            <span class="commit-goal">/ {{ item.progress.target }}{% if item.progress.commitment_type == 'time' %}m{% else %} sessions{% endif %}</span>
+                            <span class="commit-pct">{{ item.progress.percentage|floatformat:0 }}%</span>
+                        </p>
+                        <div class="meter">
+                            <div class="meter-fill {{ item.progress.status }}" style="width: {{ item.progress.percentage|floatformat:0 }}%"></div>
+                        </div>
+
+                        {% if item.commitment.banking_enabled %}
+                        <div class="bank-row">
+                            <div class="bank-cell">
+                                <span class="bank-label">Bank (reconciled)</span>
+                                <span class="bank-value {% if item.progress.balance >= 0 %}text-green{% else %}text-red{% endif %}">{% if item.progress.balance >= 0 %}+{% endif %}{{ item.progress.balance }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
+                            </div>
+                            <div class="bank-cell">
+                                <span class="bank-label">This period (unbanked)</span>
+                                <span class="bank-value {% if item.progress.current_surplus >= 0 %}text-green{% else %}text-red{% endif %}">{% if item.progress.current_surplus >= 0 %}+{% endif %}{{ item.progress.current_surplus }}{% if item.progress.commitment_type == 'time' %}m{% endif %}</span>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="streak-row">
+                            <i class="fas fa-fire streak-flame{% if item.streak.current_streak %} is-hot{% endif %}"></i>
+                            <span class="streak-count">{{ item.streak.current_streak }} period{{ item.streak.current_streak|pluralize }}</span>
+                            <div class="period-strip">
+                                {% for period in item.streak.periods %}
+                                <span class="period-cell {% if period.is_current %}current{% elif period.saved_by_bank %}banked{% elif period.met %}met{% else %}missed{% endif %}"
+                                      title="{{ period.actual|floatformat:0 }}/{{ period.target }}{% if period.saved_by_bank %} (bank covered deficit){% elif period.is_current %} — current period{% endif %}">
+                                    {% if period.is_current %}<i class="fas fa-hourglass-half"></i>{% elif period.met %}<i class="fas fa-check"></i>{% else %}<i class="fas fa-times"></i>{% endif %}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </article>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty">No active commitments. <a href="{% url 'create_commitment_generic' %}">Add one</a>.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="slab disclose" data-disclose>
+            <button class="disclose-head" type="button" aria-expanded="true">
+                <i class="fas fa-calendar-alt disclose-icon text-green"></i>
+                <span class="disclose-title">Activity</span>
+                <span class="disclose-summary">{{ daily_streak.current_streak }}-day streak</span>
+                <i class="fas fa-chevron-down disclose-chevron"></i>
+            </button>
+
+            <div class="disclose-body">
+                <div class="activity" data-activity>
+                    <div class="range-tabs" role="tablist" aria-label="Activity range">
+                        <button class="range-tab" type="button" role="tab" data-range="7">Week</button>
+                        <button class="range-tab is-active" type="button" role="tab" aria-selected="true" data-range="14">2 weeks</button>
+                        <button class="range-tab" type="button" role="tab" data-range="30">Month</button>
+                    </div>
+
+                    <div class="cal">
+                        <div class="cal-head">
+                            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span>
+                            <span>Fri</span><span>Sat</span><span>Sun</span>
+                        </div>
+                        <div class="cal-grid" data-cal-grid>
+                            {% for day in daily_streak.recent_days %}
+                            <span class="cal-cell {% if day.active %}is-active{% else %}is-inactive{% endif %}"
+                                  data-weekday="{{ day.weekday }}"
+                                  title="{{ day.date|date:'D d M Y' }}{% if day.active %} — tracked{% endif %}">{{ day.date|date:'j' }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <p class="cal-caption" data-cal-caption>Last 14 days activity</p>
+                </div>
+            </div>
+        </section>
+
+    </aside>
 </div>
 
 {% endblock %}

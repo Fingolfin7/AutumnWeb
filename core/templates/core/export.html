@@ -2,126 +2,142 @@
 {% load static %}
 
 {% block head_includes %}
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    {# jQuery 3.6.0 comes from the shell; only jQuery UI is needed on top.   #}
+    {# The legacy page also pulled jQuery 1.7.1 and UI 1.8.16 from CDNs      #}
+    {# AFTER it, silently downgrading every script that followed.            #}
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
 {% endblock %}
 
 {% block content %}
-    <section id="export_options">
-        <form method="POST" class="card stacked" enctype="multipart/form-data" action="{% url 'export' %}" data-no-loading>
-            {% csrf_token %}
-            <div class="label-input">
-              <label for="{{ form.start_date.id_for_label }}">
-                <i class="fa fa-calendar"></i> Start Date
-              </label>
-              {{ form.start_date }}
-              {{ form.start_date.errors }}
+
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Take your history with you</p>
+        <h1 class="page-title">Export data</h1>
+    </div>
+</div>
+
+<section id="export_options">
+    <form method="POST" class="fields" enctype="multipart/form-data" action="{% url 'export' %}" data-no-loading>
+        {% csrf_token %}
+
+        <div class="split">
+            <div>
+                <section class="slab slab-pad">
+                    <p class="field-label">Date and context</p>
+
+                    <div class="two-up">
+                        <div class="field">
+                            <label for="{{ form.start_date.id_for_label }}">
+                                <i class="fa fa-calendar text-cyan"></i> Start date
+                            </label>
+                            {{ form.start_date }}
+                            {{ form.start_date.errors }}
+                        </div>
+
+                        <div class="field">
+                            <label for="{{ form.end_date.id_for_label }}">
+                                <i class="fa fa-calendar text-cyan"></i> End date
+                            </label>
+                            {{ form.end_date }}
+                            {{ form.end_date.errors }}
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="{{ form.context.id_for_label }}">
+                            <i class="fa fa-layer-group text-orange"></i> Context
+                        </label>
+                        {{ form.context }}
+                        {{ form.context.errors }}
+                    </div>
+
+                    <div class="field">
+                        <span class="field-label"><i class="fa fa-tags text-orange"></i> Tags</span>
+                        {% if form.tags|length %}
+                        <details>
+                            <summary class="filter-launcher tag-summary">Select tags</summary>
+                            <div class="check-grid u-mt-4">
+                                {% for cb in form.tags %}
+                                <label>{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% else %}
+                        <p class="empty">No tags are available. <a href="{% url 'tags' %}">Create one</a> to filter exports by label.</p>
+                        {% endif %}
+                        {{ form.tags.errors }}
+                    </div>
+                </section>
+
+                <section class="slab slab-pad">
+                    <p class="field-label">Projects</p>
+
+                    <div id="search_projects" class="field">
+                        <label for="project-search"><i class="fa fa-search text-red"></i> Project name</label>
+                        {{ form.project_name }}
+                        {{ form.project_name.errors }}
+                        <div id="project-search-results"></div>
+                    </div>
+
+                    <div class="field">
+                        <span class="field-label"><i class="fa fa-ban text-red"></i> Exclude projects</span>
+                        {% if form.exclude_projects|length %}
+                        <details class="exclude-dropdown">
+                            <summary class="filter-launcher tag-summary">Select projects to exclude</summary>
+                            <div class="check-grid exclude-options u-mt-4">
+                                <input type="text" class="exclude-search-input" placeholder="Search projectsâ€¦" autocomplete="off">
+                                {% for cb in form.exclude_projects %}
+                                <label class="exclude-option">{{ cb.tag }} <span class="tag-label text-red">{{ cb.choice_label }}</span></label>
+                                {% endfor %}
+                            </div>
+                        </details>
+                        {% else %}
+                        <p class="empty">No projects are available. <a href="{% url 'create_project' %}">Create one</a> before exporting project data.</p>
+                        {% endif %}
+                        {{ form.exclude_projects.errors }}
+                    </div>
+                </section>
             </div>
 
-            <div class="label-input">
-              <label for="{{ form.end_date.id_for_label }}">
-                <i class="fa fa-calendar"></i> End Date
-              </label>
-              {{ form.end_date }}
-              {{ form.end_date.errors }}
-            </div>
+            <section class="slab slab-pad">
+                <p class="field-label">File options</p>
 
-            <div class="label-input">
-              <label for="{{ form.context.id_for_label }}">
-                <i class="fa fa-layer-group"></i> Context
-              </label>
-              {{ form.context }}
-              {{ form.context.errors }}
-            </div>
-
-            <div class="label-input">
-              <span>
-                <i class="fa fa-tags"></i> Tags
-              </span>
-              <details class="tag-dropdown">
-                <summary class="tag-summary">Select tags</summary>
-                <div class="tag-options">
-                  {% for cb in form.tags %}
-                    <label class="tag-option">
-                      {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                    </label>
-                  {% endfor %}
+                <div class="field">
+                    {{ form.output_file.label_tag }}
+                    {{ form.output_file }}
+                    {{ form.output_file.errors }}
                 </div>
-              </details>
-              {{ form.tags.errors }}
-            </div>
 
-            <div class="label-input">
-              <span>
-                <i class="fa fa-ban"></i> Exclude Projects
-              </span>
-              <details class="tag-dropdown exclude-dropdown">
-                <summary class="tag-summary">Select projects to exclude</summary>
-                <div class="tag-options exclude-options">
-                  <input type="text" class="exclude-search-input" placeholder="Search projects..." autocomplete="off">
-                  {% for cb in form.exclude_projects %}
-                    <label class="tag-option exclude-option">
-                      {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                    </label>
-                  {% endfor %}
-                </div>
-              </details>
-              {{ form.exclude_projects.errors }}
-            </div>
-
-            <div id="search_projects">
-                <span class="label-input">
-                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
-                    {{ form.project_name }}
-                    {{ form.project_name.errors }}
-                </span>
-                <span id="project-search-results"></span>
-            </div>
-
-            <span class="label-input">
-                {{ form.output_file.label_tag }}
-                {{ form.output_file }}
-                {{ form.output_file.errors }}
-            </span>
-
-            <label>
-                Legacy format 1
-                <label class="switch">
+                <div class="check-row">
                     {{ form.legacy_format }}
-                    <span class="slider round"></span>
-                </label>
+                    <label for="{{ form.legacy_format.id_for_label }}">Legacy format 1</label>
+                </div>
                 {{ form.legacy_format.errors }}
-            </label>
 
-            <label>
-                Autumn (CLI version) compatible
-                <label class="switch">
+                <div class="check-row">
                     {{ form.autumn_compatible }}
-                    <span class="slider round"></span>
-                </label>
+                    <label for="{{ form.autumn_compatible.id_for_label }}">Autumn CLI compatible</label>
+                </div>
                 {{ form.autumn_compatible.errors }}
-            </label>
 
-            <label>
-                {{ form.compress.label_tag }}
-                <label class="switch">
+                <div class="check-row">
                     {{ form.compress }}
-                    <span class="slider round"></span>
-                </label>
+                    {{ form.compress.label_tag }}
+                </div>
                 {{ form.compress.errors }}
-            </label>
 
-            <span>
-                <button type="submit" class="primary-button">
-                    <i class="fa fa-file-export"></i>
-                    Export Projects
-                </button>
-            </span>
-        </form>
-    </section>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn--primary btn--lg btn--block">
+                        <i class="fa fa-file-export"></i> Export projects
+                    </button>
+                </div>
+            </section>
+        </div>
+    </form>
+</section>
 
 {% endblock %}

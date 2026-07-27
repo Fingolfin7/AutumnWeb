@@ -1,77 +1,86 @@
 {% extends 'core/base.html' %}
 {% load time_formats %}
-{% load static %}
-{% load crispy_forms_tags %}
-{% block content %}
-    <form class="flex-row" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
 
-        <section id="input-fields" class="card stacked two-thirds-width space-around">
-            <span class="label-input">
+{% comment %}
+  Same shape as update_project: form beside the numbers, then the shared
+  commitments panel (still legacy markup, restyled by the compatibility block
+  in focus_desk.css until chunk 7).
+{% endcomment %}
+
+{% block content %}
+
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">
+            Subproject of
+            <a class="text-red" href="{% url 'update_project' subproject.parent_project.id %}">{{ subproject.parent_project.name }}</a>
+        </p>
+        <h1 class="page-title text-blue">{{ subproject.name }}</h1>
+    </div>
+</div>
+
+<div class="split">
+    <form method="post" class="fields">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+
+        <section class="slab slab-pad">
+            <div class="field">
                 {{ form.name.label_tag }}
                 {{ form.name }}
                 {{ form.name.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
+            <div class="field">
+                <label for="{{ form.description.id_for_label }}">Description</label>
                 {{ form.description }}
                 {{ form.description.errors }}
-            </span>
+            </div>
 
-            <span>
-                <button type="submit" id="update-subproject" class="primary-button">
-                    <i class="fa fa-check-circle"></i>
-                    Update Subproject
+            <div class="form-actions">
+                <button class="btn btn--primary" type="submit" id="update-subproject">
+                    <i class="fas fa-check-circle"></i> Save changes
                 </button>
-                <button type="button" class="primary-button dark-red"
-                onclick="window.location.href = '{% url 'delete_subproject' subproject.id %}' ">
-                    <i class="fa fa-trash"></i>
-                    Delete Subproject
-                </button>
-            </span>
+                <a class="btn btn--ghost btn--spacer" href="{% url 'delete_subproject' subproject.id %}">
+                    <i class="fas fa-trash"></i> Delete subproject
+                </a>
+            </div>
         </section>
-
-
-        <section id="meta-data" class="card stacked thirds-width space-around">
-            <span>
-                From Project:
-                <span class="text-red">
-                    <a class="plain-link" href="{% url 'update_project' subproject.parent_project.id %}">
-                        {{ subproject.parent_project.name }}
-                    </a>
-                </span>
-            </span>
-            
-            <span>
-                Total time:
-                <span class="text-green" >{{ subproject.total_time|min_formatter }}</span>
-            </span>
-
-            <span>
-                Created:
-                <span class="text-cyan" >{{ subproject.start_date|date_formatter }}</span>
-            </span>
-
-            <span>
-                Last Updated:
-                <span class="text-cyan" >{{ subproject.last_updated|date_formatter }}</span>
-            </span>
-
-            <span>
-                Session Count:
-                <span class="text-cyan" >{{ session_count }}</span>
-            </span>
-
-            <span>
-                Average time per session:
-                <span class="text-cyan" >{{ average_session_duration|min_formatter }}</span>
-            </span>
-        </section>
-
     </form>
 
-    {% with commitment_entity_label='subproject' %}
-        {% include 'core/partials/commitments_panel.html' %}
-    {% endwith %}
+    <section class="slab slab-pad">
+        <p class="field-label">At a glance</p>
+        <div class="meta-list">
+            <div class="meta-row">
+                <span class="meta-label">Project</span>
+                <a class="meta-value text-red" href="{% url 'update_project' subproject.parent_project.id %}">{{ subproject.parent_project.name }}</a>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Total time</span>
+                <span class="meta-value text-green">{{ subproject.total_time|min_formatter_two }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Sessions</span>
+                <span class="meta-value">{{ session_count }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Average session</span>
+                <span class="meta-value text-green">{{ average_session_duration|min_formatter_two }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Created</span>
+                <span class="meta-value text-cyan">{{ subproject.start_date|date_formatter }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Last updated</span>
+                <span class="meta-value text-cyan">{{ subproject.last_updated|date_formatter }}</span>
+            </div>
+        </div>
+    </section>
+</div>
+
+{% with commitment_entity_label='subproject' %}
+    {% include 'core/partials/commitments_panel.html' %}
+{% endwith %}
 
 {% endblock %}

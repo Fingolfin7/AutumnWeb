@@ -282,6 +282,7 @@ def filter_sessions_by_params(
     if note_snippet:
         sessions = sessions.filter(note__icontains=note_snippet)
 
+    tags = _numeric_ids(tags)
     if tags:
         sessions = sessions.filter(project__tags__id__in=tags).distinct()
 
@@ -291,10 +292,75 @@ def filter_sessions_by_params(
         exclude_ids = params.get("exclude_projects") or []
         if isinstance(exclude_ids, str):
             exclude_ids = [exclude_ids]
+    exclude_ids = _numeric_ids(exclude_ids)
     if exclude_ids:
         sessions = sessions.exclude(project__id__in=exclude_ids)
 
     return sessions
+
+
+#: Free-text search params, in the order their pills should read.
+_TEXT_FILTER_LABELS = (
+    ("project_name", "Project"),
+    ("start_date", "From"),
+    ("end_date", "To"),
+    ("note_snippet", "Note"),
+)
+
+
+def summarise_search_filters(request, user) -> list[dict]:
+    """Label/value pairs for the filters currently narrowing a list page.
+
+    The Focus Desk nav model puts filters behind a sheet, so the page itself
+    has to say what is being hidden — otherwise a filtered list that comes
+    back empty looks broken rather than narrow. Ids are resolved to names,
+    scoped to ``user``: a pill reading "Context 3" tells nobody anything, and
+    another user's id must resolve to nothing at all.
+    """
+
+    def names_for(model, ids):
+        wanted = _numeric_ids(ids)
+        if not wanted:
+            return ""
+        return ", ".join(
+            model.objects.filter(id__in=wanted, user=user)
+            .order_by("name")
+            .values_list("name", flat=True)
+        )
+
+    params = request.GET
+    summary = [
+        {"label": label, "value": params[key]}
+        for key, label in _TEXT_FILTER_LABELS
+        if params.get(key)
+    ]
+
+    for label, names in (
+        ("Context", names_for(Context, [params.get("context") or ""])),
+        ("Tags", names_for(Tag, params.getlist("tags"))),
+        ("Excluding", names_for(Projects, params.getlist("exclude_projects"))),
+    ):
+        if names:
+            summary.append({"label": label, "value": names})
+
+    return summary
+
+
+def _numeric_ids(values) -> list[int]:
+    """Keep only the values that can be primary keys.
+
+    Every filter here comes from a query string, so any of it can be junk.
+    Unparseable dates are already ignored rather than fatal; id lists get the
+    same treatment, because `?tags=abc` reaching the ORM raises ValueError and
+    turns a typo in the URL bar into a 500.
+    """
+    ids = []
+    for value in values or []:
+        try:
+            ids.append(int(value))
+        except (TypeError, ValueError):
+            continue
+    return ids
 
 
 def group_sessions_by_date(sessions):
@@ -643,8 +709,12 @@ def get_period_bounds(
     if timezone.is_naive(reference_date):
         reference_date = timezone.make_aware(reference_date)
 
-    # Get the start of the day for reference
-    ref_date = reference_date.date()
+    # Periods are boundaries in the USER'S day, so the date has to be read in
+    # the active timezone. Reading .date() off a UTC-aware `timezone.now()`
+    # meant that between local midnight and UTC midnight — every night for
+    # anyone east of UTC — this returned the PREVIOUS period, and every
+    # commitment reported zero progress until the offset had passed.
+    ref_date = timezone.localtime(reference_date).date()
 
     if period == "daily":
         start_date = ref_date

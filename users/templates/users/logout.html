@@ -1,13 +1,17 @@
 {% extends 'users/base.html' %}
 {% load static %}
-{% block content %}
-    <div class="card stacked">
-        <h2> You have been logged out </h2>
 
-        <span>
-            <a href="{% url 'login' %}" class="plain-link primary-button">
-                <i>Log back in</i>
-            </a>
-        </span>
+{% block content %}
+
+<section class="slab slab-pad auth-card">
+    <p class="page-eyebrow">Session ended</p>
+    <h1 class="page-title">You have been logged out</h1>
+    <p class="focus-lede">Your Autumn data is still here when you return.</p>
+    <div class="form-actions">
+        <a href="{% url 'login' %}" class="btn btn--primary">
+            <i class="fa fa-sign-in-alt"></i> Log back in
+        </a>
     </div>
+</section>
+
 {% endblock %}

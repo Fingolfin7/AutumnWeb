@@ -1,8 +1,7 @@
 import json
-import os
-from AutumnWeb import settings
 from core.forms import *
 from core.importer import iter_import
+from core.temp_uploads import discard_upload, store_upload
 from core.utils import *
 from core.models import Context
 from django.contrib import messages
@@ -22,9 +21,12 @@ def stream_response(message):
 
 @login_required
 def import_view(request):
-    # clear session data
-    request.session.delete("file_path")
-    request.session.delete("import_data")
+    # Landing here abandons whatever import this session had pending, so take
+    # the chance to reclaim its temp file -- only import_stream() deletes them,
+    # and an upload that never gets streamed would otherwise sit there forever.
+    # (session.delete(key) does not remove a key; it takes a session key.)
+    discard_upload(request.session.pop("file_path", None))
+    request.session.pop("import_data", None)
 
     if request.method == "POST":
         form = ImportJSONForm(request.POST, request.FILES, user=request.user)
@@ -32,20 +34,8 @@ def import_view(request):
             uploaded_file = request.FILES.get("file")
 
             if uploaded_file:
-                # Save to disk in media/temp
-                file_path = os.path.join(
-                    settings.MEDIA_ROOT, "temp", uploaded_file.name
-                )
-
-                if not os.path.exists(os.path.dirname(file_path)):
-                    os.makedirs(os.path.dirname(file_path))
-
-                with open(file_path, "wb+") as destination:
-                    for chunk in uploaded_file.chunks():
-                        destination.write(chunk)
-
                 # Store file path in session for later processing
-                request.session["file_path"] = file_path
+                request.session["file_path"] = store_upload(uploaded_file)
 
             # Exclude 'file' since it's already handled separately
             form_data = form.cleaned_data.copy()
@@ -117,11 +107,8 @@ def import_stream(request):
                     try:
                         data = json.load(f)
                     except json.JSONDecodeError:
-                        os.remove(file_path)
                         yield stream_response("Error: Invalid JSON file")
                         return
-
-            os.remove(file_path)
 
             # Stream progress live as the importer works through the file.
             for message in iter_import(
@@ -138,6 +125,10 @@ def import_stream(request):
 
         except Exception as e:
             yield stream_response(f"Error: {str(e)}")
+        finally:
+            # Whether the import succeeded, failed on bad JSON, or blew up
+            # partway through, this upload has had its one shot.
+            discard_upload(file_path)
 
     response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
     response["Cache-Control"] = "no-cache"

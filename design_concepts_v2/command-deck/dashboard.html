@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autumn — Dashboard · Command Deck</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<link rel="stylesheet" href="concept.css">
+</head>
+
+<!-- --workspace-bg-image is a pure-CSS stand-in for the user's backdrop photo
+     (upload / Bing daily / NASA APOD). --background-dim-opacity is live-editable
+     from the deckbar to prove legibility across the whole dim range. -->
+<body class="dark-mode bg-active" style="
+  --workspace-bg-image:
+    radial-gradient(60% 42% at 74% 16%, rgba(232,168,96,.62), transparent 68%),
+    radial-gradient(48% 34% at 74% 16%, rgba(255,214,150,.55), transparent 60%),
+    radial-gradient(120% 60% at 12% 8%, rgba(38,64,86,.85), transparent 70%),
+    radial-gradient(90% 40% at 30% 108%, rgba(6,9,11,.98), transparent 72%),
+    radial-gradient(70% 30% at 88% 104%, rgba(8,12,14,.96), transparent 70%),
+    linear-gradient(180deg,#101d28 0%,#1d2c38 26%,#3c3b34 47%,#5a3f2a 60%,#2a1d16 76%,#0c0b0a 100%);
+  --background-dim-opacity:.58;">
+
+<!-- ═══════════════════════════ ICON RAIL (56px) ═══════════════════════════ -->
+<nav class="rail" aria-label="Primary">
+  <a class="rail-brand" href="#" data-tip="Autumn" aria-label="Autumn"><i class="fas fa-leaf"></i></a>
+
+  <div class="rail-nav">
+    <a class="rail-btn is-on" href="#" data-tip="Home"><i class="fas fa-home"></i></a>
+    <a class="rail-btn" href="#" data-tip="Manage Projects"><i class="fas fa-layer-group"></i></a>
+    <a class="rail-btn" href="#" data-tip="Timers"><i class="fas fa-stopwatch"></i></a>
+    <a class="rail-btn" href="#" data-tip="Session Logs"><i class="fas fa-history"></i></a>
+    <a class="rail-btn" href="#" data-tip="Insights"><i class="fas fa-brain"></i></a>
+    <a class="rail-btn" href="#" data-tip="Charts"><i class="fas fa-chart-line"></i></a>
+    <div class="rail-sep"></div>
+    <a class="rail-btn" href="#" data-tip="Import"><i class="fas fa-file-import"></i></a>
+    <a class="rail-btn" href="#" data-tip="Export"><i class="fas fa-file-export"></i></a>
+  </div>
+
+  <div class="rail-foot">
+    <button class="rail-btn" data-tip="Command palette  ⌘K" id="railCmd"><i class="fas fa-bolt"></i></button>
+    <a class="rail-btn" href="#" data-tip="finrod — Profile"><span class="rail-avatar">F</span></a>
+    <a class="rail-btn" href="#" data-tip="Log out"><i class="fas fa-sign-out-alt"></i></a>
+  </div>
+</nav>
+
+<div class="deck">
+
+  <!-- ═══════════════════════════ DECKBAR (44px) ══════════════════════════ -->
+  <header class="deckbar">
+    <h1 class="page-title">Dashboard</h1>
+    <span class="page-sub num">Sat 25 Jul 2026 · 17:47</span>
+
+    <span class="deckbar-spacer"></span>
+
+    <button class="cmdk-trigger" id="cmdkTrigger">
+      <i class="fas fa-search"></i>
+      <span>Run a command or jump anywhere…</span>
+      <span class="kbd">⌘K</span>
+    </button>
+
+    <button class="btn btn-primary" id="startBtn"><i class="fas fa-play"></i> Start</button>
+
+    <span class="runbadge" title="2 timers running">
+      <i class="fas fa-circle fa-xs"></i> 2 RUNNING
+      <span class="num" id="badgeElapsed">01:33</span>
+    </span>
+
+    <label class="dimctl" title="User backdrop dim — the design holds from 0.10 to 0.90">
+      Dim <input type="range" id="dimRange" min="10" max="90" value="58">
+    </label>
+
+    <a class="userchip" href="#"><span>finrod</span><span class="rail-avatar">F</span></a>
+  </header>
+
+  <main class="page">
+  <div class="page-inner">
+
+    <!-- ══════════════ A · QUICK STATS — no panel, straight on the photo ═══ -->
+    <section class="strip" aria-label="Quick stats">
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-sun"></i> Today</span>
+        <span class="stat-value t-dur">5<span class="stat-unit">h</span> 12<span class="stat-unit">m</span></span>
+        <span class="stat-sub">4 sessions · 3 projects</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-calendar-week"></i> This week</span>
+        <span class="stat-value t-time">1<span class="stat-unit">d</span> 17<span class="stat-unit">h</span></span>
+        <span class="stat-sub">Mon 20 Jul → today</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-stopwatch"></i> Active timers</span>
+        <span class="stat-value t-note">2</span>
+        <span class="stat-sub">Atlas API · Rust by Example</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label"><i class="fas fa-fire"></i> Current streak</span>
+        <span class="stat-value t-project">23<span class="stat-unit"> days</span></span>
+        <span class="stat-sub">since 3 Jul 2026</span>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════ B · ACTIVE TIMERS ═════════════════════ -->
+    <section class="panel" id="panel-timers">
+      <div class="panel-head">
+        <span class="panel-title"><i class="fas fa-play-circle t-note"></i> Active timers</span>
+        <span class="panel-tools">
+          <span class="row-meta num">auto-refresh 10s</span>
+          <button class="collapse-btn" aria-expanded="true" data-collapse="panel-timers"><i class="fas fa-chevron-down"></i></button>
+        </span>
+      </div>
+      <div class="panel-body">
+        <ul class="rows">
+          <li class="row timer-row">
+            <span class="pulse" aria-hidden="true"></span>
+            <a class="t-project timer-project" href="#">Atlas API</a>
+            <span class="s-subs"><a class="chip chip-sub" href="#">auth</a></span>
+            <span class="u-flex u-gap3">
+              <span class="num timer-elapsed" data-elapsed="2598">43 minutes 18 seconds</span>
+              <span class="autostop"><i class="fas fa-hourglass-half"></i> stops in <span class="num" data-countdown="4602">01:16:42</span></span>
+            </span>
+            <span class="row-actions">
+              <button class="btn-icon" title="Restart"><i class="fas fa-redo"></i></button>
+              <button class="btn-icon is-stop" title="Stop"><i class="fas fa-stopwatch"></i></button>
+              <button class="btn-icon is-del" title="Remove"><i class="fas fa-trash"></i></button>
+            </span>
+          </li>
+
+          <li class="row timer-row">
+            <span class="pulse" aria-hidden="true"></span>
+            <a class="t-project timer-project" href="#">Rust by Example</a>
+            <span class="s-subs"><a class="chip chip-sub" href="#">exercises</a></span>
+            <span class="u-flex u-gap3">
+              <span class="num timer-elapsed" data-elapsed="2980">49 minutes 40 seconds</span>
+              <span class="autostop t-faint">no auto-stop</span>
+            </span>
+            <span class="row-actions">
+              <button class="btn-icon" title="Restart"><i class="fas fa-redo"></i></button>
+              <button class="btn-icon is-stop" title="Stop"><i class="fas fa-stopwatch"></i></button>
+              <button class="btn-icon is-del" title="Remove"><i class="fas fa-trash"></i></button>
+            </span>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ══════════════ C · COMMITMENTS  |  ACTIVITY  (hairline split) ════ -->
+    <div class="split">
+
+      <!-- C1 · COMMITMENTS — rows, not cards. Most behind first. -->
+      <section class="panel split-main" id="panel-commit">
+        <div class="panel-head">
+          <span class="panel-title"><i class="fas fa-bullseye t-time"></i> Commitments</span>
+          <span class="panel-tools">
+            <span class="row-meta">most behind first</span>
+            <button class="collapse-btn" aria-expanded="true" data-collapse="panel-commit"><i class="fas fa-chevron-down"></i></button>
+          </span>
+        </div>
+        <div class="panel-body">
+          <ul class="rows">
+
+            <!-- 1 · Study — context (orange), weekly, time -->
+            <li class="row commit-row">
+              <div class="commit-id">
+                <a class="commit-name t-ctx" href="#">Study</a>
+                <span class="commit-kind">Context · weekly · time</span>
+              </div>
+              <div class="commit-body">
+                <div class="commit-line">
+                  <span class="num meter-num"><span class="t-dur">195m</span> <span class="t-faint">/</span> 480m</span>
+                  <span class="meter-pct num">40.6%</span>
+                  <span class="row-meta">285m behind pace</span>
+                </div>
+                <div class="meter"><div class="meter-fill warning" style="width:40.6%"></div></div>
+                <div class="bankline">
+                  <span><span class="bk">Bank</span> <span class="num bank-neg">−60m</span></span>
+                  <span><span class="bk">This period</span> <span class="num bank-neg">−285m</span></span>
+                  <span class="u-right streak-flame"><i class="fas fa-fire"></i> 0 periods</span>
+                </div>
+                <div class="streak" role="img" aria-label="last 8 periods">
+                  <span class="streak-cell met"     title="512/480"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell missed"  title="300/480"><i class="fas fa-times"></i></span>
+                  <span class="streak-cell met"     title="496/480"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell missed"  title="210/480"><i class="fas fa-times"></i></span>
+                  <span class="streak-cell met"     title="520/480"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="488/480"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell missed"  title="344/480"><i class="fas fa-times"></i></span>
+                  <span class="streak-cell current" title="195/480 — current period"><i class="fas fa-hourglass-half"></i></span>
+                </div>
+              </div>
+              <span class="row-actions row-actions--pinned">
+                <button class="btn-icon" title="Edit commitment"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-go" title="Start a Study timer"><i class="fas fa-play"></i></button>
+              </span>
+            </li>
+
+            <!-- 2 · Atlas API — project (red), weekly, time -->
+            <li class="row commit-row">
+              <div class="commit-id">
+                <a class="commit-name t-project" href="#">Atlas API</a>
+                <span class="commit-kind">Project · weekly · time</span>
+              </div>
+              <div class="commit-body">
+                <div class="commit-line">
+                  <span class="num meter-num"><span class="t-dur">468m</span> <span class="t-faint">/</span> 600m</span>
+                  <span class="meter-pct num">78.0%</span>
+                  <span class="row-meta">132m to go</span>
+                </div>
+                <div class="meter"><div class="meter-fill approaching" style="width:78%"></div></div>
+                <div class="bankline">
+                  <span><span class="bk">Bank</span> <span class="num bank-pos">+145m</span></span>
+                  <span><span class="bk">This period</span> <span class="num bank-neg">−132m</span></span>
+                  <span class="u-right streak-flame is-hot"><i class="fas fa-fire"></i> 6 periods</span>
+                </div>
+                <div class="streak" role="img" aria-label="last 8 periods">
+                  <span class="streak-cell missed"  title="402/600"><i class="fas fa-times"></i></span>
+                  <span class="streak-cell met"     title="655/600"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="612/600"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="705/600"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell saved"   title="548/600 (bank covered deficit)"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="690/600"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="601/600"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell current" title="468/600 — current period"><i class="fas fa-hourglass-half"></i></span>
+                </div>
+              </div>
+              <span class="row-actions row-actions--pinned">
+                <button class="btn-icon" title="Edit commitment"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-go" title="Start an Atlas API timer"><i class="fas fa-play"></i></button>
+              </span>
+            </li>
+
+            <!-- 3 · Autumn — project (red), weekly, SESSION-based, no banking -->
+            <li class="row commit-row">
+              <div class="commit-id">
+                <a class="commit-name t-project" href="#">Autumn</a>
+                <span class="commit-kind">Project · weekly · sessions</span>
+              </div>
+              <div class="commit-body">
+                <div class="commit-line">
+                  <span class="num meter-num"><span class="t-dur">6</span> <span class="t-faint">/</span> 5</span>
+                  <span class="meter-pct num">100%</span>
+                  <span class="row-meta t-dur"><i class="fas fa-check"></i> met for this week</span>
+                </div>
+                <div class="meter"><div class="meter-fill complete" style="width:100%"></div></div>
+                <div class="bankline">
+                  <span class="bk t-faint">no time banking</span>
+                  <span class="u-right streak-flame is-hot"><i class="fas fa-fire"></i> 11 periods</span>
+                </div>
+                <div class="streak" role="img" aria-label="last 8 periods">
+                  <span class="streak-cell met"     title="6/5"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="7/5"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="5/5"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="8/5"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="6/5"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="5/5"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell met"     title="9/5"><i class="fas fa-check"></i></span>
+                  <span class="streak-cell current" title="6/5 — current period"><i class="fas fa-hourglass-half"></i></span>
+                </div>
+              </div>
+              <span class="row-actions row-actions--pinned">
+                <button class="btn-icon" title="Edit commitment"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-go" title="Start an Autumn timer"><i class="fas fa-play"></i></button>
+              </span>
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- C2 · ACTIVITY -->
+      <section class="panel split-side" id="panel-activity">
+        <div class="panel-head">
+          <span class="panel-title"><i class="fas fa-calendar-alt t-dur"></i> Activity</span>
+          <span class="panel-tools">
+            <span class="segmented" id="calRange">
+              <button class="seg" data-days="7">7d</button>
+              <button class="seg is-on" data-days="14">14d</button>
+              <button class="seg" data-days="30">30d</button>
+            </span>
+            <button class="collapse-btn" aria-expanded="true" data-collapse="panel-activity"><i class="fas fa-chevron-down"></i></button>
+          </span>
+        </div>
+        <div class="panel-body is-padded">
+          <div class="cal">
+            <div class="cal-head">
+              <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+            <div class="u-flex u-gap4">
+              <span class="cal-caption" id="calCaption">Last 14 days activity</span>
+              <span class="cal-caption u-right num" id="calCount">14 / 14 tracked</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ═══════════════════════ D · RECENT SESSIONS ══════════════════════ -->
+    <!-- Fixes the production quirk: production lists only 3 sessions but prints
+         the group total as if it were the day total. Here the list is deep
+         enough to be useful and the totals are the real day totals. -->
+    <section class="panel" id="panel-sessions">
+      <div class="panel-head">
+        <span class="panel-title"><i class="fas fa-history t-sub"></i> Recent sessions</span>
+        <span class="panel-tools">
+          <a class="btn btn-sm" href="#">All sessions <i class="fas fa-arrow-right"></i></a>
+          <button class="collapse-btn" aria-expanded="true" data-collapse="panel-sessions"><i class="fas fa-chevron-down"></i></button>
+        </span>
+      </div>
+      <div class="panel-body">
+
+        <div class="group">
+          <div class="group-head">
+            <button class="collapse-btn" aria-expanded="true" data-collapse="grp-sat"><i class="fas fa-chevron-down"></i></button>
+            <span class="group-title">Saturday 25 Jul 2026</span>
+            <span class="group-count">· 4 sessions</span>
+            <span class="group-total num t-dur">05h 12m</span>
+          </div>
+          <ul class="rows" id="grp-sat">
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">15:20:00</span> <span class="row-arrow">→</span> <span class="t-time">16:55:30</span></span>
+              <span class="s-dur num t-dur">01h 35m</span>
+              <a class="s-project t-project" href="#" title="Atlas API">Atlas API</a>
+              <span class="s-subs">
+                <a class="chip chip-sub" href="#">billing</a>
+                <a class="chip chip-sub" href="#">migrations</a>
+              </span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Stripe webhook backfill; wrote the idempotency-key migration</span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">13:40:00</span> <span class="row-arrow">→</span> <span class="t-time">14:12:45</span></span>
+              <span class="s-dur num t-dur">32m 45s</span>
+              <a class="s-project t-project" href="#" title="Rust by Example">Rust by Example</a>
+              <span class="s-subs"><a class="chip chip-sub" href="#">async</a></span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Pinning chapter — re-read it twice</span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">11:05:00</span> <span class="row-arrow">→</span> <span class="t-time">12:32:18</span></span>
+              <span class="s-dur num t-dur">01h 27m</span>
+              <a class="s-project t-project" href="#" title="Autumn">Autumn</a>
+              <span class="s-subs"><a class="chip chip-sub" href="#">ui-redesign</a></span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note"><strong>Sketching</strong> the new session card — 3 columns feels cramped on mobile</span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">09:12:04</span> <span class="row-arrow">→</span> <span class="t-time">10:48:31</span></span>
+              <span class="s-dur num t-dur">01h 36m</span>
+              <a class="s-project t-project" href="#" title="Atlas API">Atlas API</a>
+              <span class="s-subs"><a class="chip chip-sub" href="#">auth</a></span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Rate-limiter tests green; token refresh still flaky under load</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <button class="collapse-btn" aria-expanded="true" data-collapse="grp-fri"><i class="fas fa-chevron-down"></i></button>
+            <span class="group-title">Friday 24 Jul 2026</span>
+            <span class="group-count">· 6 sessions</span>
+            <span class="group-total num t-dur">07h 30m</span>
+          </div>
+          <ul class="rows" id="grp-fri">
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">20:10:00</span> <span class="row-arrow">→</span> <span class="t-time">21:38:00</span></span>
+              <span class="s-dur num t-dur">01h 28m</span>
+              <a class="s-project t-project" href="#" title="Autumn">Autumn</a>
+              <span class="s-subs">
+                <a class="chip chip-sub" href="#">ui-redesign</a>
+                <a class="chip chip-sub" href="#">docs</a>
+              </span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Dark-mode contrast pass. See <a href="#">issue #41</a></span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">16:00:00</span> <span class="row-arrow">→</span> <span class="t-time">17:22:00</span></span>
+              <span class="s-dur num t-dur">01h 22m</span>
+              <a class="s-project t-project" href="#" title="Rust by Example">Rust by Example</a>
+              <span class="s-subs">
+                <a class="chip chip-sub" href="#">ownership</a>
+                <a class="chip chip-sub" href="#">exercises</a>
+              </span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Borrow checker finally clicked on ex. 12</span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">13:30:00</span> <span class="row-arrow">→</span> <span class="t-time">15:05:00</span></span>
+              <span class="s-dur num t-dur">01h 35m</span>
+              <a class="s-project t-project" href="#" title="Atlas API">Atlas API</a>
+              <span class="s-subs"><a class="chip chip-sub" href="#">code-review</a></span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">12:15:00</span> <span class="row-arrow">→</span> <span class="t-time">12:50:00</span></span>
+              <span class="s-dur num t-dur">35m 00s</span>
+              <a class="s-project t-project" href="#" title="Newsletter">Newsletter</a>
+              <span class="s-subs"><a class="chip chip-sub" href="#">drafting</a></span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Issue #14 outline: “why your time tracker lies to you”</span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">09:45:00</span> <span class="row-arrow">→</span> <span class="t-time">11:30:00</span></span>
+              <span class="s-dur num t-dur">01h 45m</span>
+              <a class="s-project t-project" href="#" title="Atlas API">Atlas API</a>
+              <span class="s-subs"><a class="chip chip-sub" href="#">auth</a></span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Pairing with Dana on the OAuth device flow</span>
+            </li>
+
+            <li class="row session-row" tabindex="0">
+              <span class="s-time num"><span class="t-time">08:35:00</span> <span class="row-arrow">→</span> <span class="t-time">09:20:00</span></span>
+              <span class="s-dur num t-dur">45m 00s</span>
+              <a class="s-project t-project" href="#" title="Autumn">Autumn</a>
+              <span class="s-subs"><a class="chip chip-sub" href="#">mcp-server</a></span>
+              <span class="row-actions">
+                <button class="btn-icon is-go" title="Restart this combo"><i class="fas fa-redo"></i></button>
+                <button class="btn-icon" title="Edit session"><i class="fas fa-pen"></i></button>
+                <button class="btn-icon is-del" title="Delete session"><i class="fas fa-trash"></i></button>
+              </span>
+              <span class="row-note">Added the <code>tally_by_tags</code> tool; docstrings still thin</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+  </main>
+</div>
+
+<!-- ══════════════════ COMMAND PALETTE — shown OPEN (⌘K) ═════════════════ -->
+<div class="cmdk-scrim" id="cmdkScrim">
+  <div class="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="cmdk-field">
+      <i class="fas fa-bolt"></i>
+      <input class="cmdk-input" id="cmdkInput" value="au" placeholder="start a timer, stop one, or jump somewhere…" autocomplete="off" spellcheck="false">
+      <span class="cmdk-esc"><span class="kbd">esc</span></span>
+    </div>
+    <div class="cmdk-list" id="cmdkList"></div>
+    <div class="cmdk-foot">
+      <span class="cmdk-syntax"><b>start</b> project sub · <b>stop</b> · <b>go</b> sessions · <b>log</b> 45m project</span>
+      <span class="u-right"><span class="kbd">↑</span><span class="kbd">↓</span> move · <span class="kbd">⏎</span> run · <span class="kbd">esc</span> close</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────── COMMAND PALETTE ─────────────────────────── */
+const COMMANDS = [
+  {g:'Start a timer', i:'fa-play',  html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Autumn</span> <span class="chip chip-sub">ui-redesign</span>', hint:'last used 11:05', s:'start timer autumn ui-redesign'},
+  {g:'Start a timer', i:'fa-play',  html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Autumn</span> <span class="chip chip-sub">mcp-server</span>', hint:'', s:'start timer autumn mcp-server'},
+  {g:'Start a timer', i:'fa-play',  html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Autumn</span> <span class="chip chip-sub">docs</span>', hint:'', s:'start timer autumn docs'},
+  {g:'Start a timer', i:'fa-play',  html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Autumn</span> <span class="cmdk-dim">no subproject</span>', hint:'', s:'start timer autumn'},
+  {g:'Start a timer', i:'fa-play',  html:'Start timer <span class="cmdk-dim">·</span> <span class="t-project">Atlas API</span> <span class="chip chip-sub">auth</span>', hint:'', s:'start timer atlas api auth'},
+
+  {g:'Running now',   i:'fa-stopwatch', html:'Stop <span class="cmdk-dim">·</span> <span class="t-project">Atlas API</span> <span class="chip chip-sub">auth</span> <span class="num t-dur">43 minutes 18 seconds</span>', hint:'⏎', s:'stop atlas api auth running'},
+  {g:'Running now',   i:'fa-stopwatch', html:'Stop <span class="cmdk-dim">·</span> <span class="t-project">Rust by Example</span> <span class="chip chip-sub">exercises</span> <span class="num t-dur">49 minutes 40 seconds</span>', hint:'', s:'stop rust by example exercises running'},
+  {g:'Running now',   i:'fa-times',     html:'Stop all timers', hint:'', s:'stop all timers running'},
+
+  {g:'Go to',         i:'fa-history',      html:'Session Logs', hint:'G then S', s:'go to session logs sessions'},
+  {g:'Go to',         i:'fa-layer-group',  html:'Manage Projects', hint:'G then P', s:'go to manage projects'},
+  {g:'Go to',         i:'fa-chart-line',   html:'Charts', hint:'G then C', s:'go to charts'},
+  {g:'Go to',         i:'fa-brain',        html:'Insights', hint:'G then I', s:'go to insights ai'},
+  {g:'Go to',         i:'fa-folder-open',  html:'Project <span class="cmdk-dim">·</span> <span class="t-project">Autumn</span> <span class="num t-dur">6 days 13 hours 48 minutes</span>', hint:'', s:'go to open project autumn'},
+  {g:'Go to',         i:'fa-folder-open',  html:'Project <span class="cmdk-dim">·</span> <span class="t-project">Atlas API</span> <span class="num t-dur">13 days 22 minutes</span>', hint:'', s:'go to open project atlas api'},
+
+  {g:'Create',        i:'fa-plus',       html:'New project…', hint:'', s:'create new project'},
+  {g:'Create',        i:'fa-clock',      html:'Log a past session <span class="cmdk-dim">·</span> <span class="num t-dur">45m</span> <span class="t-project">Newsletter</span>', hint:'', s:'create log past session newsletter'},
+  {g:'Create',        i:'fa-bullseye',   html:'New commitment…', hint:'', s:'create new commitment'}
+];
+const GROUP_ORDER = ['Start a timer','Running now','Go to','Create'];
+
+const scrim = document.getElementById('cmdkScrim');
+const input = document.getElementById('cmdkInput');
+const list  = document.getElementById('cmdkList');
+let sel = 0, visible = [];
+
+function render(){
+  const q = input.value.toLowerCase().trim();
+  const toks = q ? q.split(/\s+/) : [];
+  visible = COMMANDS.filter(c => toks.every(t => c.s.includes(t)));
+  if (sel >= visible.length) sel = Math.max(0, visible.length - 1);
+
+  let html = '';
+  GROUP_ORDER.forEach(g => {
+    const items = visible.filter(c => c.g === g);
+    if (!items.length) return;
+    html += '<div class="cmdk-group">' + g + '</div>';
+    items.forEach(c => {
+      const idx = visible.indexOf(c);
+      html += '<div class="cmdk-item' + (idx === sel ? ' is-selected' : '') + '" data-i="' + idx + '">'
+            +   '<span class="cmdk-ico"><i class="fas ' + c.i + '"></i></span>'
+            +   '<span class="cmdk-label">' + c.html + '</span>'
+            +   '<span class="cmdk-hint">' + (idx === sel ? '⏎ run' : c.hint) + '</span>'
+            + '</div>';
+    });
+  });
+  list.innerHTML = html || '<div class="empty">No command matches “' + input.value + '”</div>';
+}
+
+function openPalette(prefill){
+  scrim.hidden = false;
+  if (typeof prefill === 'string') input.value = prefill;
+  sel = 0; render(); input.focus(); input.select();
+}
+function closePalette(){ scrim.hidden = true; }
+
+document.getElementById('cmdkTrigger').addEventListener('click', () => openPalette(''));
+document.getElementById('railCmd').addEventListener('click', () => openPalette(''));
+document.getElementById('startBtn').addEventListener('click', () => openPalette('start '));
+scrim.addEventListener('mousedown', e => { if (e.target === scrim) closePalette(); });
+input.addEventListener('input', () => { sel = 0; render(); });
+list.addEventListener('click', e => {
+  const it = e.target.closest('.cmdk-item');
+  if (it) { sel = +it.dataset.i; render(); setTimeout(closePalette, 90); }
+});
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); scrim.hidden ? openPalette() : closePalette(); return; }
+  if (scrim.hidden) return;
+  if (e.key === 'Escape') { closePalette(); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, visible.length - 1); render(); }
+  else if (e.key === 'ArrowUp')   { e.preventDefault(); sel = Math.max(sel - 1, 0); render(); }
+  else if (e.key === 'Enter')     { e.preventDefault(); closePalette(); }
+});
+render();
+
+/* ────────────────────────── COLLAPSE TOGGLES ─────────────────────────── */
+document.querySelectorAll('[data-collapse]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const open = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!open));
+    const target = document.getElementById(btn.dataset.collapse);
+    if (!target) return;
+    if (target.classList.contains('panel')) target.dataset.collapsed = String(open);
+    else target.style.display = open ? 'none' : '';
+  });
+});
+
+/* ───────────────────────── ACTIVITY CALENDAR ─────────────────────────── */
+/* 30 days, Fri 26 Jun → Sat 25 Jul 2026. Inactive only on 28 Jun and 2 Jul. */
+const DAYS = [];
+[26,27,28,29,30].forEach(d => DAYS.push({m:'Jun', d, a: d !== 28}));
+for (let d = 1; d <= 25; d++) DAYS.push({m:'Jul', d, a: d !== 2});
+const FIRST_WD = 4; /* Fri, Monday-first index */
+
+function drawCal(n){
+  const slice  = DAYS.slice(-n);
+  const offset = (FIRST_WD + (DAYS.length - n)) % 7;
+  let html = '';
+  for (let i = 0; i < offset; i++) html += '<span></span>';
+  slice.forEach((day, i) => {
+    const today = (i === slice.length - 1);
+    html += '<span class="cal-day ' + (day.a ? 'is-active' : 'is-inactive') + (today ? ' is-today' : '') +
+            '" title="' + day.m + ' ' + day.d + (day.a ? ' — tracked' : ' — nothing tracked') + '">' + day.d + '</span>';
+  });
+  document.getElementById('calGrid').innerHTML = html;
+  document.getElementById('calCaption').textContent = 'Last ' + n + ' days activity';
+  document.getElementById('calCount').textContent = slice.filter(x => x.a).length + ' / ' + n + ' tracked';
+}
+document.getElementById('calRange').addEventListener('click', e => {
+  const b = e.target.closest('.seg'); if (!b) return;
+  document.querySelectorAll('#calRange .seg').forEach(s => s.classList.remove('is-on'));
+  b.classList.add('is-on');
+  drawCal(+b.dataset.days);
+});
+drawCal(14);
+
+/* ─────────────────────────── LIVE TIMER TICK ─────────────────────────── */
+function minFmt(s){
+  const m = Math.floor(s / 60), sec = s % 60;
+  if (m >= 60){ const h = Math.floor(m / 60); return h + (h === 1 ? ' hour ' : ' hours ') + (m % 60) + ' minutes'; }
+  return m + (m === 1 ? ' minute ' : ' minutes ') + sec + (sec === 1 ? ' second' : ' seconds');
+}
+function hms(s){
+  const p = n => String(n).padStart(2,'0');
+  return p(Math.floor(s/3600)) + ':' + p(Math.floor(s/60)%60) + ':' + p(s%60);
+}
+setInterval(() => {
+  document.querySelectorAll('[data-elapsed]').forEach(el => {
+    const v = +el.dataset.elapsed + 1; el.dataset.elapsed = v; el.textContent = minFmt(v);
+  });
+  document.querySelectorAll('[data-countdown]').forEach(el => {
+    const v = Math.max(0, +el.dataset.countdown - 1); el.dataset.countdown = v; el.textContent = hms(v);
+  });
+  const b = document.getElementById('badgeElapsed');
+  const t = +document.querySelector('[data-elapsed]').dataset.elapsed;
+  b.textContent = String(Math.floor(t/3600)).padStart(2,'0') + ':' + String(Math.floor(t/60)%60).padStart(2,'0');
+}, 1000);
+
+/* ──────────────── LIVE BACKDROP DIM — proves §2.2 legibility ─────────── */
+document.getElementById('dimRange').addEventListener('input', e => {
+  document.body.style.setProperty('--background-dim-opacity', (e.target.value / 100).toFixed(2));
+});
+</script>
+</body>
+</html>

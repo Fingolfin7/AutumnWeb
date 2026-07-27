@@ -1,186 +1,166 @@
 {% extends 'core/base.html' %}
 {% load time_formats %}
-{% load static %}
-{% load crispy_forms_tags %}
+
+{% comment %}
+  ============================================================================
+  UPDATE PROJECT — Focus Desk (UI_REDESIGN.md chunk 4)
+  ----------------------------------------------------------------------------
+  Form on the left, the project's own numbers on the right (.split), then the
+  commitments panel, then its subprojects as ordinary bands.
+
+  partials/commitments_panel.html is still in its legacy markup: it is shared
+  with update_subproject, update_context and update_tag, which have not been
+  ported yet, so a shared partial cannot change design system on its own.
+  focus_desk.css restyles its existing class names in the meantime; chunk 7
+  rewrites the markup and drops those rules.
+
+  The legacy page carried a <details>-based tag dropdown and a script to close
+  it on outside click. Tags are a short list, so they are simply shown — a
+  dropdown that hides four checkboxes is a control with no job.
+  ============================================================================
+{% endcomment %}
+
 {% block content %}
-    <form class="flex-row" method="post" enctype="multipart/form-data">
+
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Project</p>
+        <h1 class="page-title text-red">{{ project.name }}</h1>
+    </div>
+</div>
+
+<div class="split">
+    <form method="post" class="fields">
         {% csrf_token %}
-        <section id="input-fields" class="card stacked half-width">
-            <span class="label-input">
+        {{ form.non_field_errors }}
+
+        <section class="slab slab-pad">
+            <div class="field">
                 {{ form.name.label_tag }}
                 {{ form.name }}
                 {{ form.name.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
+            <div class="field">
                 {{ form.status.label_tag }}
                 {{ form.status }}
                 {{ form.status.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
+            <div class="field">
+                <label for="{{ form.description.id_for_label }}">Description</label>
                 {{ form.description }}
                 {{ form.description.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
+            <div class="field">
                 {{ form.context.label_tag }}
                 {{ form.context }}
                 {{ form.context.errors }}
-            </span>
-
-        <span class="label-input">
-          {{ form.tags.label_tag }}
-          <details class="tag-dropdown">
-            <summary class="tag-summary">Select tags</summary>
-            <div class="tag-options">
-              {% for cb in form.tags %}
-                <label class="tag-option">
-                  {{ cb.tag }}
-                  <span class="tag-label">{{ cb.choice_label }}</span>
-                </label>
-              {% endfor %}
             </div>
-          </details>
-          {{ form.tags.errors }}
-        </span>
 
-            <span>
-                <button type="submit" id="update-project" class="primary-button">
-                    <i class="fa fa-check-circle"></i>
-                    Update Project
+            <div class="field">
+                <span class="field-label">Tags</span>
+                {% if form.tags|length %}
+                <div class="check-grid">
+                    {% for cb in form.tags %}
+                    <span>{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="muted">No tags yet. <a href="{% url 'tags' %}">Create one</a> to group projects.</p>
+                {% endif %}
+                {{ form.tags.errors }}
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn--primary" type="submit" id="update-project">
+                    <i class="fas fa-check-circle"></i> Save changes
                 </button>
-
-                <button type="button" class="primary-button dark-red"
-                onclick="window.location.href = '{% url 'delete_project' project.id %}' ">
-                    <i class="fa fa-trash"></i>
-                    Delete Project
-                </button>
-            </span>
-        </section>
-
-        <section id="meta-data" class="card stacked half-width space-around">
-            <span>
-                Total time:
-                <span class="text-green" >{{ project.total_time|min_formatter }}</span>
-            </span>
-
-            <span>
-                Created:
-                <span class="text-cyan" >{{ project.start_date|date_formatter }}</span>
-            </span>
-
-            <span>
-                Last Updated:
-                <span class="text-cyan" >{{ project.last_updated|date_formatter }}</span>
-            </span>
-
-            <span>
-                Session Count:
-                <span class="text-cyan" >{{ session_count }}</span>
-            </span>
-
-            <span>
-                Average time per session:
-                <span class="text-cyan" >{{ average_session_duration|min_formatter }}</span>
-            </span>
+                <a class="btn btn--ghost btn--spacer" href="{% url 'delete_project' project.id %}">
+                    <i class="fas fa-trash"></i> Delete project
+                </a>
+            </div>
         </section>
     </form>
 
-    {% with commitment_entity_label='project' %}
-        {% include 'core/partials/commitments_panel.html' %}
-    {% endwith %}
-
-    <br><br>
-
-    <button type="button" id="create-subproject-button" class="primary-button"
-            onclick="window.location.href= '{% url 'create_subproject' project.id %}'">
-        <i class="fa fa-plus"></i>
-        Create Subproject
-    </button>
-    
-    {% if subprojects %}
-        <button type="button" id="merge-subprojects-button" class="secondary-button"
-            onclick="window.location.href= '{% url 'merge_subprojects' project.id %}'">
-            <i class="fa fa-code-branch"></i>
-            Merge Subprojects
-        </button>
-    {% endif %}
-
-    <br><br>
-
-    <section id="subprojects-list" class="grid-rows">
-
-        {% for subproject in subprojects %}
-            <div class="card bordered-top" id="subproject-{{ subproject.id }}">
-                <table>
-                    <tr>
-                        <td class="text-blue">
-                            <h3>
-                                <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                                    {{ subproject.name }}
-                                </a>
-                            </h3>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="text-green">
-                            {{ subproject.total_time|min_formatter }}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <span>{{ subproject.start_date|date_formatter }}</span>
-
-                            ->
-
-                            <span>{{ subproject.last_updated|date_formatter }}</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <button type="button" class="primary-button"
-                            onclick="window.location.href = '{% url 'update_subproject' subproject.id %}' ">
-                                <i class="fa fa-pen"></i>
-                            </button>
-
-                            <button type="button" class="primary-button"
-                            onclick="window.location.href = '{% url 'delete_subproject' subproject.id %}' ">
-                                <i class="fa fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                </table>
+    <section class="slab slab-pad">
+        <p class="field-label">At a glance</p>
+        <div class="meta-list">
+            <div class="meta-row">
+                <span class="meta-label">Total time</span>
+                <span class="meta-value text-green">{{ project.total_time|min_formatter_two }}</span>
             </div>
-        {% endfor %}
+            <div class="meta-row">
+                <span class="meta-label">Sessions</span>
+                <span class="meta-value">{{ session_count }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Average session</span>
+                <span class="meta-value text-green">{{ average_session_duration|min_formatter_two }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Created</span>
+                <span class="meta-value text-cyan">{{ project.start_date|date_formatter }}</span>
+            </div>
+            <div class="meta-row">
+                <span class="meta-label">Last updated</span>
+                <span class="meta-value text-cyan">{{ project.last_updated|date_formatter }}</span>
+            </div>
+        </div>
     </section>
+</div>
 
+{% with commitment_entity_label='project' %}
+    {% include 'core/partials/commitments_panel.html' %}
+{% endwith %}
 
-<script>
-  // auto-close when clicking outside
-  document.addEventListener("click", (e) => {
-    document.querySelectorAll("details.tag-dropdown[open]").forEach((d) => {
-      if (!d.contains(e.target)) d.removeAttribute("open");
-    });
-  });
+<section class="slab disclose" data-disclose>
+    <button class="disclose-head" type="button" aria-expanded="true">
+        <i class="fas fa-sitemap disclose-icon text-blue"></i>
+        <span class="disclose-title">Subprojects</span>
+        <span class="disclose-summary">{{ subprojects|length }}</span>
+        <i class="fas fa-chevron-down disclose-chevron"></i>
+    </button>
 
-  // optional: update "Select tags" summary with count
-  const dropdowns = document.querySelectorAll(".tag-dropdown");
-  dropdowns.forEach((dropdown) => {
-    const summary = dropdown.querySelector(".tag-summary");
-    const checkboxes = dropdown.querySelectorAll("input[type='checkbox']");
+    <div class="disclose-body">
+        {% if subprojects %}
+        <ul class="band-list">
+            {% for subproject in subprojects %}
+            <li class="band project" id="subproject-{{ subproject.id }}">
+                <div class="u-grow">
+                    <div class="project-top">
+                        <a class="project-name text-blue" href="{% url 'update_subproject' subproject.id %}">{{ subproject.name }}</a>
+                    </div>
+                    <p class="project-total">{{ subproject.total_time|min_formatter_two }}</p>
+                    <p class="project-dates">{{ subproject.start_date|date_formatter }} &rarr; {{ subproject.last_updated|date_formatter }}</p>
+                </div>
+                <div class="u-row u-gap-2">
+                    <a class="btn-icon" href="{% url 'update_subproject' subproject.id %}" title="Edit subproject">
+                        <i class="fas fa-pen"></i><span class="sr-only">Edit {{ subproject.name }}</span>
+                    </a>
+                    <a class="btn-icon btn-icon--danger" href="{% url 'delete_subproject' subproject.id %}" title="Delete subproject">
+                        <i class="fas fa-trash"></i><span class="sr-only">Delete {{ subproject.name }}</span>
+                    </a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="empty">No subprojects yet. <a href="{% url 'create_subproject' project.id %}">Create one</a> to break this project down.</p>
+        {% endif %}
 
-    checkboxes.forEach((cb) => {
-      cb.addEventListener("change", () => {
-        const count = dropdown.querySelectorAll("input[type='checkbox']:checked").length;
-        summary.textContent = count ? `Select tags (${count})` : "Select tags";
-      });
-
-      // initialize state on load
-      const count = dropdown.querySelectorAll("input[type='checkbox']:checked").length;
-      if (count) summary.textContent = `Select tags (${count})`;
-    });
-  });
-</script>
+        <div class="slab-foot action-row">
+            <a class="btn btn--primary" href="{% url 'create_subproject' project.id %}">
+                <i class="fas fa-plus"></i> New subproject
+            </a>
+            {% if subprojects %}
+            <a class="btn btn--ghost" href="{% url 'merge_subprojects' project.id %}">
+                <i class="fas fa-code-branch"></i> Merge
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</section>
 
 {% endblock %}

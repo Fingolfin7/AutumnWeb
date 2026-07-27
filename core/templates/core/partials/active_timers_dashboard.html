@@ -1,43 +1,83 @@
 {% load time_formats %}
+{% comment %}
+  ============================================================================
+  FOCUS DECK — running timers (dashboard surface)
+  ----------------------------------------------------------------------------
+  One .focus-card per running timer. This fragment is re-fetched every five
+  seconds by timer_poll.js and swapped in wholesale, so it must stay
+  self-contained: it is rendered WITHOUT context processors (see
+  core.views.timers.active_timers_fragment) and may only use `timers`.
 
-<section id="active-timers" class="card" data-timer-surface="dashboard" data-refresh-url="{% url 'active_timers_fragment' %}" data-max-visible="5" style="border-left: 4px solid var(--main-yellow);{% if not timers %} display: none;{% endif %}">
-    <h2 class="section-header collapsible-header" data-target="active-timers-body">
-        <span><i class="fas fa-play-circle text-yellow"></i> <u>Active Timers</u></span>
-        <button type="button" class="collapse-toggle" aria-expanded="true" aria-controls="active-timers-body">
-            <i class="fas fa-chevron-down"></i>
-        </button>
-    </h2>
-    <div id="active-timers-body" class="collapsible-body active-timers-list">
-        {% for timer in timers %}
-        <div class="active-timer-item card" data-timer-id="{{ timer.id }}" data-project-id="{{ timer.project.id }}" style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.2); border-radius: 4px; width: 100%;" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}">
-            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-                <span class="text-red timer-project" style="font-weight: bold;">{{ timer.project.name }}</span>
-                {% if timer.subprojects.all %}
-                <span style="font-size: 0.9em;">
-                    {% for sub in timer.subprojects.all %}
-                        {% if forloop.first %}[ {% endif %}'<span class="text-blue">{{ sub.name }}</span>'{% if not forloop.last %}, {% endif %}{% if forloop.last %} ]{% endif %}
-                    {% endfor %}
-                </span>
-                {% endif %}
-                <span class="text-green timer-duration" style="font-family: monospace;">{{ timer.duration|min_formatter }}</span>
-                {% if timer.auto_stop_at %}
-                <span class="timer-stop-after-status">
-                    stops in <span class="timer-stop-after-remaining" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"></span>
-                </span>
-                {% endif %}
-            </div>
-            <div class="dashboard-timer-actions" style="display: inline-flex; gap: 0.3rem; margin-left: 1rem;">
-                <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'" title="Restart">
-                    <i class="fas fa-redo-alt"></i>
-                </button>
-                <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'" title="Stop">
-                    <i class="fa fa-stopwatch"></i>
-                </button>
-                <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'" title="Remove">
-                    <i class="fa fa-trash"></i>
-                </button>
-            </div>
+  The wrapper is `display: contents` (.focus-cards), so the cards it renders
+  are direct children of the .focus-track in dashboard.html and sit alongside
+  the "start something" card, which lives outside this fragment because it
+  needs page context the fragment does not get.
+
+  Live values (elapsed time, auto-stop countdown, bar fill) are painted from
+  the data attributes by dashboard_desk.js. The server-rendered figures are
+  the correct values at render time, not placeholders — the page is readable
+  before the first tick and with JS off.
+  ============================================================================
+{% endcomment %}
+<div id="active-timers" class="focus-cards"
+     data-timer-surface="dashboard"
+     data-refresh-url="{% url 'active_timers_fragment' %}"
+     data-max-visible="5">
+    {% for timer in timers %}
+    <article class="focus-card"
+             id="timer-{{ timer.id }}"
+             data-timer-id="{{ timer.id }}"
+             data-start-time="{{ timer.start_time|utc_time_formatter }}"
+             {% if timer.auto_stop_at %}data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"{% endif %}
+             aria-label="Running timer: {{ timer.project.name }}">
+        <p class="focus-eyebrow"><span class="live-dot"></span> Running</p>
+
+        <h2 class="focus-project">
+            <a href="{% url 'update_project' timer.project.id %}">{{ timer.project.name }}</a>
+        </h2>
+
+        {% if timer.subprojects.all %}
+        <div class="focus-subs">
+            {% for sub in timer.subprojects.all %}
+            <a class="sub-chip" href="{% url 'update_subproject' sub.id %}">{{ sub.name }}</a>
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-</section>
+        {% endif %}
+
+        {% comment %}
+          Each number and its unit are one .focus-time-part so they can never
+          be split across a line break — "43 minutes / 21 / seconds" is what
+          you get without it. The pairs wrap as wholes instead.
+        {% endcomment %}
+        <p class="focus-time" data-timer-elapsed>
+            {% for part in timer.duration|hero_duration %}<span class="focus-time-part"><span class="num">{{ part.value }}</span><span class="unit">{{ part.unit }}</span></span>{% endfor %}
+        </p>
+
+        <div class="focus-autostop">
+            <span>started <span class="mono">{{ timer.start_time|time_formatter }}</span></span>
+            {% if timer.auto_stop_at %}
+            <span>stops in <span class="mono" data-timer-countdown>&mdash;</span></span>
+            {% else %}
+            <span class="muted">no auto-stop</span>
+            {% endif %}
+        </div>
+        {% if timer.auto_stop_at %}
+        <div class="focus-autostop-bar">
+            <div class="focus-autostop-fill" data-timer-autostop-fill></div>
+        </div>
+        {% endif %}
+
+        <div class="focus-actions">
+            <a class="btn btn--stop btn--lg focus-stop" href="{% url 'stop_timer' timer.id %}">
+                <i class="fas fa-stopwatch"></i> Stop
+            </a>
+            <a class="btn-icon" href="{% url 'restart_timer' timer.id %}" title="Restart this timer">
+                <i class="fas fa-redo"></i><span class="sr-only">Restart timer</span>
+            </a>
+            <a class="btn-icon btn-icon--danger" href="{% url 'remove_timer' timer.id %}" title="Remove without saving">
+                <i class="fas fa-trash"></i><span class="sr-only">Remove timer</span>
+            </a>
+        </div>
+    </article>
+    {% endfor %}
+</div>

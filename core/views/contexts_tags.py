@@ -1,11 +1,19 @@
 from core.forms import *
 from core.utils import *
+# Imported under its own name deliberately: `from core.utils import *` brings
+# in set_active_context, and the view below used to be called that too. The
+# view shadowed the helper, so its own calls resolved back to itself and every
+# POST to /set-context/ raised TypeError. Nothing in the UI linked to the
+# endpoint, so it went unnoticed. Keeping this explicit alias makes the
+# shadowing impossible to reintroduce.
+from core.utils import set_active_context as store_active_context
 from core.models import Context, Tag
 from django.contrib import messages
 from core.totals import derived_project_totals
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, redirect, reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic import (
     UpdateView,
     DeleteView,
@@ -23,9 +31,13 @@ from core.services import (
 
 
 @login_required
-def set_active_context(request):
+def switch_context(request):
     """
     Update the active context in the session based on a dropdown selection.
+
+    Named switch_context rather than set_active_context so it cannot shadow
+    the core.utils helper it calls — see the import note at the top of this
+    module. The URL keeps its original name.
     """
     if request.method == "POST":
         context_id = request.POST.get("context_id") or "all"
@@ -35,16 +47,21 @@ def set_active_context(request):
                 Context.objects.get(id=int(context_id), user=request.user)
             except (Context.DoesNotExist, ValueError, TypeError):
                 context_id = "all"
-        set_active_context(request, context_id)
+        store_active_context(request, context_id)
         next_url = (
             request.POST.get("next")
             or request.META.get("HTTP_REFERER")
             or reverse("home")
         )
+        # Never bounce to a URL supplied by someone else's page.
+        if not url_has_allowed_host_and_scheme(
+            next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        ):
+            next_url = reverse("home")
         return redirect(next_url)
 
     # Fallback GET handler – treat like resetting to All
-    set_active_context(request, "all")
+    store_active_context(request, "all")
     return redirect("home")
 
 

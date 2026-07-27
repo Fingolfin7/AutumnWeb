@@ -1,69 +1,94 @@
 {% load time_formats %}
+{% comment %}
+  ============================================================================
+  FOCUS DECK — running timers (timers surface)
+  ----------------------------------------------------------------------------
+  The dashboard's deck without the five-card cap, and with the thing that only
+  belongs here: the notes-as-you-go editor. This is the page you leave open
+  while a timer runs.
 
-<section id="active-timers" data-timer-surface="timers" data-refresh-url="{% url 'active_timers_fragment' %}">
-    <h2>Active Timers</h2>
-    {% if timers %}
-        {% for timer in timers %}
-            <div class="card" id="timer-{{ timer.id }}" data-timer-id="{{ timer.id }}" data-start-time="{{ timer.start_time|utc_time_formatter }}" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}" data-project-id="{{ timer.project.id }}">
-                <div class="timer-row-flex">
-                    <span>[{{ forloop.counter0 }}]: Started</span>
-                    <span class="text-red">
-                        <a class="plain-link" href="{% url 'update_project' timer.project.id %}">
-                            {{ timer.project.name }}
-                        </a>
-                    </span>
-                    <span class="timer-subprojects">
-                        {% for subproject in timer.subprojects.all %}
-                            <a class="plain-link" href="{% url 'update_subproject' subproject.id %}">
-                                {% if forloop.first %}[{% endif %}
-                                '<span class="text-blue">{{ subproject.name }}</span>'{% if not forloop.last %}, {% endif %}
-                                {% if forloop.last %}]{% endif %}
-                            </a>
-                        {% endfor %}
-                    </span>
-                    <span>
-                        <span class="text-green timer-duration">{{ timer.duration|min_formatter }}</span> ago
-                    </span>
-                    {% if timer.auto_stop_at %}
-                        <span class="timer-stop-after-status">
-                            stops in <span class="timer-stop-after-remaining" data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"></span>
-                        </span>
-                    {% endif %}
-                    <span class="timer-actions">
-                        <button class="timer-button" onclick="window.location.href='{% url 'restart_timer' timer.id %}'" title="Restart">
-                            <i class="fas fa-redo-alt"></i>
-                        </button>
-                        <button class="timer-button" onclick="window.location.href='{% url 'stop_timer' timer.id %}'" title="Stop">
-                            <i class="fa fa-stopwatch"></i>
-                        </button>
-                        <button class="timer-button" onclick="window.location.href='{% url 'remove_timer' timer.id %}'" title="Remove">
-                            <i class="fa fa-trash"></i>
-                        </button>
-                    </span>
-                </div>
-                <div class="timer-note-editor" data-timer-note-editor data-dirty="false"
-                     data-save-url="{% url 'update_timer_note' timer.id %}">
-                    <label for="timer-note-{{ timer.id }}">Session note</label>
-                    <div class="timer-note-toolbar">
-                        <button type="button" class="attr-mini-btn" data-timer-note-stamp>
-                            <i class="fa fa-clock" aria-hidden="true"></i> Insert timestamp
-                        </button>
-                    </div>
-                    <textarea id="timer-note-{{ timer.id }}" data-timer-note-input
-                              placeholder="Jot down progress while this timer runs.">{{ timer.note|default_if_none:"" }}</textarea>
-                    <div class="timer-note-footer">
-                        <small class="timer-note-status saved" data-timer-note-status>Saved</small>
-                        <button type="button" class="attr-mini-btn timer-note-save" data-timer-note-save>
-                            <i class="fa fa-save" aria-hidden="true"></i> Save note
-                        </button>
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
-    {% else %}
-        <div class="timer-empty-state">
-            <i class="fa fa-clock"></i>
-            <span>No timers are running.</span>
+  Re-fetched every five seconds by timer_poll.js and swapped in wholesale,
+  so it must stand alone: rendered WITHOUT context processors, `timers` is the
+  only variable available. The wrapper is `display: contents` (.focus-cards)
+  so its cards stay layout children of the .focus-track in timers.html.
+
+  timer_notes.js owns every [data-timer-note-*] hook and the data-dirty flag
+  that tells timer_poll.js not to swap the fragment out from under an
+  unsaved note. Do not rename them.
+  ============================================================================
+{% endcomment %}
+<div id="active-timers" class="focus-cards"
+     data-timer-surface="timers"
+     data-refresh-url="{% url 'active_timers_fragment' %}">
+    {% for timer in timers %}
+    <article class="focus-card"
+             id="timer-{{ timer.id }}"
+             data-timer-id="{{ timer.id }}"
+             data-project-id="{{ timer.project.id }}"
+             data-start-time="{{ timer.start_time|utc_time_formatter }}"
+             {% if timer.auto_stop_at %}data-auto-stop-at="{{ timer.auto_stop_at|utc_time_formatter }}"{% endif %}
+             aria-label="Running timer: {{ timer.project.name }}">
+        <p class="focus-eyebrow"><span class="live-dot"></span> Running</p>
+
+        <h2 class="focus-project">
+            <a href="{% url 'update_project' timer.project.id %}">{{ timer.project.name }}</a>
+        </h2>
+
+        {% if timer.subprojects.all %}
+        <div class="focus-subs">
+            {% for sub in timer.subprojects.all %}
+            <a class="sub-chip" href="{% url 'update_subproject' sub.id %}">{{ sub.name }}</a>
+            {% endfor %}
         </div>
-    {% endif %}
-</section>
+        {% endif %}
+
+        <p class="focus-time" data-timer-elapsed>
+            {% for part in timer.duration|hero_duration %}<span class="focus-time-part"><span class="num">{{ part.value }}</span><span class="unit">{{ part.unit }}</span></span>{% endfor %}
+        </p>
+
+        <div class="focus-autostop">
+            <span>started <span class="mono">{{ timer.start_time|time_formatter }}</span></span>
+            {% if timer.auto_stop_at %}
+            <span>stops in <span class="mono" data-timer-countdown>&mdash;</span></span>
+            {% else %}
+            <span class="muted">no auto-stop</span>
+            {% endif %}
+        </div>
+        {% if timer.auto_stop_at %}
+        <div class="focus-autostop-bar">
+            <div class="focus-autostop-fill" data-timer-autostop-fill></div>
+        </div>
+        {% endif %}
+
+        <div class="timer-note-editor" data-timer-note-editor data-dirty="false"
+             data-save-url="{% url 'update_timer_note' timer.id %}">
+            <label for="timer-note-{{ timer.id }}">Session note</label>
+            <div class="timer-note-toolbar">
+                <button type="button" class="attr-mini-btn" data-timer-note-stamp>
+                    <i class="fa fa-clock" aria-hidden="true"></i> Insert timestamp
+                </button>
+            </div>
+            <textarea id="timer-note-{{ timer.id }}" data-timer-note-input
+                      placeholder="Jot down progress while this timer runs.">{{ timer.note|default_if_none:"" }}</textarea>
+            <div class="timer-note-footer">
+                <small class="timer-note-status saved" data-timer-note-status>Saved</small>
+                <button type="button" class="attr-mini-btn timer-note-save" data-timer-note-save>
+                    <i class="fa fa-save" aria-hidden="true"></i> Save note
+                </button>
+            </div>
+        </div>
+
+        <div class="focus-actions">
+            <a class="btn btn--stop btn--lg focus-stop" href="{% url 'stop_timer' timer.id %}">
+                <i class="fas fa-stopwatch"></i> Stop
+            </a>
+            <a class="btn-icon" href="{% url 'restart_timer' timer.id %}" title="Restart this timer">
+                <i class="fas fa-redo"></i><span class="sr-only">Restart timer</span>
+            </a>
+            <a class="btn-icon btn-icon--danger" href="{% url 'remove_timer' timer.id %}" title="Remove without saving">
+                <i class="fas fa-trash"></i><span class="sr-only">Remove timer</span>
+            </a>
+        </div>
+    </article>
+    {% endfor %}
+</div>

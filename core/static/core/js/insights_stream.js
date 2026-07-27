@@ -183,7 +183,7 @@ function deleteChat(url) {
         });
 
         if (!link) {
-            chatList.querySelectorAll('.text-muted').forEach((node) => node.remove());
+            chatList.querySelectorAll('.chat-list-empty').forEach((node) => node.remove());
 
             const container = document.createElement('div');
             container.className = 'chat-item-container active';
