@@ -1,821 +1,381 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_fd.html' %}
 {% load time_formats %}
 {% load static %}
 {% load crispy_forms_tags %}
 {% load background_images %}
 
 {% block content %}
-    <form method="post" enctype="multipart/form-data" class="profile-page">
-        {% csrf_token %}
 
-        <section class="card profile-shell">
-            <div class="profile-section-heading">
-                <div>
-                    <span class="section-kicker">Account</span>
-                    <h2>Profile</h2>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Account and workspace</p>
+        <h1 class="page-title">Profile</h1>
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="fields profile-page">
+    {% csrf_token %}
+
+    <section class="slab slab-pad">
+        <p class="field-label">Account</p>
+
+        <div class="profile-account-grid">
+            <div class="profile-avatar-panel">
+                <img class="profile-pic profile-avatar-large" src="{{ user.profile.image_url }}" alt="{{ user.username }} profile picture">
+                <div class="field">
+                    <label for="{{ profile_form.image.id_for_label }}">
+                        <i class="fas fa-cloud-upload-alt text-orange"></i> Upload profile image
+                    </label>
+                    {{ profile_form.image }}
+                    <small id="profile-image-filename" class="muted">No new image selected</small>
+                    {{ profile_form.image.errors }}
                 </div>
             </div>
 
-            <div class="profile-overview-grid">
-                <div class="profile-avatar-panel">
-                    <img class="profile-pic profile-avatar-large" src="{{ user.profile.image_url }}" alt="profile picture">
-                    <label for="{{ profile_form.image.id_for_label }}" class="custom-file-upload profile-upload-button">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        Upload Image
-                        {{ profile_form.image }}
-                    </label>
-                    <small id="profile-image-filename" class="profile-muted">No new image selected</small>
-                    {{ profile_form.image.errors }}
-                </div>
-
-                <div class="profile-fields-panel">
-                    <span class="label-input">
+            <div>
+                <div class="two-up">
+                    <div class="field">
                         {{ user_form.username.errors }}
                         {{ user_form.username.label_tag }}
                         {{ user_form.username }}
-                    </span>
+                    </div>
 
-                    <span class="label-input">
+                    <div class="field">
                         {{ user_form.email.errors }}
                         {{ user_form.email.label_tag }}
                         {{ user_form.email }}
-                    </span>
+                    </div>
+                </div>
 
-                    <span class="label-input">
-                        {{ profile_form.timezone.errors }}
-                        {{ profile_form.timezone.label_tag }}
-                        {{ profile_form.timezone }}
-                        <small class="profile-muted">{{ profile_form.timezone.help_text }}</small>
-                    </span>
+                <div class="field">
+                    {{ profile_form.timezone.errors }}
+                    {{ profile_form.timezone.label_tag }}
+                    {{ profile_form.timezone }}
+                    <small class="muted">{{ profile_form.timezone.help_text }}</small>
                 </div>
             </div>
+        </div>
+    </section>
 
-            <div class="profile-background-panel">
-                <div class="profile-panel-title-row">
-                    <div>
-                        <span class="section-kicker">Background</span>
-                        <h3>Workspace Image</h3>
-                    </div>
-                    <label class="profile-switch-row">
-                        <span>{{ profile_form.automatic_background.label }}</span>
-                        <label class="switch">
-                            {{ profile_form.automatic_background }}
-                            <span class="slider round"></span>
-                        </label>
-                    </label>
-                    {{ profile_form.automatic_background.errors }}
+    <section class="slab slab-pad">
+        <div class="u-between u-wrap u-gap-3">
+            <div>
+                <p class="page-eyebrow">Background</p>
+                <h2 class="disclose-title">Workspace image</h2>
+            </div>
+            <div>
+                <div class="check-row">
+                    {{ profile_form.automatic_background }}
+                    <label for="{{ profile_form.automatic_background.id_for_label }}">{{ profile_form.automatic_background.label }}</label>
                 </div>
+                {{ profile_form.automatic_background.errors }}
+            </div>
+        </div>
 
-                <div id="automatic_background_options" class="profile-background-options" style="display: none;">
-                    {% for radio in profile_form.background_choice %}
-                        <label class="profile-choice-pill" for="{{ radio.id_for_label }}">
-                            {{ radio.tag }}
-                            <span>{{ radio.choice_label }}</span>
-                        </label>
-                    {% endfor %}
-                    {{ profile_form.background_choice.errors }}
-                </div>
+        <div id="automatic_background_options" class="profile-background-options">
+            {% for radio in profile_form.background_choice %}
+            <label class="profile-choice-pill" for="{{ radio.id_for_label }}">
+                {{ radio.tag }}
+                <span>{{ radio.choice_label }}</span>
+            </label>
+            {% endfor %}
+            {{ profile_form.background_choice.errors }}
+        </div>
 
-                <div class="profile-background-tuning">
-                    <div class="profile-slider-heading">
-                        <label for="{{ profile_form.background_dimming.id_for_label }}">{{ profile_form.background_dimming.label }}</label>
-                        <output id="background-dimming-value" for="{{ profile_form.background_dimming.id_for_label }}">{{ profile_form.background_dimming.value|default:user.profile.background_dimming }}%</output>
-                    </div>
-                    {{ profile_form.background_dimming }}
-                    <div class="profile-slider-scale">
-                        <span>Brighter photo</span>
-                        <span>Darker interface</span>
-                    </div>
-                    {{ profile_form.background_dimming.errors }}
-                </div>
+        <div class="profile-background-tuning">
+            <div class="u-between u-gap-3">
+                <label for="{{ profile_form.background_dimming.id_for_label }}">{{ profile_form.background_dimming.label }}</label>
+                <output id="background-dimming-value" class="mono text-cyan" for="{{ profile_form.background_dimming.id_for_label }}">{{ profile_form.background_dimming.value|default:user.profile.background_dimming }}%</output>
+            </div>
+            {{ profile_form.background_dimming }}
+            <div class="u-between u-gap-3 muted">
+                <small>Brighter photo</small>
+                <small>Darker interface</small>
+            </div>
+            {{ profile_form.background_dimming.errors }}
+        </div>
 
-                {% if user.profile.automatic_background %}
-                    <div class="background-context profile-background-context">
-                        <span class="section-kicker">About Background</span>
-                        {% if user.profile.bing_background %}
-                            {% bing_background as bing_url %}
-                            <h4>{% bing_background_title %}</h4>
-                            <p>{% bing_background_description %}</p>
-                            {% if bing_url %}
-                                <button type="button" class="secondary-button compact-button" title="Download Bing daily image" aria-label="Download Bing daily image" onclick="window.location.href='{% url 'download_background' %}'">
-                                    <i class="fas fa-download"></i> Download Background
-                                </button>
-                            {% endif %}
-                        {% elif user.profile.nasa_apod_background %}
-                            {% nasa_apod_background as nasa_url %}
-                            <h4>{% nasa_apod_title %}</h4>
-                            <p>{% nasa_apod_explanation %}</p>
-                            {% if nasa_url %}
-                                <button type="button" class="secondary-button compact-button" title="Download NASA APOD image" aria-label="Download NASA APOD image" onclick="window.location.href='{% url 'download_background' %}'">
-                                    <i class="fas fa-download"></i> Download Background
-                                </button>
-                            {% endif %}
-                        {% else %}
-                            <p>No automatic background source selected.</p>
-                        {% endif %}
-                    </div>
+        {% if user.profile.automatic_background %}
+        <div class="background-context profile-background-context">
+            <p class="field-label">About background</p>
+            {% if user.profile.bing_background %}
+                {% bing_background as bing_url %}
+                <h3 class="disclose-title">{% bing_background_title %}</h3>
+                <p class="focus-lede">{% bing_background_description %}</p>
+                {% if bing_url %}
+                <button type="button" class="btn btn--ghost u-mt-4" title="Download Bing daily image" aria-label="Download Bing daily image" onclick="window.location.href='{% url 'download_background' %}'">
+                    <i class="fas fa-download"></i> Download background
+                </button>
                 {% endif %}
-
-                <div class="uploaded_backgrounds profile-background-upload">
-                    <span class="label-input">
-                        <label for="{{ profile_form.background_image.id_for_label }}">
-                            <i class="fas fa-cloud-upload-alt"></i> Upload Background
-                        </label>
-                        {{ profile_form.background_image }}
-                    </span>
-
-                    {% if user.profile.background_image %}
-                        <div class="profile-current-background">
-                            <img src="{{ user.profile.background_image.url }}" alt="Current background">
-                            <div>
-                                <strong>Current background</strong>
-                                <label class="profile-switch-row">
-                                    <span>{{ profile_form.remove_background_image.label }}</span>
-                                    <label class="switch">
-                                        {{ profile_form.remove_background_image }}
-                                        <span class="slider round"></span>
-                                    </label>
-                                </label>
-                                {{ profile_form.remove_background_image.errors }}
-                                <button type="button" class="secondary-button compact-button" title="Download current background image" aria-label="Download current background image" onclick="window.location.href='{% url 'download_background' %}'">
-                                    <i class="fas fa-download"></i> Download
-                                </button>
-                            </div>
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </section>
-
-        <section class="card profile-shell">
-            <div class="profile-section-heading">
-                <div>
-                    <span class="section-kicker">Preferences</span>
-                    <h2>Defaults</h2>
-                </div>
-                <span class="profile-muted">Independent starting points for each workflow</span>
-            </div>
-
-            <div class="profile-defaults-grid">
-                <div class="profile-default-item">
-                    <label for="{{ profile_form.default_filter_value.id_for_label }}">
-                        <i class="fa fa-calendar-alt"></i>
-                        App date range
-                    </label>
-                    <div class="profile-default-control">
-                        {{ profile_form.default_filter_value }}
-                        {{ profile_form.default_filter_unit }}
-                    </div>
-                    <p class="profile-muted">Charts and other date-filtered pages will look back this far from today.</p>
-                    {{ profile_form.default_filter_value.errors }}
-                    {{ profile_form.default_filter_unit.errors }}
-                </div>
-
-                <div class="profile-default-item">
-                    <label for="{{ profile_form.insights_default_filter_value.id_for_label }}">
-                        <i class="fa fa-lightbulb"></i>
-                        Insights date range
-                    </label>
-                    <div class="profile-default-control">
-                        {{ profile_form.insights_default_filter_value }}
-                        {{ profile_form.insights_default_filter_unit }}
-                    </div>
-                    <p class="profile-muted">New Insights chats will begin with this separate analysis window.</p>
-                    {{ profile_form.insights_default_filter_value.errors }}
-                    {{ profile_form.insights_default_filter_unit.errors }}
-                </div>
-
-                <div class="profile-default-item">
-                    <label for="{{ profile_form.default_chart_project_count.id_for_label }}">
-                        <i class="fa fa-chart-pie"></i>
-                        Projects per chart
-                    </label>
-                    <div class="profile-default-control">
-                        {{ profile_form.default_chart_project_count }}
-                        <span class="profile-default-suffix">projects</span>
-                    </div>
-                    <p class="profile-muted">Additional project series are combined into Other. Maximum 100.</p>
-                    {{ profile_form.default_chart_project_count.errors }}
-                </div>
-            </div>
-        </section>
-
-        {% if ai_features_enabled %}
-        <section class="card profile-shell llm-shell">
-            <div class="profile-section-heading">
-                <div>
-                    <span class="section-kicker blue">Insights</span>
-                    <h2>LLM Connections</h2>
-                </div>
-                <span class="profile-muted">Encrypted at rest</span>
-            </div>
-
-            <div class="llm-codex-panel">
-                <div class="llm-codex-copy">
-                    <span class="section-kicker blue">Primary OpenAI Bucket</span>
-                    <h3>Codex Login</h3>
-                    <p>OpenAI models use Codex first when connected. A profile API key is kept as fallback.</p>
-                    {% if have_keys.openai_chatgpt %}
-                        <span class="connection-chip connected">
-                            <i class="fas fa-check-circle"></i>
-                            Codex connected{% if openai_chatgpt_summary.email %} as {{ openai_chatgpt_summary.email }}{% endif %}{% if openai_chatgpt_summary.plan %} ({{ openai_chatgpt_summary.plan }}){% endif %}
-                        </span>
-                    {% else %}
-                        <span class="connection-chip">
-                            <i class="fas fa-circle"></i>
-                            Codex not connected
-                        </span>
-                    {% endif %}
-                </div>
-
-                <div class="llm-codex-actions">
-                    {% if have_keys.openai_chatgpt %}
-                        <button type="submit" name="disconnect_openai_chatgpt" class="secondary-button">
-                            <i class="fas fa-unlink"></i> Disconnect Codex
-                        </button>
-                    {% else %}
-                        <button type="submit" name="start_openai_chatgpt_login" class="secondary-button">
-                            <i class="fas fa-sign-in-alt"></i> Use Codex Login
-                        </button>
-                    {% endif %}
-                </div>
-            </div>
-
-            {% if openai_chatgpt_device_code %}
-                <div class="device-code-panel">
-                    <span>Open <a href="{{ openai_chatgpt_device_code.verification_url }}" target="_blank" rel="noopener noreferrer">{{ openai_chatgpt_device_code.verification_url }}</a> and enter:</span>
-                    <strong class="device-code">{{ openai_chatgpt_device_code.user_code }}</strong>
-                    <button type="submit" name="complete_openai_chatgpt_login" class="primary-button compact-button">
-                        <i class="fas fa-check-circle"></i> Complete Codex Login
-                    </button>
-                </div>
+            {% elif user.profile.nasa_apod_background %}
+                {% nasa_apod_background as nasa_url %}
+                <h3 class="disclose-title">{% nasa_apod_title %}</h3>
+                <p class="focus-lede">{% nasa_apod_explanation %}</p>
+                {% if nasa_url %}
+                <button type="button" class="btn btn--ghost u-mt-4" title="Download NASA APOD image" aria-label="Download NASA APOD image" onclick="window.location.href='{% url 'download_background' %}'">
+                    <i class="fas fa-download"></i> Download background
+                </button>
+                {% endif %}
+            {% else %}
+                <p class="empty">No automatic background source is selected. <a href="#automatic_background_options">Choose Bing or NASA above</a>, then save changes.</p>
             {% endif %}
-
-            <div class="api-keys-grid">
-                <div class="api-key-item">
-                    <div class="api-key-header">
-                        <label class="api-key-label">Gemini</label>
-                        <span class="api-key-status">{% if have_keys.gemini %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
-                    </div>
-                    <div class="api-key-input-wrapper">
-                        {{ profile_form.gemini_api_key }}
-                    </div>
-                    <div class="api-key-clear-wrapper">
-                        <label class="switch">
-                            {{ profile_form.clear_gemini_api_key }}
-                            <span class="slider round"></span>
-                        </label>
-                        <small class="api-key-clear-label">Clear key</small>
-                    </div>
-                    {{ profile_form.gemini_api_key.errors }}
-                </div>
-
-                <div class="api-key-item">
-                    <div class="api-key-header">
-                        <label class="api-key-label">OpenAI API Key</label>
-                        <span class="api-key-status">
-                            {% if have_keys.openai %}
-                                <span class="text-green">Fallback stored</span>
-                            {% elif have_keys.openai_server %}
-                                <span class="text-green">Server key</span>
-                            {% else %}
-                                <span class="text-red">None</span>
-                            {% endif %}
-                        </span>
-                    </div>
-                    <div class="api-key-input-wrapper">
-                        {{ profile_form.openai_api_key }}
-                    </div>
-                    <small class="api-key-help">
-                        {% if have_keys.openai_chatgpt %}
-                            Used after Codex if the Codex bucket is unavailable.
-                        {% elif have_keys.openai_server and not have_keys.openai %}
-                            Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key to override it.
-                        {% else %}
-                            Paste an OpenAI API key to enable OpenAI models.
-                        {% endif %}
-                    </small>
-                    <div class="api-key-clear-wrapper">
-                        <label class="switch">
-                            {{ profile_form.clear_openai_api_key }}
-                            <span class="slider round"></span>
-                        </label>
-                        <small class="api-key-clear-label">Clear key</small>
-                    </div>
-                    {{ profile_form.openai_api_key.errors }}
-                </div>
-
-                <div class="api-key-item">
-                    <div class="api-key-header">
-                        <label class="api-key-label">Claude</label>
-                        <span class="api-key-status">{% if have_keys.claude %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
-                    </div>
-                    <div class="api-key-input-wrapper">
-                        {{ profile_form.claude_api_key }}
-                    </div>
-                    <div class="api-key-clear-wrapper">
-                        <label class="switch">
-                            {{ profile_form.clear_claude_api_key }}
-                            <span class="slider round"></span>
-                        </label>
-                        <small class="api-key-clear-label">Clear key</small>
-                    </div>
-                    {{ profile_form.claude_api_key.errors }}
-                </div>
-            </div>
-        </section>
+        </div>
         {% endif %}
 
-        <div class="profile-submit-row">
-            <button type="submit" class="primary-button">
-                <i class="fa fa-check-circle"></i>
-                Update Profile
-            </button>
+        <div class="uploaded_backgrounds profile-background-upload">
+            <div class="field">
+                <label for="{{ profile_form.background_image.id_for_label }}">
+                    <i class="fas fa-cloud-upload-alt text-orange"></i> Upload background
+                </label>
+                {{ profile_form.background_image }}
+                {{ profile_form.background_image.errors }}
+            </div>
+
+            {% if user.profile.background_image %}
+            <div class="profile-current-background">
+                <img src="{{ user.profile.background_image.url }}" alt="Current background">
+                <div>
+                    <p class="field-label">Current background</p>
+                    <div class="check-row">
+                        {{ profile_form.remove_background_image }}
+                        <label for="{{ profile_form.remove_background_image.id_for_label }}">{{ profile_form.remove_background_image.label }}</label>
+                    </div>
+                    {{ profile_form.remove_background_image.errors }}
+                    <button type="button" class="btn btn--ghost" title="Download current background image" aria-label="Download current background image" onclick="window.location.href='{% url 'download_background' %}'">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            </div>
+            {% endif %}
         </div>
-    </form>
+    </section>
 
-    <script>
-        $('#id_image').on('change',function(){
-            let fileName = $(this).val().split('\\').pop();
-            if (this.files && this.files[0]) {
-                let reader = new FileReader();
-                reader.onload = function (e) {
-                    $('.profile-pic').attr('src', e.target.result);
-                }
-                reader.readAsDataURL(this.files[0]);
+    <section class="slab slab-pad">
+        <div class="u-between u-wrap u-gap-3">
+            <div>
+                <p class="page-eyebrow">Preferences</p>
+                <h2 class="disclose-title">Defaults</h2>
+            </div>
+            <span class="muted">Independent starting points for each workflow</span>
+        </div>
+
+        <div class="profile-defaults-grid">
+            <div class="profile-default-item">
+                <label for="{{ profile_form.default_filter_value.id_for_label }}">
+                    <i class="fa fa-calendar-alt text-cyan"></i> App date range
+                </label>
+                <div class="profile-default-control">
+                    {{ profile_form.default_filter_value }}
+                    {{ profile_form.default_filter_unit }}
+                </div>
+                <p class="muted">Charts and other date-filtered pages will look back this far from today.</p>
+                {{ profile_form.default_filter_value.errors }}
+                {{ profile_form.default_filter_unit.errors }}
+            </div>
+
+            <div class="profile-default-item">
+                <label for="{{ profile_form.insights_default_filter_value.id_for_label }}">
+                    <i class="fa fa-lightbulb text-yellow"></i> Insights date range
+                </label>
+                <div class="profile-default-control">
+                    {{ profile_form.insights_default_filter_value }}
+                    {{ profile_form.insights_default_filter_unit }}
+                </div>
+                <p class="muted">New Insights chats will begin with this separate analysis window.</p>
+                {{ profile_form.insights_default_filter_value.errors }}
+                {{ profile_form.insights_default_filter_unit.errors }}
+            </div>
+
+            <div class="profile-default-item">
+                <label for="{{ profile_form.default_chart_project_count.id_for_label }}">
+                    <i class="fa fa-chart-pie text-green"></i> Projects per chart
+                </label>
+                <div class="profile-default-control">
+                    {{ profile_form.default_chart_project_count }}
+                    <span class="muted">projects</span>
+                </div>
+                <p class="muted">Additional project series are combined into Other. Maximum 100.</p>
+                {{ profile_form.default_chart_project_count.errors }}
+            </div>
+        </div>
+    </section>
+
+    {% if ai_features_enabled %}
+    <section class="slab slab-pad">
+        <div class="u-between u-wrap u-gap-3">
+            <div>
+                <p class="page-eyebrow text-blue">Insights</p>
+                <h2 class="disclose-title">LLM connections</h2>
+            </div>
+            <span class="muted"><i class="fas fa-lock"></i> Encrypted at rest</span>
+        </div>
+
+        <div class="profile-codex-panel">
+            <div>
+                <p class="field-label text-blue">Primary OpenAI bucket</p>
+                <h3 class="disclose-title">Codex login</h3>
+                <p class="focus-lede">OpenAI models use Codex first when connected. A profile API key is kept as fallback.</p>
+                {% if have_keys.openai_chatgpt %}
+                <span class="context-chip text-green">
+                    <i class="fas fa-check-circle"></i>
+                    Codex connected{% if openai_chatgpt_summary.email %} as {{ openai_chatgpt_summary.email }}{% endif %}{% if openai_chatgpt_summary.plan %} ({{ openai_chatgpt_summary.plan }}){% endif %}
+                </span>
+                {% else %}
+                <span class="context-chip"><i class="fas fa-circle"></i> Codex not connected</span>
+                {% endif %}
+            </div>
+
+            <div class="form-actions">
+                {% if have_keys.openai_chatgpt %}
+                <button type="submit" name="disconnect_openai_chatgpt" class="btn btn--ghost">
+                    <i class="fas fa-unlink"></i> Disconnect Codex
+                </button>
+                {% else %}
+                <button type="submit" name="start_openai_chatgpt_login" class="btn btn--ghost">
+                    <i class="fas fa-sign-in-alt"></i> Use Codex login
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if openai_chatgpt_device_code %}
+        <div class="msg msg--info u-mt-4">
+            <i class="fas fa-key msg-icon"></i>
+            <div>
+                <span>Open <a class="text-cyan" href="{{ openai_chatgpt_device_code.verification_url }}" target="_blank" rel="noopener noreferrer">{{ openai_chatgpt_device_code.verification_url }}</a> and enter:</span>
+                <strong class="mono text-orange">{{ openai_chatgpt_device_code.user_code }}</strong>
+                <button type="submit" name="complete_openai_chatgpt_login" class="btn btn--primary u-mt-4">
+                    <i class="fas fa-check-circle"></i> Complete Codex login
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="profile-keys-grid">
+            <div class="profile-key-item">
+                <div class="u-between u-gap-3">
+                    <label for="{{ profile_form.gemini_api_key.id_for_label }}">Gemini</label>
+                    <span>{% if have_keys.gemini %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
+                </div>
+                {{ profile_form.gemini_api_key }}
+                <div class="check-row">
+                    {{ profile_form.clear_gemini_api_key }}
+                    <label for="{{ profile_form.clear_gemini_api_key.id_for_label }}">Clear key</label>
+                </div>
+                {{ profile_form.gemini_api_key.errors }}
+            </div>
+
+            <div class="profile-key-item">
+                <div class="u-between u-gap-3">
+                    <label for="{{ profile_form.openai_api_key.id_for_label }}">OpenAI API key</label>
+                    <span>
+                        {% if have_keys.openai %}
+                        <span class="text-green">Fallback stored</span>
+                        {% elif have_keys.openai_server %}
+                        <span class="text-green">Server key</span>
+                        {% else %}
+                        <span class="text-red">None</span>
+                        {% endif %}
+                    </span>
+                </div>
+                {{ profile_form.openai_api_key }}
+                <small class="muted">
+                    {% if have_keys.openai_chatgpt %}
+                    Used after Codex if the Codex bucket is unavailable.
+                    {% elif have_keys.openai_server and not have_keys.openai %}
+                    Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key to override it.
+                    {% else %}
+                    Paste an OpenAI API key to enable OpenAI models.
+                    {% endif %}
+                </small>
+                <div class="check-row">
+                    {{ profile_form.clear_openai_api_key }}
+                    <label for="{{ profile_form.clear_openai_api_key.id_for_label }}">Clear key</label>
+                </div>
+                {{ profile_form.openai_api_key.errors }}
+            </div>
+
+            <div class="profile-key-item">
+                <div class="u-between u-gap-3">
+                    <label for="{{ profile_form.claude_api_key.id_for_label }}">Claude</label>
+                    <span>{% if have_keys.claude %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
+                </div>
+                {{ profile_form.claude_api_key }}
+                <div class="check-row">
+                    {{ profile_form.clear_claude_api_key }}
+                    <label for="{{ profile_form.clear_claude_api_key.id_for_label }}">Clear key</label>
+                </div>
+                {{ profile_form.claude_api_key.errors }}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <div class="form-actions profile-submit-row">
+        <button type="submit" class="btn btn--primary btn--lg">
+            <i class="fa fa-check-circle"></i> Update profile
+        </button>
+    </div>
+</form>
+
+<script>
+    $('#id_image').on('change',function(){
+        let fileName = $(this).val().split('\\').pop();
+        if (this.files && this.files[0]) {
+            let reader = new FileReader();
+            reader.onload = function (e) {
+                $('.profile-pic').attr('src', e.target.result);
             }
-            $('#profile-image-filename').text(fileName || 'No new image selected');
+            reader.readAsDataURL(this.files[0]);
+        }
+        $('#profile-image-filename').text(fileName || 'No new image selected');
+    });
+
+    function updateBackgroundDimmingPreview(value) {
+        const dimming = Math.min(85, Math.max(0, parseInt(value, 10) || 0));
+        $('#background-dimming-value').text(dimming + '%');
+        document.body.style.setProperty('--background-dim-opacity', (dimming / 100).toFixed(2));
+    }
+
+    $('#id_background_dimming').on('input change', function() {
+        updateBackgroundDimmingPreview($(this).val());
+    });
+
+    function syncDefaultRangeControl(select) {
+        const rangeSelect = $(select);
+        const control = rangeSelect.closest('.profile-default-control');
+        const valueInput = control.find('.profile-default-value');
+        const isToDate = String(rangeSelect.val()).endsWith('_to_date');
+
+        control.toggleClass('to-date-range', isToDate);
+        valueInput.prop('disabled', isToDate);
+    }
+
+    $(document).ready(function() {
+        $('.profile-default-unit').each(function() {
+            syncDefaultRangeControl(this);
+        }).on('change', function() {
+            syncDefaultRangeControl(this);
         });
 
-        function updateBackgroundDimmingPreview(value) {
-            const dimming = Math.min(85, Math.max(0, parseInt(value, 10) || 0));
-            $('#background-dimming-value').text(dimming + '%');
-            document.body.style.setProperty('--background-dim-opacity', (dimming / 100).toFixed(2));
+        if ($('#id_automatic_background').is(':checked')) {
+            $('#automatic_background_options').show();
+            $('.uploaded_backgrounds').hide();
+            $('.background-context').show();
         }
 
-        $('#id_background_dimming').on('input change', function() {
-            updateBackgroundDimmingPreview($(this).val());
-        });
-
-        function syncDefaultRangeControl(select) {
-            const rangeSelect = $(select);
-            const control = rangeSelect.closest('.profile-default-control');
-            const valueInput = control.find('.profile-default-value');
-            const isToDate = String(rangeSelect.val()).endsWith('_to_date');
-
-            control.toggleClass('to-date-range', isToDate);
-            valueInput.prop('disabled', isToDate);
-        }
-
-        $(document).ready(function() {
-            $('.profile-default-unit').each(function() {
-                syncDefaultRangeControl(this);
-            }).on('change', function() {
-                syncDefaultRangeControl(this);
-            });
-
-            if ($('#id_automatic_background').is(':checked')) {
+        $('#id_automatic_background').change(function() {
+            if ($(this).is(':checked')) {
                 $('#automatic_background_options').show();
                 $('.uploaded_backgrounds').hide();
                 $('.background-context').show();
+            } else {
+                $('#automatic_background_options').hide();
+                $('.uploaded_backgrounds').show();
+                $('.background-context').hide();
             }
-
-            $('#id_automatic_background').change(function() {
-                if ($(this).is(':checked')) {
-                    $('#automatic_background_options').show();
-                    $('.uploaded_backgrounds').hide();
-                    $('.background-context').show();
-                } else {
-                    $('#automatic_background_options').hide();
-                    $('.uploaded_backgrounds').show();
-                    $('.background-context').hide();
-                }
-            });
         });
-    </script>
-
-    <style>
-        .profile-page {
-            display: grid;
-            gap: 1.2rem;
-            width: 100%;
-            margin: 0;
-        }
-
-        .profile-shell {
-            padding: 1.6rem;
-            margin: 0;
-            border-color: var(--border-dark);
-        }
-
-        .profile-section-heading,
-        .profile-panel-title-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border-dark);
-        }
-
-        .profile-section-heading h2,
-        .profile-panel-title-row h3,
-        .llm-codex-copy h3 {
-            margin: 0.2rem 0 0;
-        }
-
-        .section-kicker {
-            color: var(--dark-text);
-            opacity: 0.7;
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        .section-kicker.blue {
-            color: var(--accent-color);
-            opacity: 1;
-        }
-
-        .profile-overview-grid {
-            display: grid;
-            grid-template-columns: minmax(13rem, 16rem) minmax(18rem, 1fr);
-            gap: 1.4rem;
-            margin-top: 1.3rem;
-            align-items: stretch;
-        }
-
-        .profile-avatar-panel,
-        .profile-fields-panel,
-        .profile-background-panel,
-        .profile-default-item,
-        .api-key-item,
-        .llm-codex-panel,
-        .device-code-panel {
-            background: var(--surface-3);
-            border: 1px solid var(--border-dark);
-            border-radius: 0;
-        }
-
-        .profile-avatar-panel {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 0.8rem;
-            padding: 1.2rem;
-        }
-
-        .profile-avatar-large {
-            width: 7.5rem;
-            height: 7.5rem;
-            margin: 0;
-            border: 2px solid rgba(201, 130, 69, 0.38);
-            box-shadow: 0 0 0 4px rgba(201, 130, 69, 0.08);
-            object-fit: cover;
-        }
-
-        .profile-upload-button {
-            margin: 0;
-            width: 100%;
-            text-align: center;
-        }
-
-        .profile-muted,
-        .api-key-help {
-            color: var(--main-muted);
-            line-height: 1.45;
-        }
-
-        .profile-fields-panel {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(14rem, 1fr));
-            gap: 1.2rem;
-            padding: 1.4rem;
-            align-content: center;
-        }
-
-        .profile-background-panel {
-            margin-top: 1rem;
-            padding: 1.2rem;
-        }
-
-        .profile-defaults-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-            gap: 1rem;
-            margin-top: 1.2rem;
-        }
-
-        .profile-default-item {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            padding: 1.2rem;
-        }
-
-        .profile-default-item > label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin: 0;
-            font-weight: 700;
-        }
-
-        .profile-default-item > label i {
-            color: var(--accent-color);
-        }
-
-        .profile-default-control {
-            display: grid;
-            grid-template-columns: minmax(7rem, 0.65fr) minmax(8rem, 1fr);
-            align-items: center;
-            gap: 0.65rem;
-        }
-
-        .profile-default-control input,
-        .profile-default-control select {
-            width: 100%;
-        }
-
-        .profile-default-control.to-date-range .profile-default-value {
-            display: none;
-        }
-
-        .profile-default-control.to-date-range .profile-default-unit {
-            grid-column: 1 / -1;
-        }
-
-        .profile-default-suffix {
-            padding: 0.65rem 0.75rem;
-            border-left: 2px solid var(--accent-color);
-            color: var(--main-muted);
-            background: var(--surface-2);
-        }
-
-        .profile-default-item p {
-            margin: 0;
-        }
-
-        .profile-switch-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin: 0;
-        }
-
-        .profile-background-options {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-            margin-top: 1rem;
-        }
-
-        .profile-background-tuning {
-            margin-top: 1rem;
-            padding: 1rem;
-            border: 1px solid var(--border-dark);
-            background: var(--surface-3);
-        }
-
-        .profile-slider-heading,
-        .profile-slider-scale {
-            display: flex;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-
-        .profile-slider-heading label {
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .profile-slider-heading output,
-        .profile-slider-scale {
-            color: var(--main-muted);
-        }
-
-        .profile-slider-scale {
-            margin-top: 0.4rem;
-            font-size: 0.82rem;
-        }
-
-        .background-dimming-slider {
-            width: 100%;
-            min-height: auto;
-            margin-top: 0.85rem;
-            accent-color: var(--accent-color);
-        }
-
-        .profile-background-context {
-            margin-top: 1rem;
-            padding: 1rem;
-            border: 1px solid var(--border-dark);
-            background: rgba(255, 255, 255, 0.03);
-        }
-
-        .profile-background-context h4 {
-            margin: 0.45rem 0 0.65rem;
-            color: var(--dark-text);
-            font-size: 1rem;
-            text-transform: none;
-            letter-spacing: 0;
-        }
-
-        .profile-background-context p {
-            max-width: 75rem;
-            margin-bottom: 0.9rem;
-            color: var(--dark-text);
-            opacity: 0.86;
-            line-height: 1.55;
-        }
-
-        .profile-choice-pill {
-            display: flex;
-            align-items: center;
-            gap: 0.45rem;
-            padding: 0.55rem 0.7rem;
-            border: 1px solid var(--border-dark);
-            border-radius: 0;
-            background: rgba(201, 130, 69, 0.08);
-        }
-
-        .profile-background-upload {
-            display: grid;
-            grid-template-columns: minmax(16rem, 1fr) minmax(18rem, auto);
-            gap: 1rem;
-            margin-top: 1.2rem;
-            align-items: center;
-        }
-
-        .profile-current-background {
-            display: flex;
-            align-items: center;
-            gap: 0.9rem;
-            padding: 0.75rem;
-            border: 1px solid var(--border-dark);
-            border-radius: 0;
-            background: rgba(255, 255, 255, 0.03);
-        }
-
-        .profile-current-background img {
-            width: 6rem;
-            height: 4rem;
-            object-fit: cover;
-            border-radius: 0;
-        }
-
-        .llm-shell {
-            background: var(--card-bg-dark-alpha);
-        }
-
-        .llm-codex-panel {
-            display: grid;
-            grid-template-columns: minmax(18rem, 1fr) auto;
-            gap: 1.2rem;
-            margin-top: 1.2rem;
-            padding: 1.2rem;
-            align-items: center;
-            background: var(--surface-3);
-        }
-
-        .llm-codex-copy p {
-            margin: 0.4rem 0 0.8rem;
-            max-width: 58rem;
-            color: var(--main-muted);
-        }
-
-        .llm-codex-actions,
-        .api-key-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.6rem;
-            justify-content: flex-end;
-        }
-
-        .connection-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            padding: 0.42rem 0.62rem;
-            border: 1px solid var(--border-dark);
-            border-radius: 0;
-            color: var(--main-muted);
-            background: var(--surface-2);
-        }
-
-        .connection-chip.connected {
-            color: var(--accent-color);
-            border-color: rgba(0, 200, 81, 0.35);
-            background: rgba(0, 200, 81, 0.08);
-        }
-
-        .device-code-panel {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 0.9rem;
-            margin-top: 1rem;
-            padding: 1rem;
-        }
-
-        .device-code {
-            width: fit-content;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid rgba(201, 130, 69, 0.4);
-            border-radius: 0;
-            letter-spacing: 0.08em;
-            background-color: rgba(201, 130, 69, 0.12);
-            color: var(--accent-color);
-        }
-
-        .api-keys-grid {
-            display: grid;
-            gap: 1rem;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            margin-top: 1rem;
-        }
-
-        .api-key-item {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            padding: 1rem;
-        }
-
-        .api-key-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.7rem;
-        }
-
-        .api-key-label {
-            font-weight: 700;
-            margin: 0;
-        }
-
-        .api-key-status {
-            font-weight: 700;
-            white-space: nowrap;
-        }
-
-        .api-key-input-wrapper input[type=password] {
-            width: 100%;
-            padding: 0.65rem;
-            border: 1px solid var(--border-dark);
-            border-radius: 0;
-            background-color: var(--surface-3);
-            color: var(--dark-text);
-        }
-
-        .api-key-clear-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-top: auto;
-        }
-
-        .api-key-clear-label {
-            margin: 0;
-            font-size: 0.9em;
-        }
-
-        .api-key-item .errorlist {
-            margin-top: 0.5rem;
-            color: var(--main-red);
-            font-size: 0.85em;
-        }
-
-        .profile-submit-row {
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        .compact-button {
-            width: fit-content;
-        }
-
-        @media (max-width: 920px) {
-            .profile-overview-grid,
-            .profile-fields-panel,
-            .profile-defaults-grid,
-            .profile-background-upload,
-            .llm-codex-panel,
-            .api-keys-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .profile-section-heading,
-            .profile-panel-title-row {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-
-            .llm-codex-actions {
-                justify-content: flex-start;
-            }
-        }
-    </style>
+    });
+</script>
 
 {% endblock %}

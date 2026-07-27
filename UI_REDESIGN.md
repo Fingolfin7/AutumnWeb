@@ -72,11 +72,11 @@ Status: `TODO` / `WIP` / `DONE`
 | 4 | Projects | `projects_list`, `create_project`, `update_project`, `delete_project`, `merge_projects` | **DONE** |
 | 5 | Subprojects | `create_subproject`, `update_subproject`, `delete_subproject`, `merge_subprojects` | **DONE** |
 | 6 | Timers | `timers`, `start_timer`, `stop_timer`, `remove_timer`, `partials/active_timers_timers`, `partials/timer_suggestion_card` | **DONE** (see note: `active_timers_home` left for chunk 13) |
-| 7 | Commitments | `create_commitment`, `update_commitment`, `delete_commitment`, `partials/commitments_panel` | TODO |
+| 7 | Commitments | `create_commitment`, `update_commitment`, `delete_commitment`, `partials/commitments_panel` | **DONE** |
 | 8 | Contexts & Tags | `contexts`, `update_context`, `delete_context`, `tags`, `update_tag`, `delete_tag` | **DONE** |
 | 9 | Charts | `charts` | **DONE** |
-| 10 | Import / Export | `import`, `export` (`home` was dead — deleted) | TODO |
-| 11 | Users | `users/base`, `login`, `logout`, `register`, `password_reset`, `profile` | TODO |
+| 10 | Import / Export | `import`, `export` (`home` was dead — deleted) | **DONE** |
+| 11 | Users | `users/base`, `login`, `logout`, `register`, `password_reset`, `profile` | **DONE** |
 | 12 | Insights | `llm_insights/insights` | TODO |
 | 13 | Cutover: delete legacy shell + `style.css`, rename `base_fd` → `base` | — | TODO |
 

@@ -137,6 +137,15 @@
    Utilities    .text-red .text-blue .text-green .text-cyan .text-yellow
                 .text-orange .muted .mono .tnum
                 .u-row .u-between .u-wrap .u-gap-2 .u-gap-3 .u-mt-4 .sr-only
+   Data transfer .stream-output .stream-progress .stream-log .log-entry
+   Users         .auth-card
+                 .profile-page .profile-account-grid .profile-avatar-panel
+                 .profile-avatar-large .profile-background-options
+                 .profile-choice-pill .profile-background-tuning
+                 .profile-background-context .profile-background-upload
+                 .profile-current-background .profile-defaults-grid
+                 .profile-default-item .profile-default-control
+                 .profile-codex-panel .profile-keys-grid .profile-key-item
    ============================================================================ */
 
 /* ---------------------------------------------------------------- TOKENS -- */
@@ -592,7 +601,10 @@ body.bg-active .app { position: relative; z-index: 2; }
   background: var(--sunken); overflow: hidden;
   box-shadow: inset 0 1px 2px rgba(0,0,0,.35);
 }
-.meter-fill { height: 100%; border-radius: var(--r-pill); transition: width .4s var(--ease); }
+.meter-fill {
+  width: var(--progress, 0%); height: 100%;
+  border-radius: var(--r-pill); transition: width .4s var(--ease);
+}
 .meter-fill.complete    { background: var(--status-complete); }
 .meter-fill.approaching { background: var(--status-approaching); }
 .meter-fill.on-track    { background: var(--status-on-track); }
@@ -2007,3 +2019,200 @@ img.brand-mark {
 }
 .chart-bar .field { margin-bottom: 0; flex: 1 1 14rem; min-width: 0; }
 .chart-bar .btn { flex: 0 0 auto; }
+
+/* ============================================================================
+   IMPORT STREAM + AUTH + PROFILE                                  (10 / 11)
+   ----------------------------------------------------------------------------
+   These are the only page-specific shapes the shared vocabulary cannot
+   express by itself:
+
+     - the import script needs three elements hidden until a stream starts;
+     - signed-out forms need a readable measure after the desktop shell widens;
+     - profile owns image previews and compound value/unit controls.
+
+   Form controls still come from .fields, surfaces from .slab, actions from
+   .btn, and status hues from the semantic palette above.
+   ==========================================================================*/
+
+/* ----------------------------------------------------- import stream ------ */
+.stream-output,
+.stream-progress,
+.stream-log { display: none; }
+
+.stream-progress {
+  height: 1.5rem;
+  margin-top: var(--s4);
+}
+.stream-progress .progress {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  color: var(--ink-invert);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.stream-log {
+  max-height: 22rem;
+  margin-top: var(--s4);
+  padding: var(--s3);
+  overflow-y: auto;
+  border-radius: var(--r-sm);
+  background: var(--sunken);
+}
+.log-entry {
+  padding: .3rem .45rem;
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+.log-entry + .log-entry { border-top: 1px solid var(--hairline); }
+.log-entry.error { color: var(--project); }
+.log-entry.warning { color: var(--note); }
+.log-entry.success { color: var(--duration); }
+
+/* ------------------------------------------------------- public auth ------ */
+.auth-card {
+  width: min(100%, 32rem);
+  margin-inline: auto;
+}
+
+/* ----------------------------------------------------------- profile ------ */
+.profile-page {
+  display: grid;
+  gap: var(--s4);
+}
+.profile-page > .slab { margin-bottom: 0; }
+
+.profile-account-grid {
+  display: grid;
+  grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr);
+  gap: var(--s5);
+  align-items: center;
+  margin-top: var(--s4);
+}
+.profile-avatar-panel {
+  display: grid;
+  gap: var(--s3);
+  justify-items: center;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-avatar-panel .field { width: 100%; margin-bottom: 0; }
+.profile-avatar-large {
+  width: 8rem;
+  height: 8rem;
+  border-radius: var(--r-pill);
+  object-fit: cover;
+  box-shadow: 0 0 0 3px rgba(209,139,76,.18), var(--e1);
+}
+
+.profile-background-options {
+  display: none;
+  margin-top: var(--s4);
+}
+.fields .profile-choice-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: .55rem .7rem;
+  margin: var(--s2) 0 0;
+  border-radius: var(--r-sm);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.profile-background-tuning,
+.profile-background-context {
+  margin-top: var(--s4);
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.fields .background-dimming-slider {
+  width: 100%;
+  margin: var(--s3) 0;
+  accent-color: var(--brand-deep);
+}
+.profile-background-upload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr);
+  gap: var(--s4);
+  align-items: center;
+  margin-top: var(--s4);
+}
+.profile-current-background {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-current-background img {
+  width: 7rem;
+  height: 4.5rem;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+}
+
+.profile-defaults-grid,
+.profile-keys-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s3);
+  margin-top: var(--s4);
+}
+.profile-default-item,
+.profile-key-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  min-width: 0;
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-default-item > label,
+.profile-key-item > .u-between > label {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.profile-default-control {
+  display: grid;
+  grid-template-columns: minmax(6rem, .7fr) minmax(8rem, 1fr);
+  gap: var(--s2);
+  align-items: center;
+}
+.profile-default-control.to-date-range .profile-default-value { display: none; }
+.profile-default-control.to-date-range .profile-default-unit { grid-column: 1 / -1; }
+.profile-codex-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--s4);
+  align-items: center;
+  margin-top: var(--s4);
+  padding: var(--s4);
+  border-radius: var(--r-md);
+  background: var(--sunken);
+}
+.profile-codex-panel .form-actions { margin-top: 0; }
+.profile-key-item .check-row { margin-top: auto; }
+.profile-submit-row { justify-content: flex-end; margin-top: 0; }
+
+@media (max-width: 760px) {
+  .profile-account-grid,
+  .profile-background-upload,
+  .profile-codex-panel,
+  .profile-defaults-grid,
+  .profile-keys-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-codex-panel .form-actions { justify-content: flex-start; }
+}

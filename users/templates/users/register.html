@@ -3,47 +3,49 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-        <form method="post" class="card stacked centered-card thirds-width">
-            {% csrf_token %}
-            <h2>Register</h2>
-            <span class="label-input">
-                {{ form.username.errors }}
-                {{ form.username.label_tag }}
-                {{ form.username }}
-            </span>
 
-            <span class="label-input">
-                {{ form.email.errors }}
-                {{ form.email.label_tag }}
-                {{ form.email }}
-            </span>
+<div class="desk-head auth-card">
+    <div>
+        <p class="page-eyebrow">New account</p>
+        <h1 class="page-title">Register</h1>
+    </div>
+</div>
 
-            <span class="label-input">
-                {{ form.password1.errors }}
-                {{ form.password1.label_tag }}
-                {{ form.password1 }}
-            </span>
+<form method="post" class="fields slab slab-pad auth-card">
+    {% csrf_token %}
 
-            <span class="label-input">
-                {{ form.password2.errors }}
-                {{ form.password2.label_tag }}
-                {{ form.password2 }}
-            </span>
+    <div class="field">
+        {{ form.username.errors }}
+        {{ form.username.label_tag }}
+        {{ form.username }}
+    </div>
 
-            <span>
-                <button type="submit" class="primary-button">
-                    Register
-                    <i class="fa fa-check-circle"></i>
-                </button>
+    <div class="field">
+        {{ form.email.errors }}
+        {{ form.email.label_tag }}
+        {{ form.email }}
+    </div>
 
-                <br> <br>
+    <div class="field">
+        {{ form.password1.errors }}
+        {{ form.password1.label_tag }}
+        {{ form.password1 }}
+    </div>
 
-                <a href="{% url 'login' %}" class="plain-link transparent-button">
-                    <small>
-                        <i>Already have an account? Log in.</i>
-                        <i class="fa fa-sign-in"></i>
-                    </small>
-                </a>
-            </span>
-        </form>
+    <div class="field">
+        {{ form.password2.errors }}
+        {{ form.password2.label_tag }}
+        {{ form.password2 }}
+    </div>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'login' %}">
+            <i class="fa fa-sign-in-alt"></i> Already registered?
+        </a>
+        <button type="submit" class="btn btn--primary btn--spacer">
+            <i class="fa fa-check-circle"></i> Register
+        </button>
+    </div>
+</form>
+
 {% endblock %}

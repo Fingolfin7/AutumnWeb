@@ -1,250 +1,243 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_fd.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
 
 {% block content %}
-    <h2>Add Commitment</h2>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">New commitment</p>
+        <h1 class="page-title">Choose a rhythm to protect</h1>
+    </div>
+</div>
 
-    <form class="flex-row" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <section id="input-fields" class="card stacked half-width">
-            <h4>Scope</h4>
-            <span class="label-input">
-                {{ form.aggregation_type.label_tag }}
-                {{ form.aggregation_type }}
-                {{ form.aggregation_type.errors }}
-            </span>
+<form class="fields" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
 
-            <span class="label-input">
-                <label for="scope-target-search">Scope Target Search</label>
-                <input type="text" id="scope-target-search" class="half-width" placeholder="Search selected scope target..." autocomplete="off" list="scope-target-options">
-                <datalist id="scope-target-options"></datalist>
-                <small class="help-text">Type and pick a match. This is the only scope target selector.</small>
-            </span>
+    <div class="split">
+        <div id="input-fields">
+            <section class="slab slab-pad">
+                <p class="field-label">Scope</p>
 
-            <span class="label-input commitment-target-field" data-target-type="context" style="display:none;">
-                {{ form.context.label_tag }}
-                {{ form.context }}
-                {{ form.context.errors }}
-            </span>
-
-            <span class="label-input commitment-target-field" data-target-type="tag" style="display:none;">
-                {{ form.tag.label_tag }}
-                {{ form.tag }}
-                {{ form.tag.errors }}
-            </span>
-
-            <span class="label-input commitment-target-field" data-target-type="project" style="display:none;">
-                {{ form.project.label_tag }}
-                {{ form.project }}
-                {{ form.project.errors }}
-            </span>
-
-            <span class="label-input commitment-target-field" data-target-type="subproject" style="display:none;">
-                {{ form.subproject.label_tag }}
-                {{ form.subproject }}
-                {{ form.subproject.errors }}
-            </span>
-
-            <hr>
-            <h4>Composable Rules</h4>
-            <small class="help-text">Use include/exclude lists to control which sessions count inside the selected scope.</small>
-
-            <span class="label-input commitment-rule-group" data-dimension="project">
-                <label for="id_include_projects">Only include projects</label>
-                <details class="tag-dropdown commitment-rule-dropdown">
-                    <summary class="tag-summary">Select projects</summary>
-                    <div class="tag-options">
-                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search projects..." autocomplete="off">
-                        {% for cb in form.include_projects %}
-                            <label class="tag-option commitment-rule-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                <small class="help-text">{{ form.include_projects.help_text }}</small>
-                {{ form.include_projects.errors }}
-            </span>
-
-            <span class="label-input commitment-rule-group" data-dimension="project">
-                <label for="id_exclude_projects">Exclude projects</label>
-                <details class="tag-dropdown commitment-rule-dropdown">
-                    <summary class="tag-summary">Select projects to exclude</summary>
-                    <div class="tag-options">
-                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search projects..." autocomplete="off">
-                        {% for cb in form.exclude_projects %}
-                            <label class="tag-option commitment-rule-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                <small class="help-text">{{ form.exclude_projects.help_text }}</small>
-                {{ form.exclude_projects.errors }}
-            </span>
-
-            <span class="label-input commitment-rule-group" data-dimension="subproject">
-                <label for="id_include_subprojects">Only include subprojects</label>
-                <details class="tag-dropdown commitment-rule-dropdown">
-                    <summary class="tag-summary">Select subprojects</summary>
-                    <div class="tag-options">
-                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search subprojects..." autocomplete="off">
-                        {% for cb in form.include_subprojects %}
-                            <label class="tag-option commitment-rule-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                <small class="help-text">{{ form.include_subprojects.help_text }}</small>
-                {{ form.include_subprojects.errors }}
-            </span>
-
-            <span class="label-input commitment-rule-group" data-dimension="subproject">
-                <label for="id_exclude_subprojects">Exclude subprojects</label>
-                <details class="tag-dropdown commitment-rule-dropdown">
-                    <summary class="tag-summary">Select subprojects to exclude</summary>
-                    <div class="tag-options">
-                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search subprojects..." autocomplete="off">
-                        {% for cb in form.exclude_subprojects %}
-                            <label class="tag-option commitment-rule-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                <small class="help-text">{{ form.exclude_subprojects.help_text }}</small>
-                {{ form.exclude_subprojects.errors }}
-            </span>
-
-            <span class="label-input commitment-rule-group" data-dimension="tag">
-                <label for="id_include_tags">Only include tags</label>
-                <details class="tag-dropdown commitment-rule-dropdown">
-                    <summary class="tag-summary">Select tags</summary>
-                    <div class="tag-options">
-                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search tags..." autocomplete="off">
-                        {% for cb in form.include_tags %}
-                            <label class="tag-option commitment-rule-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                <small class="help-text">{{ form.include_tags.help_text }}</small>
-                {{ form.include_tags.errors }}
-            </span>
-
-            <span class="label-input commitment-rule-group" data-dimension="tag">
-                <label for="id_exclude_tags">Exclude tags</label>
-                <details class="tag-dropdown commitment-rule-dropdown">
-                    <summary class="tag-summary">Select tags to exclude</summary>
-                    <div class="tag-options">
-                        <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search tags..." autocomplete="off">
-                        {% for cb in form.exclude_tags %}
-                            <label class="tag-option commitment-rule-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                <small class="help-text">{{ form.exclude_tags.help_text }}</small>
-                {{ form.exclude_tags.errors }}
-            </span>
-
-            <span class="label-input">
-                {{ form.commitment_type.label_tag }}
-                {{ form.commitment_type }}
-                {{ form.commitment_type.errors }}
-            </span>
-
-            <span class="label-input">
-                {{ form.period.label_tag }}
-                {{ form.period }}
-                {{ form.period.errors }}
-            </span>
-
-            <span class="label-input">
-                {{ form.start_date.label_tag }}
-                {{ form.start_date }}
-                <small class="help-text">{{ form.start_date.help_text }}</small>
-                {{ form.start_date.errors }}
-            </span>
-
-            <span class="label-input">
-                {{ form.target.label_tag }}
-                {{ form.target }}
-                <small class="help-text">{{ form.target.help_text }}</small>
-                {{ form.target.errors }}
-            </span>
-
-            <hr>
-
-            <h4>Time Banking Options</h4>
-
-            <span class="label-input">
-                <label for="{{ form.banking_enabled.id_for_label }}">
-                    {{ form.banking_enabled }}
-                    Enable Time Banking
-                </label>
-                <small class="help-text">Carry over surplus/deficit between periods</small>
-                {{ form.banking_enabled.errors }}
-            </span>
-
-            <span class="label-input">
-                {{ form.max_balance.label_tag }}
-                {{ form.max_balance }}
-                <small class="help-text">{{ form.max_balance.help_text }}</small>
-                {{ form.max_balance.errors }}
-            </span>
-
-            <span class="label-input">
-                {{ form.min_balance.label_tag }}
-                {{ form.min_balance }}
-                <small class="help-text">{{ form.min_balance.help_text }}</small>
-                {{ form.min_balance.errors }}
-            </span>
-
-            {% if form.non_field_errors %}
-                <div class="error-list">
-                    {{ form.non_field_errors }}
+                <div class="field">
+                    {{ form.aggregation_type.label_tag }}
+                    {{ form.aggregation_type }}
+                    {{ form.aggregation_type.errors }}
                 </div>
-            {% endif %}
 
-            <span>
-                <button type="submit" class="primary-button">
-                    <i class="fa fa-check-circle"></i>
-                    Create Commitment
-                </button>
+                <div class="field">
+                    <label for="scope-target-search">Scope target</label>
+                    <input type="text" id="scope-target-search" placeholder="Search selected scope targetâ€¦" autocomplete="off" list="scope-target-options">
+                    <datalist id="scope-target-options"></datalist>
+                    <small class="muted">Type and pick the context, tag, project, or subproject this commitment belongs to.</small>
+                </div>
 
-                <button type="button" class="secondary-button"
-                onclick="window.location.href = '{% url 'home' %}' ">
-                    <i class="fa fa-arrow-left"></i>
-                    Cancel
-                </button>
-            </span>
-        </section>
+                <div class="commitment-target-field" data-target-type="context" hidden>
+                    {{ form.context.label_tag }}
+                    {{ form.context }}
+                    {{ form.context.errors }}
+                </div>
+                <div class="commitment-target-field" data-target-type="tag" hidden>
+                    {{ form.tag.label_tag }}
+                    {{ form.tag }}
+                    {{ form.tag.errors }}
+                </div>
+                <div class="commitment-target-field" data-target-type="project" hidden>
+                    {{ form.project.label_tag }}
+                    {{ form.project }}
+                    {{ form.project.errors }}
+                </div>
+                <div class="commitment-target-field" data-target-type="subproject" hidden>
+                    {{ form.subproject.label_tag }}
+                    {{ form.subproject }}
+                    {{ form.subproject.errors }}
+                </div>
+            </section>
 
-        <section id="help-info" class="card stacked half-width space-around">
-            <h4><i class="fa fa-info-circle"></i> About Commitments</h4>
-            <p>
-                Commitments track progress for a selected scope, then refine what counts using include/exclude rules.
-            </p>
-            <p>
-                <strong>Time-based:</strong> Set a target number of minutes per period.
-            </p>
-            <p>
-                <strong>Session-based:</strong> Set a target number of sessions per period.
-            </p>
-            <p>
-                <strong>Composable example:</strong> Track a project commitment, include only selected subprojects, and exclude one noisy subproject.
-            </p>
-            <p>
-                <strong>Time Banking:</strong> When enabled, surplus time/sessions from one period
-                carry over to the next. This helps balance busy and slow periods.
-            </p>
-        </section>
-    </form>
+            <section class="slab slab-pad">
+                <p class="field-label">Composable rules</p>
+                <p class="muted">Include lists narrow the scope; exclude lists remove matching sessions.</p>
+
+                <div class="field commitment-rule-group u-mt-4" data-dimension="project">
+                    <label for="id_include_projects">Only include projects</label>
+                    <details class="commitment-rule-dropdown">
+                        <summary class="filter-launcher tag-summary">Select projects</summary>
+                        <div class="check-grid u-mt-4">
+                            <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search projectsâ€¦" autocomplete="off">
+                            {% for cb in form.include_projects %}
+                            <label class="commitment-rule-option">{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <small class="muted">{{ form.include_projects.help_text }}</small>
+                    {{ form.include_projects.errors }}
+                </div>
+
+                <div class="field commitment-rule-group" data-dimension="project">
+                    <label for="id_exclude_projects">Exclude projects</label>
+                    <details class="commitment-rule-dropdown">
+                        <summary class="filter-launcher tag-summary">Select projects to exclude</summary>
+                        <div class="check-grid u-mt-4">
+                            <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search projectsâ€¦" autocomplete="off">
+                            {% for cb in form.exclude_projects %}
+                            <label class="commitment-rule-option">{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <small class="muted">{{ form.exclude_projects.help_text }}</small>
+                    {{ form.exclude_projects.errors }}
+                </div>
+
+                <div class="field commitment-rule-group" data-dimension="subproject">
+                    <label for="id_include_subprojects">Only include subprojects</label>
+                    <details class="commitment-rule-dropdown">
+                        <summary class="filter-launcher tag-summary">Select subprojects</summary>
+                        <div class="check-grid u-mt-4">
+                            <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search subprojectsâ€¦" autocomplete="off">
+                            {% for cb in form.include_subprojects %}
+                            <label class="commitment-rule-option">{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <small class="muted">{{ form.include_subprojects.help_text }}</small>
+                    {{ form.include_subprojects.errors }}
+                </div>
+
+                <div class="field commitment-rule-group" data-dimension="subproject">
+                    <label for="id_exclude_subprojects">Exclude subprojects</label>
+                    <details class="commitment-rule-dropdown">
+                        <summary class="filter-launcher tag-summary">Select subprojects to exclude</summary>
+                        <div class="check-grid u-mt-4">
+                            <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search subprojectsâ€¦" autocomplete="off">
+                            {% for cb in form.exclude_subprojects %}
+                            <label class="commitment-rule-option">{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <small class="muted">{{ form.exclude_subprojects.help_text }}</small>
+                    {{ form.exclude_subprojects.errors }}
+                </div>
+
+                <div class="field commitment-rule-group" data-dimension="tag">
+                    <label for="id_include_tags">Only include tags</label>
+                    <details class="commitment-rule-dropdown">
+                        <summary class="filter-launcher tag-summary">Select tags</summary>
+                        <div class="check-grid u-mt-4">
+                            <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search tagsâ€¦" autocomplete="off">
+                            {% for cb in form.include_tags %}
+                            <label class="commitment-rule-option">{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <small class="muted">{{ form.include_tags.help_text }}</small>
+                    {{ form.include_tags.errors }}
+                </div>
+
+                <div class="field commitment-rule-group" data-dimension="tag">
+                    <label for="id_exclude_tags">Exclude tags</label>
+                    <details class="commitment-rule-dropdown">
+                        <summary class="filter-launcher tag-summary">Select tags to exclude</summary>
+                        <div class="check-grid u-mt-4">
+                            <input type="text" class="exclude-search-input commitment-rule-search" placeholder="Search tagsâ€¦" autocomplete="off">
+                            {% for cb in form.exclude_tags %}
+                            <label class="commitment-rule-option">{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                    <small class="muted">{{ form.exclude_tags.help_text }}</small>
+                    {{ form.exclude_tags.errors }}
+                </div>
+            </section>
+
+            <section class="slab slab-pad">
+                <p class="field-label">Target</p>
+
+                <div class="two-up">
+                    <div class="field">
+                        {{ form.commitment_type.label_tag }}
+                        {{ form.commitment_type }}
+                        {{ form.commitment_type.errors }}
+                    </div>
+                    <div class="field">
+                        {{ form.period.label_tag }}
+                        {{ form.period }}
+                        {{ form.period.errors }}
+                    </div>
+                    <div class="field">
+                        {{ form.start_date.label_tag }}
+                        {{ form.start_date }}
+                        <small class="muted">{{ form.start_date.help_text }}</small>
+                        {{ form.start_date.errors }}
+                    </div>
+                    <div class="field">
+                        {{ form.target.label_tag }}
+                        {{ form.target }}
+                        <small class="help-text muted">{{ form.target.help_text }}</small>
+                        {{ form.target.errors }}
+                    </div>
+                </div>
+            </section>
+
+            <section class="slab slab-pad">
+                <p class="field-label">Time banking</p>
+
+                <div class="check-row">
+                    {{ form.banking_enabled }}
+                    <label for="{{ form.banking_enabled.id_for_label }}">Enable time banking</label>
+                </div>
+                <small class="muted">Carry surplus or deficit between periods.</small>
+                {{ form.banking_enabled.errors }}
+
+                <div class="two-up u-mt-4">
+                    <div class="field">
+                        {{ form.max_balance.label_tag }}
+                        {{ form.max_balance }}
+                        <small class="muted">{{ form.max_balance.help_text }}</small>
+                        {{ form.max_balance.errors }}
+                    </div>
+                    <div class="field">
+                        {{ form.min_balance.label_tag }}
+                        {{ form.min_balance }}
+                        <small class="muted">{{ form.min_balance.help_text }}</small>
+                        {{ form.min_balance.errors }}
+                    </div>
+                </div>
+
+                {{ form.non_field_errors }}
+
+                <div class="form-actions">
+                    <a class="btn btn--ghost" href="{% url 'home' %}">
+                        <i class="fa fa-arrow-left"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn--primary btn--spacer">
+                        <i class="fa fa-check-circle"></i> Create commitment
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <aside id="help-info" class="slab slab-pad">
+            <p class="field-label"><i class="fa fa-info-circle text-orange"></i> About commitments</p>
+            <div class="meta-list">
+                <div>
+                    <p class="meta-label">Time-based</p>
+                    <p>Set a target number of minutes per period.</p>
+                </div>
+                <div>
+                    <p class="meta-label">Session-based</p>
+                    <p>Set a target number of sessions per period.</p>
+                </div>
+                <div>
+                    <p class="meta-label">Composable rules</p>
+                    <p>Narrow a broad scope to selected projects, subprojects, or tags, then exclude anything that should not count.</p>
+                </div>
+                <div>
+                    <p class="meta-label">Time banking</p>
+                    <p>Carry surplus or deficit into the next period to balance busy and quiet weeks.</p>
+                </div>
+            </div>
+        </aside>
+    </div>
+</form>
 {% endblock %}
 
 {% block head_includes %}

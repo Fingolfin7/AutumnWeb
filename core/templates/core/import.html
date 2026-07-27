@@ -1,4 +1,4 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_fd.html' %}
 {% load static %}
 
 {% block head_includes %}
@@ -6,152 +6,93 @@
 {% endblock %}
 
 {% block content %}
-    <style>
-        #progress-bar {
-            width: 100%;
-            height: 20px;
-            background-color: #f0f0f0;
-            border-radius: 4px;
-            margin: 10px 0;
-            display: none;
-        }
 
-        #progress-bar .progress {
-            width: 0;
-            height: 100%;
-            background-color: #4CAF50;
-            border-radius: 4px;
-            transition: width 0.3s ease-in-out;
-        }
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Bring work into Autumn</p>
+        <h1 class="page-title">Import data</h1>
+    </div>
+</div>
 
-        .progress{
-            text-align: center;
-        }
+<form method="post" class="fields" enctype="multipart/form-data" id="stream-form">
+    {% csrf_token %}
 
-        #output-section{
-            display: none;
-        }
+    <div class="split">
+        <section id="import_options" class="slab slab-pad">
+            <p class="field-label">JSON source</p>
 
-        #output-text {
-            max-height: 300px;
-            overflow-y: auto;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            {#font-family: monospace;#}
-            display: none;
-        }
-
-        .log-entry {
-            margin: 5px 0;
-            padding: 3px 5px;
-        }
-
-        .log-entry.error {
-            color: #d32f2f;
-        }
-
-        .log-entry.warning {
-            color: #f57c00;
-        }
-
-        .log-entry.success {
-            color: #388e3c;
-        }
-    </style>
-
-    <form method="post" class="flex-row" enctype="multipart/form-data" id="stream-form">
-        {% csrf_token %}
-
-        <section id="import_options" class="card stacked half-width">
-            <span>
-                <label for="{{ form.file.id_for_label }}" class="custom-file-upload" >
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    Upload JSON File
-                    {{ form.file }}
+            <div class="field">
+                <label for="{{ form.file.id_for_label }}">
+                    <i class="fas fa-cloud-upload-alt text-orange"></i> Upload JSON file
                 </label>
+                {{ form.file }}
                 {{ form.file.errors }}
-            </span>
+            </div>
 
-            <hr/>
+            <p class="field-label u-mt-4">Import destination</p>
 
-            <h3>Import Destination</h3>
-
-            <span class="label-input">
+            <div class="field">
                 {{ form.import_context.label_tag }}
                 {{ form.import_context }}
                 {{ form.import_context.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
+            <div class="field">
                 {{ form.import_context_new.label_tag }}
                 {{ form.import_context_new }}
-                <small>{{ form.import_context_new.help_text }}</small>
+                <small class="muted">{{ form.import_context_new.help_text }}</small>
                 {{ form.import_context_new.errors }}
-            </span>
+            </div>
 
-            <hr/>
+            <p class="field-label u-mt-4">Import behavior</p>
 
-            <label>
+            <div class="check-row">
+                {{ form.autumn_import }}
                 {{ form.autumn_import.label_tag }}
-                <label class="switch">
-                    {{ form.autumn_import }}
-                    <span class="slider round"></span>
-                </label>
-                {{ form.autumn_import.errors }}
-            </label>
+            </div>
+            {{ form.autumn_import.errors }}
 
-            <label>
+            <div class="check-row">
+                {{ form.force }}
                 {{ form.force.label_tag }}
-                <label class="switch">
-                    {{ form.force }}
-                    <span class="slider round"></span>
-                </label>
-                {{ form.force.errors }}
-            </label>
+            </div>
+            {{ form.force.errors }}
 
-            <span>
+            <div class="check-row">
+                {{ form.merge }}
                 {{ form.merge.label_tag }}
-                <label class="switch">
-                    {{ form.merge }}
-                    <span class="slider round"></span>
-                </label>
-                {{ form.merge.errors }}
-            </span>
+            </div>
+            {{ form.merge.errors }}
 
-            <span>
+            <div class="check-row">
+                {{ form.verbose }}
                 {{ form.verbose.label_tag }}
-                <label class="switch">
-                    {{ form.verbose }}
-                    <span class="slider round"></span>
-                </label>
-                {{ form.verbose.errors }}
-            </span>
+            </div>
+            {{ form.verbose.errors }}
 
-            <span class="label-input">
+            <div class="field u-mt-4">
                 {{ form.tolerance.label_tag }}
                 {{ form.tolerance }}
                 {{ form.tolerance.errors }}
-            </span>
+            </div>
 
-            <br/>
-
-            <div class="button-row">
-                <button type="submit" class="primary-button">
-                     <i class="fa fa-file-import"></i>
-                    Import
+            <div class="form-actions">
+                <button type="submit" class="btn btn--primary btn--lg">
+                    <i class="fa fa-file-import"></i> Import
                 </button>
             </div>
         </section>
 
-        <section class="card stacked full-width" id="output-section">
-            <h2>Importing: <i id="output-title"></i></h2>
+        <section class="slab slab-pad stream-output" id="output-section" aria-live="polite">
+            <p class="field-label">Import progress</p>
+            <h2 class="disclose-title">Importing <span id="output-title" class="text-orange"></span></h2>
 
-            <div id="progress-bar">
-                <div class="progress"></div>
+            <div id="progress-bar" class="meter stream-progress">
+                <div class="progress meter-fill complete"></div>
             </div>
-            <div id="output-text"></div>
+            <div id="output-text" class="stream-log"></div>
         </section>
-    </form>
+    </div>
+</form>
 
 {% endblock %}

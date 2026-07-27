@@ -3,67 +3,65 @@
 {% load crispy_forms_tags %}
 
 {% block content %}
-        <form method="post" class="card stacked centered-card thirds-width">
-            {% csrf_token %}
 
-            <h2>Login</h2>
+<div class="desk-head auth-card">
+    <div>
+        <p class="page-eyebrow">Welcome back</p>
+        <h1 class="page-title">Log in</h1>
+    </div>
+</div>
 
-            <span class="label-input">
-                {{ form.username.errors }}
-                {{ form.username.label_tag }}
-                {{ form.username }}
-            </span>
+<form method="post" class="fields slab slab-pad auth-card">
+    {% csrf_token %}
 
-            <span class="label-input">
-                {{ form.password.errors }}
-                {{ form.password.label_tag }}
-                {{ form.password }}
-{#                <span class="password-toggle-icon"><i class="fa fa-eye" id="eye-icon"></i></span>#}
-            </span>
+    <div class="field">
+        {{ form.username.errors }}
+        {{ form.username.label_tag }}
+        {{ form.username }}
+    </div>
 
-            <script>
-                $(document).ready(function() {
-                    const eye = $("#eye-icon");
-                    const password = $("#password");
+    <div class="field">
+        {{ form.password.errors }}
+        {{ form.password.label_tag }}
+        {{ form.password }}
+{#      <span class="password-toggle-icon"><i class="fa fa-eye" id="eye-icon"></i></span> #}
+    </div>
 
-                    // Initially hide the eye icon
-                    eye.hide();
+    <script>
+        $(document).ready(function() {
+            const eye = $("#eye-icon");
+            const password = $("#password");
 
-                    // Show the eye icon when the password field is focused
-                    password.focus(function() {
-                        eye.show();
-                    });
+            // Initially hide the eye icon
+            eye.hide();
 
-                    eye.click(function() {
-                        let type = password.attr('type');
+            // Show the eye icon when the password field is focused
+            password.focus(function() {
+                eye.show();
+            });
 
-                        if (type === 'password') {
-                            password.attr('type', 'text');
-                            $(this).removeClass('fa-eye').addClass('fa-eye-slash');
-                        } else {
-                            password.attr('type', 'password');
-                            $(this).removeClass('fa-eye-slash').addClass('fa-eye');
-                        }
-                    });
-                });
-           </script>
+            eye.click(function() {
+                let type = password.attr('type');
 
-            <span>
-                <button type="submit" class="primary-button">
-                    LOGIN
-                    <i class="fa fa-check-circle"></i>
-                </button>
-            </span>
+                if (type === 'password') {
+                    password.attr('type', 'text');
+                    $(this).removeClass('fa-eye').addClass('fa-eye-slash');
+                } else {
+                    password.attr('type', 'password');
+                    $(this).removeClass('fa-eye-slash').addClass('fa-eye');
+                }
+            });
+        });
+    </script>
 
-            <small>
-                <a href="{% url 'register' %}" class="plain-link">
-                    <i>Register</i>
-                    <i class="fa fa-sign-up"></i>
-                </a>
-{#                |#}
-{#                <a href="{% url 'password_reset' %}" class="plain-link">#}
-{#                    <i>Password Reset</i>#}
-{#                </a>#}
-            </small>
-        </form>
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'register' %}">
+            <i class="fa fa-user-plus"></i> Register
+        </a>
+        <button type="submit" class="btn btn--primary btn--spacer">
+            <i class="fa fa-check-circle"></i> Log in
+        </button>
+    </div>
+</form>
+
 {% endblock %}
