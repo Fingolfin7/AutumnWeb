@@ -202,7 +202,16 @@
   --sunken:      rgba(0, 0, 0, 0.26);
   --hairline:    rgba(228, 232, 229, 0.085);
   --hairline-2:  rgba(228, 232, 229, 0.16);
-  --scrim:       rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
+  /* NO --scrim TOKEN HERE. It used to live at this line, as
+       --scrim: rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
+     and it silently never worked. A custom property is substituted at
+     computed-value time ON THE ELEMENT THAT DECLARES IT, so the inner var()
+     resolved against :root — where --background-dim-opacity is never set —
+     and the 0.55 fallback was baked in permanently. The shell sets the real
+     value inline on <body>, which is a descendant, and by then --scrim had
+     already computed. The backdrop sat at 55% for every user regardless of
+     their setting. The substitution now happens where it is used, on the
+     element that actually carries the value: see body.bg-active::after. */
 
   /* --- depth (soft, wide, low-contrast — "physical", never glassy) ------ */
   --e1: 0 1px 2px rgba(0,0,0,.30), 0 6px 18px rgba(0,0,0,.26);
@@ -287,7 +296,11 @@ body.bg-active::before {
 body.bg-active::after {
   content: "";
   position: fixed; inset: 0; z-index: 1;
-  background: var(--scrim);
+  /* Written out here rather than behind a token on purpose — see the note
+     where --scrim used to be. This element IS <body>, which is where the
+     shell writes --background-dim-opacity inline and where the header slider
+     updates it, so the var() resolves against a value that actually exists. */
+  background: rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
   pointer-events: none;
 }
 body.bg-active .app { position: relative; z-index: 2; }
