@@ -1319,23 +1319,53 @@ body.bg-active .app { position: relative; z-index: 2; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-/* Two collapse steps, sized against the strings these lines actually carry at
-   --fs-xs: "Revision" measures 49px, "1h 17m" 46px, "14m" 23px, and each line
-   spends 17.6px of the block's width on its own inline padding.
+/* The label pair moves rather than disappears.
+   -------------------------------------------------------------------------
+   A block only holds its own text while it is wide enough: "Revision" needs
+   49px and "1h 17m" 46px at --fs-xs, plus 17.6px of inline padding. Past the
+   day view that is almost never true — a 1h 17m swim is 23px on the 3-day
+   axis and 7px on the week — so hiding the text there left a row of blank
+   marks that could only be read by hovering one at a time.
 
-     < 5.5rem  (88px block, ~70px of text)  drop the subproject label. Below
-               this a name is more ellipsis than word, and of the two lines
-               the duration is the one worth keeping.
-     < 4rem    (64px block, ~46px of text)  drop the duration too. 46px is
-               precisely what a "1h 17m" needs, so anything narrower could
-               only ever show a fragment of a number.
+   So below 5.5rem (88px) the same box hangs just OUTSIDE the block instead,
+   in the empty track beside it, and the mark keeps its meaning at any width.
+   That works because the track is mostly empty at these scales: the marks are
+   hairlines precisely because the sessions are short relative to the window.
 
-   Under both, the block keeps everything that makes it a mark: its width, its
-   colour, its hover lift, its focus ring, its tabindex — and its tooltip,
-   which is now the only way to read it, and which still opens on hover and on
-   focus-within at every size because the block does not clip. */
-@container (max-width: 5.5rem) { .fd-tl-b-lab { display: none; } }
-@container (max-width: 4rem)   { .fd-tl-b-dur { display: none; } }
+   Above 88px nothing moves — the text sits inside, clipped, exactly as the
+   day view has always drawn it.
+
+   Two consequences worth knowing. Labels are painted in DOM order within the
+   lane, so where two sessions fall very close together a label can be crossed
+   by the next mark; hovering lifts the block to z-index 5 and resolves it.
+   And .is-endflip (set by the template above 85% across) swaps the label to
+   the block's left so a late-evening session does not write off the track. */
+.fd-tl-b-text {
+  display: flex; flex-direction: column; gap: .1rem; min-width: 0;
+}
+@container (max-width: 5.5rem) {
+  .fd-tl-b-text {
+    position: absolute; left: 100%; top: 50%;
+    transform: translateY(-50%);
+    margin-left: .4rem; z-index: 2;
+    /* It floats over the track, so it must never intercept a pointer aimed at
+       whatever is under it. Where two sessions fall close together this label
+       can lie across the next mark; without this it would swallow that mark's
+       hover and make it unreachable. Hovering a block lifts it to z-index 5
+       and brings its own label to the front, which is the way out when two
+       labels do overlap each other. */
+    pointer-events: none;
+  }
+  /* Outside the block there is nothing to clip against, and the .55rem inset
+     each line carries for the inside case would only push the text away. */
+  .fd-tl-b-lab,
+  .fd-tl-b-dur { padding-inline: 0; overflow: visible; text-overflow: clip; }
+  .fd-tl-block.is-endflip .fd-tl-b-text {
+    left: auto; right: 100%;
+    margin-left: 0; margin-right: .4rem;
+    align-items: flex-end;
+  }
+}
 
 /* running — the system already has a language for "alive": glow + breath */
 .fd-tl-block.is-live {
@@ -1468,6 +1498,12 @@ body.bg-active .app { position: relative; z-index: 2; }
     padding: 0 0 .35rem;
   }
   .fd-tl-track { height: 3.5rem; }
+  /* The beside-the-mark label keeps its duration here but drops the
+     subproject. The track is only ~295px on a 375px phone, so a two-line
+     label runs about a fifth of the week: with both lines, 4 of 12 labels
+     overlapped a neighbour, with the duration alone, 2. The subproject is
+     still one tap away in the tooltip, which spans the whole track here. */
+  .fd-tl-b-lab { display: none; }
   /* Now that the tooltip is anchored to the track it can just span it: no
      edge of a 24px block to hang off, and the track is the full content width
      here because the gutter has collapsed to 0. Both min-width and max-width

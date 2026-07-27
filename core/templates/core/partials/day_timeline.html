@@ -90,9 +90,22 @@
                     <div class="fd-tl-mark"
                          style="--start: {{ block.start_pct }}%; --w: {{ block.width_pct }}%; --end: {{ block.end_pct }}%"
                          {% if block.is_live %}data-live-block data-start-iso="{{ block.session.start_time|utc_time_formatter }}"{% endif %}>
-                        <div class="fd-tl-block{% if block.is_live %} is-live{% endif %}" tabindex="0">
-                            {% if block.label %}<span class="fd-tl-b-lab">{{ block.label }}</span>{% endif %}
-                            <span class="fd-tl-b-dur" {% if block.is_live %}data-live-dur{% endif %}>{{ block.duration_label }}</span>
+                        {% comment %}
+                          .fd-tl-b-text is one box so it can move as a unit. Wide
+                          enough and it sits INSIDE the block; too narrow and the
+                          same box hangs just outside the block's edge instead,
+                          so a hairline mark still says what it is without a
+                          hover. The container query on .fd-tl-block decides —
+                          see the TIMELINE section of focus_desk.css.
+                          is-endflip puts it on the left for blocks near the end
+                          of the window, where a right-hand label would run off
+                          the track.
+                        {% endcomment %}
+                        <div class="fd-tl-block{% if block.is_live %} is-live{% endif %}{% if block.start_pct > 85 %} is-endflip{% endif %}" tabindex="0">
+                            <span class="fd-tl-b-text">
+                                {% if block.label %}<span class="fd-tl-b-lab">{{ block.label }}</span>{% endif %}
+                                <span class="fd-tl-b-dur" {% if block.is_live %}data-live-dur{% endif %}>{{ block.duration_label }}</span>
+                            </span>
                         </div>
                         <div class="fd-tl-tip{% if block.start_pct > 55 %} fd-tl-tip--flip{% endif %}">
                             <p>
