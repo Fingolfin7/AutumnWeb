@@ -101,7 +101,9 @@
                           of the window, where a right-hand label would run off
                           the track.
                         {% endcomment %}
-                        <div class="fd-tl-block{% if block.is_live %} is-live{% endif %}{% if block.start_pct > 85 %} is-endflip{% endif %}" tabindex="0">
+                        <div class="fd-tl-block{% if block.is_live %} is-live{% endif %}{% if block.start_pct > 85 %} is-endflip{% endif %}"
+                             tabindex="0"
+                             aria-label="{{ lane.project.name }}{% if block.label %}, {{ block.label }}{% endif %}, {{ block.duration_label }}{% if block.is_live %}, running{% endif %}">
                             <span class="fd-tl-b-text">
                                 {% if block.label %}<span class="fd-tl-b-lab">{{ block.label }}</span>{% endif %}
                                 <span class="fd-tl-b-dur" {% if block.is_live %}data-live-dur{% endif %}>{{ block.duration_label }}</span>

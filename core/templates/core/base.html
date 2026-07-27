@@ -76,8 +76,8 @@
 
     {% with un=request.resolver_match.url_name %}
 
-    <header class="app-header">
-        <div class="screen">
+    <header class="app-header{% if user.is_authenticated %} app-header--auth{% endif %}">
+        <div class="screen{% if user.is_authenticated %} app-header-screen--auth{% endif %}">
             <a class="brand" href="{% url 'home' %}">
                 <img class="brand-mark" src="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}?v={{ static_version.focus_desk }}" alt="">
                 <span class="brand-word">Autumn</span>

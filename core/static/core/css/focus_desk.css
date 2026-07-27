@@ -246,7 +246,7 @@
   --fs-label: .6875rem;
 
   /* --- layout ----------------------------------------------------------- */
-  --col:        clamp(20rem, 100%, 40rem);  /* the one content column       */
+  --col:        min(100%, 40rem);           /* the one content column       */
   --tabbar-h:   4.25rem;
   --header-h:   3.5rem;
   --ease: cubic-bezier(.22,.61,.36,1);
@@ -271,7 +271,9 @@ body {
   color: var(--ink);
   background: var(--base);
   -webkit-font-smoothing: antialiased;
-  padding-bottom: calc(var(--tabbar-h) + var(--s6));
+  padding-bottom: calc(
+    var(--tabbar-h) + var(--s6) + env(safe-area-inset-bottom, 0px)
+  );
 }
 h1,h2,h3,h4,p,ul,ol,figure { margin: 0; }
 ul,ol { list-style: none; padding: 0; }
@@ -336,14 +338,16 @@ body.bg-active .app { position: relative; z-index: 2; }
    currently looking at, which happens to be changeable. It borrows the
    --context orange the context chips use everywhere else so the connection to
    Contexts is not something you have to learn. */
-.context-switch { display: flex; align-items: center; }
+.context-switch { display: flex; align-items: center; min-width: 0; }
 .context-switch select {
   appearance: none;
+  max-width: min(14rem, 32vw);
   padding: .2rem 1.5rem .2rem .6rem;
   border: 0; border-radius: var(--r-pill);
   font-family: inherit; font-size: var(--fs-xs);
   color: var(--context); background: rgba(224, 164, 88, .13);
   box-shadow: inset 0 0 0 1px rgba(224, 164, 88, .24);
+  text-overflow: ellipsis;
   cursor: pointer;
   /* the chevron, drawn rather than shipped as an asset */
   background-image: linear-gradient(45deg, transparent 50%, var(--context) 50%),
@@ -354,8 +358,44 @@ body.bg-active .app { position: relative; z-index: 2; }
 }
 .context-switch select:hover { background-color: rgba(224, 164, 88, .2); }
 @media (max-width: 560px) {
-  /* the header has the brand, the dimmer and the avatar to fit as well */
-  .context-switch select { max-width: 7rem; text-overflow: ellipsis; }
+  /* On a phone the brand, context, dimmer and avatar do not belong on one
+     increasingly compressed line. Keep the identity and viewing tools calm
+     on the first row, then give the active workspace its own utility row. */
+  .app-header--auth {
+    height: auto;
+    min-height: var(--header-h);
+    padding: var(--s2) 0;
+  }
+  .app-header > .app-header-screen--auth {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand dim avatar"
+      "context context context";
+    column-gap: var(--s3);
+    row-gap: var(--s2);
+  }
+  .app-header-screen--auth .brand { grid-area: brand; }
+  .app-header-screen--auth .header-right { display: contents; }
+  .app-header-screen--auth .context-switch {
+    grid-area: context;
+    width: min(100%, 14rem);
+    min-width: 0;
+  }
+  .app-header-screen--auth .context-switch select {
+    width: 100%;
+    max-width: none;
+    min-height: 2.25rem;
+    text-overflow: ellipsis;
+  }
+  .app-header-screen--auth .dim-control {
+    grid-area: dim;
+    justify-self: end;
+  }
+  .app-header-screen--auth .avatar {
+    grid-area: avatar;
+    justify-self: end;
+  }
 }
 
 /* Backdrop dimming, parked in the header beside the avatar. Hidden unless a
@@ -1036,10 +1076,64 @@ body.bg-active .dim-control { display: flex; }
   .stat-strip { grid-template-columns: repeat(4, 1fr); }
   .stat, .stat:nth-child(odd) { border-top: 0; border-left: 1px solid var(--hairline); }
   .stat:first-child { border-left: 0; }
-  .tabbar-inner { width: auto; max-width: none; padding: .35rem; }
-  .tab { flex: 0 0 auto; flex-direction: row; gap: .5rem; padding: .6rem 1rem; }
+  /* Wide phones used to switch this bar to intrinsic width here. Five tabs
+     then grew wider than the viewport and the centred pill was clipped at
+     both edges. Keep the bounded, equal-width dock until the true desktop
+     breakpoint; only change the icon/label arrangement at this width. */
+  .tabbar-inner { padding: .35rem; }
+  .tab {
+    flex: 1 1 0;
+    flex-direction: row;
+    gap: .4rem;
+    padding: .6rem .55rem;
+  }
   .tab-label { font-size: var(--fs-xs); }
   .tab--overflow.is-inline { display: flex; }   /* Insights/Charts inline */
+}
+
+/* A commitment's eight-period history and the activity range are the two
+   densest dashboard controls. Give each a deliberate second row on narrow
+   phones instead of relying on flex overflow/wrapping by accident. */
+@media (max-width: 420px) {
+  .commit,
+  .activity { padding: .875rem; }
+
+  .bank-cell { padding-inline: .6rem; }
+  .bank-label { letter-spacing: .075em; }
+
+  .streak-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--s2);
+  }
+  .period-strip {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: .35rem;
+    width: 100%;
+    margin-left: 0;
+  }
+  .period-cell {
+    width: 100%;
+    max-width: 1.75rem;
+    height: auto;
+    aspect-ratio: 1;
+    justify-self: center;
+  }
+
+  .range-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  .range-tab {
+    min-height: 2.5rem;
+    padding: .35rem .25rem;
+  }
+
+  .cal-head,
+  .cal-grid { gap: var(--s1); }
 }
 
 @media (min-width: 900px) {
@@ -1600,12 +1694,6 @@ body.bg-active .dim-control { display: flex; }
     padding: 0 0 .35rem;
   }
   .fd-tl-track { height: 3.5rem; }
-  /* The beside-the-mark label keeps its duration here but drops the
-     subproject. The track is only ~295px on a 375px phone, so a two-line
-     label runs about a fifth of the week: with both lines, 4 of 12 labels
-     overlapped a neighbour, with the duration alone, 2. The subproject is
-     still one tap away in the tooltip, which spans the whole track here. */
-  .fd-tl-b-lab { display: none; }
   /* Now that the tooltip is anchored to the track it can just span it: no
      edge of a 24px block to hang off, and the track is the full content width
      here because the gutter has collapsed to 0. Both min-width and max-width
@@ -1615,6 +1703,18 @@ body.bg-active .dim-control { display: flex; }
   .fd-tl-tip, .fd-tl-tip--flip {
     left: 0; right: 0; min-width: 0; max-width: none;
   }
+}
+
+/* Project names and totals already summarize each lane on compact screens.
+   Session-level text is useful on a desk-sized timeline, but on a phone its
+   labels are wider than their marks and collide with neighbouring sessions.
+   Keep the honest block geometry and reveal full detail on focus/tap instead.
+   The short-height branch catches landscape phones whose CSS width can look
+   desktop-sized even though their usable canvas is only a few hundred pixels
+   tall. */
+@media (max-width: 999px),
+       (max-height: 600px) and (pointer: coarse) {
+  .fd-tl-b-text { display: none; }
 }
 
 /* ============================================================================
