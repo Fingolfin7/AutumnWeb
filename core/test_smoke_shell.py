@@ -20,6 +20,8 @@ class PortedPagesSmokeTests(TestCase):
         cls.user = User.objects.create_user(
             username="smoke", email="smoke@example.com", password="pw"
         )
+        cls.user.profile.ai_features_enabled = True  # so Insights renders
+        cls.user.profile.save()
         cls.context = Context.objects.create(user=cls.user, name="Work")
         cls.tag = Tag.objects.create(user=cls.user, name="deep")
         cls.project = Projects.objects.create(
@@ -74,6 +76,10 @@ class PortedPagesSmokeTests(TestCase):
             reverse("update_tag", args=[self.tag.id]),
             reverse("delete_tag", args=[self.tag.id]),
             reverse("charts"),
+            reverse("insights"),
+            reverse("import"),
+            reverse("export"),
+            reverse("profile"),
         ]
 
     def test_fragments_render_without_a_shell(self):

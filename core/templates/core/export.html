@@ -2,9 +2,10 @@
 {% load static %}
 
 {% block head_includes %}
+    {# jQuery 3.6.0 comes from the shell; only jQuery UI is needed on top.   #}
+    {# The legacy page also pulled jQuery 1.7.1 and UI 1.8.16 from CDNs      #}
+    {# AFTER it, silently downgrading every script that followed.            #}
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>

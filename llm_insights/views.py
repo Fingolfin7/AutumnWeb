@@ -7,7 +7,12 @@ from django.db import close_old_connections, transaction
 from core.models import Sessions
 from core.forms import SearchProjectForm
 from core.templatetags.markdown_render import markdown as render_markdown
-from core.utils import filter_sessions_by_params, filter_by_active_context, build_exclude_project_meta
+from core.utils import (
+    filter_sessions_by_params,
+    filter_by_active_context,
+    build_exclude_project_meta,
+    summarise_search_filters,
+)
 from .llm_handlers import get_llm_handler
 from .models import LLMChat, LLMMessage
 import json
@@ -589,6 +594,12 @@ class InsightsView(View):
                 "usage_stats": usage_stats,
                 "openai_connection_source": self._openai_connection_source(user),
                 "exclude_project_meta_json": json.dumps(build_exclude_project_meta(user)),
+                # Filters live in a sheet on this shell, so the page has to
+                # say what is narrowing the session set — an empty selection
+                # otherwise reads as broken. Resolved here rather than in the
+                # async caller because it queries. Same helper as Sessions,
+                # Projects and Charts.
+                "active_filters": summarise_search_filters(request, user),
             }
 
         data = await sync_to_async(get_all_sync_data)()
@@ -620,12 +631,18 @@ class InsightsView(View):
             request.GET.get("reasoning_effort") or stored_reasoning_effort,
         )
 
-        provider_models_json = json.dumps(
-            {
+        # insights_page.js used to be an inline <script> with these values
+        # interpolated by Django. It is a static file now, so they travel as
+        # one json_script blob instead. Keys are camelCase to match the JS.
+        insights_config = {
+            "providerModels": {
                 p: [{"value": v, "label": l} for v, l in lst]
                 for p, lst in provider_models.items()
-            }
-        )
+            },
+            "username": data["username"],
+            "selectedProvider": selected_provider,
+            "selectedModel": selected_model,
+        }
 
         context = {
             "title": "Session Analysis",
@@ -640,7 +657,7 @@ class InsightsView(View):
             "selected_provider": selected_provider,
             "selected_reasoning_effort": selected_reasoning_effort,
             "openai_reasoning_efforts": self.OPENAI_REASONING_EFFORTS,
-            "provider_models_json": provider_models_json,
+            "insights_config": insights_config,
             "providers": list(provider_models.keys()),
             "chat_id": chat_id,
             "recent_chats": data["recent_chats"],
@@ -648,6 +665,7 @@ class InsightsView(View):
             "username": data["username"],
             "openai_connection_source": data["openai_connection_source"],
             "exclude_project_meta_json": data["exclude_project_meta_json"],
+            "active_filters": data["active_filters"],
         }
         return await sync_to_async(render)(
             request, "llm_insights/insights.html", context

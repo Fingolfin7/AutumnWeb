@@ -137,6 +137,18 @@
    Utilities    .text-red .text-blue .text-green .text-cyan .text-yellow
                 .text-orange .muted .mono .tnum
                 .u-row .u-between .u-wrap .u-gap-2 .u-gap-3 .u-mt-4 .sr-only
+   Insights      .chat-layout (--chat-h) .chat-sidebar .chat-sidebar.collapsed
+                 .new-chat-btn .chat-list .chat-list-empty
+                 .chat-item-container .chat-item .chat-title .delete-chat-btn
+                 .chat-main .chat-header .chat-header-meta .chat-header-range
+                 .chat-header-tokens .chat-header-actions .chat-action-btn
+                 .chat-form .conversation-container .conversation-container.selecting
+                 .user-message .assistant-message (+ .streaming .stream-error)
+                 .message-content .assistant-sources .copy-btn .msg-selected
+                 .composer .composer-toolbar .composer-field .composer-note
+                 .composer-input-row .empty-state-container
+                 (These names are a JS contract — insights_stream.js builds
+                  several of them at runtime. Grep before renaming.)
    Data transfer .stream-output .stream-progress .stream-log .log-entry
    Users         .auth-card
                  .profile-page .profile-account-grid .profile-avatar-panel
@@ -1007,6 +1019,10 @@ body.light-mode {
   .screen { width: 100%; max-width: 90rem; padding-left: var(--s5); padding-right: var(--s5); }
   .screen-pad { padding-bottom: var(--s6); }
   .app-header { position: sticky; top: 0; z-index: 45; }
+  /* body reserves --tabbar-h at the bottom so the fixed phone tabbar never
+     covers the last row. Up here the tabbar is a sticky pill at the TOP, so
+     that reservation is 100px of dead space at the foot of every page. */
+  body { padding-bottom: var(--s6); }
 
   /* ── 3 · nav pill moves to the top ─────────────────────────────────────*/
   .tabbar {
@@ -1238,13 +1254,36 @@ body.light-mode {
 }
 
 /* ── blocks ────────────────────────────────────────────────────────────── */
+
+/* The block is a CONTAINER, so it can answer the one question this chart
+   needs and CSS cannot otherwise ask: "am I wide enough to hold my own
+   text?" Same technique as .session-list above.
+
+   It has to ask, because --w is a percentage of the window and the window is
+   sometimes a week. A 14-minute session is 0.3% of a 3-day range, so it lands
+   on min-width no matter how wide the viewport gets — and the two nowrap
+   lines inside it then clip to ONE GLYPH EACH ("Revision" → "R", "14m" → "1"),
+   stacked, in a 24px-wide 52px-tall box. A vertical pill of alphabet soup.
+   min-width itself is right and stays: a tiny session must remain visible and
+   hoverable. It is the text that has to go — see the @container steps below.
+
+   Note where the inline padding is NOT. It lives on the text lines rather
+   than here, for two reasons. It keeps the query honest — the block measures
+   its real width instead of its width minus 17.6px of its own padding — and
+   it keeps the collapse rules off any property that feeds back into the size
+   being queried, because zeroing a container's own padding inside its own
+   container query is a layout loop — the padding shrinks the content box, the
+   smaller content box un-matches the query, the padding comes back.
+   (The block's silhouette is unaffected either way: box-sizing is border-box
+   and the width comes from --w / min-width, so padding never sized it.) */
 .fd-tl-block {
   position: absolute; top: .5rem; bottom: .5rem;
   left: var(--start); width: var(--w); min-width: 1.5rem;
+  container-type: inline-size;
   border-radius: var(--r-xs);
   background: color-mix(in srgb, var(--proj, var(--project)) 34%, transparent);
   box-shadow: var(--edge), var(--e1);
-  padding: .4rem .55rem; cursor: help;   /* hover/focus reveals the tooltip */
+  padding: .4rem 0; cursor: help;        /* hover/focus reveals the tooltip */
   display: flex; flex-direction: column; justify-content: center; gap: .1rem;
   transition: transform .16s var(--ease), background .16s var(--ease),
               box-shadow .16s var(--ease);
@@ -1257,15 +1296,41 @@ body.light-mode {
   box-shadow: var(--edge), var(--e2);
   transform: translateY(-2px); outline: none; z-index: 5;
 }
+/* .55rem each side, carried here rather than on the block — see the note on
+   .fd-tl-block. The text sits exactly where it always did; the difference is
+   only in which box owns the inset. */
 .fd-tl-b-lab {
   font-size: var(--fs-xs); font-weight: 600; color: var(--sub);
+  padding-inline: .55rem;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .fd-tl-b-dur {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   font-size: var(--fs-xs); color: var(--duration);
-  white-space: nowrap; overflow: hidden;
+  padding-inline: .55rem;
+  /* ellipsis, not a bare clip: in the middle step below the duration is the
+     only line left, and "1h 1" reads as a wrong number where "1h 1…" reads
+     as a truncated one. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* Two collapse steps, sized against the strings these lines actually carry at
+   --fs-xs: "Revision" measures 49px, "1h 17m" 46px, "14m" 23px, and each line
+   spends 17.6px of the block's width on its own inline padding.
+
+     < 5.5rem  (88px block, ~70px of text)  drop the subproject label. Below
+               this a name is more ellipsis than word, and of the two lines
+               the duration is the one worth keeping.
+     < 4rem    (64px block, ~46px of text)  drop the duration too. 46px is
+               precisely what a "1h 17m" needs, so anything narrower could
+               only ever show a fragment of a number.
+
+   Under both, the block keeps everything that makes it a mark: its width, its
+   colour, its hover lift, its focus ring, its tabindex — and its tooltip,
+   which is now the only way to read it, and which still opens on hover and on
+   focus-within at every size because the block does not clip. */
+@container (max-width: 5.5rem) { .fd-tl-b-lab { display: none; } }
+@container (max-width: 4rem)   { .fd-tl-b-dur { display: none; } }
 
 /* running — the system already has a language for "alive": glow + breath */
 .fd-tl-block.is-live {
@@ -2215,4 +2280,301 @@ img.brand-mark {
     grid-template-columns: 1fr;
   }
   .profile-codex-panel .form-actions { justify-content: flex-start; }
+}
+
+/* ============================================================================
+   INSIGHTS — the chat page                          (UI_REDESIGN.md chunk 12)
+   ----------------------------------------------------------------------------
+   Everything below was `chat_style.css`, a second stylesheet that only this
+   page loaded. It has been folded in here because it depended on fourteen
+   variables that exist only in the legacy colour file (--border-dark,
+   --dark-text, --card-bg-dark-alpha, …) and on three legacy shell elements
+   (.container, .main-body, .left-panel) that base_fd.html does not have.
+   Porting it meant re-expressing it in the tokens above, at which point
+   keeping it in its own file bought nothing.
+
+   THE ONE STRUCTURAL DIFFERENCE FROM EVERY OTHER PAGE
+   The old page made the whole DOCUMENT a fixed 100dvh app view and scrolled
+   `.main-body` internally. That is not available here: the shell's tabbar is
+   fixed to the bottom on phones and sticky at the TOP from 1000px up, so a
+   document-level height fight would break the nav at one station or the other.
+
+   Instead the page scrolls normally and only the chat SLAB is height-bound,
+   with the transcript scrolling inside it and the composer docked below.
+   --chat-h is that height: 100dvh minus the chrome stacked above and below the
+   slab. There is no way to express that in CSS other than a measured constant,
+   and the values below were read off the live page rather than derived. If you
+   add or remove anything between the page title and the slab, re-measure. The
+   clamp is what keeps a wrong constant from being a disaster — the chat is
+   never shorter than 26rem nor taller than 58rem.
+
+   CLASS NAMES HERE ARE A JAVASCRIPT CONTRACT — see the comment at the top of
+   insights.html before renaming any of them.
+   ==========================================================================*/
+.chat-layout {
+  /* Phone/tablet, measured at 375x812: 225px above the slab (header, page
+     title, searchbar) and ~130px below (its own margin, screen-pad, and the
+     body padding that keeps the fixed tabbar off the content). */
+  --chat-h: clamp(26rem, calc(100dvh - 21.5rem), 58rem);
+  display: flex;
+  height: var(--chat-h);
+  margin-bottom: var(--s4);
+}
+
+/* ── chat list ──────────────────────────────────────────────────────────── */
+/* Appearance only. HOW it collapses is a per-layout decision and lives in the
+   two media queries at the bottom of this section: wide screens shrink a flex
+   column to nothing, phones slide a drawer off the left edge. Neither shape
+   belongs here, and mixing them is what leaves a padding-wide sliver of
+   sidebar sitting over the transcript. */
+.chat-sidebar {
+  display: flex; flex-direction: column;
+  min-height: 0; overflow: hidden;
+  padding: var(--s4);
+  border-right: 1px solid var(--hairline);
+}
+/* Wide: a real column in the flex row, shrunk to nothing. Toggled by
+   insights_page.js, which persists the choice to localStorage. This block
+   stays ABOVE the min-width:1000px one below so that the wider breakpoint can
+   still widen flex-basis — equal specificity, so source order decides. */
+@media (min-width: 701px) {
+  .chat-sidebar {
+    flex: 0 0 15rem;
+    transition: flex-basis .24s var(--ease), padding .24s var(--ease);
+  }
+  .chat-sidebar.collapsed {
+    flex-basis: 0; padding-left: 0; padding-right: 0; border-right: 0;
+  }
+}
+.new-chat-btn { flex-shrink: 0; margin-bottom: var(--s3); white-space: nowrap; }
+
+.chat-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.chat-list-empty { padding: var(--s4) 0; }
+
+.chat-item-container {
+  display: flex; align-items: center;
+  border-radius: var(--r-xs);
+  border-left: 2px solid transparent;
+  transition: background .16s var(--ease);
+}
+.chat-item-container:hover { background: var(--raised); }
+.chat-item-container.active {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  border-left-color: var(--brand);
+}
+.chat-item {
+  flex: 1; min-width: 0;
+  padding: .5rem .65rem;
+  font-size: var(--fs-sm);
+}
+.chat-item.active { font-weight: 650; }
+.chat-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.delete-chat-btn {
+  padding: .5rem; color: var(--project);
+  opacity: 0; transition: opacity .16s var(--ease);
+}
+/* Keyboard users never hover, so focus has to reveal it too. */
+.chat-item-container:hover .delete-chat-btn,
+.delete-chat-btn:focus-visible { opacity: 1; }
+
+/* ── transcript column ──────────────────────────────────────────────────── */
+.chat-main {
+  flex: 1; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+  padding: var(--s4);
+}
+.chat-header {
+  display: flex; align-items: center; gap: var(--s3);
+  flex-shrink: 0; padding-bottom: var(--s3); margin-bottom: var(--s3);
+  border-bottom: 1px solid var(--hairline);
+}
+.chat-header-meta {
+  display: flex; align-items: baseline; gap: var(--s3);
+  flex-wrap: wrap; min-width: 0;
+}
+.chat-header-meta h3 { font-size: var(--fs-md); font-weight: 650; white-space: nowrap; }
+.chat-header-range,
+.chat-header-tokens { font-size: var(--fs-xs); white-space: nowrap; }
+.chat-header-actions {
+  margin-left: auto; flex-shrink: 0;
+  display: flex; gap: var(--s2); flex-wrap: wrap; justify-content: flex-end;
+}
+.chat-action-btn {
+  padding: .35rem .7rem; border-radius: var(--r-pill);
+  background: var(--raised); color: var(--ink-2); font-size: var(--fs-xs);
+  white-space: nowrap;
+  transition: color .16s var(--ease), background .16s var(--ease);
+}
+.chat-action-btn:hover:not(:disabled) { background: var(--raised-2); color: var(--ink); }
+.chat-action-btn:disabled { opacity: .45; cursor: default; }
+
+.chat-form { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.conversation-container {
+  flex: 1; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  padding: var(--s3) var(--s2) var(--s4);
+  display: flex; flex-direction: column; gap: var(--s3);
+}
+
+/* ── messages ───────────────────────────────────────────────────────────── */
+/* Asymmetric on purpose: the user prompt is the brand colour and sits right,
+   the model answer is a neutral raised slab and sits left. Both cap at 80% so
+   long transcripts never lose the left/right cue. */
+.user-message,
+.assistant-message {
+  position: relative;
+  max-width: 80%; min-width: 0;
+  padding: var(--s3) var(--s4);
+  border-radius: var(--r-sm);
+}
+.user-message {
+  margin-left: auto;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 26%, transparent);
+}
+.assistant-message {
+  margin-right: auto;
+  background: var(--raised);
+  box-shadow: var(--edge);
+}
+.assistant-message.stream-error {
+  box-shadow: inset 0 0 0 1px var(--project);
+}
+
+.message-content { overflow-wrap: anywhere; word-break: break-word; }
+.message-content > :first-child { margin-top: 0; }
+.message-content > :last-child { margin-bottom: 0; }
+.message-content p { margin: 0 0 .6rem; }
+.message-content ul,
+.message-content ol { list-style: revert; padding-left: 1.4rem; margin: 0 0 .6rem; }
+.message-content h1,
+.message-content h2,
+.message-content h3 { font-size: var(--fs-lg); font-weight: 650; margin: .9rem 0 .4rem; }
+.message-content a { color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }
+.message-content code {
+  font-family: var(--font-mono); font-size: .9em;
+  background: var(--sunken); padding: .1rem .3rem; border-radius: var(--r-xs);
+}
+.message-content pre {
+  overflow-x: auto; margin: 0 0 .6rem;
+  padding: var(--s3); border-radius: var(--r-sm); background: var(--sunken);
+}
+.message-content pre code { background: none; padding: 0; }
+.message-content table {
+  display: block; width: max-content; max-width: 100%;
+  overflow-x: auto; border-collapse: collapse; margin: .75rem 0;
+}
+.message-content th,
+.message-content td {
+  padding: .45rem .65rem; border: 1px solid var(--hairline);
+  text-align: left; vertical-align: top;
+}
+.message-content th { background: var(--raised); font-weight: 650; }
+.message-content tbody tr:nth-child(even) { background: rgba(255,255,255,.025); }
+
+.assistant-sources {
+  display: block; margin-top: var(--s3); padding-top: var(--s3);
+  border-top: 1px solid var(--hairline);
+  font-size: var(--fs-xs); color: var(--muted);
+}
+.assistant-sources .plain-link { color: var(--sub); text-decoration: underline; text-underline-offset: 3px; }
+
+.copy-btn {
+  position: absolute; top: .35rem; right: .35rem;
+  padding: .35rem; color: var(--muted);
+  opacity: 0; transition: opacity .16s var(--ease), color .16s var(--ease);
+}
+.user-message:hover .copy-btn,
+.assistant-message:hover .copy-btn,
+.copy-btn:focus-visible { opacity: 1; }
+.copy-btn:hover { color: var(--brand); }
+
+/* streaming caret — the system already reads green as "alive" (live timers,
+   durations), so the caret borrows that rather than inventing a colour. */
+.assistant-message.streaming .message-content::after {
+  content: "▍"; color: var(--duration); margin-left: 2px;
+  animation: fd-caret 1s steps(1) infinite;
+}
+@keyframes fd-caret { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .assistant-message.streaming .message-content::after { animation: none; }
+}
+
+/* ── multi-select mode ──────────────────────────────────────────────────── */
+.conversation-container.selecting { user-select: none; }
+.conversation-container.selecting .user-message,
+.conversation-container.selecting .assistant-message { cursor: pointer; }
+.conversation-container.selecting .copy-btn { pointer-events: none; }
+.conversation-container .msg-selected { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* ── composer ───────────────────────────────────────────────────────────── */
+.composer { flex-shrink: 0; display: flex; flex-direction: column; gap: var(--s2); }
+.composer-toolbar { display: flex; align-items: center; gap: var(--s4); min-width: 0; }
+.composer-field { display: inline-flex; align-items: center; gap: .4rem; flex-shrink: 0; }
+.composer-field label { font-size: var(--fs-xs); color: var(--muted); }
+/* The chat form is not a `.fields` form — its widgets are hand-placed, so
+   they are styled here rather than by the generic form rules. */
+.composer-field select,
+.composer-input-row textarea {
+  background: var(--sunken); border: 1px solid var(--hairline);
+  border-radius: var(--r-sm); color: var(--ink);
+}
+.composer-field select { padding: .35rem .5rem; font-size: var(--fs-xs); }
+.composer-note {
+  flex: 1 1 auto; min-width: 0; text-align: right;
+  font-size: var(--fs-xs); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.composer-input-row { display: flex; align-items: flex-end; gap: var(--s2); }
+.composer-input-row textarea {
+  flex: 1; min-width: 0; resize: none;
+  min-height: 2.9rem; max-height: 11rem; overflow-y: auto;
+  padding: .7rem .85rem; font: inherit; font-size: var(--fs-md);
+}
+.composer-input-row textarea:focus { outline: none; box-shadow: var(--focus-ring); }
+.composer-input-row .btn { flex-shrink: 0; }
+
+/* ── empty states ───────────────────────────────────────────────────────── */
+/* insights_stream.js removes these when the first answer starts streaming. */
+.empty-state-container {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: var(--s3); text-align: center; padding: var(--s5);
+}
+.empty-state-container img { max-width: 11rem; opacity: .55; }
+.empty-state-container .empty { padding: 0; max-width: 26rem; }
+
+@media (min-width: 1000px) {
+  /* Measured at 1440x900: 264px above the slab (sticky header + nav pill +
+     page title + searchbar) and 80px below it (its own margin, screen-pad's
+     bottom, body's bottom). 344px ≈ 21.5rem; 22rem leaves slack for the extra
+     row a filter-pill summary adds. */
+  .chat-layout { --chat-h: clamp(26rem, calc(100dvh - 22rem), 58rem); }
+  .chat-sidebar { flex-basis: 17rem; }
+}
+
+@media (max-width: 700px) {
+  /* Two columns do not fit, so the list becomes a drawer OVER the transcript.
+     It slides out rather than shrinking: a zero-width box still renders its
+     own padding, which is exactly the sliver this avoids. It also starts
+     closed here — see the matching note in insights_page.js. */
+  .chat-layout { position: relative; }
+  .chat-sidebar {
+    position: absolute; z-index: 3; inset: 0 auto 0 0;
+    width: 15rem;
+    background: var(--slab-solid);
+    box-shadow: var(--e2);
+    transition: transform .24s var(--ease), visibility .24s var(--ease);
+  }
+  .chat-sidebar.collapsed {
+    transform: translateX(-100%);
+    /* out of the tab order too, not merely out of sight */
+    visibility: hidden;
+    box-shadow: none;
+  }
+  .user-message,
+  .assistant-message { max-width: 92%; }
+  .composer-note { display: none; }
+  .chat-header-tokens { display: none; }
 }

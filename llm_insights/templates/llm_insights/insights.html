@@ -1,480 +1,328 @@
-{% extends 'core/base.html' %}
+{% extends 'core/base_fd.html' %}
 {% load static %}
 {% load time_formats %}
 {% load markdown_render %}
 {% load param_replace %}
 
+{% comment %}
+  ============================================================================
+  INSIGHTS — Focus Desk (UI_REDESIGN.md chunk 12)
+  ----------------------------------------------------------------------------
+  The one page in the app that is a CHAT rather than a document: the transcript
+  scrolls inside itself and the composer stays docked, so the height is
+  computed rather than natural. That is what --chat-h in focus_desk.css is for.
+
+  Narrowing controls go in the filter sheet, same as Sessions / Projects /
+  Charts. What stays on the page is what this page is FOR: the transcript, the
+  composer, and the model picker.
+
+  CLASS NAMES HERE ARE A JAVASCRIPT CONTRACT. insights_stream.js constructs
+  .chat-item-container / .chat-item / .chat-title / .delete-chat-btn /
+  .copy-btn / .assistant-message / .message-content / .assistant-sources /
+  .plain-link at runtime and removes .empty-state-container and
+  .chat-list-empty. insights_page.js drives #provider #model #reasoning_effort
+  #provider_filter #model_filter #reasoning_effort_filter #conversation-container
+  #select-messages-btn #copy-selected-btn #copy-full-chat-btn
+  #toggle-sidebar-btn #prompt #chat-form and .chat-sidebar.collapsed.
+  Do not rename any of them without grepping both files first.
+  ============================================================================
+{% endcomment %}
+
 {% block head_includes %}
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script> <!-- for jquery ui and autocomplete-->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js" type="text/javascript"> </script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.16/jquery-ui.min.js" type="text/javascript"></script>
+    {# jQuery 3.6.0 comes from the shell. The legacy page also pulled jQuery #}
+    {# 1.7.1 and jQuery UI 1.8.16 from CDNs, which silently DOWNGRADED it —   #}
+    {# only jQuery UI 1.12.1 is actually needed, for the autocomplete.        #}
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
     <script src="{% static 'core/js/insights_stream.js' %}?v={{ static_version.insights_stream }}" type="text/javascript"></script>
-    <link rel="stylesheet" type="text/css" href="{% static 'core/css/chat_style.css' %}?v={{ static_version.chat_style }}">
-    <script type="text/javascript">
-        const PROVIDER_MODELS = {{ provider_models_json|safe }};
-        function repopulateModels(provider, selectedModel){
-            const modelSelect = $('#model');
-            modelSelect.empty();
-            const entries = PROVIDER_MODELS[provider] || [];
-            entries.forEach(entry => {
-                const opt = $('<option></option>').val(entry.value).text(entry.label);
-                if (entry.value === selectedModel) opt.attr('selected','selected');
-                modelSelect.append(opt);
-            });
-            if (!selectedModel && entries.length>0){
-                modelSelect.val(entries[0].value);
-            }
-        }
-
-        function updateReasoningEffortVisibility(provider){
-            const reasoningField = $('#reasoning-effort-field');
-            const reasoningSelect = $('#reasoning_effort');
-            if (provider === 'openai') {
-                reasoningField.show();
-                reasoningSelect.prop('disabled', false);
-                $('#reasoning_effort_filter').val(reasoningSelect.val());
-            } else {
-                reasoningField.hide();
-                reasoningSelect.prop('disabled', true);
-                $('#reasoning_effort_filter').val('');
-            }
-        }
-
-        function copyToClipboard(text, btn) {
-            navigator.clipboard.writeText(text).then(() => {
-                const originalHtml = btn.innerHTML;
-                btn.innerHTML = '<i class="fa fa-check"></i>';
-                setTimeout(() => {
-                    btn.innerHTML = originalHtml;
-                }, 2000);
-            });
-        }
-
-        function buildChatTranscript(onlySelected) {
-            const messages = [];
-            const selector = onlySelected
-                ? '.conversation-container > .msg-selected'
-                : '.conversation-container > div';
-            $(selector).each(function() {
-                let sender = 'User';
-                if ($(this).hasClass('user-message')) {
-                    sender = '{{ username|default:"User" }}';
-                } else if ($(this).hasClass('assistant-message')) {
-                    const model = $(this).data('model') || '{{ selected_model|default:"LLM" }}';
-                    sender = `Autumn (${model})`;
-                }
-                const content = $(this).find('.message-content').text().trim();
-                if (content) {
-                    messages.push(`[${sender}]\n${content}`);
-                }
-            });
-            return messages.join('\n\n---\n\n');
-        }
-
-        function flashCopied(btn) {
-            const originalText = $(btn).html();
-            $(btn).html('<i class="fa fa-check"></i> Copied!');
-            setTimeout(() => $(btn).html(originalText), 2000);
-        }
-
-        function copyFullChat() {
-            navigator.clipboard.writeText(buildChatTranscript(false)).then(() => {
-                flashCopied(document.getElementById('copy-full-chat-btn'));
-            });
-        }
-
-        let messageSelectMode = false;
-
-        function updateSelectedCount() {
-            const n = document.querySelectorAll('#conversation-container .msg-selected').length;
-            const btn = $('#copy-selected-btn');
-            btn.html('<i class="fa fa-copy"></i> Copy (' + n + ')');
-            btn.prop('disabled', n === 0);
-        }
-
-        function toggleSelectMode() {
-            messageSelectMode = !messageSelectMode;
-            const container = document.getElementById('conversation-container');
-            if (container) {
-                container.classList.toggle('selecting', messageSelectMode);
-                if (!messageSelectMode) {
-                    container.querySelectorAll('.msg-selected').forEach((m) => m.classList.remove('msg-selected'));
-                }
-            }
-            $('#select-messages-btn').html(
-                messageSelectMode
-                    ? '<i class="fa fa-times"></i> Cancel'
-                    : '<i class="fa fa-check-square"></i> Select'
-            );
-            $('#copy-selected-btn').toggle(messageSelectMode);
-            updateSelectedCount();
-        }
-
-        function copySelectedMessages(btn) {
-            const transcript = buildChatTranscript(true);
-            if (!transcript) {
-                return;
-            }
-            navigator.clipboard.writeText(transcript).then(() => flashCopied(btn));
-        }
-
-        function toggleSidebar() {
-            const sidebar = $('.chat-sidebar');
-            sidebar.toggleClass('collapsed');
-            const isCollapsed = sidebar.hasClass('collapsed');
-            localStorage.setItem('chatSidebarCollapsed', isCollapsed);
-            
-            // Update icon
-            const icon = $('#toggle-sidebar-btn i');
-            if (isCollapsed) {
-                icon.removeClass('fa-chevron-left').addClass('fa-chevron-right');
-            } else {
-                icon.removeClass('fa-chevron-right').addClass('fa-chevron-left');
-            }
-        }
-
-        $(document).ready(function(){
-            // Restore sidebar state
-            if (localStorage.getItem('chatSidebarCollapsed') === 'true') {
-                toggleSidebar();
-            }
-
-            // initial populate
-            repopulateModels('{{ selected_provider }}','{{ selected_model }}');
-            updateReasoningEffortVisibility('{{ selected_provider }}');
-            // keep GET filter hidden fields in sync
-            $('#provider_filter').val($('#provider').val());
-            $('#model_filter').val($('#model').val() || '{{ selected_model }}');
-            $('#reasoning_effort_filter').val(
-                $('#reasoning_effort').prop('disabled') ? '' : $('#reasoning_effort').val()
-            );
-
-            $('#provider').on('change', function(){
-                const newProvider = $(this).val();
-                repopulateModels(newProvider,null);
-                updateReasoningEffortVisibility(newProvider);
-                $('#provider_filter').val(newProvider);
-                $('#model_filter').val($('#model').val());
-            });
-            
-            $('#model').on('change', function() {
-                let selected = $(this).val();
-                $('#model_filter').val(selected);
-            });
-
-            $('#reasoning_effort').on('change', function() {
-                $('#reasoning_effort_filter').val($(this).prop('disabled') ? '' : $(this).val());
-            });
-
-            // Scroll conversation to bottom
-            const container = document.getElementById('conversation-container');
-            if (container) {
-                container.scrollTop = container.scrollHeight;
-            }
-
-            // Toggle message selection in select mode (delegated so it also
-            // covers messages appended later by the streaming code)
-            $(document).on('click', '#conversation-container > .user-message, #conversation-container > .assistant-message', function (e) {
-                if (!messageSelectMode) {
-                    return;
-                }
-                e.preventDefault();
-                $(this).toggleClass('msg-selected');
-                updateSelectedCount();
-            });
-
-            // Composer: auto-grow textarea, Enter to send (Shift+Enter for newline)
-            const promptEl = document.getElementById('prompt');
-            const chatForm = document.getElementById('chat-form');
-            if (promptEl) {
-                const autogrow = () => {
-                    promptEl.style.height = 'auto';
-                    promptEl.style.height = Math.min(promptEl.scrollHeight, 176) + 'px';
-                };
-                promptEl.addEventListener('input', autogrow);
-                autogrow();
-                // Re-measure once everything (stylesheets included) has loaded,
-                // in case autogrow first ran before chat_style.css applied
-                window.addEventListener('load', autogrow);
-
-                promptEl.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' && !e.shiftKey && !promptEl.readOnly) {
-                        e.preventDefault();
-                        if (chatForm && promptEl.value.trim()) {
-                            chatForm.requestSubmit();
-                        }
-                    }
-                });
-
-                if (chatForm) {
-                    // Reset height after the streaming handler clears the prompt
-                    chatForm.addEventListener('submit', () => setTimeout(autogrow, 0));
-                }
-            }
-        });
-    </script>
 {% endblock %}
 
 {% block content %}
-    <section id="search_options">
-        <details class="filters-panel card" {% if not conversation_history %}open{% endif %}>
-            <summary class="filters-summary">
-                <i class="fa fa-filter"></i>
-                <span>Session Filters</span>
-                {% if session_count > 0 %}
-                    <span class="text-muted filters-hint">
-                        {{ session_count }} session{{ session_count|pluralize }} &middot;
-                        {{ earliest_date|day_date_formatter }} &ndash; {{ latest_date|day_date_formatter }}
-                    </span>
-                {% endif %}
-                <i class="fa fa-chevron-down filters-caret"></i>
-            </summary>
-            <form method="get" id="search_form" class="flex-row" enctype="multipart/form-data">
-            <div id="search_projects">
-                <span class="label-input">
-                    <label for="project-search"><i class="fa fa-search"></i> Search</label>
-                    {{ search_form.project_name }}
-                    {{ search_form.project_name.errors }}
-                </span>
-                <span id="project-search-results"></span>
-            </div>
 
-            <span class="label-input" id="filter_start">
-                <label for="start_date"><i class="fa fa-calendar"></i> Start Date</label>
+<div class="desk-head">
+    <div>
+        <p class="page-eyebrow">Ask about your time</p>
+        <h1 class="page-title">Insights</h1>
+    </div>
+</div>
+
+<form method="get" class="fields" id="search_form" enctype="multipart/form-data">
+    <div class="searchbar">
+        <i class="fas fa-search muted" aria-hidden="true"></i>
+        <label class="sr-only" for="project-search">Search projects</label>
+        {{ search_form.project_name }}
+        <button class="filter-launcher" type="button" data-sheet-open="filterSheet" aria-haspopup="dialog">
+            <i class="fas fa-sliders-h"></i> Filters
+            {% if active_filters %}<span class="filter-count">{{ active_filters|length }}</span>{% endif %}
+        </button>
+        {# Distinct from the "Filters" launcher beside it: that opens the      #}
+        {# sheet, this re-selects the session set the chat is grounded in.     #}
+        {# name="filter" is what makes the view confirm the new selection.     #}
+        <button type="submit" class="btn btn--primary" id="search_button" name="filter" value="true">
+            <i class="fa fa-check"></i> Select sessions
+        </button>
+    </div>
+    <div id="project-search-results"></div>
+
+    {% if active_filters %}
+    <p class="filter-summary">
+        {% for item in active_filters %}
+        <span class="filter-pill">{{ item.label }} <b>{{ item.value }}</b></span>
+        {% endfor %}
+        <a class="btn btn--quiet" href="{% url 'insights' %}">Clear</a>
+    </p>
+    {% endif %}
+
+    {# The composer's model pickers live inside the chat form below, so the  #}
+    {# GET form carries its own copies; insights_page.js keeps them in sync. #}
+    <input type="hidden" name="provider" id="provider_filter" value="{{ selected_provider }}">
+    <input type="hidden" name="model" id="model_filter" value="{{ selected_model }}">
+    <input type="hidden" name="reasoning_effort" id="reasoning_effort_filter" value="{{ selected_reasoning_effort }}">
+
+    <div class="sheet filter-sheet" id="filterSheet" role="dialog" aria-modal="true" aria-label="Filter sessions">
+        <div class="sheet-scrim" data-close></div>
+        <div class="sheet-panel">
+            <div class="sheet-grab"></div>
+            <p class="sheet-title">Filter sessions</p>
+
+            <div class="field">
+                <label for="start_date">Start date</label>
                 {{ search_form.start_date }}
                 {{ search_form.start_date.errors }}
-            </span>
+            </div>
 
-            <span class="label-input" id="filter_end">
-                <label for="end_date"><i class="fa fa-calendar"></i> End Date</label>
+            <div class="field">
+                <label for="end_date">End date</label>
                 {{ search_form.end_date }}
                 {{ search_form.end_date.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
-                <label for="context-filter"><i class="fa fa-layer-group"></i> Context</label>
+            <div class="field">
+                <label for="context-filter">Context</label>
                 {{ search_form.context }}
                 {{ search_form.context.errors }}
-            </span>
+            </div>
 
-            <span class="label-input">
-                <label for="tag-filter"><i class="fa fa-tags"></i> Tags</label>
-                <details class="tag-dropdown">
-                    <summary class="tag-summary">Select tags</summary>
-                    <div class="tag-options">
-                        {% for cb in search_form.tags %}
-                            <label class="tag-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                {{ search_form.tags.errors }}
-            </span>
-
-            <span class="label-input">
-                <label for="exclude-projects-filter"><i class="fa fa-ban"></i> Exclude Projects</label>
-                <details class="tag-dropdown exclude-dropdown">
-                    <summary class="tag-summary">Select projects to exclude</summary>
-                    <div class="tag-options exclude-options">
-                        <input type="text" class="exclude-search-input" placeholder="Search projects..." autocomplete="off">
-                        {% for cb in search_form.exclude_projects %}
-                            <label class="tag-option exclude-option">
-                                {{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span>
-                            </label>
-                        {% endfor %}
-                    </div>
-                </details>
-                {{ search_form.exclude_projects.errors }}
-            </span>
-
-            <span class="label-input">
-                <label for="note_snippet"><i class="fa fa-sticky-note"></i> Note</label>
+            <div class="field">
+                <label for="note_snippet">Note contains</label>
                 {{ search_form.note_snippet }}
                 {{ search_form.note_snippet.errors }}
-            </span>
-
-            <input type="hidden" name="provider" id="provider_filter" value="{{ selected_provider }}">
-            <input type="hidden" name="model" id="model_filter" value="{{ selected_model }}">
-            <input type="hidden" name="reasoning_effort" id="reasoning_effort_filter" value="{{ selected_reasoning_effort }}">
-
-            <span>
-                <button type="submit" class="primary-button" id="search_button" name="filter" value="true">
-                    <i class="fa fa-filter"></i>
-                    Filter Sessions
-                </button>
-            </span>
-            </form>
-        </details>
-    </section>
-
-    <div class="chat-layout card">
-        <aside class="chat-sidebar">
-            <a href="{% url 'insights' %}" class="primary-button new-chat-btn">
-                <i class="fa fa-plus"></i> New Chat
-            </a>
-            <div class="chat-list">
-                {% for chat in recent_chats %}
-                    <div class="chat-item-container {% if chat.id == chat_id %}active{% endif %}">
-                        <a href="{% url 'insights_detail' chat.id %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
-                            <span class="chat-title" title="{{ chat.title }}">{{ chat.title }}</span>
-                        </a>
-                        <a href="#" class="delete-chat-btn" onclick="return deleteChat('{% url 'delete_chat' chat.id %}')">
-                            <i class="fa fa-trash"></i>
-                        </a>
-                    </div>
-                {% empty %}
-                    <p class="text-muted text-center">No recent chats.</p>
-                {% endfor %}
             </div>
-        </aside>
 
-        <main class="chat-main">
-            <div class="chat-header">
-                <button type="button" id="toggle-sidebar-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
-                    <i class="fa fa-chevron-left"></i>
-                </button>
-                {% if sessions or conversation_history %}
-                    <div class="chat-header-meta">
-                        <h3>{% if session_count > 0 %}Sessions: {{ session_count }}{% else %}Conversation History{% endif %}</h3>
-                        {% if session_count > 0 %}
-                            <span class="text-muted chat-header-range"><span class="text-cyan">{{ earliest_date|day_date_formatter }}</span> &ndash; <span class="text-cyan">{{ latest_date|day_date_formatter }}</span></span>
-                        {% endif %}
-                        <span id="token-usage" class="text-muted chat-header-tokens" data-prompt="{{ usage_stats.prompt|default:0 }}" data-response="{{ usage_stats.response|default:0 }}" title="Approximate cumulative token usage for this conversation. In = input/prompt tokens sent to the model, Out = tokens generated by the model (includes reasoning tokens).">
-                            In: {{ usage_stats.prompt|default:0 }} &middot; Out: {{ usage_stats.response|default:0 }}
-                        </span>
-                    </div>
-                    <div class="chat-header-actions">
-                        <button type="button" id="select-messages-btn" class="chat-action-btn" onclick="toggleSelectMode()" title="Select messages to copy">
-                            <i class="fa fa-check-square"></i> Select
-                        </button>
-                        <button type="button" id="copy-selected-btn" class="chat-action-btn" onclick="copySelectedMessages(this)" style="display: none;" disabled>
-                            <i class="fa fa-copy"></i> Copy (0)
-                        </button>
-                        <button type="button" id="copy-full-chat-btn" class="chat-action-btn" onclick="copyFullChat()">
-                            <i class="fa fa-copy"></i> Copy Full Chat
-                        </button>
-                    </div>
-                {% endif %}
-            </div>
-            {% if not sessions and not conversation_history %}
-                <div class="empty-state-container">
-                    <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}" alt="No sessions found">
-                    <p class="text-muted">Filter some sessions to start a conversation!</p>
+            {% if search_form.tags|length %}
+            <div class="field">
+                <span class="field-label">Tags</span>
+                <div class="check-grid">
+                    {% for cb in search_form.tags %}
+                    <span>{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
+                    {% endfor %}
                 </div>
-            {% else %}
-                <form method="post" class="chat-form" id="chat-form"
-                      data-stream-url="{% if chat_id %}{% url 'insights_detail_stream' chat_id %}{% else %}{% url 'insights_stream' %}{% endif %}">
-                    {% csrf_token %}
+                {{ search_form.tags.errors }}
+            </div>
+            {% endif %}
 
-                    <div id="conversation-container" class="conversation-container">
-                        {% if conversation_history %}
-                            {% for message in conversation_history %}
-                                {% if message.role == 'user' %}
-                                    <div class="user-message">
-                                        <button type="button" class="copy-btn" title="Copy message"
-                                                onclick="copyToClipboard(`{{ message.content|escapejs }}`, this)">
-                                            <i class="fa fa-copy"></i>
-                                        </button>
-                                        <div class="message-content">
-                                            {{ message.content|markdown|safe }}
-                                        </div>
+            {% if search_form.exclude_projects|length %}
+            <div class="field">
+                <span class="field-label">Exclude projects</span>
+                <input type="text" class="exclude-search-input input" placeholder="Search projects…" autocomplete="off">
+                <div class="check-grid exclude-options u-mt-4">
+                    {% for cb in search_form.exclude_projects %}
+                    <span class="exclude-option">{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
+                    {% endfor %}
+                </div>
+                {{ search_form.exclude_projects.errors }}
+            </div>
+            {% endif %}
+
+            <div class="sheet-foot">
+                <a class="btn btn--ghost" href="{% url 'insights' %}">Clear all</a>
+                <button class="btn btn--primary" type="submit" name="filter" value="true">Apply filters</button>
+            </div>
+        </div>
+    </div>
+</form>
+
+<section class="slab chat-layout">
+    <aside class="chat-sidebar">
+        <a href="{% url 'insights' %}" class="btn btn--primary btn--block new-chat-btn">
+            <i class="fa fa-plus"></i> New chat
+        </a>
+        <div class="chat-list">
+            {% for chat in recent_chats %}
+                <div class="chat-item-container {% if chat.id == chat_id %}active{% endif %}">
+                    <a href="{% url 'insights_detail' chat.id %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
+                        <span class="chat-title" title="{{ chat.title }}">{{ chat.title }}</span>
+                    </a>
+                    <a href="#" class="delete-chat-btn" title="Delete chat" onclick="return deleteChat('{% url 'delete_chat' chat.id %}')">
+                        <i class="fa fa-trash"></i>
+                    </a>
+                </div>
+            {% empty %}
+                <p class="empty chat-list-empty">No chats yet. Filter some sessions and ask a question.</p>
+            {% endfor %}
+        </div>
+    </aside>
+
+    <main class="chat-main">
+        <div class="chat-header">
+            <button type="button" id="toggle-sidebar-btn" class="btn-icon" onclick="toggleSidebar()" title="Toggle chat list" aria-label="Toggle chat list">
+                <i class="fa fa-chevron-left"></i>
+            </button>
+            {% if sessions or conversation_history %}
+                <div class="chat-header-meta">
+                    <h3>{% if session_count > 0 %}{{ session_count }} session{{ session_count|pluralize }}{% else %}Conversation{% endif %}</h3>
+                    {% if session_count > 0 %}
+                        <span class="chat-header-range muted"><span class="text-cyan">{{ earliest_date|day_date_formatter }}</span> &ndash; <span class="text-cyan">{{ latest_date|day_date_formatter }}</span></span>
+                    {% endif %}
+                    <span id="token-usage" class="chat-header-tokens muted" data-prompt="{{ usage_stats.prompt|default:0 }}" data-response="{{ usage_stats.response|default:0 }}" title="Approximate cumulative token usage for this conversation. In = input/prompt tokens sent to the model, Out = tokens generated by the model (includes reasoning tokens).">
+                        In: {{ usage_stats.prompt|default:0 }} &middot; Out: {{ usage_stats.response|default:0 }}
+                    </span>
+                </div>
+                <div class="chat-header-actions">
+                    <button type="button" id="select-messages-btn" class="chat-action-btn" onclick="toggleSelectMode()" title="Select messages to copy">
+                        <i class="fa fa-check-square"></i> Select
+                    </button>
+                    <button type="button" id="copy-selected-btn" class="chat-action-btn" onclick="copySelectedMessages(this)" hidden disabled>
+                        <i class="fa fa-copy"></i> Copy (0)
+                    </button>
+                    <button type="button" id="copy-full-chat-btn" class="chat-action-btn" onclick="copyFullChat()">
+                        <i class="fa fa-copy"></i> Copy chat
+                    </button>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if not sessions and not conversation_history %}
+            <div class="empty-state-container">
+                <img src="{% static 'core/images/reddit_such_empty_transparent.png' %}" alt="">
+                <p class="empty">
+                    No sessions match these filters, so there is nothing to ask about yet.
+                    Widen the range in <b>Filters</b>, or
+                    <a href="{% url 'sessions' %}">check what you have tracked</a>.
+                </p>
+            </div>
+        {% else %}
+            <form method="post" class="chat-form" id="chat-form"
+                  data-stream-url="{% if chat_id %}{% url 'insights_detail_stream' chat_id %}{% else %}{% url 'insights_stream' %}{% endif %}">
+                {% csrf_token %}
+
+                <div id="conversation-container" class="conversation-container">
+                    {% if conversation_history %}
+                        {% for message in conversation_history %}
+                            {% if message.role == 'user' %}
+                                <div class="user-message">
+                                    <button type="button" class="copy-btn" title="Copy message"
+                                            onclick="copyToClipboard(`{{ message.content|escapejs }}`, this)">
+                                        <i class="fa fa-copy"></i>
+                                    </button>
+                                    <div class="message-content">
+                                        {{ message.content|markdown|safe }}
                                     </div>
-                                {% elif message.role == 'assistant' %}
-                                    <div class="assistant-message" data-model="{{ message.model|default:selected_model }}">
-                                        <button type="button" class="copy-btn" title="Copy message" 
-                                                onclick="copyToClipboard(`{{ message.content|escapejs }}`, this)">
-                                            <i class="fa fa-copy"></i>
-                                        </button>
-                                        <div class="message-content">
-                                            {{ message.content|markdown|safe }}
-                                        </div>
-                                        {% if message.sources|length > 0 %}
-                                            <br><hr><br>
-                                            <small class="assistant-sources">
-                                                <strong>Sources:</strong>
-                                                {% for source in message.sources %}
-                                                    <a href="{{source.link}}" class="plain-link" target="_blank" rel="noopener noreferrer">
-                                                        {{source.title|default:forloop.counter|cut:" "}}
-                                                        {% if not forloop.last %},{% endif %}
-                                                    </a>
-                                                {% endfor %}
-                                            </small>
-                                        {% endif %}
+                                </div>
+                            {% elif message.role == 'assistant' %}
+                                <div class="assistant-message" data-model="{{ message.model|default:selected_model }}">
+                                    <button type="button" class="copy-btn" title="Copy message"
+                                            onclick="copyToClipboard(`{{ message.content|escapejs }}`, this)">
+                                        <i class="fa fa-copy"></i>
+                                    </button>
+                                    <div class="message-content">
+                                        {{ message.content|markdown|safe }}
                                     </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% else %}
-                            <div class="empty-state-container" style="opacity: 0.5;">
-                                <i class="fa fa-comments fa-3x"></i>
-                                <p>Start a new conversation about the selected sessions.</p>
-                            </div>
+                                    {% if message.sources|length > 0 %}
+                                        <small class="assistant-sources">
+                                            <strong>Sources:</strong>
+                                            {% for source in message.sources %}
+                                                <a href="{{source.link}}" class="plain-link" target="_blank" rel="noopener noreferrer">
+                                                    {{source.title|default:forloop.counter|cut:" "}}
+                                                    {% if not forloop.last %},{% endif %}
+                                                </a>
+                                            {% endfor %}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-state-container">
+                            <i class="fa fa-comments fa-3x muted" aria-hidden="true"></i>
+                            <p class="empty">
+                                {{ session_count }} session{{ session_count|pluralize }} selected.
+                                Ask something below to start the conversation.
+                            </p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="composer">
+                    <div class="composer-toolbar">
+                        <span class="composer-field">
+                            <label for="provider">Provider</label>
+                            <select id="provider" name="provider">
+                                {% for p in providers %}
+                                    <option value="{{ p }}" {% if p == selected_provider %}selected{% endif %}>{{ p|capfirst }}</option>
+                                {% endfor %}
+                            </select>
+                        </span>
+
+                        <span class="composer-field">
+                            <label for="model">Model</label>
+                            <select id="model" name="model"></select>
+                        </span>
+
+                        <span class="composer-field" id="reasoning-effort-field">
+                            <label for="reasoning_effort" title="OpenAI reasoning effort">Effort</label>
+                            <select id="reasoning_effort" name="reasoning_effort">
+                                {% for effort in openai_reasoning_efforts %}
+                                    <option value="{{ effort }}" {% if effort == selected_reasoning_effort %}selected{% endif %}>
+                                        {{ effort|capfirst }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </span>
+
+                        {% if openai_connection_source == "server" %}
+                            <span class="composer-note muted" title="OpenAI models are available through the server OPENAI_API_KEY. Add a personal key in Profile to use your own API account.">
+                                OpenAI via server key &mdash; add your own in <a href="{% url 'profile' %}" class="plain-link">Profile</a>.
+                            </span>
+                        {% elif openai_connection_source == "codex_with_api_fallback" %}
+                            <span class="composer-note muted" title="OpenAI models use your Codex login first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.">
+                                OpenAI via Codex login, API key fallback.
+                            </span>
+                        {% elif openai_connection_source == "codex" %}
+                            <span class="composer-note muted" title="OpenAI models are available through your Codex login.">
+                                OpenAI via Codex login.
+                            </span>
+                        {% elif openai_connection_source == "profile" %}
+                            <span class="composer-note muted" title="OpenAI models are using your profile API key.">
+                                OpenAI via your profile API key.
+                            </span>
+                        {% elif "openai" not in providers %}
+                            <span class="composer-note muted" title="OpenAI models need an API key or Codex login.">
+                                OpenAI needs a key or Codex login &mdash; add one in <a href="{% url 'profile' %}" class="plain-link">Profile</a>.
+                            </span>
                         {% endif %}
                     </div>
 
-                    <div class="composer">
-                        <div class="composer-toolbar">
-                            <span class="composer-field">
-                                <label for="provider">Provider</label>
-                                <select id="provider" name="provider">
-                                    {% for p in providers %}
-                                        <option value="{{ p }}" {% if p == selected_provider %}selected{% endif %}>{{ p|capfirst }}</option>
-                                    {% endfor %}
-                                </select>
-                            </span>
-
-                            <span class="composer-field">
-                                <label for="model">Model</label>
-                                <select id="model" name="model"></select>
-                            </span>
-
-                            <span class="composer-field" id="reasoning-effort-field">
-                                <label for="reasoning_effort" title="OpenAI reasoning effort">Effort</label>
-                                <select id="reasoning_effort" name="reasoning_effort">
-                                    {% for effort in openai_reasoning_efforts %}
-                                        <option value="{{ effort }}" {% if effort == selected_reasoning_effort %}selected{% endif %}>
-                                            {{ effort|capfirst }}
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                            </span>
-
-                            {% if openai_connection_source == "server" %}
-                                <span class="composer-note text-muted" title="OpenAI models are available through the server OPENAI_API_KEY. Add a personal key in Profile to use your own API account.">
-                                    OpenAI via server key &mdash; add your own in <a href="{% url 'profile' %}" class="plain-link">Profile</a>.
-                                </span>
-                            {% elif openai_connection_source == "codex_with_api_fallback" %}
-                                <span class="composer-note text-muted" title="OpenAI models use your Codex login first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.">
-                                    OpenAI via Codex login, API key fallback.
-                                </span>
-                            {% elif openai_connection_source == "codex" %}
-                                <span class="composer-note text-muted" title="OpenAI models are available through your Codex login.">
-                                    OpenAI via Codex login.
-                                </span>
-                            {% elif openai_connection_source == "profile" %}
-                                <span class="composer-note text-muted" title="OpenAI models are using your profile API key.">
-                                    OpenAI via your profile API key.
-                                </span>
-                            {% elif "openai" not in providers %}
-                                <span class="composer-note text-muted" title="OpenAI models need an API key or Codex login.">
-                                    OpenAI needs a key or Codex login &mdash; add one in <a href="{% url 'profile' %}" class="plain-link">Profile</a>.
-                                </span>
-                            {% endif %}
-                        </div>
-
-                        <div class="composer-input-row">
-                            <textarea name="prompt" id="prompt" rows="1"
-                                      placeholder="Ask a question about your sessions..."></textarea>
-                            <button type="submit" class="primary-button" title="Send (Enter)">
-                                <i class="fa fa-paper-plane"></i> Send
-                            </button>
-                        </div>
+                    <div class="composer-input-row">
+                        <label class="sr-only" for="prompt">Your question</label>
+                        <textarea name="prompt" id="prompt" rows="1"
+                                  placeholder="Ask a question about your sessions…"></textarea>
+                        <button type="submit" class="btn btn--primary" title="Send (Enter)">
+                            <i class="fa fa-paper-plane"></i> Send
+                        </button>
                     </div>
-                </form>
-            {% endif %}
-        </main>
-    </div>
+                </div>
+            </form>
+        {% endif %}
+    </main>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    {# Values Django used to interpolate straight into an inline <script>.  #}
+    {# json_script escapes them safely; insights_page.js reads this element. #}
+    {{ insights_config|json_script:"insights-config" }}
+    <script src="{% static 'core/js/insights_page.js' %}?v={{ static_version.insights_page }}" type="text/javascript"></script>
 {% endblock %}
