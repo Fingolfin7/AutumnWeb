@@ -34,6 +34,7 @@ python manage.py audit --username=<user>  # Recalculate totals (omit --username 
 python manage.py export <username> --output_file=<path>
 python manage.py import <username> --input_file=<path>
 python manage.py clear --username=<user>  # Delete all project data (omit --username for all users)
+python manage.py clear_temp_uploads --older-than-hours=24 [--dry-run]  # Sweep abandoned import uploads from MEDIA_ROOT/temp
 ```
 
 ## Architecture
@@ -88,6 +89,7 @@ Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate
 - `core/views/` - UI views package, one module per area (`timers`, `sessions`, `projects`, `contexts_tags`, `commitments`, `import_export`, `charts`, `dashboard`); `__init__.py` re-exports every view so `from core.views import X` still works
 - `core/api/` - REST API package, same layout (`helpers`, `timers`, `sessions`, `projects`, `subprojects`, `tallies`, `commitments`, `contexts_tags`, `import_export`, `misc`); `__init__.py` re-exports every endpoint
 - `core/importer.py` - Shared `iter_import` generator and `run_import` wrapper used by web and API imports
+- `core/temp_uploads.py` - Staging of web-import uploads under `MEDIA_ROOT/temp` between the import POST and the stream GET, plus their cleanup
 - `core/urls.py` - URL routing, including `/healthz/`
 - `core/utils.py` (~20KB) - Helper functions, date parsing, data formatting
 - `users/models.py` - Profile model with encrypted API key get/set methods

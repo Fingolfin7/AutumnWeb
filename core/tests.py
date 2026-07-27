@@ -1,4 +1,4 @@
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from core.models import Projects, SubProjects, Sessions, Commitment, Tag
@@ -10,6 +10,9 @@ from django.conf import settings
 import io
 import json
 import os
+import shutil
+import tempfile
+import time
 from unittest.mock import patch
 from core.models import Context
 from rest_framework.authtoken.models import Token
@@ -960,6 +963,164 @@ class ImportIntoContextUITests(TestCase):
         new_ctx = Context.objects.get(user=self.user, name="NewCtxWins")
         proj = Projects.objects.get(user=self.user, name="UI Project 2")
         self.assertEqual(proj.context_id, new_ctx.id)
+
+
+class PendingImportCleanupTests(TestCase):
+    """Uploads are staged on disk between the import POST and the stream GET.
+
+    Only the stream used to delete them, so any session that never streamed
+    left a file behind for good.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="tempclean", password="password")
+        self.client.login(username="tempclean", password="password")
+
+        media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, media_root, ignore_errors=True)
+        media = override_settings(MEDIA_ROOT=media_root)
+        media.enable()
+        self.addCleanup(media.disable)
+
+        self.media_root = media_root
+        self.temp_dir = os.path.join(media_root, "temp")
+
+    def _post_upload(self, contents: bytes, name: str = "export.json") -> str:
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        response = self.client.post(
+            reverse("import"),
+            data={
+                "file": SimpleUploadedFile(
+                    name, contents, content_type="application/json"
+                ),
+                "merge": "on",
+                "tolerance": "0.5",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        return self.client.session["file_path"]
+
+    def _upload_project(self, project_name: str) -> str:
+        payload = {
+            project_name: {
+                "Start Date": "05-01-2024",
+                "Last Updated": "05-02-2024",
+                "Total Time": 0.0,
+                "Description": "",
+                "Status": "active",
+                "Context": "FileContext",
+                "Tags": [],
+                "Sub Projects": {},
+                "Session History": [],
+            }
+        }
+        return self._post_upload(json.dumps(payload).encode("utf-8"))
+
+    def _staged_files(self):
+        if not os.path.isdir(self.temp_dir):
+            return []
+        return sorted(os.listdir(self.temp_dir))
+
+    def _write_staged(self, name: str, age_hours: float) -> str:
+        os.makedirs(self.temp_dir, exist_ok=True)
+        path = os.path.join(self.temp_dir, name)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("{}")
+        stamp = time.time() - age_hours * 3600
+        os.utime(path, (stamp, stamp))
+        return path
+
+    def test_revisiting_the_import_page_reclaims_an_abandoned_upload(self):
+        path = self._upload_project("Abandoned Project")
+        self.assertTrue(os.path.exists(path))
+
+        # The user never opened the stream; they just came back to the form.
+        self.assertEqual(self.client.get(reverse("import")).status_code, 200)
+
+        self.assertFalse(os.path.exists(path))
+        self.assertEqual(self._staged_files(), [])
+
+    def test_a_second_upload_discards_the_first(self):
+        first = self._upload_project("First Upload")
+        second = self._upload_project("Second Upload")
+
+        # Unique paths, so the second no longer overwrites the first.
+        self.assertNotEqual(first, second)
+        self.assertFalse(os.path.exists(first))
+        self.assertTrue(os.path.exists(second))
+        self.assertEqual(self._staged_files(), [os.path.basename(second)])
+
+    def test_stream_removes_the_upload_even_when_the_file_is_not_json(self):
+        path = self._post_upload(b"this is not json")
+
+        response = self.client.get(reverse("import_stream"))
+        body = "".join(
+            chunk.decode("utf-8", errors="ignore") if isinstance(chunk, bytes) else chunk
+            for chunk in response.streaming_content
+        )
+
+        self.assertIn("Invalid JSON file", body)
+        self.assertFalse(os.path.exists(path))
+        self.assertEqual(self._staged_files(), [])
+
+    def test_successful_stream_still_removes_the_upload(self):
+        path = self._upload_project("Streamed Project")
+
+        response = self.client.get(reverse("import_stream"))
+        for _ in response.streaming_content:
+            pass
+
+        self.assertTrue(Projects.objects.filter(user=self.user, name="Streamed Project").exists())
+        self.assertFalse(os.path.exists(path))
+
+    def test_sweep_removes_only_uploads_past_the_age_threshold(self):
+        from core.temp_uploads import sweep
+
+        stale = self._write_staged("import_stale.json", age_hours=48)
+        fresh = self._write_staged("import_fresh.json", age_hours=1)
+
+        removed, freed = sweep(max_age_seconds=24 * 3600, dry_run=True)
+        self.assertEqual(removed, [stale])
+        self.assertEqual(freed, 2)
+        self.assertTrue(os.path.exists(stale), "dry run must not delete")
+
+        removed, freed = sweep(max_age_seconds=24 * 3600)
+        self.assertEqual(removed, [stale])
+        self.assertEqual(freed, 2)
+        self.assertFalse(os.path.exists(stale))
+        self.assertTrue(os.path.exists(fresh))
+
+    def test_sweep_is_a_no_op_when_nothing_has_been_staged_yet(self):
+        from core.temp_uploads import sweep
+
+        self.assertEqual(sweep(max_age_seconds=0), ([], 0))
+
+    def test_discard_upload_refuses_paths_outside_the_staging_directory(self):
+        from core.temp_uploads import discard_upload
+
+        outside = os.path.join(self.media_root, "keep_me.json")
+        with open(outside, "w", encoding="utf-8") as f:
+            f.write("{}")
+
+        self.assertFalse(discard_upload(outside))
+        self.assertTrue(os.path.exists(outside))
+        self.assertFalse(discard_upload(None))
+        self.assertFalse(discard_upload(os.path.join(self.temp_dir, "gone.json")))
+
+    def test_clear_temp_uploads_command_sweeps_stale_uploads(self):
+        stale = self._write_staged("import_stale.json", age_hours=48)
+        fresh = self._write_staged("import_fresh.json", age_hours=1)
+
+        out = io.StringIO()
+        call_command("clear_temp_uploads", "--older-than-hours=24", stdout=out)
+        output = out.getvalue()
+
+        self.assertIn("Removed", output)
+        self.assertIn("import_stale.json", output)
+        self.assertNotIn("import_fresh.json", output)
+        self.assertFalse(os.path.exists(stale))
+        self.assertTrue(os.path.exists(fresh))
 
 
 class ProjectsGroupedApiTests(TestCase):
