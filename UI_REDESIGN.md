@@ -139,11 +139,13 @@ is the Focus Desk shell, and `focus_desk.css` is the only stylesheet.
 
 ### Still open
 
-- `body.light-mode` in `focus_desk.css` is unreachable — nothing sets that
-  class any more. It is a complete token set for a light theme, so it was left
-  in place rather than deleted; wire it up or drop it deliberately.
 - The elapsed figure on `stop_timer` and `remove_timer` is static. It reads
   like it should tick, and the markup already carries `data-start-time`.
+
+Deliberately closed: the `body.light-mode` token set was deleted rather than
+kept. Nothing had set that class since the legacy shell went, and an unreachable
+half-theme is worse than no theme — it looks maintained without being tested.
+A light theme, if wanted, starts from the dark tokens again.
 
 ## Chunk 12 (Insights) — how it went
 

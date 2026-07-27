@@ -966,24 +966,6 @@ body.bg-active .app { position: relative; z-index: 2; }
   }
 }
 
-/* ------------------------------------------------------------ LIGHT MODE --
-   Secondary. Derived from the dark tokens, never the reverse.               */
-body.light-mode {
-  --ink: #22201c; --ink-2: #4a4f4b; --muted: #6d746f; --ink-invert: #fffdf8;
-  --base: #f4f1ec;
-  --slab: rgba(255,253,248,0.88);
-  --slab-focus: rgba(255,253,248,0.94);
-  --slab-solid: #fffdf8;
-  --raised: rgba(34,32,28,0.05);
-  --raised-2: rgba(34,32,28,0.09);
-  --sunken: rgba(34,32,28,0.06);
-  --hairline: rgba(34,32,28,0.10);
-  --hairline-2: rgba(34,32,28,0.18);
-  --project: #a84f47; --sub: #4f6d92; --duration: #55803f;
-  --time: #327d72; --note: #8a7530; --brand: #a9662d;
-  --edge: inset 0 1px 0 rgba(255,255,255,.7);
-}
-
 /* ============================================================================
    ═══  DESKTOP LAYER  —  "FOCUS DESK"  ═══════════════════════════════════════
    ----------------------------------------------------------------------------
