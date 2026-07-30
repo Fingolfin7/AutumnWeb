@@ -37,7 +37,7 @@ class ChartsPageTests(TestCase):
             'id="chart-empty"',
             'id="canvas_container"',
             'id="chart"',
-            'id="draw"',
+            'id="refresh-chart"',
             'id="chart_type"',
             "data-selected=",
         ):
@@ -51,7 +51,20 @@ class ChartsPageTests(TestCase):
 
         before_sheet = html.split('id="filterSheet"')[0]
         self.assertIn('id="chart_type"', before_sheet)
-        self.assertIn('id="draw"', before_sheet)
+        self.assertIn('id="refresh-chart"', before_sheet)
+
+    def test_the_picker_still_posts_its_type_through_apply(self):
+        """Picking a type now redraws client-side without submitting, so nothing
+        in the redraw path needs name="chart_type" any more. Apply still does:
+        it reloads, and the type has to survive the round-trip and come back in
+        data-selected."""
+        html = self.client.get(
+            reverse("charts"), {"chart_type": "treemap"}
+        ).content.decode()
+
+        picker = html.split('id="chart_type"')[1].split(">")[0]
+        self.assertIn('name="chart_type"', picker)
+        self.assertIn('data-selected="treemap"', picker)
 
     def test_filters_are_echoed_like_the_other_list_pages(self):
         response = self.client.get(reverse("charts"), {"context": str(self.context.id)})

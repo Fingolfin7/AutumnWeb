@@ -136,6 +136,15 @@ function consolidateTopN(data, topN = getProjectLimit(), timeKey = 'total_time')
 
 const chartDataCache = new Map();
 
+/**
+ * Drop every cached payload so the next render re-fetches.
+ * The whole map, not one key: the point of refreshing is "give me current
+ * data", so switching type afterwards should hit the server too.
+ */
+function invalidateChartData() {
+    chartDataCache.clear();
+}
+
 function get_project_data(type, start_date = "", end_date = "", project_name = "", context_id = "", tag_ids = [], exclude_ids = []) {
     // Every chart type is served by the v2 charts endpoint; the server picks
     // the payload shape from chart_type (legacy tally/hierarchy shapes for
@@ -232,6 +241,27 @@ function applyChartLayout(type) {
 
     const circularTypes = ['pie', 'status', 'radar'];
     $canvasContainer.toggleClass('chart-circular', circularTypes.includes(type));
+}
+
+/**
+ * Mirror the picked type into the query string. Picking a type no longer
+ * submits the form, so without this a reload or a shared link would drop back
+ * to whatever chart_type the URL still carried.
+ *
+ * Pass the SELECT's value, never render()'s local `type` — that one gets
+ * rewritten to the *_subprojects variants, which are not option values.
+ * replaceState adds no history entry, so Back is unaffected.
+ */
+function syncChartTypeInUrl(type) {
+    if (!type || !window.history || !window.history.replaceState) return;
+
+    try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('chart_type', type);
+        window.history.replaceState(null, '', url);
+    } catch (e) {
+        // A URL we cannot parse is not worth failing the redraw over.
+    }
 }
 
 // ============================================================================
@@ -338,7 +368,7 @@ $(document).ready(function() {
     initUIElements();
 
     let selectType = $('#chart_type');
-    let draw = $('#draw');
+    let refresh = $('#refresh-chart');
 
     // Persist chart type from server-rendered data attribute
     const preselectedType = selectType.data('selected');
@@ -348,7 +378,27 @@ $(document).ready(function() {
 
     // Initial draw
     render();
-    draw.on('click', render);
+
+    /* Picking a type IS the action — the same reasoning as the self-submitting
+       selects in focus_desk.js, except the redraw is client-side so there is no
+       form submit to make. Safe to fire on every change: render() reads all its
+       inputs live from the DOM, renderGeneration discards out-of-order
+       responses, and chartDataCache makes a type you have already seen instant.
+
+       The narrowing controls keep their explicit Apply, because those DO reload
+       the page to update the URL and the filter pills. */
+    selectType.on('change', function() {
+        syncChartTypeInUrl($(this).val());
+        render();
+    });
+
+    /* The one thing a redraw alone cannot do: pick up time tracked since the
+       page loaded. chartDataCache holds a payload per URL for the life of the
+       page, so refreshing has to drop it first. */
+    refresh.on('click', function() {
+        invalidateChartData();
+        render();
+    });
 });
 
 // Export utilities for other modules

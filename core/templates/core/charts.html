@@ -5,14 +5,19 @@
   ============================================================================
   CHARTS — Focus Desk (UI_REDESIGN.md chunk 9)
   ----------------------------------------------------------------------------
-  The chart-type picker and Draw stay on the page: they are what this page is
-  FOR. Only the narrowing controls — dates, context, tags, exclusions — go in
-  the filter sheet, same as Sessions and Projects, with the applied ones
+  The chart-type picker and Refresh stay on the page: they are what this page
+  is FOR. Only the narrowing controls — dates, context, tags, exclusions — go
+  in the filter sheet, same as Sessions and Projects, with the applied ones
   echoed back as pills.
+
+  Picking a chart type redraws on the spot — there is no Draw button, because
+  the redraw is client-side and a second click bought nothing. Refresh is the
+  one thing a redraw cannot do by itself: drop the cached payload and re-fetch.
+  The narrowing controls still commit through Apply, which reloads.
 
   charts/core.js owns these and they must not be renamed:
     #chart_data_link  #chart-loading  #chart-empty  #canvas_container  #chart
-    #draw  #chart_type (and its data-selected)
+    #refresh-chart  #chart_type (and its data-selected, and its name= for Apply)
   It also toggles .chart-circular on #canvas_container for the square charts.
   ============================================================================
 {% endcomment %}
@@ -120,8 +125,9 @@
                 </optgroup>
             </select>
         </div>
-        <button type="button" class="btn btn--primary" id="draw">
-            <i class="fas fa-chart-line"></i> Draw
+        <button type="button" class="btn btn--primary" id="refresh-chart"
+                title="Re-fetch this chart's data, picking up anything tracked since the page loaded">
+            <i class="fas fa-sync-alt"></i> Refresh
         </button>
     </div>
 
