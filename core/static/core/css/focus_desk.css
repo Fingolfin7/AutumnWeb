@@ -255,13 +255,31 @@
 /* ------------------------------------------------------------ RESET/BASE -- */
 *, *::before, *::after { box-sizing: border-box; }
 /* color-scheme is what tells the BROWSER this is a dark UI, and it is the only
-   way to reach the parts of a control the page cannot style. A <select>'s open
-   dropdown is drawn by the OS, not by us: without this it renders on the light
-   grey system popup while our CSS colours the text pale, which is why the
-   chart picker's options were unreadable. It also fixes the scrollbars, the
-   date-picker panel, and the default checkbox and radio glyphs. Setting it
-   here rather than on <body> matters — the scrollbar belongs to the root. */
+   way to reach the parts of a control the page cannot style: the scrollbars, the
+   date-picker panel, and the default checkbox and radio glyphs. Setting it here
+   rather than on <body> matters — the scrollbar belongs to the root. */
 html { font-size: 16px; -webkit-text-size-adjust: 100%; color-scheme: dark; }
+
+/* A <select>'s open dropdown is drawn by the OS, and color-scheme alone does NOT
+   reach it once we have styled the control: Chromium paints the popup from the
+   select's own background-color, and ours is translucent (--sunken), so it
+   composites over the popup's white base into a light grey — then inherits
+   --ink on top of that, which is what washed the chart picker's options out.
+   Naming the row colours is the only thing that beats an author background.
+
+   Opaque on purpose. The closed control stays translucent over the backdrop
+   photo; a popup floats above the page with nothing behind it to show through,
+   so translucency there buys a muddy blend and nothing else. */
+option {
+  background-color: var(--slab-solid);
+  color: var(--ink);
+}
+/* Group headings are labels, not choices — quiet them like .field-label. The UA
+   already renders them bold, so weight is not ours to set. */
+optgroup {
+  background-color: var(--slab-solid);
+  color: var(--muted);
+}
 body {
   margin: 0;
   min-height: 100vh;
