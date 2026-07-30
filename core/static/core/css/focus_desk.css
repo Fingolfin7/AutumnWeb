@@ -1870,6 +1870,16 @@ img.brand-mark {
    search_projects.js and timer_search_projects.js attach jQuery UI
    autocomplete and append its menu to #project-search-results. The widget owns
    those class names, so they are restyled here rather than renamed.          */
+/* The menu is absolutely positioned INSIDE the form, so a slab clipping its
+   own overflow cuts the suggestions off at its padding edge — on the start
+   timer form the subproject picker is still hidden when you first type, so the
+   slab ends a few pixels under the input and all but the first row disappears.
+   A slab holding a search anchor opts out, the way .fd-tl-slab does for its
+   tooltips. Safe because every such slab is .slab-pad: the padding keeps
+   content off the rounded corners that overflow: hidden was there to protect,
+   and stops the last field's bottom margin collapsing out. */
+.slab:has(#project-search-results) { overflow: visible; }
+
 .ui-autocomplete {
   position: absolute; z-index: 50;
   max-height: 18rem; overflow-y: auto;
