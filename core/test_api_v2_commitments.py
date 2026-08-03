@@ -6,7 +6,7 @@ from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
 
-from core.models import Commitment, Projects
+from core.models import Commitment, CommitmentPeriod, CommitmentRevision, Projects
 from core.services import SessionMutationService
 
 
@@ -191,6 +191,23 @@ class V2CommitmentsTests(TestCase):
         )
         self.assertEqual(stale.status_code, 409)
 
+        ambiguous_type_change = self.client.post(
+            url,
+            {"keep_balance": False, "changes": {"commitment_type": "sessions"}},
+            format="json",
+            HTTP_IF_MATCH="2",
+        )
+        self.assertEqual(ambiguous_type_change.status_code, 400)
+        self.assertIn(
+            "target is required",
+            str(ambiguous_type_change.json()["error"]["details"]),
+        )
+        current = Commitment.objects.get(pk=commitment["id"])
+        self.assertEqual(
+            (current.commitment_type, current.target, current.generation, current.version),
+            ("time", 60, 2, 2),
+        )
+
         with freeze_time("2026-01-02 14:00:00+00:00"):
             reset = self.client.post(
                 url,
@@ -202,6 +219,62 @@ class V2CommitmentsTests(TestCase):
         self.assertEqual(reset.json()["generation"], 3)
         self.assertEqual(reset.json()["balance"], 0.0)
         self.assertEqual(reset.json()["target_value"], 30.0)
+
+    @freeze_time("2026-01-01 12:00:00+00:00")
+    def test_delete_removes_all_restarted_generation_history(self):
+        commitment = self.create_commitment().json()
+        detail_url = reverse(
+            "api_v2:commitment-detail", args=[commitment["id"]]
+        )
+        with freeze_time("2026-01-03 12:00:00+00:00"):
+            self.client.get(detail_url)
+        with freeze_time("2026-01-03 13:00:00+00:00"):
+            restarted = self.client.post(
+                reverse("api_v2:commitment-restart", args=[commitment["id"]]),
+                {
+                    "keep_balance": False,
+                    "changes": {
+                        "commitment_type": "sessions",
+                        "target_value": 2,
+                    },
+                },
+                format="json",
+                HTTP_IF_MATCH="1",
+            )
+        self.assertEqual(restarted.status_code, 200, restarted.content)
+        with freeze_time("2026-01-04 14:00:00+00:00"):
+            self.client.get(detail_url)
+
+        self.assertGreaterEqual(
+            CommitmentRevision.objects.filter(
+                commitment_id=commitment["id"]
+            ).count(),
+            2,
+        )
+        self.assertGreaterEqual(
+            CommitmentPeriod.objects.filter(
+                commitment_id=commitment["id"]
+            ).count(),
+            2,
+        )
+
+        deleted = self.client.delete(
+            detail_url,
+            HTTP_IF_MATCH=str(restarted.json()["version"]),
+        )
+
+        self.assertEqual(deleted.status_code, 204, deleted.content)
+        self.assertFalse(Commitment.objects.filter(pk=commitment["id"]).exists())
+        self.assertFalse(
+            CommitmentRevision.objects.filter(
+                commitment_id=commitment["id"]
+            ).exists()
+        )
+        self.assertFalse(
+            CommitmentPeriod.objects.filter(
+                commitment_id=commitment["id"]
+            ).exists()
+        )
 
     @freeze_time("2026-01-01 08:00:00+00:00")
     def test_manual_adjustment_is_unclamped_then_clamped_at_close(self):

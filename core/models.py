@@ -522,7 +522,9 @@ class CommitmentPeriod(models.Model):
     generation = models.IntegerField(default=1, db_default=1)
     revision = models.ForeignKey(
         CommitmentRevision,
-        on_delete=models.PROTECT,
+        # Preserve revisions while period rows reference them, but permit a
+        # commitment-family cascade to remove both sides together.
+        on_delete=models.RESTRICT,
         related_name='period_rows',
     )
     period_start = models.DateTimeField()

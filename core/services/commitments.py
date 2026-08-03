@@ -307,6 +307,15 @@ class CommitmentEditService:
         )
         if expected_version is not None and commitment.version != expected_version:
             raise StaleVersionError(commitment)
+        if (
+            "commitment_type" in changes
+            and changes["commitment_type"] != commitment.commitment_type
+            and "target" not in changes
+        ):
+            raise ValidationError(
+                "target is required when changing commitment_type because "
+                "target values use commitment-specific units."
+            )
         now = timezone.now()
         prior_generation = commitment.generation
         current_revision = (
