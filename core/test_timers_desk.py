@@ -5,7 +5,9 @@ scripts build or drive markup this template only supplies hooks for, and a
 renamed id fails silently in the browser while every Python test still passes.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
+
+from freezegun import freeze_time
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -127,6 +129,41 @@ class ScriptContractTests(TimerPagesTestCase):
 
 
 class TimerPageContentTests(TimerPagesTestCase):
+    def test_stop_page_datetime_inputs_include_seconds(self):
+        started_at = timezone.make_aware(datetime(2026, 8, 5, 9, 7, 43))
+        timer = Sessions.objects.create(
+            user=self.user,
+            project=self.atlas,
+            start_time=started_at,
+        )
+
+        with freeze_time("2026-08-05 10:11:29+00:00"):
+            response = self.client.get(reverse("stop_timer", args=[timer.id]))
+            expected_end = timezone.localtime(timezone.now()).strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
+
+        self.assertContains(response, 'step="1"', count=2)
+        self.assertContains(response, started_at.strftime("%Y-%m-%dT%H:%M:%S"))
+        self.assertContains(response, expected_end)
+
+    @freeze_time("2026-08-05 10:11:29+00:00")
+    def test_stop_without_explicit_times_preserves_second_accuracy(self):
+        started_at = timezone.make_aware(datetime(2026, 8, 5, 9, 7, 43))
+        timer = Sessions.objects.create(
+            user=self.user,
+            project=self.atlas,
+            start_time=started_at,
+        )
+
+        response = self.client.post(reverse("stop_timer", args=[timer.id]))
+
+        self.assertRedirects(response, reverse("timers"))
+        timer.refresh_from_db()
+        self.assertEqual(timer.start_time, started_at)
+        self.assertEqual(timer.end_time.second, 29)
+        self.assertEqual(timer.end_time.microsecond, 0)
+
     def test_the_deck_always_offers_a_way_to_start(self):
         """Even with timers running — the start card is not an empty state."""
         self._timer()

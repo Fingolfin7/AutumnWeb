@@ -152,9 +152,13 @@ def stop_timer(request, session_id: int):
 
         # Maintain legacy behavior where POSTing without explicit date/time still stops immediately.
         if not post_data.get("start_time"):
-            post_data["start_time"] = timer.start_time.strftime("%Y-%m-%dT%H:%M")
+            post_data["start_time"] = timezone.localtime(timer.start_time).strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
         if not post_data.get("end_time"):
-            post_data["end_time"] = timezone.localtime(timezone.now()).strftime("%Y-%m-%dT%H:%M")
+            post_data["end_time"] = timezone.localtime(timezone.now()).strftime(
+                "%Y-%m-%dT%H:%M:%S"
+            )
 
         form = StopTimerForm(post_data, instance=timer)
         if form.is_valid():
