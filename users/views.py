@@ -165,6 +165,10 @@ def profile(request):
         'claude': bool(profile.claude_api_key_enc),
         'openai_server': bool(os.environ.get('OPENAI_API_KEY')),
     }
+    have_keys['profile_credentials'] = any(
+        have_keys[provider]
+        for provider in ('gemini', 'openai', 'openai_chatgpt', 'claude')
+    )
     have_keys['openai_available'] = have_keys['openai'] or have_keys['openai_server']
     openai_chatgpt_bundle = (
         deserialize_token_bundle(profile.get_api_key('openai_chatgpt'))

@@ -34,7 +34,10 @@ class DeleteChatMethodTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="chat-user", password=None)
         self.user.profile.ai_features_enabled = True
-        self.user.profile.save(update_fields=["ai_features_enabled"])
+        self.user.profile.set_api_key("openai", "test-openai-key")
+        self.user.profile.save(
+            update_fields=["ai_features_enabled", "openai_api_key_enc"]
+        )
         self.chat = LLMChat.objects.create(user=self.user, title="t")
         self.client.force_login(self.user)
 

@@ -77,7 +77,7 @@ All API endpoints require authentication (session or token) except `GET /healthz
 
 Pluggable handler architecture with a base class:
 - `base_handler.py` - Abstract base
-- `gemini_handler.py` - Google Gemini (has server-side fallback key)
+- `gemini_handler.py` - Google Gemini (uses the user's profile key)
 - `openai_handler.py` - OpenAI (user-provided key only)
 - `claude_handler.py` - Anthropic Claude (user-provided key only)
 
@@ -101,7 +101,6 @@ Required in `.env`:
 ```
 SECRET_KEY=<django-secret>
 DEBUG=TRUE/FALSE
-GEMINI_API_KEY=<key>  # Server-side fallback for Gemini
 ```
 
 Optional:

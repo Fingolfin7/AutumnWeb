@@ -156,7 +156,7 @@
             <a class="tab {% if un == 'sessions' or un == 'update_session' or un == 'delete_session' %}is-active{% endif %}" href="{% url 'sessions' %}">
                 <i class="fas fa-list-ul tab-icon"></i><span class="tab-label">Sessions</span>
             </a>
-            {% if user.profile.ai_features_enabled %}
+            {% if user.profile.insights_access_enabled %}
             <a class="tab tab--overflow {% if un == 'insights' or un == 'insights_detail' %}is-active{% endif %}" href="{% url 'insights' %}">
                 <i class="fas fa-brain tab-icon"></i><span class="tab-label">Insights</span>
             </a>
@@ -200,7 +200,7 @@
             <div class="sheet-grab"></div>
             <p class="sheet-title">{{ user.username }}</p>
             <div class="sheet-list">
-                {% if user.profile.ai_features_enabled %}
+                {% if user.profile.insights_access_enabled %}
                 <a class="sheet-item" href="{% url 'insights' %}"><i class="fas fa-brain sheet-item-icon"></i> Insights</a>
                 {% endif %}
                 <a class="sheet-item" href="{% url 'charts' %}"><i class="fas fa-chart-pie sheet-item-icon"></i> Charts</a>

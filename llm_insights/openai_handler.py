@@ -10,17 +10,18 @@ from .base_handler import BaseLLMHandler
 
 
 class OpenAIHandler(BaseLLMHandler):
+    CHAT_TITLE_MODEL = "gpt-5.6-luna"
     AUTH_API = "api"
     AUTH_CODEX = "codex"
     AUTH_CODEX_WITH_API_FALLBACK = "codex_with_api_fallback"
 
     def __init__(
         self,
-        model="gpt-5.5",
+        model="gpt-5.6-luna",
         api_key: str | None = None,
         codex_token: str | None = None,
         auth_mode: str | None = None,
-        reasoning_effort: str | None = "medium",
+        reasoning_effort: str | None = "high",
     ):
         self.model = model
         self.api_key = api_key
@@ -121,7 +122,7 @@ class OpenAIHandler(BaseLLMHandler):
             "max_output_tokens": 4096,
             "store": False,
         }
-        if self.reasoning_effort in {"low", "medium", "high"}:
+        if self.reasoning_effort in {"low", "medium", "high", "extra-high"}:
             kwargs["reasoning"] = {"effort": self.reasoning_effort}
         if include_web_search:
             kwargs["tools"] = [{"type": "web_search"}]
@@ -130,7 +131,7 @@ class OpenAIHandler(BaseLLMHandler):
 
     def _api_title_response_kwargs(self, prompt):
         return {
-            "model": self.model,
+            "model": self.CHAT_TITLE_MODEL,
             "input": [
                 {
                     "role": "system",
@@ -147,7 +148,7 @@ class OpenAIHandler(BaseLLMHandler):
 
     def _codex_title_response_kwargs(self, prompt):
         return {
-            "model": self.model,
+            "model": self.CHAT_TITLE_MODEL,
             "instructions": (
                 "You write concise conversation titles. Return only the title, "
                 "with no quotes, markdown, or trailing punctuation."

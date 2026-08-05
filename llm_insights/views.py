@@ -130,6 +130,21 @@ async def generate_and_save_chat_title(
     return title
 
 
+def get_chat_title_handler(selected_handler, api_keys):
+    """Prefer Luna for titles whenever the user has OpenAI auth configured."""
+    if not (
+        api_keys.get("openai")
+        or api_keys.get("openai_chatgpt")
+        or os.environ.get("OPENAI_API_KEY")
+    ):
+        return selected_handler
+    return get_llm_handler(
+        model="gpt-5.6-luna",
+        api_keys=api_keys,
+        reasoning_effort="high",
+    )
+
+
 def stream_queue_events(event_queue, stream_done, heartbeat_seconds=SSE_HEARTBEAT_SECONDS):
     while True:
         try:
@@ -142,13 +157,20 @@ def stream_queue_events(event_queue, stream_done, heartbeat_seconds=SSE_HEARTBEA
         yield item
 
 
-def user_has_ai_features(user):
+def user_has_insights_access(user):
     profile = getattr(user, "profile", None)
-    return bool(profile and profile.ai_features_enabled)
+    return bool(profile and profile.insights_access_enabled)
 
 
-def ai_features_disabled_response(request):
-    messages.error(request, "AI features are disabled for this account.")
+def insights_access_disabled_response(request):
+    profile = getattr(request.user, "profile", None)
+    if profile and not profile.ai_features_enabled:
+        messages.error(request, "AI features are disabled for this account.")
+    else:
+        messages.error(
+            request,
+            "Add an AI provider API key or connect Codex in your Profile first.",
+        )
     return redirect("home")
 
 
@@ -336,8 +358,8 @@ async def perform_llm_analysis_stream(
 def delete_chat(request, chat_id):
     # POST-only: a GET-reachable delete can be triggered by link prefetching
     # or a cross-site <img> request.
-    if not user_has_ai_features(request.user):
-        return ai_features_disabled_response(request)
+    if not user_has_insights_access(request.user):
+        return insights_access_disabled_response(request)
     chat = get_object_or_404(LLMChat, id=chat_id, user=request.user)
     chat.delete()
     messages.success(request, "Chat deleted.")
@@ -345,29 +367,29 @@ def delete_chat(request, chat_id):
 
 
 class InsightsView(View):
-    OPENAI_REASONING_EFFORTS = ["low", "medium", "high"]
+    OPENAI_REASONING_EFFORTS = ["low", "medium", "high", "extra-high"]
 
     def _has_env_api_key(self, env_var):
         return bool(os.environ.get(env_var))
 
     def _provider_models(self, user):
         profile = getattr(user, "profile", None)
-        provider_models = {
-            "gemini": [
-                ("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
-                ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
-            ]
-        }
+        provider_models = {}
         if (
             (profile and profile.openai_api_key_enc)
             or (profile and profile.openai_chatgpt_token_enc)
             or self._has_env_api_key("OPENAI_API_KEY")
         ):
             provider_models["openai"] = [
+                ("gpt-5.6-luna", "GPT-5.6 Luna"),
                 ("gpt-5.6-sol", "GPT-5.6 Sol"),
                 ("gpt-5.6-terra", "GPT-5.6 Terra"),
-                ("gpt-5.6-luna", "GPT-5.6 Luna"),
                 ("gpt-5.5", "GPT-5.5"),
+            ]
+        if profile and profile.gemini_api_key_enc:
+            provider_models["gemini"] = [
+                ("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
+                ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
             ]
         if profile and profile.claude_api_key_enc:
             provider_models["claude"] = [
@@ -428,7 +450,7 @@ class InsightsView(View):
         if provider != "openai":
             return ""
         if effort not in self.OPENAI_REASONING_EFFORTS:
-            return "medium"
+            return "high"
         return effort
 
     def _extract_filter_params(self, request):
@@ -465,8 +487,8 @@ class InsightsView(View):
             from django.contrib.auth.views import redirect_to_login
 
             return redirect_to_login(request.get_full_path(), settings.LOGIN_URL)
-        if not await sync_to_async(user_has_ai_features)(user):
-            return await sync_to_async(ai_features_disabled_response)(request)
+        if not await sync_to_async(user_has_insights_access)(user):
+            return await sync_to_async(insights_access_disabled_response)(request)
 
         def get_all_sync_data():
             # Get current chat if any
@@ -729,9 +751,9 @@ class InsightsView(View):
                 content_type="text/event-stream",
                 status=401,
             )
-        if not user_has_ai_features(user):
+        if not user_has_insights_access(user):
             return StreamingHttpResponse(
-                iter([stream_event("error", {"message": "AI features are disabled for this account."})]),
+                iter([stream_event("error", {"message": "Insights requires an AI provider API key or Codex login in your profile."})]),
                 content_type="text/event-stream",
                 status=403,
             )
@@ -896,7 +918,7 @@ class InsightsView(View):
 
                 chat_title = await generate_and_save_chat_title(
                     stream_context["chat_id"],
-                    handler,
+                    get_chat_title_handler(handler, stream_context["api_keys"]),
                     conversation_history,
                     fallback_title=stream_context["fallback_title"],
                 )
@@ -984,8 +1006,8 @@ class InsightsView(View):
             from django.contrib.auth.views import redirect_to_login
 
             return redirect_to_login(request.get_full_path(), settings.LOGIN_URL)
-        if not await sync_to_async(user_has_ai_features)(user):
-            return await sync_to_async(ai_features_disabled_response)(request)
+        if not await sync_to_async(user_has_insights_access)(user):
+            return await sync_to_async(insights_access_disabled_response)(request)
 
         def get_initial_post_data():
             chat_obj = None
@@ -1154,7 +1176,7 @@ class InsightsView(View):
             await sync_to_async(finalize_post_session)()
             await generate_and_save_chat_title(
                 chat_obj,
-                handler,
+                get_chat_title_handler(handler, data["api_keys"]),
                 conversation_history,
                 fallback_title=chat_obj.title,
             )

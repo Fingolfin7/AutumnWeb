@@ -25,6 +25,7 @@ class InsightsDeskTests(TestCase):
             username="insightsdesk", email="i@example.com", password="pw"
         )
         cls.user.profile.ai_features_enabled = True
+        cls.user.profile.set_api_key("openai", "test-openai-key")
         cls.user.profile.save()
         cls.context = Context.objects.create(user=cls.user, name="Work")
         cls.tag = Tag.objects.create(user=cls.user, name="deep")
@@ -93,6 +94,7 @@ class ScriptContractTests(TestCase):
             username="insightsjs", email="j@example.com", password="pw"
         )
         cls.user.profile.ai_features_enabled = True
+        cls.user.profile.set_api_key("openai", "test-openai-key")
         cls.user.profile.save()
         cls.project = Projects.objects.create(user=cls.user, name="Atlas API")
         end = timezone.now() - timedelta(hours=1)

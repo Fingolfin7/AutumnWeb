@@ -70,8 +70,8 @@ class Profile(models.Model):
     openai_chatgpt_token_enc = models.BinaryField(null=True, blank=True, editable=False)
     claude_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     ai_features_enabled = models.BooleanField(
-        # Off by default: Gemini can fall back to the server's API key, so a
-        # fresh account must not get AI access until the operator grants it.
+        # Off by default so a fresh account must not get AI access until the
+        # operator grants it.
         default=False,
         verbose_name="AI features",
         help_text="Allow this account to use Insights and configure AI provider credentials.",
@@ -104,6 +104,24 @@ class Profile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} Profile"
+
+    @property
+    def has_ai_credentials(self):
+        """Whether this profile has a provider key or a Codex login."""
+        return any(
+            getattr(self, field_name)
+            for field_name in (
+                "gemini_api_key_enc",
+                "openai_api_key_enc",
+                "openai_chatgpt_token_enc",
+                "claude_api_key_enc",
+            )
+        )
+
+    @property
+    def insights_access_enabled(self):
+        """Whether the user can see or use Insights."""
+        return bool(self.ai_features_enabled and self.has_ai_credentials)
 
     def _filter_date_range(
         self,

@@ -2,7 +2,6 @@ from toon import encode
 from google import genai
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
 from typing import Any, AsyncIterator
-from AutumnWeb.settings import GEMINI_API_KEY
 from core.utils import build_project_json_from_sessions
 from .base_handler import BaseLLMHandler
 
@@ -12,7 +11,9 @@ class GeminiHandler(BaseLLMHandler):
 
     def __init__(self, model="gemini-2.5-flash", api_key: str | None = None):
         self.model = model
-        self.api_key = api_key or str(GEMINI_API_KEY)
+        if not api_key:
+            raise RuntimeError("Gemini API key is not configured.")
+        self.api_key = api_key
         self.client = genai.Client(api_key=self.api_key)
         self.google_search_tool = Tool(google_search=GoogleSearch())
         self.chat = None

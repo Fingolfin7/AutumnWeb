@@ -282,6 +282,8 @@
                 <small class="muted">
                     {% if have_keys.openai_chatgpt %}
                     Used after Codex if the Codex bucket is unavailable.
+                    {% elif have_keys.openai_server and not have_keys.profile_credentials %}
+                    The server <code>OPENAI_API_KEY</code> is available, but Insights requires a profile key or Codex login.
                     {% elif have_keys.openai_server and not have_keys.openai %}
                     Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key to override it.
                     {% else %}

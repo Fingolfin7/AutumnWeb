@@ -43,9 +43,15 @@ class InsightsViewProviderModelsTests(TestCase):
             self.assertTrue(model_value)
             self.assertTrue(model_label)
 
-    def test_gemini_models_are_available_without_api_key(self):
+    def test_gemini_models_require_a_profile_api_key(self):
         provider_models = self.view._provider_models(self.user)
 
+        self.assertNotIn("gemini", provider_models)
+
+        self.user.profile.set_api_key("gemini", "test-gemini-key")
+        self.user.profile.save()
+
+        provider_models = self.view._provider_models(self.user)
         self.assert_has_model_choices(provider_models, "gemini")
 
     def test_openai_models_are_available_when_key_present(self):
@@ -58,9 +64,9 @@ class InsightsViewProviderModelsTests(TestCase):
         self.assertEqual(
             provider_models["openai"],
             [
+                ("gpt-5.6-luna", "GPT-5.6 Luna"),
                 ("gpt-5.6-sol", "GPT-5.6 Sol"),
                 ("gpt-5.6-terra", "GPT-5.6 Terra"),
-                ("gpt-5.6-luna", "GPT-5.6 Luna"),
                 ("gpt-5.5", "GPT-5.5"),
             ],
         )
@@ -90,10 +96,28 @@ class InsightsViewProviderModelsTests(TestCase):
         self.assertIn(("gpt-5.6-sol", "GPT-5.6 Sol"), provider_models["openai"])
         self.assertNotIn("openai_chatgpt", provider_models)
 
-    def test_openai_reasoning_effort_defaults_to_medium(self):
+    def test_openai_reasoning_effort_defaults_to_high(self):
         self.assertEqual(
             self.view._validate_reasoning_effort("openai", "unexpected"),
-            "medium",
+            "high",
+        )
+
+    def test_extra_high_reasoning_effort_is_available(self):
+        self.assertIn("extra-high", self.view.OPENAI_REASONING_EFFORTS)
+        self.assertEqual(
+            self.view._validate_reasoning_effort("openai", "extra-high"),
+            "extra-high",
+        )
+
+    def test_openai_is_the_default_provider_and_model_when_available(self):
+        self.user.profile.set_api_key("openai", "test-openai-key")
+        self.user.profile.save()
+
+        provider_models = self.view._provider_models(self.user)
+
+        self.assertEqual(
+            self.view._validate_selection(provider_models, None, None),
+            ("openai", "gpt-5.6-luna"),
         )
 
     def test_reasoning_effort_is_ignored_for_non_openai_providers(self):
@@ -111,6 +135,19 @@ class InsightsViewProviderModelsTests(TestCase):
         response = client.get(reverse("insights"))
 
         self.assertRedirects(response, reverse("home"))
+
+    def test_insights_page_redirects_when_no_profile_credentials_exist(self):
+        self.user.profile.ai_features_enabled = True
+        self.user.profile.save()
+        client = Client()
+        client.force_login(self.user)
+
+        response = client.get(reverse("insights"))
+
+        self.assertRedirects(response, reverse("home"))
+
+        home_response = client.get(reverse("home"))
+        self.assertNotContains(home_response, f'href="{reverse("insights")}"')
 
 
 class GetLlmHandlerTests(SimpleTestCase):
@@ -170,8 +207,25 @@ class GetLlmHandlerTests(SimpleTestCase):
         self.assertIsInstance(handler, OpenAIHandler)
         self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX_WITH_API_FALLBACK)
 
+    def test_openai_title_requests_always_use_luna(self):
+        handler = OpenAIHandler(model="gpt-5.6-terra")
+
+        self.assertEqual(
+            handler._api_title_response_kwargs("title this")["model"],
+            "gpt-5.6-luna",
+        )
+        self.assertEqual(
+            handler._codex_title_response_kwargs("title this")["model"],
+            "gpt-5.6-luna",
+        )
+
 
 class GeminiHandlerUsageTests(SimpleTestCase):
+    def test_gemini_does_not_use_a_global_environment_key(self):
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "global-key"}):
+            with self.assertRaisesRegex(RuntimeError, "not configured"):
+                GeminiHandler()
+
     def test_update_usage_counts_thought_tokens_in_response(self):
         handler = object.__new__(GeminiHandler)
         handler.usage_stats = {"prompt": 0, "response": 0, "total": 0}

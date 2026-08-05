@@ -88,7 +88,10 @@ class ProfileSaveTests(TestCase):
         # AI features are off by default since the hardening slice; these
         # tests exercise API-key and insights flows, which are gated on it.
         self.user.profile.ai_features_enabled = True
-        self.user.profile.save(update_fields=["ai_features_enabled"])
+        self.user.profile.set_api_key("openai", "test-openai-key")
+        self.user.profile.save(
+            update_fields=["ai_features_enabled", "openai_api_key_enc"]
+        )
         self.client.login(username="profile-user", password="test-pass-123")
 
     def tearDown(self):
@@ -225,7 +228,8 @@ class ProfileSaveTests(TestCase):
     def test_profile_hides_and_ignores_ai_settings_when_disabled(self):
         profile = self.user.profile
         profile.ai_features_enabled = False
-        profile.save()
+        profile.set_api_key("openai", None)
+        profile.save(update_fields=["ai_features_enabled", "openai_api_key_enc"])
 
         response = self.client.get(reverse("profile"))
 

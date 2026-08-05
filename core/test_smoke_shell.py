@@ -21,6 +21,7 @@ class PortedPagesSmokeTests(TestCase):
             username="smoke", email="smoke@example.com", password="pw"
         )
         cls.user.profile.ai_features_enabled = True  # so Insights renders
+        cls.user.profile.set_api_key("openai", "test-openai-key")
         cls.user.profile.save()
         cls.context = Context.objects.create(user=cls.user, name="Work")
         cls.tag = Tag.objects.create(user=cls.user, name="deep")

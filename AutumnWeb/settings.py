@@ -35,8 +35,6 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
-# Gemini API Key
-GEMINI_API_KEY = env("GEMINI_API_KEY")
 # NASA API Key (for Astronomy Picture of the Day, optional)
 NASA_API_KEY = env("NASA_API_KEY", default="DEMO_KEY")  # Use a demo key if not set
 
