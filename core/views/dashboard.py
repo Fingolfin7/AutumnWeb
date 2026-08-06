@@ -24,6 +24,13 @@ from core.timeline import DEFAULT_RANGE, build_timeline
 QUICK_START_LIMIT = 3
 QUICK_START_LOOKBACK = 40
 
+# The recent-session panel favors a complete latest workday. It only reaches
+# into older active dates when that latest day is sparse, and the expansion is
+# capped so a few quiet days do not turn the dashboard into a session archive.
+RECENT_SESSION_DAY_LIMIT = 3
+RECENT_SESSION_EXPANSION_THRESHOLD = 3
+RECENT_SESSION_EXPANSION_LIMIT = 5
+
 
 def greeting_for(moment):
     """Time-of-day greeting for the dashboard title, in the user's timezone."""
@@ -61,6 +68,68 @@ def build_quick_starts(recent_sessions, active_timers):
             break
 
     return quick_starts
+
+
+def select_recent_dashboard_sessions(sessions):
+    """Select the sessions shown in the dashboard's recent-session panel.
+
+    ``sessions`` must be ordered newest-first by completed ``end_time`` (with
+    a stable tie-breaker). Dates are derived from the active Django timezone,
+    matching ``group_sessions_by_date`` and the rest of the dashboard.
+
+    The newest active date is always shown in full. If it contains fewer than
+    three sessions, append sessions from up to two older distinct active dates,
+    stopping at five total sessions during that expansion. This intentionally
+    allows a busy newest day to exceed five rows so that day is not presented
+    as if it were complete when it has actually been truncated.
+    """
+    selected = []
+    active_dates = []
+    newest_date = None
+    newest_day_count = 0
+
+    for session in sessions:
+        if not session.end_time:
+            continue
+
+        session_date = timezone.localtime(session.end_time).date()
+
+        if newest_date is None:
+            newest_date = session_date
+            active_dates.append(session_date)
+
+        if session_date == newest_date:
+            selected.append(session)
+            newest_day_count += 1
+            continue
+
+        # A non-sparse newest day is complete by itself; do not pull in older
+        # dates just because they happen to have more recent-looking rows.
+        if newest_day_count >= RECENT_SESSION_EXPANSION_THRESHOLD:
+            break
+
+        if session_date not in active_dates:
+            if len(active_dates) >= RECENT_SESSION_DAY_LIMIT:
+                break
+            active_dates.append(session_date)
+
+        if len(selected) >= RECENT_SESSION_EXPANSION_LIMIT:
+            break
+
+        selected.append(session)
+
+    return selected
+
+
+def get_recent_dashboard_sessions(user):
+    """Return the completed sessions selected for the dashboard panel."""
+    sessions = (
+        Sessions.objects.filter(user=user, end_time__isnull=False)
+        .select_related("project")
+        .prefetch_related("subprojects")
+        .order_by("-end_time", "-id")
+    )
+    return select_recent_dashboard_sessions(sessions.iterator(chunk_size=100))
 
 
 TIMELINE_FRAGMENT_TEMPLATE = "core/partials/day_timeline.html"
@@ -138,13 +207,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         commitments_data.sort(key=lambda x: x["progress"]["percentage"])
         context["commitments_data"] = commitments_data
 
-        # 3. Recent 3 completed sessions
-        recent_sessions = (
-            Sessions.objects.filter(user=user, end_time__isnull=False)
-            .select_related("project")
-            .prefetch_related("subprojects")
-            .order_by("-end_time")[:3]
-        )
+        # 3. Adaptive recent completed sessions, favoring the latest active day
+        recent_sessions = get_recent_dashboard_sessions(user)
         context["recent_sessions"] = recent_sessions
 
         from core.utils import group_sessions_by_date

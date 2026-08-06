@@ -6,7 +6,7 @@ dashboard_desk.js paints a second later, and the start card's quick-start
 chips must not offer to start a timer that is already running.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -15,7 +15,13 @@ from django.utils import timezone
 
 from core.models import Context, Projects, Sessions, SubProjects
 from core.templatetags.time_formats import hero_duration
-from core.views.dashboard import QUICK_START_LIMIT, build_quick_starts, greeting_for
+from core.views.dashboard import (
+    QUICK_START_LIMIT,
+    build_quick_starts,
+    get_recent_dashboard_sessions,
+    greeting_for,
+    select_recent_dashboard_sessions,
+)
 
 
 class HeroDurationTests(TestCase):
@@ -109,6 +115,143 @@ class DashboardTestCase(TestCase):
             )
             timer.subprojects.add(sub)
         return timer
+
+
+class RecentDashboardSessionSelectionTests(DashboardTestCase):
+    def _session_at(self, project, day, hour, minute=0, second=0):
+        end = timezone.make_aware(
+            datetime(2026, 7, day, hour, minute, second),
+            timezone.get_current_timezone(),
+        )
+        return Sessions.objects.create(
+            user=self.user,
+            project=project,
+            start_time=end - timedelta(minutes=30),
+            end_time=end,
+        )
+
+    def _selected(self):
+        return list(get_recent_dashboard_sessions(self.user))
+
+    def test_three_to_five_sessions_on_newest_day_stay_on_that_day(self):
+        newest = [
+            self._session_at(self.atlas, 25, 15, index)
+            for index in range(4)
+        ]
+        older = self._session_at(self.autumn, 24, 15)
+
+        selected = self._selected()
+
+        self.assertEqual(
+            [session.id for session in selected],
+            [session.id for session in reversed(newest)],
+        )
+        self.assertNotIn(older.id, [session.id for session in selected])
+
+    def test_exactly_three_newest_sessions_do_not_expand(self):
+        newest = [
+            self._session_at(self.atlas, 25, 15, index)
+            for index in range(3)
+        ]
+        self._session_at(self.autumn, 24, 15)
+
+        selected = self._selected()
+
+        self.assertEqual(
+            [session.id for session in selected],
+            [session.id for session in reversed(newest)],
+        )
+
+    def test_busy_newest_day_is_shown_in_full(self):
+        newest = [
+            self._session_at(self.atlas, 25, 15, index)
+            for index in range(6)
+        ]
+        older = self._session_at(self.autumn, 24, 15)
+
+        selected = self._selected()
+
+        self.assertEqual(
+            [session.id for session in selected],
+            [session.id for session in reversed(newest)],
+        )
+        self.assertNotIn(older.id, [session.id for session in selected])
+
+    def test_sparse_newest_day_expands_across_nonconsecutive_dates_to_five(self):
+        newest = [
+            self._session_at(self.atlas, 25, 15, index)
+            for index in range(2)
+        ]
+        middle = [
+            self._session_at(self.autumn, 21, 15, index)
+            for index in range(2)
+        ]
+        oldest = [
+            self._session_at(self.atlas, 10, 15, index)
+            for index in range(2)
+        ]
+
+        selected = self._selected()
+
+        self.assertEqual(
+            [session.id for session in selected],
+            [
+                *[session.id for session in reversed(newest)],
+                *[session.id for session in reversed(middle)],
+                oldest[-1].id,
+            ],
+        )
+        self.assertEqual(
+            {timezone.localtime(session.end_time).date() for session in selected},
+            {
+                datetime(2026, 7, 25).date(),
+                datetime(2026, 7, 21).date(),
+                datetime(2026, 7, 10).date(),
+            },
+        )
+
+    def test_sparse_activity_returns_all_available_sessions(self):
+        newest = self._session_at(self.atlas, 25, 15)
+        older = self._session_at(self.autumn, 10, 15)
+
+        selected = self._selected()
+
+        self.assertEqual(
+            [session.id for session in selected], [newest.id, older.id]
+        )
+
+    def test_active_and_other_users_sessions_are_excluded(self):
+        completed = self._session_at(self.atlas, 25, 15)
+        Sessions.objects.create(
+            user=self.user,
+            project=self.autumn,
+            start_time=timezone.now() - timedelta(minutes=10),
+        )
+        other_user = User.objects.create_user(
+            username="other", email="other@example.com", password="pw"
+        )
+        other_project = Projects.objects.create(user=other_user, name="Other")
+        Sessions.objects.create(
+            user=other_user,
+            project=other_project,
+            start_time=timezone.now() - timedelta(minutes=20),
+            end_time=timezone.now() - timedelta(minutes=5),
+        )
+
+        selected = self._selected()
+
+        self.assertEqual([session.id for session in selected], [completed.id])
+
+    def test_same_end_time_uses_id_as_stable_tiebreaker(self):
+        first = self._session_at(self.atlas, 25, 15)
+        second = self._session_at(self.autumn, 25, 15)
+        sessions = Sessions.objects.filter(user=self.user).order_by(
+            "-end_time", "-id"
+        )
+
+        selected = select_recent_dashboard_sessions(sessions)
+
+        self.assertEqual([session.id for session in selected], [second.id, first.id])
 
 
 class QuickStartTests(DashboardTestCase):
