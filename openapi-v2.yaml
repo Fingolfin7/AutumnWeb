@@ -2204,11 +2204,24 @@ components:
           nullable: true
         project_count:
           type: integer
+        session_count:
+          type: integer
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        avg_session_minutes:
+          type: number
+          format: double
+          readOnly: true
       required:
+      - avg_session_minutes
       - description
       - id
       - name
       - project_count
+      - session_count
+      - total_minutes
     ContextWriteRequest:
       type: object
       properties:
@@ -3088,11 +3101,24 @@ components:
           nullable: true
         project_count:
           type: integer
+        session_count:
+          type: integer
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        avg_session_minutes:
+          type: number
+          format: double
+          readOnly: true
       required:
+      - avg_session_minutes
       - color
       - id
       - name
       - project_count
+      - session_count
+      - total_minutes
     TagWriteRequest:
       type: object
       properties:

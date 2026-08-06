@@ -1,9 +1,12 @@
+from datetime import timedelta
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 
-from core.models import Commitment, Context, Projects, Tag
+from core.models import Commitment, Context, Projects, Sessions, Tag
 
 
 class V2ContextsTagsTests(TestCase):
@@ -36,9 +39,11 @@ class V2ContextsTagsTests(TestCase):
                 "count": 2,
                 "contexts": [
                     {"id": alpha.id, "name": "Alpha", "description": None,
-                     "project_count": 2},
+                     "project_count": 2, "session_count": 0,
+                     "total_minutes": 0.0, "avg_session_minutes": 0.0},
                     {"id": beta.id, "name": "Beta", "description": None,
-                     "project_count": 1},
+                     "project_count": 1, "session_count": 0,
+                     "total_minutes": 0.0, "avg_session_minutes": 0.0},
                 ],
             },
         )
@@ -85,9 +90,11 @@ class V2ContextsTagsTests(TestCase):
                 "count": 2,
                 "tags": [
                     {"id": alpha.id, "name": "Alpha", "color": None,
-                     "project_count": 2},
+                     "project_count": 2, "session_count": 0,
+                     "total_minutes": 0.0, "avg_session_minutes": 0.0},
                     {"id": beta.id, "name": "Beta", "color": None,
-                     "project_count": 1},
+                     "project_count": 1, "session_count": 0,
+                     "total_minutes": 0.0, "avg_session_minutes": 0.0},
                 ],
             },
         )
@@ -114,6 +121,53 @@ class V2ContextsTagsTests(TestCase):
         self.assertEqual(deleted.status_code, 204)
         self.assertEqual(absent.status_code, 204)
         self.assertFalse(Tag.objects.filter(pk=created.json()["id"]).exists())
+
+    def test_context_and_tag_lists_include_completed_session_stats(self):
+        work = Context.objects.create(user=self.user, name="Work")
+        empty = Tag.objects.create(user=self.user, name="Empty")
+        focus = Tag.objects.create(user=self.user, name="Focus")
+        first = self._project("One", work)
+        second = self._project("Two", work)
+        first.tags.add(focus)
+        second.tags.add(focus)
+
+        now = timezone.now()
+        Sessions.objects.create(
+            user=self.user,
+            project=first,
+            start_time=now - timedelta(minutes=30),
+            end_time=now,
+        )
+        Sessions.objects.create(
+            user=self.user,
+            project=second,
+            start_time=now - timedelta(minutes=90),
+            end_time=now,
+        )
+        Sessions.objects.create(
+            user=self.user,
+            project=first,
+            start_time=now - timedelta(minutes=10),
+        )
+
+        context = self.client.get(reverse("api_v2:contexts")).json()["contexts"][0]
+        tags = {
+            item["name"]: item
+            for item in self.client.get(reverse("api_v2:tags")).json()["tags"]
+        }
+
+        self.assertEqual(context["project_count"], 2)
+        self.assertEqual(context["session_count"], 2)
+        self.assertEqual(context["total_minutes"], 120.0)
+        self.assertEqual(context["avg_session_minutes"], 60.0)
+        self.assertEqual(tags["Focus"]["project_count"], 2)
+        self.assertEqual(tags["Focus"]["session_count"], 2)
+        self.assertEqual(tags["Focus"]["total_minutes"], 120.0)
+        self.assertEqual(tags["Focus"]["avg_session_minutes"], 60.0)
+        self.assertEqual(tags["Empty"]["project_count"], 0)
+        self.assertEqual(tags["Empty"]["session_count"], 0)
+        self.assertEqual(tags["Empty"]["total_minutes"], 0.0)
+        self.assertEqual(tags["Empty"]["avg_session_minutes"], 0.0)
 
     def test_case_insensitive_duplicates_conflict_on_create_and_patch(self):
         Context.objects.create(user=self.user, name="Work")

@@ -4,7 +4,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, FloatField, Prefetch, Q, Sum, Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
@@ -62,7 +63,11 @@ from core.session_canonical import (
     canonical_instant,
     canonical_session_content,
 )
-from core.totals import annotate_project_totals, annotate_subproject_totals
+from core.totals import (
+    annotate_project_totals,
+    annotate_subproject_totals,
+    rounded_session_minutes,
+)
 from core.utils import stop_expired_timers
 
 
@@ -381,6 +386,13 @@ def _named_count_payload(target):
         "id": target.id,
         "name": target.name,
         "project_count": target.project_count,
+        "session_count": target.session_count,
+        "total_minutes": round(target.total_minutes, 2),
+        "avg_session_minutes": round(
+            target.total_minutes / target.session_count, 2
+        )
+        if target.session_count
+        else 0.0,
     }
     if isinstance(target, Context):
         payload["description"] = target.description
@@ -402,12 +414,33 @@ def _apply_named_write(target, validated, *, extra_field):
 
 
 def _named_count_queryset(model, user):
+    completed_sessions = Q(
+        projects__sessions__user=user,
+        projects__sessions__end_time__isnull=False,
+    )
     return (
         model.objects.filter(user=user)
         .annotate(
             project_count=Count(
                 "projects",
                 filter=Q(projects__user=user),
+                distinct=True,
+            ),
+            session_count=Count(
+                "projects__sessions",
+                filter=completed_sessions,
+                distinct=True,
+            ),
+            total_minutes=Coalesce(
+                Sum(
+                    rounded_session_minutes(
+                        "projects__sessions__end_time",
+                        "projects__sessions__start_time",
+                    ),
+                    filter=completed_sessions,
+                ),
+                Value(0.0),
+                output_field=FloatField(),
             )
         )
         .order_by("name", "id")
@@ -465,6 +498,9 @@ class ContextsView(V2APIView):
                 "name": context.name,
                 "description": context.description,
                 "project_count": 0,
+                "session_count": 0,
+                "total_minutes": 0.0,
+                "avg_session_minutes": 0.0,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -562,6 +598,9 @@ class TagsView(V2APIView):
                 "name": tag.name,
                 "color": tag.color,
                 "project_count": 0,
+                "session_count": 0,
+                "total_minutes": 0.0,
+                "avg_session_minutes": 0.0,
             },
             status=status.HTTP_201_CREATED,
         )

@@ -472,6 +472,17 @@ class ContextResourceSerializer(serializers.Serializer):
     name = serializers.CharField()
     description = serializers.CharField(allow_null=True)
     project_count = serializers.IntegerField()
+    session_count = serializers.IntegerField()
+    total_minutes = serializers.SerializerMethodField()
+    avg_session_minutes = serializers.SerializerMethodField()
+
+    def get_total_minutes(self, context) -> float:
+        return round(context.total_minutes, 2)
+
+    def get_avg_session_minutes(self, context) -> float:
+        if not context.session_count:
+            return 0.0
+        return round(context.total_minutes / context.session_count, 2)
 
 
 class TagResourceSerializer(serializers.Serializer):
@@ -479,6 +490,17 @@ class TagResourceSerializer(serializers.Serializer):
     name = serializers.CharField()
     color = serializers.CharField(allow_null=True)
     project_count = serializers.IntegerField()
+    session_count = serializers.IntegerField()
+    total_minutes = serializers.SerializerMethodField()
+    avg_session_minutes = serializers.SerializerMethodField()
+
+    def get_total_minutes(self, tag) -> float:
+        return round(tag.total_minutes, 2)
+
+    def get_avg_session_minutes(self, tag) -> float:
+        if not tag.session_count:
+            return 0.0
+        return round(tag.total_minutes / tag.session_count, 2)
 
 
 class ContextListResponseSerializer(serializers.Serializer):
