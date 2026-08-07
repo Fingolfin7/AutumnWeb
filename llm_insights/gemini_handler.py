@@ -23,7 +23,7 @@ class GeminiHandler(BaseLLMHandler):
         self.conversation_history = []
 
         # Track cumulative usage stats
-        self.usage_stats = {"prompt": 0, "response": 0, "total": 0}
+        self.usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
 
         self.system_prompt_template = """
         You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
@@ -34,68 +34,96 @@ class GeminiHandler(BaseLLMHandler):
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
         You have access to google search to find more information if needed.
-        
-        When formating text and links please use markdown formatting.
-        
-        Here is {username}'s prompt:
-        {user_prompt}
+
+        When formatting text and links please use markdown formatting.
 
         Sessions data:
         {session_data}
         """
 
-        self.update_session_data_template = """
-        {username} has updated their session data. 
+        self.update_session_data_notice = """
+        {username} has updated their session data.
         Refer to the new session data for the remainder of the conversation.
-        If possible please quote the session notes and dates/times for any insights you provide.
-        All time and duration values are in minutes.
-        You have access to google search to find more information if needed.
-        
-        When formating text and links please use markdown formatting.
-        
-        Here is {username}'s prompt:
-        {user_prompt}
-        
-        New sessions data:
-        {session_data}
         """
 
-    async def _create_chat(self, model, history=None):
-        """Helper to (re)create a chat for a given model."""
+    def _build_system_text(self, notice: str = "") -> str:
+        body = self.system_prompt_template.format(
+            username=self.username, session_data=self.session_data
+        )
+        return f"{notice.strip()}\n{body}" if notice.strip() else body
+
+    def _active_system_text(self) -> str:
+        """The system instruction for this request.
+
+        The stored snapshot wins: every path that changes the session data also
+        stores a fresh system turn, so the last one is always current — and
+        reusing it verbatim keeps the cached prefix byte-identical across turns.
+        Rebuilding is the fallback for a history that has no system turn yet
+        (turn one, or a chat predating stored system turns).
+        """
+        for message in reversed(self.conversation_history):
+            if message.get("role") == "system":
+                return message.get("content") or ""
+        if self.username and self.session_data is not None:
+            return self._build_system_text()
+        return ""
+
+    async def _create_chat(self, model, history=None, system_text=None):
+        """Helper to (re)create a chat for a given model.
+
+        System turns are lifted out of the transcript into system_instruction:
+        replaying them as user turns (the previous behaviour) both misrepresents
+        the role and pushes the session payload into the cache-varying part of
+        the prompt.
+        """
         gemini_history = []
         history = history if history is not None else self.conversation_history
+        if system_text is None:
+            system_text = self._active_system_text()
         if history:
             for m in history:
-                role = "user" if m["role"] in ["user", "system"] else "model"
+                if m["role"] == "system":
+                    continue
+                role = "user" if m["role"] == "user" else "model"
                 gemini_history.append({"role": role, "parts": [{"text": m["content"]}]})
 
         self.chat = self.client.aio.chats.create(
             model=model,
             history=gemini_history,
             config=GenerateContentConfig(
-                tools=[self.google_search_tool], response_modalities=["TEXT"]
+                system_instruction=system_text or None,
+                tools=[self.google_search_tool],
+                response_modalities=["TEXT"],
             ),
         )
         self.model = model
 
-    def set_conversation_history(self, history: list):
-        self.conversation_history = history
+    @staticmethod
+    def _usage_from_response(response) -> dict[str, int]:
+        """Unlike Anthropic, Google's prompt_token_count already includes the
+        implicitly-cached prefix, so `cached` here is a subset of `prompt`."""
+        metadata = getattr(response, "usage_metadata", None)
+        if not metadata:
+            return {"prompt": 0, "response": 0, "cached": 0}
+        return {
+            "prompt": getattr(metadata, "prompt_token_count", 0) or 0,
+            "response": (getattr(metadata, "candidates_token_count", 0) or 0)
+            + (getattr(metadata, "thoughts_token_count", 0) or 0),
+            "cached": getattr(metadata, "cached_content_token_count", 0) or 0,
+        }
 
     def _update_usage(self, response):
         """Internal helper to extract and accumulate token usage metadata if available."""
         metadata = getattr(response, "usage_metadata", None)
         if metadata:
-            # Google response usage metadata fields: prompt_token_count, candidates_token_count, thoughts_token_count, total_token_count
-            prompt_tokens = getattr(metadata, "prompt_token_count", 0) or 0
-            response_tokens = (getattr(metadata, "candidates_token_count", 0) or 0) + (
-                getattr(metadata, "thoughts_token_count", 0) or 0
-            )
+            usage = self._usage_from_response(response)
             total_tokens = (
-                getattr(metadata, "total_token_count", prompt_tokens + response_tokens)
+                getattr(metadata, "total_token_count", usage["prompt"] + usage["response"])
                 or 0
             )
-            self.usage_stats["prompt"] += prompt_tokens
-            self.usage_stats["response"] += response_tokens
+            self.usage_stats["prompt"] += usage["prompt"]
+            self.usage_stats["response"] += usage["response"]
+            self.usage_stats["cached"] += usage["cached"]
             self.usage_stats["total"] += total_tokens
         else:
             # Fallback approximation: word count heuristic for total
@@ -237,22 +265,7 @@ class GeminiHandler(BaseLLMHandler):
             if delta:
                 chunks.append(delta)
                 yield {"type": "delta", "text": delta}
-        usage = {"prompt": 0, "response": 0}
-        if last_response and getattr(last_response, "usage_metadata", None):
-            usage = {
-                "prompt": getattr(last_response.usage_metadata, "prompt_token_count", 0)
-                or 0,
-                "response": (
-                    getattr(
-                        last_response.usage_metadata, "candidates_token_count", 0
-                    )
-                    or 0
-                )
-                + (
-                    getattr(last_response.usage_metadata, "thoughts_token_count", 0)
-                    or 0
-                ),
-            }
+        usage = self._usage_from_response(last_response)
         yield {
             "type": "final",
             "text": "".join(chunks),
@@ -271,27 +284,31 @@ class GeminiHandler(BaseLLMHandler):
 
     async def update_session_data(self, sessions_data, user_prompt) -> str:
         """Update the session data without adding to chat history"""
-        update_session_data_prompt = ""
+        # Update stored session data
+        self.session_data = encode(
+            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+        )
+        # The payload lives in system_instruction, which is fixed at chat
+        # creation — rebuild the chat so the new data takes effect.
+        update_session_data_prompt = self._build_system_text(
+            self.update_session_data_notice.format(username=self.username)
+        )
+        history_before = list(self.conversation_history)
+        self.conversation_history.append(
+            {"role": "system", "content": update_session_data_prompt}
+        )
+        self.conversation_history.append({"role": "user", "content": user_prompt})
+
         try:
+            await self._create_chat(
+                self.model,
+                history=history_before,
+                system_text=update_session_data_prompt,
+            )
+
             if not self.chat:
-                await self._create_chat(self.model, history=self.conversation_history)
-
-            # Update stored session data
-            self.session_data = encode(
-                build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-            )
-
-            # Create a new chat with updated system prompt
-            update_session_data_prompt = self.update_session_data_template.format(
-                username=self.username,
-                user_prompt=user_prompt,
-                session_data=self.session_data,
-            )
-
-            if self.chat:
-                response = await self.chat.send_message(update_session_data_prompt)
-            else:
-                return "Error: Chat not initialized"
+                raise RuntimeError("Chat not initialized")
+            response = await self.chat.send_message(user_prompt)
         except Exception as e:
             return self._handle_error(
                 e, original_message=update_session_data_prompt, allow_fallback=True
@@ -301,32 +318,15 @@ class GeminiHandler(BaseLLMHandler):
         # Safely extract sources (defensive against missing grounding metadata)
         sources = self._extract_sources(response)
 
-        # Add message to conversation history
-        self.conversation_history.append(
-            {"role": "system", "content": update_session_data_prompt}
-        )
-        self.conversation_history.append({"role": "user", "content": user_prompt})
+        # System and user turns were appended before the call; only the
+        # assistant reply is outstanding.
         self.conversation_history.append(
             {
                 "role": "assistant",
                 "content": assistant_response,
                 "sources": sources,
                 "model": self.model,
-                "usage": {
-                    "prompt": getattr(response.usage_metadata, "prompt_token_count", 0)
-                    if response.usage_metadata
-                    else 0,
-                    "response": (
-                        getattr(response.usage_metadata, "candidates_token_count", 0)
-                        or 0
-                    )
-                    + (
-                        getattr(response.usage_metadata, "thoughts_token_count", 0)
-                        or 0
-                    )
-                    if response.usage_metadata
-                    else 0,
-                },
+                "usage": self._usage_from_response(response),
             }
         )
 
@@ -339,33 +339,36 @@ class GeminiHandler(BaseLLMHandler):
         self, sessions_data, user_prompt
     ) -> AsyncIterator[str]:
         """Update session data and stream the assistant response."""
-        update_session_data_prompt = ""
         result = None
-        try:
-            if not self.chat:
-                await self._create_chat(self.model, history=self.conversation_history)
+        self.session_data = encode(
+            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
+        )
+        update_session_data_prompt = self._build_system_text(
+            self.update_session_data_notice.format(username=self.username)
+        )
+        history_before = list(self.conversation_history)
+        self.conversation_history.append(
+            {"role": "system", "content": update_session_data_prompt}
+        )
+        self.conversation_history.append({"role": "user", "content": user_prompt})
 
-            self.session_data = encode(
-                build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-            )
-            update_session_data_prompt = self.update_session_data_template.format(
-                username=self.username,
-                user_prompt=user_prompt,
-                session_data=self.session_data,
+        try:
+            await self._create_chat(
+                self.model,
+                history=history_before,
+                system_text=update_session_data_prompt,
             )
 
             if not self.chat:
                 result = {
                     "text": "Error: Chat not initialized",
                     "sources": [],
-                    "usage": {"prompt": 0, "response": 0},
+                    "usage": {"prompt": 0, "response": 0, "cached": 0},
                     "response": None,
                 }
                 yield result["text"]
             else:
-                async for event in self._stream_chat_response(
-                    update_session_data_prompt
-                ):
+                async for event in self._stream_chat_response(user_prompt):
                     if event.get("type") == "delta":
                         yield event.get("text", "")
                     elif event.get("type") == "final":
@@ -380,20 +383,18 @@ class GeminiHandler(BaseLLMHandler):
         result = result or {
             "text": "",
             "sources": [],
-            "usage": {"prompt": 0, "response": 0},
+            "usage": {"prompt": 0, "response": 0, "cached": 0},
             "response": None,
         }
-        self.conversation_history.append(
-            {"role": "system", "content": update_session_data_prompt}
-        )
-        self.conversation_history.append({"role": "user", "content": user_prompt})
+        # System and user turns were appended before the call; only the
+        # assistant reply is outstanding.
         self.conversation_history.append(
             {
                 "role": "assistant",
                 "content": result["text"],
                 "sources": result.get("sources", []),
                 "model": self.model,
-                "usage": result.get("usage", {"prompt": 0, "response": 0}),
+                "usage": result.get("usage", {"prompt": 0, "response": 0, "cached": 0}),
             }
         )
         if result.get("response"):
@@ -401,38 +402,33 @@ class GeminiHandler(BaseLLMHandler):
 
     async def send_message(self, message) -> str:
         """Send a message to the LLM and return the response"""
+        # Same ordering rule as stream_message: this turn's system and user
+        # entries land before anything that can raise.
+        system_text = self._active_system_text()
+        history_before = list(self.conversation_history)
+        if not any(m.get("role") == "system" for m in self.conversation_history):
+            # Stored so a resumed chat can recover it — a fresh handler on
+            # turn 2+ never calls initialize_chat.
+            self.conversation_history.append(
+                {"role": "system", "content": system_text}
+            )
+        self.conversation_history.append({"role": "user", "content": message})
+
         try:
             if not self.chat:
-                await self._create_chat(self.model, history=self.conversation_history)
+                await self._create_chat(
+                    self.model, history=history_before, system_text=system_text
+                )
 
             if not self.chat:
-                return "Error: Chat not initialized"
+                raise RuntimeError("Chat not initialized")
 
-            if len(self.conversation_history) == 0:
-                # send system prompt along with user message
-                initial_prompt = self.system_prompt_template.format(
-                    username=self.username,
-                    user_prompt=message,
-                    session_data=self.session_data,
+            try:
+                response = await self.chat.send_message(message)
+            except Exception as e:
+                return self._handle_error(
+                    e, original_message=message, allow_fallback=True
                 )
-                try:
-                    response = await self.chat.send_message(initial_prompt)
-                except Exception as e:
-                    return self._handle_error(
-                        e, original_message=initial_prompt, allow_fallback=True
-                    )
-                self.conversation_history.append(
-                    {"role": "system", "content": initial_prompt}
-                )
-                self.conversation_history.append({"role": "user", "content": message})
-            else:
-                self.conversation_history.append({"role": "user", "content": message})
-                try:
-                    response = await self.chat.send_message(message)
-                except Exception as e:
-                    return self._handle_error(
-                        e, original_message=message, allow_fallback=True
-                    )
 
             # Extract response text
             assistant_response = response.text
@@ -446,27 +442,7 @@ class GeminiHandler(BaseLLMHandler):
                     "content": assistant_response,
                     "sources": sources,
                     "model": self.model,
-                    "usage": {
-                        "prompt": getattr(
-                            response.usage_metadata, "prompt_token_count", 0
-                        )
-                        if response.usage_metadata
-                        else 0,
-                        "response": (
-                            getattr(
-                                response.usage_metadata, "candidates_token_count", 0
-                            )
-                            or 0
-                        )
-                        + (
-                            getattr(
-                                response.usage_metadata, "thoughts_token_count", 0
-                            )
-                            or 0
-                        )
-                        if response.usage_metadata
-                        else 0,
-                    },
+                    "usage": self._usage_from_response(response),
                 }
             )
 
@@ -480,30 +456,30 @@ class GeminiHandler(BaseLLMHandler):
 
     async def stream_message(self, message) -> AsyncIterator[str]:
         """Send a message to Gemini and stream response text chunks."""
+        # Store this turn's system and user entries before anything that can
+        # raise. _handle_error only appends an assistant turn, so bailing out
+        # earlier used to leave the history short — and the view persists a
+        # fixed-size tail, which then re-saved the *previous* exchange and lost
+        # the current snapshot.
+        system_text = self._active_system_text()
+        history_before = list(self.conversation_history)
+        if not any(m.get("role") == "system" for m in self.conversation_history):
+            self.conversation_history.append(
+                {"role": "system", "content": system_text}
+            )
+        self.conversation_history.append({"role": "user", "content": message})
+
         try:
             if not self.chat:
-                await self._create_chat(self.model, history=self.conversation_history)
+                await self._create_chat(
+                    self.model, history=history_before, system_text=system_text
+                )
 
             if not self.chat:
-                yield "Error: Chat not initialized"
-                return
-
-            if len(self.conversation_history) == 0:
-                prompt = self.system_prompt_template.format(
-                    username=self.username,
-                    user_prompt=message,
-                    session_data=self.session_data,
-                )
-                self.conversation_history.append(
-                    {"role": "system", "content": prompt}
-                )
-                self.conversation_history.append({"role": "user", "content": message})
-            else:
-                prompt = message
-                self.conversation_history.append({"role": "user", "content": message})
+                raise RuntimeError("Chat not initialized")
 
             result = None
-            async for event in self._stream_chat_response(prompt):
+            async for event in self._stream_chat_response(message):
                 if event.get("type") == "delta":
                     yield event.get("text", "")
                 elif event.get("type") == "final":
@@ -512,7 +488,7 @@ class GeminiHandler(BaseLLMHandler):
             result = result or {
                 "text": "",
                 "sources": [],
-                "usage": {"prompt": 0, "response": 0},
+                "usage": {"prompt": 0, "response": 0, "cached": 0},
                 "response": None,
             }
             self.conversation_history.append(
@@ -521,7 +497,7 @@ class GeminiHandler(BaseLLMHandler):
                     "content": result["text"],
                     "sources": result.get("sources", []),
                     "model": self.model,
-                    "usage": result.get("usage", {"prompt": 0, "response": 0}),
+                    "usage": result.get("usage", {"prompt": 0, "response": 0, "cached": 0}),
                 }
             )
             if result.get("response"):

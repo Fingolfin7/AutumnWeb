@@ -37,7 +37,7 @@ class OpenAIHandler(BaseLLMHandler):
         self.username = None
         self.session_data = None
         self.conversation_history = []
-        self.usage_stats = {"prompt": 0, "response": 0, "total": 0}
+        self.usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
         self.last_auth_source = self.auth_mode
         self.system_prompt_template = """
         You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
@@ -51,27 +51,35 @@ class OpenAIHandler(BaseLLMHandler):
 
         When formatting text and links please use markdown formatting.
 
-        Here is {username}'s prompt:
-        {user_prompt}
-
         Sessions data:
         {session_data}
         """
-        self.update_session_data_template = """
+        self.update_session_data_notice = """
         {username} has updated their session data.
         Refer to the new session data for the remainder of the conversation.
-        If possible please quote the session notes and dates/times for any insights you provide.
-        All time and duration values are in minutes.
-        You have access to web search to find more information if needed.
-
-        When formatting text and links please use markdown formatting.
-
-        Here is {username}'s prompt:
-        {user_prompt}
-
-        New sessions data:
-        {session_data}
         """
+
+    def _build_system_text(self, notice: str = "") -> str:
+        body = self.system_prompt_template.format(
+            username=self.username, session_data=self.session_data
+        )
+        return f"{notice.strip()}\n{body}" if notice.strip() else body
+
+    def _active_system_text(self) -> str:
+        """The system message for this request.
+
+        The stored snapshot wins: every path that changes the session data also
+        stores a fresh system turn, so the last one is always current — and
+        reusing it verbatim keeps the cached prefix byte-identical across turns.
+        Rebuilding is the fallback for a history that has no system turn yet
+        (turn one, or a chat predating stored system turns).
+        """
+        for message in reversed(self.conversation_history):
+            if message.get("role") == "system":
+                return message.get("content") or ""
+        if self.username and self.session_data is not None:
+            return self._build_system_text()
+        return ""
 
     def _default_auth_mode(self) -> str:
         if self.codex_token and self.api_key:
@@ -89,17 +97,34 @@ class OpenAIHandler(BaseLLMHandler):
     def get_usage_stats(self):
         return self.usage_stats
 
-    def set_conversation_history(self, history: list):
-        self.conversation_history = history
+    def _messages_from_history(
+        self, new_user_message: str | None = None, system_text: str | None = None
+    ):
+        """Exactly one system message — the current one — followed by the
+        conversation.
 
-    def _messages_from_history(self):
-        return [
-            {
-                "role": m["role"] if m["role"] in ["user", "assistant", "system"] else "user",
-                "content": m["content"],
-            }
+        Every filter change stores another system turn carrying a full session
+        payload. Replaying all of them sent the model N+1 snapshots with nothing
+        marking which was current, and left the codex path reading `instructions`
+        off the oldest one.
+
+        `system_text` must be passed on the filter-change turn: the caller stores
+        a notice-bearing snapshot, and recomputing it here would send a prefix
+        that differs from the one persisted — losing the next turn's cache hit.
+        """
+        messages = []
+        if system_text is None:
+            system_text = self._active_system_text()
+        if system_text:
+            messages.append({"role": "system", "content": system_text})
+        messages.extend(
+            {"role": m["role"], "content": m["content"]}
             for m in self.conversation_history
-        ]
+            if m.get("role") in ("user", "assistant")
+        )
+        if new_user_message is not None:
+            messages.append({"role": "user", "content": new_user_message})
+        return messages
 
     def _api_response_kwargs(self, messages):
         kwargs = {
@@ -233,7 +258,7 @@ class OpenAIHandler(BaseLLMHandler):
         request["stream"] = True
         event_stream = await self.codex_client.responses.create(**request)
         chunks = []
-        usage = {"prompt": 0, "response": 0}
+        usage = {"prompt": 0, "response": 0, "cached": 0}
         sources = []
         async for event in event_stream:
             event_type = getattr(event, "type", "")
@@ -258,7 +283,7 @@ class OpenAIHandler(BaseLLMHandler):
         request["stream"] = True
         event_stream = await self._api_client().responses.create(**request)
         chunks = []
-        usage = {"prompt": 0, "response": 0}
+        usage = {"prompt": 0, "response": 0, "cached": 0}
         sources = []
         async for event in event_stream:
             event_type = getattr(event, "type", "")
@@ -291,7 +316,7 @@ class OpenAIHandler(BaseLLMHandler):
         request["stream"] = True
         event_stream = await self.codex_client.responses.create(**request)
         chunks = []
-        usage = {"prompt": 0, "response": 0}
+        usage = {"prompt": 0, "response": 0, "cached": 0}
         sources = []
         async for event in event_stream:
             event_type = getattr(event, "type", "")
@@ -423,13 +448,14 @@ class OpenAIHandler(BaseLLMHandler):
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
-        update_prompt = self.update_session_data_template.format(
-            username=self.username,
-            user_prompt=user_prompt,
-            session_data=self.session_data,
+        # The payload rides in the system message, so the update turn only has
+        # to say that it changed — resending it inline would duplicate it.
+        update_prompt = self._build_system_text(
+            self.update_session_data_notice.format(username=self.username)
         )
-        messages = self._messages_from_history()
-        messages.append({"role": "user", "content": update_prompt})
+        messages = self._messages_from_history(
+            new_user_message=user_prompt, system_text=update_prompt
+        )
 
         try:
             result = await self._send_with_priority(messages)
@@ -437,7 +463,7 @@ class OpenAIHandler(BaseLLMHandler):
             result = {
                 "text": f"OpenAI error: {e}",
                 "sources": [],
-                "usage": {"prompt": 0, "response": 0},
+                "usage": {"prompt": 0, "response": 0, "cached": 0},
                 "source": self.last_auth_source,
             }
 
@@ -452,13 +478,12 @@ class OpenAIHandler(BaseLLMHandler):
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
-        update_prompt = self.update_session_data_template.format(
-            username=self.username,
-            user_prompt=user_prompt,
-            session_data=self.session_data,
+        update_prompt = self._build_system_text(
+            self.update_session_data_notice.format(username=self.username)
         )
-        messages = self._messages_from_history()
-        messages.append({"role": "user", "content": update_prompt})
+        messages = self._messages_from_history(
+            new_user_message=user_prompt, system_text=update_prompt
+        )
 
         result = None
         try:
@@ -471,7 +496,7 @@ class OpenAIHandler(BaseLLMHandler):
             result = {
                 "text": f"OpenAI error: {e}",
                 "sources": [],
-                "usage": {"prompt": 0, "response": 0},
+                "usage": {"prompt": 0, "response": 0, "cached": 0},
                 "source": self.last_auth_source,
             }
             yield result["text"]
@@ -481,21 +506,19 @@ class OpenAIHandler(BaseLLMHandler):
         self._append_assistant_result(result or {
             "text": "",
             "sources": [],
-            "usage": {"prompt": 0, "response": 0},
+            "usage": {"prompt": 0, "response": 0, "cached": 0},
             "source": self.last_auth_source,
         })
 
     async def send_message(self, message) -> str:
-        if len(self.conversation_history) == 0:
-            system_prompt = self.system_prompt_template.format(
-                username=self.username,
-                user_prompt=message,
-                session_data=self.session_data,
+        if not any(m.get("role") == "system" for m in self.conversation_history):
+            # Stored so a resumed chat can recover it — a fresh handler on turn
+            # 2+ never calls initialize_chat.
+            self.conversation_history.append(
+                {"role": "system", "content": self._active_system_text()}
             )
-            self.conversation_history.append({"role": "system", "content": system_prompt})
 
-        messages = self._messages_from_history()
-        messages.append({"role": "user", "content": message})
+        messages = self._messages_from_history(new_user_message=message)
 
         try:
             result = await self._send_with_priority(messages)
@@ -503,7 +526,7 @@ class OpenAIHandler(BaseLLMHandler):
             result = {
                 "text": f"OpenAI error: {e}",
                 "sources": [],
-                "usage": {"prompt": 0, "response": 0},
+                "usage": {"prompt": 0, "response": 0, "cached": 0},
                 "source": self.last_auth_source,
             }
 
@@ -512,16 +535,14 @@ class OpenAIHandler(BaseLLMHandler):
         return result["text"]
 
     async def stream_message(self, message) -> AsyncIterator[str]:
-        if len(self.conversation_history) == 0:
-            system_prompt = self.system_prompt_template.format(
-                username=self.username,
-                user_prompt=message,
-                session_data=self.session_data,
+        if not any(m.get("role") == "system" for m in self.conversation_history):
+            # Stored so a resumed chat can recover it — a fresh handler on turn
+            # 2+ never calls initialize_chat.
+            self.conversation_history.append(
+                {"role": "system", "content": self._active_system_text()}
             )
-            self.conversation_history.append({"role": "system", "content": system_prompt})
 
-        messages = self._messages_from_history()
-        messages.append({"role": "user", "content": message})
+        messages = self._messages_from_history(new_user_message=message)
 
         result = None
         try:
@@ -534,7 +555,7 @@ class OpenAIHandler(BaseLLMHandler):
             result = {
                 "text": f"OpenAI error: {e}",
                 "sources": [],
-                "usage": {"prompt": 0, "response": 0},
+                "usage": {"prompt": 0, "response": 0, "cached": 0},
                 "source": self.last_auth_source,
             }
             yield result["text"]
@@ -543,7 +564,7 @@ class OpenAIHandler(BaseLLMHandler):
         self._append_assistant_result(result or {
             "text": "",
             "sources": [],
-            "usage": {"prompt": 0, "response": 0},
+            "usage": {"prompt": 0, "response": 0, "cached": 0},
             "source": self.last_auth_source,
         })
 
@@ -554,7 +575,7 @@ class OpenAIHandler(BaseLLMHandler):
                 "content": result["text"],
                 "sources": result.get("sources", []),
                 "model": self.model,
-                "usage": result.get("usage", {"prompt": 0, "response": 0}),
+                "usage": result.get("usage", {"prompt": 0, "response": 0, "cached": 0}),
                 "auth_source": result.get("source", self.last_auth_source),
             }
         )
@@ -615,34 +636,67 @@ class OpenAIHandler(BaseLLMHandler):
             unique_sources.append(source)
         return unique_sources
 
+    @staticmethod
+    def _cached_tokens(usage) -> int:
+        """Responses API reports cache hits under input_tokens_details; the
+        chat-completions shape uses prompt_tokens_details. Either way the count
+        is a subset of the prompt total, not an addition to it."""
+        for attr in ("input_tokens_details", "prompt_tokens_details"):
+            details = getattr(usage, attr, None)
+            if details is None:
+                continue
+            if isinstance(details, dict):
+                cached = details.get("cached_tokens")
+            else:
+                cached = getattr(details, "cached_tokens", None)
+            if cached:
+                return cached
+        return 0
+
     def _usage_from_api_response(self, response) -> dict[str, int]:
         usage = getattr(response, "usage", None)
         if not usage:
-            return {"prompt": 0, "response": 0}
+            return {"prompt": 0, "response": 0, "cached": 0}
         prompt = getattr(usage, "prompt_tokens", getattr(usage, "input_tokens", 0)) or 0
         response_tokens = (
             getattr(usage, "completion_tokens", getattr(usage, "output_tokens", 0)) or 0
         )
-        return {"prompt": prompt, "response": response_tokens}
+        return {
+            "prompt": prompt,
+            "response": response_tokens,
+            "cached": self._cached_tokens(usage),
+        }
 
     def _usage_from_codex_event(self, event) -> dict[str, int]:
         response = getattr(event, "response", None)
         usage = getattr(response, "usage", None) if response else None
         if usage is None:
-            return {"prompt": 0, "response": 0}
+            return {"prompt": 0, "response": 0, "cached": 0}
         if isinstance(usage, dict):
             prompt = usage.get("input_tokens", usage.get("prompt_tokens", 0)) or 0
             response_tokens = usage.get("output_tokens", usage.get("completion_tokens", 0)) or 0
-            return {"prompt": prompt, "response": response_tokens}
+            details = usage.get("input_tokens_details") or usage.get(
+                "prompt_tokens_details"
+            ) or {}
+            return {
+                "prompt": prompt,
+                "response": response_tokens,
+                "cached": (details.get("cached_tokens") if isinstance(details, dict) else 0) or 0,
+            }
         prompt = getattr(usage, "input_tokens", getattr(usage, "prompt_tokens", 0)) or 0
         response_tokens = (
             getattr(usage, "output_tokens", getattr(usage, "completion_tokens", 0)) or 0
         )
-        return {"prompt": prompt, "response": response_tokens}
+        return {
+            "prompt": prompt,
+            "response": response_tokens,
+            "cached": self._cached_tokens(usage),
+        }
 
     def _update_usage(self, usage):
         self.usage_stats["prompt"] += usage.get("prompt", 0)
         self.usage_stats["response"] += usage.get("response", 0)
+        self.usage_stats["cached"] += usage.get("cached", 0)
         self.usage_stats["total"] = (
             self.usage_stats["prompt"] + self.usage_stats["response"]
         )

@@ -203,6 +203,10 @@ async def save_llm_messages(chat_obj, messages_to_save):
                         "auth_source": msg.get("auth_source", ""),
                         "error": msg.get("error", False),
                         "error_message": msg.get("error_message", ""),
+                        # Handlers are rebuilt from this metadata each turn, so
+                        # a refusal that is not persisted is a refusal that gets
+                        # replayed to the provider on the next request.
+                        "refusal": msg.get("refusal", False),
                     },
                 )
 
@@ -264,57 +268,35 @@ async def perform_llm_analysis(
     sessions_updated=False,
     chat_obj=None,
 ):
-    if conversation_history is None or not conversation_history:
+    llm_handler.set_username(username)
+    # See perform_llm_analysis_stream: persist this turn's delta, not a fixed tail.
+    already_persisted = len(llm_handler.get_conversation_history())
+
+    if (
+        conversation_history is None
+        or not conversation_history
+        or not llm_handler.has_system_context()
+    ):
         llm_handler.initialize_chat(username, sessions)
-    else:
-        # If sessions were updated, update the session data
-        if sessions_updated:
-            assistant_response = await llm_handler.update_session_data(
-                sessions, user_prompt=user_prompt
+    elif sessions_updated:
+        assistant_response = await llm_handler.update_session_data(
+            sessions, user_prompt=user_prompt
+        )
+        conversation_history = llm_handler.get_conversation_history()
+        if chat_obj:
+            await save_llm_messages(
+                chat_obj, conversation_history[already_persisted:]
             )
-            conversation_history = llm_handler.get_conversation_history()
-
-            # Save to DB if chat_obj exists
-            if chat_obj:
-                latest = conversation_history[-3:]
-                for msg in latest:
-                    await sync_to_async(LLMMessage.objects.create)(
-                        chat=chat_obj,
-                        role=msg["role"],
-                        content=msg["content"],
-                        metadata={
-                            "sources": msg.get("sources", []),
-                            "model": msg.get("model", ""),
-                            "usage": msg.get("usage", {}),
-                        },
-                    )
-
-            return assistant_response, conversation_history
+        return assistant_response, conversation_history
 
     # Send user message if provided
     if user_prompt:
         assistant_response = await llm_handler.send_message(user_prompt)
         conversation_history = llm_handler.get_conversation_history()
-
-        # Save to DB if chat_obj exists
         if chat_obj:
-            if len(conversation_history) <= 3:
-                to_save = conversation_history
-            else:
-                to_save = conversation_history[-2:]
-
-            for msg in to_save:
-                await sync_to_async(LLMMessage.objects.create)(
-                    chat=chat_obj,
-                    role=msg["role"],
-                    content=msg["content"],
-                    metadata={
-                        "sources": msg.get("sources", []),
-                        "model": msg.get("model", ""),
-                        "usage": msg.get("usage", {}),
-                    },
-                )
-
+            await save_llm_messages(
+                chat_obj, conversation_history[already_persisted:]
+            )
         return assistant_response, conversation_history
 
     return None, conversation_history
@@ -329,28 +311,38 @@ async def perform_llm_analysis_stream(
     sessions_updated=False,
     chat_obj=None,
 ):
-    if conversation_history is None or not conversation_history:
+    llm_handler.set_username(username)
+    # Everything already in the handler's history came from the database, so
+    # anything appended past this mark is this turn's delta. Slicing a fixed
+    # tail instead re-persisted earlier messages whenever a turn appended fewer
+    # entries than expected — which is exactly what a mid-turn provider error
+    # does.
+    already_persisted = len(llm_handler.get_conversation_history())
+
+    if (
+        conversation_history is None
+        or not conversation_history
+        or not llm_handler.has_system_context()
+    ):
         llm_handler.initialize_chat(username, sessions)
     elif sessions_updated:
         async for chunk in llm_handler.stream_update_session_data(
             sessions, user_prompt=user_prompt
         ):
             yield chunk
-        conversation_history = llm_handler.get_conversation_history()
         if chat_obj:
-            await save_llm_messages(chat_obj, conversation_history[-3:])
+            await save_llm_messages(
+                chat_obj, llm_handler.get_conversation_history()[already_persisted:]
+            )
         return
 
     if user_prompt:
         async for chunk in llm_handler.stream_message(user_prompt):
             yield chunk
-        conversation_history = llm_handler.get_conversation_history()
         if chat_obj:
-            if len(conversation_history) <= 3:
-                to_save = conversation_history
-            else:
-                to_save = conversation_history[-2:]
-            await save_llm_messages(chat_obj, to_save)
+            await save_llm_messages(
+                chat_obj, llm_handler.get_conversation_history()[already_persisted:]
+            )
 
 
 @login_required
@@ -392,10 +384,14 @@ class InsightsView(View):
                 ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
             ]
         if profile and profile.claude_api_key_enc:
+            # Anthropic model IDs are hyphenated and carry no date suffix; the
+            # dotted form 404s. Haiku 4.5 is still the current Haiku — there is
+            # no Haiku 5.
             provider_models["claude"] = [
-                ("claude-haiku-4.5", "Claude Haiku 4.5"),
-                ("claude-sonnet-4.6", "Claude Sonnet 4.6"),
-                ("claude-opus-4.6", "Claude Opus 4.6"),
+                ("claude-haiku-4-5", "Claude Haiku 4.5"),
+                ("claude-sonnet-5", "Claude Sonnet 5"),
+                ("claude-opus-5", "Claude Opus 5"),
+                ("claude-fable-5", "Claude Fable 5"),
             ]
         return provider_models
 
@@ -593,12 +589,16 @@ class InsightsView(View):
                 messages.success(request, "Session selection updated.")
 
             # Calculate usage stats from messages
-            usage_stats = {"prompt": 0, "response": 0, "total": 0}
+            # "cached" is the share of prompt tokens served from the provider's
+            # prompt cache at a fraction of the normal rate — a subset of
+            # "prompt", not an addition to it.
+            usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
             for m in history:
                 meta = m.get("metadata") or {}
                 usage = meta.get("usage") or {}
                 usage_stats["prompt"] += usage.get("prompt", 0) or 0
                 usage_stats["response"] += usage.get("response", 0) or 0
+                usage_stats["cached"] += usage.get("cached", 0) or 0
             usage_stats["total"] = usage_stats["prompt"] + usage_stats["response"]
 
             return {
@@ -803,6 +803,7 @@ class InsightsView(View):
                     "sources": m.metadata.get("sources", []),
                     "model": m.metadata.get("model", ""),
                     "usage": m.metadata.get("usage", {}),
+                    "refusal": m.metadata.get("refusal", False),
                     "auth_source": m.metadata.get("auth_source", ""),
                 }
                 for m in chat_obj.messages.all()
@@ -1143,6 +1144,7 @@ class InsightsView(View):
                     "sources": m.metadata.get("sources", []),
                     "model": m.metadata.get("model", ""),
                     "usage": m.metadata.get("usage", {}),
+                    "refusal": m.metadata.get("refusal", False),
                 }
                 for m in chat_obj.messages.all()
             ]

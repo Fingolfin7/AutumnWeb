@@ -1,12 +1,31 @@
 from toon import encode
-from anthropic import AsyncAnthropic
+from anthropic import NOT_GIVEN, AsyncAnthropic
 from typing import Any, AsyncIterator
 from core.utils import build_project_json_from_sessions
 from .base_handler import BaseLLMHandler
 
 
 class ClaudeHandler(BaseLLMHandler):
-    def __init__(self, model="claude-3-5-sonnet-latest", api_key: str | None = None):
+    # The instructions and the session payload are the largest, most stable part
+    # of every request and get resent on each turn, so they ride in `system` with
+    # a cache breakpoint rather than inside the message list. Anything that
+    # varies per turn (the user's prompt) must stay out of this block or the
+    # cached prefix never matches.
+
+    # max_tokens is required by the Messages API — there is no way to leave it
+    # unset — so each model gets its documented output ceiling instead of an
+    # arbitrary cap. Non-streaming calls can't use the ceiling: the SDK refuses
+    # requests it estimates will outrun its HTTP timeout.
+    MAX_OUTPUT_TOKENS = {
+        "claude-fable-5": 128000,
+        "claude-opus-5": 128000,
+        "claude-sonnet-5": 128000,
+        "claude-haiku-4-5": 64000,
+    }
+    DEFAULT_MAX_OUTPUT_TOKENS = 64000
+    NON_STREAMING_MAX_OUTPUT_TOKENS = 16000
+
+    def __init__(self, model="claude-sonnet-5", api_key: str | None = None):
         self.model = model
         self.api_key = api_key
         self.client = (
@@ -15,7 +34,7 @@ class ClaudeHandler(BaseLLMHandler):
         self.username = None
         self.session_data = None
         self.conversation_history = []
-        self.usage_stats = {"prompt": 0, "response": 0, "total": 0}
+        self.usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
         self.system_prompt_template = """
         You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
         and session logs to provide insights based on the data provided.
@@ -24,30 +43,15 @@ class ClaudeHandler(BaseLLMHandler):
 
         If possible please quote the session notes and dates/times for any insights you provide.
         All time and duration values are in minutes.
-        You have access to web search to find more information if needed.
-        
-        When formating text and links please use markdown formatting.
-        
-        Here is {username}'s prompt:
-        {user_prompt}
+
+        When formatting text and links please use markdown formatting.
 
         Sessions data:
         {session_data}
         """
-        self.update_session_data_template = """
-        {username} has updated their session data. 
+        self.update_session_data_notice = """
+        {username} has updated their session data.
         Refer to the new session data for the remainder of the conversation.
-        If possible please quote the session notes and dates/times for any insights you provide.
-        All time and duration values are in minutes.
-        You have access to web search to find more information if needed.
-        
-        When formating text and links please use markdown formatting.
-        
-        Here is {username}'s prompt:
-        {user_prompt}
-        
-        New sessions data:
-        {session_data}
         """
 
     def initialize_chat(self, username, sessions_data):
@@ -56,30 +60,118 @@ class ClaudeHandler(BaseLLMHandler):
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
 
-    def _update_usage(self, response):
+    def _build_system_text(self, notice: str = "") -> str:
+        body = self.system_prompt_template.format(
+            username=self.username, session_data=self.session_data
+        )
+        return f"{notice.strip()}\n{body}" if notice.strip() else body
+
+    def _active_system_text(self) -> str:
+        """The system prompt for this request.
+
+        The stored snapshot wins: every path that changes the session data also
+        stores a fresh system turn, so the last one is always current — and
+        reusing it verbatim keeps the cached prefix byte-identical across turns.
+        Rebuilding is the fallback for a history that has no system turn yet
+        (turn one, or a chat predating stored system turns).
+        """
+        for message in reversed(self.conversation_history):
+            if message.get("role") == "system":
+                return message.get("content") or ""
+        if self.username and self.session_data is not None:
+            return self._build_system_text()
+        return ""
+
+    def _max_tokens(self, streaming: bool) -> int:
+        ceiling = self.MAX_OUTPUT_TOKENS.get(self.model, self.DEFAULT_MAX_OUTPUT_TOKENS)
+        return ceiling if streaming else min(
+            ceiling, self.NON_STREAMING_MAX_OUTPUT_TOKENS
+        )
+
+    @staticmethod
+    def _refusal_text(response) -> str | None:
+        """Claude Opus 5 and Fable 5 can decline via safety classifiers: HTTP 200,
+        stop_reason "refusal", and an empty or partial content list."""
+        if getattr(response, "stop_reason", None) != "refusal":
+            return None
+        details = getattr(response, "stop_details", None)
+        category = getattr(details, "category", None)
+        suffix = f" (category: {category})" if category else ""
+        return (
+            "Claude declined this request via its safety classifiers"
+            f"{suffix}. Try rephrasing, or switch models in the selector."
+        )
+
+    def _system_param(self, system_text: str):
+        if not system_text:
+            return NOT_GIVEN
+        return [
+            {
+                "type": "text",
+                "text": system_text,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
+    def _api_messages(self, new_user_message: str | None = None):
+        """History as Claude messages. System turns are excluded — they are
+        delivered via the `system` parameter, not as conversation.
+
+        Refused turns are excluded too, along with the prompt that triggered
+        them: replaying content a safety classifier already declined tends to
+        trip the same classifier again on the following turn. The pair stays in
+        the database so the UI still shows what happened.
+        """
+        msgs = []
+        for m in self.conversation_history:
+            if m.get("role") not in ("user", "assistant"):
+                continue
+            if m.get("refusal"):
+                if msgs and msgs[-1]["role"] == "user":
+                    msgs.pop()
+                continue
+            msgs.append({"role": m["role"], "content": m["content"]})
+        if new_user_message is not None:
+            msgs.append({"role": "user", "content": new_user_message})
+        return msgs
+
+    @staticmethod
+    def _usage_from_response(response) -> dict[str, int]:
+        """Anthropic reports input_tokens as the *uncached remainder*, so the
+        full prompt is that plus whatever was written to and read from cache.
+        Reporting input_tokens alone understates the prompt once caching works.
+        """
         usage = getattr(response, "usage", None)
-        if usage:
-            pt = getattr(usage, "input_tokens", 0)
-            ct = getattr(usage, "output_tokens", 0)
-            self.usage_stats["prompt"] += pt
-            self.usage_stats["response"] += ct
-            self.usage_stats["total"] += pt + ct
+        if not usage:
+            return {"prompt": 0, "response": 0, "cached": 0}
+        cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+        cache_write = getattr(usage, "cache_creation_input_tokens", 0) or 0
+        return {
+            "prompt": (getattr(usage, "input_tokens", 0) or 0) + cache_read + cache_write,
+            "response": getattr(usage, "output_tokens", 0) or 0,
+            "cached": cache_read,
+        }
+
+    def _update_usage(self, response):
+        usage = self._usage_from_response(response)
+        self.usage_stats["prompt"] += usage["prompt"]
+        self.usage_stats["response"] += usage["response"]
+        self.usage_stats["cached"] += usage["cached"]
+        self.usage_stats["total"] += usage["prompt"] + usage["response"]
 
     def get_usage_stats(self):
         return self.usage_stats
 
-    def set_conversation_history(self, history: list):
-        self.conversation_history = history
-
     async def _stream_message_response(
-        self, messages
+        self, messages, system_text: str = ""
     ) -> AsyncIterator[dict[str, Any]]:
         text = ""
         final_message = None
         async with self.client.messages.stream(
             model=self.model,
+            system=self._system_param(system_text),
             messages=messages,
-            max_tokens=1024,
+            max_tokens=self._max_tokens(streaming=True),
         ) as stream:
             async for delta in stream.text_stream:
                 if delta:
@@ -100,19 +192,16 @@ class ClaudeHandler(BaseLLMHandler):
                         }
                     )
 
-        usage = {
-            "prompt": getattr(final_message.usage, "input_tokens", 0)
-            if final_message and final_message.usage
-            else 0,
-            "response": getattr(final_message.usage, "output_tokens", 0)
-            if final_message and final_message.usage
-            else 0,
-        }
+        usage = self._usage_from_response(final_message)
+        refusal = self._refusal_text(final_message)
+        if refusal:
+            text = f"{text}\n\n{refusal}".strip() if text else refusal
         yield {
             "type": "final",
             "text": text or "(No content)",
             "sources": sources,
             "usage": usage,
+            "refusal": bool(refusal),
             "response": final_message,
         }
 
@@ -144,39 +233,22 @@ class ClaudeHandler(BaseLLMHandler):
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
-        update_prompt = self.update_session_data_template.format(
-            username=self.username,
-            user_prompt=user_prompt,
-            session_data=self.session_data,
+        # The payload lives in `system`, so the update turn only has to say that
+        # it changed — resending the data inline would duplicate it.
+        update_prompt = self._build_system_text(
+            self.update_session_data_notice.format(username=self.username)
         )
-
-        # Build API messages from existing conversation history
-        msgs = []
-        for m in self.conversation_history:
-            if m["role"] == "system":
-                continue
-            elif m["role"] in ("user", "assistant"):
-                msgs.append({"role": m["role"], "content": m["content"]})
-
-        # If first user message exists and there's a system prompt, prepend system content
-        if (
-            msgs
-            and msgs[0]["role"] == "user"
-            and self.conversation_history
-            and self.conversation_history[0]["role"] == "system"
-        ):
-            msgs[0]["content"] = self.conversation_history[0]["content"]
-
-        # Send the full update prompt (with session data) to the API
-        msgs.append({"role": "user", "content": update_prompt})
+        msgs = self._api_messages(new_user_message=user_prompt)
 
         resp = None
         sources = []
+        was_refused = False
         try:
             resp = await self.client.messages.create(
                 model=self.model,
+                system=self._system_param(update_prompt),
                 messages=msgs,
-                max_tokens=1024,
+                max_tokens=self._max_tokens(streaming=False),
             )
 
             text = ""
@@ -189,6 +261,15 @@ class ClaudeHandler(BaseLLMHandler):
                     text = "(No content)"
             else:
                 text = "(No content)"
+
+            refusal = self._refusal_text(resp)
+            if refusal:
+                was_refused = True
+                text = (
+                    refusal
+                    if text == "(No content)"
+                    else f"{text}\n\n{refusal}"
+                )
 
             citations = getattr(resp, "citations", None)
             if citations:
@@ -216,14 +297,8 @@ class ClaudeHandler(BaseLLMHandler):
                 "content": text,
                 "sources": sources,
                 "model": self.model,
-                "usage": {
-                    "prompt": getattr(resp.usage, "input_tokens", 0)
-                    if resp and resp.usage
-                    else 0,
-                    "response": getattr(resp.usage, "output_tokens", 0)
-                    if resp and resp.usage
-                    else 0,
-                },
+                "usage": self._usage_from_response(resp),
+                "refusal": was_refused,
             }
         )
 
@@ -238,32 +313,14 @@ class ClaudeHandler(BaseLLMHandler):
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
-        update_prompt = self.update_session_data_template.format(
-            username=self.username,
-            user_prompt=user_prompt,
-            session_data=self.session_data,
+        update_prompt = self._build_system_text(
+            self.update_session_data_notice.format(username=self.username)
         )
-
-        msgs = []
-        for m in self.conversation_history:
-            if m["role"] == "system":
-                continue
-            if m["role"] in ("user", "assistant"):
-                msgs.append({"role": m["role"], "content": m["content"]})
-
-        if (
-            msgs
-            and msgs[0]["role"] == "user"
-            and self.conversation_history
-            and self.conversation_history[0]["role"] == "system"
-        ):
-            msgs[0]["content"] = self.conversation_history[0]["content"]
-
-        msgs.append({"role": "user", "content": update_prompt})
+        msgs = self._api_messages(new_user_message=user_prompt)
 
         result = None
         try:
-            async for event in self._stream_message_response(msgs):
+            async for event in self._stream_message_response(msgs, update_prompt):
                 if event.get("type") == "delta":
                     yield event.get("text", "")
                 elif event.get("type") == "final":
@@ -272,7 +329,7 @@ class ClaudeHandler(BaseLLMHandler):
             result = {
                 "text": f"Claude error: {e}",
                 "sources": [],
-                "usage": {"prompt": 0, "response": 0},
+                "usage": {"prompt": 0, "response": 0, "cached": 0},
                 "response": None,
             }
             yield result["text"]
@@ -285,61 +342,32 @@ class ClaudeHandler(BaseLLMHandler):
                 "content": result["text"],
                 "sources": result.get("sources", []),
                 "model": self.model,
-                "usage": result.get("usage", {"prompt": 0, "response": 0}),
+                "usage": result.get("usage", {"prompt": 0, "response": 0, "cached": 0}),
+                "refusal": bool(result.get("refusal")),
             }
         )
         if result.get("response"):
             self._update_usage(result["response"])
 
     async def send_message(self, message) -> str:
-        msgs = []
-
-        # If this is the first message, create and store system prompt
-        if len(self.conversation_history) == 0:
-            system_prompt = self.system_prompt_template.format(
-                username=self.username,
-                user_prompt=message,
-                session_data=self.session_data,
-            )
-            # Store system prompt in conversation history first
+        system_text = self._active_system_text()
+        if not any(m.get("role") == "system" for m in self.conversation_history):
+            # Stored so a resumed chat can recover it — a fresh handler on turn 2+
+            # never calls initialize_chat and has no session data of its own.
             self.conversation_history.append(
-                {"role": "system", "content": system_prompt}
+                {"role": "system", "content": system_text}
             )
-            # Also store the actual user message separately for display purposes
-            self.conversation_history.append({"role": "user", "content": message})
-
-        # Rebuild history as Claude messages
-        # Claude API: system prompt content goes in first user message, then user/assistant pairs
-        for m in self.conversation_history:
-            if m["role"] == "system":
-                # For Claude, include system content in the first user message
-                # We'll prepend it to the first user message
-                continue
-            elif m["role"] == "assistant":
-                msgs.append({"role": "assistant", "content": m["content"]})
-            elif m["role"] == "user":
-                msgs.append({"role": "user", "content": m["content"]})
-
-        # If this is the first message, prepend system prompt to the first user message
-        if len(msgs) == 1 and msgs[0]["role"] == "user":
-            system_content = self.conversation_history[0]["content"]
-            # The system prompt already includes the user message, so we can use it directly
-            msgs[0]["content"] = system_content
-
-        # Add the current user message if it's not the first message
-        if len(self.conversation_history) > 1:  # More than just system prompt
-            msgs.append({"role": "user", "content": message})
+        msgs = self._api_messages(new_user_message=message)
 
         resp = None
         sources = []
+        was_refused = False
         try:
-            # Claude standard API does not have a "web_search" parameter.
-            # If you have a custom implementation or specific model that supports it,
-            # it would usually be via tools. Removing it for standard compatibility.
             resp = await self.client.messages.create(
                 model=self.model,
+                system=self._system_param(system_text),
                 messages=msgs,
-                max_tokens=1024,
+                max_tokens=self._max_tokens(streaming=False),
             )
 
             text = ""
@@ -352,6 +380,15 @@ class ClaudeHandler(BaseLLMHandler):
                     text = "(No content)"
             else:
                 text = "(No content)"
+
+            refusal = self._refusal_text(resp)
+            if refusal:
+                was_refused = True
+                text = (
+                    refusal
+                    if text == "(No content)"
+                    else f"{text}\n\n{refusal}"
+                )
 
             # Extract sources from web search if available
             # Claude may include citations in the response metadata or blocks
@@ -370,24 +407,15 @@ class ClaudeHandler(BaseLLMHandler):
             text = f"Claude error: {e}"
             resp = None
 
-        # Store user message and assistant response in conversation history
-        # User message already stored if first message, otherwise store it now
-        if len(self.conversation_history) > 1:  # Not the first message
-            self.conversation_history.append({"role": "user", "content": message})
+        self.conversation_history.append({"role": "user", "content": message})
         self.conversation_history.append(
             {
                 "role": "assistant",
                 "content": text,
                 "sources": sources,
                 "model": self.model,
-                "usage": {
-                    "prompt": getattr(resp.usage, "input_tokens", 0)
-                    if resp and resp.usage
-                    else 0,
-                    "response": getattr(resp.usage, "output_tokens", 0)
-                    if resp and resp.usage
-                    else 0,
-                },
+                "usage": self._usage_from_response(resp),
+                "refusal": was_refused,
             }
         )
 
@@ -397,26 +425,16 @@ class ClaudeHandler(BaseLLMHandler):
 
     async def stream_message(self, message) -> AsyncIterator[str]:
         """Send a message to Claude and stream response text chunks."""
-        if len(self.conversation_history) == 0:
-            system_prompt = self.system_prompt_template.format(
-                username=self.username,
-                user_prompt=message,
-                session_data=self.session_data,
+        system_text = self._active_system_text()
+        if not any(m.get("role") == "system" for m in self.conversation_history):
+            self.conversation_history.append(
+                {"role": "system", "content": system_text}
             )
-            msgs = [{"role": "user", "content": system_prompt}]
-            self.conversation_history.append({"role": "system", "content": system_prompt})
-        else:
-            msgs = []
-            for m in self.conversation_history:
-                if m["role"] == "system":
-                    continue
-                if m["role"] in ("user", "assistant"):
-                    msgs.append({"role": m["role"], "content": m["content"]})
-            msgs.append({"role": "user", "content": message})
+        msgs = self._api_messages(new_user_message=message)
 
         result = None
         try:
-            async for event in self._stream_message_response(msgs):
+            async for event in self._stream_message_response(msgs, system_text):
                 if event.get("type") == "delta":
                     yield event.get("text", "")
                 elif event.get("type") == "final":
@@ -425,7 +443,7 @@ class ClaudeHandler(BaseLLMHandler):
             result = {
                 "text": f"Claude error: {e}",
                 "sources": [],
-                "usage": {"prompt": 0, "response": 0},
+                "usage": {"prompt": 0, "response": 0, "cached": 0},
                 "response": None,
             }
             yield result["text"]
@@ -437,7 +455,8 @@ class ClaudeHandler(BaseLLMHandler):
                 "content": result["text"],
                 "sources": result.get("sources", []),
                 "model": self.model,
-                "usage": result.get("usage", {"prompt": 0, "response": 0}),
+                "usage": result.get("usage", {"prompt": 0, "response": 0, "cached": 0}),
+                "refusal": bool(result.get("refusal")),
             }
         )
         if result.get("response"):

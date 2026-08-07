@@ -148,19 +148,23 @@ function deleteChat(url) {
             return;
         }
 
-        const currentPrompt = Number(el.dataset.prompt);
-        const currentResponse = Number(el.dataset.response);
-        const promptDelta = Number(usage.prompt);
-        const responseDelta = Number(usage.response);
+        const add = (current, delta) => {
+            const base = Number.isNaN(Number(current)) ? 0 : Number(current);
+            const step = Number.isNaN(Number(delta)) ? 0 : Number(delta);
+            return base + step;
+        };
 
-        const prompt = (Number.isNaN(currentPrompt) ? 0 : currentPrompt)
-            + (Number.isNaN(promptDelta) ? 0 : promptDelta);
-        const response = (Number.isNaN(currentResponse) ? 0 : currentResponse)
-            + (Number.isNaN(responseDelta) ? 0 : responseDelta);
+        const prompt = add(el.dataset.prompt, usage.prompt);
+        const response = add(el.dataset.response, usage.response);
+        // Cached is a subset of prompt, not an addition to it.
+        const cached = add(el.dataset.cached, usage.cached);
 
         el.dataset.prompt = prompt;
         el.dataset.response = response;
-        el.textContent = 'In: ' + prompt.toLocaleString() + ' · Out: ' + response.toLocaleString();
+        el.dataset.cached = cached;
+        el.textContent = 'In: ' + prompt.toLocaleString()
+            + ' · Out: ' + response.toLocaleString()
+            + (cached > 0 ? ' · Cached: ' + cached.toLocaleString() : '');
     }
 
     function upsertActiveChatItem(payload) {
