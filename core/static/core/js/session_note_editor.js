@@ -1,4 +1,35 @@
 (function () {
+    const NOTE_DRAFT_KEY_PREFIX = 'autumn:timer-note-draft:';
+
+    function restoreTimerNoteDraft(editorContainer, textarea) {
+        if (!editorContainer.hasAttribute('data-timer-note-draft')) {
+            return;
+        }
+
+        const timerContainer = editorContainer.closest('[data-timer-id]');
+        if (!timerContainer || !timerContainer.dataset.timerId) {
+            return;
+        }
+
+        try {
+            const key = NOTE_DRAFT_KEY_PREFIX + timerContainer.dataset.timerId;
+            const draft = window.sessionStorage.getItem(key);
+            if (draft === null) {
+                return;
+            }
+
+            textarea.value = draft;
+            window.sessionStorage.removeItem(key);
+
+            const status = editorContainer.querySelector('[data-note-status]');
+            if (status) {
+                status.textContent = 'Current timer note carried over.';
+            }
+        } catch (error) {
+            // Keep the server-rendered note when session storage is unavailable.
+        }
+    }
+
     function wrapSelection(textarea, before, after) {
         const start = textarea.selectionStart || 0;
         const end = textarea.selectionEnd || 0;
@@ -309,6 +340,8 @@
         if (!textarea) {
             return;
         }
+
+        restoreTimerNoteDraft(editorContainer, textarea);
 
         editorContainer.querySelectorAll('[data-note-action]').forEach(function (button) {
             const action = button.getAttribute('data-note-action');

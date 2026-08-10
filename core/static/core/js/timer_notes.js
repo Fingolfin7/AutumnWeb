@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    const NOTE_DRAFT_KEY_PREFIX = 'autumn:timer-note-draft:';
+
     function cookie(name) {
         const match = document.cookie.split(';').map(value => value.trim())
             .find(value => value.startsWith(`${name}=`));
@@ -20,6 +22,8 @@
         const status = editor.querySelector('[data-timer-note-status]');
         const saveButton = editor.querySelector('[data-timer-note-save]');
         const stampButton = editor.querySelector('[data-timer-note-stamp]');
+        const timerCard = editor.closest('[data-timer-id]');
+        const stopButton = timerCard ? timerCard.querySelector('[data-timer-stop]') : null;
         let timer = null;
         let saving = false;
 
@@ -85,6 +89,20 @@
             textarea.setSelectionRange(caret, caret);
             markDirty();
         });
+
+        if (stopButton && timerCard.dataset.timerId) {
+            stopButton.addEventListener('click', () => {
+                try {
+                    window.sessionStorage.setItem(
+                        NOTE_DRAFT_KEY_PREFIX + timerCard.dataset.timerId,
+                        textarea.value
+                    );
+                } catch (error) {
+                    // Storage can be unavailable in locked-down browsers. The
+                    // existing autosave remains the fallback in that case.
+                }
+            });
+        }
     }
 
     function initialiseAll() {

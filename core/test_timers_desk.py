@@ -99,6 +99,7 @@ class ScriptContractTests(TimerPagesTestCase):
             "data-timer-note-save",
             "data-timer-note-status",
             "data-timer-note-stamp",
+            "data-timer-stop",
             'data-dirty="false"',
             "data-save-url",
         ):
@@ -126,6 +127,7 @@ class ScriptContractTests(TimerPagesTestCase):
         self.assertContains(response, "data-allocation-editor")
         self.assertContains(response, "data-allocation-item")
         self.assertContains(response, 'data-subproject-name="auth"')
+        self.assertContains(response, "data-timer-note-draft")
 
 
 class TimerPageContentTests(TimerPagesTestCase):

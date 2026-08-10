@@ -79,7 +79,7 @@
         </div>
 
         <div class="focus-actions">
-            <a class="btn btn--stop btn--lg focus-stop" href="{% url 'stop_timer' timer.id %}">
+            <a class="btn btn--stop btn--lg focus-stop" data-timer-stop href="{% url 'stop_timer' timer.id %}">
                 <i class="fas fa-stopwatch"></i> Stop
             </a>
             <a class="btn-icon" href="{% url 'restart_timer' timer.id %}" title="Restart this timer">
