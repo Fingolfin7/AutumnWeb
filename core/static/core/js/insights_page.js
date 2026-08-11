@@ -17,6 +17,7 @@
 
   var CONFIG = JSON.parse(document.getElementById('insights-config').textContent);
   var PROVIDER_MODELS = CONFIG.providerModels || {};
+  var OPENAI_REASONING_EFFORTS = CONFIG.openaiReasoningEffortsByModel || {};
   function repopulateModels(provider, selectedModel){
       const modelSelect = $('#model');
       modelSelect.empty();
@@ -29,6 +30,24 @@
       if (!selectedModel && entries.length>0){
           modelSelect.val(entries[0].value);
       }
+  }
+
+  function repopulateReasoningEfforts(model, selectedEffort){
+      const reasoningSelect = $('#reasoning_effort');
+      const efforts = OPENAI_REASONING_EFFORTS[model] || [];
+      reasoningSelect.empty();
+      efforts.forEach(effort => {
+          const label = effort === 'xhigh'
+              ? 'Extra high'
+              : effort.charAt(0).toUpperCase() + effort.slice(1);
+          const opt = $('<option></option>').val(effort).text(label);
+          if (effort === selectedEffort) opt.attr('selected', 'selected');
+          reasoningSelect.append(opt);
+      });
+      if (!efforts.includes(selectedEffort)) {
+          reasoningSelect.val(efforts.includes('high') ? 'high' : efforts[0]);
+      }
+      $('#reasoning_effort_filter').val(reasoningSelect.val() || '');
   }
 
   function updateReasoningEffortVisibility(provider){
@@ -152,6 +171,10 @@
 
       // initial populate
       repopulateModels(CONFIG.selectedProvider, CONFIG.selectedModel);
+      repopulateReasoningEfforts(
+          CONFIG.selectedModel,
+          $('#reasoning_effort').val()
+      );
       updateReasoningEffortVisibility(CONFIG.selectedProvider);
       // keep GET filter hidden fields in sync
       $('#provider_filter').val($('#provider').val());
@@ -163,6 +186,7 @@
       $('#provider').on('change', function(){
           const newProvider = $(this).val();
           repopulateModels(newProvider,null);
+          repopulateReasoningEfforts($('#model').val(), 'high');
           updateReasoningEffortVisibility(newProvider);
           $('#provider_filter').val(newProvider);
           $('#model_filter').val($('#model').val());
@@ -171,6 +195,7 @@
       $('#model').on('change', function() {
           let selected = $(this).val();
           $('#model_filter').val(selected);
+          repopulateReasoningEfforts(selected, $('#reasoning_effort').val());
       });
 
       $('#reasoning_effort').on('change', function() {

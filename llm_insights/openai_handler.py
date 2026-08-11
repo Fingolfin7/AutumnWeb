@@ -11,6 +11,7 @@ from .base_handler import BaseLLMHandler
 
 class OpenAIHandler(BaseLLMHandler):
     CHAT_TITLE_MODEL = "gpt-5.6-luna"
+    REASONING_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
     AUTH_API = "api"
     AUTH_CODEX = "codex"
     AUTH_CODEX_WITH_API_FALLBACK = "codex_with_api_fallback"
@@ -147,7 +148,7 @@ class OpenAIHandler(BaseLLMHandler):
             "max_output_tokens": 4096,
             "store": False,
         }
-        if self.reasoning_effort in {"low", "medium", "high", "extra-high"}:
+        if self.reasoning_effort in self.REASONING_EFFORTS:
             kwargs["reasoning"] = {"effort": self.reasoning_effort}
         if include_web_search:
             kwargs["tools"] = [{"type": "web_search"}]

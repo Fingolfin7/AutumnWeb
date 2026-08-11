@@ -282,7 +282,7 @@
                             <select id="reasoning_effort" name="reasoning_effort">
                                 {% for effort in openai_reasoning_efforts %}
                                     <option value="{{ effort }}" {% if effort == selected_reasoning_effort %}selected{% endif %}>
-                                        {{ effort|capfirst }}
+                                        {% if effort == "xhigh" %}Extra high{% else %}{{ effort|capfirst }}{% endif %}
                                     </option>
                                 {% endfor %}
                             </select>

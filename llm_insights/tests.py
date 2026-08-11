@@ -104,11 +104,29 @@ class InsightsViewProviderModelsTests(TestCase):
             "high",
         )
 
-    def test_extra_high_reasoning_effort_is_available(self):
-        self.assertIn("extra-high", self.view.OPENAI_REASONING_EFFORTS)
+    def test_xhigh_reasoning_effort_is_available(self):
+        self.assertIn("xhigh", self.view.OPENAI_REASONING_EFFORTS)
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "extra-high"),
-            "extra-high",
+            self.view._validate_reasoning_effort("openai", "xhigh", "gpt-5.5"),
+            "xhigh",
+        )
+
+    def test_legacy_extra_high_reasoning_effort_is_normalized(self):
+        self.assertEqual(
+            self.view._validate_reasoning_effort(
+                "openai", "extra-high", "gpt-5.6-sol"
+            ),
+            "xhigh",
+        )
+
+    def test_max_reasoning_effort_is_only_available_for_gpt_5_6(self):
+        self.assertEqual(
+            self.view._validate_reasoning_effort("openai", "max", "gpt-5.6-sol"),
+            "max",
+        )
+        self.assertEqual(
+            self.view._validate_reasoning_effort("openai", "max", "gpt-5.5"),
+            "high",
         )
 
     def test_openai_is_the_default_provider_and_model_when_available(self):
@@ -497,6 +515,31 @@ class OpenAIMessageAssemblyTests(SimpleTestCase):
         self.assertIn(PAYLOAD, kwargs["instructions"])
         self.assertNotIn("STALE-PAYLOAD", kwargs["instructions"])
         self.assertNotIn("system", [m["role"] for m in kwargs["input"]])
+
+    def test_xhigh_and_max_use_the_api_enum_values(self):
+        handler = OpenAIHandler(
+            model="gpt-5.6-sol", api_key="test-key", reasoning_effort="xhigh"
+        )
+        messages = [{"role": "user", "content": "q"}]
+
+        self.assertEqual(
+            handler._api_response_kwargs(messages)["reasoning"],
+            {"effort": "xhigh"},
+        )
+        self.assertEqual(
+            handler._codex_response_kwargs(messages)["reasoning"],
+            {"effort": "xhigh"},
+        )
+
+        handler.reasoning_effort = "max"
+        self.assertEqual(
+            handler._api_response_kwargs(messages)["reasoning"],
+            {"effort": "max"},
+        )
+        self.assertEqual(
+            handler._codex_response_kwargs(messages)["reasoning"],
+            {"effort": "max"},
+        )
 
 
 class CachedTokenAccountingTests(SimpleTestCase):

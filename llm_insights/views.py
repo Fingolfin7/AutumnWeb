@@ -359,7 +359,7 @@ def delete_chat(request, chat_id):
 
 
 class InsightsView(View):
-    OPENAI_REASONING_EFFORTS = ["low", "medium", "high", "extra-high"]
+    OPENAI_REASONING_EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 
     def _has_env_api_key(self, env_var):
         return bool(os.environ.get(env_var))
@@ -442,10 +442,19 @@ class InsightsView(View):
             model = valid_models[0][0]
         return provider, model
 
-    def _validate_reasoning_effort(self, provider, effort):
+    def _openai_reasoning_efforts(self, model):
+        if model and not model.startswith("gpt-5.6"):
+            return self.OPENAI_REASONING_EFFORTS[:-1]
+        return self.OPENAI_REASONING_EFFORTS
+
+    def _validate_reasoning_effort(self, provider, effort, model=None):
         if provider != "openai":
             return ""
-        if effort not in self.OPENAI_REASONING_EFFORTS:
+        # Preserve the intended setting in chats saved before the UI used the
+        # API's actual `xhigh` enum value.
+        if effort == "extra-high":
+            effort = "xhigh"
+        if effort not in self._openai_reasoning_efforts(model):
             return "high"
         return effort
 
@@ -651,6 +660,7 @@ class InsightsView(View):
         selected_reasoning_effort = self._validate_reasoning_effort(
             selected_provider,
             request.GET.get("reasoning_effort") or stored_reasoning_effort,
+            selected_model,
         )
 
         # insights_page.js used to be an inline <script> with these values
@@ -664,6 +674,10 @@ class InsightsView(View):
             "username": data["username"],
             "selectedProvider": selected_provider,
             "selectedModel": selected_model,
+            "openaiReasoningEffortsByModel": {
+                model: self._openai_reasoning_efforts(model)
+                for model, _label in provider_models.get("openai", [])
+            },
         }
 
         context = {
@@ -678,7 +692,9 @@ class InsightsView(View):
             "selected_model": selected_model,
             "selected_provider": selected_provider,
             "selected_reasoning_effort": selected_reasoning_effort,
-            "openai_reasoning_efforts": self.OPENAI_REASONING_EFFORTS,
+            "openai_reasoning_efforts": self._openai_reasoning_efforts(
+                selected_model
+            ),
             "insights_config": insights_config,
             "providers": list(provider_models.keys()),
             "chat_id": chat_id,
@@ -769,7 +785,9 @@ class InsightsView(View):
                 provider_models, selected_provider, selected_model
             )
             selected_reasoning_effort = self._validate_reasoning_effort(
-                selected_provider, post_data.get("reasoning_effort")
+                selected_provider,
+                post_data.get("reasoning_effort"),
+                selected_model,
             )
 
             chat_obj = data["chat_obj"]
@@ -1101,7 +1119,9 @@ class InsightsView(View):
             provider_models, selected_provider, selected_model
         )
         selected_reasoning_effort = self._validate_reasoning_effort(
-            selected_provider, request.POST.get("reasoning_effort")
+            selected_provider,
+            request.POST.get("reasoning_effort"),
+            selected_model,
         )
 
         chat_obj = data["chat_obj"]
