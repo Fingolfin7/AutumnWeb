@@ -100,6 +100,11 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "allauth",
+    "allauth.account",
+    "allauth.socialaccount",
+    "allauth.socialaccount.providers.github",
+    "allauth.socialaccount.providers.google",
     "django_cleanup.apps.CleanupConfig",  # delete old files and images on file field and imagefield update/delete
 ]
 
@@ -124,6 +129,7 @@ SPECTACULAR_SETTINGS = {
 AUTHENTICATION_BACKENDS = [
     "users.auth_backends.EmailOrUsernameModelBackend",  # use email or username to login
     "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
 ]
 
 MIDDLEWARE = [
@@ -134,6 +140,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
     "users.middleware.UserTimezoneMiddleware",
     "core.api_v2.middleware.V2ErrorEnvelopeMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
@@ -173,6 +180,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "core.context_processors.static_version",  # Custom context processor for static versioning
                 "core.context_processors.active_context",  # Inject active context + user contexts
+                "users.context_processors.auth_features",
             ],
         },
     },
@@ -361,6 +369,49 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "home"
 LOGIN_URL = "login"
+
+# Optional social authentication. Provider credentials live in the deployment
+# environment rather than the database, so database backups do not contain
+# OAuth client secrets.
+GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", default="")
+GOOGLE_OAUTH_CLIENT_SECRET = env("GOOGLE_OAUTH_CLIENT_SECRET", default="")
+GITHUB_OAUTH_CLIENT_ID = env("GITHUB_OAUTH_CLIENT_ID", default="")
+GITHUB_OAUTH_CLIENT_SECRET = env("GITHUB_OAUTH_CLIENT_SECRET", default="")
+
+GOOGLE_AUTH_ENABLED = bool(GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET)
+GITHUB_AUTH_ENABLED = bool(GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET)
+
+ACCOUNT_ADAPTER = "users.adapters.AutumnAccountAdapter"
+SOCIALACCOUNT_ADAPTER = "users.adapters.AutumnSocialAccountAdapter"
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_LOGIN_ON_GET = False
+SOCIALACCOUNT_QUERY_EMAIL = True
+SOCIALACCOUNT_STORE_TOKENS = False
+ACCOUNT_EMAIL_VERIFICATION = "none"
+
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "SCOPE": ["openid", "profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+        "OAUTH_PKCE_ENABLED": True,
+    },
+    # This is the minimum scope needed when a GitHub user keeps their primary
+    # email private; no repository or organization access is requested.
+    "github": {"SCOPE": ["user:email"]},
+}
+if GOOGLE_AUTH_ENABLED:
+    SOCIALACCOUNT_PROVIDERS["google"]["APP"] = {
+        "client_id": GOOGLE_OAUTH_CLIENT_ID,
+        "secret": GOOGLE_OAUTH_CLIENT_SECRET,
+        "key": "",
+    }
+if GITHUB_AUTH_ENABLED:
+    SOCIALACCOUNT_PROVIDERS["github"]["APP"] = {
+        "client_id": GITHUB_OAUTH_CLIENT_ID,
+        "secret": GITHUB_OAUTH_CLIENT_SECRET,
+        "key": "",
+    }
 
 # AUDIT Settings
 RUN_AUDIT_SCHEDULER = env.bool(

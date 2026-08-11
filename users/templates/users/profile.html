@@ -3,6 +3,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load background_images %}
+{% load socialaccount %}
 
 {% block content %}
 
@@ -56,6 +57,75 @@
             </div>
         </div>
     </section>
+
+    {% if social_auth_connections %}
+    <section class="slab slab-pad">
+        <div class="u-between u-wrap u-gap-3">
+            <div>
+                <p class="page-eyebrow">Sign-in methods</p>
+                <h2 class="disclose-title">Connected accounts</h2>
+            </div>
+            <span class="muted">Connecting and disconnecting take effect immediately</span>
+        </div>
+
+        {% if not user.has_usable_password %}
+        <div class="msg msg--warning u-mt-4">
+            <i class="fas fa-exclamation-triangle msg-icon" aria-hidden="true"></i>
+            <div>
+                This account has no Autumn password, so a connected provider is the only
+                way to log in. Autumn will refuse to disconnect the last one.
+            </div>
+        </div>
+        {% endif %}
+
+        <ul class="profile-auth-list">
+            {% for connection in social_auth_connections %}
+            <li class="profile-auth-panel">
+                <div>
+                    <h3 class="disclose-title profile-auth-name">
+                        <i class="{{ connection.icon }} profile-auth-icon" aria-hidden="true"></i>
+                        {{ connection.name }}
+                    </h3>
+                    {% if connection.account %}
+                    <p class="focus-lede">
+                        {% if connection.enabled %}
+                        Log in with {{ connection.name }}{% if user.has_usable_password %} or with your Autumn password{% endif %}.
+                        {% else %}
+                        {{ connection.name }} is no longer configured on this Autumn
+                        instance, so it cannot log you in until an administrator sets it
+                        up again.
+                        {% endif %}
+                    </p>
+                    <span class="context-chip profile-auth-chip {% if connection.enabled %}text-green{% else %}text-yellow{% endif %}">
+                        <i class="fas {% if connection.enabled %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}" aria-hidden="true"></i>
+                        Connected{% if connection.display_identity %} as {{ connection.display_identity }}{% endif %}
+                    </span>
+                    {% else %}
+                    <p class="focus-lede">
+                        Link {{ connection.name }} here, while you are logged in. Autumn never
+                        matches an account by email address on its own.
+                    </p>
+                    <span class="context-chip profile-auth-chip">
+                        <i class="fas fa-circle" aria-hidden="true"></i> Not connected
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="form-actions">
+                    {% if connection.account %}
+                    <button type="submit" form="social-disconnect-{{ connection.id }}" class="btn btn--ghost">
+                        <i class="fas fa-unlink" aria-hidden="true"></i> Disconnect {{ connection.name }}
+                    </button>
+                    {% elif connection.enabled %}
+                    <button type="submit" form="social-connect-{{ connection.id }}" class="btn btn--ghost">
+                        <i class="fas fa-link" aria-hidden="true"></i> Connect {{ connection.name }}
+                    </button>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
 
     <section class="slab slab-pad">
         <div class="u-between u-wrap u-gap-3">
@@ -319,6 +389,22 @@
         </button>
     </div>
 </form>
+
+{% comment %}
+  Form owners for the buttons in "Connected accounts". The buttons stay where
+  they belong visually, inside the profile form, and the `form` attribute makes
+  these their submitters instead. That matters: as plain submit buttons with a
+  formaction they carried the whole profile form to an endpoint that ignores it,
+  so any unsaved edit — and a picked avatar file, over multipart — was uploaded
+  and then silently dropped. POST and CSRF are unchanged.
+{% endcomment %}
+{% for connection in social_auth_connections %}
+{% if connection.account %}
+<form id="social-disconnect-{{ connection.id }}" method="post" action="{% url 'disconnect_social_account' connection.id %}">{% csrf_token %}</form>
+{% elif connection.enabled %}
+<form id="social-connect-{{ connection.id }}" method="post" action="{% provider_login_url connection.id process='connect' %}">{% csrf_token %}</form>
+{% endif %}
+{% endfor %}
 
 <script>
     $('#id_image').on('change',function(){

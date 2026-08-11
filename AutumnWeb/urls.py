@@ -49,6 +49,39 @@ urlpatterns = [
     ),
     path("profile/", user_views.profile, name="profile"),
     path(
+        "accounts/<str:provider>/disconnect/",
+        user_views.disconnect_social_account,
+        name="disconnect_social_account",
+    ),
+    path(
+        "accounts/login/",
+        user_views.account_login_redirect,
+        name="account_login",
+    ),
+    # Mount only social authentication. Autumn keeps its existing local
+    # login/registration views and does not expose allauth's reset routes.
+    path("accounts/3rdparty/", include("allauth.socialaccount.urls")),
+    path(
+        "accounts/google/login/",
+        user_views.google_oauth_login,
+        name="google_login",
+    ),
+    path(
+        "accounts/google/login/callback/",
+        user_views.google_oauth_callback,
+        name="google_callback",
+    ),
+    path(
+        "accounts/github/login/",
+        user_views.github_oauth_login,
+        name="github_login",
+    ),
+    path(
+        "accounts/github/login/callback/",
+        user_views.github_oauth_callback,
+        name="github_callback",
+    ),
+    path(
         "profile/background-dimming/",
         user_views.set_background_dimming,
         name="set_background_dimming",

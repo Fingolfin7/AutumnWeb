@@ -1,0 +1,38 @@
+{% extends 'users/base.html' %}
+
+{% block title %}Sign-in unsuccessful{% endblock %}
+
+{% block content %}
+<div class="desk-head auth-card">
+    <div>
+        <p class="page-eyebrow">External sign-in</p>
+        <h1 class="page-title">Sign-in unsuccessful</h1>
+    </div>
+</div>
+
+<div class="slab slab-pad auth-card">
+    <p class="focus-lede">
+        The provider did not complete the sign-in. That usually means the
+        authorization was declined or it took long enough to expire.
+    </p>
+    <p class="focus-lede">
+        {% if user.is_authenticated %}
+        Nothing was connected, and you are still logged in. You can try again from
+        Profile.
+        {% else %}
+        Nothing was created or changed. Try again, or log in with your password.
+        {% endif %}
+    </p>
+    <div class="form-actions">
+        {% if user.is_authenticated %}
+        <a class="btn btn--primary" href="{% url 'profile' %}">
+            <i class="fa fa-user" aria-hidden="true"></i> Back to profile
+        </a>
+        {% else %}
+        <a class="btn btn--primary" href="{% url 'login' %}">
+            <i class="fa fa-sign-in-alt" aria-hidden="true"></i> Return to login
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

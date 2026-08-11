@@ -1,0 +1,34 @@
+{% extends 'users/base.html' %}
+
+{% comment %}
+  allauth falls back to this whenever a signup is attempted while the instance
+  is closed. Only social signup can reach it here: Autumn keeps its own
+  registration view and does not mount allauth's account URLs.
+{% endcomment %}
+
+{% block title %}Registration is closed{% endblock %}
+
+{% block content %}
+<div class="desk-head auth-card">
+    <div>
+        <p class="page-eyebrow">External sign-in</p>
+        <h1 class="page-title">Registration is closed</h1>
+    </div>
+</div>
+
+<div class="slab slab-pad auth-card">
+    <p class="focus-lede">
+        This Autumn instance is not accepting new accounts, so the provider could not
+        create one for you. Nothing was created or changed.
+    </p>
+    <p class="focus-lede">
+        Already have an account? Log in with your password, then connect the provider
+        from Profile — after that it will log you in on its own.
+    </p>
+    <div class="form-actions">
+        <a class="btn btn--primary" href="{% url 'login' %}">
+            <i class="fa fa-sign-in-alt" aria-hidden="true"></i> Return to login
+        </a>
+    </div>
+</div>
+{% endblock %}

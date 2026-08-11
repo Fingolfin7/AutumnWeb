@@ -1,0 +1,50 @@
+{% extends 'users/base.html' %}
+
+{% comment %}
+  allauth renders this confirmation on a GET to a provider's start URL
+  (SOCIALACCOUNT_LOGIN_ON_GET = False). Context is `provider` and `process`.
+  The form must keep posting to the current URL with no action of its own —
+  `process` and `next` travel in the query string.
+{% endcomment %}
+
+{% block title %}{% if process == 'connect' %}Connect {{ provider.name }}{% else %}Continue with {{ provider.name }}{% endif %}{% endblock %}
+
+{% block content %}
+<div class="desk-head auth-card">
+    <div>
+        <p class="page-eyebrow">{% if process == 'connect' %}Sign-in methods{% else %}External sign-in{% endif %}</p>
+        <h1 class="page-title">
+            {% if process == 'connect' %}Connect {{ provider.name }}{% else %}Continue with {{ provider.name }}{% endif %}
+        </h1>
+    </div>
+</div>
+
+<form method="post" class="slab slab-pad auth-card">
+    {% csrf_token %}
+
+    <p class="auth-provider-mark">
+        <i class="{% if provider.id == 'github' %}fab fa-github{% elif provider.id == 'google' %}fab fa-google{% else %}fas fa-id-badge{% endif %}" aria-hidden="true"></i>
+    </p>
+
+    <p class="focus-lede">
+        {% if process == 'connect' %}
+        Autumn will link this {{ provider.name }} account to the account you are
+        logged in as. Afterwards either one logs you in, and you can disconnect it
+        again from Profile at any time.
+        {% else %}
+        You will be sent to {{ provider.name }} to authorize Autumn, then returned
+        here. Autumn asks only for your basic profile and email address.
+        {% endif %}
+    </p>
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% if process == 'connect' %}{% url 'profile' %}{% else %}{% url 'login' %}{% endif %}">
+            <i class="fa fa-times" aria-hidden="true"></i> Cancel
+        </a>
+        <button type="submit" class="btn btn--primary btn--spacer">
+            <i class="fa fa-arrow-right" aria-hidden="true"></i>
+            Continue to {{ provider.name }}
+        </button>
+    </div>
+</form>
+{% endblock %}

@@ -8,13 +8,18 @@ from .codex_auth import (
     start_device_code_login,
     token_bundle_summary,
 )
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.http import HttpResponse, FileResponse, HttpResponseBadRequest
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
+from allauth.socialaccount.forms import DisconnectForm
+from allauth.socialaccount.models import SocialAccount
+from allauth.socialaccount.providers.github import views as github_oauth_views
+from allauth.socialaccount.providers.google import views as google_oauth_views
+from .context_processors import configured_social_providers
 import logging
 import mimetypes
 import os
@@ -52,6 +57,64 @@ class CustomLoginView(LoginView):
         response = super().form_valid(form)
         messages.success(self.request, 'Login successful.')
         return response
+
+
+def _social_oauth_view(request, provider, view):
+    enabled_setting = {
+        'google': settings.GOOGLE_AUTH_ENABLED,
+        'github': settings.GITHUB_AUTH_ENABLED,
+    }
+    if not enabled_setting[provider]:
+        messages.error(request, f'{provider.title()} sign-in is not configured.')
+        return redirect('login')
+    return view(request)
+
+
+def google_oauth_login(request):
+    return _social_oauth_view(request, 'google', google_oauth_views.oauth2_login)
+
+
+def google_oauth_callback(request):
+    return _social_oauth_view(request, 'google', google_oauth_views.oauth2_callback)
+
+
+def github_oauth_login(request):
+    return _social_oauth_view(request, 'github', github_oauth_views.oauth2_login)
+
+
+def github_oauth_callback(request):
+    return _social_oauth_view(request, 'github', github_oauth_views.oauth2_callback)
+
+
+@require_GET
+def account_login_redirect(request):
+    """Send allauth fallbacks to Autumn's canonical login page."""
+
+    return redirect('login')
+
+
+@login_required
+@require_POST
+def disconnect_social_account(request, provider):
+    if provider not in {'google', 'github'}:
+        return HttpResponseBadRequest('Unsupported social account provider.')
+
+    account = get_object_or_404(
+        SocialAccount,
+        user=request.user,
+        provider=provider,
+    )
+    form = DisconnectForm(data={'account': account.pk}, request=request)
+    if form.is_valid():
+        form.save()
+        messages.success(request, f'{provider.title()} account disconnected.')
+    else:
+        error = next(
+            (message for errors in form.errors.values() for message in errors),
+            f'{provider.title()} could not be disconnected.',
+        )
+        messages.error(request, error)
+    return redirect('profile')
 
 
 
@@ -175,6 +238,28 @@ def profile(request):
         if ai_features_enabled
         else None
     )
+    social_accounts = {
+        account.provider: account
+        for account in SocialAccount.objects.filter(
+            user=request.user,
+            provider__in=('google', 'github'),
+        )
+    }
+    social_auth_connections = []
+    for provider in configured_social_providers():
+        account = social_accounts.get(provider['id'])
+        if not provider['enabled'] and account is None:
+            continue
+        connection = dict(provider)
+        connection['account'] = account
+        connection['display_identity'] = (
+            account.extra_data.get('email')
+            or account.extra_data.get('login')
+            or account.uid
+            if account
+            else ''
+        )
+        social_auth_connections.append(connection)
     context = {
         'user_form': u_form,
         'profile_form': p_form,
@@ -182,6 +267,7 @@ def profile(request):
         'have_keys': have_keys,
         'openai_chatgpt_device_code': request.session.get('openai_chatgpt_device_code') if ai_features_enabled else None,
         'openai_chatgpt_summary': token_bundle_summary(openai_chatgpt_bundle),
+        'social_auth_connections': social_auth_connections,
     }
     return render(request, 'users/profile.html', context)
 

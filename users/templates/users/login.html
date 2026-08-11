@@ -1,6 +1,7 @@
 {% extends 'users/base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load socialaccount %}
 
 {% block content %}
 
@@ -24,44 +25,56 @@
         {{ form.password.errors }}
         {{ form.password.label_tag }}
         {{ form.password }}
-{#      <span class="password-toggle-icon"><i class="fa fa-eye" id="eye-icon"></i></span> #}
     </div>
 
-    <script>
-        $(document).ready(function() {
-            const eye = $("#eye-icon");
-            const password = $("#password");
-
-            // Initially hide the eye icon
-            eye.hide();
-
-            // Show the eye icon when the password field is focused
-            password.focus(function() {
-                eye.show();
-            });
-
-            eye.click(function() {
-                let type = password.attr('type');
-
-                if (type === 'password') {
-                    password.attr('type', 'text');
-                    $(this).removeClass('fa-eye').addClass('fa-eye-slash');
-                } else {
-                    password.attr('type', 'password');
-                    $(this).removeClass('fa-eye-slash').addClass('fa-eye');
-                }
-            });
-        });
-    </script>
-
     <div class="form-actions">
+        {% if allow_registration %}
         <a class="btn btn--ghost" href="{% url 'register' %}">
-            <i class="fa fa-user-plus"></i> Register
+            <i class="fa fa-user-plus" aria-hidden="true"></i> Register
         </a>
+        {% endif %}
         <button type="submit" class="btn btn--primary btn--spacer">
-            <i class="fa fa-check-circle"></i> Log in
+            <i class="fa fa-check-circle" aria-hidden="true"></i> Log in
         </button>
     </div>
 </form>
+
+{% if social_auth_enabled %}
+{% comment %}
+  Each provider is its own <form>, deliberately a SIBLING of the credential
+  form rather than a submit button inside it. A button with formaction still
+  submits its owner form's fields, so the typed username and password would
+  ride along to the provider's start URL and sit in that request's body for
+  nothing. Initiation is still POST + CSRF, exactly as before.
+{% endcomment %}
+<section class="auth-card" aria-labelledby="auth-alt-title">
+    <h2 id="auth-alt-title" class="sr-only">Other ways to log in</h2>
+
+    <div class="auth-divider" aria-hidden="true"><span>or</span></div>
+
+    <div class="slab slab-pad">
+        <div class="auth-provider-list">
+            {% for provider in social_auth_providers %}
+            <form method="post" action="{% provider_login_url provider.id process='login' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn--ghost btn--block auth-provider-button">
+                    <i class="{{ provider.icon }} auth-provider-icon" aria-hidden="true"></i>
+                    <span>Continue with {{ provider.name }}</span>
+                </button>
+            </form>
+            {% endfor %}
+        </div>
+
+        <p class="auth-note">
+            {% if allow_registration %}
+            First time here? Continuing with a provider creates your Autumn account.
+            {% else %}
+            Registration is closed on this Autumn instance, so a provider only logs you
+            in to an account that already exists — connect it from Profile first.
+            {% endif %}
+        </p>
+    </div>
+</section>
+{% endif %}
 
 {% endblock %}

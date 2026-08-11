@@ -111,7 +111,15 @@ SERVE_MEDIA=TRUE  # For PaaS deployments
 RUN_AUDIT_SCHEDULER=FALSE
 ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *
 ALLOW_REGISTRATION=FALSE  # Registration is closed unless explicitly enabled
+GOOGLE_OAUTH_CLIENT_ID=<google-web-client-id>
+GOOGLE_OAUTH_CLIENT_SECRET=<google-web-client-secret>
+GITHUB_OAUTH_CLIENT_ID=<github-oauth-client-id>
+GITHUB_OAUTH_CLIENT_SECRET=<github-oauth-client-secret>
 ```
+
+Google and GitHub buttons are enabled independently when both credentials for
+that provider are set. See `docs/social-auth.md` for provider setup and callback
+URLs. Run `python manage.py migrate` after installing or updating dependencies.
 
 ## Database Notes
 

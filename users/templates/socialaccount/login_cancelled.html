@@ -1,0 +1,30 @@
+{% extends 'users/base.html' %}
+
+{% block title %}Sign-in cancelled{% endblock %}
+
+{% block content %}
+<div class="desk-head auth-card">
+    <div>
+        <p class="page-eyebrow">External sign-in</p>
+        <h1 class="page-title">Sign-in cancelled</h1>
+    </div>
+</div>
+
+<div class="slab slab-pad auth-card">
+    <p class="focus-lede">
+        You stopped before the provider confirmed anything, so nothing was connected
+        or changed.
+    </p>
+    <div class="form-actions">
+        {% if user.is_authenticated %}
+        <a class="btn btn--primary" href="{% url 'profile' %}">
+            <i class="fa fa-user" aria-hidden="true"></i> Back to profile
+        </a>
+        {% else %}
+        <a class="btn btn--primary" href="{% url 'login' %}">
+            <i class="fa fa-sign-in-alt" aria-hidden="true"></i> Return to login
+        </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

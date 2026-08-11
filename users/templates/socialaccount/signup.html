@@ -1,0 +1,53 @@
+{% extends 'users/base.html' %}
+
+{% comment %}
+  Shown when a provider identity has no Autumn account yet and allauth needs a
+  username/email before creating one. The fields are rendered by hand, the way
+  users/register.html does it: `|crispy` emits bootstrap4 markup that nothing in
+  focus_desk.css styles, while a plain .fields region styles the controls by
+  element for free. The action and {{ redirect_field }} are allauth's and stay.
+{% endcomment %}
+
+{% block title %}Finish account setup{% endblock %}
+
+{% block content %}
+<div class="desk-head auth-card">
+    <div>
+        <p class="page-eyebrow">Finish account setup</p>
+        <h1 class="page-title">Continue with {{ account.get_provider.name }}</h1>
+    </div>
+</div>
+
+<form method="post" action="{% url 'socialaccount_signup' %}" class="fields slab slab-pad auth-card">
+    {% csrf_token %}
+
+    <p class="focus-lede">
+        {{ account.get_provider.name }} confirmed who you are. Autumn needs a name for
+        the account before it can create one — this is what you will see in the app.
+    </p>
+
+    {{ form.non_field_errors }}
+
+    {% for field in form %}
+    <div class="field">
+        {{ field.errors }}
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+        <small class="muted">{{ field.help_text }}</small>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {{ redirect_field }}
+
+    <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'login' %}">
+            <i class="fa fa-times" aria-hidden="true"></i> Cancel
+        </a>
+        <button type="submit" class="btn btn--primary btn--spacer">
+            <i class="fa fa-check-circle" aria-hidden="true"></i> Create account
+        </button>
+    </div>
+</form>
+{% endblock %}

@@ -2473,6 +2473,58 @@ img.brand-mark {
   width: min(100%, 32rem);
   margin-inline: auto;
 }
+/* Providers sit in their own card under the credential form — they cannot
+   share its <form> (see users/login.html), and a rule reading "or" says the two
+   cards are alternatives where a plain gap would just say "and then". The slab
+   above it already carries the margin, so this only needs its own bottom one. */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+  color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--hairline);
+}
+
+/* One provider per row rather than a row of side-by-side buttons: the brand
+   marks then line up in a column, the labels stay readable at any provider
+   count, and each button clears the 48px touch target on a phone. The mark is
+   parked in a fixed leading slot so the label stays centred in the button
+   whatever it is called; the inline padding keeps the two from ever meeting. */
+.auth-provider-list {
+  display: grid;
+  gap: var(--s3);
+}
+.auth-provider-button {
+  position: relative;
+  min-height: 3rem;
+  padding-inline: 2.75rem;
+}
+.auth-provider-icon {
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+/* The same mark, enlarged, as the subject of the provider confirmation page. */
+.auth-provider-mark {
+  margin-bottom: var(--s3);
+  font-size: 1.75rem;
+  color: var(--ink-2);
+}
+.auth-note {
+  margin-top: var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
 
 /* ----------------------------------------------------------- profile ------ */
 .profile-page {
@@ -2598,7 +2650,8 @@ img.brand-mark {
 }
 .profile-default-control.to-date-range .profile-default-value { display: none; }
 .profile-default-control.to-date-range .profile-default-unit { grid-column: 1 / -1; }
-.profile-codex-panel {
+.profile-codex-panel,
+.profile-auth-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--s4);
@@ -2608,7 +2661,26 @@ img.brand-mark {
   border-radius: var(--r-md);
   background: var(--sunken);
 }
-.profile-codex-panel .form-actions { margin-top: 0; }
+.profile-auth-list {
+  display: grid;
+  gap: var(--s3);
+  margin-top: var(--s4);
+}
+.profile-auth-panel { margin-top: 0; }
+.profile-auth-name { display: flex; align-items: center; gap: var(--s2); }
+.profile-auth-icon { width: 1.4rem; text-align: center; color: var(--ink-2); }
+/* The identity in the chip is an email address, and a long one would otherwise
+   push the panel wider than the card it sits in. */
+.profile-auth-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  max-width: 100%;
+  margin-top: var(--s3);
+  overflow-wrap: anywhere;
+}
+.profile-codex-panel .form-actions,
+.profile-auth-panel .form-actions { margin-top: 0; }
 .profile-key-item .check-row { margin-top: auto; }
 .profile-submit-row { justify-content: flex-end; margin-top: 0; }
 
@@ -2616,11 +2688,13 @@ img.brand-mark {
   .profile-account-grid,
   .profile-background-upload,
   .profile-codex-panel,
+  .profile-auth-panel,
   .profile-defaults-grid,
   .profile-keys-grid {
     grid-template-columns: 1fr;
   }
-  .profile-codex-panel .form-actions { justify-content: flex-start; }
+  .profile-codex-panel .form-actions,
+  .profile-auth-panel .form-actions { justify-content: flex-start; }
 }
 
 /* ============================================================================

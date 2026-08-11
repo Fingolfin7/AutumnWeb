@@ -26,3 +26,4 @@ whitenoise==6.11.0
 psycopg2-binary==2.9.11
 boto3==1.43.34
 django-storages==1.14.6
+django-allauth[socialaccount]==65.18.0
