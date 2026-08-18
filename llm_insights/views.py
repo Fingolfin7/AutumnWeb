@@ -37,6 +37,7 @@ from users.codex_auth import (
 
 
 SSE_HEARTBEAT_SECONDS = 15
+CHAT_LIST_PAGE_SIZE = 20
 
 
 def stream_event(event_name, payload):
@@ -542,10 +543,24 @@ class InsightsView(View):
             elif not has_explicit_filters:
                 self._apply_default_date_filters(current_filters, user)
 
-            # Get user's chat list
-            recent_chats = LLMChat.objects.filter(user=user).only(
+            # Keep the initial sidebar light, while allowing the user to reveal
+            # older chats in fixed-size batches. Count first so an arbitrarily
+            # large query-string value cannot turn into an arbitrarily large
+            # database LIMIT.
+            try:
+                requested_chat_limit = int(
+                    request.GET.get("chat_limit", CHAT_LIST_PAGE_SIZE)
+                )
+            except (TypeError, ValueError):
+                requested_chat_limit = CHAT_LIST_PAGE_SIZE
+            requested_chat_limit = max(requested_chat_limit, CHAT_LIST_PAGE_SIZE)
+
+            chat_queryset = LLMChat.objects.filter(user=user).only(
                 "id", "title", "updated_at"
-            )[:20]
+            )
+            total_chat_count = chat_queryset.count()
+            visible_chat_count = min(requested_chat_limit, total_chat_count)
+            recent_chats = list(chat_queryset[:visible_chat_count])
 
             qs = (
                 Sessions.objects.filter(end_time__isnull=False, user=user)
@@ -621,7 +636,10 @@ class InsightsView(View):
                 "username": user.username,
                 "chat_obj": chat_obj,
                 "conversation_history": history,
-                "recent_chats": list(recent_chats),
+                "recent_chats": recent_chats,
+                "chat_list_limit": requested_chat_limit,
+                "has_older_chats": total_chat_count > visible_chat_count,
+                "next_chat_list_limit": requested_chat_limit + CHAT_LIST_PAGE_SIZE,
                 "usage_stats": usage_stats,
                 "openai_connection_source": self._openai_connection_source(user),
                 "exclude_project_meta_json": json.dumps(build_exclude_project_meta(user)),
@@ -699,6 +717,9 @@ class InsightsView(View):
             "providers": list(provider_models.keys()),
             "chat_id": chat_id,
             "recent_chats": data["recent_chats"],
+            "chat_list_limit": data["chat_list_limit"],
+            "has_older_chats": data["has_older_chats"],
+            "next_chat_list_limit": data["next_chat_list_limit"],
             "usage_stats": data["usage_stats"],
             "username": data["username"],
             "openai_connection_source": data["openai_connection_source"],

@@ -80,6 +80,36 @@ class InsightsDeskTests(TestCase):
         self.assertIn("No sessions match these filters", body)
         self.assertIn(reverse("sessions"), body)
 
+    def test_older_chats_can_be_loaded_in_batches(self):
+        LLMChat.objects.bulk_create(
+            [
+                LLMChat(
+                    user=self.user,
+                    title=f"Chat {number}",
+                    model="openai:gpt-5.6-luna",
+                )
+                for number in range(25)
+            ]
+        )
+
+        first_page = self.client.get(reverse("insights"))
+
+        self.assertEqual(len(first_page.context["recent_chats"]), 20)
+        self.assertTrue(first_page.context["has_older_chats"])
+        self.assertContains(first_page, "Load older chats")
+        self.assertContains(first_page, "chat_limit=40")
+
+        expanded_page = self.client.get(reverse("insights"), {"chat_limit": 40})
+
+        self.assertEqual(len(expanded_page.context["recent_chats"]), 25)
+        self.assertFalse(expanded_page.context["has_older_chats"])
+        self.assertNotContains(expanded_page, "Load older chats")
+        self.assertContains(
+            expanded_page,
+            '?chat_limit=40" class="chat-item',
+            count=25,
+        )
+
 
 class ScriptContractTests(TestCase):
     """insights_page.js and insights_stream.js address the page by id/class.

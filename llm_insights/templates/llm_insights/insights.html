@@ -141,7 +141,7 @@
         <div class="chat-list">
             {% for chat in recent_chats %}
                 <div class="chat-item-container {% if chat.id == chat_id %}active{% endif %}">
-                    <a href="{% url 'insights_detail' chat.id %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
+                    <a href="{% url 'insights_detail' chat.id %}{% if chat_list_limit > 20 %}?chat_limit={{ chat_list_limit }}{% endif %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
                         <span class="chat-title" title="{{ chat.title }}">{{ chat.title }}</span>
                     </a>
                     <a href="#" class="delete-chat-btn" title="Delete chat" onclick="return deleteChat('{% url 'delete_chat' chat.id %}')">
@@ -151,6 +151,11 @@
             {% empty %}
                 <p class="empty chat-list-empty">No chats yet. Filter some sessions and ask a question.</p>
             {% endfor %}
+            {% if has_older_chats %}
+                <a href="?{% param_replace chat_limit=next_chat_list_limit %}" class="btn btn--quiet btn--block load-older-chats">
+                    <i class="fa fa-chevron-down" aria-hidden="true"></i> Load older chats
+                </a>
+            {% endif %}
         </div>
     </aside>
 
