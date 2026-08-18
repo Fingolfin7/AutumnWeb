@@ -2876,6 +2876,7 @@ img.brand-mark {
 
 .chat-item-container {
   display: flex; align-items: center;
+  position: relative;
   border-radius: var(--r-xs);
   border-left: 2px solid transparent;
   transition: background .16s var(--ease);
@@ -2892,11 +2893,18 @@ img.brand-mark {
 }
 .chat-item.active { font-weight: 650; }
 .chat-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Floats over the (possibly truncated) title instead of reserving flex
+   space, so hovering never shrinks how much of the title is readable. */
 .reveal-stamp {
-  flex-shrink: 0;
-  font-family: var(--font-mono); font-size: .75rem; color: var(--time);
-  padding: .5rem 0 .5rem .4rem;
-  opacity: 0; transition: opacity .16s var(--ease);
+  position: absolute; right: 2.1rem; top: 50%;
+  transform: translateY(-50%);
+  background: var(--slab-solid);
+  border: 1px solid var(--hairline-2);
+  border-radius: var(--r-xs);
+  padding: .1rem .4rem;
+  font-family: var(--font-mono); font-size: .72rem; color: var(--time);
+  opacity: 0; pointer-events: none;
+  transition: opacity .16s var(--ease);
   white-space: nowrap;
 }
 .delete-chat-btn {
