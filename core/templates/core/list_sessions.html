@@ -103,7 +103,7 @@
             {% endif %}
 
             {% if search_form.exclude_projects|length %}
-            {% include 'core/partials/option_picker.html' with field=search_form.exclude_projects label="Exclude projects" search_placeholder="Search projects…" picker_meta="exclude-projects" empty_text="No projects match that search." %}
+            {% include 'core/partials/project_picker.html' with include_field=search_form.include_projects exclude_field=search_form.exclude_projects %}
             {% endif %}
 
             <div class="sheet-foot">

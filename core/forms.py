@@ -70,6 +70,20 @@ class SearchProjectForm(forms.Form):
         ),
     )
 
+    # The project picker submits under one name or the other depending on the
+    # mode its toggle is in: 'only these projects' or 'everything but these'.
+    # Two fields rather than one field plus a mode flag, so an existing
+    # ?exclude_projects= link keeps meaning exactly what it always meant.
+    include_projects = forms.ModelMultipleChoiceField(
+        required=False,
+        queryset=Projects.objects.none(),
+        widget=forms.CheckboxSelectMultiple(
+            attrs={
+                'id': 'include-projects-filter',
+            }
+        ),
+    )
+
     exclude_projects = forms.ModelMultipleChoiceField(
         required=False,
         queryset=Projects.objects.none(),
@@ -106,9 +120,11 @@ class SearchProjectForm(forms.Form):
             tags_field = cast(forms.ModelMultipleChoiceField, self.fields['tags'])
             tags_field.queryset = Tag.objects.filter(user=user).order_by('name')
             tags_field.label_from_instance = lambda obj: obj.name
-            exclude_field = cast(forms.ModelMultipleChoiceField, self.fields['exclude_projects'])
-            exclude_field.queryset = Projects.objects.filter(user=user).order_by('name')
-            exclude_field.label_from_instance = lambda obj: obj.name
+            user_projects = Projects.objects.filter(user=user).order_by('name')
+            for name in ('include_projects', 'exclude_projects'):
+                project_field = cast(forms.ModelMultipleChoiceField, self.fields[name])
+                project_field.queryset = user_projects
+                project_field.label_from_instance = lambda obj: obj.name
         self.fields['context'].choices = choices
 
 
@@ -393,6 +409,16 @@ class ExportJSONForm(forms.Form):
         )
     )
 
+    include_projects = forms.ModelMultipleChoiceField(
+        required=False,
+        queryset=Projects.objects.none(),
+        widget=forms.CheckboxSelectMultiple(
+            attrs={
+                'id': 'include-projects-filter',
+            }
+        ),
+    )
+
     exclude_projects = forms.ModelMultipleChoiceField(
         required=False,
         queryset=Projects.objects.none(),
@@ -442,9 +468,11 @@ class ExportJSONForm(forms.Form):
             tags_field = cast(forms.ModelMultipleChoiceField, self.fields['tags'])
             tags_field.queryset = Tag.objects.filter(user=user).order_by('name')
             tags_field.label_from_instance = lambda obj: obj.name
-            exclude_field = cast(forms.ModelMultipleChoiceField, self.fields['exclude_projects'])
-            exclude_field.queryset = Projects.objects.filter(user=user).order_by('name')
-            exclude_field.label_from_instance = lambda obj: obj.name
+            user_projects = Projects.objects.filter(user=user).order_by('name')
+            for name in ('include_projects', 'exclude_projects'):
+                project_field = cast(forms.ModelMultipleChoiceField, self.fields[name])
+                project_field.queryset = user_projects
+                project_field.label_from_instance = lambda obj: obj.name
 
         self.fields['context'].choices = choices
 

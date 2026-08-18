@@ -145,7 +145,7 @@ function invalidateChartData() {
     chartDataCache.clear();
 }
 
-function get_project_data(type, start_date = "", end_date = "", project_name = "", context_id = "", tag_ids = [], exclude_ids = []) {
+function get_project_data(type, start_date = "", end_date = "", project_name = "", context_id = "", tag_ids = [], exclude_ids = [], include_ids = []) {
     // Every chart type is served by the v2 charts endpoint; the server picks
     // the payload shape from chart_type (legacy tally/hierarchy shapes for
     // pie/bar/context/status/bubble/treemap/radar).
@@ -161,6 +161,11 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
     if (context_id) qs.set('context', context_id);
     if (Array.isArray(tag_ids) && tag_ids.length) {
         tag_ids.forEach(t => qs.append('tags', t));
+    }
+    // The project picker sends one list or the other depending on its mode;
+    // the server narrows to the includes first, then subtracts the excludes.
+    if (Array.isArray(include_ids) && include_ids.length) {
+        include_ids.forEach(id => qs.append('include_projects', id));
     }
     if (Array.isArray(exclude_ids) && exclude_ids.length) {
         exclude_ids.forEach(id => qs.append('exclude_projects', id));
@@ -298,12 +303,15 @@ function render() {
         .get()
         .filter(v => v && v !== 'on');
 
-    const exclude_ids = $('input[type="checkbox"][name="exclude_projects"]:checked')
+    const checkedProjectIds = (name) => $('input[type="checkbox"][name="' + name + '"]:checked')
         .map(function() { return String($(this).val()); })
         .get()
         .filter(v => v && v !== 'on');
 
-    get_project_data(type, start_date, end_date, project_name, context_id, tag_ids, exclude_ids)
+    const exclude_ids = checkedProjectIds('exclude_projects');
+    const include_ids = checkedProjectIds('include_projects');
+
+    get_project_data(type, start_date, end_date, project_name, context_id, tag_ids, exclude_ids, include_ids)
         .then(data => {
             if (generation !== renderGeneration) return;
 

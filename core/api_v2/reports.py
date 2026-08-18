@@ -270,6 +270,12 @@ class ReportChartsView(V2APIView):
             OpenApiParameter("context", OpenApiTypes.INT, OpenApiParameter.QUERY),
             OpenApiParameter("tags", OpenApiTypes.INT, OpenApiParameter.QUERY, many=True),
             OpenApiParameter(
+                "include_projects",
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                many=True,
+            ),
+            OpenApiParameter(
                 "exclude_projects",
                 OpenApiTypes.INT,
                 OpenApiParameter.QUERY,
@@ -425,6 +431,9 @@ class ReportChartsView(V2APIView):
         }
 
         projects = Projects.objects.filter(user=user)
+        include_ids = request.query_params.getlist("include_projects")
+        if include_ids:
+            projects = projects.filter(id__in=include_ids)
         exclude_ids = request.query_params.getlist("exclude_projects")
         if exclude_ids:
             projects = projects.exclude(id__in=exclude_ids)
@@ -475,6 +484,9 @@ class ReportChartsView(V2APIView):
 
         user = request.user
         projects = Projects.objects.filter(user=user)
+        include_ids = request.query_params.getlist("include_projects")
+        if include_ids:
+            projects = projects.filter(id__in=include_ids)
         exclude_ids = request.query_params.getlist("exclude_projects")
         if exclude_ids:
             projects = projects.exclude(id__in=exclude_ids)

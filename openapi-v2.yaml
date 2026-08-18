@@ -785,6 +785,12 @@ paths:
           type: string
         description: Comma-separated tag IDs to exclude.
       - in: query
+        name: include_projects
+        schema:
+          type: array
+          items:
+            type: integer
+      - in: query
         name: note_snippet
         schema:
           type: string

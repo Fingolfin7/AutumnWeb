@@ -77,10 +77,10 @@
                     </div>
 
                     {% if form.exclude_projects|length %}
-                    {% include 'core/partials/option_picker.html' with field=form.exclude_projects label="Exclude projects" icon="fa-ban" icon_class="text-red" search_placeholder="Search projects…" picker_meta="exclude-projects" empty_text="No projects match that search." %}
+                    {% include 'core/partials/project_picker.html' with include_field=form.include_projects exclude_field=form.exclude_projects icon="fa-filter" icon_class="text-red" %}
                     {% else %}
                     <div class="field">
-                        <span class="field-label"><i class="fa fa-ban text-red"></i> Exclude projects</span>
+                        <span class="field-label"><i class="fa fa-filter text-red"></i> Projects</span>
                         <p class="empty">No projects are available. <a href="{% url 'create_project' %}">Create one</a> before exporting project data.</p>
                         {{ form.exclude_projects.errors }}
                     </div>

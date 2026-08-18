@@ -186,6 +186,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
                 "note_snippet": self.request.GET.get("note_snippet"),
                 "context": self.request.GET.get("context") or "",
                 "tags": self.request.GET.getlist("tags"),
+                "include_projects": self.request.GET.getlist("include_projects"),
                 "exclude_projects": self.request.GET.getlist("exclude_projects"),
             },
             user=self.request.user,

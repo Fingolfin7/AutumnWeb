@@ -133,6 +133,7 @@
                 .field .field-label .input .select .check-row
                 .picker .picker-search .picker-search-input .picker-options
                 .option-chip .option-label .picker-empty .picker-count
+                .picker-head-controls .picker-mode .picker-mode-btn
    Buttons      .btn .btn--primary .btn--stop .btn--ghost .btn--quiet
                 .btn--block .btn--lg .btn-icon .btn-icon--danger
    Pager        .pager .pager-btn .pager-btn.is-current
@@ -1960,6 +1961,29 @@ img.brand-mark {
   white-space: nowrap;
 }
 .picker-count:hover { color: var(--brand); }
+
+/* The head can carry a mode toggle beside the count; on a narrow sheet the
+   two wrap under the label rather than squeezing it. */
+.field-head { flex-wrap: wrap; }
+.picker-head-controls { display: inline-flex; align-items: center; gap: var(--s3); }
+.picker-mode {
+  display: inline-flex; padding: 2px;
+  border-radius: var(--r-pill);
+  background: var(--sunken); box-shadow: inset 0 0 0 1px var(--hairline);
+}
+.picker-mode-btn {
+  padding: .15rem .6rem; border: 0; background: none; cursor: pointer;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs); color: var(--muted);
+  transition: background .14s var(--ease), color .14s var(--ease);
+}
+.picker-mode-btn:hover { color: var(--ink-2); }
+.picker-mode-btn.is-active { background: var(--raised-2); color: var(--ink); box-shadow: var(--edge); }
+/* Which way the list reads is the one thing worth colour here: a deny-list
+   wears the project hue the app already uses for "this project", an
+   allow-list the brand accent every other applied filter wears. */
+.picker-mode-btn.is-active[data-picker-mode="exclude"] { color: var(--project); }
+.picker-mode-btn.is-active[data-picker-mode="include"] { color: var(--brand); }
 
 /* The commitment form stacks six pickers, so those stay folded behind a
    <summary> that already reads as a control (.filter-launcher). The UA

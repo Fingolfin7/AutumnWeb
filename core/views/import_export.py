@@ -195,6 +195,11 @@ def export_view(request):
             if tag_ids:
                 qs = qs.filter(project__tags__id__in=tag_ids).distinct()
 
+        include_objs = form.cleaned_data.get("include_projects")
+        if include_objs:
+            include_ids = [p.id for p in include_objs]
+            qs = qs.filter(project__id__in=include_ids)
+
         exclude_objs = form.cleaned_data.get("exclude_projects")
         if exclude_objs:
             exclude_ids = [p.id for p in exclude_objs]

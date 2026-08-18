@@ -283,6 +283,14 @@ class ChartApiRegressionTests(TestCase):
             ({"context": self.personal.id}, {"Beta"}),
             ({"tags": [self.focus.id]}, {"Alpha"}),
             ({"exclude_projects": [self.alpha.id]}, {"Beta"}),
+            ({"include_projects": [self.beta.id]}, {"Beta"}),
+            (
+                {
+                    "include_projects": [self.alpha.id, self.beta.id],
+                    "exclude_projects": [self.beta.id],
+                },
+                {"Alpha"},
+            ),
         )
         for params, expected_series in cases:
             with self.subTest(params=params):

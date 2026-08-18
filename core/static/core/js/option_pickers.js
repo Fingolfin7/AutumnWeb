@@ -10,6 +10,11 @@
  *   - keeps a "N selected" button beside the label that clears the picker,
  *   - shows an empty state when a search matches nothing.
  *
+ * A picker carrying a mode toggle (see partials/project_picker.html) also
+ * switches the name its checkboxes submit under — include_projects or
+ * exclude_projects — so the same ticks read as "only these" or "everything
+ * but these" without the selection itself changing.
+ *
  * A picker marked data-picker-meta="exclude-projects" additionally narrows
  * itself to the context and tags chosen elsewhere in the same form, using the
  * global EXCLUDE_PROJECT_META the page defines:
@@ -107,12 +112,36 @@
         var empty = picker.querySelector("[data-picker-empty]");
         if (empty) { empty.hidden = shown !== 0; }
 
-        var count = (picker.closest(".field") || document).querySelector("[data-picker-count]");
+        var count = headOf(picker).querySelector("[data-picker-count]");
         if (count) {
             count.hidden = selected === 0;
             count.textContent = selected + " selected · clear";
             count.setAttribute("aria-label", "Clear the " + selected + " selected options");
         }
+    }
+
+    /** The label, its count and the mode toggle sit outside .picker. */
+    function headOf(picker) {
+        return picker.closest(".field") || picker;
+    }
+
+    /** The toggle only rewrites the submitted name; the ticks stay put. */
+    function applyMode(picker, mode) {
+        var name = null;
+        Array.prototype.forEach.call(
+            headOf(picker).querySelectorAll("[data-picker-mode]"),
+            function (btn) {
+                var active = btn.dataset.pickerMode === mode;
+                btn.classList.toggle("is-active", active);
+                btn.setAttribute("aria-pressed", active ? "true" : "false");
+                if (active) { name = btn.dataset.pickerName; }
+            }
+        );
+        if (!name) { return; }
+        chipsOf(picker).forEach(function (chip) {
+            var box = boxOf(chip);
+            if (box) { box.name = name; }
+        });
     }
 
     function refreshAll() {
@@ -138,7 +167,16 @@
                 if (ev.target.matches('input[type="checkbox"]')) { refresh(picker); }
             });
 
-            var count = (picker.closest(".field") || document).querySelector("[data-picker-count]");
+            Array.prototype.forEach.call(
+                headOf(picker).querySelectorAll("[data-picker-mode]"),
+                function (btn) {
+                    btn.addEventListener("click", function () {
+                        applyMode(picker, btn.dataset.pickerMode);
+                    });
+                }
+            );
+
+            var count = headOf(picker).querySelector("[data-picker-count]");
             if (count) {
                 count.addEventListener("click", function () {
                     chipsOf(picker).forEach(function (chip) {

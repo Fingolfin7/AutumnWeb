@@ -253,12 +253,7 @@ def filter_sessions_by_params(
     start_date = params.get("start_date")
     end_date = params.get("end_date")
     note_snippet = params.get("note_snippet")
-    if hasattr(params, "getlist"):
-        tags = params.getlist("tags")
-    else:
-        tags = params.get("tags") or []
-        if isinstance(tags, str):
-            tags = [tags]
+    tags = _param_list(params, "tags")
 
     if project_name:
         sessions = sessions.filter(project__name__icontains=project_name)
@@ -286,13 +281,15 @@ def filter_sessions_by_params(
     if tags:
         sessions = sessions.filter(project__tags__id__in=tags).distinct()
 
-    if hasattr(params, "getlist"):
-        exclude_ids = params.getlist("exclude_projects")
-    else:
-        exclude_ids = params.get("exclude_projects") or []
-        if isinstance(exclude_ids, str):
-            exclude_ids = [exclude_ids]
-    exclude_ids = _numeric_ids(exclude_ids)
+    # The project picker is either an allow-list or a deny-list. Both can
+    # arrive together (an old link carrying ?exclude_projects= alongside a new
+    # ?include_projects=), and the order is the rule the commitment rules
+    # already use: include narrows the field first, then exclude subtracts.
+    include_ids = _numeric_ids(_param_list(params, "include_projects"))
+    if include_ids:
+        sessions = sessions.filter(project__id__in=include_ids)
+
+    exclude_ids = _numeric_ids(_param_list(params, "exclude_projects"))
     if exclude_ids:
         sessions = sessions.exclude(project__id__in=exclude_ids)
 
@@ -338,12 +335,28 @@ def summarise_search_filters(request, user) -> list[dict]:
     for label, names in (
         ("Context", names_for(Context, [params.get("context") or ""])),
         ("Tags", names_for(Tag, params.getlist("tags"))),
+        ("Only", names_for(Projects, params.getlist("include_projects"))),
         ("Excluding", names_for(Projects, params.getlist("exclude_projects"))),
     ):
         if names:
             summary.append({"label": label, "value": names})
 
     return summary
+
+
+def _param_list(params, key) -> list:
+    """Read a repeated query param off either a QueryDict or a plain dict.
+
+    ``filter_sessions_by_params`` is called with request.GET on the web pages
+    and with a stored filter dict from the Insights chats, so the multi-value
+    reader has to work on both.
+    """
+    if hasattr(params, "getlist"):
+        return params.getlist(key)
+    values = params.get(key) or []
+    if isinstance(values, str):
+        return [values]
+    return list(values)
 
 
 def _numeric_ids(values) -> list[int]:

@@ -1,0 +1,24 @@
+{% comment %}
+  ============================================================================
+  PROJECT PICKER — the option picker in its two-mode form.
+  ----------------------------------------------------------------------------
+  One list of projects that reads either way: "only these" or "everything but
+  these". Rather than a mode flag beside a single field, there are two form
+  fields — include_projects and exclude_projects — and the toggle decides
+  which name the checkboxes submit under. An existing ?exclude_projects= link
+  therefore keeps meaning exactly what it always meant, and the server applies
+  the pair in one fixed order: include narrows first, then exclude subtracts.
+
+  Which mode the page comes back in is decided here, by which of the two
+  fields actually carries a value.
+
+  Params
+    include_field / exclude_field   the two bound fields
+    label, icon, icon_class         passed through to option_picker
+  ============================================================================
+{% endcomment %}
+{% if include_field.value %}
+{% include 'core/partials/option_picker.html' with field=include_field mode="include" label=label|default:"Projects" search_placeholder="Search projects…" picker_meta="exclude-projects" empty_text="No projects match that search." %}
+{% else %}
+{% include 'core/partials/option_picker.html' with field=exclude_field mode="exclude" label=label|default:"Projects" search_placeholder="Search projects…" picker_meta="exclude-projects" empty_text="No projects match that search." %}
+{% endif %}

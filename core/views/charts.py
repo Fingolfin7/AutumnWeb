@@ -21,6 +21,7 @@ def ChartsView(request):
             "chart_type": request.GET.get("chart_type"),
             "context": request.GET.get("context") or "",
             "tags": selected_tags,
+            "include_projects": request.GET.getlist("include_projects"),
             "exclude_projects": request.GET.getlist("exclude_projects"),
         },
         user=request.user,

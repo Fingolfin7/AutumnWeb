@@ -45,6 +45,7 @@ class ProjectsListView(LoginRequiredMixin, ListView):
                 "end_date": self.request.GET.get("end_date"),
                 "context": self.request.GET.get("context") or "",
                 "tags": self.request.GET.getlist("tags"),
+                "include_projects": self.request.GET.getlist("include_projects"),
                 "exclude_projects": self.request.GET.getlist("exclude_projects"),
             },
             user=self.request.user,
@@ -143,6 +144,12 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
         if tag_ids:
             projects = projects.filter(tags__id__in=tag_ids).distinct()
+
+        # Include narrows the field first, then exclude subtracts from it —
+        # the same order filter_sessions_by_params applies.
+        include_ids = self.request.GET.getlist("include_projects")
+        if include_ids:
+            projects = projects.filter(id__in=include_ids)
 
         exclude_ids = self.request.GET.getlist("exclude_projects")
         if exclude_ids:

@@ -502,10 +502,11 @@ class InsightsView(View):
         if tags:
             params["tags"] = tags
 
-        # Get lists (exclude_projects)
-        exclude_projects = request.GET.getlist("exclude_projects") or request.POST.getlist("exclude_projects")
-        if exclude_projects:
-            params["exclude_projects"] = exclude_projects
+        # Get lists (include_projects / exclude_projects)
+        for key in ("include_projects", "exclude_projects"):
+            projects = request.GET.getlist(key) or request.POST.getlist(key)
+            if projects:
+                params[key] = projects
 
         return params
 
@@ -542,6 +543,7 @@ class InsightsView(View):
                 "note_snippet",
                 "context",
                 "tags",
+                "include_projects",
                 "exclude_projects",
                 "filter",
             ]
@@ -630,6 +632,7 @@ class InsightsView(View):
                     "note_snippet": current_filters.get("note_snippet"),
                     "context": current_filters.get("context") or "",
                     "tags": current_filters.get("tags", []),
+                    "include_projects": current_filters.get("include_projects", []),
                     "exclude_projects": current_filters.get("exclude_projects", []),
                 },
                 user=user,
@@ -778,6 +781,7 @@ class InsightsView(View):
                 "note_snippet",
                 "context",
                 "tags",
+                "include_projects",
                 "exclude_projects",
             ]
             has_values = any(current_filters.get(k) for k in filter_keys)
@@ -1105,6 +1109,7 @@ class InsightsView(View):
                     "note_snippet",
                     "context",
                     "tags",
+                    "include_projects",
                     "exclude_projects",
                 ]
                 # Check if current_filters has any meaningful values

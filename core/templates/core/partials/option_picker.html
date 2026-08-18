@@ -25,12 +25,29 @@
     picker_meta        data-picker-meta, e.g. "exclude-projects" for the
                        context/tag-reactive filtering
     empty_text         message shown when search hides everything
+    mode               "include" / "exclude" — renders the mode toggle, which
+                       flips the name every checkbox submits under (see
+                       partials/project_picker.html)
+    include_name       field name for the include half (default include_projects)
+    exclude_name       field name for the exclude half (default exclude_projects)
   ============================================================================
 {% endcomment %}
 <div class="field">
     <div class="field-head">
         <span class="field-label">{% if icon %}<i class="fa {{ icon }} {{ icon_class }}" aria-hidden="true"></i> {% endif %}{{ label }}</span>
-        <button type="button" class="picker-count" data-picker-count hidden></button>
+        <span class="picker-head-controls">
+            {% if mode %}
+            <span class="picker-mode" role="group" aria-label="How this list is applied">
+                <button type="button" class="picker-mode-btn{% if mode == 'exclude' %} is-active{% endif %}"
+                        data-picker-mode="exclude" data-picker-name="{{ exclude_name|default:'exclude_projects' }}"
+                        aria-pressed="{% if mode == 'exclude' %}true{% else %}false{% endif %}">{{ exclude_label|default:"Exclude" }}</button>
+                <button type="button" class="picker-mode-btn{% if mode == 'include' %} is-active{% endif %}"
+                        data-picker-mode="include" data-picker-name="{{ include_name|default:'include_projects' }}"
+                        aria-pressed="{% if mode == 'include' %}true{% else %}false{% endif %}">{{ include_label|default:"Only these" }}</button>
+            </span>
+            {% endif %}
+            <button type="button" class="picker-count" data-picker-count hidden></button>
+        </span>
     </div>
 
     <div class="picker" data-picker{% if picker_meta %} data-picker-meta="{{ picker_meta }}"{% endif %}>
