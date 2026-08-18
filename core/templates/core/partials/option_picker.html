@@ -1,0 +1,54 @@
+{% comment %}
+  ============================================================================
+  OPTION PICKER — the one shape every multi-select filter wears.
+  ----------------------------------------------------------------------------
+  A checkbox set only stays readable while it is short. Tags are short;
+  "exclude projects" is however many projects the user has ever made, and as a
+  bare grid of checkboxes it made the filter sheet several screens tall.
+
+  So the options live in a bounded, scrollable well: chips instead of rows,
+  an optional search field pinned to the top of the well, checked chips pinned
+  to the front of the list, and a count beside the label. The sheet is then
+  the same height whether the user has six projects or six hundred.
+
+  option_pickers.js drives search / pinning / count off `data-picker`.
+
+  Params
+    field              bound form field whose subwidgets are checkboxes
+    label              group label (uppercase eyebrow)
+    icon               optional Font Awesome class beside the label
+    icon_class         colour class for that icon
+    option_class       extra class on each chip     (JS hook: exclude-option)
+    options_class      extra class on the options well (JS hook: exclude-options)
+    search_placeholder renders the search row when set
+    search_class       extra class on the search input (JS hook)
+    picker_meta        data-picker-meta, e.g. "exclude-projects" for the
+                       context/tag-reactive filtering
+    empty_text         message shown when search hides everything
+  ============================================================================
+{% endcomment %}
+<div class="field">
+    <div class="field-head">
+        <span class="field-label">{% if icon %}<i class="fa {{ icon }} {{ icon_class }}" aria-hidden="true"></i> {% endif %}{{ label }}</span>
+        <button type="button" class="picker-count" data-picker-count hidden></button>
+    </div>
+
+    <div class="picker" data-picker{% if picker_meta %} data-picker-meta="{{ picker_meta }}"{% endif %}>
+        {% if search_placeholder %}
+        <div class="picker-search">
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input type="text" class="picker-search-input {{ search_class }}" placeholder="{{ search_placeholder }}"
+                   autocomplete="off" aria-label="{{ search_placeholder }}">
+        </div>
+        {% endif %}
+
+        <div class="picker-options {{ options_class }}">
+            {% for cb in field %}
+            <label class="option-chip {{ option_class }}">{{ cb.tag }}<span class="option-label tag-label">{{ cb.choice_label }}</span></label>
+            {% endfor %}
+        </div>
+
+        <p class="picker-empty" data-picker-empty hidden>{{ empty_text|default:"Nothing matches that search." }}</p>
+    </div>
+    {{ field.errors }}
+</div>

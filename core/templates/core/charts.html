@@ -37,7 +37,7 @@
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script>window.AUTUM_CHART_PROJECT_COUNT = {{ default_chart_project_count|default:7 }};</script>
-    <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/option_pickers.js' %}?v={{ static_version.option_pickers }}" type="text/javascript" defer></script>
     <!-- Modular chart files -->
     <script src="{% static 'core/js/charts/core.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
     <script src="{% static 'core/js/charts/basic.js' %}?v={{ static_version.charts }}" type="text/javascript"></script>
@@ -151,28 +151,11 @@
             </div>
 
             {% if search_form.tags|length %}
-            <div class="field">
-                <span class="field-label">Tags</span>
-                <div class="check-grid">
-                    {% for cb in search_form.tags %}
-                    <span>{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
-                    {% endfor %}
-                </div>
-                {{ search_form.tags.errors }}
-            </div>
+            {% include 'core/partials/option_picker.html' with field=search_form.tags label="Tags" empty_text="No tags match that search." %}
             {% endif %}
 
             {% if search_form.exclude_projects|length %}
-            <div class="field">
-                <span class="field-label">Exclude projects</span>
-                <input type="text" class="exclude-search-input input" placeholder="Search projects…" autocomplete="off">
-                <div class="check-grid exclude-options u-mt-4">
-                    {% for cb in search_form.exclude_projects %}
-                    <span class="exclude-option">{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
-                    {% endfor %}
-                </div>
-                {{ search_form.exclude_projects.errors }}
-            </div>
+            {% include 'core/partials/option_picker.html' with field=search_form.exclude_projects label="Exclude projects" search_placeholder="Search projects…" picker_meta="exclude-projects" empty_text="No projects match that search." %}
             {% endif %}
 
             <div class="sheet-foot">

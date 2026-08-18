@@ -8,7 +8,7 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
-    <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/option_pickers.js' %}?v={{ static_version.option_pickers }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -55,22 +55,15 @@
                         {{ form.context.errors }}
                     </div>
 
+                    {% if form.tags|length %}
+                    {% include 'core/partials/option_picker.html' with field=form.tags label="Tags" icon="fa-tags" icon_class="text-orange" empty_text="No tags match that search." %}
+                    {% else %}
                     <div class="field">
                         <span class="field-label"><i class="fa fa-tags text-orange"></i> Tags</span>
-                        {% if form.tags|length %}
-                        <details>
-                            <summary class="filter-launcher tag-summary">Select tags</summary>
-                            <div class="check-grid u-mt-4">
-                                {% for cb in form.tags %}
-                                <label>{{ cb.tag }} <span class="tag-label">{{ cb.choice_label }}</span></label>
-                                {% endfor %}
-                            </div>
-                        </details>
-                        {% else %}
                         <p class="empty">No tags are available. <a href="{% url 'tags' %}">Create one</a> to filter exports by label.</p>
-                        {% endif %}
                         {{ form.tags.errors }}
                     </div>
+                    {% endif %}
                 </section>
 
                 <section class="slab slab-pad">
@@ -83,23 +76,15 @@
                         <div id="project-search-results"></div>
                     </div>
 
+                    {% if form.exclude_projects|length %}
+                    {% include 'core/partials/option_picker.html' with field=form.exclude_projects label="Exclude projects" icon="fa-ban" icon_class="text-red" search_placeholder="Search projects…" picker_meta="exclude-projects" empty_text="No projects match that search." %}
+                    {% else %}
                     <div class="field">
                         <span class="field-label"><i class="fa fa-ban text-red"></i> Exclude projects</span>
-                        {% if form.exclude_projects|length %}
-                        <details class="exclude-dropdown">
-                            <summary class="filter-launcher tag-summary">Select projects to exclude</summary>
-                            <div class="check-grid exclude-options u-mt-4">
-                                <input type="text" class="exclude-search-input" placeholder="Search projectsâ€¦" autocomplete="off">
-                                {% for cb in form.exclude_projects %}
-                                <label class="exclude-option">{{ cb.tag }} <span class="tag-label text-red">{{ cb.choice_label }}</span></label>
-                                {% endfor %}
-                            </div>
-                        </details>
-                        {% else %}
                         <p class="empty">No projects are available. <a href="{% url 'create_project' %}">Create one</a> before exporting project data.</p>
-                        {% endif %}
                         {{ form.exclude_projects.errors }}
                     </div>
+                    {% endif %}
                 </section>
             </div>
 

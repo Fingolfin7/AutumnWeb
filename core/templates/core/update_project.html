@@ -1,4 +1,9 @@
 {% extends 'core/base.html' %}
+{% load static %}
+
+{% block head_includes %}
+    <script src="{% static 'core/js/option_pickers.js' %}?v={{ static_version.option_pickers }}" type="text/javascript" defer></script>
+{% endblock %}
 {% load time_formats %}
 
 {% comment %}
@@ -59,19 +64,15 @@
                 {{ form.context.errors }}
             </div>
 
+            {% if form.tags|length %}
+            {% include 'core/partials/option_picker.html' with field=form.tags label="Tags" %}
+            {% else %}
             <div class="field">
                 <span class="field-label">Tags</span>
-                {% if form.tags|length %}
-                <div class="check-grid">
-                    {% for cb in form.tags %}
-                    <span>{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
-                    {% endfor %}
-                </div>
-                {% else %}
                 <p class="muted">No tags yet. <a href="{% url 'tags' %}">Create one</a> to group projects.</p>
-                {% endif %}
                 {{ form.tags.errors }}
             </div>
+            {% endif %}
 
             <div class="form-actions">
                 <button class="btn btn--primary" type="submit" id="update-project">

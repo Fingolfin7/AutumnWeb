@@ -27,7 +27,7 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
-    <script src="{% static 'core/js/exclude_projects.js' %}?v={{ static_version.exclude_projects }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/option_pickers.js' %}?v={{ static_version.option_pickers }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -71,16 +71,19 @@
             <div class="sheet-grab"></div>
             <p class="sheet-title">Filter sessions</p>
 
-            <div class="field">
-                <label for="start_date">Start date</label>
-                {{ search_form.start_date }}
-                {{ search_form.start_date.errors }}
-            </div>
+            {# The two ends of one range: side by side once there is room. #}
+            <div class="two-up">
+                <div class="field">
+                    <label for="start_date">Start date</label>
+                    {{ search_form.start_date }}
+                    {{ search_form.start_date.errors }}
+                </div>
 
-            <div class="field">
-                <label for="end_date">End date</label>
-                {{ search_form.end_date }}
-                {{ search_form.end_date.errors }}
+                <div class="field">
+                    <label for="end_date">End date</label>
+                    {{ search_form.end_date }}
+                    {{ search_form.end_date.errors }}
+                </div>
             </div>
 
             <div class="field">
@@ -96,28 +99,11 @@
             </div>
 
             {% if search_form.tags|length %}
-            <div class="field">
-                <span class="field-label">Tags</span>
-                <div class="check-grid">
-                    {% for cb in search_form.tags %}
-                    <span>{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
-                    {% endfor %}
-                </div>
-                {{ search_form.tags.errors }}
-            </div>
+            {% include 'core/partials/option_picker.html' with field=search_form.tags label="Tags" empty_text="No tags match that search." %}
             {% endif %}
 
             {% if search_form.exclude_projects|length %}
-            <div class="field">
-                <span class="field-label">Exclude projects</span>
-                <input type="text" class="exclude-search-input input" placeholder="Search projects…" autocomplete="off">
-                <div class="check-grid exclude-options u-mt-4">
-                    {% for cb in search_form.exclude_projects %}
-                    <span class="exclude-option">{{ cb.tag }} <label for="{{ cb.id_for_label }}">{{ cb.choice_label }}</label></span>
-                    {% endfor %}
-                </div>
-                {{ search_form.exclude_projects.errors }}
-            </div>
+            {% include 'core/partials/option_picker.html' with field=search_form.exclude_projects label="Exclude projects" search_placeholder="Search projects…" picker_meta="exclude-projects" empty_text="No projects match that search." %}
             {% endif %}
 
             <div class="sheet-foot">
