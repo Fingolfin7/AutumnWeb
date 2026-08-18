@@ -18,9 +18,10 @@
 
   CLASS NAMES HERE ARE A JAVASCRIPT CONTRACT. insights_stream.js constructs
   .chat-item-container / .chat-item / .chat-title / .delete-chat-btn /
-  .copy-btn / .assistant-message / .message-content / .assistant-sources /
-  .plain-link at runtime and removes .empty-state-container and
-  .chat-list-empty. insights_page.js drives #provider #model #reasoning_effort
+  .reveal-stamp / .group-label / .copy-btn / .assistant-message /
+  .message-content / .assistant-sources / .plain-link at runtime and removes
+  .empty-state-container and .chat-list-empty. insights_page.js drives
+  #provider #model #reasoning_effort
   #provider_filter #model_filter #reasoning_effort_filter #conversation-container
   #select-messages-btn #copy-selected-btn #copy-full-chat-btn
   #toggle-sidebar-btn #prompt #chat-form and .chat-sidebar.collapsed.
@@ -139,15 +140,19 @@
             <i class="fa fa-plus"></i> New chat
         </a>
         <div class="chat-list">
-            {% for chat in recent_chats %}
-                <div class="chat-item-container {% if chat.id == chat_id %}active{% endif %}">
-                    <a href="{% url 'insights_detail' chat.id %}{% if chat_list_limit > 20 %}?chat_limit={{ chat_list_limit }}{% endif %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
-                        <span class="chat-title" title="{{ chat.title }}">{{ chat.title }}</span>
-                    </a>
-                    <a href="#" class="delete-chat-btn" title="Delete chat" onclick="return deleteChat('{% url 'delete_chat' chat.id %}')">
-                        <i class="fa fa-trash"></i>
-                    </a>
-                </div>
+            {% for group_label, group_chats in recent_chat_groups %}
+                <p class="group-label">{{ group_label }}</p>
+                {% for chat in group_chats %}
+                    <div class="chat-item-container {% if chat.id == chat_id %}active{% endif %}">
+                        <a href="{% url 'insights_detail' chat.id %}{% if chat_list_limit > 20 %}?chat_limit={{ chat_list_limit }}{% endif %}" class="chat-item {% if chat.id == chat_id %}active{% endif %}">
+                            <span class="chat-title" title="{{ chat.title }}">{{ chat.title }}</span>
+                        </a>
+                        <span class="reveal-stamp">{{ chat.updated_at|chat_hover_stamp }}</span>
+                        <a href="#" class="delete-chat-btn" title="Delete chat" onclick="return deleteChat('{% url 'delete_chat' chat.id %}')">
+                            <i class="fa fa-trash"></i>
+                        </a>
+                    </div>
+                {% endfor %}
             {% empty %}
                 <p class="empty chat-list-empty">No chats yet. Filter some sessions and ask a question.</p>
             {% endfor %}

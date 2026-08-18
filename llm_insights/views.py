@@ -54,6 +54,34 @@ def configure_sse_response(response):
     return response
 
 
+def group_chats_by_recency(chats):
+    """Bucket chats (already ordered newest-first) into Today / Yesterday /
+    Previous 7 days / Older, the same grouping ChatGPT/Claude use for their own
+    sidebars. Empty buckets are dropped so the template only has to render
+    whatever comes back."""
+    today = timezone.localdate()
+    buckets = [
+        ("Today", []),
+        ("Yesterday", []),
+        ("Previous 7 days", []),
+        ("Older", []),
+    ]
+    for chat in chats:
+        if not chat.updated_at:
+            buckets[3][1].append(chat)
+            continue
+        days_diff = (today - timezone.localtime(chat.updated_at).date()).days
+        if days_diff <= 0:
+            buckets[0][1].append(chat)
+        elif days_diff == 1:
+            buckets[1][1].append(chat)
+        elif days_diff <= 7:
+            buckets[2][1].append(chat)
+        else:
+            buckets[3][1].append(chat)
+    return [(label, items) for label, items in buckets if items]
+
+
 def fallback_chat_title(user_prompt):
     title = re.sub(r"\s+", " ", (user_prompt or "").strip())
     if not title:
@@ -637,6 +665,7 @@ class InsightsView(View):
                 "chat_obj": chat_obj,
                 "conversation_history": history,
                 "recent_chats": recent_chats,
+                "recent_chat_groups": group_chats_by_recency(recent_chats),
                 "chat_list_limit": requested_chat_limit,
                 "has_older_chats": total_chat_count > visible_chat_count,
                 "next_chat_list_limit": requested_chat_limit + CHAT_LIST_PAGE_SIZE,
@@ -717,6 +746,7 @@ class InsightsView(View):
             "providers": list(provider_models.keys()),
             "chat_id": chat_id,
             "recent_chats": data["recent_chats"],
+            "recent_chat_groups": data["recent_chat_groups"],
             "chat_list_limit": data["chat_list_limit"],
             "has_older_chats": data["has_older_chats"],
             "next_chat_list_limit": data["next_chat_list_limit"],

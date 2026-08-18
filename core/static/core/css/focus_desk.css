@@ -140,8 +140,9 @@
                 .text-orange .muted .mono .tnum
                 .u-row .u-between .u-wrap .u-gap-2 .u-gap-3 .u-mt-4 .sr-only
    Insights      .chat-layout (--chat-h) .chat-sidebar .chat-sidebar.collapsed
-                 .new-chat-btn .chat-list .chat-list-empty
-                 .chat-item-container .chat-item .chat-title .delete-chat-btn
+                 .new-chat-btn .chat-list .chat-list-empty .group-label
+                 .chat-item-container .chat-item .chat-title .reveal-stamp
+                 .delete-chat-btn
                  .chat-main .chat-header .chat-header-meta .chat-header-range
                  .chat-header-tokens .chat-header-actions .chat-action-btn
                  .chat-form .conversation-container .conversation-container.selecting
@@ -2866,6 +2867,12 @@ img.brand-mark {
 
 .chat-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .chat-list-empty { padding: var(--s4) 0; }
+.group-label {
+  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  color: var(--muted); font-weight: 650;
+  padding: .55rem .65rem .3rem;
+}
+.group-label:first-child { padding-top: .15rem; }
 
 .chat-item-container {
   display: flex; align-items: center;
@@ -2885,12 +2892,21 @@ img.brand-mark {
 }
 .chat-item.active { font-weight: 650; }
 .chat-title { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.reveal-stamp {
+  flex-shrink: 0;
+  font-family: var(--font-mono); font-size: .75rem; color: var(--time);
+  padding: .5rem 0 .5rem .4rem;
+  opacity: 0; transition: opacity .16s var(--ease);
+  white-space: nowrap;
+}
 .delete-chat-btn {
   padding: .5rem; color: var(--project);
   opacity: 0; transition: opacity .16s var(--ease);
 }
-/* Keyboard users never hover, so focus has to reveal it too. */
+/* Keyboard users never hover, so focus has to reveal these too. */
+.chat-item-container:hover .reveal-stamp,
 .chat-item-container:hover .delete-chat-btn,
+.reveal-stamp:focus-visible,
 .delete-chat-btn:focus-visible { opacity: 1; }
 
 /* ── transcript column ──────────────────────────────────────────────────── */

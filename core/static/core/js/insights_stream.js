@@ -200,6 +200,10 @@ function deleteChat(url) {
             title.className = 'chat-title';
             link.appendChild(title);
 
+            const stamp = document.createElement('span');
+            stamp.className = 'reveal-stamp';
+            stamp.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
             const deleteUrl = new URL(payload.chat_url, window.location.origin);
             deleteUrl.pathname = deleteUrl.pathname.replace(/[^/]+\/$/, `delete/${payload.chat_id}/`);
 
@@ -212,8 +216,21 @@ function deleteChat(url) {
             deleteLink.innerHTML = '<i class="fa fa-trash"></i>';
 
             container.appendChild(link);
+            container.appendChild(stamp);
             container.appendChild(deleteLink);
-            chatList.prepend(container);
+
+            // A brand-new chat is always "Today" — reuse that group if the
+            // sidebar already has one, otherwise create it at the top.
+            let todayLabel = Array.from(chatList.querySelectorAll('.group-label')).find(
+                (node) => node.textContent === 'Today'
+            );
+            if (!todayLabel) {
+                todayLabel = document.createElement('p');
+                todayLabel.className = 'group-label';
+                todayLabel.textContent = 'Today';
+                chatList.prepend(todayLabel);
+            }
+            todayLabel.insertAdjacentElement('afterend', container);
         } else {
             link.classList.add('active');
             if (link.parentElement) {

@@ -185,6 +185,26 @@ def day_date_formatter(date: datetime | str):
 
 
 @register.filter
+def chat_hover_stamp(date: datetime):
+    """
+    Compact timestamp for the Insights sidebar's hover-reveal chat stamp.
+    Today/yesterday show a time (the group header already carries the day);
+    anything older shows a short date, with the year appended once it's not
+    this year. E.g. "2:14 PM", "13 Aug", "13 Aug 2025".
+    """
+    date = make_timezone_datetime(date)
+    if not date or isinstance(date, str):
+        return ""
+    now = timezone.localtime()
+    days_diff = (now.date() - date.date()).days
+    if days_diff <= 1:
+        return date.strftime("%I:%M %p").lstrip("0")
+    if date.year == now.year:
+        return date.strftime("%d %b")
+    return date.strftime("%d %b %Y")
+
+
+@register.filter
 def project_status_counts_formatter(counts: dict | None) -> str:
     """Format a project status counts dict into a compact parenthesized string.
 
