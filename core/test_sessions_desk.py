@@ -5,7 +5,7 @@ the list. If that echo is wrong, a filtered list that comes back empty is
 indistinguishable from a broken one — which is exactly what these pin down.
 """
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -155,6 +155,42 @@ class SessionsShellTests(SessionsPageTestCase):
 
         before_container = html.split('id="subproject_options"')[0]
         self.assertIn('id="list_subs"', before_container)
+
+    def test_edit_page_datetime_inputs_include_seconds(self):
+        started_at = timezone.make_aware(datetime(2026, 8, 19, 9, 7, 43))
+        ended_at = timezone.make_aware(datetime(2026, 8, 19, 10, 11, 29))
+        session = Sessions.objects.create(
+            user=self.user,
+            project=self.atlas,
+            start_time=started_at,
+            end_time=ended_at,
+        )
+
+        response = self.client.get(reverse("update_session", args=[session.id]))
+
+        self.assertContains(response, 'step="1"', count=2)
+        self.assertContains(response, started_at.strftime("%Y-%m-%dT%H:%M:%S"))
+        self.assertContains(response, ended_at.strftime("%Y-%m-%dT%H:%M:%S"))
+
+    def test_edit_page_saves_second_accurate_times(self):
+        session = self._session(self.atlas)
+        started_at = timezone.make_aware(datetime(2026, 8, 19, 9, 7, 43))
+        ended_at = timezone.make_aware(datetime(2026, 8, 19, 10, 11, 29))
+
+        response = self.client.post(
+            reverse("update_session", args=[session.id]),
+            {
+                "project_name": self.atlas.name,
+                "start_time": started_at.strftime("%Y-%m-%dT%H:%M:%S"),
+                "end_time": ended_at.strftime("%Y-%m-%dT%H:%M:%S"),
+                "note": "Second-accurate edit",
+            },
+        )
+
+        self.assertRedirects(response, reverse("update_session", args=[session.id]))
+        session.refresh_from_db()
+        self.assertEqual(session.start_time, started_at)
+        self.assertEqual(session.end_time, ended_at)
 
     def test_the_empty_list_distinguishes_no_data_from_no_matches(self):
         no_data = self.client.get(reverse("sessions"))

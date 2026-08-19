@@ -211,20 +211,33 @@ class UpdateSessionForm(forms.ModelForm):
         fields = ['start_time', 'end_time', 'note']
         widgets = {
             'start_time': forms.DateTimeInput(
-                attrs={'type': 'datetime-local', 'class': 'half-width'},
-                format='%Y-%m-%dT%H:%M',
+                attrs={
+                    'type': 'datetime-local',
+                    'class': 'half-width',
+                    'step': '1',
+                },
+                format='%Y-%m-%dT%H:%M:%S',
             ),
             'end_time': forms.DateTimeInput(
-                attrs={'type': 'datetime-local', 'class': 'half-width'},
-                format='%Y-%m-%dT%H:%M',
+                attrs={
+                    'type': 'datetime-local',
+                    'class': 'half-width',
+                    'step': '1',
+                },
+                format='%Y-%m-%dT%H:%M:%S',
             ),
             'note': forms.Textarea(attrs={'placeholder': 'Note', 'class': 'half-width', 'required': False}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['start_time'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S']
-        self.fields['end_time'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M:%S']
+        datetime_formats = [
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%dT%H:%M',
+            '%Y-%m-%d %H:%M:%S',
+        ]
+        self.fields['start_time'].input_formats = datetime_formats
+        self.fields['end_time'].input_formats = datetime_formats
 
     def clean(self):
         cleaned_data = super().clean()
