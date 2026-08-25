@@ -1,8 +1,9 @@
 import importlib.util
-import logging
 
 from django.conf import settings
 from django.test import SimpleTestCase
+
+from AutumnWeb.access_log_policy import should_log_access
 
 
 def load_gunicorn_config():
@@ -36,23 +37,11 @@ class DjangoLoggingConfigurationTests(SimpleTestCase):
 
 
 class GunicornAccessLogFilterTests(SimpleTestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.log_filter = load_gunicorn_config().SuccessfulPollingRequestFilter()
-
-    def make_record(self, *, method="GET", path="/healthz/", status="200"):
-        record = logging.LogRecord(
-            name="gunicorn.access",
-            level=logging.INFO,
-            pathname=__file__,
-            lineno=1,
-            msg="request",
-            args=(),
-            exc_info=None,
+    def test_gunicorn_uses_the_custom_logger(self):
+        self.assertEqual(
+            load_gunicorn_config().logger_class,
+            "AutumnWeb.gunicorn_logging.AutumnLogger",
         )
-        record.args = {"m": method, "U": path, "s": status}
-        return record
 
     def test_successful_health_and_polling_requests_are_suppressed(self):
         for path in (
@@ -61,27 +50,13 @@ class GunicornAccessLogFilterTests(SimpleTestCase):
             "/timers/active-fragment/",
         ):
             with self.subTest(path=path):
-                self.assertFalse(self.log_filter.filter(self.make_record(path=path)))
+                self.assertFalse(should_log_access("GET", path, "200 OK"))
 
     def test_failures_on_quiet_paths_remain_visible(self):
-        self.assertTrue(
-            self.log_filter.filter(self.make_record(path="/healthz/", status="500"))
-        )
+        self.assertTrue(should_log_access("GET", "/healthz/", "500 Internal Error"))
 
     def test_ordinary_successful_requests_remain_visible(self):
-        self.assertTrue(
-            self.log_filter.filter(self.make_record(path="/sessions/", status="200"))
-        )
+        self.assertTrue(should_log_access("GET", "/sessions/", "200 OK"))
 
     def test_non_get_requests_to_quiet_paths_remain_visible(self):
-        self.assertTrue(
-            self.log_filter.filter(
-                self.make_record(method="POST", path="/healthz/", status="204")
-            )
-        )
-
-    def test_unstructured_records_remain_visible(self):
-        record = self.make_record()
-        record.args = ()
-
-        self.assertTrue(self.log_filter.filter(record))
+        self.assertTrue(should_log_access("POST", "/healthz/", "204 No Content"))

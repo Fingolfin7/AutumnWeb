@@ -1,39 +1,9 @@
-"""Gunicorn logging configuration for hosted deployments."""
+"""Gunicorn configuration for hosted deployments."""
 
-import logging
-from collections.abc import Mapping
-
-
-QUIET_SUCCESS_PATHS = frozenset(
-    {
-        "/healthz/",
-        "/timeline/fragment/",
-        "/timers/active-fragment/",
-    }
-)
+logger_class = "AutumnWeb.gunicorn_logging.AutumnLogger"
 
 
-class SuccessfulPollingRequestFilter(logging.Filter):
-    """Hide successful high-frequency GETs while preserving their failures."""
+def on_starting(server):
+    """Leave one visible confirmation that this deployment config was loaded."""
 
-    def filter(self, record):
-        atoms = record.args
-        if not isinstance(atoms, Mapping):
-            return True
-
-        method = str(atoms.get("m", "")).upper()
-        path = str(atoms.get("U", ""))
-        status = str(atoms.get("s", ""))
-        is_success = status.startswith(("2", "3"))
-
-        return not (
-            method == "GET"
-            and path in QUIET_SUCCESS_PATHS
-            and is_success
-        )
-
-
-def post_fork(server, worker):
-    """Install the filter in each worker after Gunicorn forks it."""
-
-    server.log.access_log.addFilter(SuccessfulPollingRequestFilter())
+    server.log.info("Autumn Gunicorn logging configuration loaded")
