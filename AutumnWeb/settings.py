@@ -252,80 +252,124 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # Logging
-LOG_DIR = os.path.join(BASE_DIR, "Logs")
+#
+# Render captures stdout/stderr and makes those streams searchable. Keep file
+# logging as a local convenience, but do not make production diagnostics depend
+# on an ephemeral filesystem.
+LOG_LEVEL = env("LOG_LEVEL", default="INFO").upper()
+ROOT_LOG_LEVEL = (
+    LOG_LEVEL if LOG_LEVEL in {"WARNING", "ERROR", "CRITICAL"} else "WARNING"
+)
+LOG_TO_FILES = env.bool(
+    "LOG_TO_FILES",
+    default=not env.bool("RENDER", default=False),
+)
+LOG_DIR = BASE_DIR / "Logs"
 
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
+LOG_HANDLERS = {
+    "console": {
+        "level": LOG_LEVEL,
+        "class": "logging.StreamHandler",
+        "stream": "ext://sys.stdout",
+        "formatter": "structured",
+    },
+}
+APP_LOG_HANDLERS = ["console"]
+SIGNAL_LOG_HANDLERS = ["console"]
+MODEL_LOG_HANDLERS = ["console"]
+
+if LOG_TO_FILES:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    LOG_HANDLERS.update(
+        {
+            "main": {
+                "level": LOG_LEVEL,
+                "class": "concurrent_log_handler.ConcurrentRotatingFileHandler",
+                "filename": LOG_DIR / "main.log",
+                "maxBytes": 0.5 * 1024 * 1024,
+                "backupCount": 5,
+                "formatter": "structured",
+            },
+            "signals": {
+                "level": LOG_LEVEL,
+                "class": "concurrent_log_handler.ConcurrentRotatingFileHandler",
+                "filename": LOG_DIR / "signals.log",
+                "maxBytes": 0.5 * 1024 * 1024,
+                "backupCount": 5,
+                "formatter": "structured",
+            },
+            "models": {
+                "level": LOG_LEVEL,
+                "class": "concurrent_log_handler.ConcurrentRotatingFileHandler",
+                "filename": LOG_DIR / "models.log",
+                "maxBytes": 0.5 * 1024 * 1024,
+                "backupCount": 5,
+                "formatter": "structured",
+            },
+        }
+    )
+    APP_LOG_HANDLERS.append("main")
+    SIGNAL_LOG_HANDLERS.append("signals")
+    MODEL_LOG_HANDLERS.append("models")
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "formatters": {
-        "verbose": {
-            "format": "[%(asctime)s] [%(levelname)s] [%(module)s] %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-        "simple": {
-            "format": "[%(asctime)s] [%(module)s] %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
+        "structured": {
+            "format": (
+                "timestamp=%(asctime)s level=%(levelname)s logger=%(name)s "
+                "module=%(module)s message=%(message)s"
+            ),
+            "datefmt": "%Y-%m-%dT%H:%M:%S%z",
         },
     },
-    "handlers": {
-        "console": {
-            "level": "DEBUG",
-            "class": "logging.StreamHandler",
-            "formatter": "simple",
-        },
-        "main": {
-            "level": "INFO",
-            "class": "concurrent_log_handler.ConcurrentRotatingFileHandler",
-            "filename": os.path.join(LOG_DIR, "main.log"),
-            "maxBytes": 0.5
-            * 1024
-            * 1024,  # Rotate when the file reaches half a megabyte
-            "backupCount": 5,
-            "formatter": "verbose",
-        },
-        "signals": {
-            "level": "INFO",
-            "class": "concurrent_log_handler.ConcurrentRotatingFileHandler",
-            "filename": os.path.join(LOG_DIR, "signals.log"),
-            "maxBytes": 0.5
-            * 1024
-            * 1024,  # Rotate when the file reaches half a megabyte
-            "backupCount": 5,
-            "formatter": "simple",
-        },
-        "models": {
-            "level": "INFO",
-            "class": "concurrent_log_handler.ConcurrentRotatingFileHandler",
-            "filename": os.path.join(LOG_DIR, "models.log"),
-            "maxBytes": 0.5
-            * 1024
-            * 1024,  # Rotate when the file reaches half a megabyte
-            "backupCount": 5,
-            "formatter": "simple",
-        },
+    "handlers": LOG_HANDLERS,
+    "root": {
+        "handlers": ["console"],
+        # Keep unexpected third-party chatter out of production while still
+        # surfacing warnings and errors from libraries without dedicated rules.
+        "level": ROOT_LOG_LEVEL,
     },
     "loggers": {
+        "AutumnWeb": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "core": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "users": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
+        "llm_insights": {
+            "handlers": ["console"],
+            "level": LOG_LEVEL,
+            "propagate": False,
+        },
         "main": {
-            "handlers": ["main"],
-            "level": "INFO",
+            "handlers": APP_LOG_HANDLERS,
+            "level": LOG_LEVEL,
             "propagate": False,
         },
         "signals": {
-            "handlers": ["signals"],
-            "level": "INFO",
+            "handlers": SIGNAL_LOG_HANDLERS,
+            "level": LOG_LEVEL,
             "propagate": False,
         },
         "models": {
-            "handlers": ["models"],
-            "level": "INFO",
+            "handlers": MODEL_LOG_HANDLERS,
+            "level": LOG_LEVEL,
             "propagate": False,
         },
         "django": {
             "handlers": ["console"],
-            "level": "INFO",
+            "level": LOG_LEVEL,
             "propagate": False,
         },
     },
