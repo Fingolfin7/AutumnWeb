@@ -72,7 +72,9 @@ self.addEventListener("push", function (event) {
     event.waitUntil(self.registration.showNotification(title, {
         body: body,
         tag: "autumn-" + kind + "-" + identity,
-        renotify: false,
+        /* Repeat-interval reminders share one tag; without renotify a later
+           notification silently replaces the one still sitting unread. */
+        renotify: true,
         icon: "/static/core/images/icons/autumn-icon-192.png",
         badge: "/static/core/images/icons/autumn-icon-192.png",
         data: { url: notificationUrl(payload.url), kind: kind, session_id: payload.session_id || null }

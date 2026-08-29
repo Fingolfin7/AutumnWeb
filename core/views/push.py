@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
@@ -17,9 +16,9 @@ from core.services.push import (
     PushValidationError,
     enqueue_push_test,
     disable_subscription,
-    push_configured,
     save_subscription,
     validate_endpoint,
+    vapid_configuration,
 )
 
 
@@ -39,11 +38,13 @@ def _json_body(request):
 @require_GET
 def push_status(request):
     active = PushSubscription.objects.filter(user=request.user, active=True).count()
+    configuration = vapid_configuration()
     return JsonResponse(
         {
-            "available": push_configured(),
+            "available": configuration["configured"],
             # Only the public VAPID key is safe to send to the browser.
-            "public_key": settings.PUSH_VAPID_PUBLIC_KEY if push_configured() else None,
+            "public_key": configuration["public_key"],
+            "configuration_error": configuration["error"],
             "subscriptions": active,
             "subscribed": active > 0,
         }

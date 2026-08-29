@@ -13,6 +13,7 @@ import binascii
 import ipaddress
 import json
 import logging
+import os
 from datetime import datetime, timedelta, timezone as dt_timezone
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -33,6 +34,12 @@ except ImportError:  # pragma: no cover - requirements install supplies this
         response = None
 
 
+try:  # Same guard: the private key is only validated when py_vapid is present.
+    from py_vapid import Vapid
+except ImportError:  # pragma: no cover - requirements install supplies this
+    Vapid = None
+
+
 logger = logging.getLogger(__name__)
 
 MAX_ENDPOINT_LENGTH = 2048
@@ -43,6 +50,7 @@ MAX_ERROR_LENGTH = 500
 MAX_NOTIFICATION_TITLE_LENGTH = 120
 MAX_NOTIFICATION_BODY_LENGTH = 500
 MAX_NOTIFICATION_URL_LENGTH = 1024
+VAPID_CLI_PREFIX = "Application Server Key ="
 
 
 class PushValidationError(ValueError):
@@ -53,14 +61,128 @@ class PushUnavailable(RuntimeError):
     """The deployment cannot send push at this time."""
 
 
-def push_configured() -> bool:
-    """Return whether all VAPID values needed by pywebpush are present."""
+def _normalise_vapid_public_key(value: object) -> str:
+    """Return canonical unpadded base64url from the configured value.
 
-    return bool(
+    ``python -m py_vapid --applicationServerKey`` prints
+    ``Application Server Key = <key>``.  Copying that whole line into an
+    environment variable used to make the browser fail inside ``atob`` after
+    notification permission had already been granted.  Standard base64 and
+    padded keys decode server side but are rejected by the browser's stricter
+    base64url check, so the alphabet and padding are canonicalised here too.
+    """
+
+    if not isinstance(value, str):
+        return ""
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if not lines:
+        return ""
+    labelled = [line for line in lines if line.startswith(VAPID_CLI_PREFIX)]
+    candidate = labelled[0][len(VAPID_CLI_PREFIX) :] if labelled else lines[0]
+    candidate = candidate.strip().rstrip("=")
+    return candidate.replace("+", "-").replace("/", "_")
+
+
+def _private_key_loads(private_key: object) -> bool:
+    """Load the private key the way ``pywebpush`` will at send time.
+
+    ``pywebpush`` dispatches on ``os.path.isfile``, and ``Vapid.from_string``
+    strips newlines without stripping PEM armour, so raw PEM contents pasted
+    into the environment variable only fail once a notification is being sent.
+    """
+
+    if Vapid is None:  # pragma: no cover - requirements install supplies this
+        return True
+    try:
+        if os.path.isfile(private_key):
+            Vapid.from_file(private_key)
+        else:
+            Vapid.from_string(private_key)
+    except Exception:
+        return False
+    return True
+
+
+def _valid_vapid_subject(subject: str) -> bool:
+    """Apply the same rules as ``py_vapid._check_sub``.
+
+    That pattern is anchored, so a contact URI carrying a path or an address
+    without a host is only rejected while signing, long after the browser has
+    been told push is available.
+    """
+
+    parts = urlsplit(subject)
+    if parts.scheme == "mailto":
+        address = parts.path
+        if "@" not in address:
+            return False
+        host = address.rsplit("@", 1)[1]
+    elif parts.scheme == "https":
+        if parts.path or parts.query or parts.fragment:
+            return False
+        host = parts.hostname or ""
+    else:
+        return False
+    host = host.lower()
+    return host == "localhost" or "." in host.strip(".")
+
+
+def vapid_configuration() -> dict[str, object]:
+    """Return validated, browser-safe VAPID configuration metadata."""
+
+    public_key = _normalise_vapid_public_key(
         getattr(settings, "PUSH_VAPID_PUBLIC_KEY", "")
-        and getattr(settings, "PUSH_VAPID_PRIVATE_KEY", "")
-        and getattr(settings, "PUSH_VAPID_SUBJECT", "")
     )
+    private_key = getattr(settings, "PUSH_VAPID_PRIVATE_KEY", "")
+    subject = getattr(settings, "PUSH_VAPID_SUBJECT", "")
+    if not public_key or not private_key or not subject:
+        return {
+            "configured": False,
+            "public_key": None,
+            "error": "Browser push credentials are incomplete.",
+        }
+    try:
+        decoded = base64.b64decode(
+            public_key + "=" * (-len(public_key) % 4),
+            altchars=b"-_",
+            validate=True,
+        )
+    except (binascii.Error, ValueError, TypeError):
+        decoded = b""
+    if len(decoded) != 65 or decoded[:1] != b"\x04":
+        return {
+            "configured": False,
+            "public_key": None,
+            "error": (
+                "PUSH_VAPID_PUBLIC_KEY must be the base64url application "
+                "server key, without unrelated command output."
+            ),
+        }
+    if not _private_key_loads(private_key):
+        return {
+            "configured": False,
+            "public_key": None,
+            "error": (
+                "PUSH_VAPID_PRIVATE_KEY must be a path to the PEM file or the "
+                "base64url DER key (not raw PEM contents)."
+            ),
+        }
+    if not _valid_vapid_subject(str(subject)):
+        return {
+            "configured": False,
+            "public_key": None,
+            "error": (
+                "PUSH_VAPID_SUBJECT must be a mailto: address or an https: "
+                "origin without a path."
+            ),
+        }
+    return {"configured": True, "public_key": public_key, "error": None}
+
+
+def push_configured() -> bool:
+    """Return whether all VAPID values needed by pywebpush are valid."""
+
+    return bool(vapid_configuration()["configured"])
 
 
 def _decode_key(value: object, *, name: str) -> bytes:

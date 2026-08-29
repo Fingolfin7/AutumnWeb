@@ -8,15 +8,13 @@ from uuid import uuid4
 from django.core.cache import cache
 from django.core.management.base import BaseCommand, CommandError
 from django.db import close_old_connections
-from django.utils import timezone
 
-from core.services.push import flush_outbox
-from core.utils import stop_expired_timers
+from core.services.reminder_dispatcher import LOCK_KEY, run_dispatch_pass
 
 
 class Command(BaseCommand):
     help = "Dispatch due timer reminder and auto-stop Web Push notifications."
-    lock_key = "autumn:dispatch_timer_reminders:lock"
+    lock_key = LOCK_KEY
 
     def add_arguments(self, parser):
         group = parser.add_mutually_exclusive_group()
@@ -34,19 +32,11 @@ class Command(BaseCommand):
         parser.add_argument("--interval-seconds", type=float, default=1.0)
         parser.add_argument("--limit", type=int, default=100)
 
-    def _claim_due(self, *, now, limit):
+    def _pass(self, *, limit):
         try:
-            from core.services.reminders import claim_due_reminders
+            return run_dispatch_pass(limit=limit)
         except ImportError as exc:  # Backend reminder slice not installed yet.
             raise CommandError("Reminder claiming service is unavailable.") from exc
-        return claim_due_reminders(now=now, limit=limit)
-
-    def _pass(self, *, limit):
-        now = timezone.now()
-        stopped = stop_expired_timers(now=now)
-        claimed = self._claim_due(now=now, limit=limit)
-        flushed = flush_outbox(limit=limit, now=now)
-        return len(stopped), claimed, flushed
 
     def _lock_timeout(self, options):
         # Keep the lock through the complete bounded loop and a small cleanup

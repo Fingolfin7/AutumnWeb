@@ -114,15 +114,52 @@ PUSH_VAPID_SUBJECT=mailto:admin@example.com
 PUSH_ALLOWED_ENDPOINT_SUFFIXES=fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com
 ```
 
+Generate a keypair with `python -m py_vapid --gen`. The public-key command
+prints a labelled line; store only the value after `Application Server Key =`:
+
+```powershell
+$keyLine = python -m py_vapid --applicationServerKey --private-key .\private_key.pem |
+    Where-Object { $_ -match '^Application Server Key = ' } |
+    Select-Object -First 1
+$env:PUSH_VAPID_PUBLIC_KEY = ($keyLine -replace '^Application Server Key =\s*', '').Trim()
+$env:PUSH_VAPID_PRIVATE_KEY = (Resolve-Path .\private_key.pem).Path
+$env:PUSH_VAPID_SUBJECT = 'mailto:admin@example.com'
+```
+
+On PaaS deployments that cannot ship a key file, set `PUSH_VAPID_PRIVATE_KEY` to
+a base64url-encoded 32-byte P-256 private scalar. Do not paste raw PEM contents
+including the `-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----`
+lines into the environment variable; use a mounted PEM file path instead.
+
 Keep the private key server-only; the browser receives only the public key.
 Subscription endpoints are restricted to the configured browser push-provider
 host suffixes so the dispatcher cannot be aimed at arbitrary HTTPS services.
 The timer-page test action queues a fixed notification for the dispatcher and
 does not accept a provider endpoint or make a network request.
 
-Run `python manage.py dispatch_timer_reminders --once` from cron. For local
-testing, use bounded `--loop --max-seconds 30` mode. The command is the only
-dispatcher; the Django web process does not start a scheduler.
+Delivery needs something to run the dispatch pass. There are two supported
+modes; pick one.
+
+**Cron (default).** Run `python manage.py dispatch_timer_reminders --once` from
+cron. For local testing, use bounded `--loop --max-seconds 30` mode.
+
+**In-process dispatcher thread (opt-in).** Set `RUN_REMINDER_DISPATCHER=TRUE`
+and the web process starts a daemon thread that runs the same pass on a timer.
+This suits local `runserver` and single-service Render deployments where no
+cron or worker service is available:
+
+```text
+RUN_REMINDER_DISPATCHER=FALSE     # TRUE starts the dispatcher inside the web process
+PUSH_DISPATCH_INTERVAL_SECONDS=15 # Seconds between passes when the thread runs
+```
+
+The thread only starts in a web process — `runserver` (in the autoreload child,
+or with `--noreload`) and gunicorn/uvicorn/daphne. Management commands such as
+`test`, `migrate`, `check`, and `dispatch_timer_reminders` itself never start
+it. Both modes take the same best-effort cache lock, so a cron job and the
+thread do not run a pass at the same time when they share a cache backend.
+Note that on a free-tier service that sleeps when idle, nothing dispatches
+while the service is asleep; reminders are delivered after it wakes.
 
 ---
 

@@ -1,3 +1,4 @@
+import base64
 from datetime import timedelta
 from io import StringIO
 from types import SimpleNamespace
@@ -17,11 +18,17 @@ from core.services.push import (
     enqueue_push_test,
     save_subscription,
     validate_subscription,
+    vapid_configuration,
 )
 
 
 P256DH = "B" * 87  # 65 bytes when decoded, with URL-safe padding omitted
 AUTH = "Y" * 22  # 16 bytes when decoded
+VAPID_PUBLIC = base64.urlsafe_b64encode(b"\x04" + b"v" * 64).rstrip(b"=").decode()
+# py_vapid reads a 32-byte value as a raw key, so this loads the way a real
+# deployment's private key does without keeping a PEM file in the repository.
+VAPID_PRIVATE = base64.urlsafe_b64encode(b"k" * 32).rstrip(b"=").decode()
+PEM_CONTENTS = "-----BEGIN PRIVATE KEY-----\nMIGHAgEA\n-----END PRIVATE KEY-----\n"
 
 
 class ProviderError(Exception):
@@ -50,8 +57,8 @@ class PushTestMixin:
 
 
 @override_settings(
-    PUSH_VAPID_PUBLIC_KEY="public-key",
-    PUSH_VAPID_PRIVATE_KEY="private-key",
+    PUSH_VAPID_PUBLIC_KEY=VAPID_PUBLIC,
+    PUSH_VAPID_PRIVATE_KEY=VAPID_PRIVATE,
     PUSH_VAPID_SUBJECT="mailto:test@example.com",
     PUSH_MAX_ATTEMPTS=2,
     PUSH_RETRY_BASE_SECONDS=5,
@@ -142,7 +149,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         status = client.get(reverse("push_status"))
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["subscriptions"], 1)
-        self.assertNotIn("private-key", status.content.decode())
+        self.assertNotIn(VAPID_PRIVATE, status.content.decode())
 
         response = client.post(
             reverse("push_unsubscribe"),
@@ -152,6 +159,78 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["removed"])
         self.assertFalse(PushSubscription.objects.get().active)
+
+    @override_settings(
+        PUSH_VAPID_PUBLIC_KEY=f"Application Server Key = {VAPID_PUBLIC}\n\n",
+    )
+    def test_status_normalises_py_vapid_cli_output(self):
+        client = Client()
+        client.force_login(self.user)
+
+        configuration = vapid_configuration()
+        response = client.get(reverse("push_status"))
+
+        self.assertTrue(configuration["configured"])
+        self.assertEqual(configuration["public_key"], VAPID_PUBLIC)
+        self.assertTrue(response.json()["available"])
+        self.assertEqual(response.json()["public_key"], VAPID_PUBLIC)
+
+    def test_status_canonicalises_standard_base64_and_padded_public_keys(self):
+        # The VAPID_PUBLIC bytes never encode to "+" or "/", so this key body
+        # exercises both the alphabet translation and the padding strip.
+        raw = b"\x04" + b"\xfb\xff" * 32
+        client = Client()
+        client.force_login(self.user)
+
+        for value in (
+            base64.b64encode(raw).decode(),
+            base64.urlsafe_b64encode(raw).decode(),
+        ):
+            with self.subTest(value=value), override_settings(
+                PUSH_VAPID_PUBLIC_KEY=value
+            ):
+                key = client.get(reverse("push_status")).json()["public_key"]
+                self.assertRegex(key, r"^[A-Za-z0-9_-]+$")
+                self.assertEqual(
+                    base64.urlsafe_b64decode(key + "=" * (-len(key) % 4)), raw
+                )
+
+    def test_status_rejects_subjects_py_vapid_would_reject_at_send_time(self):
+        client = Client()
+        client.force_login(self.user)
+
+        for subject in ("https://example.com/contact", "mailto:admin"):
+            with self.subTest(subject=subject), override_settings(
+                PUSH_VAPID_SUBJECT=subject
+            ):
+                body = client.get(reverse("push_status")).json()
+                self.assertFalse(body["available"])
+                self.assertIsNone(body["public_key"])
+                self.assertIn("PUSH_VAPID_SUBJECT", body["configuration_error"])
+
+    @override_settings(PUSH_VAPID_PRIVATE_KEY=PEM_CONTENTS)
+    def test_status_rejects_raw_pem_contents_as_the_private_key(self):
+        client = Client()
+        client.force_login(self.user)
+
+        configuration = vapid_configuration()
+        response = client.get(reverse("push_status"))
+
+        self.assertFalse(configuration["configured"])
+        self.assertIn("PUSH_VAPID_PRIVATE_KEY", str(configuration["error"]))
+        self.assertFalse(response.json()["available"])
+        self.assertIsNone(response.json()["public_key"])
+
+    @override_settings(PUSH_VAPID_PUBLIC_KEY="not a base64url key")
+    def test_status_rejects_malformed_public_key_before_browser_decode(self):
+        client = Client()
+        client.force_login(self.user)
+
+        response = client.get(reverse("push_status"))
+
+        self.assertFalse(response.json()["available"])
+        self.assertIsNone(response.json()["public_key"])
+        self.assertIn("PUSH_VAPID_PUBLIC_KEY", response.json()["configuration_error"])
 
     def test_dispatch_fans_out_and_success_aggregates_with_expired_device(self):
         first = save_subscription(

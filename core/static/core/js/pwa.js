@@ -57,11 +57,32 @@
     }
 
     function decodeBase64Url(value) {
+        if (typeof value !== "string" || !/^[A-Za-z0-9_-]+$/.test(value) || value.length > 128) {
+            throw new Error("Autumn's Web Push public key is invalid. Check PUSH_VAPID_PUBLIC_KEY.");
+        }
         var padding = "=".repeat((4 - value.length % 4) % 4);
-        var binary = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
+        var binary;
+        try {
+            binary = atob((value + padding).replace(/-/g, "+").replace(/_/g, "/"));
+        } catch (error) {
+            throw new Error("Autumn's Web Push public key is invalid. Check PUSH_VAPID_PUBLIC_KEY.");
+        }
         var bytes = new Uint8Array(binary.length);
         for (var i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+        if (bytes.length !== 65 || bytes[0] !== 4) {
+            throw new Error("Autumn's Web Push public key is invalid. Check PUSH_VAPID_PUBLIC_KEY.");
+        }
         return bytes;
+    }
+
+    function sameApplicationServerKey(existing, expected) {
+        if (!existing) return true;
+        var bytes = new Uint8Array(existing);
+        if (bytes.length !== expected.length) return false;
+        for (var i = 0; i < bytes.length; i += 1) {
+            if (bytes[i] !== expected[i]) return false;
+        }
+        return true;
     }
 
     function enable(statusUrl, subscribeUrl) {
@@ -71,12 +92,17 @@
             if (permission !== "granted") throw new Error(permission === "denied" ? "Notifications are blocked in this browser." : "Notification permission was not granted.");
             return status(statusUrl);
         }).then(function (data) {
-            if (!data.available || !data.public_key) throw new Error("Browser push is not configured for this deployment.");
+            if (!data.available || !data.public_key) throw new Error(data.configuration_error || "Browser push is not configured for this deployment.");
             return navigator.serviceWorker.ready.then(function (registration) {
+                var serverKey = decodeBase64Url(data.public_key);
+                var options = { userVisibleOnly: true, applicationServerKey: serverKey };
                 return registration.pushManager.getSubscription().then(function (subscription) {
-                    return subscription || registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: decodeBase64Url(data.public_key)
+                    if (!subscription) return registration.pushManager.subscribe(options);
+                    // A subscription held under an older key re-registers happily
+                    // and then fails every push with 403, so replace it.
+                    if (sameApplicationServerKey(subscription.options && subscription.options.applicationServerKey, serverKey)) return subscription;
+                    return subscription.unsubscribe().then(function () {
+                        return registration.pushManager.subscribe(options);
                     });
                 });
             });

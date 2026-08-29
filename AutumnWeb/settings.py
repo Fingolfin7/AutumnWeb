@@ -84,13 +84,14 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 PUSH_VAPID_PUBLIC_KEY = env("PUSH_VAPID_PUBLIC_KEY", default="").strip()
 PUSH_VAPID_PRIVATE_KEY = env("PUSH_VAPID_PRIVATE_KEY", default="").strip()
 PUSH_VAPID_SUBJECT = env("PUSH_VAPID_SUBJECT", default="").strip()
-PUSH_VAPID_CONFIGURED = bool(
-    PUSH_VAPID_PUBLIC_KEY and PUSH_VAPID_PRIVATE_KEY and PUSH_VAPID_SUBJECT
-)
 PUSH_WEBPUSH_TIMEOUT = env.float("PUSH_WEBPUSH_TIMEOUT", default=10.0)
 PUSH_MAX_ATTEMPTS = env.int("PUSH_MAX_ATTEMPTS", default=5)
 PUSH_RETRY_BASE_SECONDS = env.int("PUSH_RETRY_BASE_SECONDS", default=30)
 PUSH_CLAIM_LEASE_SECONDS = env.int("PUSH_CLAIM_LEASE_SECONDS", default=120)
+# Opt-in in-process dispatcher thread.  Off by default: the bounded
+# ``dispatch_timer_reminders`` cron command stays the alternative delivery path.
+RUN_REMINDER_DISPATCHER = env.bool("RUN_REMINDER_DISPATCHER", default=False)
+PUSH_DISPATCH_INTERVAL_SECONDS = env.float("PUSH_DISPATCH_INTERVAL_SECONDS", default=15.0)
 PUSH_ALLOWED_ENDPOINT_SUFFIXES = tuple(
     suffix.strip().lower().lstrip(".")
     for suffix in env.list(

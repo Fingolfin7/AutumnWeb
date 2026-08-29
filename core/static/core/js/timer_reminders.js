@@ -193,7 +193,7 @@
             var status = results[0];
             var localSubscription = results[1];
             if (!status.available) {
-                setPermissionState(container, "unavailable", "Notifications are unavailable.", "This deployment has not configured browser push yet.", "", "");
+                setPermissionState(container, "unavailable", "Notifications are unavailable.", status.configuration_error || "This deployment has not configured browser push yet.", "", "");
                 return;
             }
             var permission = "default";
