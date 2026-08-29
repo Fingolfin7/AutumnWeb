@@ -157,6 +157,19 @@ class PortedPagesSmokeTests(TestCase):
                     f"{ref} is precached but does not exist on disk",
                 )
 
+    def test_service_worker_has_safe_timer_notification_handlers(self):
+        from pathlib import Path
+
+        source = (
+            Path(__file__).parent / "static" / "core" / "pwa" / "service-worker.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('addEventListener("push"', source)
+        self.assertIn('addEventListener("notificationclick"', source)
+        self.assertIn('tag: "autumn-" + kind + "-" + identity', source)
+        self.assertIn('openWindow(target)', source)
+        self.assertIn('startsWith("/timers/")', source)
+
     def test_no_ported_page_reloads_a_second_jquery(self):
         """The shell ships jQuery 3.6; the legacy pages pulled 1.7.1 in after
         it, silently downgrading every script that followed."""

@@ -2,6 +2,8 @@ import json
 import re
 import zlib
 import base64
+import time
+from django.db import OperationalError
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from collections import defaultdict
@@ -53,6 +55,8 @@ def parse_stop_after_duration(value) -> timedelta | None:
 def stop_expired_timers(user=None, now=None):
     """Close active sessions whose optional auto-stop deadline has passed."""
     now = now or timezone.now()
+    if timezone.is_naive(now):
+        now = timezone.make_aware(now)
     sessions = Sessions.objects.filter(
         end_time__isnull=True,
         auto_stop_at__isnull=False,
@@ -63,17 +67,24 @@ def stop_expired_timers(user=None, now=None):
 
     from core.services import SessionMutationService
 
+    for attempt in range(8):
+        try:
+            session_ids = list(sessions.order_by("auto_stop_at", "pk").values_list("pk", flat=True))
+            break
+        except OperationalError as exc:
+            if "locked" not in str(exc).lower() or attempt == 7:
+                raise
+            time.sleep(0.02 * (attempt + 1))
+
     stopped = []
-    for session in sessions.select_related("project"):
-        stopped.append(
-            SessionMutationService.mutate_session(
-                session.pk,
-                user=user,
-                end_time=session.auto_stop_at,
-                auto_stop_at=None,
-                is_active=False,
-            )
+    for session_id in session_ids:
+        # Re-check the deadline under the session row lock.  A manual stop (or
+        # another worker's auto-stop) may have won after the candidate query.
+        stopped_session = SessionMutationService.auto_stop_session(
+            session_id, user=user, now=now
         )
+        if stopped_session is not None:
+            stopped.append(stopped_session)
 
     return stopped
 

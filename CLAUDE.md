@@ -115,11 +115,21 @@ GOOGLE_OAUTH_CLIENT_ID=<google-web-client-id>
 GOOGLE_OAUTH_CLIENT_SECRET=<google-web-client-secret>
 GITHUB_OAUTH_CLIENT_ID=<github-oauth-client-id>
 GITHUB_OAUTH_CLIENT_SECRET=<github-oauth-client-secret>
+PUSH_VAPID_PUBLIC_KEY=<base64url public key>
+PUSH_VAPID_PRIVATE_KEY=<private key secret; never commit>
+PUSH_VAPID_SUBJECT=mailto:admin@example.com
+PUSH_ALLOWED_ENDPOINT_SUFFIXES=fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com
 ```
 
 Google and GitHub buttons are enabled independently when both credentials for
 that provider are set. See `docs/social-auth.md` for provider setup and callback
 URLs. Run `python manage.py migrate` after installing or updating dependencies.
+
+Timer reminder delivery is optional and runs only through the bounded
+`python manage.py dispatch_timer_reminders --once` cron command (or
+`--loop --max-seconds 30` locally); no scheduler is started from
+`AppConfig.ready()`. The VAPID private key remains server-only; browser test
+notifications are queued for the dispatcher rather than sent from a request.
 
 ## Database Notes
 

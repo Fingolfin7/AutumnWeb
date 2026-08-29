@@ -6,6 +6,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from datetime import datetime, timedelta, time
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Prefetch
 from django.views.generic import (
     TemplateView,
 )
@@ -14,7 +15,7 @@ from core.commitments import (
     get_commitment_progress,
     reconcile_commitment,
 )
-from core.models import Sessions, Commitment
+from core.models import Sessions, Commitment, TimerReminder
 from core.timeline import DEFAULT_RANGE, build_timeline
 
 
@@ -239,7 +240,24 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         active_timers = (
             Sessions.objects.filter(user=user, end_time__isnull=True)
             .select_related("project")
-            .prefetch_related("subprojects")
+            .prefetch_related(
+                "subprojects",
+                Prefetch(
+                    "reminders",
+                    queryset=TimerReminder.objects.filter(active=True)
+                    .only(
+                        "id",
+                        "session_id",
+                        "mode",
+                        "next_fire_at",
+                        "interval_seconds",
+                        "message",
+                        "last_fired_at",
+                    )
+                    .order_by("next_fire_at", "id"),
+                    to_attr="active_reminders",
+                ),
+            )
         )
         active_timers = filter_by_active_context(active_timers, self.request)
         context["active_timers_count"] = active_timers.count()

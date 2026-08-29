@@ -233,12 +233,23 @@ class SessionsAdmin(admin.ModelAdmin):
         # Admin edits bypass SessionMutationService, so replicate its integrity
         # guarantees: floor instants to whole seconds, version the row, and mark
         # the user's commitments for recompute.
+        prior_end_time = None
+        if change and obj.pk:
+            prior_end_time = Sessions.objects.filter(pk=obj.pk).values_list(
+                "end_time", flat=True
+            ).first()
         obj.start_time = _floor_instant(obj.start_time)
         obj.end_time = _floor_instant(obj.end_time)
         obj.auto_stop_at = _floor_instant(obj.auto_stop_at)
         obj.version = (obj.version or 1) + 1
         super().save_model(request, obj, form, change)
         _mark_commitments_dirty(obj.user_id)
+        if prior_end_time is None and obj.end_time is not None:
+            # An admin edit can stop a timer without going through the normal
+            # mutation service. Keep reminder lifecycle semantics consistent.
+            from .services.reminders import cancel_timer_reminders
+
+            cancel_timer_reminders(obj, cancelled_at=obj.end_time)
 
     def save_formset(self, request, form, formset, change):
         super().save_formset(request, form, formset, change)

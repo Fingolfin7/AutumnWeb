@@ -14,7 +14,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Context, Projects, Sessions, SubProjects
+from core.models import Context, Projects, Sessions, SubProjects, TimerReminder
 
 
 class TimerPagesTestCase(TestCase):
@@ -181,3 +181,149 @@ class TimerPageContentTests(TimerPagesTestCase):
         response = self.client.get(reverse("remove_timer", args=[timer.id]))
 
         self.assertContains(response, reverse("stop_timer", args=[timer.id]))
+
+
+class TimerReminderPageTests(TimerPagesTestCase):
+    def test_start_form_exposes_the_shared_reminder_contract(self):
+        response = self.client.get(reverse("start_timer"))
+
+        self.assertContains(response, 'name="reminder_mode"')
+        self.assertContains(response, 'value="after"')
+        self.assertContains(response, 'value="interval"')
+        self.assertContains(response, 'name="reminder_amount"')
+        self.assertContains(response, 'name="reminder_unit"')
+        self.assertContains(response, 'name="reminder_at"')
+        self.assertContains(response, 'name="notify_on_auto_stop"')
+        self.assertContains(response, self.user.profile.timezone)
+        self.assertContains(response, "data-rm-timezone")
+
+    def test_start_timer_creates_one_shot_reminder_and_auto_stop_preference(self):
+        response = self.client.post(
+            reverse("start_timer"),
+            {
+                "project": self.atlas.name,
+                "reminder_mode": "after",
+                "reminder_amount": "20",
+                "reminder_unit": "minutes",
+                "reminder_message": "Check in",
+                "notify_on_auto_stop": "1",
+            },
+        )
+
+        self.assertRedirects(response, reverse("timers"))
+        session = Sessions.objects.get(user=self.user, end_time__isnull=True)
+        self.assertTrue(session.notify_on_auto_stop)
+        reminder = TimerReminder.objects.get(session=session)
+        self.assertEqual(reminder.mode, "after")
+        self.assertIsNone(reminder.interval_seconds)
+        self.assertEqual(
+            int((reminder.next_fire_at - session.start_time).total_seconds()),
+            20 * 60,
+        )
+        self.assertEqual(reminder.message, "Check in")
+
+    def test_start_timer_creates_interval_reminder(self):
+        self.client.post(
+            reverse("start_timer"),
+            {
+                "project": self.atlas.name,
+                "reminder_mode": "interval",
+                "reminder_amount": "5",
+                "reminder_unit": "minutes",
+            },
+        )
+
+        session = Sessions.objects.get(user=self.user, end_time__isnull=True)
+        reminder = TimerReminder.objects.get(session=session)
+        self.assertEqual(reminder.mode, "interval")
+        self.assertEqual(reminder.interval_seconds, 5 * 60)
+
+    def test_start_timer_at_uses_profile_timezone(self):
+        self.user.profile.timezone = "America/New_York"
+        self.user.profile.save(update_fields=["timezone"])
+
+        response = self.client.post(
+            reverse("start_timer"),
+            {
+                "project": self.atlas.name,
+                "reminder_mode": "at",
+                "reminder_at": "2030-08-05T15:30",
+            },
+        )
+
+        self.assertRedirects(response, reverse("timers"))
+        session = Sessions.objects.get(user=self.user, end_time__isnull=True)
+        reminder = TimerReminder.objects.get(session=session)
+        self.assertEqual(reminder.mode, "at")
+        self.assertEqual(
+            reminder.next_fire_at.isoformat(), "2030-08-05T19:30:00+00:00"
+        )
+
+    def test_start_timer_rejects_a_past_at_reminder_without_creating_a_timer(self):
+        response = self.client.post(
+            reverse("start_timer"),
+            {
+                "project": self.atlas.name,
+                "reminder_mode": "at",
+                "reminder_at": "2020-01-01T12:00",
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, "Reminder time must be in the future")
+        self.assertFalse(Sessions.objects.filter(user=self.user).exists())
+
+    def test_active_fragment_renders_prefetched_reminder_with_cancel_url(self):
+        timer = self._timer()
+        TimerReminder.objects.create(
+            session=timer,
+            mode="after",
+            next_fire_at=timezone.now() + timedelta(minutes=5),
+        )
+
+        with self.assertNumQueries(7):
+            response = self.client.get(
+                reverse("active_timers_fragment"), {"surface": "timers"}
+            )
+
+        self.assertContains(response, "Once after")
+        self.assertContains(
+            response,
+            reverse(
+                "cancel_timer_reminder",
+                args=[timer.id, timer.reminders.first().id],
+            ),
+        )
+
+    def test_dashboard_first_paint_includes_active_reminders(self):
+        timer = self._timer()
+        reminder = TimerReminder.objects.create(
+            session=timer,
+            mode="after",
+            next_fire_at=timezone.now() + timedelta(minutes=5),
+            message="First-paint reminder",
+        )
+
+        response = self.client.get(reverse("home"))
+
+        self.assertContains(response, "First-paint reminder")
+        self.assertContains(
+            response,
+            reverse("cancel_timer_reminder", args=[timer.id, reminder.id]),
+        )
+
+    def test_cancel_reminder_is_owned_and_removes_active_rule(self):
+        timer = self._timer()
+        reminder = TimerReminder.objects.create(
+            session=timer,
+            mode="at",
+            next_fire_at=timezone.now() + timedelta(minutes=5),
+        )
+
+        response = self.client.post(
+            reverse("cancel_timer_reminder", args=[timer.id, reminder.id])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        reminder.refresh_from_db()
+        self.assertFalse(reminder.active)

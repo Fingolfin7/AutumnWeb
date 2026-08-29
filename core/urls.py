@@ -37,6 +37,11 @@ from core.views import (
     CreateCommitmentView,
     UpdateCommitmentView,
     DeleteCommitmentView,
+    push_status,
+    push_subscribe,
+    push_unsubscribe,
+    push_test,
+    cancel_timer_reminder,
 )
 
 
@@ -60,6 +65,15 @@ urlpatterns = [
     path("timers/<int:session_id>/note/", update_timer_note, name="update_timer_note"),
     path("restart_timer/<int:session_id>/", restart_timer, name="restart_timer"),
     path("remove_timer/<int:session_id>/", remove_timer, name="remove_timer"),
+    path("push/status/", push_status, name="push_status"),
+    path("push/subscribe/", push_subscribe, name="push_subscribe"),
+    path("push/unsubscribe/", push_unsubscribe, name="push_unsubscribe"),
+    path("push/test/", push_test, name="push_test"),
+    path(
+        "timers/<int:session_id>/reminders/<int:reminder_id>/cancel/",
+        cancel_timer_reminder,
+        name="cancel_timer_reminder",
+    ),
     # Was served at "create_subproject/" — a copy-paste slip. Only the URL name
     # is ever used to build links, so nothing referenced the wrong path, but it
     # made the address bar lie on the create-project page.

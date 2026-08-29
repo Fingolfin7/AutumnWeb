@@ -28,6 +28,7 @@
 
 {% block head_includes %}
     <script src="{% static 'core/js/timer_poll.js' %}?v={{ static_version.timer_poll }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/timer_reminders.js' %}?v={{ static_version.timer_reminders }}" type="text/javascript" defer></script>
     <script src="{% static 'core/js/dashboard_desk.js' %}?v={{ static_version.dashboard_desk }}" type="text/javascript" defer></script>
 {% endblock %}
 
@@ -58,6 +59,8 @@
         </div>
     </section>
 </div>
+
+<div hidden>{% csrf_token %}</div>
 
 {# ============================================================ HERO ZONE == #}
 

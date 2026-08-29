@@ -2,12 +2,13 @@ from collections import Counter
 from core.forms import *
 from core.utils import *
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Prefetch
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, render, redirect
@@ -21,8 +22,9 @@ from core.commitments import (
     get_commitment_progress,
     reconcile_commitment,
 )
-from core.models import Projects, SubProjects, Sessions, Commitment
+from core.models import Projects, SubProjects, Sessions, Commitment, TimerReminder
 from core.services import SessionMutationService
+from core.services.reminders import create_timer_reminder
 from core.views.allocations import parse_allocation_post
 
 
@@ -30,6 +32,25 @@ ACTIVE_TIMER_FRAGMENT_TEMPLATES = {
     "dashboard": "core/partials/active_timers_dashboard.html",
     "timers": "core/partials/active_timers_timers.html",
 }
+
+
+def _active_timer_reminder_prefetch():
+    """Keep reminder rows on the active-card render to one related query."""
+    return Prefetch(
+        "reminders",
+        queryset=TimerReminder.objects.filter(active=True)
+        .only(
+            "id",
+            "session_id",
+            "mode",
+            "next_fire_at",
+            "interval_seconds",
+            "message",
+            "last_fired_at",
+        )
+        .order_by("next_fire_at", "id"),
+        to_attr="active_reminders",
+    )
 
 
 @login_required
@@ -48,7 +69,8 @@ def active_timers_fragment(request):
             Prefetch(
                 "subprojects",
                 queryset=SubProjects.objects.only("id", "name"),
-            )
+            ),
+            _active_timer_reminder_prefetch(),
         )
         .only(
             "id",
@@ -58,6 +80,7 @@ def active_timers_fragment(request):
             "start_time",
             "end_time",
             "auto_stop_at",
+            "notify_on_auto_stop",
             "note",
             "version",
         )
@@ -90,6 +113,19 @@ def start_timer(request):
             )
             stop_after_duration = parse_stop_after_duration(stop_after)
 
+            reminder_mode = (request.POST.get("reminder_mode") or "none").strip().lower()
+            if reminder_mode not in {"none", "after", "interval", "at"}:
+                raise ValueError("Choose a valid reminder option.")
+            reminder_at = None
+            if reminder_mode == "at":
+                reminder_at_value = (request.POST.get("reminder_at") or "").strip()
+                if not reminder_at_value:
+                    raise ValidationError({"at": "Choose a date and time for the reminder."})
+                try:
+                    reminder_at = datetime.fromisoformat(reminder_at_value)
+                except ValueError as exc:
+                    raise ValidationError({"at": "Enter a valid date and time for the reminder."}) from exc
+
             # Fetch the project
             project = Projects.objects.filter(
                 name=project_name, user=request.user
@@ -105,23 +141,52 @@ def start_timer(request):
                 raise ValueError("No subprojects found for the selected project")
 
             start_time = timezone.now()
-            session = SessionMutationService.create_session(
-                user=request.user,
-                project=project,
-                start_time=start_time,
-                auto_stop_at=(
-                    start_time + stop_after_duration
-                    if stop_after_duration
-                    else None
-                ),
-                is_active=True,
-                subprojects=list(subprojects),
-            )
+            with transaction.atomic():
+                session = SessionMutationService.create_session(
+                    user=request.user,
+                    project=project,
+                    start_time=start_time,
+                    auto_stop_at=(
+                        start_time + stop_after_duration
+                        if stop_after_duration
+                        else None
+                    ),
+                    notify_on_auto_stop=(
+                        str(request.POST.get("notify_on_auto_stop", ""))
+                        .strip()
+                        .lower()
+                        in {"1", "true", "on", "yes"}
+                    ),
+                    is_active=True,
+                    subprojects=list(subprojects),
+                )
+                if reminder_mode != "none":
+                    create_timer_reminder(
+                        user=request.user,
+                        session=session,
+                        mode=reminder_mode,
+                        amount=request.POST.get("reminder_amount"),
+                        unit=request.POST.get("reminder_unit"),
+                        at_local=reminder_at,
+                        message=request.POST.get("reminder_message", ""),
+                    )
             messages.success(request, "Started timer")
             return redirect("timers")
 
         except ValueError as ve:
             messages.error(request, str(ve))
+            return redirect("start_timer")
+
+        except ValidationError as ve:
+            if hasattr(ve, "message_dict"):
+                error_text = " ".join(
+                    str(message)
+                    for messages_for_field in ve.message_dict.values()
+                    for message in messages_for_field
+                )
+            else:
+                error_text = str(ve)
+            messages.error(request, error_text or "Please correct the reminder details.")
             return redirect("start_timer")
 
         except Exception as e:
@@ -274,7 +339,29 @@ class TimerListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         stop_expired_timers(self.request.user)
-        qs = Sessions.objects.filter(end_time__isnull=True, user=self.request.user)
+        qs = (
+            Sessions.objects.filter(end_time__isnull=True, user=self.request.user)
+            .select_related("project")
+            .prefetch_related(
+                Prefetch(
+                    "subprojects",
+                    queryset=SubProjects.objects.only("id", "name"),
+                ),
+                _active_timer_reminder_prefetch(),
+            )
+            .only(
+                "id",
+                "project_id",
+                "project__id",
+                "project__name",
+                "start_time",
+                "end_time",
+                "auto_stop_at",
+                "notify_on_auto_stop",
+                "note",
+                "version",
+            )
+        )
         # Respect active context (timers only for projects in the active context)
         return filter_by_active_context(qs, self.request)
 

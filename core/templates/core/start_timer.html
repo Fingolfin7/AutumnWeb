@@ -1,32 +1,13 @@
 {% extends 'core/base.html' %}
 {% load static %}
 
-{% comment %}
-  ============================================================================
-  START TIMER — Focus Desk (UI_REDESIGN.md chunk 6)
-  ----------------------------------------------------------------------------
-  Two decisions, in the order you make them: what am I working on, and should
-  it stop by itself. The second is optional, so it reads as an option rather
-  than a required field.
-
-  timer_search_projects.js owns all of these and they must not be renamed:
-    #project-search  #project-search-results  #list_subs  #subproject_options
-    #pick-subprojects  #select-all-block  #select-all
-    [data-stop-after-preset]  #stop-after-amount  #stop-after-unit
-    [data-start-timer-summary]  #start-timer  (which it enables/disables)
-
-  The legacy page carried its hourglass keyframes in an inline <style> block;
-  they now live in focus_desk.css with the rest of the system.
-  ============================================================================
-{% endcomment %}
-
 {% block head_includes %}
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
     <script src="{% static 'core/js/timer_search_projects.js' %}?v={{ static_version.timer_search_projects }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/timer_reminders.js' %}?v={{ static_version.timer_reminders }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
-
 <div class="desk-head">
     <div>
         <p class="page-eyebrow">New timer</p>
@@ -34,69 +15,201 @@
     </div>
 </div>
 
-<form method="post" class="fields">
+<form method="post" class="fields desk" data-reminder-form
+      data-profile-timezone="{{ request.user.profile.timezone|default:'UTC' }}"
+      data-push-status-url="{% url 'push_status' %}"
+      data-push-subscribe-url="{% url 'push_subscribe' %}"
+      data-push-unsubscribe-url="{% url 'push_unsubscribe' %}"
+      data-push-test-url="{% url 'push_test' %}">
     {% csrf_token %}
 
-    <section class="slab slab-pad">
-        <div class="field" id="search-projects">
-            <label for="project-search">Project</label>
-            <input type="text" id="project-search" name="project" placeholder="Start typing a project name…"
-                   autocomplete="off" data-ajax_url="{% url 'api_v2:projects' %}">
-            <div id="project-search-results"></div>
-        </div>
-
-        <section id="pick-subprojects" class="field">
-            <input type="hidden" id="list_subs" data-ajax_url="{% url 'api_v2:project-subprojects' project_id=0 %}">
-
-            <div class="field-head" id="select-all-block">
-                <span class="field-label">Subprojects</span>
-                <span class="select-all-row">
-                    <input type="checkbox" id="select-all" class="select-all">
-                    <label for="select-all">All</label>
-                </span>
+    <div class="desk-main">
+        <section class="slab slab-pad">
+            <div class="field" id="search-projects">
+                <label for="project-search">Project</label>
+                <input type="text" id="project-search" name="project"
+                       placeholder="Start typing a project name..." autocomplete="off"
+                       data-ajax_url="{% url 'api_v2:projects' %}">
+                <div id="project-search-results"></div>
             </div>
 
-            <div class="check-grid" id="subproject_options">
-                <span class="subproject-empty-state">Pick a project first.</span>
+            <section id="pick-subprojects" class="field">
+                <input type="hidden" id="list_subs"
+                       data-ajax_url="{% url 'api_v2:project-subprojects' project_id=0 %}">
+                <div class="field-head" id="select-all-block">
+                    <span class="field-label">Subprojects</span>
+                    <span class="select-all-row">
+                        <input type="checkbox" id="select-all" class="select-all">
+                        <label for="select-all">All</label>
+                    </span>
+                </div>
+                <div class="check-grid" id="subproject_options">
+                    <span class="subproject-empty-state">Pick a project first.</span>
+                </div>
+            </section>
+        </section>
+
+        <section class="slab slab-pad">
+            <p class="field-label">
+                <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+                Stop after <span class="muted">(optional)</span>
+            </p>
+            <div class="preset-row" role="group" aria-label="Stop after presets">
+                <button type="button" class="timer-preset-button" data-stop-after-preset="15">15m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="25">25m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="30">30m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="45">45m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="60">60m</button>
+            </div>
+            <div class="two-up u-mt-4">
+                <div class="field">
+                    <label for="stop-after-amount">Duration</label>
+                    <input type="number" id="stop-after-amount" name="stop_after_amount"
+                           min="1" step="1" inputmode="numeric" placeholder="No limit">
+                </div>
+                <div class="field">
+                    <label for="stop-after-unit">Unit</label>
+                    <select id="stop-after-unit" name="stop_after_unit">
+                        <option value="minutes" selected>Minutes</option>
+                        <option value="hours">Hours</option>
+                    </select>
+                </div>
             </div>
         </section>
-    </section>
+    </div>
 
-    <section class="slab slab-pad">
-        <p class="field-label"><i class="fas fa-hourglass-half"></i> Stop after <span class="muted">(optional)</span></p>
+    <div class="desk-side">
+        <section class="slab slab-pad rm-block" data-rm-block data-mode="none">
+            <fieldset class="rm-fieldset">
+                <legend class="field-label rm-legend">
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+                    Remind me <span class="muted">(optional)</span>
+                </legend>
+                <p class="rm-lede">A reminder belongs to this timer. It ends when the timer stops and never stops the timer itself.</p>
 
-        <div class="preset-row" role="group" aria-label="Stop after presets">
-            <button type="button" class="timer-preset-button" data-stop-after-preset="15">15m</button>
-            <button type="button" class="timer-preset-button" data-stop-after-preset="25">25m</button>
-            <button type="button" class="timer-preset-button" data-stop-after-preset="30">30m</button>
-            <button type="button" class="timer-preset-button" data-stop-after-preset="45">45m</button>
-            <button type="button" class="timer-preset-button" data-stop-after-preset="60">60m</button>
+                <div class="rm-modes" role="radiogroup" aria-label="Reminder timing">
+                    <label class="rm-mode">
+                        <input type="radio" name="reminder_mode" value="none" data-rm-mode checked>
+                        <span class="rm-mode-face"><span class="rm-mode-name">None</span><span class="rm-mode-hint">no reminder</span></span>
+                    </label>
+                    <label class="rm-mode">
+                        <input type="radio" name="reminder_mode" value="after" data-rm-mode>
+                        <span class="rm-mode-face"><span class="rm-mode-name">Once after</span><span class="rm-mode-hint">one nudge</span></span>
+                    </label>
+                    <label class="rm-mode">
+                        <input type="radio" name="reminder_mode" value="interval" data-rm-mode>
+                        <span class="rm-mode-face"><span class="rm-mode-name">Every</span><span class="rm-mode-hint">repeats</span></span>
+                    </label>
+                    <label class="rm-mode">
+                        <input type="radio" name="reminder_mode" value="at" data-rm-mode>
+                        <span class="rm-mode-face"><span class="rm-mode-name">At</span><span class="rm-mode-hint">clock time</span></span>
+                    </label>
+                </div>
+
+                <div class="rm-panel rm-panel--none">
+                    <p class="rm-note">No reminder. The timer runs quietly until you stop it.</p>
+                </div>
+                <div class="rm-panel rm-panel--after" data-rm-panel="after">
+                    <div class="two-up">
+                        <div class="field">
+                            <label for="reminder-amount">Notify me once after</label>
+                            <input type="number" id="reminder-amount" name="reminder_amount"
+                                   min="1" step="1" inputmode="numeric" disabled>
+                        </div>
+                        <div class="field">
+                            <label for="reminder-unit">Unit</label>
+                            <select id="reminder-unit" name="reminder_unit" disabled>
+                                <option value="minutes" selected>Minutes</option>
+                                <option value="hours">Hours</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="rm-note">Fires once, then the rule is done.</p>
+                </div>
+                <div class="rm-panel rm-panel--interval" data-rm-panel="interval">
+                    <div class="two-up">
+                        <div class="field">
+                            <label for="interval-amount">Notify me every</label>
+                            <input type="number" id="interval-amount" name="reminder_amount"
+                                   min="1" step="1" inputmode="numeric" disabled>
+                        </div>
+                        <div class="field">
+                            <label for="interval-unit">Unit</label>
+                            <select id="interval-unit" name="reminder_unit" disabled>
+                                <option value="minutes" selected>Minutes</option>
+                                <option value="hours">Hours</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="rm-note">Missed occurrences are skipped rather than delivered as a catch-up burst. One minute is the shortest interval.</p>
+                </div>
+                <div class="rm-panel rm-panel--at" data-rm-panel="at">
+                    <div class="field">
+                        <label for="reminder-at">Date and time</label>
+                        <input type="datetime-local" id="reminder-at" name="reminder_at"
+                               step="60" aria-describedby="reminder-timezone" disabled>
+                    </div>
+                    <p class="rm-tz" id="reminder-timezone" data-rm-timezone>
+                        Read as a local time in your profile timezone
+                        (<strong data-rm-profile-zone>{{ request.user.profile.timezone|default:'UTC' }}</strong>).
+                    </p>
+                    <p class="rm-note">If a clock change makes that time skip or repeat, Autumn asks for another time instead of guessing which one you meant.</p>
+                </div>
+
+                <figure class="rm-rail" data-rm-rail aria-labelledby="rm-rail-title">
+                    <figcaption class="rm-rail-cap">
+                        <span class="rm-rail-title" id="rm-rail-title">When this fires</span>
+                        <span class="rm-rail-count mono" data-rm-rail-count>No reminders</span>
+                    </figcaption>
+                    <div class="rm-rail-track" data-rm-rail-track>
+                        <span class="rm-rail-now" aria-hidden="true"></span>
+                        <span class="rm-rail-stop" data-rm-rail-stop aria-hidden="true" hidden></span>
+                    </div>
+                    <div class="rm-rail-axis" aria-hidden="true">
+                        <span class="mono" data-rm-rail-now>now</span>
+                        <span class="mono" data-rm-rail-end>open-ended</span>
+                    </div>
+                    <p class="rm-plan" data-rm-rail-plan role="status">No reminders. The timer runs until you stop it.</p>
+                    <p class="rm-warn" data-rm-rail-warning hidden></p>
+                </figure>
+
+                <div class="field rm-message-field">
+                    <label for="reminder-message">Message <span class="muted">(optional)</span></label>
+                    <input type="text" id="reminder-message" name="reminder_message"
+                           maxlength="240" placeholder="Time to check in"
+                           aria-describedby="reminder-message-help">
+                    <p class="rm-note" id="reminder-message-help">Use <span class="mono">{project}</span> and <span class="mono">{elapsed}</span> to include live timer details.</p>
+                </div>
+                <label class="check-row rm-auto-stop">
+                    <input type="checkbox" name="notify_on_auto_stop" value="1">
+                    <span>Notify me when this timer auto-stops</span>
+                </label>
+
+                <div class="rm-perm" data-perm-state="default"
+                     data-perm-status-url="{% url 'push_status' %}">
+                    <div class="rm-perm-row">
+                        <span class="rm-perm-dot" aria-hidden="true"></span>
+                        <p class="rm-perm-text" data-perm-text>
+                            <span class="rm-perm-title">Notifications are not enabled.</span>
+                            <span class="rm-perm-detail">Choose Enable only if you want reminders to reach you when Autumn is not the front tab.</span>
+                        </p>
+                        <button type="button" class="btn btn--quiet rm-perm-action" data-perm-action>Enable notifications</button>
+                        <button type="button" class="btn btn--ghost rm-perm-unsubscribe" data-perm-unsubscribe hidden>Turn off</button>
+                    </div>
+                    <p class="rm-perm-status" data-perm-status role="status" aria-live="polite"></p>
+                </div>
+            </fieldset>
+        </section>
+
+        <div class="form-actions">
+            <a class="btn btn--ghost" href="{% url 'timers' %}">
+                <i class="fas fa-arrow-left" aria-hidden="true"></i> Back
+            </a>
+            <span class="start-summary" data-start-timer-summary>No project selected</span>
+            <button type="submit" id="start-timer" class="btn btn--primary btn--lg btn--spacer" disabled>
+                <span class="hourglass-icon" aria-hidden="true"></span> Start timer
+            </button>
         </div>
-
-        <div class="two-up u-mt-4">
-            <div class="field">
-                <label for="stop-after-amount">Duration</label>
-                <input type="number" id="stop-after-amount" name="stop_after_amount" min="1" step="1" placeholder="No limit">
-            </div>
-            <div class="field">
-                <label for="stop-after-unit">Unit</label>
-                <select id="stop-after-unit" name="stop_after_unit">
-                    <option value="minutes" selected>Minutes</option>
-                    <option value="hours">Hours</option>
-                </select>
-            </div>
-        </div>
-    </section>
-
-    <div class="form-actions">
-        <a class="btn btn--ghost" href="{% url 'timers' %}">
-            <i class="fas fa-arrow-left"></i> Back
-        </a>
-        <span class="start-summary" data-start-timer-summary>No project selected</span>
-        <button type="submit" id="start-timer" class="btn btn--primary btn--lg btn--spacer" disabled>
-            <span class="hourglass-icon"></span> Start timer
-        </button>
     </div>
 </form>
-
 {% endblock %}

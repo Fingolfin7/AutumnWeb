@@ -1,9 +1,11 @@
 """Atomic mutations for session rows."""
 
 from datetime import datetime
+import time
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import OperationalError, transaction
+from django.db.models import F
 
 from core.models import Commitment, Sessions, SessionSubproject
 UNSET = object()
@@ -137,6 +139,8 @@ class SessionMutationService:
         note=UNSET,
         is_active=UNSET,
         allocations=UNSET,
+        notify_on_auto_stop=UNSET,
+        auto_stop=False,
         expected_version=None,
     ):
         """Edit an existing row in place."""
@@ -146,6 +150,7 @@ class SessionMutationService:
         session = queryset.get(pk=session_id)
         if expected_version is not None and (session.version or 1) != expected_version:
             raise StaleVersionError(session)
+        was_active = session.end_time is None
         # is_active is accepted for caller compatibility but ignored: the
         # column was dropped in S12 and the state derives from end_time.
         updates = {
@@ -154,6 +159,7 @@ class SessionMutationService:
             "end_time": _floor_instant(end_time),
             "auto_stop_at": _floor_instant(auto_stop_at),
             "note": note,
+            "notify_on_auto_stop": notify_on_auto_stop,
         }
         for field, value in updates.items():
             if value is not UNSET:
@@ -184,7 +190,73 @@ class SessionMutationService:
             )
 
         _mark_commitments_dirty(session.user_id)
+        if was_active and session.end_time is not None:
+            from core.services.reminders import cancel_timer_reminders, enqueue_auto_stop_event
+
+            cancel_timer_reminders(session, cancelled_at=session.end_time)
+            if auto_stop and session.notify_on_auto_stop:
+                enqueue_auto_stop_event(session, session.end_time)
         return session
+
+    @staticmethod
+    def auto_stop_session(session_id, *, user=None, now=None):
+        """Stop one timer with a portable compare-and-set transition.
+
+        ``select_for_update`` is not a lock on SQLite. Reading the deadline
+        and then saving the row would therefore allow two workers to both
+        report a stop. The conditional update below is the claim: exactly one
+        worker can replace the same active deadline with a completed session.
+        All outbox work remains inside this transaction and is only delivered
+        later by the dispatcher.
+        """
+        from django.utils import timezone
+
+        now = now or timezone.now()
+        if timezone.is_naive(now):
+            now = timezone.make_aware(now)
+        for attempt in range(4):
+            try:
+                with transaction.atomic():
+                    queryset = Sessions.objects.filter(
+                        pk=session_id,
+                        end_time__isnull=True,
+                        auto_stop_at__isnull=False,
+                        auto_stop_at__lte=now,
+                    )
+                    if user is not None:
+                        queryset = queryset.filter(user=user)
+                    stored_deadline = queryset.values_list("auto_stop_at", flat=True).first()
+                    if stored_deadline is None:
+                        return None
+                    deadline = _floor_instant(stored_deadline)
+                    claimed = queryset.filter(auto_stop_at=stored_deadline).update(
+                        end_time=deadline,
+                        auto_stop_at=None,
+                        version=F("version") + 1,
+                    )
+                    if claimed != 1:
+                        return None
+
+                    session = Sessions.objects.select_related("project").get(
+                        pk=session_id
+                    )
+                    _mark_commitments_dirty(session.user_id)
+                    from core.services.reminders import (
+                        cancel_timer_reminders,
+                        enqueue_auto_stop_event,
+                    )
+
+                    cancel_timer_reminders(session, cancelled_at=deadline)
+                    if session.notify_on_auto_stop:
+                        enqueue_auto_stop_event(session, deadline)
+                    return session
+            except OperationalError:
+                if attempt == 3:
+                    raise
+                # SQLite uses a short busy timeout, but a second worker may
+                # still observe a transient table lock while the first worker
+                # commits its outbox update. Retry the CAS after that commit.
+                time.sleep(0.01 * (attempt + 1))
 
     @staticmethod
     @transaction.atomic
@@ -196,6 +268,9 @@ class SessionMutationService:
         session = queryset.get(pk=session_id)
         if expected_version is not None and (session.version or 1) != expected_version:
             raise StaleVersionError(session)
+        from core.services.reminders import cancel_timer_reminders
+
+        cancel_timer_reminders(session)
         deleted_id = session.pk
         user_id = session.user_id
         session.delete()

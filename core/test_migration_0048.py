@@ -7,6 +7,14 @@ class RemoveLegacyAllocationModeMigrationTests(TransactionTestCase):
     migrate_from = ("core", "0047_remove_sessions_core_sessio_user_id_509018_idx_and_more")
     migrate_to = ("core", "0048_remove_sessions_allocation_mode")
 
+    def tearDown(self):
+        # Migration tests share the test database with later
+        # TransactionTestCase classes. Restore every app to its leaf state so
+        # test order cannot leave those classes running against an old schema.
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
     def test_legacy_multilink_is_even_split_and_partitioned_is_untouched(self):
         executor = MigrationExecutor(connection)
         executor.migrate([self.migrate_from])

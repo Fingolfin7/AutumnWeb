@@ -78,6 +78,33 @@ DEFAULT_FILE_STORAGE = STORAGES["default"]["BACKEND"]
 # Defaults to "*" so existing deployments keep working; set it on the PaaS.
 ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["*"])
 
+# Browser Web Push is deliberately optional.  A deployment can run all timer
+# functionality without push credentials; the dispatcher will mark due work
+# unavailable instead of retrying it forever.
+PUSH_VAPID_PUBLIC_KEY = env("PUSH_VAPID_PUBLIC_KEY", default="").strip()
+PUSH_VAPID_PRIVATE_KEY = env("PUSH_VAPID_PRIVATE_KEY", default="").strip()
+PUSH_VAPID_SUBJECT = env("PUSH_VAPID_SUBJECT", default="").strip()
+PUSH_VAPID_CONFIGURED = bool(
+    PUSH_VAPID_PUBLIC_KEY and PUSH_VAPID_PRIVATE_KEY and PUSH_VAPID_SUBJECT
+)
+PUSH_WEBPUSH_TIMEOUT = env.float("PUSH_WEBPUSH_TIMEOUT", default=10.0)
+PUSH_MAX_ATTEMPTS = env.int("PUSH_MAX_ATTEMPTS", default=5)
+PUSH_RETRY_BASE_SECONDS = env.int("PUSH_RETRY_BASE_SECONDS", default=30)
+PUSH_CLAIM_LEASE_SECONDS = env.int("PUSH_CLAIM_LEASE_SECONDS", default=120)
+PUSH_ALLOWED_ENDPOINT_SUFFIXES = tuple(
+    suffix.strip().lower().lstrip(".")
+    for suffix in env.list(
+        "PUSH_ALLOWED_ENDPOINT_SUFFIXES",
+        default=[
+            "fcm.googleapis.com",
+            "push.services.mozilla.com",
+            "notify.windows.com",
+            "push.apple.com",
+        ],
+    )
+    if suffix.strip()
+)
+
 # Single-user install: registration is closed unless explicitly enabled.
 ALLOW_REGISTRATION = env.bool("ALLOW_REGISTRATION", default=False)
 

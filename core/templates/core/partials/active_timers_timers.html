@@ -1,4 +1,4 @@
-{% load time_formats %}
+{% load time_formats tz %}
 {% comment %}
   ============================================================================
   FOCUS DECK — running timers (timers surface)
@@ -57,6 +57,36 @@
         {% if timer.auto_stop_at %}
         <div class="focus-autostop-bar">
             <div class="focus-autostop-fill" data-timer-autostop-fill></div>
+        </div>
+        {% endif %}
+
+        {% if timer.active_reminders or timer.notify_on_auto_stop %}
+        <div class="rm-live" data-reminder-list aria-label="Timer reminders">
+            {% for reminder in timer.active_reminders %}
+            <div class="rm-live-row" data-reminder-row data-reminder-id="{{ reminder.id }}">
+                <div class="rm-live-copy">
+                    <span class="rm-live-mode">
+                        <i class="fas fa-bell" aria-hidden="true"></i>
+                        {% if reminder.mode == 'after' %}Once after{% elif reminder.mode == 'interval' %}Every{% else %}At{% endif %}
+                    </span>
+                    <span class="rm-live-next">Next <span class="mono">{{ reminder.next_fire_at|localtime|date:"M j, H:i" }}</span></span>
+                    {% if reminder.message %}<span class="rm-live-message">{{ reminder.message }}</span>{% endif %}
+                </div>
+                <button type="button" class="btn btn--quiet rm-live-cancel"
+                        data-cancel-reminder
+                        data-cancel-url="{% url 'cancel_timer_reminder' session_id=timer.id reminder_id=reminder.id %}">
+                    <i class="fas fa-times" aria-hidden="true"></i> Cancel
+                </button>
+            </div>
+            {% endfor %}
+            {% if timer.notify_on_auto_stop %}
+            <div class="rm-live-row rm-live-row--auto-stop" data-auto-stop-row>
+                <div class="rm-live-copy">
+                    <span class="rm-live-mode"><i class="fas fa-stopwatch" aria-hidden="true"></i> Auto-stop</span>
+                    <span class="rm-live-next">Notify when this timer stops itself</span>
+                </div>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 

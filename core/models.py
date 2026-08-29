@@ -194,6 +194,7 @@ class Sessions(models.Model):
     start_time = models.DateTimeField(default=timezone.now)
     end_time = models.DateTimeField(null=True, blank=True)
     auto_stop_at = models.DateTimeField(null=True, blank=True)
+    notify_on_auto_stop = models.BooleanField(default=False, db_default=False)
     note = models.TextField(null=True, blank=True)
     version = models.IntegerField(default=1, db_default=1)
 
@@ -330,6 +331,232 @@ class Sessions(models.Model):
     @property
     def crosses_dst_transition(self):
         return self._compute_crosses_dst_transition(self.start_time, self.end_time)
+
+
+class PushSubscription(models.Model):
+    """A browser push subscription owned by one account.
+
+    Endpoints are globally unique because a browser endpoint must never be
+    allowed to receive two users' notifications.  The subscribe endpoint can
+    transfer an existing endpoint to the currently authenticated user.
+    """
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="push_subscriptions"
+    )
+    endpoint = models.URLField(max_length=2048, unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    expiration_time = models.DateTimeField(null=True, blank=True)
+    active = models.BooleanField(default=True, db_default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    disabled_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default="", db_default="")
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        indexes = [
+            models.Index(fields=["user", "active", "id"], name="pushsub_user_active_idx"),
+        ]
+
+
+class TimerReminder(models.Model):
+    """One notification schedule attached to an active timer."""
+
+    MODE_CHOICES = (
+        ("after", "Once after"),
+        ("at", "At"),
+        ("interval", "Every"),
+    )
+
+    session = models.ForeignKey(
+        Sessions, on_delete=models.CASCADE, related_name="reminders"
+    )
+    mode = models.CharField(max_length=16, choices=MODE_CHOICES)
+    next_fire_at = models.DateTimeField(null=True, blank=True)
+    interval_seconds = models.PositiveIntegerField(null=True, blank=True)
+    message = models.TextField(blank=True, default="", db_default="")
+    active = models.BooleanField(default=True, db_default=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    last_fired_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["next_fire_at", "id"]
+        indexes = [
+            models.Index(
+                fields=["active", "next_fire_at", "id"],
+                name="timerrem_due_idx",
+            ),
+            models.Index(fields=["session", "active", "id"], name="timerrem_session_active_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(mode__in=("after", "at", "interval")),
+                name="timerrem_mode_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    (
+                        models.Q(mode="interval")
+                        & models.Q(interval_seconds__isnull=False)
+                        & models.Q(interval_seconds__gt=0)
+                    )
+                    | (
+                        ~models.Q(mode="interval")
+                        & models.Q(interval_seconds__isnull=True)
+                    )
+                ),
+                name="timerrem_interval_seconds_valid",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    ~models.Q(active=True, next_fire_at__isnull=True)
+                ),
+                name="timerrem_active_next_fire_valid",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.mode not in {choice[0] for choice in self.MODE_CHOICES}:
+            raise ValidationError({"mode": "Unknown reminder mode."})
+        if self.active and self.next_fire_at is None:
+            raise ValidationError({"next_fire_at": "Active reminders need a next fire time."})
+        if self.mode == "interval" and (
+            self.interval_seconds is None or self.interval_seconds <= 0
+        ):
+            raise ValidationError(
+                {"interval_seconds": "Interval reminders need a positive interval."}
+            )
+        if self.mode != "interval" and self.interval_seconds is not None:
+            raise ValidationError(
+                {"interval_seconds": "Only interval reminders have an interval."}
+            )
+
+
+class NotificationEvent(models.Model):
+    """A durable, deduplicated notification waiting for delivery."""
+
+    EVENT_TYPES = (
+        ("reminder", "Timer reminder"),
+        ("auto_stop", "Auto-stop"),
+    )
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("delivered", "Delivered"),
+        ("unavailable", "Unavailable"),
+        ("failed", "Failed"),
+        ("cancelled", "Cancelled"),
+    )
+
+    dedupe_key = models.CharField(max_length=255, unique=True)
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notification_events"
+    )
+    session = models.ForeignKey(
+        Sessions,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notification_events",
+    )
+    reminder = models.ForeignKey(
+        TimerReminder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notification_events",
+    )
+    # A callable is valid as the Python default but cannot be serialized into
+    # a database-level default on SQLite/PostgreSQL.
+    payload = models.JSONField(default=dict)
+    scheduled_at = models.DateTimeField()
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    attempts = models.PositiveIntegerField(default=0, db_default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default="", db_default="")
+    last_error_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["scheduled_at", "id"]
+        indexes = [
+            models.Index(fields=["status", "next_attempt_at", "id"], name="notifyevent_due_idx"),
+            models.Index(fields=["user", "scheduled_at", "id"], name="notifyevent_user_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=(
+                        "pending",
+                        "processing",
+                        "delivered",
+                        "unavailable",
+                        "failed",
+                        "cancelled",
+                    )
+                ),
+                name="notifyevent_status_valid",
+            ),
+        ]
+
+
+class NotificationDelivery(models.Model):
+    """Per-event/per-browser delivery state used for retry-safe fan-out."""
+
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("processing", "Processing"),
+        ("delivered", "Delivered"),
+        ("expired", "Expired"),
+        ("unavailable", "Unavailable"),
+        ("failed", "Failed"),
+    )
+
+    event = models.ForeignKey(
+        NotificationEvent, on_delete=models.CASCADE, related_name="deliveries"
+    )
+    subscription = models.ForeignKey(
+        PushSubscription, on_delete=models.CASCADE, related_name="deliveries"
+    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    attempts = models.PositiveIntegerField(default=0, db_default=0)
+    next_attempt_at = models.DateTimeField(null=True, blank=True)
+    lease_until = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(blank=True, default="", db_default="")
+    last_error_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "next_attempt_at", "id"], name="notifydelivery_due_idx"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "subscription"],
+                name="unique_notification_event_subscription",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=(
+                        "pending",
+                        "processing",
+                        "delivered",
+                        "expired",
+                        "unavailable",
+                        "failed",
+                    )
+                ),
+                name="notifydelivery_status_valid",
+            ),
+        ]
 
 
 period_choices = (

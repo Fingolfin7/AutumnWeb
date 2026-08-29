@@ -232,13 +232,15 @@ class DurationLabelTests(TimelineTestCase):
         self.assertEqual(lane["total_label"], "1h 30m")
         self.assertIsNone(lane["live_label"])
 
-    def test_a_lane_with_only_a_running_timer_has_no_completed_total(self):
+    @mock.patch("core.timeline.timezone.now")
+    def test_a_lane_with_only_a_running_timer_has_no_completed_total(self, current_time):
         """A fresh timer must not announce itself as "0m" tracked."""
-        now = timezone.now()
+        now = timezone.make_aware(datetime(2030, 1, 15, 12, 0))
+        current_time.return_value = now
         Sessions.objects.create(
             user=self.user, project=self.atlas, start_time=now - timedelta(minutes=20)
         )
-        lane = build_day_timeline(self.user)["lanes"][0]
+        lane = build_day_timeline(self.user, now.date())["lanes"][0]
         self.assertIsNone(lane["total_label"])
         self.assertEqual(lane["live_label"], "20m")
 

@@ -46,6 +46,61 @@ self.addEventListener("activate", function (event) {
     self.clients.claim();
 });
 
+function notificationUrl(value) {
+    try {
+        var url = new URL(typeof value === "string" ? value : "/timers/", self.location.origin);
+        if (url.origin !== self.location.origin) return new URL("/timers/", self.location.origin).href;
+        if (url.pathname !== "/timers" && !url.pathname.startsWith("/timers/")) return new URL("/timers/", self.location.origin).href;
+        return url.href;
+    } catch (error) {
+        return new URL("/timers/", self.location.origin).href;
+    }
+}
+
+self.addEventListener("push", function (event) {
+    var payload = {};
+    try {
+        payload = event.data ? event.data.json() : {};
+    } catch (error) {
+        try { payload = { body: event.data ? event.data.text() : "" }; } catch (ignored) { payload = {}; }
+    }
+    if (!payload || typeof payload !== "object") payload = {};
+    var kind = payload.kind || payload.event_type || "timer";
+    var identity = payload.reminder_id || payload.session_id || "general";
+    var title = payload.title || "Autumn";
+    var body = payload.body || "Your timer needs your attention.";
+    event.waitUntil(self.registration.showNotification(title, {
+        body: body,
+        tag: "autumn-" + kind + "-" + identity,
+        renotify: false,
+        icon: "/static/core/images/icons/autumn-icon-192.png",
+        badge: "/static/core/images/icons/autumn-icon-192.png",
+        data: { url: notificationUrl(payload.url), kind: kind, session_id: payload.session_id || null }
+    }));
+});
+
+self.addEventListener("notificationclick", function (event) {
+    event.notification.close();
+    var target = notificationUrl(event.notification.data && event.notification.data.url);
+    event.waitUntil(
+        self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+            for (var i = 0; i < clientList.length; i += 1) {
+                var client = clientList[i];
+                if (client.url && new URL(client.url).origin === self.location.origin && "focus" in client) {
+                    if ("navigate" in client && client.url !== target) {
+                        return client.navigate(target).then(function (navigated) {
+                            return navigated && "focus" in navigated ? navigated.focus() : client.focus();
+                        });
+                    }
+                    return client.focus();
+                }
+            }
+            if (self.clients.openWindow) return self.clients.openWindow(target);
+            return undefined;
+        })
+    );
+});
+
 self.addEventListener("fetch", function (event) {
     if (event.request.method !== "GET") {
         return;

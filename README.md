@@ -101,6 +101,29 @@ python manage.py createsuperuser  # For admin access
 
 Access the app at `http://127.0.0.1:8000/`.
 
+### Browser timer reminders
+
+Browser reminders use Web Push and are optional. Configure the deployment with
+the VAPID public key, private key, and a `mailto:` subject:
+
+```text
+PUSH_VAPID_PUBLIC_KEY=<base64url public key>
+PUSH_VAPID_PRIVATE_KEY=<private key secret>
+PUSH_VAPID_SUBJECT=mailto:admin@example.com
+# Optional comma-separated additions/replacements for browser push providers:
+PUSH_ALLOWED_ENDPOINT_SUFFIXES=fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com
+```
+
+Keep the private key server-only; the browser receives only the public key.
+Subscription endpoints are restricted to the configured browser push-provider
+host suffixes so the dispatcher cannot be aimed at arbitrary HTTPS services.
+The timer-page test action queues a fixed notification for the dispatcher and
+does not accept a provider endpoint or make a network request.
+
+Run `python manage.py dispatch_timer_reminders --once` from cron. For local
+testing, use bounded `--loop --max-seconds 30` mode. The command is the only
+dispatcher; the Django web process does not start a scheduler.
+
 ---
 
 ### Tech Stack
