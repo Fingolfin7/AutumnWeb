@@ -1,8 +1,10 @@
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.db import connection
+from django.test import TestCase, TransactionTestCase
 from freezegun import freeze_time
 
 from core.models import NotificationEvent, NotificationPreference, Projects
@@ -71,22 +73,33 @@ class ScheduledNotificationServiceTests(TestCase):
         self.assertFalse(reminder.active)
         self.assertIsNone(reminder.next_fire_at)
 
-    def test_paused_category_advances_without_delivering_stale_one_shot(self):
+    def test_paused_category_preserves_due_one_shot_until_reenabled(self):
         reminder = self.create()
         preference = ensure_notification_preferences(self.user)
         preference.scheduled_reminders_enabled = False
         preference.save(update_fields=["scheduled_reminders_enabled"])
+        due_at = datetime(2026, 1, 5, 17, 30, tzinfo=UTC)
 
-        events = claim_due_scheduled_reminders(
-            now=datetime(2026, 1, 5, 17, 30, tzinfo=UTC)
-        )
+        paused_events = claim_due_scheduled_reminders(now=due_at)
 
-        self.assertEqual(events, [])
+        self.assertEqual(paused_events, [])
         reminder.refresh_from_db()
-        self.assertFalse(reminder.active)
+        self.assertTrue(reminder.active)
+        self.assertEqual(reminder.next_fire_at, due_at)
         self.assertFalse(
             NotificationEvent.objects.filter(scheduled_reminder=reminder).exists()
         )
+
+        preference.scheduled_reminders_enabled = True
+        preference.save(update_fields=["scheduled_reminders_enabled"])
+        resumed_events = claim_due_scheduled_reminders(
+            now=due_at + timedelta(hours=1)
+        )
+
+        self.assertEqual(len(resumed_events), 1)
+        reminder.refresh_from_db()
+        self.assertFalse(reminder.active)
+        self.assertEqual(resumed_events[0].scheduled_at, due_at)
 
     def test_snoozed_daily_occurrence_returns_to_anchor_cadence(self):
         reminder = self.create(cadence="daily")
@@ -218,6 +231,30 @@ class CommitmentAndReviewClaimTests(TestCase):
             datetime(2026, 1, 2, 18, tzinfo=UTC),
         )
 
+    @freeze_time("2026-01-02 00:30:00+00:00")
+    def test_delayed_commitment_check_skips_period_that_already_closed(self):
+        self.create_daily_commitment(self.project)
+        preference = NotificationPreference.objects.create(
+            user=self.user,
+            commitment_checks_enabled=True,
+            commitment_check_time=time(18),
+            next_commitment_check_at=datetime(2026, 1, 1, 18, tzinfo=UTC),
+        )
+
+        events = claim_due_commitment_checks(
+            now=datetime(2026, 1, 2, 0, 30, tzinfo=UTC)
+        )
+
+        self.assertEqual(events, [])
+        self.assertFalse(
+            NotificationEvent.objects.filter(event_type="commitment_check").exists()
+        )
+        preference.refresh_from_db()
+        self.assertEqual(
+            preference.next_commitment_check_at,
+            datetime(2026, 1, 2, 18, tzinfo=UTC),
+        )
+
     @freeze_time("2026-01-01 12:00:00+00:00")
     def test_combined_claimer_gives_each_due_category_a_turn(self):
         self.create_daily_commitment(self.project)
@@ -322,4 +359,87 @@ class CommitmentAndReviewClaimTests(TestCase):
         self.assertEqual(
             NotificationEvent.objects.filter(event_type="weekly_review").count(),
             1,
+        )
+
+
+class ProactiveClaimTransactionScopeTests(TransactionTestCase):
+    """Expensive history work must happen before the short CAS transaction."""
+
+    reset_sequences = True
+
+    def setUp(self):
+        self.user = User.objects.create_user("transaction-user", password="password")
+        self.user.profile.timezone = "UTC"
+        self.user.profile.save(update_fields=["timezone"])
+        self.project = Projects.objects.create(user=self.user, name="Exercise")
+
+    @freeze_time("2026-01-01 18:00:00+00:00")
+    def test_commitment_actionability_runs_outside_claim_transaction(self):
+        commitment = CommitmentEditService.create(
+            self.user,
+            {
+                "aggregation_type": "project",
+                "project": self.project,
+                "commitment_type": "sessions",
+                "period": "daily",
+                "start_date": date(2026, 1, 1),
+                "target": 1,
+                "banking_enabled": False,
+                "max_balance": 0,
+                "min_balance": 0,
+            },
+        )
+        commitment.notifications_enabled = True
+        commitment.save(update_fields=["notifications_enabled"])
+        NotificationPreference.objects.create(
+            user=self.user,
+            commitment_checks_enabled=True,
+            next_commitment_check_at=datetime(2026, 1, 1, 18, tzinfo=UTC),
+        )
+        from core.services import proactive_notifications as proactive
+
+        original = proactive.get_commitment_actionability
+        atomic_states = []
+
+        def observed(*args, **kwargs):
+            atomic_states.append(connection.in_atomic_block)
+            return original(*args, **kwargs)
+
+        with patch.object(
+            proactive, "get_commitment_actionability", side_effect=observed
+        ):
+            events = claim_due_commitment_checks(
+                now=datetime(2026, 1, 1, 18, tzinfo=UTC)
+            )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(atomic_states, [False])
+
+    @freeze_time("2026-01-12 09:00:00+00:00")
+    def test_weekly_summary_runs_outside_claim_transaction(self):
+        preference = NotificationPreference.objects.create(
+            user=self.user,
+            weekly_review_enabled=True,
+            next_weekly_review_at=datetime(2026, 1, 12, 9, tzinfo=UTC),
+        )
+        from core.services import proactive_notifications as proactive
+
+        original = proactive.weekly_review_summary
+        atomic_states = []
+
+        def observed(*args, **kwargs):
+            atomic_states.append(connection.in_atomic_block)
+            return original(*args, **kwargs)
+
+        with patch.object(proactive, "weekly_review_summary", side_effect=observed):
+            events = claim_due_weekly_reviews(
+                now=datetime(2026, 1, 12, 9, tzinfo=UTC)
+            )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(atomic_states, [False])
+        preference.refresh_from_db()
+        self.assertEqual(
+            preference.next_weekly_review_at,
+            datetime(2026, 1, 19, 9, tzinfo=UTC),
         )

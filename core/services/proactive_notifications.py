@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import OperationalError, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.urls import reverse
 from django.utils import timezone
 
@@ -470,6 +470,14 @@ def _claim_one_scheduled_reminder(reminder_id, now):
         old_next = _canonical_instant(reminder.next_fire_at)
         if old_next > now:
             return None
+        preference = NotificationPreference.objects.filter(
+            user_id=reminder.user_id
+        ).only("scheduled_reminders_enabled").first()
+        if preference is not None and not preference.scheduled_reminders_enabled:
+            # Pausing a category pauses its schedules too.  In particular, do
+            # not consume a one-shot occurrence while delivery is disabled;
+            # it remains visible and due when the user re-enables the category.
+            return None
         next_fire = _next_reminder_slot(reminder, now)
         active = next_fire is not None
         claimed = ScheduledReminder.objects.filter(
@@ -485,9 +493,6 @@ def _claim_one_scheduled_reminder(reminder_id, now):
             version=F("version") + 1,
         )
         if not claimed:
-            return None
-        preference = NotificationPreference.objects.filter(user_id=reminder.user_id).first()
-        if preference is not None and not preference.scheduled_reminders_enabled:
             return None
         dedupe_key = f"scheduled:{reminder.pk}:{old_next.isoformat()}"
         event, created = NotificationEvent.objects.get_or_create(
@@ -510,7 +515,11 @@ def claim_due_scheduled_reminders(*, now=None, limit=100):
         return []
     candidate_ids = (
         ScheduledReminder.objects.filter(
-            active=True, next_fire_at__isnull=False, next_fire_at__lte=now
+            Q(user__notification_preferences__isnull=True)
+            | Q(user__notification_preferences__scheduled_reminders_enabled=True),
+            active=True,
+            next_fire_at__isnull=False,
+            next_fire_at__lte=now,
         )
         .order_by("next_fire_at", "pk")
         .values_list("pk", flat=True)
@@ -608,66 +617,87 @@ def _commitment_event(commitment, occurrence, actionability, profile_zone):
 def _claim_one_commitment_preference(preference_id, now, event_limit):
     if event_limit <= 0:
         return []
-    with transaction.atomic():
-        preference = (
-            NotificationPreference.objects.select_for_update()
-            .select_related("user__profile")
-            .filter(pk=preference_id)
-            .first()
-        )
-        if (
-            preference is None
-            or not preference.commitment_checks_enabled
-            or preference.next_commitment_check_at is None
-            or preference.next_commitment_check_at > now
-        ):
-            return []
-        old_next = preference.next_commitment_check_at
-        zone = user_timezone(preference.user)
-        occurrence = _latest_daily_slot(preference.commitment_check_time, zone, now)
-        next_slot = _next_daily_slot(preference.commitment_check_time, zone, now)
-        events = []
-        commitments = Commitment.objects.filter(
-            user_id=preference.user_id,
-            active=True,
-            notifications_enabled=True,
-        ).select_related(
-            "project", "subproject__parent_project", "context", "tag"
-        ).order_by("pk")
-        occurrence_fully_handled = True
-        with timezone.override(zone):
-            for commitment in commitments:
-                actionability = get_commitment_actionability(commitment, occurrence)
-                if not actionability["actionable"]:
-                    continue
+    preference = (
+        NotificationPreference.objects.select_related("user__profile")
+        .filter(pk=preference_id)
+        .first()
+    )
+    if (
+        preference is None
+        or not preference.commitment_checks_enabled
+        or preference.next_commitment_check_at is None
+        or preference.next_commitment_check_at > now
+    ):
+        return []
 
-                dedupe_key = _commitment_dedupe_key(
-                    commitment, actionability["evaluation"]
-                )
-                if NotificationEvent.objects.filter(dedupe_key=dedupe_key).exists():
-                    continue
-                if len(events) >= event_limit:
-                    # Leave this preference on the same occurrence.  A later
-                    # bounded pass resumes it and dedupe keys skip the events
-                    # already materialized above.
-                    occurrence_fully_handled = False
-                    continue
-                event, created = _commitment_event(
-                    commitment, occurrence, actionability, zone
-                )
-                if created:
-                    events.append(event)
+    old_next = preference.next_commitment_check_at
+    zone = user_timezone(preference.user)
+    occurrence = _latest_daily_slot(preference.commitment_check_time, zone, now)
+    next_slot = _next_daily_slot(preference.commitment_check_time, zone, now)
 
-        if occurrence_fully_handled:
-            NotificationPreference.objects.filter(
-                pk=preference.pk,
-                commitment_checks_enabled=True,
-                next_commitment_check_at=old_next,
-                version=preference.version,
-            ).update(
-                next_commitment_check_at=next_slot,
-                version=F("version") + 1,
+    # Reconciliation and actionability evaluation can scan and materialize a
+    # user's commitment history.  Keep that work outside the short preference
+    # claim transaction so the dispatcher does not hold a row lock throughout.
+    candidates = []
+    commitments = Commitment.objects.filter(
+        user_id=preference.user_id,
+        active=True,
+        notifications_enabled=True,
+    ).select_related(
+        "project", "subproject__parent_project", "context", "tag"
+    ).order_by("pk")
+    with timezone.override(zone):
+        for commitment in commitments:
+            actionability = get_commitment_actionability(commitment, occurrence)
+            if not actionability["actionable"]:
+                continue
+            # A delayed dispatcher must not revive a warning for a period that
+            # has closed since its configured local check slot.
+            if _canonical_instant(actionability["deadline"]) <= now:
+                continue
+            candidates.append(
+                (
+                    commitment,
+                    actionability,
+                    _commitment_dedupe_key(
+                        commitment, actionability["evaluation"]
+                    ),
+                )
             )
+
+    with transaction.atomic():
+        candidate_keys = [dedupe_key for _, _, dedupe_key in candidates]
+        existing_keys = set(
+            NotificationEvent.objects.filter(
+                dedupe_key__in=candidate_keys
+            ).values_list("dedupe_key", flat=True)
+        )
+        missing = [
+            candidate for candidate in candidates if candidate[2] not in existing_keys
+        ]
+        selected = missing[:event_limit]
+        occurrence_fully_handled = len(missing) <= event_limit
+        claimed = NotificationPreference.objects.filter(
+            pk=preference.pk,
+            commitment_checks_enabled=True,
+            next_commitment_check_at=old_next,
+            version=preference.version,
+        ).update(
+            next_commitment_check_at=(
+                next_slot if occurrence_fully_handled else old_next
+            ),
+            version=F("version") + 1,
+        )
+        if not claimed:
+            return []
+
+        events = []
+        for commitment, actionability, _ in selected:
+            event, created = _commitment_event(
+                commitment, occurrence, actionability, zone
+            )
+            if created:
+                events.append(event)
         return events
 
 
@@ -772,36 +802,38 @@ def _weekly_review_event(preference, occurrence, summary):
 
 
 def _claim_one_weekly_preference(preference_id, now):
+    preference = (
+        NotificationPreference.objects.select_related("user__profile")
+        .filter(pk=preference_id)
+        .first()
+    )
+    if (
+        preference is None
+        or not preference.weekly_review_enabled
+        or preference.next_weekly_review_at is None
+        or preference.next_weekly_review_at > now
+    ):
+        return []
+    old_next = preference.next_weekly_review_at
+    zone = user_timezone(preference.user)
+    occurrence = _latest_weekly_slot(
+        preference.weekly_review_weekday,
+        preference.weekly_review_time,
+        zone,
+        now,
+    )
+    next_slot = _next_weekly_slot(
+        preference.weekly_review_weekday,
+        preference.weekly_review_time,
+        zone,
+        now,
+    )
+
+    # Session aggregation and commitment reconciliation are intentionally
+    # outside the claim transaction.  A versioned compare-and-set below makes
+    # the computed snapshot disposable if settings changed concurrently.
+    summary = weekly_review_summary(preference, occurrence)
     with transaction.atomic():
-        preference = (
-            NotificationPreference.objects.select_for_update()
-            .select_related("user__profile")
-            .filter(pk=preference_id)
-            .first()
-        )
-        if (
-            preference is None
-            or not preference.weekly_review_enabled
-            or preference.next_weekly_review_at is None
-            or preference.next_weekly_review_at > now
-        ):
-            return []
-        old_next = preference.next_weekly_review_at
-        zone = user_timezone(preference.user)
-        occurrence = _latest_weekly_slot(
-            preference.weekly_review_weekday,
-            preference.weekly_review_time,
-            zone,
-            now,
-        )
-        next_slot = _next_weekly_slot(
-            preference.weekly_review_weekday,
-            preference.weekly_review_time,
-            zone,
-            now,
-        )
-        summary = weekly_review_summary(preference, occurrence)
-        event, created = _weekly_review_event(preference, occurrence, summary)
         claimed = NotificationPreference.objects.filter(
             pk=preference.pk,
             weekly_review_enabled=True,
@@ -810,6 +842,7 @@ def _claim_one_weekly_preference(preference_id, now):
         ).update(next_weekly_review_at=next_slot, version=F("version") + 1)
         if not claimed:
             return []
+        event, created = _weekly_review_event(preference, occurrence, summary)
         return [event] if created else []
 
 
