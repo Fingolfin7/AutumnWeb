@@ -564,12 +564,26 @@ class ScheduledReminder(models.Model):
     project = models.ForeignKey(
         Projects,
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="scheduled_reminders",
     )
-    subproject = models.ForeignKey(
-        SubProjects,
-        on_delete=models.SET_NULL,
+    context = models.ForeignKey(
+        Context,
+        on_delete=models.CASCADE,
         null=True,
+        blank=True,
+        related_name="scheduled_reminders",
+    )
+    tag = models.ForeignKey(
+        Tag,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="scheduled_reminders",
+    )
+    subprojects = models.ManyToManyField(
+        SubProjects,
         blank=True,
         related_name="scheduled_reminders",
     )
@@ -616,10 +630,43 @@ class ScheduledReminder(models.Model):
                 condition=models.Q(version__gte=1),
                 name="schedrem_version_positive",
             ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        project__isnull=False, context__isnull=True, tag__isnull=True
+                    )
+                    | models.Q(
+                        project__isnull=True, context__isnull=False, tag__isnull=True
+                    )
+                    | models.Q(
+                        project__isnull=True, context__isnull=True, tag__isnull=False
+                    )
+                ),
+                name="schedrem_target_exactly_one",
+            ),
         ]
 
+    # Ordered so ``target_name`` and validation always agree on which single
+    # relation carries the schedule's meaning.
+    TARGET_FIELDS = ("project", "context", "tag")
+
+    @property
+    def target(self):
+        """The single project, context, or tag this schedule points at."""
+
+        for field_name in self.TARGET_FIELDS:
+            if getattr(self, f"{field_name}_id"):
+                return getattr(self, field_name)
+        return None
+
+    @property
+    def target_name(self):
+        """The human label of whichever single target this schedule holds."""
+
+        return getattr(self.target, "name", None) or "Reminder"
+
     def __str__(self):
-        return f"{self.project.name} reminder ({self.cadence})"
+        return f"{self.target_name} reminder ({self.cadence})"
 
     def clean(self):
         super().clean()
@@ -628,17 +675,23 @@ class ScheduledReminder(models.Model):
         if self.cadence not in {choice[0] for choice in self.CADENCE_CHOICES}:
             errors["cadence"] = "Unknown reminder cadence."
 
-        if self.user_id and self.project_id:
-            if self.project.user_id != self.user_id:
-                errors["project"] = "Reminder project must belong to the same user."
-            if self.project.status not in {"active", "paused"}:
-                errors["project"] = "Reminders can only target active or paused projects."
+        chosen = [
+            field_name
+            for field_name in self.TARGET_FIELDS
+            if getattr(self, f"{field_name}_id")
+        ]
+        if len(chosen) != 1:
+            errors["project"] = "Choose a project, context, or tag."
 
-        if self.subproject_id:
-            if self.user_id and self.subproject.user_id != self.user_id:
-                errors["subproject"] = "Reminder subproject must belong to the same user."
-            if self.project_id and self.subproject.parent_project_id != self.project_id:
-                errors["subproject"] = "Reminder subproject must belong to the selected project."
+        if self.user_id:
+            for field_name in chosen:
+                if getattr(self, field_name).user_id != self.user_id:
+                    errors[field_name] = (
+                        f"Reminder {field_name} must belong to the same user."
+                    )
+
+        if self.project_id and self.project.status not in {"active", "paused"}:
+            errors["project"] = "Reminders can only target active or paused projects."
 
         if self.timezone:
             try:

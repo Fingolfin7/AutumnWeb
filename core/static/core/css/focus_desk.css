@@ -1321,10 +1321,22 @@ body.bg-active .dim-control { display: flex; }
 .nx-schedule-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s4); }
 .nx-schedule-fields .field { margin-bottom: 0; }
 .nx-perm { margin-top: var(--s2); }
-.nx-schedule-editor { margin-bottom: var(--s5); }
+/* The editor sits beside the schedule list; at half width two form columns
+   read better than six squeezed tracks, and action rows may need to wrap. */
+.nx-columns .nx-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.nx-columns .nx-form-grid .field { grid-column: span 1; }
+.nx-columns .nx-form-grid .nx-message-field,
+.nx-columns .nx-form-grid .nx-subprojects-field { grid-column: span 2; }
+.nx-columns .nx-schedule-row { flex-wrap: wrap; }
 .nx-form-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--s3); }
 .nx-form-grid .field { grid-column: span 2; margin-bottom: 0; }
 .nx-form-grid .nx-message-field { grid-column: span 4; }
+.nx-form-grid .nx-subprojects-field { grid-column: span 6; }
+/* Option labels wrap their own checkbox; they take the picker's chip
+   treatment (shared rules below) rather than the .fields eyebrow one. */
+.nx-subproject-options { display: flex; flex-wrap: wrap; gap: .3rem; }
+.nx-subproject-options > div { display: contents; }
+.nx-target-kind { font-size: var(--fs-xs); letter-spacing: .04em; text-transform: uppercase; }
 .nx-timezone-note { margin: var(--s3) 0 0; }
 .nx-schedule-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); }
 .nx-schedule-copy { min-width: 0; }
@@ -1369,7 +1381,7 @@ body.bg-active .dim-control { display: flex; }
 @media (max-width: 700px) {
   .nx-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nx-form-grid .field, .nx-form-grid .nx-message-field { grid-column: span 1; }
-  .nx-form-grid .nx-message-field { grid-column: span 2; }
+  .nx-form-grid .nx-message-field, .nx-form-grid .nx-subprojects-field { grid-column: span 2; }
   .nx-schedule-row { align-items: flex-start; flex-direction: column; }
   .nx-row-actions { justify-content: flex-start; }
 }
@@ -2030,7 +2042,8 @@ img.brand-mark {
    hit target. The box stays visible on purpose: the checked tint below leans
    on :has(), and where that is missing the state must still read. */
 .picker .option-chip,
-.fields .picker .option-chip {
+.fields .picker .option-chip,
+.fields .nx-subproject-options label {
   display: inline-flex; align-items: center; gap: .4rem;
   max-width: 100%; margin: 0;
   padding: .3rem .6rem .3rem .45rem;
@@ -2041,14 +2054,19 @@ img.brand-mark {
   cursor: pointer;
   transition: background .14s var(--ease), color .14s var(--ease);
 }
-.picker .option-chip[hidden] { display: none; }
-.picker .option-chip:hover { background: var(--raised-2); color: var(--ink); }
-.picker .option-chip:focus-within { box-shadow: var(--focus-ring); }
-.picker .option-chip:has(input:checked) {
+.picker .option-chip[hidden],
+.fields .nx-subproject-options label[hidden] { display: none; }
+.picker .option-chip:hover,
+.fields .nx-subproject-options label:hover { background: var(--raised-2); color: var(--ink); }
+.picker .option-chip:focus-within,
+.fields .nx-subproject-options label:focus-within { box-shadow: var(--focus-ring); }
+.picker .option-chip:has(input:checked),
+.fields .nx-subproject-options label:has(input:checked) {
   background: var(--raised-2); color: var(--ink);
   box-shadow: inset 0 0 0 1px var(--brand-deep);
 }
-.picker .option-chip input[type="checkbox"] { flex: 0 0 auto; }
+.picker .option-chip input[type="checkbox"],
+.nx-subproject-options input[type="checkbox"] { flex: 0 0 auto; }
 .option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .picker-empty {

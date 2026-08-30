@@ -2,7 +2,7 @@ from datetime import date, datetime, time, timezone as dt_timezone
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils import timezone
 
@@ -14,6 +14,7 @@ from core.models import (
     Projects,
     ScheduledReminder,
     SubProjects,
+    Tag,
 )
 
 
@@ -81,16 +82,107 @@ class ProactiveNotificationModelTests(TestCase):
             naive_claim.full_clean()
 
     def test_scheduled_reminder_defaults_and_related_names(self):
-        reminder = self.reminder(subproject=self.subproject, cadence="weekly")
+        reminder = self.reminder(cadence="weekly")
+        reminder.subprojects.add(self.subproject)
 
         self.assertTrue(reminder.active)
         self.assertEqual(reminder.timezone, "Europe/Prague")
         self.assertEqual(reminder.version, 1)
+        self.assertEqual(reminder.target_name, "Focused work")
         self.assertEqual(list(self.user.scheduled_reminders.all()), [reminder])
         self.assertEqual(list(self.project.scheduled_reminders.all()), [reminder])
         self.assertEqual(list(self.subproject.scheduled_reminders.all()), [reminder])
 
-    def test_scheduled_reminder_clean_enforces_ownership_eligibility_and_subproject_scope(self):
+    def test_scheduled_reminder_target_is_exactly_one_of_project_context_or_tag(self):
+        context = Context.objects.create(user=self.user, name="Exercise")
+        tag = Tag.objects.create(user=self.user, name="Deep work")
+
+        for extra in ({"context": context}, {"tag": tag}):
+            two_targets = ScheduledReminder(
+                user=self.user,
+                project=self.project,
+                cadence="once",
+                timezone="Europe/Prague",
+                anchor_date=date(2026, 8, 30),
+                anchor_time=time(18, 30),
+                next_fire_at=self.fire_at,
+                **extra,
+            )
+            with self.assertRaises(ValidationError):
+                two_targets.full_clean()
+            with self.assertRaises(IntegrityError):
+                with transaction.atomic():
+                    two_targets.save()
+
+        no_target = ScheduledReminder(
+            user=self.user,
+            cadence="once",
+            timezone="Europe/Prague",
+            anchor_date=date(2026, 8, 30),
+            anchor_time=time(18, 30),
+            next_fire_at=self.fire_at,
+        )
+        with self.assertRaises(ValidationError):
+            no_target.full_clean()
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                no_target.save()
+
+        by_context = self.reminder(project=None, context=context)
+        by_context.full_clean()
+        self.assertEqual(by_context.target_name, "Exercise")
+        self.assertIn("Exercise", str(by_context))
+        self.assertEqual(list(context.scheduled_reminders.all()), [by_context])
+
+        by_tag = self.reminder(project=None, tag=tag)
+        by_tag.full_clean()
+        self.assertEqual(by_tag.target_name, "Deep work")
+        self.assertEqual(list(tag.scheduled_reminders.all()), [by_tag])
+
+        foreign_context = ScheduledReminder(
+            user=self.user,
+            context=Context.objects.create(user=self.other, name="Theirs"),
+            cadence="once",
+            timezone="Europe/Prague",
+            anchor_date=date(2026, 8, 30),
+            anchor_time=time(18, 30),
+            next_fire_at=self.fire_at,
+        )
+        with self.assertRaises(ValidationError):
+            foreign_context.full_clean()
+
+        foreign_tag = ScheduledReminder(
+            user=self.user,
+            tag=Tag.objects.create(user=self.other, name="Theirs"),
+            cadence="once",
+            timezone="Europe/Prague",
+            anchor_date=date(2026, 8, 30),
+            anchor_time=time(18, 30),
+            next_fire_at=self.fire_at,
+        )
+        with self.assertRaises(ValidationError):
+            foreign_tag.full_clean()
+
+    def test_context_target_delete_cascades_reminder_and_cancels_pending_events(self):
+        context = Context.objects.create(user=self.user, name="Exercise")
+        reminder = self.reminder(project=None, context=context)
+        event = NotificationEvent.objects.create(
+            dedupe_key="scheduled-before-context-delete",
+            event_type="scheduled_reminder",
+            user=self.user,
+            scheduled_reminder=reminder,
+            payload={"title": "Scheduled"},
+            scheduled_at=self.fire_at,
+        )
+
+        context.delete()
+
+        self.assertFalse(ScheduledReminder.objects.filter(pk=reminder.pk).exists())
+        event.refresh_from_db()
+        self.assertEqual(event.status, "cancelled")
+        self.assertIsNone(event.scheduled_reminder_id)
+
+    def test_scheduled_reminder_clean_enforces_ownership_and_project_eligibility(self):
         wrong_owner = ScheduledReminder(
             user=self.user,
             project=self.other_project,
@@ -127,24 +219,6 @@ class ProactiveNotificationModelTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             archived_reminder.full_clean()
-
-        foreign_subproject = SubProjects.objects.create(
-            user=self.other,
-            name="Foreign",
-            parent_project=self.other_project,
-        )
-        wrong_subproject = ScheduledReminder(
-            user=self.user,
-            project=self.project,
-            subproject=foreign_subproject,
-            cadence="once",
-            timezone="Europe/Prague",
-            anchor_date=date(2026, 8, 30),
-            anchor_time=time(18, 30),
-            next_fire_at=self.fire_at,
-        )
-        with self.assertRaises(ValidationError):
-            wrong_subproject.full_clean()
 
     def test_scheduled_reminder_clean_enforces_cadence_timezone_state_and_aware_instants(self):
         invalid_cadence = ScheduledReminder(

@@ -44,7 +44,7 @@ def _notification_context(request, *, schedule_form=None, preference_form=None, 
     preference = ensure_notification_preferences(request.user)
     schedules = list(ScheduledReminder.objects.filter(
         user=request.user, active=True
-    ).select_related("project", "subproject"))
+    ).select_related("project", "context", "tag").prefetch_related("subprojects"))
     horizon = timezone.now() + timedelta(days=7)
     return {
         "title": "How Autumn interrupts you",
@@ -69,7 +69,7 @@ def notifications(request):
     preference = ensure_notification_preferences(request.user)
     action = request.POST.get("action", "") if request.method == "POST" else ""
     if not action:
-        if request.method == "POST" and "project" in request.POST:
+        if request.method == "POST" and "local_date" in request.POST:
             action = "create_schedule"
         elif request.method == "POST":
             action = "save_preferences"
@@ -100,8 +100,10 @@ def notifications(request):
             try:
                 create_scheduled_reminder(
                     user=request.user,
-                    project=form.cleaned_data["project"],
-                    subproject=form.cleaned_data.get("subproject"),
+                    project=form.cleaned_data.get("project"),
+                    context=form.cleaned_data.get("context"),
+                    tag=form.cleaned_data.get("tag"),
+                    subprojects=form.cleaned_data.get("subprojects"),
                     local_date=form.cleaned_data["local_date"],
                     local_time=form.cleaned_data["local_time"],
                     cadence=form.cleaned_data["cadence"],
@@ -124,7 +126,9 @@ def notifications(request):
 @login_required
 def edit_scheduled_reminder(request, reminder_id):
     reminder = get_object_or_404(
-        ScheduledReminder.objects.select_related("project", "subproject"),
+        ScheduledReminder.objects.select_related(
+            "project", "context", "tag"
+        ).prefetch_related("subprojects"),
         pk=reminder_id,
         user=request.user,
         active=True,
@@ -137,8 +141,10 @@ def edit_scheduled_reminder(request, reminder_id):
                     user=request.user,
                     reminder_id=reminder.pk,
                     version=form.cleaned_data.get("version"),
-                    project=form.cleaned_data["project"],
-                    subproject=form.cleaned_data.get("subproject"),
+                    project=form.cleaned_data.get("project"),
+                    context=form.cleaned_data.get("context"),
+                    tag=form.cleaned_data.get("tag"),
+                    subprojects=form.cleaned_data.get("subprojects"),
                     local_date=form.cleaned_data["local_date"],
                     local_time=form.cleaned_data["local_time"],
                     cadence=form.cleaned_data["cadence"],

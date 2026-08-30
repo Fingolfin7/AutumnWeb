@@ -916,12 +916,60 @@ class NotificationPreferenceForm(forms.ModelForm):
         return obj
 
 
-class ScheduledReminderForm(forms.Form):
-    """Owned project schedule fields; local date/time are profile-local."""
+class SubprojectCheckboxSelect(forms.CheckboxSelectMultiple):
+    """Checkboxes that carry their parent project id for client-side filtering."""
 
-    project = forms.ModelChoiceField(queryset=Projects.objects.none(), label="Project")
-    subproject = forms.ModelChoiceField(
-        queryset=SubProjects.objects.none(), required=False, label="Subproject (optional)"
+    def create_option(self, name, value, *args, **kwargs):
+        option = super().create_option(name, value, *args, **kwargs)
+        instance = getattr(value, "instance", None)
+        if instance is not None:
+            option["attrs"]["data-parent"] = str(instance.parent_project_id)
+        return option
+
+
+class ScheduledReminderForm(forms.Form):
+    """Owned schedule fields; local date/time are profile-local.
+
+    A schedule targets exactly one of a project (optionally narrowed to some of
+    its subprojects), a context, or a tag.
+    """
+
+    target = forms.ChoiceField(
+        choices=(
+            ("project", "A project"),
+            ("context", "A context"),
+            ("tag", "A tag"),
+        ),
+        initial="project",
+        label="Remind me about",
+        widget=forms.Select(attrs={"data-schedule-target": ""}),
+    )
+    project = forms.ModelChoiceField(
+        queryset=Projects.objects.none(),
+        required=False,
+        label="Project",
+        widget=forms.Select(attrs={"data-schedule-project": ""}),
+    )
+    context = forms.ModelChoiceField(
+        queryset=Context.objects.none(),
+        required=False,
+        label="Context",
+        widget=forms.Select(attrs={"data-schedule-context": ""}),
+    )
+    tag = forms.ModelChoiceField(
+        queryset=Tag.objects.none(),
+        required=False,
+        label="Tag",
+        widget=forms.Select(attrs={"data-schedule-tag": ""}),
+    )
+    subprojects = forms.ModelMultipleChoiceField(
+        queryset=SubProjects.objects.none(),
+        required=False,
+        label="Subprojects (optional)",
+        widget=SubprojectCheckboxSelect(attrs={
+            "class": "nx-subproject-options",
+            "data-schedule-subprojects": "",
+        }),
     )
     local_date = forms.DateField(
         label="Date", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
@@ -946,14 +994,37 @@ class ScheduledReminderForm(forms.Form):
             self.fields["project"].queryset = Projects.objects.filter(user=self.user).exclude(
                 status__in=["archived", "complete"]
             ).order_by("name")
-            self.fields["subproject"].queryset = SubProjects.objects.filter(
+            # Context/Tag __str__ carries the owner's username; these pickers
+            # only ever show one account's rows, so label by name alone.
+            self.fields["context"].queryset = Context.objects.filter(
                 user=self.user
-            ).select_related("parent_project").order_by("name")
-            self.fields["subproject"].label_from_instance = lambda obj: f"{obj.name} ({obj.parent_project.name})"
+            ).order_by("name")
+            self.fields["context"].label_from_instance = lambda obj: obj.name
+            self.fields["tag"].queryset = Tag.objects.filter(
+                user=self.user
+            ).order_by("name")
+            self.fields["tag"].label_from_instance = lambda obj: obj.name
+            self.fields["subprojects"].queryset = SubProjects.objects.filter(
+                user=self.user
+            ).exclude(
+                parent_project__status__in=["archived", "complete"]
+            ).select_related("parent_project").order_by("parent_project__name", "name")
+            self.fields["subprojects"].label_from_instance = (
+                lambda obj: f"{obj.name} ({obj.parent_project.name})"
+            )
         if self.instance is not None and not self.is_bound:
             self.initial.update({
+                "target": (
+                    "context" if self.instance.context_id
+                    else "tag" if self.instance.tag_id
+                    else "project"
+                ),
                 "project": self.instance.project_id,
-                "subproject": self.instance.subproject_id,
+                "context": self.instance.context_id,
+                "tag": self.instance.tag_id,
+                "subprojects": list(
+                    self.instance.subprojects.values_list("pk", flat=True)
+                ),
                 "local_date": self.instance.anchor_date,
                 "local_time": self.instance.anchor_time,
                 "cadence": self.instance.cadence,
@@ -963,8 +1034,24 @@ class ScheduledReminderForm(forms.Form):
 
     def clean(self):
         cleaned = super().clean()
+        target = cleaned.get("target")
+        if target in {"context", "tag"}:
+            if cleaned.get(target) is None:
+                self.add_error(target, f"Choose a {target}.")
+            # A context or tag already names its own scope; drop the project
+            # fields so the service never sees two targets.
+            for unused in {"project", "context", "tag"} - {target}:
+                cleaned[unused] = None
+            cleaned["subprojects"] = self.fields["subprojects"].queryset.none()
+            return cleaned
+
+        cleaned["context"] = None
+        cleaned["tag"] = None
         project = cleaned.get("project")
-        subproject = cleaned.get("subproject")
-        if subproject is not None and project is not None and subproject.parent_project_id != project.pk:
-            self.add_error("subproject", "Choose a subproject from the selected project.")
+        if project is None:
+            self.add_error("project", "Choose a project.")
+            return cleaned
+        subprojects = cleaned.get("subprojects") or []
+        if any(item.parent_project_id != project.pk for item in subprojects):
+            self.add_error("subprojects", "Choose subprojects from the selected project.")
         return cleaned

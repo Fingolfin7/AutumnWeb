@@ -7,7 +7,7 @@
     <div>
         <p class="page-eyebrow">Scheduled reminder</p>
         <h1 class="page-title">{{ title }}</h1>
-        <p class="nx-lede"><strong>{{ reminder.project.name }}</strong>{% if reminder.subproject %} · {{ reminder.subproject.name }}{% endif %} · <span class="mono">{{ reminder.anchor_time|time:"H:i" }}</span></p>
+        <p class="nx-lede"><strong>{{ reminder.target_name }}</strong>{% if reminder.context_id %} <span class="muted nx-target-kind">context</span>{% elif reminder.tag_id %} <span class="muted nx-target-kind">tag</span>{% endif %}{% for sub in reminder.subprojects.all %} · {{ sub.name }}{% endfor %} · <span class="mono">{{ reminder.anchor_time|time:"H:i" }}</span></p>
     </div>
 </div>
 

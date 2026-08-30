@@ -13,7 +13,10 @@ $(document).ready(function() {
     // A notification can hand us owned ids via the GET page.  They are only
     // used to seed the existing picker; the POST still submits the same names
     // and the server remains the authority for ownership.
-    let initialSubprojectId = String($('[data-reminder-form]').attr('data-initial-subproject-id') || '');
+    let initialSubprojectIds = String($('[data-reminder-form]').attr('data-initial-subproject-ids') || '')
+        .split(',')
+        .map(function (value) { return value.trim(); })
+        .filter(function (value) { return value !== ''; });
     const stopAfterPresets = {
         minutes: [
             {value: '15', label: '15m'},
@@ -249,9 +252,9 @@ $(document).ready(function() {
                     );
                 });
                 $('#subproject_options').empty().append(...options);
-                if (initialSubprojectId !== '') {
-                    $('#subproject_options input[data-subproject-id="' + initialSubprojectId + '"]').prop('checked', true);
-                }
+                initialSubprojectIds.forEach(function (id) {
+                    $('#subproject_options input[data-subproject-id="' + id + '"]').prop('checked', true);
+                });
             },
             error: function() {
                 lastLoadedProject = '';

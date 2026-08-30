@@ -17,7 +17,7 @@
 
 <form method="post" class="fields desk" data-reminder-form
       data-initial-project-id="{% if initial_project %}{{ initial_project.id }}{% endif %}"
-      data-initial-subproject-id="{% if initial_subproject %}{{ initial_subproject.id }}{% endif %}"
+      data-initial-subproject-ids="{% for sub in initial_subprojects %}{{ sub.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
       data-profile-timezone="{{ request.user.profile.timezone|default:'UTC' }}"
       data-push-status-url="{% url 'push_status' %}"
       data-push-subscribe-url="{% url 'push_subscribe' %}"

@@ -23,11 +23,13 @@ from django.utils import timezone
 from core.commitments import get_commitment_actionability, weekly_commitment_score
 from core.models import (
     Commitment,
+    Context,
     NotificationEvent,
     NotificationPreference,
     Projects,
     ScheduledReminder,
     SubProjects,
+    Tag,
 )
 from core.services.reporting import summarize_completed_sessions
 from core.services.push import validate_notification_payload
@@ -202,32 +204,80 @@ def reschedule_notification_preferences(preference, *, now=None):
     return preference
 
 
+def _resolve_reminder_target(user, project, context, tag, subprojects):
+    """Resolve the single owned target and its owned subproject selection.
+
+    Exactly one of ``project``/``context``/``tag`` may be given.  Only a
+    project target has subprojects, so a selection submitted alongside a
+    context or tag is dropped rather than attached to the wrong scope.
+    """
+
+    targets = {
+        "project": getattr(project, "pk", project),
+        "context": getattr(context, "pk", context),
+        "tag": getattr(tag, "pk", tag),
+    }
+    chosen = [name for name, value in targets.items() if value]
+    if len(chosen) != 1:
+        raise ValidationError({"project": "Choose a project, context, or tag."})
+
+    if chosen[0] == "context":
+        context = Context.objects.filter(pk=targets["context"], user=user).first()
+        if context is None:
+            raise ValidationError(
+                {"context": "Context does not belong to this account."}
+            )
+        return {"context": context}, []
+
+    if chosen[0] == "tag":
+        tag = Tag.objects.filter(pk=targets["tag"], user=user).first()
+        if tag is None:
+            raise ValidationError({"tag": "Tag does not belong to this account."})
+        return {"tag": tag}, []
+
+    project = Projects.objects.filter(pk=targets["project"], user=user).first()
+    if project is None:
+        raise ValidationError({"project": "Project does not belong to this account."})
+
+    subproject_ids = {
+        getattr(item, "pk", item) for item in (subprojects or []) if item is not None
+    }
+    if not subproject_ids:
+        return {"project": project}, []
+    resolved = list(
+        SubProjects.objects.filter(
+            pk__in=subproject_ids, user=user, parent_project=project
+        )
+    )
+    if len(resolved) != len(subproject_ids):
+        raise ValidationError(
+            {"subprojects": "Choose subprojects from the selected project."}
+        )
+    return {"project": project}, resolved
+
+
+def _target_fields(target):
+    return {name: target.get(name) for name in ScheduledReminder.TARGET_FIELDS}
+
+
 def create_scheduled_reminder(
     *,
     user,
-    project,
+    project=None,
+    context=None,
+    tag=None,
+    subprojects=None,
     local_date,
     local_time,
     cadence,
-    subproject=None,
     message="",
     timezone_name=None,
     now=None,
 ):
     now = _canonical_instant(now or timezone.now())
-    project_id = getattr(project, "pk", project)
-    project = Projects.objects.filter(pk=project_id, user=user).first()
-    if project is None:
-        raise ValidationError({"project": "Project does not belong to this account."})
-    if subproject is not None:
-        subproject_id = getattr(subproject, "pk", subproject)
-        subproject = SubProjects.objects.filter(
-            pk=subproject_id, user=user, parent_project=project
-        ).first()
-        if subproject is None:
-            raise ValidationError(
-                {"subproject": "Subproject does not belong to the selected project."}
-            )
+    target, resolved_subprojects = _resolve_reminder_target(
+        user, project, context, tag, subprojects
+    )
     timezone_name = str(timezone_name or user_timezone(user).key)
     scheduled_for = local_wall_to_utc(
         datetime.combine(local_date, local_time), timezone_name, strict=True
@@ -237,8 +287,7 @@ def create_scheduled_reminder(
     ensure_notification_preferences(user, now=now)
     reminder = ScheduledReminder(
         user=user,
-        project=project,
-        subproject=subproject,
+        **_target_fields(target),
         message=str(message or "").strip()[:MAX_SCHEDULE_MESSAGE_LENGTH],
         cadence=str(cadence or "").strip().lower(),
         timezone=timezone_name,
@@ -248,6 +297,7 @@ def create_scheduled_reminder(
     )
     reminder.full_clean()
     reminder.save()
+    reminder.subprojects.set(resolved_subprojects)
     return reminder
 
 
@@ -257,11 +307,13 @@ def update_scheduled_reminder(
     user,
     reminder_id,
     version,
-    project,
+    project=None,
+    context=None,
+    tag=None,
+    subprojects=None,
     local_date,
     local_time,
     cadence,
-    subproject=None,
     message="",
     timezone_name=None,
     now=None,
@@ -283,19 +335,9 @@ def update_scheduled_reminder(
             {"version": "This schedule changed in another tab. Reload and try again."}
         )
 
-    project_id = getattr(project, "pk", project)
-    project = Projects.objects.filter(pk=project_id, user=user).first()
-    if project is None:
-        raise ValidationError({"project": "Project does not belong to this account."})
-    if subproject is not None:
-        subproject_id = getattr(subproject, "pk", subproject)
-        subproject = SubProjects.objects.filter(
-            pk=subproject_id, user=user, parent_project=project
-        ).first()
-        if subproject is None:
-            raise ValidationError(
-                {"subproject": "Subproject does not belong to the selected project."}
-            )
+    target, resolved_subprojects = _resolve_reminder_target(
+        user, project, context, tag, subprojects
+    )
     timezone_name = str(timezone_name or user_timezone(user).key)
     next_fire_at = local_wall_to_utc(
         datetime.combine(local_date, local_time), timezone_name, strict=True
@@ -303,8 +345,8 @@ def update_scheduled_reminder(
     if next_fire_at <= now:
         raise ValidationError({"scheduled_for": "The next reminder must be in the future."})
 
-    reminder.project = project
-    reminder.subproject = subproject
+    for field_name, value in _target_fields(target).items():
+        setattr(reminder, field_name, value)
     reminder.message = str(message or "").strip()[:MAX_SCHEDULE_MESSAGE_LENGTH]
     reminder.cadence = str(cadence or "").strip().lower()
     reminder.timezone = timezone_name
@@ -316,6 +358,9 @@ def update_scheduled_reminder(
     reminder.version += 1
     reminder.full_clean()
     reminder.save()
+    # Always re-set: switching to a context or tag target must clear a
+    # project's previous subproject selection rather than leave it stranded.
+    reminder.subprojects.set(resolved_subprojects)
     _cancel_pending_schedule_events(reminder)
     return reminder
 
@@ -338,16 +383,22 @@ def _next_reminder_slot(reminder, after):
 
 
 def _start_url(reminder):
-    query = {"project_id": reminder.project_id}
-    if reminder.subproject_id:
-        query["subproject_id"] = reminder.subproject_id
-    return f"{reverse('start_timer')}?{urlencode(query)}"
+    # A context or tag spans many projects, so there is nothing honest to
+    # prefill; send the user to the ordinary start page instead.
+    if not reminder.project_id:
+        return reverse("start_timer")
+    pairs = [("project_id", reminder.project_id)]
+    pairs.extend(
+        ("subproject_id", pk)
+        for pk in sorted(reminder.subprojects.values_list("pk", flat=True))
+    )
+    return f"{reverse('start_timer')}?{urlencode(pairs)}"
 
 
 def _scheduled_payload(reminder, occurrence):
     local_occurrence = occurrence.astimezone(_zone(reminder.timezone))
     body = reminder.message.strip() or (
-        f"You planned {reminder.project.name} for {local_occurrence:%H:%M}."
+        f"You planned {reminder.target_name} for {local_occurrence:%H:%M}."
     )
     start_url = _start_url(reminder)
     snooze_url = reverse("snooze_scheduled_reminder", args=[reminder.pk])
@@ -463,8 +514,8 @@ def _retry_locked(operation):
 def _claim_one_scheduled_reminder(reminder_id, now):
     with transaction.atomic():
         reminder = ScheduledReminder.objects.select_related(
-            "user__profile", "project", "subproject"
-        ).filter(pk=reminder_id).first()
+            "user__profile", "project", "context", "tag"
+        ).prefetch_related("subprojects").filter(pk=reminder_id).first()
         if reminder is None or not reminder.active or reminder.next_fire_at is None:
             return None
         old_next = _canonical_instant(reminder.next_fire_at)

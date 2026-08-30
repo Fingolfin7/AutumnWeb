@@ -199,7 +199,7 @@ def start_timer(request):
     # them only for this authenticated owner and only on GET; no timer state is
     # changed until the ordinary POST form is submitted.
     initial_project = None
-    initial_subproject = None
+    initial_subprojects = []
     try:
         project_id = int((request.GET.get("project_id") or "").strip())
     except (TypeError, ValueError):
@@ -209,20 +209,24 @@ def start_timer(request):
             pk=project_id, user=request.user
         ).first()
     if initial_project:
-        try:
-            subproject_id = int((request.GET.get("subproject_id") or "").strip())
-        except (TypeError, ValueError):
-            subproject_id = None
-        if subproject_id:
-            initial_subproject = SubProjects.objects.filter(
-                pk=subproject_id,
-                user=request.user,
-                parent_project=initial_project,
-            ).first()
+        subproject_ids = set()
+        for raw in request.GET.getlist("subproject_id"):
+            try:
+                subproject_ids.add(int(str(raw).strip()))
+            except (TypeError, ValueError):
+                continue
+        if subproject_ids:
+            initial_subprojects = list(
+                SubProjects.objects.filter(
+                    pk__in=subproject_ids,
+                    user=request.user,
+                    parent_project=initial_project,
+                ).order_by("pk")
+            )
     context = {
         "title": "Start Timer",
         "initial_project": initial_project,
-        "initial_subproject": initial_subproject,
+        "initial_subprojects": initial_subprojects,
     }
 
     return render(request, "core/start_timer.html", context)

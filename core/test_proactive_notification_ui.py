@@ -5,7 +5,15 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import NotificationPreference, Projects, ScheduledReminder, SubProjects
+from core.forms import ScheduledReminderForm
+from core.models import (
+    Context,
+    NotificationPreference,
+    Projects,
+    ScheduledReminder,
+    SubProjects,
+    Tag,
+)
 from core.services import CommitmentEditService, SessionMutationService
 from core.services.proactive_notifications import create_scheduled_reminder
 
@@ -27,6 +35,9 @@ class ProactiveNotificationUITests(TestCase):
         self.subproject = SubProjects.objects.create(
             user=self.user, parent_project=self.project, name="Push day"
         )
+        self.other_subproject = SubProjects.objects.create(
+            user=self.user, parent_project=self.project, name="Pull day"
+        )
         self.foreign_project = Projects.objects.create(user=self.other, name="Private")
         self.client.force_login(self.user)
 
@@ -35,7 +46,7 @@ class ProactiveNotificationUITests(TestCase):
         values = {
             "user": self.user,
             "project": self.project,
-            "subproject": self.subproject,
+            "subprojects": [self.subproject],
             "local_date": local_date,
             "local_time": time(18, 30),
             "cadence": "weekly",
@@ -96,6 +107,7 @@ class ProactiveNotificationUITests(TestCase):
             reverse("notifications"),
             {
                 "action": "create_schedule",
+                "target": "project",
                 "project": self.foreign_project.pk,
                 "local_date": first_date.isoformat(),
                 "local_time": "18:30",
@@ -109,8 +121,9 @@ class ProactiveNotificationUITests(TestCase):
             reverse("notifications"),
             {
                 "action": "create_schedule",
+                "target": "project",
                 "project": self.project.pk,
-                "subproject": self.subproject.pk,
+                "subprojects": [self.subproject.pk, self.other_subproject.pk],
                 "local_date": first_date.isoformat(),
                 "local_time": "18:30",
                 "cadence": "weekly",
@@ -119,12 +132,17 @@ class ProactiveNotificationUITests(TestCase):
         )
         self.assertRedirects(response, reverse("notifications"))
         reminder = ScheduledReminder.objects.get()
+        self.assertCountEqual(
+            reminder.subprojects.values_list("pk", flat=True),
+            [self.subproject.pk, self.other_subproject.pk],
+        )
 
         response = self.client.post(
             reverse("edit_scheduled_reminder", args=[reminder.pk]),
             {
+                "target": "project",
                 "project": self.project.pk,
-                "subproject": self.subproject.pk,
+                "subprojects": [self.subproject.pk],
                 "local_date": (first_date + timedelta(days=1)).isoformat(),
                 "local_time": "19:00",
                 "cadence": "weekly",
@@ -139,7 +157,9 @@ class ProactiveNotificationUITests(TestCase):
 
     def test_snooze_and_cancel_are_owned_csrf_protected_posts(self):
         reminder = self.schedule()
-        foreign = self.schedule(user=self.other, project=self.foreign_project, subproject=None)
+        foreign = self.schedule(
+            user=self.other, project=self.foreign_project, subprojects=None
+        )
         self.assertEqual(
             self.client.get(reverse("snooze_scheduled_reminder", args=[foreign.pk])).status_code,
             404,
@@ -169,18 +189,146 @@ class ProactiveNotificationUITests(TestCase):
         reminder.refresh_from_db()
         self.assertFalse(reminder.active)
 
-    def test_start_timer_prefill_only_accepts_owned_project_and_subproject(self):
+    def test_start_timer_prefill_only_accepts_owned_project_and_subprojects(self):
+        foreign_subproject = SubProjects.objects.create(
+            user=self.other, parent_project=self.foreign_project, name="Hidden"
+        )
         response = self.client.get(
             reverse("start_timer"),
-            {"project_id": self.project.pk, "subproject_id": self.subproject.pk},
+            {
+                "project_id": self.project.pk,
+                "subproject_id": [
+                    self.subproject.pk,
+                    self.other_subproject.pk,
+                    foreign_subproject.pk,
+                    "not-a-number",
+                ],
+            },
         )
         self.assertContains(response, 'value="Gym"')
-        self.assertContains(response, f'data-initial-subproject-id="{self.subproject.pk}"')
+        expected = ",".join(
+            str(pk) for pk in sorted([self.subproject.pk, self.other_subproject.pk])
+        )
+        self.assertContains(response, f'data-initial-subproject-ids="{expected}"')
 
         response = self.client.get(
             reverse("start_timer"), {"project_id": self.foreign_project.pk}
         )
         self.assertNotContains(response, 'value="Private"')
+
+    def test_schedule_can_target_a_context_and_edit_form_prefills_subprojects(self):
+        context = Context.objects.create(user=self.user, name="Exercise")
+        tag = Tag.objects.create(user=self.user, name="Deep work")
+        first_date = timezone.localdate() + timedelta(days=4)
+
+        response = self.client.post(
+            reverse("notifications"),
+            {
+                "action": "create_schedule",
+                "target": "context",
+                "context": context.pk,
+                # A stray project/subproject selection must not survive the
+                # context target choice.
+                "project": self.project.pk,
+                "subprojects": [self.subproject.pk],
+                "local_date": first_date.isoformat(),
+                "local_time": "18:30",
+                "cadence": "once",
+            },
+        )
+        self.assertRedirects(response, reverse("notifications"))
+        reminder = ScheduledReminder.objects.get()
+        self.assertIsNone(reminder.project_id)
+        self.assertIsNone(reminder.tag_id)
+        self.assertEqual(reminder.context_id, context.pk)
+        self.assertEqual(list(reminder.subprojects.all()), [])
+
+        response = self.client.get(reverse("notifications"))
+        self.assertContains(response, "Exercise")
+        self.assertContains(response, ">context</span>")
+
+        # Switching to a project target restores the subproject picker.
+        response = self.client.post(
+            reverse("edit_scheduled_reminder", args=[reminder.pk]),
+            {
+                "target": "project",
+                "project": self.project.pk,
+                "subprojects": [self.subproject.pk, self.other_subproject.pk],
+                "local_date": first_date.isoformat(),
+                "local_time": "18:30",
+                "cadence": "once",
+                "version": reminder.version,
+            },
+        )
+        self.assertRedirects(response, reverse("notifications"))
+        reminder.refresh_from_db()
+        self.assertIsNone(reminder.context_id)
+        self.assertCountEqual(
+            reminder.subprojects.values_list("pk", flat=True),
+            [self.subproject.pk, self.other_subproject.pk],
+        )
+
+        response = self.client.get(
+            reverse("edit_scheduled_reminder", args=[reminder.pk])
+        )
+        initial = response.context["schedule_form"].initial
+        self.assertEqual(initial["target"], "project")
+        self.assertCountEqual(
+            initial["subprojects"], [self.subproject.pk, self.other_subproject.pk]
+        )
+
+        # Switching to a tag target clears the subprojects again.
+        response = self.client.post(
+            reverse("edit_scheduled_reminder", args=[reminder.pk]),
+            {
+                "target": "tag",
+                "tag": tag.pk,
+                "subprojects": [self.subproject.pk],
+                "local_date": first_date.isoformat(),
+                "local_time": "18:30",
+                "cadence": "once",
+                "version": reminder.version,
+            },
+        )
+        self.assertRedirects(response, reverse("notifications"))
+        reminder.refresh_from_db()
+        self.assertEqual(reminder.tag_id, tag.pk)
+        self.assertIsNone(reminder.project_id)
+        self.assertEqual(list(reminder.subprojects.all()), [])
+        self.assertEqual(
+            ScheduledReminderForm(user=self.user, instance=reminder).initial["target"],
+            "tag",
+        )
+
+    def test_schedule_rejects_a_context_target_without_a_context(self):
+        response = self.client.post(
+            reverse("notifications"),
+            {
+                "action": "create_schedule",
+                "target": "context",
+                "local_date": (timezone.localdate() + timedelta(days=2)).isoformat(),
+                "local_time": "18:30",
+                "cadence": "once",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Choose a context.")
+        self.assertFalse(ScheduledReminder.objects.exists())
+
+    def test_schedule_rejects_a_context_owned_by_another_account(self):
+        response = self.client.post(
+            reverse("notifications"),
+            {
+                "action": "create_schedule",
+                "target": "context",
+                "context": Context.objects.create(user=self.other, name="Theirs").pk,
+                "local_date": (timezone.localdate() + timedelta(days=2)).isoformat(),
+                "local_time": "18:30",
+                "cadence": "once",
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(ScheduledReminder.objects.exists())
 
     def test_commitment_opt_in_only_appears_when_global_category_is_on(self):
         commitment = CommitmentEditService.create(

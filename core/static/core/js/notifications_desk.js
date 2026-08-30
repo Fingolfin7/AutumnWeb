@@ -49,8 +49,66 @@
         });
     }
 
+    // The schedule form stays fully usable without JS: every field renders and
+    // the server is the authority on the one-target rule.  This only narrows
+    // what is worth looking at while filling the form in.
+    function setHidden(node, hidden) {
+        if (node) node.hidden = !!hidden;
+    }
+
+    function subprojectInputs(field) {
+        if (!field) return [];
+        return Array.prototype.slice.call(
+            field.querySelectorAll("input[type=checkbox][data-parent]")
+        );
+    }
+
+    function optionLabel(input) {
+        return (input.closest ? input.closest("label") : null) || input.parentElement;
+    }
+
+    function syncSubprojects(projectSelect, subprojectsField) {
+        if (!subprojectsField) return 0;
+        var selected = projectSelect ? String(projectSelect.value || "") : "";
+        var visible = 0;
+        subprojectInputs(subprojectsField).forEach(function (input) {
+            var matches = selected !== "" && input.dataset.parent === selected;
+            if (matches) {
+                visible += 1;
+            } else {
+                input.checked = false;
+            }
+            setHidden(optionLabel(input), !matches);
+        });
+        return visible;
+    }
+
+    function initScheduleTarget() {
+        var targetSelect = document.querySelector("[data-schedule-target]");
+        if (!targetSelect) return;
+        var projectField = document.querySelector("[data-schedule-project-field]");
+        var contextField = document.querySelector("[data-schedule-context-field]");
+        var tagField = document.querySelector("[data-schedule-tag-field]");
+        var subprojectsField = document.querySelector("[data-schedule-subprojects-field]");
+        var projectSelect = document.querySelector("[data-schedule-project]");
+
+        function sync() {
+            var target = targetSelect.value;
+            setHidden(projectField, target !== "project");
+            setHidden(contextField, target !== "context");
+            setHidden(tagField, target !== "tag");
+            var visible = syncSubprojects(projectSelect, subprojectsField);
+            setHidden(subprojectsField, target !== "project" || visible === 0);
+        }
+
+        targetSelect.addEventListener("change", sync);
+        if (projectSelect) projectSelect.addEventListener("change", sync);
+        sync();
+    }
+
     function init() {
         document.querySelectorAll(".nx-perm").forEach(status);
+        initScheduleTarget();
     }
 
     document.addEventListener("click", function (event) {
