@@ -1,0 +1,142 @@
+{% extends 'core/base.html' %}
+{% load static tz %}
+
+{% block title %}How Autumn interrupts you{% endblock %}
+
+{% block head_includes %}
+    {{ block.super }}
+    <script src="{% static 'core/js/notifications_desk.js' %}?v={{ static_version.notifications_desk }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<div class="desk-head nx-page-head">
+    <div>
+        <p class="page-eyebrow">Notifications</p>
+        <h1 class="page-title">How Autumn interrupts you</h1>
+        <p class="nx-lede">A small set of deliberate nudges, shaped around what you already chose to do.</p>
+    </div>
+</div>
+
+<section class="slab slab-pad nx-rail-slab" aria-labelledby="next-week-title">
+    <div class="nx-section-head">
+        <div>
+            <p class="field-label">Look ahead</p>
+            <h2 class="nx-title" id="next-week-title">The next seven days</h2>
+        </div>
+        <span class="nx-rail-key" aria-hidden="true"><i class="nx-dot nx-dot--plan"></i> planned</span>
+    </div>
+    <div class="nx-rail" role="list" aria-label="Notification lanes for the next seven days">
+        <section class="nx-lane nx-lane--planned" role="listitem" aria-labelledby="lane-planned">
+            <div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">↳</span><h3 id="lane-planned">Planned reminders</h3></div>
+            <div class="nx-lane-track">
+                {% if upcoming_schedules %}
+                    {% for schedule in upcoming_schedules %}
+                    <a class="nx-event" href="{% url 'edit_scheduled_reminder' schedule.id %}">
+                        <time class="mono" datetime="{{ schedule.next_fire_at|date:'c' }}">{{ schedule.anchor_date|date:"D j M" }} · {{ schedule.anchor_time|time:"H:i" }}</time>
+                        <strong>{{ schedule.project.name }}</strong>
+                        {% if schedule.subproject %}<span>{{ schedule.subproject.name }}</span>{% endif %}
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <p class="nx-lane-empty">Nothing scheduled for the next seven days.</p>
+                {% endif %}
+            </div>
+        </section>
+        <section class="nx-lane nx-lane--check" role="listitem" aria-labelledby="lane-check">
+            <div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">□</span><h3 id="lane-check">Commitment checks</h3></div>
+            <div class="nx-lane-track">
+                {% if preference.commitment_checks_enabled %}
+                    <p class="nx-event nx-event--quiet"><span class="mono">{{ preference.commitment_check_time|time:"H:i" }}</span><strong>Actionable commitments</strong><span>Only in the final window</span></p>
+                {% else %}
+                    <p class="nx-lane-empty">Paused until you turn this category on.</p>
+                {% endif %}
+            </div>
+        </section>
+        <section class="nx-lane nx-lane--review" role="listitem" aria-labelledby="lane-review">
+            <div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">◷</span><h3 id="lane-review">Weekly review</h3></div>
+            <div class="nx-lane-track">
+                {% if preference.weekly_review_enabled %}
+                    <p class="nx-event nx-event--quiet"><span class="mono">{{ preference.weekly_review_time|time:"H:i" }}</span><strong>Last week, in focus</strong><span>Every {{ weekly_weekday_label }}</span></p>
+                {% else %}
+                    <p class="nx-lane-empty">Paused until you turn this category on.</p>
+                {% endif %}
+            </div>
+        </section>
+    </div>
+    <p class="nx-prose">Autumn only interrupts for a reminder you planned, a commitment nearing its deadline, or a weekly review you asked to receive.</p>
+</section>
+
+<div class="nx-columns">
+    <section class="slab slab-pad" aria-labelledby="delivery-title">
+        <div class="nx-section-head"><div><p class="field-label">Delivery</p><h2 class="nx-title" id="delivery-title">Browser notifications</h2></div></div>
+        <div class="rm-perm nx-perm" data-perm-state="default"
+             data-perm-status-url="{% url 'push_status' %}"
+             data-perm-subscribe-url="{% url 'push_subscribe' %}"
+             data-perm-unsubscribe-url="{% url 'push_unsubscribe' %}"
+             data-perm-test-url="{% url 'push_test' %}">
+            <div class="rm-perm-row">
+                <span class="rm-perm-dot" aria-hidden="true"></span>
+                <p class="rm-perm-text"><span class="rm-perm-title" data-perm-title>Checking this browser…</span><span class="rm-perm-detail" data-perm-detail>Autumn will only ask after you choose to enable delivery.</span></p>
+                <button type="button" class="btn btn--quiet rm-perm-action" data-perm-action>Enable notifications</button>
+                <button type="button" class="btn btn--ghost rm-perm-unsubscribe" data-perm-unsubscribe hidden>Turn off</button>
+            </div>
+            <p class="rm-perm-status" data-perm-status role="status" aria-live="polite"></p>
+        </div>
+    </section>
+
+    <form class="slab slab-pad fields" method="post" aria-labelledby="categories-title">
+        {% csrf_token %}<input type="hidden" name="action" value="save_preferences">
+        <div class="nx-section-head"><div><p class="field-label">Categories</p><h2 class="nx-title" id="categories-title">What may reach you</h2></div></div>
+        {% if preference_form.non_field_errors %}{{ preference_form.non_field_errors }}{% endif %}
+        <label class="nx-switch"><span><strong>Scheduled reminders</strong><small>You planned CMG prep for 18:30.</small></span>{{ preference_form.scheduled_reminders_enabled }}</label>
+        <label class="nx-switch"><span><strong>Commitment checks</strong><small>Exercise: 1 session remaining; period ends Sunday.</small></span>{{ preference_form.commitment_checks_enabled }}</label>
+        <label class="nx-switch"><span><strong>Weekly review</strong><small>6h 12m across 4 projects; 2 of 3 commitments met.</small></span>{{ preference_form.weekly_review_enabled }}</label>
+        <div class="nx-schedule-fields">
+            <div class="field"><label for="{{ preference_form.commitment_check_time.id_for_label }}">Commitment check time</label>{{ preference_form.commitment_check_time }}<small class="muted">{{ preference_form.commitment_check_time.help_text }}</small>{{ preference_form.commitment_check_time.errors }}</div>
+            <div class="field"><label for="{{ preference_form.weekly_review_weekday.id_for_label }}">Weekly review day</label>{{ preference_form.weekly_review_weekday }}</div>
+            <div class="field"><label for="{{ preference_form.weekly_review_time.id_for_label }}">Weekly review time</label>{{ preference_form.weekly_review_time }}<small class="muted">{{ preference_form.weekly_review_time.help_text }}</small>{{ preference_form.weekly_review_time.errors }}</div>
+        </div>
+        <div class="form-actions"><button class="btn btn--primary" type="submit">Save settings</button></div>
+    </form>
+</div>
+
+<section class="slab slab-pad nx-schedule-editor" aria-labelledby="schedule-title">
+    <div class="nx-section-head"><div><p class="field-label">One intentional nudge</p><h2 class="nx-title" id="schedule-title">{% if editing_schedule %}Edit this schedule{% else %}Plan a reminder{% endif %}</h2></div></div>
+    <p class="nx-prose">Choose a project and a local time. Recurring schedules skip missed occurrences; Autumn never sends a catch-up burst.</p>
+    <form class="fields" method="post" action="{% if editing_schedule %}{% url 'edit_scheduled_reminder' editing_schedule.id %}{% else %}{% url 'notifications' %}{% endif %}">
+        {% csrf_token %}
+        {% if not editing_schedule %}<input type="hidden" name="action" value="create_schedule">{% endif %}
+        {{ schedule_form.version }}
+        {% if schedule_form.non_field_errors %}{{ schedule_form.non_field_errors }}{% endif %}
+        <div class="nx-form-grid">
+            <div class="field">{{ schedule_form.project.label_tag }}{{ schedule_form.project }}{{ schedule_form.project.errors }}</div>
+            <div class="field">{{ schedule_form.subproject.label_tag }}{{ schedule_form.subproject }}{{ schedule_form.subproject.errors }}</div>
+            <div class="field">{{ schedule_form.local_date.label_tag }}{{ schedule_form.local_date }}{{ schedule_form.local_date.errors }}</div>
+            <div class="field">{{ schedule_form.local_time.label_tag }}{{ schedule_form.local_time }}{{ schedule_form.local_time.errors }}</div>
+            <div class="field">{{ schedule_form.cadence.label_tag }}{{ schedule_form.cadence }}{{ schedule_form.cadence.errors }}</div>
+            <div class="field nx-message-field">{{ schedule_form.message.label_tag }}{{ schedule_form.message }}{{ schedule_form.message.errors }}</div>
+        </div>
+        <p class="muted nx-timezone-note">Times are read in your profile timezone: <span class="mono">{{ request.user.profile.timezone }}</span>.</p>
+        <div class="form-actions">
+            {% if editing_schedule %}<a class="btn btn--ghost" href="{% url 'notifications' %}">Cancel edit</a>{% endif %}
+            <button class="btn btn--primary" type="submit">{% if editing_schedule %}Save schedule{% else %}Add schedule{% endif %}</button>
+        </div>
+    </form>
+</section>
+
+<section class="slab nx-active-schedules" aria-labelledby="active-schedules-title">
+    <div class="slab-pad nx-section-head"><div><p class="field-label">Your plans</p><h2 class="nx-title" id="active-schedules-title">Active schedules</h2></div></div>
+    {% if schedules %}
+    <div class="band-list">
+        {% for schedule in schedules %}
+        <article class="band nx-schedule-row">
+            <div class="nx-schedule-copy"><div class="nx-schedule-name"><strong>{{ schedule.project.name }}</strong>{% if schedule.subproject %}<span class="text-blue">{{ schedule.subproject.name }}</span>{% endif %}</div><p>{{ schedule.message|default:"A focused session" }}</p><small class="muted"><span class="mono">{{ schedule.anchor_time|time:"H:i" }}</span> · {{ schedule.get_cadence_display }} · next <span class="mono">{{ schedule.next_fire_at|localtime|date:"D j M, H:i" }}</span></small></div>
+            <div class="nx-row-actions"><a class="btn btn--quiet" href="{% url 'edit_scheduled_reminder' schedule.id %}">Edit</a><a class="btn btn--quiet" href="{% url 'snooze_scheduled_reminder' schedule.id %}">Snooze</a><a class="btn btn--quiet btn-icon--danger" href="{% url 'cancel_scheduled_reminder' schedule.id %}">Cancel</a></div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}<p class="empty slab-pad">Nothing scheduled for the next seven days.</p>{% endif %}
+</section>
+
+<p class="nx-footer-link"><a href="{% url 'weekly_review' %}">Open your weekly review</a> <span aria-hidden="true">→</span></p>
+{% endblock %}

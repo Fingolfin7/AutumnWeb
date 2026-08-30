@@ -42,6 +42,11 @@ from core.views import (
     push_unsubscribe,
     push_test,
     cancel_timer_reminder,
+    notifications,
+    weekly_review,
+    edit_scheduled_reminder,
+    snooze_scheduled_reminder,
+    cancel_scheduled_reminder,
 )
 
 
@@ -73,6 +78,23 @@ urlpatterns = [
         "timers/<int:session_id>/reminders/<int:reminder_id>/cancel/",
         cancel_timer_reminder,
         name="cancel_timer_reminder",
+    ),
+    path("notifications/", notifications, name="notifications"),
+    path("review/weekly/", weekly_review, name="weekly_review"),
+    path(
+        "notifications/schedules/<int:reminder_id>/edit/",
+        edit_scheduled_reminder,
+        name="edit_scheduled_reminder",
+    ),
+    path(
+        "notifications/schedules/<int:reminder_id>/snooze/",
+        snooze_scheduled_reminder,
+        name="snooze_scheduled_reminder",
+    ),
+    path(
+        "notifications/schedules/<int:reminder_id>/cancel/",
+        cancel_scheduled_reminder,
+        name="cancel_scheduled_reminder",
     ),
     # Was served at "create_subproject/" — a copy-paste slip. Only the URL name
     # is ever used to build links, so nothing referenced the wrong path, but it

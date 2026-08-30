@@ -46,15 +46,124 @@ self.addEventListener("activate", function (event) {
     self.clients.claim();
 });
 
-function notificationUrl(value) {
-    try {
-        var url = new URL(typeof value === "string" ? value : "/timers/", self.location.origin);
-        if (url.origin !== self.location.origin) return new URL("/timers/", self.location.origin).href;
-        if (url.pathname !== "/timers" && !url.pathname.startsWith("/timers/")) return new URL("/timers/", self.location.origin).href;
-        return url.href;
-    } catch (error) {
-        return new URL("/timers/", self.location.origin).href;
+/* Notification destinations are intentionally separate from the cache
+   routing rules below.  A notification is untrusted data and may navigate
+   only to an explicit same-origin Autumn path. */
+const NOTIFICATION_PATH_PREFIXES = [
+    "/timers",
+    "/start_timer",
+    "/notifications",
+    "/commitments",
+    "/update_commitment",
+    "/review/weekly",
+];
+
+const NOTIFICATION_CATEGORY_PATHS = {
+    timer: ["/timers"],
+    reminder: ["/timers"],
+    auto_stop: ["/timers"],
+    test: ["/timers"],
+    scheduled_reminder: ["/notifications", "/start_timer", "/timers"],
+    commitment_check: ["/notifications", "/commitments", "/update_commitment", "/start_timer"],
+    weekly_review: ["/review/weekly"],
+};
+
+function notificationCategory(value) {
+    var category = typeof value === "string" ? value.trim().toLowerCase() : "timer";
+    if (category === "scheduled-reminder") category = "scheduled_reminder";
+    if (category === "commitment-check") category = "commitment_check";
+    if (category === "weekly-review") category = "weekly_review";
+    return Object.prototype.hasOwnProperty.call(NOTIFICATION_CATEGORY_PATHS, category)
+        ? category
+        : "timer";
+}
+
+function pathMatches(path, prefixes) {
+    return prefixes.some(function (prefix) {
+        return path === prefix || path.startsWith(prefix + "/");
+    });
+}
+
+function safeNotificationPath(path) {
+    return path.indexOf("\\") === -1
+        && !/%(?:2e|2f|5c)/i.test(path)
+        && !path.split("/").some(function (part) { return part === "." || part === ".."; });
+}
+
+function defaultNotificationPath(category) {
+    if (category === "weekly_review") return "/review/weekly/";
+    if (category === "scheduled_reminder" || category === "commitment_check") {
+        return "/notifications/";
     }
+    return "/timers/";
+}
+
+function safeNotificationUrl(value, category, fallback) {
+    var fallbackPath = fallback || defaultNotificationPath(category);
+    try {
+        if (typeof value === "string" && (!value.startsWith("/") || value.startsWith("//"))) {
+            return new URL(fallbackPath, self.location.origin).href;
+        }
+        var url = new URL(typeof value === "string" ? value : fallbackPath, self.location.origin);
+        if (url.origin !== self.location.origin) return new URL(fallbackPath, self.location.origin).href;
+        if (!safeNotificationPath(url.pathname)) return new URL(fallbackPath, self.location.origin).href;
+        if (!pathMatches(url.pathname, NOTIFICATION_PATH_PREFIXES)) {
+            return new URL(fallbackPath, self.location.origin).href;
+        }
+        if (!pathMatches(url.pathname, NOTIFICATION_CATEGORY_PATHS[category])) {
+            return new URL(fallbackPath, self.location.origin).href;
+        }
+        return url.pathname + url.search + url.hash;
+    } catch (error) {
+        return new URL(fallbackPath, self.location.origin).href;
+    }
+}
+
+function safeActionUrl(value, category) {
+    if (typeof value !== "string" || !value) return null;
+    try {
+        if (!value.startsWith("/") || value.startsWith("//")) return null;
+        var url = new URL(value, self.location.origin);
+        if (url.origin !== self.location.origin) return null;
+        if (!safeNotificationPath(url.pathname)) return null;
+        if (!pathMatches(url.pathname, NOTIFICATION_PATH_PREFIXES)) return null;
+        if (!pathMatches(url.pathname, NOTIFICATION_CATEGORY_PATHS[category])) return null;
+        return url.pathname + url.search + url.hash;
+    } catch (error) {
+        return null;
+    }
+}
+
+function safeNotificationIdentity(payload) {
+    var identity = payload.identity || payload.reminder_id || payload.schedule_id
+        || payload.commitment_id || payload.session_id || "general";
+    return String(identity).replace(/[^A-Za-z0-9_.:+-]/g, "-").slice(0, 96) || "general";
+}
+
+function safeNotificationTag(value, category, identity) {
+    var supplied = typeof value === "string" && value;
+    var tag = supplied ? value : "autumn-" + category + "-" + identity;
+    tag = tag.replace(/[^A-Za-z0-9_.:+-]/g, "-").slice(0, 100) || identity;
+    if (!supplied) return tag;
+    /* Prefix the category even when a producer supplied a tag so a scheduled
+       reminder can never replace a commitment or review notification. */
+    return category + "-" + tag;
+}
+
+function notificationActions(payloadActions, category) {
+    if (!Array.isArray(payloadActions)) return [];
+    return payloadActions.slice(0, 2).reduce(function (actions, item, index) {
+        if (!item || typeof item !== "object") return actions;
+        var title = typeof item.title === "string" ? item.title : item.label;
+        var url = safeActionUrl(item.url, category);
+        if (!title || !url) return actions;
+        var action = typeof item.action === "string" && item.action
+            ? item.action
+            : "action-" + (index + 1);
+        if (actions.some(function (existing) { return existing.action === action; })) return actions;
+        actions.push({ action: action, title: title.slice(0, 64), url: url });
+        return actions;
+    }, []);
 }
 
 self.addEventListener("push", function (event) {
@@ -64,26 +173,50 @@ self.addEventListener("push", function (event) {
     } catch (error) {
         try { payload = { body: event.data ? event.data.text() : "" }; } catch (ignored) { payload = {}; }
     }
-    if (!payload || typeof payload !== "object") payload = {};
-    var kind = payload.kind || payload.event_type || "timer";
-    var identity = payload.reminder_id || payload.session_id || "general";
-    var title = payload.title || "Autumn";
-    var body = payload.body || "Your timer needs your attention.";
-    event.waitUntil(self.registration.showNotification(title, {
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) payload = {};
+    var category = notificationCategory(payload.kind || payload.event_type);
+    var identity = safeNotificationIdentity(payload);
+    var actions = notificationActions(payload.actions, category);
+    var tag = safeNotificationTag(payload.tag, category, identity);
+    var title = typeof payload.title === "string" && payload.title ? payload.title : "Autumn";
+    var body = typeof payload.body === "string" && payload.body
+        ? payload.body
+        : "Your timer needs your attention.";
+    var options = {
         body: body,
-        tag: "autumn-" + kind + "-" + identity,
-        /* Repeat-interval reminders share one tag; without renotify a later
-           notification silently replaces the one still sitting unread. */
+        tag: tag,
+        /* Repeat-interval reminders share a tag; renotify makes a later
+           occurrence visible without collapsing unrelated categories. */
         renotify: true,
         icon: "/static/core/images/icons/autumn-icon-192.png",
         badge: "/static/core/images/icons/autumn-icon-192.png",
-        data: { url: notificationUrl(payload.url), kind: kind, session_id: payload.session_id || null }
-    }));
+        data: {
+            url: safeNotificationUrl(payload.url, category),
+            kind: category,
+            identity: identity,
+            actions: actions,
+        },
+    };
+    if (actions.length) {
+        options.actions = actions.map(function (item) {
+            return { action: item.action, title: item.title };
+        });
+    }
+    event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener("notificationclick", function (event) {
     event.notification.close();
-    var target = notificationUrl(event.notification.data && event.notification.data.url);
+    var data = event.notification.data || {};
+    var category = notificationCategory(data.kind);
+    var target = data.url;
+    if (event.action && Array.isArray(data.actions)) {
+        var selected = data.actions.find(function (item) {
+            return item && item.action === event.action;
+        });
+        if (selected) target = selected.url;
+    }
+    target = new URL(safeNotificationUrl(target, category), self.location.origin).href;
     event.waitUntil(
         self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
             for (var i = 0; i < clientList.length; i += 1) {

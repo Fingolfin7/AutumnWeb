@@ -195,7 +195,35 @@ def start_timer(request):
             )
             return redirect("start_timer")
 
-    context = {"title": "Start Timer"}
+    # Notification action links may prefill a project and subproject.  Resolve
+    # them only for this authenticated owner and only on GET; no timer state is
+    # changed until the ordinary POST form is submitted.
+    initial_project = None
+    initial_subproject = None
+    try:
+        project_id = int((request.GET.get("project_id") or "").strip())
+    except (TypeError, ValueError):
+        project_id = None
+    if project_id:
+        initial_project = Projects.objects.filter(
+            pk=project_id, user=request.user
+        ).first()
+    if initial_project:
+        try:
+            subproject_id = int((request.GET.get("subproject_id") or "").strip())
+        except (TypeError, ValueError):
+            subproject_id = None
+        if subproject_id:
+            initial_subproject = SubProjects.objects.filter(
+                pk=subproject_id,
+                user=request.user,
+                parent_project=initial_project,
+            ).first()
+    context = {
+        "title": "Start Timer",
+        "initial_project": initial_project,
+        "initial_subproject": initial_subproject,
+    }
 
     return render(request, "core/start_timer.html", context)
 

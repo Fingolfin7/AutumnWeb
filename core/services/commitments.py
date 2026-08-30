@@ -47,7 +47,7 @@ NEXT_BOUNDARY_FIELDS = {
     "banking_enabled",
     *FILTER_FIELDS,
 }
-IMMEDIATE_FIELDS = {"active"}
+IMMEDIATE_FIELDS = {"active", "notifications_enabled"}
 ALLOWED_FIELDS = RESTART_FIELDS | NEXT_BOUNDARY_FIELDS | IMMEDIATE_FIELDS
 
 
@@ -148,6 +148,7 @@ class CommitmentEditService:
             "max_balance": definition.get("max_balance", 600),
             "min_balance": definition.get("min_balance", -600),
             "active": definition.get("active", True),
+            "notifications_enabled": definition.get("notifications_enabled", False),
             "balance": 0,
             "generation": 1,
             "ledger_start_at": now,
@@ -281,12 +282,17 @@ class CommitmentEditService:
                     update_fields=[*revision_values.keys(), "effective_from_instant"]
                 )
 
+        immediate_updates = []
         if changes.get("active") is False and commitment.active:
             commitment.active = False
+            immediate_updates.append("active")
+        if "notifications_enabled" in changes:
+            commitment.notifications_enabled = bool(changes["notifications_enabled"])
+            immediate_updates.append("notifications_enabled")
 
         commitment.version += 1
         commitment.needs_recompute = True
-        commitment.save(update_fields=["active", "version", "needs_recompute"])
+        commitment.save(update_fields=[*dict.fromkeys([*immediate_updates, "version", "needs_recompute"])])
         return commitment
 
     @staticmethod
@@ -359,6 +365,7 @@ class CommitmentEditService:
             "banking_enabled",
             "max_balance",
             "min_balance",
+            "notifications_enabled",
             "active",
         ):
             if field in changes:

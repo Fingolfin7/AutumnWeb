@@ -1,0 +1,38 @@
+{% extends 'core/base.html' %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="desk-head nx-page-head">
+    <div>
+        <p class="page-eyebrow">Scheduled reminder</p>
+        <h1 class="page-title">{{ title }}</h1>
+        <p class="nx-lede"><strong>{{ reminder.project.name }}</strong>{% if reminder.subproject %} · {{ reminder.subproject.name }}{% endif %} · <span class="mono">{{ reminder.anchor_time|time:"H:i" }}</span></p>
+    </div>
+</div>
+
+<section class="slab slab-pad nx-confirm" aria-labelledby="confirm-title">
+    {% if is_cancel %}
+        <p class="field-label">This cannot be undone</p>
+        <h2 class="nx-title" id="confirm-title">Cancel this schedule?</h2>
+        <p class="nx-prose">Autumn will stop future occurrences of this reminder. Already delivered notifications are not changed.</p>
+        <form method="post" action="{% url 'cancel_scheduled_reminder' reminder.id %}">
+            {% csrf_token %}<input type="hidden" name="version" value="{{ reminder.version }}">
+            <div class="form-actions"><a class="btn btn--ghost" href="{% url 'notifications' %}">Keep schedule</a><button class="btn btn--stop" type="submit">Cancel schedule</button></div>
+        </form>
+    {% else %}
+        <p class="field-label">A small adjustment</p>
+        <h2 class="nx-title" id="confirm-title">Snooze this reminder</h2>
+        <p class="nx-prose">Choose one new occurrence. A recurring reminder returns to its regular local cadence after it fires.</p>
+        <form method="post" action="{% url 'snooze_scheduled_reminder' reminder.id %}">
+            {% csrf_token %}<input type="hidden" name="version" value="{{ reminder.version }}">
+            <fieldset class="nx-snooze-options"><legend class="sr-only">Snooze duration</legend>
+                <label><input type="radio" name="choice" value="15m" checked><span><strong>15 minutes</strong><small>Just a little later</small></span></label>
+                <label><input type="radio" name="choice" value="1h"><span><strong>1 hour</strong><small>After this block</small></span></label>
+                <label><input type="radio" name="choice" value="tomorrow"><span><strong>Tomorrow</strong><small>At the schedule’s local time</small></span></label>
+            </fieldset>
+            <div class="form-actions"><a class="btn btn--ghost" href="{% url 'notifications' %}">Keep time</a><button class="btn btn--primary" type="submit">Snooze reminder</button></div>
+        </form>
+    {% endif %}
+</section>
+{% endblock %}

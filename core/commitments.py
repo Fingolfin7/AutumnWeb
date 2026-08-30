@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
 from django.db import transaction
@@ -530,6 +530,242 @@ def _revision_accrual(revision, period_start, period_end):
     return total_microseconds // 6000, len(sessions)
 
 
+def _aware_instant(value, *, default=None):
+    """Return an aware instant without silently consulting the active zone."""
+    if value is None:
+        value = timezone.now() if default is None else default
+    if timezone.is_naive(value):
+        # Explicit instants passed by domain callers are conventionally in the
+        # Django default timezone.  Keeping this conversion here means the
+        # rest of the domain code can compare values safely even when a
+        # request-local timezone is active.
+        value = timezone.make_aware(value, timezone.get_default_timezone())
+    return value
+
+
+def _revision_timezone(revision):
+    """Return the frozen revision timezone, with the app zone as a fallback."""
+    try:
+        return ZoneInfo(revision.timezone)
+    except (TypeError, ValueError, ZoneInfoNotFoundError):
+        return timezone.get_default_timezone()
+
+
+def _revision_period_bounds(revision, reference_instant):
+    """Get canonical cadence boundaries in a revision's frozen timezone."""
+    reference_instant = _aware_instant(reference_instant)
+    zone = _revision_timezone(revision)
+    with timezone.override(zone):
+        return get_period_bounds(
+            revision.cadence,
+            reference_instant.astimezone(zone),
+        )
+
+
+def _active_revisions(commitment):
+    return list(
+        commitment.revisions.filter(
+            generation=commitment.generation,
+            status=CommitmentRevision.STATUS_ACTIVE,
+        ).order_by("effective_from_instant", "pk")
+    )
+
+
+def _governing_revision(commitment, reference_instant):
+    """Find the revision governing an explicit instant.
+
+    Revision snapshots are intentionally used even when the live target or
+    many-to-many filters have since changed.  Pending revisions are activated
+    by reconciliation before this lookup is used for the normal (current)
+    path; an old ledger may still contain several active revisions.
+    """
+    revisions = _active_revisions(commitment)
+    if not revisions:
+        # Directly-created legacy commitments do not have a revision until a
+        # reconciliation pass bootstraps one.
+        reconcile_commitment(commitment)
+        revisions = _active_revisions(commitment)
+    if not revisions:
+        return None
+
+    reference_instant = _aware_instant(reference_instant)
+    governing = revisions[0]
+    for revision in revisions:
+        if revision.effective_from_instant <= reference_instant:
+            governing = revision
+        else:
+            break
+    return governing
+
+
+def _revision_actual(revision, period_start, period_end, reference_instant):
+    """Evaluate a snapshot's completed sessions through an explicit instant."""
+    accrual_end = min(period_end, reference_instant)
+    if period_start >= accrual_end:
+        return 0
+    numerator, session_count = _revision_accrual(
+        revision, period_start, accrual_end
+    )
+    if revision.commitment_type == "time":
+        return numerator / 10000
+    return session_count
+
+
+def _balance_at(commitment, reference_instant):
+    """Read the persisted ledger balance through ``reference_instant``.
+
+    ``Commitment.balance`` is the current post-replay value.  An explicit
+    evaluation instant can be earlier than that value, so use the same event
+    ordering as :func:`recompute_commitment` for an as-of balance.  Closed rows
+    already contain the canonical replay result; only adjustments after the
+    latest closed row need to be applied here.  This keeps banking decisions
+    tied to the canonical ledger without duplicating its clamp/accrual math.
+    """
+    reference_instant = _aware_instant(reference_instant)
+    anchor = commitment.ledger_start_at
+    if anchor is None:
+        return commitment.balance
+
+    rows = commitment.period_rows.filter(
+        generation=commitment.generation,
+        period_end__lte=reference_instant,
+    ).order_by("-period_end", "-pk")
+    latest_row = rows.first()
+    running = latest_row.balance_out if latest_row is not None else 0
+    latest_end = latest_row.period_end if latest_row is not None else anchor
+
+    # Recompute orders adjustments before period-close events at equal
+    # instants.  A row's balance_out therefore already includes adjustments at
+    # its period_end, so only strictly later adjustments are applied.
+    adjustment_filter = {
+        "effective_at__gte" if latest_row is None else "effective_at__gt": latest_end,
+        "effective_at__lte": reference_instant,
+    }
+    for adjustment in commitment.adjustments.filter(
+        **adjustment_filter,
+    ).order_by("effective_at", "seq"):
+        if adjustment.kind in {
+            CommitmentAdjustment.KIND_OPENING,
+            CommitmentAdjustment.KIND_RESTART_CARRY,
+        }:
+            running = adjustment.amount
+        else:
+            running += adjustment.amount
+    return running
+
+
+def commitment_banking(evaluation):
+    """Return the canonical banking/coverage values for an evaluation dict."""
+    target = evaluation["target"]
+    actual = evaluation["actual"]
+    balance = evaluation["balance"]
+    enabled = evaluation["banking_enabled"]
+    banked_credit = max(balance, 0) if enabled else 0
+    covered_actual = actual + banked_credit
+    return {
+        "enabled": enabled,
+        "balance": balance,
+        "banked_credit": banked_credit,
+        "covered_actual": covered_actual,
+        "covered": covered_actual >= target,
+        "remaining": max(target - covered_actual, 0),
+    }
+
+
+def get_commitment_evaluation(commitment, reference_instant=None) -> dict:
+    """Evaluate the open commitment period at an explicit aware instant.
+
+    The governing revision supplies cadence, target, type, timezone, and the
+    immutable scope/filter snapshot.  This is the one canonical open-period
+    evaluator used by progress and proactive commitment checks.
+    """
+    reference_instant = _aware_instant(reference_instant)
+    # Reconciliation is deliberately first: callers that subsequently inspect
+    # period rows must never observe a stale derived ledger.  It is harmless
+    # for a clean commitment and also bootstraps legacy rows lacking a revision.
+    reconcile_commitment(commitment)
+    revision = _governing_revision(commitment, reference_instant)
+    if revision is None:
+        # This should only be reachable for a malformed legacy row.  Preserve
+        # the old fields rather than failing a read path.
+        period_start, period_end = get_period_bounds(
+            commitment.period, reference_instant
+        )
+        actual = commitment_actual(commitment, period_start, min(period_end, reference_instant))
+        balance = commitment.balance
+        result = {
+            "actual": round(actual, 2) if commitment.commitment_type == "time" else actual,
+            "target": commitment.target,
+            "percentage": 0,
+            "balance": balance,
+            "current_surplus": 0,
+            "status": "behind",
+            "period_start": period_start,
+            "effective_period_start": period_start,
+            "period_end": period_end,
+            "commitment_type": commitment.commitment_type,
+            "period": commitment.period,
+            "timezone": timezone.get_default_timezone_name(),
+            "banking_enabled": commitment.banking_enabled,
+            "max_balance": commitment.max_balance,
+            "min_balance": commitment.min_balance,
+            "revision": None,
+        }
+        result.update(commitment_banking(result))
+        return result
+
+    period_start, period_end = _revision_period_bounds(
+        revision, reference_instant
+    )
+    revision_start = _local_midnight(
+        revision.start_date, _revision_timezone(revision)
+    )
+    effective_period_start = max(period_start, revision_start)
+    if commitment.ledger_start_at is not None:
+        effective_period_start = max(effective_period_start, commitment.ledger_start_at)
+    actual = _revision_actual(
+        revision,
+        effective_period_start,
+        period_end,
+        reference_instant,
+    )
+    if revision.commitment_type == "time":
+        actual = round(actual, 2)
+    balance = _balance_at(commitment, reference_instant)
+    target = revision.target_value
+    percentage = min(round((actual / target) * 100, 1), 100) if target > 0 else 0
+    if percentage >= 100:
+        status = "complete"
+    elif percentage >= 75:
+        status = "approaching"
+    elif percentage >= 50:
+        status = "on-track"
+    elif percentage >= 25:
+        status = "warning"
+    else:
+        status = "behind"
+    result = {
+        "actual": actual,
+        "target": target,
+        "percentage": percentage,
+        "balance": balance,
+        "current_surplus": round(actual - target, 2),
+        "status": status,
+        "period_start": period_start,
+        "effective_period_start": effective_period_start,
+        "period_end": period_end,
+        "commitment_type": revision.commitment_type,
+        "period": revision.cadence,
+        "timezone": revision.timezone,
+        "banking_enabled": revision.banking_enabled,
+        "max_balance": revision.max_balance,
+        "min_balance": revision.min_balance,
+        "revision": revision,
+    }
+    result.update(commitment_banking(result))
+    return result
+
+
 def _periods_for_replay(revision, ledger_start_at, now):
     zone = ZoneInfo(revision.timezone)
     start_dt = _local_midnight(revision.start_date, zone)
@@ -745,53 +981,138 @@ def recompute_commitment(commitment: Commitment) -> bool:
     return derived_changed or was_dirty or old_balance != locked.balance
 
 
-def get_commitment_progress(commitment) -> dict:
+def get_commitment_progress(commitment, reference_instant=None) -> dict:
+    """Return the backwards-compatible progress projection.
+
+    The calculation itself lives in :func:`get_commitment_evaluation`; keeping
+    this wrapper's familiar keys avoids changing existing web/API callers while
+    making their period boundaries and scope revision-aware.
     """
-    Calculate the progress for a commitment in the current period.
-    """
-    period_start, period_end = get_period_bounds(commitment.period)
-    start_dt = get_commitment_start_datetime(commitment)
-    effective_period_start = max(period_start, start_dt)
-
-    if effective_period_start >= period_end:
-        actual = 0
-    else:
-        actual = commitment_actual(
-            commitment, effective_period_start, period_end
-        )
-
-    if commitment.commitment_type == "time":
-        actual = round(actual, 2)
-
-    target = commitment.target
-    percentage = min(round((actual / target) * 100, 1), 100) if target > 0 else 0
-
-    if percentage >= 100:
-        status = "complete"
-    elif percentage >= 75:
-        status = "approaching"
-    elif percentage >= 50:
-        status = "on-track"
-    elif percentage >= 25:
-        status = "warning"
-    else:
-        status = "behind"
-
-    current_surplus = actual - target
-
+    evaluation = get_commitment_evaluation(
+        commitment, reference_instant=reference_instant
+    )
     return {
-        "actual": actual,
-        "target": target,
-        "percentage": percentage,
-        "balance": commitment.balance,
-        "current_surplus": round(current_surplus, 2),
-        "status": status,
-        "period_start": period_start,
-        "effective_period_start": effective_period_start,
-        "period_end": period_end,
-        "commitment_type": commitment.commitment_type,
-        "period": commitment.period,
+        key: evaluation[key]
+        for key in (
+            "actual",
+            "target",
+            "percentage",
+            "balance",
+            "current_surplus",
+            "status",
+            "period_start",
+            "effective_period_start",
+            "period_end",
+            "commitment_type",
+            "period",
+        )
     }
+
+
+_ACTION_WINDOW = {
+    "daily": timedelta(hours=6),
+    "weekly": timedelta(days=2),
+    "fortnightly": timedelta(days=2),
+    "monthly": timedelta(days=3),
+    "quarterly": timedelta(days=7),
+    "yearly": timedelta(days=7),
+}
+
+
+def _action_window_start(evaluation):
+    """Return the local-wall-time start of a cadence's final action window."""
+    period = evaluation["period"]
+    deadline = evaluation["period_end"]
+    window = _ACTION_WINDOW.get(period, timedelta(0))
+    if period == "daily":
+        # The daily contract is an elapsed six-hour window, which guarantees
+        # an 18:00--23:59 local check slot remains inside it.
+        return deadline - window
+
+    days = window.days
+    if days <= 0:
+        return deadline
+    revision = evaluation.get("revision")
+    zone = (
+        _revision_timezone(revision)
+        if revision is not None
+        else timezone.get_default_timezone()
+    )
+    deadline_local = deadline.astimezone(zone)
+    local_start = deadline_local.date() - timedelta(days=days)
+    return datetime.combine(local_start, datetime.min.time(), tzinfo=zone)
+
+
+def commitment_remaining(value, reference_instant=None):
+    """Return exact unmet units after applying positive banked credit."""
+    evaluation = (
+        value
+        if isinstance(value, dict)
+        else get_commitment_evaluation(value, reference_instant)
+    )
+    return commitment_banking(evaluation)["remaining"]
+
+
+def commitment_deadline(value, reference_instant=None):
+    """Return the current period's aware deadline instant."""
+    evaluation = (
+        value
+        if isinstance(value, dict)
+        else get_commitment_evaluation(value, reference_instant)
+    )
+    return evaluation["period_end"]
+
+
+def commitment_is_covered(value, reference_instant=None):
+    """Whether the current period is met, including positive bank balance."""
+    evaluation = (
+        value
+        if isinstance(value, dict)
+        else get_commitment_evaluation(value, reference_instant)
+    )
+    return commitment_banking(evaluation)["covered"]
+
+
+def commitment_actionability(value, reference_instant=None) -> dict:
+    """Return the sparse final-window action decision for a commitment.
+
+    A commitment is actionable only while its open period is incomplete and
+    the explicit instant lies inside the cadence's final action window.
+    """
+    evaluation = (
+        value
+        if isinstance(value, dict)
+        else get_commitment_evaluation(value, reference_instant)
+    )
+    reference_instant = _aware_instant(reference_instant)
+    deadline = evaluation["period_end"]
+    time_remaining = deadline - reference_instant
+    window = _ACTION_WINDOW.get(evaluation["period"], timedelta(0))
+    window_start = _action_window_start(evaluation)
+    covered = commitment_banking(evaluation)["covered"]
+    actionable = (
+        not covered
+        and window_start <= reference_instant < deadline
+    )
+    return {
+        "actionable": actionable,
+        "covered": covered,
+        "remaining": commitment_remaining(evaluation),
+        "deadline": deadline,
+        "window": window,
+        "window_start": window_start,
+        "time_remaining": time_remaining,
+        "evaluation": evaluation,
+    }
+
+
+# Descriptive aliases make the domain API convenient for notification code
+# without maintaining separate implementations of the same arithmetic.
+evaluate_commitment = get_commitment_evaluation
+get_commitment_actionability = commitment_actionability
+get_commitment_remaining = commitment_remaining
+get_commitment_deadline = commitment_deadline
+get_commitment_banking = commitment_banking
 
 
 def calculate_commitment_streak(commitment, num_periods=8) -> dict:
@@ -955,6 +1276,89 @@ def reconcile_commitment(commitment, force: bool = False) -> bool:
     if latest_start != closed_periods[-1][0]:
         return recompute_commitment(commitment)
     return False
+
+
+def _period_row_is_met(row):
+    """Apply one persisted period row's revision-specific banking rules."""
+    revision = row.revision
+    actual = (
+        row.accrued_numerator / 10000
+        if revision.commitment_type == "time"
+        else row.session_count
+    )
+    available = actual
+    if revision.banking_enabled:
+        available += max(row.carryover_in, 0)
+    return {
+        "actual": actual,
+        "target": revision.target_value,
+        "balance": row.carryover_in,
+        "banking_enabled": revision.banking_enabled,
+        "met": available >= revision.target_value,
+        "saved_by_bank": (
+            revision.banking_enabled
+            and available >= revision.target_value
+            and actual < revision.target_value
+        ),
+        "period_start": row.period_start,
+        "period_end": row.period_end,
+    }
+
+
+def weekly_commitment_score(user, window_start, window_end) -> dict:
+    """Score active commitments whose canonical periods closed in a window.
+
+    Session reporting uses ``[window_start, window_end)``.  Commitment periods
+    are associated with the review by their exclusive ``period_end`` in
+    ``(window_start, window_end]``: the period ending at the closing Monday
+    midnight belongs to the preceding Monday--Sunday review.  The
+    ``closed_at`` persistence timestamp may be later when reconciliation was
+    lazy.  Each commitment contributes at most one result, regardless of how
+    many daily periods closed in the window.
+    """
+    window_start = _aware_instant(window_start)
+    window_end = _aware_instant(window_end)
+    if window_end < window_start:
+        raise ValueError("window_end must not precede window_start")
+
+    commitments = list(
+        Commitment.objects.filter(user=user, active=True).order_by("pk")
+    )
+    for commitment in commitments:
+        # Reconciliation is intentionally before the derived-row query.  This
+        # is also what materializes periods closed since the last request.
+        reconcile_commitment(commitment)
+
+    score = {"met_count": 0, "eligible_count": 0, "details": []}
+    for commitment in commitments:
+        rows = list(
+            commitment.period_rows.filter(
+                period_end__gt=window_start,
+                period_end__lte=window_end,
+            ).select_related("revision")
+        )
+        if not rows:
+            continue
+        period_results = [_period_row_is_met(row) for row in rows]
+        met = all(result["met"] for result in period_results)
+        score["eligible_count"] += 1
+        if met:
+            score["met_count"] += 1
+        score["details"].append(
+            {
+                "commitment_id": commitment.pk,
+                "period_count": len(period_results),
+                "met_period_count": sum(
+                    result["met"] for result in period_results
+                ),
+                "met": met,
+                "periods": period_results,
+            }
+        )
+    return score
+
+
+calculate_weekly_commitment_score = weekly_commitment_score
 
 
 def get_commitment_start_datetime(commitment) -> datetime:

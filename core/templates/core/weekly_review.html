@@ -1,0 +1,69 @@
+{% extends 'core/base.html' %}
+{% load static tz %}
+
+{% block title %}Your Autumn week{% endblock %}
+
+{% block content %}
+<div class="desk-head nx-page-head">
+    <div>
+        <p class="page-eyebrow">Weekly review</p>
+        <h1 class="page-title">Last week, in focus</h1>
+        <p class="nx-lede"><span class="mono">{{ summary.week_start_label|date:"D j M" }}</span> — <span class="mono">{{ summary.week_end_label|date:"D j M Y" }}</span> · {{ summary.timezone }}</p>
+    </div>
+</div>
+
+<section class="slab slab-pad nx-review-hero" aria-labelledby="review-summary-title">
+    <p class="field-label">A quiet account of the week</p>
+    <h2 class="nx-review-number" id="review-summary-title">{{ summary.duration_label }}</h2>
+    <p class="nx-review-sub">across {{ summary.project_count }} project{{ summary.project_count|pluralize }}</p>
+    <div class="stat-strip nx-review-stats">
+        <div class="stat"><span class="stat-label">Sessions</span><strong class="stat-value">{{ summary.session_count }}</strong></div>
+        <div class="stat"><span class="stat-label">Commitments met</span><strong class="stat-value">{{ summary.met_count }} / {{ summary.eligible_count }}</strong></div>
+        <div class="stat"><span class="stat-label">Timezone</span><strong class="stat-value mono">{{ summary.timezone }}</strong></div>
+    </div>
+</section>
+
+<div class="nx-review-grid">
+    <section class="slab" aria-labelledby="projects-title">
+        <div class="slab-pad nx-section-head"><div><p class="field-label">Where the time went</p><h2 class="nx-title" id="projects-title">Projects</h2></div></div>
+        {% if summary.per_project %}
+        <div class="band-list">
+            {% for project in summary.per_project %}
+            <article class="band nx-review-row">
+                <div><a class="nx-review-project text-red" href="{% url 'update_project' project.project_id %}">{{ project.project_name }}</a><small class="muted">{{ project.session_count }} session{{ project.session_count|pluralize }}</small></div>
+                <div class="nx-review-actions"><strong class="mono text-green">{{ project.total_minutes|floatformat:0 }}m</strong><a class="btn btn--quiet" href="{% url 'start_timer' %}?project_id={{ project.project_id }}">Start timer</a></div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}<p class="empty slab-pad">No completed sessions in this week.</p>{% endif %}
+        <div class="slab-foot"><a class="btn btn--ghost" href="{% url 'sessions' %}">Browse sessions</a></div>
+    </section>
+
+    <section class="slab" aria-labelledby="commitments-title">
+        <div class="slab-pad nx-section-head"><div><p class="field-label">What closed</p><h2 class="nx-title" id="commitments-title">Commitments</h2></div></div>
+        {% if summary.details %}
+        <div class="band-list">
+            {% for item in summary.details %}
+            <article class="band nx-review-row">
+                <div>
+                    {% if item.commitment %}<a class="nx-review-project" href="{% url 'update_commitment' item.commitment.id %}">{{ item.commitment.target_name }}</a>{% else %}<strong>Commitment</strong>{% endif %}
+                    <small class="muted">{{ item.met_period_count }} of {{ item.period_count }} period{{ item.period_count|pluralize }} met</small>
+                </div>
+                {% if item.met %}<span class="nx-status nx-status--met">Met</span>{% else %}<span class="nx-status nx-status--open">Needs attention</span>{% endif %}
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}<p class="empty slab-pad">No commitment periods closed in this week.</p>{% endif %}
+        <div class="slab-foot"><a class="btn btn--ghost" href="{% url 'home' %}">See commitments</a></div>
+    </section>
+</div>
+
+<section class="slab slab-pad nx-review-rail" aria-labelledby="past-rail-title">
+    <div class="nx-section-head"><div><p class="field-label">The same signal, in past tense</p><h2 class="nx-title" id="past-rail-title">Your week at a glance</h2></div><a class="btn btn--quiet" href="{% url 'weekly_review' %}">Current week</a></div>
+    <div class="nx-rail nx-rail--past" role="list" aria-label="Summary lanes from the reviewed week">
+        <div class="nx-lane nx-lane--planned" role="listitem"><div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">↳</span><h3>Planned time</h3></div><p class="nx-event nx-event--past"><strong>{{ summary.session_count }} completed sessions</strong><span>{{ summary.duration_label }} recorded</span></p></div>
+        <div class="nx-lane nx-lane--check" role="listitem"><div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">□</span><h3>Commitment checks</h3></div><p class="nx-event nx-event--past"><strong>{{ summary.met_count }} of {{ summary.eligible_count }} met</strong><span>Periods that closed this week</span></p></div>
+        <div class="nx-lane nx-lane--review" role="listitem"><div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">◷</span><h3>Weekly review</h3></div><p class="nx-event nx-event--past"><strong>Seven local days</strong><span>Recomputed from completed sessions</span></p></div>
+    </div>
+</section>
+{% endblock %}

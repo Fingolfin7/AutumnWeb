@@ -10,6 +10,10 @@ $(document).ready(function() {
     let lastLoadedProject = '';
     let presetSelectionActive = false;
     let projectIdsByName = {};
+    // A notification can hand us owned ids via the GET page.  They are only
+    // used to seed the existing picker; the POST still submits the same names
+    // and the server remains the authority for ownership.
+    let initialSubprojectId = String($('[data-reminder-form]').attr('data-initial-subproject-id') || '');
     const stopAfterPresets = {
         minutes: [
             {value: '15', label: '15m'},
@@ -245,6 +249,9 @@ $(document).ready(function() {
                     );
                 });
                 $('#subproject_options').empty().append(...options);
+                if (initialSubprojectId !== '') {
+                    $('#subproject_options input[data-subproject-id="' + initialSubprojectId + '"]').prop('checked', true);
+                }
             },
             error: function() {
                 lastLoadedProject = '';
@@ -255,4 +262,10 @@ $(document).ready(function() {
 
     updateStartTimerSummary();
     renderStopAfterPresets(false);
+
+    let initialProjectId = String($('[data-reminder-form]').attr('data-initial-project-id') || '');
+    if (initialProjectId && search.val().trim() !== '') {
+        projectIdsByName[search.val().trim().toLowerCase()] = Number(initialProjectId);
+        maybeFillSubprojects(search.val().trim());
+    }
 });

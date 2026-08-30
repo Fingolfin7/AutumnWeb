@@ -1,8 +1,15 @@
 from django import forms
 from django.urls import reverse_lazy
 from django.utils import timezone
-from .models import Projects, SubProjects, Sessions, Context, Tag, Commitment
+from .models import Projects, SubProjects, Sessions, Context, Tag, Commitment, NotificationPreference
 from typing import cast
+from datetime import time
+
+
+NOTIFICATION_WEEKDAY_CHOICES = (
+    (0, "Monday"), (1, "Tuesday"), (2, "Wednesday"), (3, "Thursday"),
+    (4, "Friday"), (5, "Saturday"), (6, "Sunday"),
+)
 
 
 class SearchProjectForm(forms.Form):
@@ -763,6 +770,23 @@ class CommitmentForm(forms.ModelForm):
             self.initial['start_date'] = timezone.localdate()
         self.fields['start_date'].required = False
 
+        # This is deliberately a dynamic field.  The global commitment-check
+        # switch is the gate for opting a single commitment in; when the
+        # category is paused the saved value remains untouched and is not
+        # silently reset by a normal commitment edit.
+        preference = None
+        if self.user is not None and getattr(self.user, "is_authenticated", False):
+            preference = NotificationPreference.objects.filter(user=self.user).first()
+        if preference is not None and preference.commitment_checks_enabled:
+            self.fields["notifications_enabled"] = forms.BooleanField(
+                required=False,
+                label="Check this commitment in notifications",
+                help_text="Autumn can mention this commitment when its period is nearly done.",
+                widget=forms.CheckboxInput(attrs={"class": "commitment-notification-toggle"}),
+            )
+            if self.instance.pk:
+                self.initial["notifications_enabled"] = self.instance.notifications_enabled
+
     def clean(self):
         cleaned_data = super().clean()
         min_balance = cleaned_data.get('min_balance')
@@ -841,3 +865,106 @@ class UpdateCommitmentForm(CommitmentForm):
             **CommitmentForm.Meta.labels,
             'active': 'Active',
         }
+
+
+class NotificationPreferenceForm(forms.ModelForm):
+    """The three independent delivery categories and their local slots."""
+
+    WEEKDAY_CHOICES = NOTIFICATION_WEEKDAY_CHOICES
+
+    class Meta:
+        model = NotificationPreference
+        fields = [
+            "scheduled_reminders_enabled",
+            "commitment_checks_enabled",
+            "weekly_review_enabled",
+            "commitment_check_time",
+            "weekly_review_weekday",
+            "weekly_review_time",
+        ]
+        widgets = {
+            "scheduled_reminders_enabled": forms.CheckboxInput(),
+            "commitment_checks_enabled": forms.CheckboxInput(),
+            "weekly_review_enabled": forms.CheckboxInput(),
+            "commitment_check_time": forms.TimeInput(attrs={"type": "time", "step": 60}),
+            "weekly_review_weekday": forms.Select(choices=NOTIFICATION_WEEKDAY_CHOICES),
+            "weekly_review_time": forms.TimeInput(attrs={"type": "time", "step": 60}),
+        }
+        labels = {
+            "scheduled_reminders_enabled": "Scheduled reminders",
+            "commitment_checks_enabled": "Commitment checks",
+            "weekly_review_enabled": "Weekly review",
+            "commitment_check_time": "Check time",
+            "weekly_review_weekday": "Review day",
+            "weekly_review_time": "Review time",
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+        self.fields["commitment_check_time"].help_text = (
+            "Choose a local time from 18:00 through 23:59."
+        )
+        self.fields["weekly_review_time"].help_text = "This uses your profile timezone."
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self.user is not None:
+            obj.user = self.user
+        if commit:
+            obj.save()
+        return obj
+
+
+class ScheduledReminderForm(forms.Form):
+    """Owned project schedule fields; local date/time are profile-local."""
+
+    project = forms.ModelChoiceField(queryset=Projects.objects.none(), label="Project")
+    subproject = forms.ModelChoiceField(
+        queryset=SubProjects.objects.none(), required=False, label="Subproject (optional)"
+    )
+    local_date = forms.DateField(
+        label="Date", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+    )
+    local_time = forms.TimeField(
+        label="Time", widget=forms.TimeInput(attrs={"type": "time", "step": 60}, format="%H:%M")
+    )
+    cadence = forms.ChoiceField(choices=(
+        ("once", "Once"), ("daily", "Daily"), ("weekly", "Weekly"),
+    ), initial="once", label="Repeat")
+    message = forms.CharField(
+        required=False, max_length=240, label="Message",
+        widget=forms.TextInput(attrs={"maxlength": 240, "placeholder": "What should Autumn remind you about?"}),
+    )
+    version = forms.IntegerField(required=False, widget=forms.HiddenInput())
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop("user", None)
+        self.instance = kwargs.pop("instance", None)
+        super().__init__(*args, **kwargs)
+        if self.user is not None:
+            self.fields["project"].queryset = Projects.objects.filter(user=self.user).exclude(
+                status__in=["archived", "complete"]
+            ).order_by("name")
+            self.fields["subproject"].queryset = SubProjects.objects.filter(
+                user=self.user
+            ).select_related("parent_project").order_by("name")
+            self.fields["subproject"].label_from_instance = lambda obj: f"{obj.name} ({obj.parent_project.name})"
+        if self.instance is not None and not self.is_bound:
+            self.initial.update({
+                "project": self.instance.project_id,
+                "subproject": self.instance.subproject_id,
+                "local_date": self.instance.anchor_date,
+                "local_time": self.instance.anchor_time,
+                "cadence": self.instance.cadence,
+                "message": self.instance.message,
+                "version": self.instance.version,
+            })
+
+    def clean(self):
+        cleaned = super().clean()
+        project = cleaned.get("project")
+        subproject = cleaned.get("subproject")
+        if subproject is not None and project is not None and subproject.parent_project_id != project.pk:
+            self.add_error("subproject", "Choose a subproject from the selected project.")
+        return cleaned

@@ -16,6 +16,8 @@
 </div>
 
 <form method="post" class="fields desk" data-reminder-form
+      data-initial-project-id="{% if initial_project %}{{ initial_project.id }}{% endif %}"
+      data-initial-subproject-id="{% if initial_subproject %}{{ initial_subproject.id }}{% endif %}"
       data-profile-timezone="{{ request.user.profile.timezone|default:'UTC' }}"
       data-push-status-url="{% url 'push_status' %}"
       data-push-subscribe-url="{% url 'push_subscribe' %}"
@@ -27,7 +29,7 @@
         <section class="slab slab-pad">
             <div class="field" id="search-projects">
                 <label for="project-search">Project</label>
-                <input type="text" id="project-search" name="project"
+                <input type="text" id="project-search" name="project" value="{% if initial_project %}{{ initial_project.name }}{% endif %}"
                        placeholder="Start typing a project name..." autocomplete="off"
                        data-ajax_url="{% url 'api_v2:projects' %}">
                 <div id="project-search-results"></div>

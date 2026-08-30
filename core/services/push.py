@@ -10,10 +10,12 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import ipaddress
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone as dt_timezone
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -50,7 +52,25 @@ MAX_ERROR_LENGTH = 500
 MAX_NOTIFICATION_TITLE_LENGTH = 120
 MAX_NOTIFICATION_BODY_LENGTH = 500
 MAX_NOTIFICATION_URL_LENGTH = 1024
+MAX_NOTIFICATION_ACTIONS = 2
+MAX_NOTIFICATION_ACTION_LABEL_LENGTH = 64
+MAX_NOTIFICATION_ACTION_ID_LENGTH = 64
+MAX_NOTIFICATION_TAG_LENGTH = 120
+MAX_NOTIFICATION_IDENTITY_LENGTH = 120
+# Keep this list deliberately narrower than "any same-origin path".  Push
+# payloads can be replayed after a deployment, so a future route must be
+# explicitly added here before it can become a notification destination.
+NOTIFICATION_ALLOWED_PATH_PREFIXES = (
+    "/timers",
+    "/start_timer",
+    "/notifications",
+    "/commitments",
+    "/update_commitment",
+    "/review/weekly",
+)
 VAPID_CLI_PREFIX = "Application Server Key ="
+
+_NOTIFICATION_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]*$")
 
 
 class PushValidationError(ValueError):
@@ -398,6 +418,212 @@ def _safe_error(exc: BaseException) -> str:
     return (value or exc.__class__.__name__)[:MAX_ERROR_LENGTH]
 
 
+def _allowed_notification_path(path: str) -> bool:
+    """Return whether *path* is an explicitly supported Autumn route."""
+
+    # Do not let a browser URL parser turn a backslash or dot segment into a
+    # different path after validation.  Fragments and query strings are fine,
+    # including the timer hash used by the existing reminder events.
+    # Empty components are normal for a trailing slash, but dot segments and
+    # backslashes are rejected because browser URL parsers canonicalise them.
+    if (
+        "\\" in path
+        or re.search(r"%(?:2e|2f|5c)", path, flags=re.IGNORECASE)
+        or any(part in {".", ".."} for part in path.split("/"))
+    ):
+        return False
+    return any(
+        path == prefix or path.startswith(f"{prefix}/")
+        for prefix in NOTIFICATION_ALLOWED_PATH_PREFIXES
+    )
+
+
+def validate_notification_url(value: object, *, default: str = "/timers/") -> str:
+    """Validate a same-origin, relative notification destination.
+
+    Notification destinations are data supplied by claimers and eventually
+    interpreted by a service worker.  Requiring an absolute-root relative
+    URL, rejecting credentials/hosts/schemes, and checking a small route
+    allowlist prevents push payloads from becoming an open redirect or a
+    notification-driven path traversal primitive.
+    """
+
+    if value in (None, ""):
+        value = default
+    if not isinstance(value, str) or not value or len(value) > MAX_NOTIFICATION_URL_LENGTH:
+        raise PushValidationError("Notification URL is invalid.")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in value):
+        raise PushValidationError("Notification URL is invalid.")
+    if not value.startswith("/") or value.startswith("//"):
+        raise PushValidationError("Notification URL must be a safe relative path.")
+    parts = urlsplit(value)
+    if (
+        parts.scheme
+        or parts.netloc
+        or parts.username
+        or parts.password
+        or not _allowed_notification_path(parts.path)
+    ):
+        raise PushValidationError("Notification URL is not an allowed Autumn path.")
+    return value
+
+
+def _bounded_text(
+    value: object, *, name: str, length: int, allow_empty: bool = False
+) -> str:
+    if not isinstance(value, str):
+        raise PushValidationError(f"Notification {name} is invalid.")
+    value = value.strip()
+    if not value and not allow_empty:
+        raise PushValidationError(f"Notification {name} is invalid.")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in value):
+        raise PushValidationError(f"Notification {name} is invalid.")
+    return value[:length]
+
+
+def _stable_identity(payload: dict) -> str:
+    """Choose a deterministic identity for browser deduplication."""
+
+    value = payload.get("identity")
+    if value in (None, ""):
+        for key in (
+            "reminder_id",
+            "scheduled_reminder_id",
+            "schedule_id",
+            "commitment_id",
+            "session_id",
+            "week_start",
+        ):
+            if payload.get(key) not in (None, ""):
+                value = payload[key]
+                break
+    if value in (None, ""):
+        value = "general"
+    if isinstance(value, (dict, list, tuple, set)):
+        try:
+            value = json.dumps(value, sort_keys=True, separators=(",", ":"))
+        except (TypeError, ValueError):
+            value = repr(value)
+    value = str(value).strip()
+    if not value:
+        value = "general"
+    # A long arbitrary identity should not consume the payload cap or make a
+    # browser tag collide merely because it was truncated at the same prefix.
+    if len(value) > MAX_NOTIFICATION_IDENTITY_LENGTH:
+        value = hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
+    return value
+
+
+def _stable_tag(payload: dict, *, kind: str, identity: str) -> str:
+    value = payload.get("tag")
+    if value in (None, ""):
+        value = f"autumn-{kind}-{identity}"
+    if not isinstance(value, str):
+        raise PushValidationError("Notification tag is invalid.")
+    value = value.strip()
+    if not value or len(value) > MAX_NOTIFICATION_TAG_LENGTH:
+        if value:
+            value = hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
+        else:
+            raise PushValidationError("Notification tag is invalid.")
+    if not _NOTIFICATION_TOKEN_RE.fullmatch(value):
+        raise PushValidationError("Notification tag is invalid.")
+    return value
+
+
+def _normalise_action(action: object, index: int) -> dict[str, str]:
+    if not isinstance(action, dict):
+        raise PushValidationError("Notification actions must be objects.")
+    if "url" not in action or not action.get("url"):
+        raise PushValidationError("Notification action URL is required.")
+    label_key = "title" if "title" in action else "label"
+    label = _bounded_text(
+        action.get(label_key), name="action label", length=MAX_NOTIFICATION_ACTION_LABEL_LENGTH
+    )
+    url = validate_notification_url(action.get("url"))
+    identifier = action.get("action", f"action-{index + 1}")
+    identifier = _bounded_text(
+        identifier, name="action identifier", length=MAX_NOTIFICATION_ACTION_ID_LENGTH
+    )
+    if not _NOTIFICATION_TOKEN_RE.fullmatch(identifier):
+        raise PushValidationError("Notification action identifier is invalid.")
+    # Keep the input's label spelling for forward compatibility while always
+    # emitting the standard Notification API title field for the service
+    # worker.  Unknown action fields are intentionally not forwarded.
+    result = {"action": identifier, "title": label, "url": url}
+    if label_key == "label":
+        result["label"] = label
+    return result
+
+
+def validate_notification_payload(payload: object) -> dict:
+    """Validate and bound the browser-facing notification payload.
+
+    This is intentionally usable by future claim services at event creation
+    time.  :func:`_serialize_payload` calls it again immediately before
+    provider I/O, covering events created by older code or a management job.
+    """
+
+    if not isinstance(payload, dict):
+        raise PushValidationError("Notification payload must be a JSON object.")
+    value = dict(payload)
+    kind = value.get("kind", value.get("event_type", "timer"))
+    if not isinstance(kind, str) or not kind.strip():
+        raise PushValidationError("Notification kind is invalid.")
+    kind = kind.strip()[:MAX_NOTIFICATION_ACTION_ID_LENGTH]
+    if not _NOTIFICATION_TOKEN_RE.fullmatch(kind):
+        raise PushValidationError("Notification kind is invalid.")
+    identity = _stable_identity(value)
+    tag = _stable_tag(value, kind=kind, identity=identity)
+
+    output = {}
+    for key, length in (
+        ("title", MAX_NOTIFICATION_TITLE_LENGTH),
+        ("body", MAX_NOTIFICATION_BODY_LENGTH),
+    ):
+        if key in value:
+            output[key] = _bounded_text(
+                value[key], name=key, length=length, allow_empty=key == "body"
+            )
+    output["url"] = validate_notification_url(value.get("url"))
+    output["kind"] = kind
+    output["identity"] = identity
+    output["tag"] = tag
+    if "event_type" in value:
+        event_type = value["event_type"]
+        if not isinstance(event_type, str):
+            raise PushValidationError("Notification event type is invalid.")
+        output["event_type"] = event_type.strip()[:MAX_NOTIFICATION_ACTION_ID_LENGTH]
+
+    for key in (
+        "session_id",
+        "session_uuid",
+        "reminder_id",
+        "scheduled_reminder_id",
+        "schedule_id",
+        "commitment_id",
+        "week_start",
+        "scheduled_at",
+    ):
+        if key in value:
+            output[key] = value[key]
+    if "actions" in value:
+        actions = value["actions"]
+        if not isinstance(actions, list) or len(actions) > MAX_NOTIFICATION_ACTIONS:
+            raise PushValidationError(
+                f"Notification actions must contain at most {MAX_NOTIFICATION_ACTIONS} items."
+            )
+        normalised_actions = [
+            _normalise_action(action, index) for index, action in enumerate(actions)
+        ]
+        if len({action["action"] for action in normalised_actions}) != len(
+            normalised_actions
+        ):
+            raise PushValidationError("Notification action identifiers must be unique.")
+        output["actions"] = normalised_actions
+    return output
+
+
 def _event_terminal_status(event, status: str, *, error: str | None = None):
     now = timezone.now()
     fields = {"status": status, "delivered_at": now if status == "delivered" else None}
@@ -409,34 +635,11 @@ def _event_terminal_status(event, status: str, *, error: str | None = None):
 
 
 def _serialize_payload(payload: object) -> str:
-    # Keep the fields understood by the service worker and bound user text.
-    # Web Push encryption adds framing bytes, so MAX_PAYLOAD_BYTES remains a
-    # conservative ceiling rather than allowing an unbounded event payload to
-    # turn into a provider-side permanent failure.
-    if isinstance(payload, dict):
-        payload = {
-            key: payload[key]
-            for key in (
-                "title",
-                "body",
-                "url",
-                "kind",
-                "session_id",
-                "session_uuid",
-                "reminder_id",
-                "scheduled_at",
-            )
-            if key in payload
-        }
-        for key, length in (
-            ("title", MAX_NOTIFICATION_TITLE_LENGTH),
-            ("body", MAX_NOTIFICATION_BODY_LENGTH),
-            ("url", MAX_NOTIFICATION_URL_LENGTH),
-        ):
-            if key in payload and not isinstance(payload[key], str):
-                payload[key] = str(payload[key])
-            if key in payload:
-                payload[key] = payload[key][:length]
+    # Keep only fields understood by the service worker and validate them at
+    # the provider boundary as well as at event creation.  Web Push encryption
+    # adds framing bytes, so MAX_PAYLOAD_BYTES remains a conservative ceiling
+    # rather than allowing an event payload to become a provider failure.
+    payload = validate_notification_payload(payload)
     try:
         value = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
     except (TypeError, ValueError) as exc:
@@ -451,10 +654,19 @@ def _serialize_payload(payload: object) -> str:
                 payload["body"] = body
                 value = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
         if len(value.encode("utf-8")) > MAX_PAYLOAD_BYTES:
-            # Retain a valid, bounded notification even for an arbitrary
-            # caller-supplied payload containing huge nested values.
+            # Retain a valid, bounded notification even for a caller-supplied
+            # payload containing huge user text or future fields. Preserve the
+            # stable identity/tag so a fallback cannot collapse into an
+            # unrelated browser notification.
             value = json.dumps(
-                {"title": "Autumn", "body": "Your timer notification is ready."},
+                {
+                    "title": "Autumn",
+                    "body": "Your notification is ready.",
+                    "url": "/timers/",
+                    "kind": payload.get("kind", "timer"),
+                    "identity": payload.get("identity", "general"),
+                    "tag": payload.get("tag", "autumn-timer-general"),
+                },
                 separators=(",", ":"),
             )
     return value
@@ -571,6 +783,28 @@ def _event_state(event):
     return "failed", (errors[0] if errors else "All push deliveries failed")
 
 
+def _event_payload(event) -> dict:
+    """Attach a durable fallback identity without changing timer payloads."""
+
+    payload = dict(event.payload) if isinstance(event.payload, dict) else {}
+    # Legacy timer events derive their identity from reminder/session IDs and
+    # intentionally default to the old ``autumn-timer-*`` category/tag.  For
+    # an event with no source identity at all, use its durable unique key so
+    # unrelated events cannot collapse into one browser notification.
+    identity_keys = (
+        "identity",
+        "reminder_id",
+        "scheduled_reminder_id",
+        "schedule_id",
+        "commitment_id",
+        "session_id",
+        "week_start",
+    )
+    if not any(payload.get(key) not in (None, "") for key in identity_keys):
+        payload["identity"] = event.dedupe_key
+    return payload
+
+
 def dispatch_event(event_id: int, *, now=None) -> str:
     """Fan out and deliver one pending event without holding locks on I/O."""
 
@@ -611,10 +845,21 @@ def dispatch_event(event_id: int, *, now=None) -> str:
             continue
         try:
             # The transaction opened by _claim_delivery has committed here.
-            send_push(delivery.subscription, event.payload)
+            send_push(delivery.subscription, _event_payload(event))
         except PushUnavailable as exc:
             NotificationDelivery.objects.filter(pk=delivery.pk).update(
                 status="unavailable",
+                last_error=_safe_error(exc),
+                last_error_at=timezone.now(),
+                lease_until=None,
+                next_attempt_at=None,
+            )
+        except PushValidationError as exc:
+            # A malformed event is a permanent producer error. Retrying it
+            # cannot make an unsafe URL or oversized action become valid and
+            # would keep the outbox pending until the retry cap is exhausted.
+            NotificationDelivery.objects.filter(pk=delivery.pk).update(
+                status="failed",
                 last_error=_safe_error(exc),
                 last_error_at=timezone.now(),
                 lease_until=None,

@@ -75,6 +75,9 @@ class RunDispatchPassTests(SimpleTestCase):
         ) as stop, mock.patch(
             "core.services.reminders.claim_due_reminders", return_value=events
         ) as claim, mock.patch(
+            "core.services.proactive_notifications.claim_due_proactive_notifications",
+            return_value=[],
+        ) as proactive_claim, mock.patch(
             "core.services.push.flush_outbox", return_value=3
         ) as flush:
             result = run_dispatch_pass(limit=7)
@@ -82,10 +85,14 @@ class RunDispatchPassTests(SimpleTestCase):
         self.assertEqual(result, (1, events, 3))
         stop.assert_called_once()
         self.assertEqual(claim.call_args.kwargs["limit"], 7)
+        self.assertEqual(proactive_claim.call_args.kwargs["limit"], 5)
         self.assertEqual(flush.call_args.kwargs["limit"], 7)
         # Every step shares the single "now" instant of the pass.
         self.assertEqual(
             stop.call_args.kwargs["now"], claim.call_args.kwargs["now"]
+        )
+        self.assertEqual(
+            stop.call_args.kwargs["now"], proactive_claim.call_args.kwargs["now"]
         )
         self.assertEqual(
             stop.call_args.kwargs["now"], flush.call_args.kwargs["now"]

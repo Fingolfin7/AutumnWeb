@@ -13,7 +13,7 @@ from core.services.reminder_dispatcher import LOCK_KEY, run_dispatch_pass
 
 
 class Command(BaseCommand):
-    help = "Dispatch due timer reminder and auto-stop Web Push notifications."
+    help = "Dispatch due timer and proactive Web Push notifications."
     lock_key = LOCK_KEY
 
     def add_arguments(self, parser):
@@ -35,8 +35,8 @@ class Command(BaseCommand):
     def _pass(self, *, limit):
         try:
             return run_dispatch_pass(limit=limit)
-        except ImportError as exc:  # Backend reminder slice not installed yet.
-            raise CommandError("Reminder claiming service is unavailable.") from exc
+        except ImportError as exc:  # A claim service may be mid-deployment.
+            raise CommandError("Notification claiming service is unavailable.") from exc
 
     def _lock_timeout(self, options):
         # Keep the lock through the complete bounded loop and a small cleanup

@@ -244,6 +244,15 @@
             <small class="muted">Uncheck to pause tracking without deleting this commitment.</small>
             {{ form.active.errors }}
 
+            {% if form.notifications_enabled %}
+            <div class="check-row u-mt-4">
+                {{ form.notifications_enabled }}
+                <label for="{{ form.notifications_enabled.id_for_label }}">{{ form.notifications_enabled.label }}</label>
+            </div>
+            <small class="muted">{{ form.notifications_enabled.help_text }}</small>
+            {{ form.notifications_enabled.errors }}
+            {% endif %}
+
             {% if form.non_field_errors and not restart_required %}
             {{ form.non_field_errors }}
             {% endif %}

@@ -122,6 +122,7 @@ def disconnect_social_account(request, provider):
 def profile(request):
     if request.method == 'POST':
         profile = request.user.profile
+        previous_timezone = profile.timezone
         ai_features_enabled = profile.ai_features_enabled
         ai_action_submitted = any(
             action in request.POST
@@ -209,6 +210,21 @@ def profile(request):
                     profile.set_api_key('claude', p_form.cleaned_data.get('claude_api_key').strip())
             profile.save()
             p_form.save()
+            if profile.timezone != previous_timezone:
+                # Proactive category slots are stored as UTC instants but
+                # recur in profile-local wall time. Existing standalone
+                # reminders keep their captured timezone; only the user's
+                # preference slots move with a profile timezone change.
+                from core.models import NotificationPreference
+                from core.services.proactive_notifications import (
+                    reschedule_notification_preferences,
+                )
+
+                notification_preference = NotificationPreference.objects.filter(
+                    user=request.user
+                ).first()
+                if notification_preference is not None:
+                    reschedule_notification_preferences(notification_preference)
             messages.success(request, f'Profile updated successfully.')
             return redirect('profile')
     else:

@@ -1,5 +1,6 @@
 from datetime import datetime, time, timezone as dt_tz
 import uuid
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import models
 from django.utils import timezone
@@ -436,12 +437,241 @@ class TimerReminder(models.Model):
             )
 
 
+class NotificationPreference(models.Model):
+    """Per-user switches and local-time slots for proactive notifications.
+
+    The ``next_*`` columns deliberately store instants rather than local
+    datetimes.  Dispatchers can therefore claim due work with a portable
+    compare-and-set update while the configured wall-clock values remain
+    stable across timezone and DST changes.
+    """
+
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notification_preferences",
+    )
+    scheduled_reminders_enabled = models.BooleanField(
+        default=True,
+        db_default=True,
+    )
+    commitment_checks_enabled = models.BooleanField(
+        default=False,
+        db_default=False,
+    )
+    weekly_review_enabled = models.BooleanField(
+        default=False,
+        db_default=False,
+    )
+    # These two values are interpreted in the user's profile timezone.  The
+    # commitment slot is intentionally limited to the final daily action
+    # window; see clean() and the matching database check below.
+    commitment_check_time = models.TimeField(
+        default=time(hour=18),
+        db_default=time(hour=18),
+    )
+    weekly_review_weekday = models.PositiveSmallIntegerField(
+        default=0,
+        db_default=0,
+    )
+    weekly_review_time = models.TimeField(
+        default=time(hour=9),
+        db_default=time(hour=9),
+    )
+    next_commitment_check_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    next_weekly_review_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    version = models.PositiveIntegerField(default=1, db_default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["user_id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(commitment_check_time__gte=time(hour=18))
+                    & models.Q(commitment_check_time__lte=time(hour=23, minute=59, second=59))
+                ),
+                name="notify_pref_commitment_time_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(weekly_review_weekday__gte=0)
+                & models.Q(weekly_review_weekday__lte=6),
+                name="notify_pref_weekday_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(version__gte=1),
+                name="notify_pref_version_positive",
+            ),
+        ]
+
+    def __str__(self):
+        return f"Notification preferences ({self.user.username})"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if self.commitment_check_time is not None:
+            earliest = time(hour=18)
+            latest = time(hour=23, minute=59, second=59)
+            if not earliest <= self.commitment_check_time <= latest:
+                errors["commitment_check_time"] = (
+                    "Commitment checks must be scheduled from 18:00 through 23:59."
+                )
+
+        if self.weekly_review_weekday is not None and not 0 <= self.weekly_review_weekday <= 6:
+            errors["weekly_review_weekday"] = "Weekday must be between Monday (0) and Sunday (6)."
+
+        for field_name in ("next_commitment_check_at", "next_weekly_review_at"):
+            instant = getattr(self, field_name)
+            if instant is not None and timezone.is_naive(instant):
+                errors[field_name] = "The next notification instant must be timezone-aware."
+
+        if errors:
+            raise ValidationError(errors)
+
+
+class ScheduledReminder(models.Model):
+    """A user-owned, project-oriented reminder schedule.
+
+    ``anchor_date`` and ``anchor_time`` are local wall-clock values in
+    ``timezone``.  ``next_fire_at`` is their computed UTC instant and is the
+    value the dispatcher claims.  A one-shot schedule becomes inactive after
+    firing; ``cancelled_at`` distinguishes an explicit cancellation from a
+    naturally completed one-shot schedule.
+    """
+
+    CADENCE_CHOICES = (
+        ("once", "Once"),
+        ("daily", "Daily"),
+        ("weekly", "Weekly"),
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="scheduled_reminders",
+    )
+    project = models.ForeignKey(
+        Projects,
+        on_delete=models.CASCADE,
+        related_name="scheduled_reminders",
+    )
+    subproject = models.ForeignKey(
+        SubProjects,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="scheduled_reminders",
+    )
+    message = models.TextField(blank=True, default="", db_default="")
+    cadence = models.CharField(max_length=10, choices=CADENCE_CHOICES)
+    # Always capture the profile timezone used to interpret the local anchor;
+    # callers must copy it explicitly so an account's timezone is never
+    # silently replaced by a deployment-wide default.
+    timezone = models.CharField(max_length=64)
+    anchor_date = models.DateField()
+    anchor_time = models.TimeField()
+    next_fire_at = models.DateTimeField(null=True, blank=True)
+    active = models.BooleanField(default=True, db_default=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    last_fired_at = models.DateTimeField(null=True, blank=True)
+    snoozed_until = models.DateTimeField(null=True, blank=True)
+    last_snoozed_at = models.DateTimeField(null=True, blank=True)
+    version = models.PositiveIntegerField(default=1, db_default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["next_fire_at", "id"]
+        indexes = [
+            models.Index(
+                fields=["active", "next_fire_at", "id"],
+                name="schedrem_due_idx",
+            ),
+            models.Index(
+                fields=["user", "active", "id"],
+                name="schedrem_user_active_idx",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(cadence__in=("once", "daily", "weekly")),
+                name="schedrem_cadence_valid",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(active=True, next_fire_at__isnull=True),
+                name="schedrem_active_next_fire_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(version__gte=1),
+                name="schedrem_version_positive",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.project.name} reminder ({self.cadence})"
+
+    def clean(self):
+        super().clean()
+        errors = {}
+
+        if self.cadence not in {choice[0] for choice in self.CADENCE_CHOICES}:
+            errors["cadence"] = "Unknown reminder cadence."
+
+        if self.user_id and self.project_id:
+            if self.project.user_id != self.user_id:
+                errors["project"] = "Reminder project must belong to the same user."
+            if self.project.status not in {"active", "paused"}:
+                errors["project"] = "Reminders can only target active or paused projects."
+
+        if self.subproject_id:
+            if self.user_id and self.subproject.user_id != self.user_id:
+                errors["subproject"] = "Reminder subproject must belong to the same user."
+            if self.project_id and self.subproject.parent_project_id != self.project_id:
+                errors["subproject"] = "Reminder subproject must belong to the selected project."
+
+        if self.timezone:
+            try:
+                ZoneInfo(self.timezone)
+            except (ZoneInfoNotFoundError, ValueError):
+                errors["timezone"] = "Enter a valid IANA timezone."
+
+        if self.active:
+            if self.next_fire_at is None:
+                errors["next_fire_at"] = "Active reminders need a next fire time."
+            elif timezone.is_naive(self.next_fire_at):
+                errors["next_fire_at"] = "The next fire instant must be timezone-aware."
+            if self.cancelled_at is not None:
+                errors["cancelled_at"] = "An active reminder cannot be cancelled."
+
+        for field_name in ("cancelled_at", "last_fired_at", "snoozed_until", "last_snoozed_at"):
+            instant = getattr(self, field_name)
+            if instant is not None and timezone.is_naive(instant):
+                errors[field_name] = "Reminder instants must be timezone-aware."
+
+        if errors:
+            raise ValidationError(errors)
+
+
 class NotificationEvent(models.Model):
     """A durable, deduplicated notification waiting for delivery."""
 
     EVENT_TYPES = (
         ("reminder", "Timer reminder"),
         ("auto_stop", "Auto-stop"),
+        ("scheduled_reminder", "Scheduled reminder"),
+        ("commitment_check", "Commitment check"),
+        ("weekly_review", "Weekly review"),
     )
     STATUS_CHOICES = (
         ("pending", "Pending"),
@@ -471,6 +701,20 @@ class NotificationEvent(models.Model):
         blank=True,
         related_name="notification_events",
     )
+    scheduled_reminder = models.ForeignKey(
+        "ScheduledReminder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notification_events",
+    )
+    commitment = models.ForeignKey(
+        "Commitment",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notification_events",
+    )
     # A callable is valid as the Python default but cannot be serialized into
     # a database-level default on SQLite/PostgreSQL.
     payload = models.JSONField(default=dict)
@@ -493,6 +737,18 @@ class NotificationEvent(models.Model):
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(
+                    event_type__in=(
+                        "reminder",
+                        "auto_stop",
+                        "scheduled_reminder",
+                        "commitment_check",
+                        "weekly_review",
+                    )
+                ),
+                name="notifyevent_type_valid",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
                     status__in=(
                         "pending",
                         "processing",
@@ -505,6 +761,18 @@ class NotificationEvent(models.Model):
                 name="notifyevent_status_valid",
             ),
         ]
+
+    def clean(self):
+        super().clean()
+        errors = {}
+        if self.scheduled_reminder_id and self.scheduled_reminder.user_id != self.user_id:
+            errors["scheduled_reminder"] = (
+                "Scheduled reminder source must belong to the event user."
+            )
+        if self.commitment_id and self.commitment.user_id != self.user_id:
+            errors["commitment"] = "Commitment source must belong to the event user."
+        if errors:
+            raise ValidationError(errors)
 
 
 class NotificationDelivery(models.Model):
@@ -646,6 +914,7 @@ class Commitment(models.Model):
     max_balance = models.PositiveIntegerField(default=600, help_text='Maximum balance cap (10 hours default)')
     min_balance = models.IntegerField(default=-600, help_text='Minimum balance cap (10 hours deficit default)')
     banking_enabled = models.BooleanField(default=True)
+    notifications_enabled = models.BooleanField(default=False, db_default=False)
 
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -166,9 +166,11 @@ class PortedPagesSmokeTests(TestCase):
 
         self.assertIn('addEventListener("push"', source)
         self.assertIn('addEventListener("notificationclick"', source)
-        self.assertIn('tag: "autumn-" + kind + "-" + identity', source)
+        self.assertIn('"autumn-" + category + "-" + identity', source)
+        self.assertIn("safeNotificationTag(payload.tag, category, identity)", source)
         self.assertIn('openWindow(target)', source)
-        self.assertIn('startsWith("/timers/")', source)
+        self.assertIn('path === prefix || path.startsWith(prefix + "/")', source)
+        self.assertIn('timer: ["/timers"]', source)
 
     def test_no_ported_page_reloads_a_second_jquery(self):
         """The shell ships jQuery 3.6; the legacy pages pulled 1.7.1 in after

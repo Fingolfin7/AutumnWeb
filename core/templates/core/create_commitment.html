@@ -223,6 +223,15 @@
                 <small class="muted">Carry surplus or deficit between periods.</small>
                 {{ form.banking_enabled.errors }}
 
+                {% if form.notifications_enabled %}
+                <div class="check-row u-mt-4">
+                    {{ form.notifications_enabled }}
+                    <label for="{{ form.notifications_enabled.id_for_label }}">{{ form.notifications_enabled.label }}</label>
+                </div>
+                <small class="muted">{{ form.notifications_enabled.help_text }}</small>
+                {{ form.notifications_enabled.errors }}
+                {% endif %}
+
                 <div class="two-up u-mt-4">
                     <div class="field">
                         {{ form.max_balance.label_tag }}

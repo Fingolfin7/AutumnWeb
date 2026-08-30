@@ -36,7 +36,9 @@ def run_dispatch_pass(*, limit=100, now=None):
     """Run one bounded dispatch pass.
 
     Returns ``(stopped_count, claimed, flushed)`` where ``claimed`` is whatever
-    ``claim_due_reminders`` returned (a list of events, or a count).
+    ``claim_due_reminders`` returned (a list of events, or a count).  When the
+    optional proactive claim service is installed, its three categories are
+    appended to that same collection; the public three-tuple is unchanged.
     """
     from django.utils import timezone
 
@@ -47,8 +49,87 @@ def run_dispatch_pass(*, limit=100, now=None):
     now = now or timezone.now()
     stopped = stop_expired_timers(now=now)
     claimed = claim_due_reminders(now=now, limit=limit)
+    claimed = _claim_proactive_notifications(claimed, now=now, limit=limit)
     flushed = flush_outbox(limit=limit, now=now)
     return len(stopped), claimed, flushed
+
+
+def _claim_proactive_notifications(timer_claimed, *, now, limit):
+    """Append optional scheduled/commitment/review claims defensively.
+
+    The proactive claim module is intentionally not imported at module load:
+    timer delivery remains deployable while that later slice is absent or its
+    migration has not yet run.  A future module may expose one combined
+    ``claim_due_notifications`` function or the three category functions
+    listed below.  Each function receives the same pass instant and a
+    remaining bounded limit, and must return a list of newly claimed events.
+    """
+
+    try:
+        from core.services import proactive_notifications
+    except ImportError:
+        return timer_claimed
+
+    if isinstance(timer_claimed, int):
+        combined = []
+        timer_count = timer_claimed
+    else:
+        try:
+            combined = list(timer_claimed or [])
+        except TypeError:
+            # Preserve the old contract for an unusual count-like return.
+            return timer_claimed
+        timer_count = len(combined)
+
+    remaining = max(0, int(limit) - timer_count)
+    if not remaining:
+        return combined
+
+    combined_claimer = next(
+        (
+            getattr(proactive_notifications, name, None)
+            for name in (
+                "claim_due_notifications",
+                "claim_due_proactive_notifications",
+            )
+            if callable(getattr(proactive_notifications, name, None))
+        ),
+        None,
+    )
+    if callable(combined_claimer):
+        try:
+            extra = combined_claimer(now=now, limit=remaining)
+        except ImportError:
+            # A partially deployed proactive module may still be waiting for
+            # its model migration.  Timer claims must continue to run.
+            return combined
+        if extra:
+            combined.extend(extra if isinstance(extra, (list, tuple)) else [extra])
+        return combined
+
+    for names in (
+        ("claim_due_scheduled_reminders", "claim_due_scheduled"),
+        ("claim_due_commitment_checks", "claim_due_commitments"),
+        ("claim_due_weekly_reviews", "claim_due_weekly_review"),
+    ):
+        name = next(
+            (candidate for candidate in names if callable(getattr(proactive_notifications, candidate, None))),
+            None,
+        )
+        claimer = getattr(proactive_notifications, name, None) if name else None
+        if not callable(claimer):
+            continue
+        remaining = max(0, int(limit) - len(combined))
+        if not remaining:
+            break
+        try:
+            extra = claimer(now=now, limit=remaining)
+        except ImportError:
+            # Keep the timer-only pass usable during a rolling deployment.
+            continue
+        if extra:
+            combined.extend(extra if isinstance(extra, (list, tuple)) else [extra])
+    return combined
 
 
 def should_start_dispatcher(argv, environ, *, enabled):

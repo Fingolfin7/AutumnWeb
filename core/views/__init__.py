@@ -68,3 +68,10 @@ from core.views.push import (
     push_test,
     cancel_timer_reminder,
 )
+from core.views.notifications import (
+    notifications,
+    weekly_review,
+    edit_scheduled_reminder,
+    snooze_scheduled_reminder,
+    cancel_scheduled_reminder,
+)
