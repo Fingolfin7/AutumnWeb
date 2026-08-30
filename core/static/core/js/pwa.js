@@ -85,26 +85,46 @@
         return true;
     }
 
+    function subscribeWithKey(registration, serverKey) {
+        return registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: serverKey });
+    }
+
+    function ensureSubscription(registration, serverKey) {
+        return registration.pushManager.getSubscription().then(function (subscription) {
+            // A subscription held under an older key re-registers happily
+            // and then fails every push with 403, so replace it.
+            if (subscription && sameApplicationServerKey(subscription.options && subscription.options.applicationServerKey, serverKey)) {
+                return subscription;
+            }
+            var cleared = subscription
+                ? subscription.unsubscribe().catch(function () {})
+                : Promise.resolve();
+            return cleared.then(function () {
+                return subscribeWithKey(registration, serverKey).catch(function () {
+                    // A stale or broken push registration can make the first
+                    // subscribe throw "push service error". Clear anything
+                    // lingering and retry once so the user does not have to
+                    // clear site data by hand.
+                    return registration.pushManager.getSubscription().then(function (stale) {
+                        return stale ? stale.unsubscribe().catch(function () {}) : null;
+                    }).then(function () {
+                        return subscribeWithKey(registration, serverKey);
+                    });
+                });
+            });
+        });
+    }
+
     function enable(statusUrl, subscribeUrl) {
         if (!("Notification" in window)) return Promise.reject(new Error("This browser does not support notifications."));
         if (!("serviceWorker" in navigator) || !("PushManager" in window)) return Promise.reject(new Error("This browser does not support push notifications."));
         return window.Notification.requestPermission().then(function (permission) {
-            if (permission !== "granted") throw new Error(permission === "denied" ? "Notifications are blocked in this browser." : "Notification permission was not granted.");
+            if (permission !== "granted") throw new Error(permission === "denied" ? "Notifications are blocked in this browser or for the browser app in system settings." : "Notification permission was not granted.");
             return status(statusUrl);
         }).then(function (data) {
             if (!data.available || !data.public_key) throw new Error(data.configuration_error || "Browser push is not configured for this deployment.");
             return navigator.serviceWorker.ready.then(function (registration) {
-                var serverKey = decodeBase64Url(data.public_key);
-                var options = { userVisibleOnly: true, applicationServerKey: serverKey };
-                return registration.pushManager.getSubscription().then(function (subscription) {
-                    if (!subscription) return registration.pushManager.subscribe(options);
-                    // A subscription held under an older key re-registers happily
-                    // and then fails every push with 403, so replace it.
-                    if (sameApplicationServerKey(subscription.options && subscription.options.applicationServerKey, serverKey)) return subscription;
-                    return subscription.unsubscribe().then(function () {
-                        return registration.pushManager.subscribe(options);
-                    });
-                });
+                return ensureSubscription(registration, decodeBase64Url(data.public_key));
             });
         }).then(function (subscription) {
             return postJson(subscribeUrl, subscription.toJSON()).then(function (result) {
