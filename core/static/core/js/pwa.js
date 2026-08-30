@@ -146,10 +146,20 @@
         });
     }
 
+    // Browser-thrown push failures (an AbortError reading "Registration failed
+    // - push service error") are only diagnosable with their name attached.
+    // Autumn's own errors already read as sentences, so they stay bare.
+    function describeError(error, fallback) {
+        var message = (error && error.message) || fallback;
+        var name = error && error.name;
+        return name && name !== "Error" ? name + ": " + message : message;
+    }
+
     window.AutumnPush = {
         status: status,
         enable: enable,
         unsubscribe: unsubscribe,
+        describeError: describeError,
         test: function (url) { return postJson(url, {}); }
     };
 })(window);

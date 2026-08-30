@@ -300,7 +300,7 @@
             }
             permissionStatus(form, container);
         }).catch(function (error) {
-            if (statusNode) statusNode.textContent = error.message || "Notifications could not be enabled.";
+            if (statusNode) statusNode.textContent = window.AutumnPush.describeError(error, "Notifications could not be enabled.");
             action.disabled = false;
         });
     });

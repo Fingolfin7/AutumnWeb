@@ -1,15 +1,6 @@
 (function () {
     "use strict";
 
-    // Browser-thrown push failures (an AbortError reading "Registration failed
-    // - push service error") are only diagnosable with their name attached.
-    // Autumn's own errors already read as sentences, so they stay bare.
-    function failureText(error, fallback) {
-        var message = (error && error.message) || fallback;
-        var name = error && error.name;
-        return name && name !== "Error" ? name + ": " + message : message;
-    }
-
     function setState(container, state, title, detail, actionLabel, action) {
         container.dataset.permState = state;
         var titleNode = container.querySelector("[data-perm-title]");
@@ -148,7 +139,7 @@
             if (statusNode) statusNode.textContent = action.dataset.permAction === "test" ? "Test notification queued." : "Notifications enabled for this browser.";
             status(container);
         }).catch(function (error) {
-            if (statusNode) statusNode.textContent = failureText(error, "Notifications could not be enabled.");
+            if (statusNode) statusNode.textContent = window.AutumnPush.describeError(error, "Notifications could not be enabled.");
         }).then(function () {
             action.disabled = false;
             action.dataset.busy = "false";
