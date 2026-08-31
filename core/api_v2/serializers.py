@@ -734,3 +734,6 @@ class ChartPayloadRowSerializer(serializers.Serializer):
     count = serializers.IntegerField(required=False)
     text = serializers.CharField(required=False)
     weight = serializers.IntegerField(required=False)
+    weekday = serializers.IntegerField(required=False, min_value=0, max_value=6)
+    hour = serializers.IntegerField(required=False, min_value=0, max_value=23)
+    average_hours = serializers.FloatField(required=False, min_value=0)

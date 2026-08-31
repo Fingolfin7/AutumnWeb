@@ -16,6 +16,7 @@ from django.db.models import (
     When,
 )
 from django.db.models.functions import TruncDate
+from django.utils import timezone
 from core.attribution import subproject_daily_series, subproject_session_points
 
 
@@ -140,7 +141,55 @@ def _daily_totals(sessions):
     ]
 
 
+def _heatmap(sessions):
+    """Aggregate sessions into sparse Sunday-first weekday/hour cells.
+
+    Iteration advances by absolute elapsed time to the next local clock-hour
+    boundary. This keeps spring-forward gaps empty and accounts for repeated
+    fall-back hours without materializing every session or sending them to the
+    browser.
+    """
+
+    totals = [[0.0] * 24 for _ in range(7)]
+    counts = [[0] * 24 for _ in range(7)]
+    active_timezone = timezone.get_current_timezone()
+    intervals = sessions.values_list("start_time", "end_time").iterator(
+        chunk_size=1_000
+    )
+
+    for start_time, end_time in intervals:
+        current = start_time
+        while current < end_time:
+            local_current = current.astimezone(active_timezone)
+            seconds_into_hour = (
+                local_current.minute * 60
+                + local_current.second
+                + local_current.microsecond / 1_000_000
+            )
+            next_boundary = current + timedelta(seconds=3_600 - seconds_into_hour)
+            block_end = min(next_boundary, end_time)
+            # JavaScript Date.getDay() uses Sunday=0; retain that chart contract.
+            weekday = (local_current.weekday() + 1) % 7
+            hour = local_current.hour
+            totals[weekday][hour] += (block_end - current).total_seconds() / 3_600
+            counts[weekday][hour] += 1
+            current = block_end
+
+    return [
+        {
+            "weekday": weekday,
+            "hour": hour,
+            "average_hours": totals[weekday][hour] / counts[weekday][hour],
+        }
+        for weekday in range(7)
+        for hour in range(24)
+        if counts[weekday][hour]
+    ]
+
+
 def _intervals(sessions):
+    """Retain the original public API payload for non-aggregated callers."""
+
     return list(sessions.order_by("-end_time").values("start_time", "end_time"))
 
 
@@ -207,7 +256,13 @@ def _wordcloud(sessions):
     ]
 
 
-def build_chart_payload(chart_type, sessions, *, use_subprojects=False):
+def build_chart_payload(
+    chart_type,
+    sessions,
+    *,
+    use_subprojects=False,
+    aggregate_heatmap=False,
+):
     """Build the legacy web-chart payload shape for an already filtered set."""
     if chart_type in SESSION_POINT_CHARTS:
         return _session_points(sessions, use_subprojects)
@@ -216,7 +271,7 @@ def build_chart_payload(chart_type, sessions, *, use_subprojects=False):
     elif chart_type in DAILY_TOTAL_CHARTS:
         return _daily_totals(sessions)
     elif chart_type in INTERVAL_CHARTS:
-        return _intervals(sessions)
+        return _heatmap(sessions) if aggregate_heatmap else _intervals(sessions)
     elif chart_type == "histogram":
         return _histogram(sessions)
     return _wordcloud(sessions)

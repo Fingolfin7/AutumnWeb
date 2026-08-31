@@ -736,6 +736,12 @@ paths:
           type: string
         description: Filter by active state (true or false).
       - in: query
+        name: aggregate
+        schema:
+          type: boolean
+        description: For heatmap charts, return server-aggregated weekday/hour cells
+          instead of raw session intervals.
+      - in: query
         name: chart_type
         schema:
           type: string
@@ -1719,6 +1725,18 @@ components:
           type: string
         weight:
           type: integer
+        weekday:
+          type: integer
+          maximum: 6
+          minimum: 0
+        hour:
+          type: integer
+          maximum: 23
+          minimum: 0
+        average_hours:
+          type: number
+          format: double
+          minimum: 0
     CommitmentAdjustmentRequest:
       type: object
       properties:

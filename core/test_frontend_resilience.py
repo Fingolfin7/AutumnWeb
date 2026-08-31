@@ -35,3 +35,11 @@ class FrontendRequestResilienceTests(SimpleTestCase):
         self.assertIn("autocompleteGeneration", source)
         self.assertIn("subprojectGeneration", source)
         self.assertGreaterEqual(source.count("generation !=="), 4)
+
+    def test_heatmap_requests_and_consumes_server_aggregation(self):
+        request_source = self._source("charts/core.js")
+        renderer_source = self._source("charts/time.js")
+
+        self.assertIn("qs.set('aggregate', 'true')", request_source)
+        self.assertIn("item.average_hours", renderer_source)
+        self.assertNotIn("new Date(item.start_time)", renderer_source)

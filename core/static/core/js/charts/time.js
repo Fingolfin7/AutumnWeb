@@ -122,39 +122,16 @@
     // ========================================================================
 
     function heatmap_graph(data, ctx) {
-        // Prepare storage: 7 days * 24 hours
-        const totals = Array.from({ length: 7 }, () => Array(24).fill(0));
-        const counts = Array.from({ length: 7 }, () => Array(24).fill(0));
-
-        // Bin each session into hour-blocks
-        data.forEach(item => {
-            const t0 = new Date(item.start_time);
-            const t1 = new Date(item.end_time);
-            let cur = new Date(t0);
-
-            while (cur < t1) {
-                const nextHour = new Date(cur);
-                nextHour.setHours(cur.getHours() + 1, 0, 0, 0);
-                const blockEnd = nextHour < t1 ? nextHour : t1;
-                const durHrs = (blockEnd - cur) / 36e5;
-
-                const wd = cur.getDay();
-                const hr = cur.getHours();
-
-                totals[wd][hr] += durHrs;
-                counts[wd][hr] += 1;
-
-                cur = blockEnd;
-            }
-        });
+        const averages = new Map(
+            data.map(item => [`${item.weekday}:${item.hour}`, Number(item.average_hours)])
+        );
 
         // Build matrix data and find max average
         let maxAvg = 0;
         const matrixData = [];
         for (let wd = 0; wd < 7; wd++) {
             for (let hr = 0; hr < 24; hr++) {
-                const cnt = counts[wd][hr];
-                const avg = cnt > 0 ? totals[wd][hr] / cnt : 0;
+                const avg = averages.get(`${wd}:${hr}`) || 0;
                 if (avg > maxAvg) maxAvg = avg;
                 matrixData.push({ x: wd, y: hr, v: avg });
             }
