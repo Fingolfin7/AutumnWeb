@@ -10,6 +10,7 @@ class DatabaseSettingsTests(SimpleTestCase):
     @staticmethod
     def load_database_settings(database_url, *, disable_server_side_cursors=None):
         process_env = os.environ.copy()
+        process_env["SECRET_KEY"] = "database-settings-test-key"
         process_env["DATABASE_URL"] = database_url
         if disable_server_side_cursors is None:
             process_env.pop("DISABLE_SERVER_SIDE_CURSORS", None)
@@ -18,15 +19,20 @@ class DatabaseSettingsTests(SimpleTestCase):
                 disable_server_side_cursors
             )
 
-        command = (
-            "import json; "
-            "from django.conf import settings; "
-            'database = settings.DATABASES["default"]; '
-            "print(json.dumps({"
-            '"disable_server_side_cursors": '
-            'database.get("DISABLE_SERVER_SIDE_CURSORS")'
-            "}))"
+        command = """
+import json
+from unittest.mock import patch
+
+with patch("environ.Env.read_env"):
+    from django.conf import settings
+
+    database = settings.DATABASES["default"]
+    print(json.dumps({
+        "disable_server_side_cursors": database.get(
+            "DISABLE_SERVER_SIDE_CURSORS"
         )
+    }))
+"""
         completed = subprocess.run(
             [sys.executable, "-c", command],
             check=True,
