@@ -6,9 +6,6 @@
 // Global chart function registry - modules register their charts here
 window.AutumnCharts = window.AutumnCharts || {
     chartFns: {},
-    register: function(name, fn) {
-        this.chartFns[name] = fn;
-    },
     registerAll: function(charts) {
         Object.assign(this.chartFns, charts);
     }
@@ -25,10 +22,6 @@ function generateRandomColor(element_position, element_count) {
         '#66837f', '#a87854', '#6f8465', '#596d80'
     ];
     return palette[element_position % palette.length];
-}
-
-function generateColorWithSaturation(element_position, element_count, saturation = 100, lightness = 70) {
-    return generateRandomColor(element_position, element_count);
 }
 
 function fillDates(minDate, maxDate) {
@@ -55,41 +48,12 @@ function getChartUnit(endDate, startDate, defaultUnit = 'week') {
     }
 }
 
-function format_date(date) {
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const year = date.getFullYear();
-    return `${year}-${month}-${day}`;
-}
-
-function countWeekdays(startDate, endDate) {
-    const counts = Array(7).fill(0);
-    const d = new Date(startDate);
-    while (d <= endDate) {
-        counts[d.getDay()] += 1;
-        d.setDate(d.getDate() + 1);
-    }
-    return counts;
-}
-
 function clearChart(ctx) {
     try {
         const existing = Chart.getChart(ctx);
         if (existing) existing.destroy();
     } catch (e) {
         // ignore
-    }
-}
-
-function formatDuration(hours) {
-    if (hours < 1) {
-        return `${Math.round(hours * 60)}m`;
-    } else if (hours < 24) {
-        return `${hours.toFixed(1)}h`;
-    } else {
-        const days = Math.floor(hours / 24);
-        const remainingHours = hours % 24;
-        return `${days}d ${remainingHours.toFixed(0)}h`;
     }
 }
 
@@ -412,13 +376,9 @@ $(document).ready(function() {
 // Export utilities for other modules
 window.AutumnCharts.utils = {
     generateRandomColor,
-    generateColorWithSaturation,
     fillDates,
     getChartUnit,
-    format_date,
-    countWeekdays,
     clearChart,
-    formatDuration,
     getProjectLimit,
     consolidateTopN
 };

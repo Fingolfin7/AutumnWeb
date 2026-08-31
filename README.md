@@ -112,6 +112,10 @@ PUSH_VAPID_PRIVATE_KEY=<private key secret>
 PUSH_VAPID_SUBJECT=mailto:admin@example.com
 # Optional comma-separated additions/replacements for browser push providers:
 PUSH_ALLOWED_ENDPOINT_SUFFIXES=fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com
+# Optional delivery tuning:
+PUSH_MAX_ATTEMPTS=5
+PUSH_RETRY_BASE_SECONDS=30
+PUSH_DISPATCH_INTERVAL_SECONDS=15
 ```
 
 Generate a keypair with `python -m py_vapid --gen`. The public-key command
@@ -161,6 +165,23 @@ thread do not run a pass at the same time when they share a cache backend.
 Note that on a free-tier service that sleeps when idle, nothing dispatches
 while the service is asleep; reminders are delivered after it wakes.
 
+#### Checking delivery on Render
+
+The dispatcher writes searchable `notification_dispatch` INFO entries to the
+`core.services.push` logger. Each entry includes the event ID and type, user
+ID and username, scheduled time, terminal or pending status, targeted-device
+count, delivered/failed/expired/unavailable counts, attempt count, and the
+time the push provider accepted a delivery. Individual provider failures also
+write `notification_device_failure` WARNING entries with the subscription ID,
+provider status, and attempt number. Endpoints and notification bodies are
+intentionally excluded from logs.
+
+In Render Logs, filter by logger `core.services.push` or search for
+`notification_dispatch`. `devices_delivered` means the push provider accepted
+the request; it does not prove that a particular operating system displayed
+the notification. `provider_accepted_at` is the delivery timestamp to use
+when checking when a device was reached.
+
 ---
 
 ### Tech Stack
@@ -175,7 +196,12 @@ while the service is asleep; reminders are delivered after it wakes.
 
 ### API Docs
 
-See `docs/api.md` for `/api/*` endpoints used by the CLI wrapper and integrations, including commitments, project metadata, context/tag management, and JSON import. `GET /healthz/` is an unauthenticated health check for waking or probing a sleeping deployment.
+See [`docs/api.md`](docs/api.md) for the legacy `/api/*` endpoints used by the
+CLI wrapper and integrations. The versioned REST API lives under `/api/v2/`
+and its checked-in OpenAPI document is [`openapi-v2.yaml`](openapi-v2.yaml).
+`GET /healthz/` is an unauthenticated root health check for waking or probing a
+sleeping deployment. Browser push subscription and delivery are web routes,
+not part of the versioned API; their operational logging is described above.
 
 ---
 

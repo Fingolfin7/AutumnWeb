@@ -1,6 +1,5 @@
 from collections import Counter
-from core.forms import *
-from core.utils import *
+
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -26,6 +25,12 @@ from core.models import Projects, SubProjects, Sessions, Commitment, TimerRemind
 from core.services import SessionMutationService
 from core.services.reminders import create_timer_reminder
 from core.views.allocations import parse_allocation_post
+from core.forms import StopTimerForm
+from core.utils import (
+    filter_by_active_context,
+    parse_stop_after_duration,
+    stop_expired_timers,
+)
 
 
 ACTIVE_TIMER_FRAGMENT_TEMPLATES = {

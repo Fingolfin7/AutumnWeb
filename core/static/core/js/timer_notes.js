@@ -57,7 +57,11 @@
                     },
                     body: body.toString()
                 });
+                if (response.redirected) {
+                    throw new Error('authentication required');
+                }
                 if (!response.ok) throw new Error('save failed');
+                await response.json();
                 if (textarea.value === sentValue) {
                     editor.dataset.dirty = 'false';
                     setStatus(`Saved ✓ ${stamp().replaceAll('—', '').trim()}`, 'saved');
@@ -66,7 +70,12 @@
                 }
             } catch (error) {
                 editor.dataset.dirty = 'true';
-                setStatus('Could not save — try again', 'error');
+                setStatus(
+                    error.message === 'authentication required'
+                        ? 'Session expired — sign in again'
+                        : 'Could not save — try again',
+                    'error'
+                );
             } finally {
                 saving = false;
                 saveButton.disabled = false;

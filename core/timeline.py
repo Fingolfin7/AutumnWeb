@@ -316,7 +316,3 @@ def _overlapping(range_start):
     from django.db.models import Q
 
     return Q(end_time__isnull=True) | Q(end_time__gt=range_start)
-
-
-#: Kept under its original name for anything still importing it.
-models_q_overlapping = _overlapping

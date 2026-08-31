@@ -418,28 +418,6 @@ def group_sessions_by_date(sessions):
     return grouped
 
 
-def tally_project_durations(sessions) -> list[dict]:
-    """
-    Tally the total duration of each project in the given list of sessions
-    :param sessions: iterable of sessions
-    :return: list of tuples containing the project name and its total duration
-    """
-
-    project_durations = defaultdict(
-        timedelta
-    )  # avoids the need to check if a key exists before updating it
-
-    for session in sessions:
-        project_name = session.project.name
-        duration = session.end_time - session.start_time
-        project_durations[project_name] += duration
-
-    return [
-        {"name": name, "total_time": total.total_seconds() / 60}
-        for name, total in project_durations.items()
-    ]
-
-
 def session_exists(
     user,
     project,
@@ -787,18 +765,6 @@ def get_period_bounds(
 
     return start, end
 
-def get_commitment_sessions_queryset(commitment, period_start, period_end):
-    from core.commitments import get_commitment_sessions_queryset as implementation
-
-    return implementation(commitment, period_start, period_end)
-
-
-def get_commitment_progress(commitment) -> dict:
-    from core.commitments import get_commitment_progress as implementation
-
-    return implementation(commitment)
-
-
 def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -> dict:
     """
     Calculate consecutive days with any logged time.
@@ -848,21 +814,3 @@ def calculate_daily_activity_streak(user, reference_date=None, days: int = 14) -
         )
 
     return {"current_streak": current_streak, "recent_days": recent_days}
-
-
-def calculate_commitment_streak(commitment, num_periods=8) -> dict:
-    from core.commitments import calculate_commitment_streak as implementation
-
-    return implementation(commitment, num_periods=num_periods)
-
-
-def reconcile_commitment(commitment, force: bool = False) -> bool:
-    from core.commitments import reconcile_commitment as implementation
-
-    return implementation(commitment, force=force)
-
-
-def get_commitment_start_datetime(commitment) -> datetime:
-    from core.commitments import get_commitment_start_datetime as implementation
-
-    return implementation(commitment)

@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+from collections import Counter
 from datetime import datetime, timedelta, timezone as dt_timezone
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -764,23 +765,117 @@ def _fanout_event(event):
     return NotificationDelivery.objects.filter(event=event).exists()
 
 
-def _event_state(event):
+def _delivery_summary(event):
     deliveries = list(
         NotificationDelivery.objects.filter(event=event).values_list(
-            "status", "last_error"
+            "status", "last_error", "attempts", "delivered_at"
         )
     )
-    if not deliveries:
+    counts = Counter(status for status, _, _, _ in deliveries)
+    accepted_at = max(
+        (delivered_at for _, _, _, delivered_at in deliveries if delivered_at is not None),
+        default=None,
+    )
+    return {
+        "devices_targeted": len(deliveries),
+        "devices_delivered": counts["delivered"],
+        "devices_pending": counts["pending"] + counts["processing"],
+        "devices_failed": counts["failed"],
+        "devices_expired": counts["expired"],
+        "devices_unavailable": counts["unavailable"],
+        "attempts": sum(attempts or 0 for _, _, attempts, _ in deliveries),
+        "provider_accepted_at": accepted_at,
+        "errors": [
+            error
+            for status, error, _, _ in deliveries
+            if status == "failed" and error
+        ],
+    }
+
+
+def _event_state_from_summary(summary):
+    statuses = {
+        status
+        for status, count in (
+            ("pending", summary["devices_pending"]),
+            ("delivered", summary["devices_delivered"]),
+            ("failed", summary["devices_failed"]),
+            ("expired", summary["devices_expired"]),
+            ("unavailable", summary["devices_unavailable"]),
+        )
+        if count
+    }
+    if not statuses:
         return "unavailable", "No active subscriptions"
-    statuses = {status for status, _ in deliveries}
-    if statuses & {"pending", "processing"}:
+    if "pending" in statuses:
         return "pending", None
     if "delivered" in statuses:
         return "delivered", None
     if statuses <= {"unavailable", "expired"}:
         return "unavailable", "No active subscriptions could receive this notification"
-    errors = [error for status, error in deliveries if status == "failed" and error]
+    errors = summary["errors"]
     return "failed", (errors[0] if errors else "All push deliveries failed")
+
+
+def _log_dispatch_result(event, status, summary, *, error=None):
+    """Write an operator-safe, searchable delivery summary to the app log."""
+
+    accepted_at = summary["provider_accepted_at"]
+    logger.info(
+        "notification_dispatch event_id=%s event_type=%s user_id=%s "
+        "username=%s scheduled_at=%s status=%s devices_targeted=%s "
+        "devices_delivered=%s devices_pending=%s devices_failed=%s "
+        "devices_expired=%s devices_unavailable=%s attempts=%s "
+        "provider_accepted_at=%s error=%s",
+        event.pk,
+        event.event_type,
+        event.user_id,
+        json.dumps(event.user.get_username(), ensure_ascii=True),
+        event.scheduled_at.isoformat(),
+        status,
+        summary["devices_targeted"],
+        summary["devices_delivered"],
+        summary["devices_pending"],
+        summary["devices_failed"],
+        summary["devices_expired"],
+        summary["devices_unavailable"],
+        summary["attempts"],
+        accepted_at.isoformat() if accepted_at is not None else "-",
+        json.dumps(error or "", ensure_ascii=True),
+    )
+
+
+def _log_device_failure(event, delivery, status, *, provider_status=None, error=None):
+    logger.warning(
+        "notification_device_failure event_id=%s event_type=%s user_id=%s "
+        "subscription_id=%s status=%s provider_status=%s attempt=%s error=%s",
+        event.pk,
+        event.event_type,
+        event.user_id,
+        delivery.subscription_id,
+        status,
+        provider_status if provider_status is not None else "-",
+        delivery.attempts or 0,
+        json.dumps(_safe_error(error) if error is not None else "", ensure_ascii=True),
+    )
+
+
+def _active_subscription_count(user_id):
+    return PushSubscription.objects.filter(user_id=user_id, active=True).count()
+
+
+def _empty_delivery_summary(*, targeted=0, unavailable=0):
+    return {
+        "devices_targeted": targeted,
+        "devices_delivered": 0,
+        "devices_pending": 0,
+        "devices_failed": 0,
+        "devices_expired": 0,
+        "devices_unavailable": unavailable,
+        "attempts": 0,
+        "provider_accepted_at": None,
+        "errors": [],
+    }
 
 
 def _event_payload(event) -> dict:
@@ -810,22 +905,36 @@ def dispatch_event(event_id: int, *, now=None) -> str:
 
     now = now or timezone.now()
     try:
-        event = NotificationEvent.objects.get(pk=event_id)
+        event = NotificationEvent.objects.select_related("user").get(pk=event_id)
     except NotificationEvent.DoesNotExist:
         return "missing"
     if event.status != "pending":
         return event.status
     if not push_configured():
-        _event_terminal_status(event, "unavailable", error="VAPID is not configured")
+        active_devices = _active_subscription_count(event.user_id)
+        summary = _empty_delivery_summary(
+            targeted=active_devices,
+            unavailable=active_devices,
+        )
+        error = "VAPID is not configured"
+        _event_terminal_status(event, "unavailable", error=error)
+        _log_dispatch_result(event, "unavailable", summary, error=error)
         return "unavailable"
 
     with transaction.atomic():
-        event = NotificationEvent.objects.select_for_update().get(pk=event.pk)
+        event = (
+            NotificationEvent.objects.select_for_update()
+            .select_related("user")
+            .get(pk=event.pk)
+        )
         if event.status != "pending":
             return event.status
         has_deliveries = _fanout_event(event)
         if not has_deliveries:
-            _event_terminal_status(event, "unavailable", error="No active subscriptions")
+            error = "No active subscriptions"
+            summary = _empty_delivery_summary()
+            _event_terminal_status(event, "unavailable", error=error)
+            _log_dispatch_result(event, "unavailable", summary, error=error)
             return "unavailable"
 
     due_filter = Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now)
@@ -854,6 +963,7 @@ def dispatch_event(event_id: int, *, now=None) -> str:
                 lease_until=None,
                 next_attempt_at=None,
             )
+            _log_device_failure(event, delivery, "unavailable", error=exc)
         except PushValidationError as exc:
             # A malformed event is a permanent producer error. Retrying it
             # cannot make an unsafe URL or oversized action become valid and
@@ -865,6 +975,7 @@ def dispatch_event(event_id: int, *, now=None) -> str:
                 lease_until=None,
                 next_attempt_at=None,
             )
+            _log_device_failure(event, delivery, "failed", error=exc)
         except Exception as exc:  # Provider/network errors stay per-device.
             code = _response_status(exc)
             attempts = delivery.attempts or 0
@@ -894,6 +1005,13 @@ def dispatch_event(event_id: int, *, now=None) -> str:
                 "lease_until": None,
             }
             NotificationDelivery.objects.filter(pk=delivery.pk).update(**values)
+            _log_device_failure(
+                event,
+                delivery,
+                status,
+                provider_status=code,
+                error=exc,
+            )
         else:
             NotificationDelivery.objects.filter(pk=delivery.pk).update(
                 status="delivered",
@@ -904,9 +1022,11 @@ def dispatch_event(event_id: int, *, now=None) -> str:
                 last_error_at=None,
             )
 
-    status, error = _event_state(event)
+    summary = _delivery_summary(event)
+    status, error = _event_state_from_summary(summary)
     if status != "pending":
         _event_terminal_status(event, status, error=error)
+    _log_dispatch_result(event, status, summary, error=error)
     return status
 
 

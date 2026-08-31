@@ -1,8 +1,10 @@
 import json
-from core.forms import *
-from core.utils import *
+
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
+
+from core.forms import SearchProjectForm
+from core.utils import build_exclude_project_meta, summarise_search_filters
 
 
 @login_required

@@ -10,6 +10,8 @@ $(document).ready(function() {
     let lastLoadedProject = '';
     let presetSelectionActive = false;
     let projectIdsByName = {};
+    let autocompleteGeneration = 0;
+    let subprojectGeneration = 0;
     // A notification can hand us owned ids via the GET page.  They are only
     // used to seed the existing picker; the POST still submits the same names
     // and the server remains the authority for ownership.
@@ -56,6 +58,7 @@ $(document).ready(function() {
         projectName = (projectName || search.val()).trim();
 
         if (projectName === '') {
+            subprojectGeneration += 1;
             lastLoadedProject = '';
             $('#pick-subprojects').hide('fast');
             $('#select-all-block').hide('fast');
@@ -97,6 +100,7 @@ $(document).ready(function() {
     search.on('keyup', function() {
         let ajax_url = $(this).attr('data-ajax_url');
         let value = $(this).val().trim();
+        let generation = ++autocompleteGeneration;
         updateStartTimerSummary();
 
         if (value === '') {
@@ -113,6 +117,9 @@ $(document).ready(function() {
             },
             dataType: 'json',
             success: function(data) {
+                if (generation !== autocompleteGeneration || search.val().trim() !== value) {
+                    return;
+                }
                 let projects = data.projects || [];
                 projects.forEach(({id, name}) => {
                     projectIdsByName[name.toLowerCase()] = id;
@@ -207,25 +214,39 @@ $(document).ready(function() {
         // swap in the real id once the name resolves.
         let urlTemplate = $('#list_subs').attr('data-ajax_url');
         if (project_name !== '') {
+            let generation = ++subprojectGeneration;
             lastLoadedProject = project_name;
             $('#pick-subprojects').show('slow');
             $('#select-all-block').show('slow');
             $('#subproject_options').html('<span class="subproject-empty-state">Loading...</span>');
 
             resolveProjectId(project_name).then(function(projectId) {
-                loadSubprojects(urlTemplate.replace('/0/', '/' + projectId + '/'));
+                if (generation !== subprojectGeneration || search.val().trim() !== project_name) {
+                    return;
+                }
+                loadSubprojects(
+                    urlTemplate.replace('/0/', '/' + projectId + '/'),
+                    project_name,
+                    generation
+                );
             }, function() {
+                if (generation !== subprojectGeneration || search.val().trim() !== project_name) {
+                    return;
+                }
                 lastLoadedProject = '';
                 $('#subproject_options').html('<span class="subproject-empty-state">Could not load subprojects.</span>');
             });
         }
     }
 
-    function loadSubprojects(url) {
+    function loadSubprojects(url, projectName, generation) {
         $.ajax({
             url: url,
             dataType: 'json',
             success: function(data) {
+                if (generation !== subprojectGeneration || search.val().trim() !== projectName) {
+                    return;
+                }
                 let subprojects = data.subprojects || [];
                 if (subprojects.length === 0) {
                     $('#subproject_options').html('<span class="subproject-empty-state">No subprojects found.</span>');
@@ -257,6 +278,9 @@ $(document).ready(function() {
                 });
             },
             error: function() {
+                if (generation !== subprojectGeneration || search.val().trim() !== projectName) {
+                    return;
+                }
                 lastLoadedProject = '';
                 $('#subproject_options').html('<span class="subproject-empty-state">Could not load subprojects.</span>');
             }

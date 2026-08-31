@@ -241,12 +241,15 @@
                 credentials: "same-origin",
                 headers: { "X-CSRFToken": csrfToken() }
             }).then(function (response) {
+                if (response.redirected) throw new Error("authentication required");
                 if (!response.ok) throw new Error("cancel failed");
+                return response.json();
+            }).then(function () {
                 var row = cancel.closest("[data-reminder-row]");
                 if (row) row.remove();
                 var list = cancel.closest("[data-reminder-list]");
                 if (list && !list.querySelector("[data-reminder-row]") && !list.querySelector("[data-auto-stop-row]")) list.remove();
-            }).catch(function () {
+            }).catch(function (error) {
                 cancel.disabled = false;
                 cancel.dataset.busy = "false";
                 var row = cancel.closest("[data-reminder-row]");
@@ -257,7 +260,9 @@
                         status.className = "rm-live-message";
                         row.querySelector(".rm-live-copy").appendChild(status);
                     }
-                    status.textContent = "Could not cancel; try again.";
+                    status.textContent = error.message === "authentication required"
+                        ? "Session expired; sign in again."
+                        : "Could not cancel; try again.";
                 }
             });
         }

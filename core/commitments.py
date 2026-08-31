@@ -1063,16 +1063,6 @@ def commitment_deadline(value, reference_instant=None):
     return evaluation["period_end"]
 
 
-def commitment_is_covered(value, reference_instant=None):
-    """Whether the current period is met, including positive bank balance."""
-    evaluation = (
-        value
-        if isinstance(value, dict)
-        else get_commitment_evaluation(value, reference_instant)
-    )
-    return commitment_banking(evaluation)["covered"]
-
-
 def commitment_actionability(value, reference_instant=None) -> dict:
     """Return the sparse final-window action decision for a commitment.
 

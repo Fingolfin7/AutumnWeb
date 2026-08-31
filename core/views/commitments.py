@@ -1,6 +1,5 @@
 import json
-from core.forms import *
-from core.utils import *
+
 from core.models import Context, Tag
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -10,6 +9,8 @@ from django.views.generic import (
     UpdateView,
     DeleteView,
 )
+
+from core.forms import CommitmentForm, UpdateCommitmentForm
 from core.commitments import (
     build_commitment_scope_meta,
     get_commitment_progress,

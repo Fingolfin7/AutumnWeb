@@ -1,4 +1,3 @@
-import os
 from datetime import date, datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -7,11 +6,8 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.files.storage import default_storage
-from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.utils import timezone
 from dateutil.relativedelta import relativedelta
-from io import BytesIO
-from PIL import Image, ImageSequence
 from cryptography.fernet import Fernet
 from django.conf import settings
 
@@ -215,28 +211,6 @@ class Profile(models.Model):
         except Exception:
             return None
 
-    # TODO: Restore the 450px avatar/GIF resizing using storage-agnostic file APIs
-    # so uploads are processed correctly with both S3 and local storage.
-    # def save(self, *args, **kwargs):
-    #     super().save(*args, **kwargs)
-    #
-    #     if not os.path.exists(self.image.path):
-    #         return  # image file does not exist
-    #
-    #     img = Image.open(self.image)
-    #
-    #     if img.format == 'GIF':
-    #         # trying to trigger the save method of the image field so that django_cleanups can clean up the old image
-    #         self.image = self.resize_gif(img)
-    #
-    #     elif img.format != 'GIF' and (img.height > 450 or img.width > 450):
-    #         img_width = img.size[0] if img.size[0] < 450 else 450
-    #         img_height = img.size[1] if img.size[1] < 450 else 450
-    #
-    #         output_size = (img_width, img_height)
-    #         img.thumbnail(output_size)
-    #         img.save(self.image.path)
-
     # create a getter for the user image that returns the default image if no image is set/is missing
     @property
     def image_url(self):
@@ -246,51 +220,3 @@ class Profile(models.Model):
             except Exception:
                 pass
         return default_storage.url("default.jpg")
-
-    def resize_gif(self, img):
-        """
-        Resize a gif image by resizing each frame and then reassembling the frames into a new gif
-        """
-
-        frame_width = img.size[0] if img.size[0] < 450 else 450
-        frame_height = img.size[1] if img.size[1] < 450 else 450
-
-        if frame_width == img.size[0] and frame_height == img.size[1]: # if the image is already the correct size
-            return self.image
-
-        frames = []
-        durations = []  # Store frame durations
-        disposal_methods = []  # Store disposal methods
-
-        for frame in ImageSequence.Iterator(img):
-            # Resize the frame
-            frame = frame.resize((frame_width, frame_height))
-
-            # Extract and store the frame duration and disposal method
-            durations.append(frame.info.get("duration", 100))  # Default duration is 100 ms
-            disposal_methods.append(frame.info.get("disposal_method", 0))  # Default disposal method is 0
-
-            frames.append(frame)
-
-        # Create a new GIF with frame durations and disposal methods
-        with BytesIO() as output_buffer:
-            frames[0].save(
-                output_buffer,
-                format="GIF",
-                save_all=True,
-                append_images=frames[1:],
-                duration=durations,
-                disposal=disposal_methods,
-                loop=img.info.get("loop", 0)  # Copy the loop count from the original
-            )
-
-            buffer = BytesIO(output_buffer.getvalue())
-
-        return InMemoryUploadedFile(
-            buffer,
-            'ImageField',
-            os.path.normpath(self.image.path),
-            'image/gif',
-            buffer.getbuffer().nbytes,
-            None
-        )

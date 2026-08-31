@@ -70,17 +70,20 @@ class ShouldStartDispatcherTests(SimpleTestCase):
 class RunDispatchPassTests(SimpleTestCase):
     def test_pass_runs_the_three_steps_and_returns_the_triple(self):
         events = [object(), object()]
-        with mock.patch(
-            "core.utils.stop_expired_timers", return_value=[object()]
-        ) as stop, mock.patch(
-            "core.services.reminders.claim_due_reminders", return_value=events
-        ) as claim, mock.patch(
-            "core.services.proactive_notifications.claim_due_proactive_notifications",
-            return_value=[],
-        ) as proactive_claim, mock.patch(
-            "core.services.push.flush_outbox", return_value=3
-        ) as flush:
-            result = run_dispatch_pass(limit=7)
+        with self.assertLogs(
+            "core.services.reminder_dispatcher", level="INFO"
+        ) as captured:
+            with mock.patch(
+                "core.utils.stop_expired_timers", return_value=[object()]
+            ) as stop, mock.patch(
+                "core.services.reminders.claim_due_reminders", return_value=events
+            ) as claim, mock.patch(
+                "core.services.proactive_notifications.claim_due_proactive_notifications",
+                return_value=[],
+            ) as proactive_claim, mock.patch(
+                "core.services.push.flush_outbox", return_value=3
+            ) as flush:
+                result = run_dispatch_pass(limit=7)
 
         self.assertEqual(result, (1, events, 3))
         stop.assert_called_once()
@@ -96,6 +99,10 @@ class RunDispatchPassTests(SimpleTestCase):
         )
         self.assertEqual(
             stop.call_args.kwargs["now"], flush.call_args.kwargs["now"]
+        )
+        self.assertIn(
+            "notification_dispatch_pass stopped=1 claimed=2 outbox_flushed=3",
+            captured.output[0],
         )
 
 

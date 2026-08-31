@@ -80,3 +80,8 @@ class ChartsPageTests(TestCase):
         html = self.client.get(reverse("charts")).content.decode()
 
         self.assertNotIn("libs/jquery/1.7.1", html)
+
+    def test_the_page_does_not_load_unused_d3(self):
+        html = self.client.get(reverse("charts")).content.decode()
+
+        self.assertNotIn("d3js.org", html)

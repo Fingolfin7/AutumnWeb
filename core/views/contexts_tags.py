@@ -1,12 +1,7 @@
-from core.forms import *
-from core.utils import *
-# Imported under its own name deliberately: `from core.utils import *` brings
-# in set_active_context, and the view below used to be called that too. The
-# view shadowed the helper, so its own calls resolved back to itself and every
-# POST to /set-context/ raised TypeError. Nothing in the UI linked to the
-# endpoint, so it went unnoticed. Keeping this explicit alias makes the
-# shadowing impossible to reintroduce.
-from core.utils import set_active_context as store_active_context
+from collections import Counter
+
+from core.forms import ContextForm, TagForm
+from core.utils import filter_by_active_context, set_active_context as store_active_context
 from core.models import Context, Tag
 from django.contrib import messages
 from core.totals import derived_project_totals
@@ -30,14 +25,43 @@ from core.services import (
 )
 
 
+def _sidebar_project_stats(user, projects):
+    """Build edit-page project stats without one query per status."""
+
+    project_rows = list(projects.order_by().values_list("id", "status"))
+    project_ids = [project_id for project_id, _ in project_rows]
+    status_counts = Counter(status for _, status in project_rows)
+    total_time = sum(derived_project_totals(user, project_ids).values())
+    session_count = (
+        Sessions.objects.filter(
+            user=user,
+            project_id__in=project_ids,
+            end_time__isnull=False,
+        ).count()
+        if project_ids
+        else 0
+    )
+
+    return {
+        "sidebar_total_projects": len(project_ids),
+        "sidebar_total_time": total_time,
+        "sidebar_average_session_duration": (
+            total_time / session_count if session_count else 0
+        ),
+        "sidebar_status_counts": {
+            status: status_counts[status]
+            for status in ("active", "paused", "complete", "archived")
+        },
+    }
+
+
 @login_required
 def switch_context(request):
     """
     Update the active context in the session based on a dropdown selection.
 
     Named switch_context rather than set_active_context so it cannot shadow
-    the core.utils helper it calls — see the import note at the top of this
-    module. The URL keeps its original name.
+    the core.utils helper it calls. The URL keeps its original name.
     """
     if request.method == "POST":
         context_id = request.POST.get("context_id") or "all"
@@ -147,38 +171,7 @@ class UpdateContextView(LoginRequiredMixin, UpdateView):
         # Respect any globally selected active context (if it's a different context, this becomes empty)
         projects_qs = filter_by_active_context(projects_qs, self.request)
 
-        total_projects = projects_qs.count()
-        project_ids = list(projects_qs.values_list("pk", flat=True))
-        total_time = sum(
-            derived_project_totals(self.request.user, project_ids).values()
-        )
-
-        # Per-status counts
-        sidebar_status_counts = {
-            "active": projects_qs.filter(status="active").count(),
-            "paused": projects_qs.filter(status="paused").count(),
-            "complete": projects_qs.filter(status="complete").count(),
-            "archived": projects_qs.filter(status="archived").count(),
-        }
-
-        sessions_qs = Sessions.objects.filter(
-            user=self.request.user,
-            project__in=projects_qs,
-            end_time__isnull=False,
-        )
-        session_count = sessions_qs.count()
-        average_session_duration = (
-            (total_time / session_count) if session_count > 0 else 0
-        )
-
-        ctx.update(
-            {
-                "sidebar_total_projects": total_projects,
-                "sidebar_total_time": total_time,
-                "sidebar_average_session_duration": average_session_duration,
-                "sidebar_status_counts": sidebar_status_counts,
-            }
-        )
+        ctx.update(_sidebar_project_stats(self.request.user, projects_qs))
         commitments_qs = (
             Commitment.objects.filter(user=self.request.user)
             .select_related("project", "subproject", "context", "tag")
@@ -269,37 +262,10 @@ class UpdateTagView(LoginRequiredMixin, UpdateView):
             projects_qs, self.request, override_context_id=override_context_id
         )
 
-        total_projects = projects_qs.count()
-        project_ids = list(projects_qs.values_list("pk", flat=True))
-        total_time = sum(
-            derived_project_totals(self.request.user, project_ids).values()
-        )
-
-        # Per-status counts
-        sidebar_status_counts = {
-            "active": projects_qs.filter(status="active").count(),
-            "paused": projects_qs.filter(status="paused").count(),
-            "complete": projects_qs.filter(status="complete").count(),
-            "archived": projects_qs.filter(status="archived").count(),
-        }
-
-        sessions_qs = Sessions.objects.filter(
-            user=self.request.user,
-            project__in=projects_qs,
-            end_time__isnull=False,
-        )
-        session_count = sessions_qs.count()
-        average_session_duration = (
-            (total_time / session_count) if session_count > 0 else 0
-        )
-
         ctx.update(
             {
                 "override_context_id": override_context_id or "",
-                "sidebar_total_projects": total_projects,
-                "sidebar_total_time": total_time,
-                "sidebar_average_session_duration": average_session_duration,
-                "sidebar_status_counts": sidebar_status_counts,
+                **_sidebar_project_stats(self.request.user, projects_qs),
             }
         )
         commitments_qs = (

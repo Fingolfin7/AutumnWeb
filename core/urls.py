@@ -1,52 +1,57 @@
 # urls.py
 from django.urls import path, re_path
 from django.http import JsonResponse
-from core.views import (
-    DashboardView,
-    timeline_fragment,
-    ProjectsListView,
-    TimerListView,
-    start_timer,
-    stop_timer,
-    restart_timer,
-    remove_timer,
-    active_timers_fragment,
-    update_timer_note,
-    CreateProjectView,
-    CreateSubProjectView,
-    UpdateProjectView,
-    UpdateSubProjectView,
-    DeleteProjectView,
-    DeleteSubProjectView,
-    SessionsListView,
-    update_session,
-    DeleteSessionView,
-    ChartsView,
-    import_view,
-    import_stream,
-    export_view,
-    merge_projects,
-    merge_subprojects,
-    switch_context,
+from core.views.charts import ChartsView
+from core.views.commitments import (
+    CreateCommitmentView,
+    DeleteCommitmentView,
+    UpdateCommitmentView,
+)
+from core.views.contexts_tags import (
+    DeleteContextView,
+    DeleteTagView,
+    UpdateContextView,
+    UpdateTagView,
     manage_contexts,
     manage_tags,
-    UpdateContextView,
-    DeleteContextView,
-    UpdateTagView,
-    DeleteTagView,
-    CreateCommitmentView,
-    UpdateCommitmentView,
-    DeleteCommitmentView,
+    switch_context,
+)
+from core.views.dashboard import DashboardView, timeline_fragment
+from core.views.import_export import export_view, import_stream, import_view
+from core.views.notifications import (
+    cancel_scheduled_reminder,
+    edit_scheduled_reminder,
+    notifications,
+    snooze_scheduled_reminder,
+    weekly_review,
+)
+from core.views.projects import (
+    CreateProjectView,
+    CreateSubProjectView,
+    DeleteProjectView,
+    DeleteSubProjectView,
+    ProjectsListView,
+    UpdateProjectView,
+    UpdateSubProjectView,
+    merge_projects,
+    merge_subprojects,
+)
+from core.views.push import (
+    cancel_timer_reminder,
     push_status,
     push_subscribe,
-    push_unsubscribe,
     push_test,
-    cancel_timer_reminder,
-    notifications,
-    weekly_review,
-    edit_scheduled_reminder,
-    snooze_scheduled_reminder,
-    cancel_scheduled_reminder,
+    push_unsubscribe,
+)
+from core.views.sessions import DeleteSessionView, SessionsListView, update_session
+from core.views.timers import (
+    TimerListView,
+    active_timers_fragment,
+    remove_timer,
+    restart_timer,
+    start_timer,
+    stop_timer,
+    update_timer_note,
 )
 
 

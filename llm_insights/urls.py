@@ -1,5 +1,6 @@
-from llm_insights.views import *
 from django.urls import path
+
+from llm_insights.views import InsightsView, delete_chat, stream_insights
 
 urlpatterns = [
     path("", InsightsView.as_view(), name="insights"),

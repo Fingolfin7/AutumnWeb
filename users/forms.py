@@ -1,5 +1,5 @@
 from django import forms
-from .models import *
+from .models import DEFAULT_FILTER_UNIT_CHOICES, Profile
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, UsernameField
 

@@ -93,14 +93,6 @@ class Projects(models.Model):
     def __str__(self):
         return f"{self.name} ({self.user.username})"
 
-    @property
-    def get_start(self):
-        return datetime.combine(self.start_date, time())
-
-    @property
-    def get_end(self):
-        return datetime.combine(self.last_updated, time())
-
     def save(self, *args, **kwargs):
         """Ensure projects always have a context.
 
@@ -136,22 +128,6 @@ class SubProjects(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.parent_project.name}) ({self.user.username})"
-
-    @property
-    def get_start(self):
-        return datetime.combine(self.start_date, time())
-
-    @property
-    def get_end(self):
-        return datetime.combine(self.last_updated, time())
-
-    # when a subproject is deleted, remove it from all its sessions
-    def delete(self, *args, **kwargs):
-        for session in self.sessions.all():
-            session.subprojects.remove(self)
-            session.save()
-        super(SubProjects, self).delete(*args, **kwargs)
-
 
 class SessionSubproject(models.Model):
     session = models.ForeignKey(
@@ -260,22 +236,12 @@ class Sessions(models.Model):
             raise ValidationError({"auto_stop_at": "Auto-stop time must be after start time."})
 
     @property
-    def get_start(self):
-        return self.start_time
-
-    @property
-    def get_end(self):
-        return self.end_time
-
-    @property
     def duration(self):
         """
         Return the duration of the session in minutes or None if the session is still active
         :return:
         """
-        if self.end_time is None and not self.is_active:
-            return None
-        elif self.is_active and not self.end_time:
+        if self.is_active:
             start_time = self._ensure_aware(self.start_time)
             if not start_time:
                 return None

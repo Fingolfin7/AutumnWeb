@@ -1,7 +1,6 @@
 import json
 import pytz
-from core.forms import *
-from core.utils import *
+
 from django.contrib import messages
 from django.db import transaction
 from django.utils import timezone
@@ -16,6 +15,14 @@ from django.views.generic import (
 from core.models import Context, Projects, SubProjects, Sessions, Tag
 from core.services import SessionMutationService, UNSET
 from core.views.allocations import parse_allocation_post
+from core.forms import SearchProjectForm, UpdateSessionForm
+from core.utils import (
+    build_exclude_project_meta,
+    filter_by_active_context,
+    filter_sessions_by_params,
+    group_sessions_by_date,
+    summarise_search_filters,
+)
 
 
 def remove_ambiguous_time_error(time_value):
@@ -193,8 +200,6 @@ class SessionsListView(LoginRequiredMixin, ListView):
         )
 
         paginated_sessions = context["object_list"]
-        from core.utils import group_sessions_by_date
-
         context["grouped_sessions"] = group_sessions_by_date(paginated_sessions)
 
         # What the filter sheet is currently hiding, echoed back onto the page.
@@ -216,7 +221,11 @@ class SessionsListView(LoginRequiredMixin, ListView):
         return context
 
     def get_queryset(self):
-        sessions = Sessions.objects.filter(end_time__isnull=False, user=self.request.user)
+        sessions = (
+            Sessions.objects.filter(end_time__isnull=False, user=self.request.user)
+            .select_related("project")
+            .prefetch_related("subprojects")
+        )
 
         # Allow explicit ?context= to override the global active context
         override_context_id = self.request.GET.get("context")

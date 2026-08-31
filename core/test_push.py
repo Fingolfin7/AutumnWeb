@@ -242,10 +242,11 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         event = self.event(self.user)
 
         expired = ProviderError(410)
-        with mock.patch(
-            "core.services.push.send_push", side_effect=[None, expired]
-        ) as sender:
-            status = dispatch_event(event.pk, now=timezone.now())
+        with self.assertLogs("core.services.push", level="INFO") as captured:
+            with mock.patch(
+                "core.services.push.send_push", side_effect=[None, expired]
+            ) as sender:
+                status = dispatch_event(event.pk, now=timezone.now())
 
         self.assertEqual(
             status,
@@ -260,6 +261,19 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         )
         self.assertEqual(PushSubscription.objects.filter(user=self.user, active=False).count(), 1)
         self.assertEqual(sender.call_count, 2)
+        summary = next(
+            line for line in captured.output if "notification_dispatch " in line
+        )
+        self.assertIn("event_type=reminder", summary)
+        self.assertIn(f"user_id={self.user.pk}", summary)
+        self.assertIn('username="push-user"', summary)
+        self.assertIn("status=delivered", summary)
+        self.assertIn("devices_targeted=2", summary)
+        self.assertIn("devices_delivered=1", summary)
+        self.assertIn("devices_expired=1", summary)
+        self.assertRegex(summary, r"provider_accepted_at=\S+")
+        self.assertNotIn(first.endpoint, summary)
+        self.assertNotIn('"body"', summary)
 
     def test_permanent_four_hundred_failure_is_terminal_and_not_retried(self):
         subscription = save_subscription(user=self.user, payload=self.payload())

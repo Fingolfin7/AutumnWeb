@@ -1,4 +1,4 @@
-from .forms import *
+from .forms import ProfileUpdateForm, UserRegisterForm, UserUpdateForm
 from .codex_auth import (
     CodexAuthError,
     CodexDevicePending,
@@ -191,8 +191,6 @@ def profile(request):
                     profile.nasa_apod_background = False
             # Handle background image removal
             if p_form.cleaned_data.get('remove_background_image'):
-                if profile.background_image:
-                    profile.background_image.delete(save=False)
                 profile.background_image = None
             # Handle API keys store/clear only when the account trait allows AI features.
             if profile.ai_features_enabled:

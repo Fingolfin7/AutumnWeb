@@ -57,7 +57,7 @@ User → Context → Projects → SubProjects → Sessions
 - **Sessions**: Time records with start/end times, notes, and subproject references
 - Sessions have many-to-many relationships with both Projects and SubProjects
 
-### API Structure (core/api/)
+### API Structure (core/api_v2/)
 
 Two API styles coexist:
 
@@ -71,7 +71,7 @@ Two API styles coexist:
 
 4. **Legacy endpoints**: `/api/create_project/`, `/api/start_session/`, etc.
 
-All API endpoints require authentication (session or token) except `GET /healthz/`, an unauthenticated health check used to probe or wake sleeping deployments. Durations are in **minutes** (float).
+All API endpoints require authentication (session or token) except `GET /healthz/`, an unauthenticated root health check used to probe or wake sleeping deployments. Durations are in **minutes** (float). The versioned `/api/v2/` surface is documented in `openapi-v2.yaml`; the legacy `/api/` surface is documented in `docs/api.md`.
 
 ### LLM Handler Pattern (llm_insights/)
 
@@ -86,8 +86,8 @@ Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate
 
 ### Key Files
 
-- `core/views/` - UI views package, one module per area (`timers`, `sessions`, `projects`, `contexts_tags`, `commitments`, `import_export`, `charts`, `dashboard`); `__init__.py` re-exports every view so `from core.views import X` still works
-- `core/api/` - REST API package, same layout (`helpers`, `timers`, `sessions`, `projects`, `subprojects`, `tallies`, `commitments`, `contexts_tags`, `import_export`, `misc`); `__init__.py` re-exports every endpoint
+- `core/views/` - UI views package, one module per area (`timers`, `sessions`, `projects`, `contexts_tags`, `commitments`, `import_export`, `charts`, `dashboard`); import views from their owning module rather than relying on package-level re-exports
+- `core/api_v2/` - versioned REST API package (`views`, `serializers`, `reports`, `commitments`, `contexts_tags`, `filters`, `import_export`); `openapi-v2.yaml` is the checked-in schema artifact
 - `core/importer.py` - Shared `iter_import` generator and `run_import` wrapper used by web and API imports
 - `core/temp_uploads.py` - Staging of web-import uploads under `MEDIA_ROOT/temp` between the import POST and the stream GET, plus their cleanup
 - `core/urls.py` - URL routing, including `/healthz/`
@@ -121,6 +121,8 @@ PUSH_VAPID_SUBJECT=mailto:admin@example.com
 PUSH_ALLOWED_ENDPOINT_SUFFIXES=fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com
 RUN_REMINDER_DISPATCHER=FALSE  # TRUE runs the dispatcher thread inside the web process
 PUSH_DISPATCH_INTERVAL_SECONDS=15.0  # Poll interval for that thread
+PUSH_MAX_ATTEMPTS=5  # Maximum attempts per device before terminal failure
+PUSH_RETRY_BASE_SECONDS=30  # Exponential-backoff base for transient failures
 ```
 
 Google and GitHub buttons are enabled independently when both credentials for
@@ -143,6 +145,15 @@ best-effort cache lock:
 The VAPID private key remains server-only; browser test notifications are
 queued for the dispatcher rather than sent from a request.
 
+Each dispatch writes an INFO `notification_dispatch` record through the
+`core.services.push` logger. It includes event/user identity, scheduled time,
+overall status, targeted/delivered/pending/failed/expired/unavailable device
+counts, attempts, and `provider_accepted_at`. Provider/device failures also
+write `notification_device_failure` WARNING records. Render captures these
+console logs; filter by logger name or search for `notification_dispatch`.
+Provider acceptance confirms that the push service accepted the request, not
+that the operating system displayed it.
+
 ## Database Notes
 
 - Development: SQLite (`db.sqlite3`)
@@ -151,4 +162,5 @@ queued for the dispatcher rather than sent from a request.
 
 ## Testing
 
-Tests are in `core/tests.py` and `core/tests/`. CI runs on GitHub Actions (Windows, Python 3.10/3.13).
+Tests are in `core/test_*.py`, `core/tests.py`, and `users/`. CI runs on GitHub
+Actions (Windows, Python 3.10/3.13).

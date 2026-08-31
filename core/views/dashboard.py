@@ -1,5 +1,3 @@
-from core.forms import *
-from core.utils import *
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -10,6 +8,7 @@ from django.db.models import Prefetch
 from django.views.generic import (
     TemplateView,
 )
+
 from core.commitments import (
     calculate_commitment_streak,
     get_commitment_progress,
@@ -17,6 +16,12 @@ from core.commitments import (
 )
 from core.models import Sessions, Commitment, TimerReminder
 from core.timeline import DEFAULT_RANGE, build_timeline
+from core.utils import (
+    calculate_daily_activity_streak,
+    filter_by_active_context,
+    group_sessions_by_date,
+    stop_expired_timers,
+)
 
 
 #: How many "pick up where you left off" chips the start card offers, and how
@@ -173,12 +178,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         context["title"] = "Autumn"
         user = self.request.user
 
-        # Import streak functions
-        from core.utils import (
-            calculate_daily_activity_streak,
-            filter_by_active_context,
-        )
-
         # 1. Daily activity streak (precompute 30 days for toggleable view)
         context["daily_streak"] = calculate_daily_activity_streak(user, days=30)
 
@@ -211,8 +210,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # 3. Adaptive recent completed sessions, favoring the latest active day
         recent_sessions = get_recent_dashboard_sessions(user)
         context["recent_sessions"] = recent_sessions
-
-        from core.utils import group_sessions_by_date
 
         context["grouped_sessions"] = group_sessions_by_date(recent_sessions)
 

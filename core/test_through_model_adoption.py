@@ -62,3 +62,12 @@ class SessionSubprojectAdoptionTests(TestCase):
 
         with self.assertRaises(IntegrityError), transaction.atomic():
             SessionSubproject.objects.create(session=session, subproject=self.first)
+
+    def test_deleting_subproject_cascades_link_without_deleting_session(self):
+        session = Sessions.objects.create(user=self.user, project=self.project)
+        SessionSubproject.objects.create(session=session, subproject=self.first)
+
+        self.first.delete()
+
+        self.assertTrue(Sessions.objects.filter(pk=session.pk).exists())
+        self.assertFalse(SessionSubproject.objects.filter(session=session).exists())

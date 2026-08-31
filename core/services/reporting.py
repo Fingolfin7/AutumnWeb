@@ -76,6 +76,3 @@ def summarize_completed_sessions(user, start, end) -> dict:
         "session_count": aggregate["session_count"],
         "per_project": per_project,
     }
-
-
-weekly_completed_session_summary = summarize_completed_sessions

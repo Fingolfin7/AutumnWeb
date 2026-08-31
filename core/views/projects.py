@@ -1,6 +1,5 @@
 import json
-from core.forms import *
-from core.utils import *
+
 from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
@@ -23,6 +22,22 @@ from core.commitments import (
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 from django.db.models import Prefetch
 from core.totals import annotate_project_totals, annotate_subproject_totals
+from core.forms import (
+    CreateProjectForm,
+    CreateSubProjectForm,
+    MergeProjectsForm,
+    MergeSubProjectsForm,
+    SearchProjectForm,
+    UpdateProjectForm,
+    UpdateSubProjectForm,
+)
+from core.utils import (
+    build_exclude_project_meta,
+    filter_by_active_context,
+    filter_by_projects,
+    parse_date_or_datetime,
+    summarise_search_filters,
+)
 from core.services import (
     CommitmentTargetProtectedError,
     DestructiveMutationService,
@@ -155,8 +170,11 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         if exclude_ids:
             projects = projects.exclude(id__in=exclude_ids)
 
-        return annotate_project_totals(projects).order_by(
-            "-derived_last_updated"
+        return (
+            annotate_project_totals(projects)
+            .select_related("context", "commitment")
+            .prefetch_related("tags")
+            .order_by("-derived_last_updated")
         )
 
 
@@ -338,10 +356,6 @@ class UpdateSubProjectView(LoginRequiredMixin, UpdateView):
         return annotate_subproject_totals(
             SubProjects.objects.filter(user=self.request.user)
         )
-
-    def get_object(self, queryset=None):
-        subproject = super().get_object(queryset)
-        return subproject
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

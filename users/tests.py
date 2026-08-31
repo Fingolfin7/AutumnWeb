@@ -132,6 +132,29 @@ class ProfileSaveTests(TestCase):
         self.assertFalse(profile.nasa_apod_background)
         self.assertEqual(profile.get_api_key("openai"), "profile-openai-key")
 
+    def test_removing_background_image_clears_field_and_deletes_file_after_commit(self):
+        profile = self.user.profile
+        profile.background_image = self._profile_image()
+        profile.save(update_fields=["background_image"])
+        old_image_name = profile.background_image.name
+        storage = profile.background_image.storage
+        self.assertTrue(storage.exists(old_image_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse("profile"),
+                data={
+                    "username": self.user.username,
+                    "email": self.user.email,
+                    "remove_background_image": "on",
+                },
+            )
+
+        self.assertRedirects(response, reverse("profile"))
+        profile.refresh_from_db()
+        self.assertFalse(profile.background_image)
+        self.assertFalse(storage.exists(old_image_name))
+
     def test_profile_default_date_range_supports_each_requested_unit(self):
         profile = self.user.profile
         reference_date = date(2026, 5, 13)

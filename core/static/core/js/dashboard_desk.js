@@ -239,7 +239,12 @@
       headers: { "X-Requested-With": "XMLHttpRequest" }
     })
       .then(function (response) {
-        return response.ok ? response.text() : Promise.reject(response.status);
+        if (response.redirected) {
+          window.location.reload();
+          throw new Error("authentication redirect");
+        }
+        if (!response.ok) { throw new Error(String(response.status)); }
+        return response.text();
       })
       .then(function (html) {
         var current = document.querySelector("[data-timeline]");

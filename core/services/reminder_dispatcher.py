@@ -51,6 +51,14 @@ def run_dispatch_pass(*, limit=100, now=None):
     claimed = claim_due_reminders(now=now, limit=limit)
     claimed = _claim_proactive_notifications(claimed, now=now, limit=limit)
     flushed = flush_outbox(limit=limit, now=now)
+    claimed_count = claimed if isinstance(claimed, int) else len(claimed)
+    if stopped or claimed_count or flushed:
+        logger.info(
+            "notification_dispatch_pass stopped=%s claimed=%s outbox_flushed=%s",
+            len(stopped),
+            claimed_count,
+            flushed,
+        )
     return len(stopped), claimed, flushed
 
 

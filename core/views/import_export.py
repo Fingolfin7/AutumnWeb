@@ -1,8 +1,7 @@
 import json
-from core.forms import *
+
 from core.importer import iter_import
 from core.temp_uploads import discard_upload, store_upload
-from core.utils import *
 from core.models import Context
 from django.contrib import messages
 from django.http import StreamingHttpResponse, JsonResponse, HttpResponse
@@ -13,6 +12,13 @@ from django.views.decorators.http import require_GET
 from django.shortcuts import render
 from core.models import Sessions
 from core.export2 import build_format2_export
+from core.forms import ExportJSONForm, ImportJSONForm
+from core.utils import (
+    build_exclude_project_meta,
+    build_project_json_from_sessions,
+    json_compress,
+    json_decompress,
+)
 
 
 def stream_response(message):

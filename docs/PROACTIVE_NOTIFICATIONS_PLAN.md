@@ -166,6 +166,18 @@ the selected week from authoritative sessions and commitment logic. Empty
 weeks may still produce a short neutral review when the user explicitly opted
 in.
 
+## Delivery observability
+
+Each outbox event writes a searchable `notification_dispatch` INFO record
+through `core.services.push`. The record includes the event and user identity,
+event type, scheduled time, overall status, targeted-device count, per-device
+delivered/pending/failed/expired/unavailable counts, attempt count, and
+`provider_accepted_at`. Provider failures additionally write
+`notification_device_failure` WARNING records with the subscription ID,
+provider status, and attempt number. Endpoints and payload bodies are never
+logged. A delivered count means the push provider accepted the request; it
+does not guarantee that a browser or operating system displayed it.
+
 ## Web UI
 
 Add a **Notifications** workspace page linked from the More menu. It contains:

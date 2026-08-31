@@ -1,6 +1,13 @@
 # Autumn API (/api/*) – reference for CLI wrapper
 
-All endpoints below live under `/api/` and use Django REST Framework with `IsAuthenticated`, except `/healthz/`.
+The endpoints below are the legacy/compact API under `/api/` used by the CLI
+wrapper and integrations. Most require authentication (session or token,
+depending on the endpoint). The unauthenticated health check is the separate
+root route `GET /healthz/`.
+
+The versioned REST API is under `/api/v2/` and is documented by the checked-in
+[`openapi-v2.yaml`](../openapi-v2.yaml) schema. Browser push subscription and
+delivery routes are intentionally web routes rather than API v2 resources.
 
 ## Auth + request basics
 

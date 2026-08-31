@@ -53,6 +53,12 @@
       headers: { "X-Requested-With": "XMLHttpRequest" }
     })
       .then(function (response) {
+        if (response.redirected) {
+          /* Fetch follows Django's login redirect and otherwise hands us a
+             200 login page. Reload the full page so its `next` stays useful. */
+          window.location.reload();
+          throw new Error("authentication redirect");
+        }
         if (!response.ok) { throw new Error(response.status); }
         return response.text();
       })
