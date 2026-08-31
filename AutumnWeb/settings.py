@@ -258,8 +258,16 @@ if os.environ.get("AUTUMN_CHZ_DB"):
 # Keep DB connections open a bit (helps in production). Set to 0 to disable.
 CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
 
-# PostgreSQL server-side settings (optional). If you're using pgbouncer, you may want DISABLE_SERVER_SIDE_CURSORS=True
-DISABLE_SERVER_SIDE_CURSORS = env.bool("DISABLE_SERVER_SIDE_CURSORS", default=False)
+# Transaction-pooled PostgreSQL connections can't preserve Django's named
+# server-side cursors between fetches. Neon identifies pooled connections with
+# a ``-pooler`` hostname; allow an explicit environment value to override the
+# safe automatic default for other deployments.
+if DATABASES["default"]["ENGINE"] == "django.db.backends.postgresql":
+    database_host = str(DATABASES["default"].get("HOST", "")).lower()
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = env.bool(
+        "DISABLE_SERVER_SIDE_CURSORS",
+        default="-pooler." in database_host,
+    )
 
 # Password validation
 # https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
