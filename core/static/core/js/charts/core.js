@@ -119,6 +119,7 @@ function get_project_data(type, start_date = "", end_date = "", project_name = "
     // Build query string safely
     const qs = new URLSearchParams();
     qs.set('chart_type', type);
+    if (type === 'heatmap') qs.set('aggregate', 'true');
     if (project_name) qs.set('project_name', project_name);
     if (start_date) qs.set('start_date', start_date);
     if (end_date) qs.set('end_date', end_date);

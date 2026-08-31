@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta, timezone as datetime_timezone
-
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase
@@ -250,6 +249,17 @@ class ChartApiRegressionTests(TestCase):
             all(set(row) == {"start_time", "end_time"} for row in heatmap.json())
         )
 
+        heatmap_cells_response = self._get_chart("heatmap", aggregate="true")
+        self.assertEqual(heatmap_cells_response.status_code, 200)
+        heatmap_cells = {
+            (row["weekday"], row["hour"]): row["average_hours"]
+            for row in heatmap_cells_response.json()
+        }
+        self.assertEqual(
+            heatmap_cells,
+            {(4, 10): 1.0, (5, 10): 0.5, (5, 13): 1.0, (5, 14): 1.0},
+        )
+
         histogram = self._get_chart("histogram")
         self.assertEqual(histogram.status_code, 200)
         self.assertEqual(
@@ -274,6 +284,68 @@ class ChartApiRegressionTests(TestCase):
         self.assertTrue(
             all(set(row) == {"text", "weight"} for row in wordcloud.json())
         )
+
+    def test_wordcloud_cleans_markdown(self):
+        self._session(
+            self.user,
+            self.alpha,
+            datetime(2026, 1, 4, 9, tzinfo=UTC),
+            15,
+            note=(
+                "# Focus **build** [review](https://example.invalid) "
+                "`inline secret` ```hidden code```"
+            ),
+        )
+
+        weights = {
+            row["text"]: row["weight"]
+            for row in self._get_chart("wordcloud").json()
+        }
+
+        self.assertGreaterEqual(weights["focus"], 3)
+        self.assertGreaterEqual(weights["build"], 3)
+        self.assertEqual(weights["review"], 2)
+        self.assertNotIn("secret", weights)
+        self.assertNotIn("hidden", weights)
+        self.assertNotIn("invalid", weights)
+
+    def test_heatmap_respects_profile_timezone_across_spring_forward(self):
+        Sessions.objects.filter(user=self.user).delete()
+        self.user.profile.timezone = "America/New_York"
+        self.user.profile.save(update_fields=["timezone"])
+        self._session(
+            self.user,
+            self.alpha,
+            datetime(2026, 3, 8, 6, 30, tzinfo=UTC),
+            60,
+        )
+
+        rows = self._get_chart("heatmap", aggregate="true").json()
+
+        cells = {
+            (row["weekday"], row["hour"]): row["average_hours"]
+            for row in rows
+        }
+        self.assertEqual(cells, {(0, 1): 0.5, (0, 3): 0.5})
+
+    def test_heatmap_accounts_for_the_repeated_fall_back_hour(self):
+        Sessions.objects.filter(user=self.user).delete()
+        self.user.profile.timezone = "America/New_York"
+        self.user.profile.save(update_fields=["timezone"])
+        self._session(
+            self.user,
+            self.alpha,
+            datetime(2026, 11, 1, 5, 30, tzinfo=UTC),
+            120,
+        )
+
+        rows = self._get_chart("heatmap", aggregate="true").json()
+
+        cells = {
+            (row["weekday"], row["hour"]): row["average_hours"]
+            for row in rows
+        }
+        self.assertEqual(cells, {(0, 1): 0.75, (0, 2): 0.5})
 
     def test_chart_filters_match_ui_parameter_semantics(self):
         cases = (

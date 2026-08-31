@@ -281,6 +281,15 @@ class ReportChartsView(V2APIView):
                 OpenApiParameter.QUERY,
                 many=True,
             ),
+            OpenApiParameter(
+                "aggregate",
+                OpenApiTypes.BOOL,
+                OpenApiParameter.QUERY,
+                description=(
+                    "For heatmap charts, return server-aggregated weekday/hour "
+                    "cells instead of raw session intervals."
+                ),
+            ),
         ],
         responses=ChartPayloadRowSerializer(many=True),
     )
@@ -345,6 +354,10 @@ class ReportChartsView(V2APIView):
             chart_type,
             sessions,
             use_subprojects=want_subprojects,
+            aggregate_heatmap=(
+                chart_type == "heatmap"
+                and request.query_params.get("aggregate", "").lower() == "true"
+            ),
         )
         return Response(payload)
 

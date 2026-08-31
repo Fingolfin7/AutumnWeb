@@ -6,7 +6,18 @@ weighted analytics helpers in :mod:`core.attribution` have different semantics.
 
 from __future__ import annotations
 
-from django.db.models import DateTimeField, F, FloatField, Func, Max, OuterRef, Subquery, Sum, Value
+from django.db.models import (
+    DateTimeField,
+    F,
+    FloatField,
+    Func,
+    Max,
+    OuterRef,
+    Q,
+    Subquery,
+    Sum,
+    Value,
+)
 from django.db.models.functions import Coalesce
 
 from core.models import Projects, Sessions, SessionSubproject, SubProjects
@@ -47,6 +58,35 @@ def rounded_session_minutes(end_field="end_time", start_field="start_time"):
     """Return the canonical per-session minutes expression."""
 
     return _RoundedSessionMinutes(F(end_field), F(start_field))
+
+
+def session_minute_totals_since(user, **windows):
+    """Return completed-session minute totals for named lower bounds.
+
+    All windows are folded into one conditional aggregate. This keeps summary
+    cards independent of the number of matching sessions while retaining the
+    model's canonical behavior of rounding each session before summing it.
+    """
+
+    if not windows:
+        return {}
+
+    oldest_lower_bound = min(windows.values())
+    aggregates = {
+        name: Coalesce(
+            Sum(
+                rounded_session_minutes(),
+                filter=Q(end_time__gte=lower_bound),
+            ),
+            Value(0.0),
+        )
+        for name, lower_bound in windows.items()
+    }
+    return Sessions.objects.filter(
+        user=user,
+        end_time__isnull=False,
+        end_time__gte=oldest_lower_bound,
+    ).aggregate(**aggregates)
 
 
 def _project_total_subquery(*, project_ref="pk"):

@@ -16,6 +16,7 @@ from core.commitments import (
 )
 from core.models import Sessions, Commitment, TimerReminder
 from core.timeline import DEFAULT_RANGE, build_timeline
+from core.totals import session_minute_totals_since
 from core.utils import (
     calculate_daily_activity_streak,
     filter_by_active_context,
@@ -216,22 +217,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # 4. Quick stats
         now = timezone.now()
         context["greeting"] = greeting_for(now)
-        today_start = timezone.make_aware(datetime.combine(now.date(), time.min))
-        week_start = today_start - timedelta(days=now.weekday())
+        local_today = timezone.localdate(now)
+        today_start = timezone.make_aware(datetime.combine(local_today, time.min))
+        week_start = today_start - timedelta(days=local_today.weekday())
 
-        # Today's total time
-        today_sessions = Sessions.objects.filter(
-            user=user, end_time__isnull=False, end_time__gte=today_start
+        # Today's and this week's totals share one database aggregate. The old
+        # path loaded every matching session twice and summed them in Python.
+        summary_totals = session_minute_totals_since(
+            user,
+            today_total=today_start,
+            week_total=week_start,
         )
-        today_total = sum(s.duration or 0 for s in today_sessions)
-        context["today_total"] = today_total
-
-        # This week's total time
-        week_sessions = Sessions.objects.filter(
-            user=user, end_time__isnull=False, end_time__gte=week_start
-        )
-        week_total = sum(s.duration or 0 for s in week_sessions)
-        context["week_total"] = week_total
+        context.update(summary_totals)
 
         # Active timers count
         active_timers = (
