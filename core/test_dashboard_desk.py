@@ -6,7 +6,8 @@ dashboard_desk.js paints a second later, and the start card's quick-start
 chips must not offer to start a timer that is already running.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as datetime_timezone
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -284,6 +285,30 @@ class QuickStartTests(DashboardTestCase):
 
 
 class DashboardRendersFocusDeskTests(DashboardTestCase):
+    def test_summary_windows_follow_the_users_local_day(self):
+        self.user.profile.timezone = "Pacific/Kiritimati"
+        self.user.profile.save(update_fields=["timezone"])
+        # Monday 00:30 in Kiritimati, while the UTC date is still Sunday.
+        now = datetime(2026, 1, 4, 10, 30, tzinfo=datetime_timezone.utc)
+        Sessions.objects.create(
+            user=self.user,
+            project=self.atlas,
+            start_time=now - timedelta(minutes=40),
+            end_time=now - timedelta(minutes=10),
+        )
+        Sessions.objects.create(
+            user=self.user,
+            project=self.autumn,
+            start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+        )
+
+        with patch("core.views.dashboard.timezone.now", return_value=now):
+            response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.context["today_total"], 30.0)
+        self.assertEqual(response.context["week_total"], 30.0)
+
     def test_dashboard_uses_the_focus_desk_shell_only(self):
         """No page may load both stylesheets — that is the whole migration."""
         response = self.client.get(reverse("home"))
