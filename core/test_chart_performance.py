@@ -275,6 +275,30 @@ class ChartApiRegressionTests(TestCase):
             all(set(row) == {"text", "weight"} for row in wordcloud.json())
         )
 
+    def test_wordcloud_cleans_markdown(self):
+        self._session(
+            self.user,
+            self.alpha,
+            datetime(2026, 1, 4, 9, tzinfo=UTC),
+            15,
+            note=(
+                "# Focus **build** [review](https://example.invalid) "
+                "`inline secret` ```hidden code```"
+            ),
+        )
+
+        weights = {
+            row["text"]: row["weight"]
+            for row in self._get_chart("wordcloud").json()
+        }
+
+        self.assertGreaterEqual(weights["focus"], 3)
+        self.assertGreaterEqual(weights["build"], 3)
+        self.assertEqual(weights["review"], 2)
+        self.assertNotIn("secret", weights)
+        self.assertNotIn("hidden", weights)
+        self.assertNotIn("invalid", weights)
+
     def test_chart_filters_match_ui_parameter_semantics(self):
         cases = (
             ({"start_date": "2026-01-02"}, {"Alpha", "Beta"}),

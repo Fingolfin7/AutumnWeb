@@ -47,6 +47,14 @@ STOP_WORDS = {
     "does", "doing", "done", "get", "got", "getting",
 }
 
+CODE_BLOCK_RE = re.compile(r"```[\s\S]*?```")
+MARKDOWN_MARKER_RE = re.compile(r"(\*{1,2}|_{1,2}|~{1,2})")
+MARKDOWN_HEADING_RE = re.compile(r"#{1,6}\s")
+MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+INLINE_CODE_RE = re.compile(r"`[^`]+`")
+WORD_RE = re.compile(r"\b[a-z]+\b")
+WORDCLOUD_NOTE_BATCH_SIZE = 1_000
+
 
 def _duration_expression():
     return ExpressionWrapper(
@@ -164,19 +172,35 @@ def _histogram(sessions):
     ]
 
 
+def _text_words(text):
+    """Yield word-cloud terms from a bounded batch of session-note text."""
+
+    clean_text = CODE_BLOCK_RE.sub("", text)
+    clean_text = MARKDOWN_MARKER_RE.sub("", clean_text)
+    clean_text = MARKDOWN_HEADING_RE.sub("", clean_text)
+    clean_text = MARKDOWN_LINK_RE.sub(r"\1", clean_text)
+    clean_text = INLINE_CODE_RE.sub("", clean_text)
+    return (
+        word
+        for word in WORD_RE.findall(clean_text.lower())
+        if word not in STOP_WORDS and len(word) > 2
+    )
+
+
 def _wordcloud(sessions):
-    notes_text = " ".join(
-        note or "" for note in sessions.values_list("note", flat=True).iterator()
+    counts = Counter()
+    note_batch = []
+    notes = sessions.values_list("note", flat=True).iterator(
+        chunk_size=WORDCLOUD_NOTE_BATCH_SIZE
     )
-    clean_text = re.sub(r"```[\s\S]*?```", "", notes_text)
-    clean_text = re.sub(r"(\*{1,2}|_{1,2}|~{1,2})", "", clean_text)
-    clean_text = re.sub(r"#{1,6}\s", "", clean_text)
-    clean_text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", clean_text)
-    clean_text = re.sub(r"`[^`]+`", "", clean_text)
-    words = re.findall(r"\b[a-z]+\b", clean_text.lower())
-    counts = Counter(
-        word for word in words if word not in STOP_WORDS and len(word) > 2
-    )
+    for note in notes:
+        if note:
+            note_batch.append(note)
+        if len(note_batch) >= WORDCLOUD_NOTE_BATCH_SIZE:
+            counts.update(_text_words(" ".join(note_batch)))
+            note_batch.clear()
+    if note_batch:
+        counts.update(_text_words(" ".join(note_batch)))
     return [
         {"text": word, "weight": weight}
         for word, weight in counts.most_common(100)
