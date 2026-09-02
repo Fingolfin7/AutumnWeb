@@ -115,7 +115,7 @@ PUSH_ALLOWED_ENDPOINT_SUFFIXES=fcm.googleapis.com,push.services.mozilla.com,noti
 # Optional delivery tuning:
 PUSH_MAX_ATTEMPTS=5
 PUSH_RETRY_BASE_SECONDS=30
-PUSH_DISPATCH_INTERVAL_SECONDS=15
+PUSH_DISPATCH_SAFETY_RESCAN_SECONDS=900
 ```
 
 Generate a keypair with `python -m py_vapid --gen`. The public-key command
@@ -148,13 +148,15 @@ modes; pick one.
 cron. For local testing, use bounded `--loop --max-seconds 30` mode.
 
 **In-process dispatcher thread (opt-in).** Set `RUN_REMINDER_DISPATCHER=TRUE`
-and the web process starts a daemon thread that runs the same pass on a timer.
+and the web process starts a daemon thread that sleeps until persisted work is
+due. Relevant commits in the web process wake it immediately; an infrequent
+safety rescan discovers writes made outside that process.
 This suits local `runserver` and single-service Render deployments where no
 cron or worker service is available:
 
 ```text
-RUN_REMINDER_DISPATCHER=FALSE     # TRUE starts the dispatcher inside the web process
-PUSH_DISPATCH_INTERVAL_SECONDS=15 # Seconds between passes when the thread runs
+RUN_REMINDER_DISPATCHER=FALSE          # TRUE starts the dispatcher inside the web process
+PUSH_DISPATCH_SAFETY_RESCAN_SECONDS=900 # Durable fallback; minimum 300 seconds
 ```
 
 The thread only starts in a web process — `runserver` (in the autoreload child,
@@ -162,6 +164,12 @@ or with `--noreload`) and gunicorn/uvicorn/daphne. Management commands such as
 `test`, `migrate`, `check`, and `dispatch_timer_reminders` itself never start
 it. Both modes take the same best-effort cache lock, so a cron job and the
 thread do not run a pass at the same time when they share a cache backend.
+The current local-memory cache only coordinates threads in one process; the
+database compare-and-set claims and unique event keys remain the correctness
+guards across multiple workers or instances. Each web process receives wakeups
+for its own committed writes, while the safety rescan covers external/bulk
+writes. The dispatcher closes its thread-local database connection before
+sleeping so an idle database sees no fixed-frequency traffic.
 Note that on a free-tier service that sleeps when idle, nothing dispatches
 while the service is asleep; reminders are delivered after it wakes.
 

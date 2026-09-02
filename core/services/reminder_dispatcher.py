@@ -3,8 +3,8 @@
 Delivery has two supported shapes:
 
 * the bounded ``dispatch_timer_reminders`` management command (cron), and
-* an env-gated daemon thread started from ``CoreConfig.ready()`` so a single
-  web process (``runserver`` locally, gunicorn on a PaaS) delivers on its own.
+* an env-gated daemon thread started from ``CoreConfig.ready()`` so a web
+  process (``runserver`` locally, gunicorn on a PaaS) delivers on its own.
 
 Both run the same :func:`run_dispatch_pass` under the same best-effort cache
 lock key, so an external cron and the in-process thread do not overlap a pass
@@ -30,6 +30,16 @@ LOCK_KEY = "autumn:dispatch_timer_reminders:lock"
 
 _thread = None
 _thread_lock = threading.Lock()
+_wake_event = threading.Event()
+
+# An idle production database must have at least one uninterrupted five-minute
+# window in which Neon can suspend compute.  Local commits normally wake the
+# dispatcher immediately; this is only the durable fallback for writes which
+# bypass this process's signals.
+MIN_SAFETY_RESCAN_SECONDS = 300.0
+DEFAULT_SAFETY_RESCAN_SECONDS = 900.0
+LOCK_RETRY_SECONDS = 5.0
+STARTUP_DELAY_SECONDS = 1.0
 
 
 def run_dispatch_pass(*, limit=100, now=None):
@@ -182,11 +192,10 @@ def _dispatch_once():
 
     close_old_connections()
 
-    interval = _interval_seconds()
     limit = int(getattr(settings, "PUSH_DISPATCH_LIMIT", 100))
     lock_token = uuid4().hex
     try:
-        acquired = cache.add(LOCK_KEY, lock_token, timeout=max(60, int(interval) + 30))
+        acquired = cache.add(LOCK_KEY, lock_token, timeout=300)
     except Exception:
         # A broken cache must not run two dispatchers; skip this tick.
         logger.debug("Timer dispatcher lock unavailable; skipping pass.", exc_info=True)
@@ -207,25 +216,194 @@ def _dispatch_once():
     return True
 
 
-def _interval_seconds():
+def _safety_rescan_seconds():
     from django.conf import settings
 
     try:
-        return max(1.0, float(getattr(settings, "PUSH_DISPATCH_INTERVAL_SECONDS", 15.0)))
+        configured = float(
+            getattr(
+                settings,
+                "PUSH_DISPATCH_SAFETY_RESCAN_SECONDS",
+                DEFAULT_SAFETY_RESCAN_SECONDS,
+            )
+        )
     except (TypeError, ValueError):
-        return 15.0
+        configured = DEFAULT_SAFETY_RESCAN_SECONDS
+    return max(MIN_SAFETY_RESCAN_SECONDS, configured)
+
+
+def wake_dispatcher():
+    """Wake this process's dispatcher after relevant state commits."""
+
+    _wake_event.set()
+
+
+def wake_dispatcher_on_commit():
+    """Schedule a wake without letting the thread observe uncommitted state."""
+
+    from django.db import transaction
+
+    transaction.on_commit(wake_dispatcher)
+
+
+def next_dispatch_at(*, now=None):
+    """Return the earliest persisted instant that can make a pass useful.
+
+    All sources are combined into one ``UNION ALL`` query.  A pending event
+    with no live deliveries is due immediately; delivery retries wait for
+    ``next_attempt_at`` and abandoned processing leases wait for
+    ``lease_until``.  This mirrors ``flush_outbox`` without changing its
+    claiming, retry, or terminal-state behavior.
+    """
+
+    from django.db.models import (
+        DateTimeField,
+        Exists,
+        F,
+        Min,
+        OuterRef,
+        Q,
+        Value,
+    )
+    from django.db.models.functions import Coalesce
+    from django.utils import timezone
+
+    from core.models import (
+        NotificationDelivery,
+        NotificationEvent,
+        NotificationPreference,
+        ScheduledReminder,
+        Sessions,
+        TimerReminder,
+    )
+
+    now = now or timezone.now()
+    instant = Value(now, output_field=DateTimeField())
+
+    def minimum(queryset, expression):
+        # Group by one constant so an empty source contributes no UNION row,
+        # while a populated source contributes only its indexed minimum.
+        return (
+            queryset.order_by()
+            .annotate(_dispatch_group=Value(1))
+            .values("_dispatch_group")
+            .annotate(dispatch_at=Min(expression))
+            .exclude(dispatch_at__isnull=True)
+            .values_list("dispatch_at")
+        )
+
+    deadlines = [
+        minimum(
+            Sessions.objects.filter(
+                end_time__isnull=True, auto_stop_at__isnull=False
+            ),
+            F("auto_stop_at"),
+        ),
+        minimum(
+            TimerReminder.objects.filter(
+                active=True,
+                next_fire_at__isnull=False,
+                session__end_time__isnull=True,
+            ),
+            F("next_fire_at"),
+        ),
+        minimum(
+            ScheduledReminder.objects.filter(
+                Q(user__notification_preferences__isnull=True)
+                | Q(
+                    user__notification_preferences__scheduled_reminders_enabled=True
+                ),
+                active=True,
+                next_fire_at__isnull=False,
+            ),
+            F("next_fire_at"),
+        ),
+        minimum(
+            NotificationPreference.objects.filter(
+                commitment_checks_enabled=True,
+                next_commitment_check_at__isnull=False,
+            ),
+            F("next_commitment_check_at"),
+        ),
+        minimum(
+            NotificationPreference.objects.filter(
+                weekly_review_enabled=True,
+                next_weekly_review_at__isnull=False,
+            ),
+            F("next_weekly_review_at"),
+        ),
+    ]
+
+    live_deliveries = NotificationDelivery.objects.filter(
+        event_id=OuterRef("pk"), status__in=("pending", "processing")
+    )
+    immediate_events = minimum(
+        NotificationEvent.objects.filter(status="pending")
+        .annotate(has_live_delivery=Exists(live_deliveries))
+        .filter(has_live_delivery=False),
+        instant,
+    )
+    pending_deliveries = minimum(
+        NotificationDelivery.objects.filter(
+            event__status="pending", status="pending"
+        ),
+        Coalesce("next_attempt_at", instant),
+    )
+    processing_deliveries = minimum(
+        NotificationDelivery.objects.filter(
+            event__status="pending", status="processing"
+        ),
+        Coalesce("lease_until", instant),
+    )
+    deadlines.extend((immediate_events, pending_deliveries, processing_deliveries))
+
+    combined = deadlines[0].union(*deadlines[1:], all=True).order_by("dispatch_at")
+    row = combined.first()
+    return row[0] if row is not None else None
+
+
+def _dispatch_step(*, now=None):
+    """Inspect persisted deadlines and run a pass only when work is due.
+
+    Returns the number of seconds to wait.  ``None`` means a pass ran and the
+    caller should immediately rescan, which also drains bounded backlogs.
+    """
+
+    from django.utils import timezone
+
+    now = now or timezone.now()
+    deadline = next_dispatch_at(now=now)
+    if deadline is not None and deadline <= now:
+        return None if _dispatch_once() else LOCK_RETRY_SECONDS
+
+    until_deadline = (
+        (deadline - now).total_seconds() if deadline is not None else float("inf")
+    )
+    return min(_safety_rescan_seconds(), max(0.0, until_deadline))
+
+
+def _error_retry_seconds(consecutive_errors):
+    """Back off repeated failures while still recovering without intervention."""
+
+    return min(300.0, 15.0 * (2 ** max(0, consecutive_errors - 1)))
 
 
 def _dispatch_loop():
-    # Wait one interval first: touching the database from a thread started in
-    # AppConfig.ready() while apps are still loading is discouraged by Django.
-    time.sleep(_interval_seconds())
+    # Let AppConfig.ready() and the rest of Django startup finish before this
+    # thread performs its initial durable deadline scan.
+    time.sleep(STARTUP_DELAY_SECONDS)
     last_error = None
+    consecutive_errors = 0
     while True:
+        # Clear before scanning. A commit racing with the scan sets the event
+        # again, so the following wait returns immediately and cannot miss it.
+        _wake_event.clear()
         try:
-            _dispatch_once()
+            wait_seconds = _dispatch_step()
             last_error = None
+            consecutive_errors = 0
         except Exception as exc:  # Never let the dispatcher thread die.
+            consecutive_errors += 1
             signature = f"{type(exc).__name__}: {exc}"
             if signature == last_error:
                 # Unmigrated database or a persistent outage: do not spam the
@@ -236,7 +414,22 @@ def _dispatch_loop():
                     "Timer dispatcher pass failed: %s", signature, exc_info=True
                 )
                 last_error = signature
-        time.sleep(_interval_seconds())
+            wait_seconds = _error_retry_seconds(consecutive_errors)
+        finally:
+            # This daemon has its own thread-local connection. Releasing it
+            # before a potentially long wait avoids holding Neon open and also
+            # makes a resumed compute reconnect cleanly.
+            try:
+                from django.db import connections
+
+                connections.close_all()
+            except Exception:
+                logger.debug(
+                    "Could not close dispatcher database connections.", exc_info=True
+                )
+
+        if wait_seconds is not None:
+            _wake_event.wait(wait_seconds)
 
 
 def start_dispatcher_thread():

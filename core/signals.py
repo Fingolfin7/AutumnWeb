@@ -5,10 +5,56 @@ following many-to-many update are separate events, so no signal sees a complete
 before/after edit. Normal mutations use core.services instead.
 """
 
-from django.db.models.signals import m2m_changed, pre_delete
+from django.db.models.signals import (
+    m2m_changed,
+    post_delete,
+    post_save,
+    pre_delete,
+)
 from django.dispatch import receiver
 
-from core.models import Commitment, NotificationEvent, Projects, ScheduledReminder
+from core.models import (
+    Commitment,
+    NotificationDelivery,
+    NotificationEvent,
+    NotificationPreference,
+    Projects,
+    ScheduledReminder,
+    Sessions,
+    TimerReminder,
+)
+
+
+def _wake_reminder_dispatcher_after_commit(**kwargs):
+    # Import lazily: signals are loaded from CoreConfig.ready(), which also
+    # owns dispatcher startup and must remain safe during app initialization.
+    from core.services.reminder_dispatcher import wake_dispatcher_on_commit
+
+    wake_dispatcher_on_commit()
+
+
+for _deadline_model in (
+    Sessions,
+    TimerReminder,
+    ScheduledReminder,
+    NotificationPreference,
+    NotificationEvent,
+    NotificationDelivery,
+):
+    post_save.connect(
+        _wake_reminder_dispatcher_after_commit,
+        sender=_deadline_model,
+        dispatch_uid=(
+            f"wake_reminder_dispatcher_save_{_deadline_model._meta.label_lower}"
+        ),
+    )
+    post_delete.connect(
+        _wake_reminder_dispatcher_after_commit,
+        sender=_deadline_model,
+        dispatch_uid=(
+            f"wake_reminder_dispatcher_delete_{_deadline_model._meta.label_lower}"
+        ),
+    )
 
 
 @receiver(m2m_changed, sender=Projects.tags.through)

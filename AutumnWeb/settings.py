@@ -91,7 +91,14 @@ PUSH_CLAIM_LEASE_SECONDS = env.int("PUSH_CLAIM_LEASE_SECONDS", default=120)
 # Opt-in in-process dispatcher thread.  Off by default: the bounded
 # ``dispatch_timer_reminders`` cron command stays the alternative delivery path.
 RUN_REMINDER_DISPATCHER = env.bool("RUN_REMINDER_DISPATCHER", default=False)
-PUSH_DISPATCH_INTERVAL_SECONDS = env.float("PUSH_DISPATCH_INTERVAL_SECONDS", default=15.0)
+# The in-process dispatcher sleeps until persisted work is due and is woken by
+# local commits.  This infrequent rescan is the durable fallback for writes
+# performed by another process or via bulk SQL, which do not emit local model
+# signals.  The dispatcher enforces a five-minute minimum so an idle Neon Free
+# database always has a real scale-to-zero window.
+PUSH_DISPATCH_SAFETY_RESCAN_SECONDS = env.float(
+    "PUSH_DISPATCH_SAFETY_RESCAN_SECONDS", default=900.0
+)
 PUSH_ALLOWED_ENDPOINT_SUFFIXES = tuple(
     suffix.strip().lower().lstrip(".")
     for suffix in env.list(
@@ -256,7 +263,8 @@ if os.environ.get("AUTUMN_CHZ_DB"):
     DATABASES["default"].setdefault("TEST", {})["NAME"] = os.environ["AUTUMN_CHZ_DB"]
 
 # Keep DB connections open a bit (helps in production). Set to 0 to disable.
-CONN_MAX_AGE = env.int("CONN_MAX_AGE", default=60)
+# Django reads this value from the database alias, not as a top-level setting.
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
 
 # Transaction-pooled PostgreSQL connections can't preserve Django's named
 # server-side cursors between fetches. Neon identifies pooled connections with
