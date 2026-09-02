@@ -4,7 +4,7 @@ from unittest import mock
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import close_old_connections
+from django.db import close_old_connections, connections
 from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
@@ -215,7 +215,9 @@ class ConcurrentTimerReminderTests(TransactionTestCase):
         try:
             return operation()
         finally:
-            close_old_connections()
+            # CONN_MAX_AGE keeps healthy connections open, but executor worker
+            # threads must not outlive their test database connections.
+            connections.close_all()
 
     def test_two_claimers_create_one_reminder_event(self):
         session = SessionMutationService.create_session(
