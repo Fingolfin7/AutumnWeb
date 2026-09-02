@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 import os
 import threading
-import time
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -39,7 +38,6 @@ _wake_event = threading.Event()
 MIN_SAFETY_RESCAN_SECONDS = 300.0
 DEFAULT_SAFETY_RESCAN_SECONDS = 900.0
 LOCK_RETRY_SECONDS = 5.0
-STARTUP_DELAY_SECONDS = 1.0
 
 
 def run_dispatch_pass(*, limit=100, now=None):
@@ -389,9 +387,13 @@ def _error_retry_seconds(consecutive_errors):
 
 
 def _dispatch_loop():
-    # Let AppConfig.ready() and the rest of Django startup finish before this
-    # thread performs its initial durable deadline scan.
-    time.sleep(STARTUP_DELAY_SECONDS)
+    # CoreConfig.ready() starts this thread while Django is still populating
+    # the app registry.  Wait for the registry's completion event rather than
+    # guessing at a delay, so the initial durable scan never triggers Django's
+    # database-during-app-initialization warning.
+    from django.apps import apps
+
+    apps.ready_event.wait()
     last_error = None
     consecutive_errors = 0
     while True:

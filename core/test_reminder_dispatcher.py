@@ -201,8 +201,20 @@ class DispatchLoopTests(SimpleTestCase):
     def tearDown(self):
         reminder_dispatcher._wake_event.clear()
 
+    def test_waits_for_app_registry_before_scanning(self):
+        with mock.patch(
+            "django.apps.apps.ready_event.wait", side_effect=StopIteration
+        ) as wait_until_ready, mock.patch.object(
+            reminder_dispatcher, "_dispatch_step"
+        ) as step:
+            with self.assertRaises(StopIteration):
+                reminder_dispatcher._dispatch_loop()
+
+        wait_until_ready.assert_called_once_with()
+        step.assert_not_called()
+
     def test_idle_timeout_rescans_without_a_fixed_pass(self):
-        with mock.patch.object(reminder_dispatcher.time, "sleep"), mock.patch.object(
+        with mock.patch.object(
             reminder_dispatcher, "_dispatch_step", side_effect=[900, 900]
         ) as step, mock.patch.object(
             reminder_dispatcher._wake_event,
@@ -216,7 +228,7 @@ class DispatchLoopTests(SimpleTestCase):
         self.assertEqual([call.args[0] for call in wait.call_args_list], [900, 900])
 
     def test_dispatcher_exception_backs_off_then_recovers(self):
-        with mock.patch.object(reminder_dispatcher.time, "sleep"), mock.patch.object(
+        with mock.patch.object(
             reminder_dispatcher,
             "_dispatch_step",
             side_effect=[RuntimeError("database unavailable"), 900],
