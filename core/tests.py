@@ -284,6 +284,7 @@ class StopAfterTimerTests(TestCase):
             reverse("start_timer"),
             data={
                 "project": self.project.name,
+                "auto_stop_enabled": "1",
                 "stop_after_amount": "30",
                 "stop_after_unit": "minutes",
             },
@@ -299,6 +300,23 @@ class StopAfterTimerTests(TestCase):
             delta=2,
         )
 
+    def test_stop_after_value_is_ignored_without_explicit_opt_in(self):
+        response = self.client.post(
+            reverse("start_timer"),
+            data={
+                "project": self.project.name,
+                "stop_after_amount": "1",
+                "stop_after_unit": "minutes",
+                "reminder_mode": "interval",
+                "reminder_amount": "1",
+                "reminder_unit": "minutes",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        session = Sessions.objects.get(user=self.user, project=self.project)
+        self.assertIsNone(session.auto_stop_at)
+        self.assertIsNone(session.end_time)
 
     def test_expired_stop_after_timer_is_closed_before_listing_active_timers(self):
         start = timezone.now() - timedelta(minutes=45)

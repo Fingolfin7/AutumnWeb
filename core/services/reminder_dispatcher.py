@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 LOCK_KEY = "autumn:dispatch_timer_reminders:lock"
 
 _thread = None
+_thread_pid = None
 _thread_lock = threading.Lock()
 _wake_event = threading.Event()
 
@@ -176,7 +177,13 @@ def should_start_dispatcher(argv, environ, *, enabled):
         # Under autoreload only the child process (RUN_MAIN=true) should run it.
         return (environ or {}).get("RUN_MAIN") == "true"
 
-    if any(server in program for server in ("gunicorn", "uvicorn", "daphne")):
+    if "gunicorn" in program:
+        # Gunicorn may import Django in its master process. Starting a thread
+        # there leaves workers with a copied, dead Thread object after fork.
+        # gunicorn.conf.py starts it from post_worker_init instead.
+        return False
+
+    if any(server in program for server in ("uvicorn", "daphne")):
         return True
 
     return False
@@ -435,10 +442,20 @@ def _dispatch_loop():
 
 
 def start_dispatcher_thread():
-    """Start the single daemon dispatcher thread. Repeat calls are no-ops."""
-    global _thread
+    """Start one dispatcher thread in the current process.
+
+    The PID check is load-bearing for prefork servers: a worker can inherit a
+    Thread object from its master, but the actual thread does not survive the
+    fork and must be replaced in the child.
+    """
+    global _thread, _thread_pid
+    current_pid = os.getpid()
     with _thread_lock:
-        if _thread is not None:
+        if (
+            _thread is not None
+            and _thread_pid == current_pid
+            and _thread.is_alive()
+        ):
             return _thread
         thread = threading.Thread(
             target=_dispatch_loop,
@@ -446,6 +463,7 @@ def start_dispatcher_thread():
             daemon=True,
         )
         _thread = thread
+        _thread_pid = current_pid
         thread.start()
         logger.info("Started in-process timer reminder dispatcher thread.")
         return thread

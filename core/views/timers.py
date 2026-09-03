@@ -109,13 +109,23 @@ def start_timer(request):
         try:
             project_name = request.POST.get("project")
             subproject_names = request.POST.getlist("subprojects")
-            stop_after_amount = (request.POST.get("stop_after_amount") or "").strip()
-            stop_after_unit = request.POST.get("stop_after_unit", "minutes")
-            stop_after = (
-                f"{stop_after_amount} {stop_after_unit}"
-                if stop_after_amount
-                else request.POST.get("stop_after")
+            auto_stop_enabled = (
+                str(request.POST.get("auto_stop_enabled", "")).strip().lower()
+                in {"1", "true", "on", "yes"}
             )
+            stop_after_amount = (
+                (request.POST.get("stop_after_amount") or "").strip()
+                if auto_stop_enabled
+                else ""
+            )
+            stop_after_unit = request.POST.get("stop_after_unit", "minutes")
+            stop_after = None
+            if auto_stop_enabled:
+                stop_after = (
+                    f"{stop_after_amount} {stop_after_unit}"
+                    if stop_after_amount
+                    else request.POST.get("stop_after")
+                )
             stop_after_duration = parse_stop_after_duration(stop_after)
 
             reminder_mode = (request.POST.get("reminder_mode") or "none").strip().lower()

@@ -7,6 +7,7 @@ $(document).ready(function() {
     let summary = $('[data-start-timer-summary]');
     let stopAfterAmount = $('#stop-after-amount');
     let stopAfterUnit = $('#stop-after-unit');
+    let autoStopEnabled = $('#auto-stop-enabled');
     let lastLoadedProject = '';
     let presetSelectionActive = false;
     let projectIdsByName = {};
@@ -97,6 +98,20 @@ $(document).ready(function() {
         });
     }
 
+    function updateAutoStopControls() {
+        let enabled = autoStopEnabled.length && autoStopEnabled.prop('checked');
+        stopAfterAmount.prop('disabled', !enabled);
+        stopAfterUnit.prop('disabled', !enabled);
+        $('.timer-preset-button').prop('disabled', !enabled);
+        if (!enabled) {
+            stopAfterAmount.val('');
+            presetSelectionActive = false;
+            $('.timer-preset-button').removeClass('is-active');
+        }
+        updateStartTimerSummary();
+        document.dispatchEvent(new CustomEvent('autumn:auto-stop-changed'));
+    }
+
     search.on('keyup', function() {
         let ajax_url = $(this).attr('data-ajax_url');
         let value = $(this).val().trim();
@@ -178,6 +193,8 @@ $(document).ready(function() {
         renderStopAfterPresets(presetSelectionActive);
         updateStartTimerSummary();
     });
+
+    autoStopEnabled.on('change', updateAutoStopControls);
 
     function resolveProjectId(project_name) {
         // Resolve a typed project name to its id (v2 routes are id-based).
@@ -287,7 +304,7 @@ $(document).ready(function() {
         });
     }
 
-    updateStartTimerSummary();
+    updateAutoStopControls();
     renderStopAfterPresets(false);
 
     let initialProjectId = String($('[data-reminder-form]').attr('data-initial-project-id') || '');

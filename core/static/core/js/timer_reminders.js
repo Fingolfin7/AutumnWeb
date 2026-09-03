@@ -220,6 +220,9 @@
             field.addEventListener("input", function () { updateTimezonePreview(form); updateRail(form); });
             field.addEventListener("change", function () { updateTimezonePreview(form); updateRail(form); });
         });
+        document.addEventListener("autumn:auto-stop-changed", function () {
+            updateRail(form);
+        });
         setMode(form);
         var permission = form.querySelector(".rm-perm");
         if (permission) permissionStatus(form, permission);

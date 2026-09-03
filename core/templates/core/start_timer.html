@@ -56,22 +56,26 @@
                 <i class="fas fa-hourglass-half" aria-hidden="true"></i>
                 Stop after <span class="muted">(optional)</span>
             </p>
+            <label class="check-row">
+                <input type="checkbox" id="auto-stop-enabled" name="auto_stop_enabled" value="1">
+                <span>Stop this timer automatically</span>
+            </label>
             <div class="preset-row" role="group" aria-label="Stop after presets">
-                <button type="button" class="timer-preset-button" data-stop-after-preset="15">15m</button>
-                <button type="button" class="timer-preset-button" data-stop-after-preset="25">25m</button>
-                <button type="button" class="timer-preset-button" data-stop-after-preset="30">30m</button>
-                <button type="button" class="timer-preset-button" data-stop-after-preset="45">45m</button>
-                <button type="button" class="timer-preset-button" data-stop-after-preset="60">60m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="15" disabled>15m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="25" disabled>25m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="30" disabled>30m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="45" disabled>45m</button>
+                <button type="button" class="timer-preset-button" data-stop-after-preset="60" disabled>60m</button>
             </div>
             <div class="two-up u-mt-4">
                 <div class="field">
                     <label for="stop-after-amount">Duration</label>
                     <input type="number" id="stop-after-amount" name="stop_after_amount"
-                           min="1" step="1" inputmode="numeric" placeholder="No limit">
+                           min="1" step="1" inputmode="numeric" placeholder="No limit" disabled>
                 </div>
                 <div class="field">
                     <label for="stop-after-unit">Unit</label>
-                    <select id="stop-after-unit" name="stop_after_unit">
+                    <select id="stop-after-unit" name="stop_after_unit" disabled>
                         <option value="minutes" selected>Minutes</option>
                         <option value="hours">Hours</option>
                     </select>

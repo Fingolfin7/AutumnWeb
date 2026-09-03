@@ -61,15 +61,22 @@ class ShouldStartDispatcherTests(SimpleTestCase):
             )
         )
 
-    def test_wsgi_servers_start_the_thread(self):
+    def test_non_prefork_wsgi_servers_start_the_thread(self):
         for argv0 in (
-            "gunicorn",
-            "/app/.venv/bin/gunicorn",
             "uvicorn",
             "daphne",
         ):
             with self.subTest(argv0=argv0):
                 self.assertTrue(
+                    should_start_dispatcher(
+                        [argv0, "AutumnWeb.wsgi:application"], {}, enabled=True
+                    )
+                )
+
+    def test_gunicorn_defers_startup_to_its_worker_hook(self):
+        for argv0 in ("gunicorn", "/app/.venv/bin/gunicorn"):
+            with self.subTest(argv0=argv0):
+                self.assertFalse(
                     should_start_dispatcher(
                         [argv0, "AutumnWeb.wsgi:application"], {}, enabled=True
                     )
@@ -375,7 +382,9 @@ class PersistedDeadlineTests(TestCase):
 class StartDispatcherThreadTests(SimpleTestCase):
     def setUp(self):
         self.addCleanup(setattr, reminder_dispatcher, "_thread", None)
+        self.addCleanup(setattr, reminder_dispatcher, "_thread_pid", None)
         reminder_dispatcher._thread = None
+        reminder_dispatcher._thread_pid = None
 
     def test_repeated_starts_create_a_single_thread(self):
         with mock.patch.object(reminder_dispatcher, "threading") as threading_mod:
@@ -386,3 +395,18 @@ class StartDispatcherThreadTests(SimpleTestCase):
         threading_mod.Thread.assert_called_once()
         first.start.assert_called_once()
         self.assertTrue(threading_mod.Thread.call_args.kwargs["daemon"])
+
+    def test_forked_worker_replaces_the_masters_dead_thread_object(self):
+        inherited = mock.Mock()
+        inherited.is_alive.return_value = True
+        reminder_dispatcher._thread = inherited
+        reminder_dispatcher._thread_pid = 100
+
+        with mock.patch.object(
+            reminder_dispatcher.os, "getpid", return_value=200
+        ), mock.patch.object(reminder_dispatcher.threading, "Thread") as thread_class:
+            worker_thread = start_dispatcher_thread()
+
+        self.assertIs(worker_thread, thread_class.return_value)
+        self.assertIsNot(worker_thread, inherited)
+        worker_thread.start.assert_called_once()

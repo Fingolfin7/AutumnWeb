@@ -1,7 +1,8 @@
 import importlib.util
+from unittest import mock
 
 from django.conf import settings
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from AutumnWeb.access_log_policy import should_log_access
 
@@ -42,6 +43,26 @@ class GunicornAccessLogFilterTests(SimpleTestCase):
             load_gunicorn_config().logger_class,
             "AutumnWeb.gunicorn_logging.AutumnLogger",
         )
+
+    @override_settings(RUN_REMINDER_DISPATCHER=True)
+    def test_gunicorn_starts_dispatcher_after_worker_initialization(self):
+        config = load_gunicorn_config()
+        with mock.patch(
+            "core.services.reminder_dispatcher.start_dispatcher_thread"
+        ) as start:
+            config.post_worker_init(mock.sentinel.worker)
+
+        start.assert_called_once_with()
+
+    @override_settings(RUN_REMINDER_DISPATCHER=False)
+    def test_gunicorn_worker_hook_respects_disabled_dispatcher(self):
+        config = load_gunicorn_config()
+        with mock.patch(
+            "core.services.reminder_dispatcher.start_dispatcher_thread"
+        ) as start:
+            config.post_worker_init(mock.sentinel.worker)
+
+        start.assert_not_called()
 
     def test_successful_health_and_polling_requests_are_suppressed(self):
         for path in (

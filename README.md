@@ -148,9 +148,11 @@ modes; pick one.
 cron. For local testing, use bounded `--loop --max-seconds 30` mode.
 
 **In-process dispatcher thread (opt-in).** Set `RUN_REMINDER_DISPATCHER=TRUE`
-and the web process starts a daemon thread that sleeps until persisted work is
-due. Relevant commits in the web process wake it immediately; an infrequent
-safety rescan discovers writes made outside that process.
+and the web worker starts a daemon thread that sleeps until persisted work is
+due. Relevant commits in that worker wake it immediately; an infrequent safety
+rescan discovers writes made outside that process. Gunicorn starts the thread
+from `post_worker_init`, after forking, because threads created in its master do
+not survive into workers.
 This suits local `runserver` and single-service Render deployments where no
 cron or worker service is available:
 
@@ -160,7 +162,8 @@ PUSH_DISPATCH_SAFETY_RESCAN_SECONDS=900 # Durable fallback; minimum 300 seconds
 ```
 
 The thread only starts in a web process — `runserver` (in the autoreload child,
-or with `--noreload`) and gunicorn/uvicorn/daphne. Management commands such as
+or with `--noreload`), Gunicorn's initialized worker, and uvicorn/daphne.
+Management commands such as
 `test`, `migrate`, `check`, and `dispatch_timer_reminders` itself never start
 it. Both modes take the same best-effort cache lock, so a cron job and the
 thread do not run a pass at the same time when they share a cache backend.

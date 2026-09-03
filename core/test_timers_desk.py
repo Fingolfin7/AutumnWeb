@@ -193,6 +193,7 @@ class TimerReminderPageTests(TimerPagesTestCase):
         self.assertContains(response, 'name="reminder_amount"')
         self.assertContains(response, 'name="reminder_unit"')
         self.assertContains(response, 'name="reminder_at"')
+        self.assertContains(response, 'name="auto_stop_enabled"')
         self.assertContains(response, 'name="notify_on_auto_stop"')
         self.assertContains(response, self.user.profile.timezone)
         self.assertContains(response, "data-rm-timezone")
@@ -235,6 +236,7 @@ class TimerReminderPageTests(TimerPagesTestCase):
 
         session = Sessions.objects.get(user=self.user, end_time__isnull=True)
         reminder = TimerReminder.objects.get(session=session)
+        self.assertIsNone(session.auto_stop_at)
         self.assertEqual(reminder.mode, "interval")
         self.assertEqual(reminder.interval_seconds, 5 * 60)
 

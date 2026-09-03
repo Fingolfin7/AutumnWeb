@@ -135,13 +135,16 @@ best-effort cache lock:
 
 - the bounded `python manage.py dispatch_timer_reminders --once` cron command
   (or `--loop --max-seconds 30` locally); and
-- an opt-in daemon thread started from `CoreConfig.ready()` when
-  `RUN_REMINDER_DISPATCHER=TRUE`. It scans persisted deadlines at startup,
+- an opt-in daemon thread enabled by `RUN_REMINDER_DISPATCHER=TRUE`.
+  `CoreConfig.ready()` starts it for runserver/uvicorn/daphne; Gunicorn uses
+  `post_worker_init` so the thread starts after the worker fork. It scans
+  persisted deadlines at startup,
   sleeps until work is due, wakes on relevant local commits, and performs an
   infrequent safety rescan (default 900 seconds, minimum 300) for external or
   bulk writes. `should_start_dispatcher` gates it to web processes only
   (`runserver` autoreload child or
-  `--noreload`, and gunicorn/uvicorn/daphne); no management command,
+  `--noreload`, plus uvicorn/daphne; Gunicorn is gated by its worker hook); no
+  management command,
   `test`/`migrate`/`check` included, ever starts it.
 
 The VAPID private key remains server-only; browser test notifications are
