@@ -627,7 +627,11 @@ def validate_notification_payload(payload: object) -> dict:
 
 def _event_terminal_status(event, status: str, *, error: str | None = None):
     now = timezone.now()
-    fields = {"status": status, "delivered_at": now if status == "delivered" else None}
+    fields = {
+        "status": status,
+        "delivered_at": now if status == "delivered" else None,
+        "completed_at": now,
+    }
     if error is not None:
         fields.update(last_error=error[:MAX_ERROR_LENGTH], last_error_at=now)
     else:

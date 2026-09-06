@@ -24,7 +24,9 @@ python manage.py makemigrations
 python manage.py migrate
 
 # Run all tests
+pip install -r requirements-dev.txt
 python manage.py test
+node --test scripts/tests/polling.test.cjs
 
 # Run specific test file
 python manage.py test core.tests.test_parse_date_or_datetime_iso
@@ -108,7 +110,6 @@ Optional:
 DATABASE_URL=postgres://...  # Falls back to SQLite
 NASA_API_KEY=<key>
 SERVE_MEDIA=TRUE  # For PaaS deployments
-RUN_AUDIT_SCHEDULER=FALSE
 ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *
 ALLOW_REGISTRATION=FALSE  # Registration is closed unless explicitly enabled
 GOOGLE_OAUTH_CLIENT_ID=<google-web-client-id>
@@ -167,5 +168,7 @@ that the operating system displayed it.
 
 ## Testing
 
-Tests are in `core/test_*.py`, `core/tests.py`, and `users/`. CI runs on GitHub
-Actions (Windows, Python 3.10/3.13).
+Tests are in `core/test_*.py`, `core/tests.py`, `users/`, and `llm_insights/`.
+Install `requirements-dev.txt` for test-only dependencies. CI runs on Windows
+with SQLite and Python 3.10, and Ubuntu with PostgreSQL and Python 3.13.
+Browser polling behavior tests use Node 22+ built-ins, with no npm dependencies.

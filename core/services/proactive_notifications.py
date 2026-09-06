@@ -420,7 +420,12 @@ def _scheduled_payload(reminder, occurrence):
 def _cancel_pending_schedule_events(reminder):
     return NotificationEvent.objects.filter(
         scheduled_reminder=reminder, status="pending"
-    ).update(status="cancelled", lease_until=None, next_attempt_at=None)
+    ).update(
+        status="cancelled",
+        completed_at=timezone.now(),
+        lease_until=None,
+        next_attempt_at=None,
+    )
 
 
 @transaction.atomic

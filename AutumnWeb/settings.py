@@ -91,6 +91,9 @@ PUSH_CLAIM_LEASE_SECONDS = env.int("PUSH_CLAIM_LEASE_SECONDS", default=120)
 # Opt-in in-process dispatcher thread.  Off by default: the bounded
 # ``dispatch_timer_reminders`` cron command stays the alternative delivery path.
 RUN_REMINDER_DISPATCHER = env.bool("RUN_REMINDER_DISPATCHER", default=False)
+# Completed notification diagnostics only; 0 disables retention cleanup.
+NOTIFICATION_HISTORY_RETENTION_DAYS = env.int("NOTIFICATION_HISTORY_RETENTION_DAYS", default=90)
+NOTIFICATION_HISTORY_CLEANUP_BATCH_SIZE = env.int("NOTIFICATION_HISTORY_CLEANUP_BATCH_SIZE", default=100)
 # The in-process dispatcher sleeps until persisted work is due and is woken by
 # local commits.  This infrequent rescan is the durable fallback for writes
 # performed by another process or via bulk SQL, which do not emit local model
@@ -500,12 +503,6 @@ if GITHUB_AUTH_ENABLED:
         "secret": GITHUB_OAUTH_CLIENT_SECRET,
         "key": "",
     }
-
-# AUDIT Settings
-RUN_AUDIT_SCHEDULER = env.bool(
-    "RUN_AUDIT_SCHEDULER", False
-)  # convert the string to a boolean
-AUDIT_PERIOD = env.int("AUDIT_PERIOD")
 
 # Test-only overrides. PBKDF2's slowness is a security feature in production but
 # dominates test runtime (~1.4s per test for create_user/login), so use MD5 there.

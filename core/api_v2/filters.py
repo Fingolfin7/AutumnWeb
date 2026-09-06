@@ -37,6 +37,8 @@ class SessionFilterSpec:
         }
         values = {}
 
+        parsed_id_fields = {}
+        fields_by_model = {}
         for field_name, model in id_fields.items():
             raw_value = qp.get(field_name)
             if raw_value in (None, ""):
@@ -53,10 +55,26 @@ class SessionFilterSpec:
                 errors[field_name] = ["Enter comma-separated positive integer IDs."]
                 continue
 
-            owned_ids = frozenset(
-                model.objects.filter(user=user, id__in=ids).values_list("id", flat=True)
+            parsed_id_fields[field_name] = (model, ids)
+            fields_by_model.setdefault(model, []).append(field_name)
+
+        # Include and exclude filters often target the same model. Validate
+        # all IDs for that model in one ownership query, while retaining the
+        # original per-field errors and parsed values.
+        owned_ids_by_model = {}
+        for model, field_names in fields_by_model.items():
+            requested_ids = set().union(
+                *(parsed_id_fields[field_name][1] for field_name in field_names)
             )
-            if owned_ids != ids:
+            owned_ids_by_model[model] = frozenset(
+                model.objects.filter(user=user, id__in=requested_ids).values_list(
+                    "id", flat=True
+                )
+            )
+
+        for field_name, (model, ids) in parsed_id_fields.items():
+            owned_ids = owned_ids_by_model[model]
+            if not ids.issubset(owned_ids):
                 errors[field_name] = ["One or more IDs do not belong to this user."]
             values[field_name] = ids
 

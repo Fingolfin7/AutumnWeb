@@ -14,6 +14,7 @@ import shutil
 import tempfile
 import time
 from unittest.mock import patch
+from freezegun import freeze_time
 from core.models import Context
 from rest_framework.authtoken.models import Token
 from core.utils import (
@@ -1320,6 +1321,7 @@ class PeriodBoundsTests(TestCase):
         self.assertEqual((end - start).days, 14)
 
 
+@freeze_time("2026-09-09 12:00:00+00:00")
 class CommitmentProgressTests(TestCase):
     """Test the get_commitment_progress utility function."""
 

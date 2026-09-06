@@ -176,3 +176,4 @@ characterization/.meta-*.tmp
 *-wal
 *-shm
 .claude/settings.local.json
+/resource-snapshots/

@@ -28,15 +28,3 @@ class CoreConfig(AppConfig):
                     start_dispatcher_thread()
         except Exception:
             logger.exception("Could not start the timer reminder dispatcher thread.")
-
-        # NOTE: Temporarily disabled DB-touching initialization.
-        # We previously enabled WAL mode for SQLite here:
-        #   PRAGMA journal_mode=WAL;
-        # Running database PRAGMAs from AppConfig.ready() can interfere with
-        # management commands, migrations, and recovery.
-        # Reintroduce later with a safe guard if needed.
-        #
-        # from django.db import connection
-        # if connection.vendor == "sqlite":
-        #     with connection.cursor() as cursor:
-        #         cursor.execute("PRAGMA journal_mode=WAL;")

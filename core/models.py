@@ -746,6 +746,7 @@ class NotificationEvent(models.Model):
     last_error_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         ordering = ["scheduled_at", "id"]

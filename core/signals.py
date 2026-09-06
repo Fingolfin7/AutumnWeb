@@ -12,6 +12,7 @@ from django.db.models.signals import (
     pre_delete,
 )
 from django.dispatch import receiver
+from django.utils import timezone
 
 from core.models import (
     Commitment,
@@ -76,6 +77,7 @@ def _cancel_pending_source_events(**source):
 
     NotificationEvent.objects.filter(status="pending", **source).update(
         status="cancelled",
+        completed_at=timezone.now(),
         next_attempt_at=None,
         lease_until=None,
     )

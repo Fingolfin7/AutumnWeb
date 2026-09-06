@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ _thread = None
 _thread_pid = None
 _thread_lock = threading.Lock()
 _wake_event = threading.Event()
+_last_history_cleanup_monotonic = None
 
 # An idle production database must have at least one uninterrupted five-minute
 # window in which Neon can suspend compute.  Local commits normally wake the
@@ -44,13 +46,12 @@ LOCK_RETRY_SECONDS = 5.0
 def run_dispatch_pass(*, limit=100, now=None):
     """Run one bounded dispatch pass.
 
-    Returns ``(stopped_count, claimed, flushed)`` where ``claimed`` is whatever
-    ``claim_due_reminders`` returned (a list of events, or a count).  When the
-    optional proactive claim service is installed, its three categories are
-    appended to that same collection; the public three-tuple is unchanged.
+    Returns ``(stopped_count, claimed_events, flushed_count)``. Timer and
+    proactive claims share the pass limit and the same scheduling instant.
     """
     from django.utils import timezone
 
+    from core.services.proactive_notifications import claim_due_proactive_notifications
     from core.services.push import flush_outbox
     from core.services.reminders import claim_due_reminders
     from core.utils import stop_expired_timers
@@ -58,9 +59,11 @@ def run_dispatch_pass(*, limit=100, now=None):
     now = now or timezone.now()
     stopped = stop_expired_timers(now=now)
     claimed = claim_due_reminders(now=now, limit=limit)
-    claimed = _claim_proactive_notifications(claimed, now=now, limit=limit)
+    remaining = max(0, int(limit) - len(claimed))
+    if remaining:
+        claimed.extend(claim_due_proactive_notifications(now=now, limit=remaining))
     flushed = flush_outbox(limit=limit, now=now)
-    claimed_count = claimed if isinstance(claimed, int) else len(claimed)
+    claimed_count = len(claimed)
     if stopped or claimed_count or flushed:
         logger.info(
             "notification_dispatch_pass stopped=%s claimed=%s outbox_flushed=%s",
@@ -70,83 +73,6 @@ def run_dispatch_pass(*, limit=100, now=None):
         )
     return len(stopped), claimed, flushed
 
-
-def _claim_proactive_notifications(timer_claimed, *, now, limit):
-    """Append optional scheduled/commitment/review claims defensively.
-
-    The proactive claim module is intentionally not imported at module load:
-    timer delivery remains deployable while that later slice is absent or its
-    migration has not yet run.  A future module may expose one combined
-    ``claim_due_notifications`` function or the three category functions
-    listed below.  Each function receives the same pass instant and a
-    remaining bounded limit, and must return a list of newly claimed events.
-    """
-
-    try:
-        from core.services import proactive_notifications
-    except ImportError:
-        return timer_claimed
-
-    if isinstance(timer_claimed, int):
-        combined = []
-        timer_count = timer_claimed
-    else:
-        try:
-            combined = list(timer_claimed or [])
-        except TypeError:
-            # Preserve the old contract for an unusual count-like return.
-            return timer_claimed
-        timer_count = len(combined)
-
-    remaining = max(0, int(limit) - timer_count)
-    if not remaining:
-        return combined
-
-    combined_claimer = next(
-        (
-            getattr(proactive_notifications, name, None)
-            for name in (
-                "claim_due_notifications",
-                "claim_due_proactive_notifications",
-            )
-            if callable(getattr(proactive_notifications, name, None))
-        ),
-        None,
-    )
-    if callable(combined_claimer):
-        try:
-            extra = combined_claimer(now=now, limit=remaining)
-        except ImportError:
-            # A partially deployed proactive module may still be waiting for
-            # its model migration.  Timer claims must continue to run.
-            return combined
-        if extra:
-            combined.extend(extra if isinstance(extra, (list, tuple)) else [extra])
-        return combined
-
-    for names in (
-        ("claim_due_scheduled_reminders", "claim_due_scheduled"),
-        ("claim_due_commitment_checks", "claim_due_commitments"),
-        ("claim_due_weekly_reviews", "claim_due_weekly_review"),
-    ):
-        name = next(
-            (candidate for candidate in names if callable(getattr(proactive_notifications, candidate, None))),
-            None,
-        )
-        claimer = getattr(proactive_notifications, name, None) if name else None
-        if not callable(claimer):
-            continue
-        remaining = max(0, int(limit) - len(combined))
-        if not remaining:
-            break
-        try:
-            extra = claimer(now=now, limit=remaining)
-        except ImportError:
-            # Keep the timer-only pass usable during a rolling deployment.
-            continue
-        if extra:
-            combined.extend(extra if isinstance(extra, (list, tuple)) else [extra])
-    return combined
 
 
 def should_start_dispatcher(argv, environ, *, enabled):
@@ -219,6 +145,26 @@ def _dispatch_once():
         except Exception:
             pass
     return True
+
+
+def _maybe_cleanup_notification_history():
+    global _last_history_cleanup_monotonic
+    now = time.monotonic()
+    if (
+        _last_history_cleanup_monotonic is not None
+        and now - _last_history_cleanup_monotonic < 86400
+    ):
+        return
+    from core.services.notification_retention import cleanup_notification_history
+
+    try:
+        cleanup_notification_history()
+    except Exception:
+        logger.warning("Notification history cleanup failed.", exc_info=True)
+    finally:
+        # Do not turn a persistent schema/database problem into a per-pass
+        # retry loop; the next daily opportunity will try again.
+        _last_history_cleanup_monotonic = now
 
 
 def _safety_rescan_seconds():
@@ -384,7 +330,16 @@ def _dispatch_step(*, now=None):
     until_deadline = (
         (deadline - now).total_seconds() if deadline is not None else float("inf")
     )
-    return min(_safety_rescan_seconds(), max(0.0, until_deadline))
+    if until_deadline >= 60:
+        cleanup_started = time.monotonic()
+        _maybe_cleanup_notification_history()
+        cleanup_elapsed = time.monotonic() - cleanup_started
+    else:
+        cleanup_elapsed = 0.0
+    return min(
+        _safety_rescan_seconds(),
+        max(0.0, until_deadline - cleanup_elapsed),
+    )
 
 
 def _error_retry_seconds(consecutive_errors):

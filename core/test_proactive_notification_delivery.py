@@ -6,7 +6,6 @@ existing return shape.
 """
 
 import json
-import sys
 from pathlib import Path
 from unittest import mock
 
@@ -104,43 +103,10 @@ class NotificationPayloadTests(SimpleTestCase):
 
 
 class DispatcherProactiveContractTests(SimpleTestCase):
-    def test_future_claimers_are_combined_after_timer_claims(self):
-        scheduled = mock.Mock(return_value=["scheduled"])
-        commitment = mock.Mock(return_value=["commitment"])
-        review = mock.Mock(return_value=["review"])
+    def test_timer_backlog_leaves_no_budget_for_proactive_claims(self):
         with mock.patch(
-            "core.services.proactive_notifications.claim_due_proactive_notifications",
-            new=None,
-        ), mock.patch(
-            "core.services.proactive_notifications.claim_due_scheduled_reminders",
-            scheduled,
-        ), mock.patch(
-            "core.services.proactive_notifications.claim_due_commitment_checks",
-            commitment,
-        ), mock.patch(
-            "core.services.proactive_notifications.claim_due_weekly_reviews",
-            review,
-        ), mock.patch(
-            "core.utils.stop_expired_timers", return_value=[]
-        ), mock.patch(
-            "core.services.reminders.claim_due_reminders", return_value=["timer"]
-        ) as timer_claim, mock.patch(
-            "core.services.push.flush_outbox", return_value=0
-        ):
-            result = run_dispatch_pass(limit=8)
-
-        self.assertEqual(result, (0, ["timer", "scheduled", "commitment", "review"], 0))
-        timer_claim.assert_called_once()
-        for claimer, expected_limit in (
-            (scheduled, 7),
-            (commitment, 6),
-            (review, 5),
-        ):
-            self.assertEqual(claimer.call_args.kwargs["limit"], expected_limit)
-            self.assertEqual(claimer.call_args.kwargs["now"], timer_claim.call_args.kwargs["now"])
-
-    def test_missing_future_module_preserves_timer_only_contract(self):
-        with mock.patch.dict(sys.modules, {"core.services.proactive_notifications": None}), mock.patch(
+            "core.services.proactive_notifications.claim_due_proactive_notifications"
+        ) as proactive_claim, mock.patch(
             "core.utils.stop_expired_timers", return_value=[]
         ), mock.patch(
             "core.services.reminders.claim_due_reminders", return_value=["timer"]
@@ -148,6 +114,7 @@ class DispatcherProactiveContractTests(SimpleTestCase):
             "core.services.push.flush_outbox", return_value=0
         ):
             self.assertEqual(run_dispatch_pass(limit=1), (0, ["timer"], 0))
+        proactive_claim.assert_not_called()
 
 
 class ServiceWorkerContractTests(SimpleTestCase):

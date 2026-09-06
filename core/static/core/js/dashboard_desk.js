@@ -52,6 +52,7 @@
   }
 
   function tickCards() {
+    if (document.hidden) { return; }
     var now = Date.now();
 
     document.querySelectorAll(".focus-card[data-start-time]").forEach(function (card) {
@@ -229,7 +230,7 @@
 
   function refetchTimeline(range) {
     var root = document.querySelector("[data-timeline]");
-    if (!root || timelineFetchInFlight) { return; }
+    if (document.hidden || !root || timelineFetchInFlight) { return; }
     var url = root.getAttribute("data-timeline-url");
     if (!url) { return; }
 
@@ -317,9 +318,24 @@
     tickTimeline();
     lastRunningSignature = runningSignature();
 
-    setInterval(tickCards, 1000);
-    setInterval(tickTimeline, TIMELINE_TICK_MS);
-    setInterval(function () { refetchTimeline(); }, TIMELINE_HEARTBEAT_MS);
+    var intervals = [];
+    function updateVisibility() {
+      intervals.forEach(clearInterval);
+      intervals = [];
+      if (document.hidden) { return; }
+      tickCards();
+      tickTimeline();
+      intervals = [
+        setInterval(tickCards, 1000),
+        setInterval(tickTimeline, TIMELINE_TICK_MS),
+        setInterval(function () { refetchTimeline(); }, TIMELINE_HEARTBEAT_MS)
+      ];
+    }
+    document.addEventListener("visibilitychange", function () {
+      updateVisibility();
+      refetchTimeline();
+    });
+    updateVisibility();
 
     document.addEventListener("autumn:timers-refreshed", function () {
       var deck = document.querySelector("[data-focus-track]");

@@ -1,6 +1,5 @@
 # core/context_processors.py
 import os
-import json
 from django.conf import settings
 from django.core.cache import cache
 from core.utils import get_active_context
@@ -31,7 +30,7 @@ def static_version(request):
             for entry in os.listdir(dir_path):
                 entry_path = os.path.join(dir_path, entry)
                 if os.path.isfile(entry_path):
-                    name, ext = os.path.splitext(entry)
+                    name = os.path.splitext(entry)[0]
                     mtime = int(os.path.getmtime(entry_path))
                     version[name] = max(version.get(name, 0), mtime)
                 elif os.path.isdir(entry_path):
@@ -50,10 +49,6 @@ def static_version(request):
         else settings.STATIC_VERSION_CACHE_TIMEOUT['production']
 
     cache.set(cache_key, version, timeout)
-
-    # if settings.DEBUG:
-    #     print("Static directories: ", static_dirs)
-    #     print("Static version: ", json.dumps(version, indent=4))
 
     return {'static_version': version}
 

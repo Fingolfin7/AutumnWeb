@@ -90,6 +90,8 @@ class ShouldStartDispatcherTests(SimpleTestCase):
 class RunDispatchPassTests(SimpleTestCase):
     def test_pass_runs_the_three_steps_and_returns_the_triple(self):
         events = [object(), object()]
+        proactive_events = [object()]
+        expected_events = events + proactive_events
         with self.assertLogs(
             "core.services.reminder_dispatcher", level="INFO"
         ) as captured:
@@ -99,13 +101,13 @@ class RunDispatchPassTests(SimpleTestCase):
                 "core.services.reminders.claim_due_reminders", return_value=events
             ) as claim, mock.patch(
                 "core.services.proactive_notifications.claim_due_proactive_notifications",
-                return_value=[],
+                return_value=proactive_events,
             ) as proactive_claim, mock.patch(
                 "core.services.push.flush_outbox", return_value=3
             ) as flush:
                 result = run_dispatch_pass(limit=7)
 
-        self.assertEqual(result, (1, events, 3))
+        self.assertEqual(result, (1, expected_events, 3))
         stop.assert_called_once()
         self.assertEqual(claim.call_args.kwargs["limit"], 7)
         self.assertEqual(proactive_claim.call_args.kwargs["limit"], 5)
@@ -121,9 +123,42 @@ class RunDispatchPassTests(SimpleTestCase):
             stop.call_args.kwargs["now"], flush.call_args.kwargs["now"]
         )
         self.assertIn(
-            "notification_dispatch_pass stopped=1 claimed=2 outbox_flushed=3",
+            "notification_dispatch_pass stopped=1 claimed=3 outbox_flushed=3",
             captured.output[0],
         )
+
+
+class HistoryCleanupSchedulingTests(SimpleTestCase):
+    def setUp(self):
+        reminder_dispatcher._last_history_cleanup_monotonic = None
+
+    def tearDown(self):
+        reminder_dispatcher._last_history_cleanup_monotonic = None
+
+    def test_cleanup_is_attempted_once_per_day(self):
+        with mock.patch(
+            "core.services.notification_retention.cleanup_notification_history"
+        ) as cleanup, mock.patch.object(
+            reminder_dispatcher.time, "monotonic", side_effect=[100.0, 200.0]
+        ):
+            reminder_dispatcher._maybe_cleanup_notification_history()
+            reminder_dispatcher._maybe_cleanup_notification_history()
+
+        cleanup.assert_called_once_with()
+
+    def test_cleanup_failure_also_backs_off_for_the_day(self):
+        with mock.patch(
+            "core.services.notification_retention.cleanup_notification_history",
+            side_effect=RuntimeError("database unavailable"),
+        ) as cleanup, mock.patch.object(
+            reminder_dispatcher.time, "monotonic", side_effect=[100.0, 200.0]
+        ), self.assertLogs(
+            "core.services.reminder_dispatcher", level="WARNING"
+        ):
+            reminder_dispatcher._maybe_cleanup_notification_history()
+            reminder_dispatcher._maybe_cleanup_notification_history()
+
+        cleanup.assert_called_once_with()
 
 
 class DispatchOnceTests(SimpleTestCase):
@@ -136,6 +171,8 @@ class DispatchOnceTests(SimpleTestCase):
             "django.core.cache.cache.get", return_value=None
         ), mock.patch(
             "django.core.cache.cache.delete"
+        ), mock.patch.object(
+            reminder_dispatcher, "_maybe_cleanup_notification_history"
         ):
             self.assertTrue(reminder_dispatcher._dispatch_once())
         one_pass.assert_called_once()
@@ -163,7 +200,9 @@ class DeadlinePlanningTests(SimpleTestCase):
         now = datetime(2026, 9, 2, 10, tzinfo=dt_timezone.utc)
         with mock.patch.object(
             reminder_dispatcher, "next_dispatch_at", return_value=None
-        ) as scan, mock.patch.object(reminder_dispatcher, "_dispatch_once") as dispatch:
+        ) as scan, mock.patch.object(reminder_dispatcher, "_dispatch_once") as dispatch, mock.patch.object(
+            reminder_dispatcher, "_maybe_cleanup_notification_history"
+        ):
             wait_seconds = reminder_dispatcher._dispatch_step(now=now)
 
         self.assertEqual(wait_seconds, 900)
@@ -179,10 +218,12 @@ class DeadlinePlanningTests(SimpleTestCase):
         deadline = now + timedelta(seconds=125)
         with mock.patch.object(
             reminder_dispatcher, "next_dispatch_at", return_value=deadline
-        ), mock.patch.object(reminder_dispatcher, "_dispatch_once") as dispatch:
+        ), mock.patch.object(reminder_dispatcher, "_dispatch_once") as dispatch, mock.patch.object(
+            reminder_dispatcher, "_maybe_cleanup_notification_history"
+        ):
             wait_seconds = reminder_dispatcher._dispatch_step(now=now)
 
-        self.assertEqual(wait_seconds, 125)
+        self.assertAlmostEqual(wait_seconds, 125, places=3)
         dispatch.assert_not_called()
 
     def test_due_deadline_dispatches_and_requests_immediate_rescan(self):
@@ -191,7 +232,9 @@ class DeadlinePlanningTests(SimpleTestCase):
             reminder_dispatcher, "next_dispatch_at", return_value=now
         ), mock.patch.object(
             reminder_dispatcher, "_dispatch_once", return_value=True
-        ) as dispatch:
+        ) as dispatch, mock.patch.object(
+            reminder_dispatcher, "_maybe_cleanup_notification_history"
+        ):
             self.assertIsNone(reminder_dispatcher._dispatch_step(now=now))
 
         dispatch.assert_called_once_with()
