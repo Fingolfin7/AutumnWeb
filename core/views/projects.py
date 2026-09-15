@@ -19,6 +19,11 @@ from core.commitments import (
     get_commitment_progress,
     reconcile_commitment,
 )
+from core.celebrations import (
+    format_tracked_time,
+    is_completion_transition,
+    project_total_minutes,
+)
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 from django.db.models import Prefetch
 from core.totals import annotate_project_totals, annotate_subproject_totals
@@ -315,9 +320,8 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
-        old_name = Projects.objects.values_list("name", flat=True).get(
-            pk=self.object.pk
-        )
+        previous_project = Projects.objects.get(pk=self.object.pk)
+        old_name = previous_project.name
         if (
             Projects.objects.filter(user=self.request.user, name=form.instance.name)
             .exclude(pk=self.object.pk)
@@ -342,7 +346,28 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
         if update_fields:
             project.save(update_fields=update_fields)
         form.save_m2m()
-        messages.success(self.request, "Project updated successfully")
+        if is_completion_transition(previous_project.status, project.status):
+            total_minutes = project_total_minutes(self.request.user, project.pk)
+            session_count = Sessions.objects.filter(
+                user=self.request.user,
+                project_id=project.pk,
+                end_time__isnull=False,
+            ).count()
+            if session_count:
+                session_word = "session" if session_count == 1 else "sessions"
+                completion_copy = (
+                    f"Project complete — {format_tracked_time(total_minutes)} "
+                    f"tracked across {session_count} {session_word}."
+                )
+            else:
+                completion_copy = "Project complete — no sessions logged yet."
+            messages.success(
+                self.request,
+                completion_copy,
+                extra_tags="celebration celebration-complete",
+            )
+        else:
+            messages.success(self.request, "Project updated successfully")
         return redirect("update_project", pk=self.kwargs["pk"])
 
 

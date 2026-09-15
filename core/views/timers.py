@@ -21,6 +21,13 @@ from core.commitments import (
     get_commitment_progress,
     reconcile_commitment,
 )
+from core.celebrations import (
+    commitment_progress_for_project,
+    crossed_tracked_time_milestone,
+    format_tracked_time,
+    newly_met_commitment,
+    project_total_minutes,
+)
 from core.models import Projects, SubProjects, Sessions, Commitment, TimerReminder
 from core.services import SessionMutationService
 from core.services.reminders import create_timer_reminder
@@ -275,6 +282,18 @@ def stop_timer(request, session_id: int):
         form = StopTimerForm(post_data, instance=timer)
         if form.is_valid():
             try:
+                # Snapshot derived progress before the active session becomes
+                # completed. The same reference instant makes the comparison
+                # a true crossing check, rather than a page-load effect.
+                celebration_reference = timezone.now()
+                before_total_minutes = project_total_minutes(
+                    request.user, timer.project_id
+                )
+                before_commitments = commitment_progress_for_project(
+                    request.user,
+                    timer.project,
+                    reference_instant=celebration_reference,
+                )
                 allocations = parse_allocation_post(
                     request.POST, list(timer.subprojects.all())
                 )
@@ -295,7 +314,37 @@ def stop_timer(request, session_id: int):
                             user=request.user,
                             allocations=allocations,
                         )
-                messages.success(request, "Stopped timer")
+                after_total_minutes = project_total_minutes(
+                    request.user, timer.project_id
+                )
+                after_commitments = commitment_progress_for_project(
+                    request.user,
+                    timer.project,
+                    reference_instant=celebration_reference,
+                )
+                newly_met = newly_met_commitment(
+                    before_commitments, after_commitments
+                )
+                crossed_milestone = crossed_tracked_time_milestone(
+                    before_total_minutes, after_total_minutes
+                )
+                if newly_met is not None:
+                    messages.success(
+                        request,
+                        f"Stopped timer — commitment met: {newly_met.target_name}.",
+                        extra_tags="celebration celebration-progress",
+                    )
+                elif crossed_milestone is not None:
+                    messages.success(
+                        request,
+                        (
+                            f"Stopped timer — {timer.project.name} reached "
+                            f"{format_tracked_time(crossed_milestone)} tracked."
+                        ),
+                        extra_tags="celebration celebration-progress",
+                    )
+                else:
+                    messages.success(request, "Stopped timer")
                 return redirect("timers")
             except ValueError as exc:
                 form.add_error(None, str(exc))

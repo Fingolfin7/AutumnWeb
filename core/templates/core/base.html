@@ -175,7 +175,21 @@
         {% if messages %}
         <section class="messages" aria-label="Notifications">
             {% for message in messages %}
-                {% if message.tags == 'error' %}
+                {% if 'celebration-complete' in message.tags %}
+                    <div class="msg msg--success msg--celebration msg--celebration-complete"
+                         data-celebration="completion"
+                         data-celebration-leaf="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}"
+                         role="status">
+                        <i class="fas fa-check-circle msg-icon" aria-hidden="true"></i><span>{{ message }}</span>
+                    </div>
+                {% elif 'celebration-progress' in message.tags %}
+                    <div class="msg msg--success msg--celebration msg--celebration-progress"
+                         data-celebration="progress"
+                         data-celebration-leaf="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}"
+                         role="status">
+                        <i class="fas fa-check-circle msg-icon" aria-hidden="true"></i><span>{{ message }}</span>
+                    </div>
+                {% elif message.tags == 'error' %}
                     <div class="msg msg--error" role="alert"><i class="fas fa-exclamation-circle msg-icon"></i><span>{{ message }}</span></div>
                 {% elif message.tags == 'warning' %}
                     <div class="msg msg--warning" role="alert"><i class="fas fa-exclamation-triangle msg-icon"></i><span>{{ message }}</span></div>

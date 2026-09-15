@@ -3379,6 +3379,64 @@ img.brand-mark {
    choice, so its affordance should not read as the obvious next step. */
 .project-start.is-running { background: var(--raised-2); color: var(--duration); }
 
+/* ============================================================================
+   MILESTONES — restrained, event-led motion
+   ----------------------------------------------------------------------------
+   The leaf asset is already part of Autumn's identity. Completion gets a
+   short drift through the viewport; meaningful progress gets one leaf rising
+   from its status message. These effects never capture focus or pointer input.
+   ==========================================================================*/
+.msg--celebration {
+  position: relative;
+  overflow: visible;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent),
+              0 0 24px color-mix(in srgb, var(--brand) 10%, transparent);
+}
+.msg--celebration-complete {
+  background: color-mix(in srgb, var(--brand) 12%, var(--slab));
+}
+.msg--celebration-progress {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--duration) 30%, transparent),
+              0 0 18px color-mix(in srgb, var(--duration) 9%, transparent);
+}
+.celebration-layer {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.celebration-leaf {
+  position: absolute;
+  top: -2rem;
+  left: var(--leaf-left);
+  width: clamp(.85rem, 2vw, 1.35rem);
+  height: auto;
+  opacity: 0;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, .32));
+  transform-origin: 50% 15%;
+  animation: fd-leaf-fall 2.05s var(--ease) var(--leaf-delay) both;
+}
+.celebration-leaf--single {
+  width: 1.15rem;
+  animation: fd-leaf-rise 1.2s var(--ease) both;
+}
+@keyframes fd-leaf-fall {
+  0% { opacity: 0; transform: translate3d(0, -2rem, 0) rotate(0deg) scale(var(--leaf-scale)); }
+  12% { opacity: .82; }
+  72% { opacity: .74; }
+  100% { opacity: 0; transform: translate3d(var(--leaf-drift), 106vh, 0) rotate(calc(180deg + var(--leaf-tilt))) scale(var(--leaf-scale)); }
+}
+@keyframes fd-leaf-rise {
+  0% { opacity: 0; transform: translate3d(-.2rem, .7rem, 0) rotate(-18deg) scale(.6); }
+  20% { opacity: .84; }
+  100% { opacity: 0; transform: translate3d(1.5rem, -3.7rem, 0) rotate(28deg) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg--celebration { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand) 30%, transparent); }
+  .celebration-layer { display: none; }
+}
+
 @media (min-width: 1000px) {
   /* One project per full-width row is a lot of scrolling — this account has 79
      of them, which at roughly four rows a screen is twenty screens to the

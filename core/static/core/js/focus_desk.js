@@ -78,3 +78,72 @@
     if (select && select.form) { select.form.submit(); }
   });
 })();
+
+/* ------------------------------------------------------- milestones ---
+   A little ceremony for the few transitions that deserve it. The server marks
+   only an actual lifecycle/progress crossing with data-celebration; ordinary
+   messages stay entirely quiet. Leaves are decorative and aria-hidden because
+   the adjacent status message already carries the accessible announcement. */
+(function () {
+  "use strict";
+
+  function reducedMotion() {
+    return window.matchMedia && window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+  }
+
+  function makeLeaf(src, single, index) {
+    var leaf = document.createElement("img");
+    leaf.className = "celebration-leaf" + (single ? " celebration-leaf--single" : "");
+    leaf.src = src;
+    leaf.alt = "";
+    leaf.setAttribute("aria-hidden", "true");
+    if (!single) {
+      leaf.style.setProperty("--leaf-left", (8 + Math.random() * 84) + "%");
+      leaf.style.setProperty("--leaf-delay", (index * 55) + "ms");
+      leaf.style.setProperty("--leaf-drift", ((Math.random() * 9) - 4.5) + "rem");
+      leaf.style.setProperty("--leaf-tilt", ((Math.random() * 80) - 40) + "deg");
+      leaf.style.setProperty("--leaf-scale", (0.72 + Math.random() * 0.45).toFixed(2));
+    }
+    return leaf;
+  }
+
+  function playCelebration(message) {
+    var kind = message.getAttribute("data-celebration");
+    var src = message.getAttribute("data-celebration-leaf");
+    if (!kind || !src || reducedMotion()) { return; }
+
+    var layer = document.createElement("div");
+    layer.className = "celebration-layer";
+    layer.setAttribute("aria-hidden", "true");
+    if (kind === "completion") {
+      for (var i = 0; i < 11; i += 1) {
+        layer.appendChild(makeLeaf(src, false, i));
+      }
+    } else {
+      var leaf = makeLeaf(src, true, 0);
+      var rect = message.getBoundingClientRect();
+      leaf.style.left = Math.round(rect.left + rect.width * 0.82) + "px";
+      leaf.style.top = Math.round(rect.top + rect.height * 0.2) + "px";
+      layer.appendChild(leaf);
+    }
+    document.body.appendChild(layer);
+    window.setTimeout(function () {
+      if (layer.parentNode) { layer.parentNode.removeChild(layer); }
+    }, kind === "completion" ? 2400 : 1500);
+  }
+
+  function start() {
+    var messages = document.querySelectorAll("[data-celebration]");
+    for (var i = 0; i < messages.length; i += 1) {
+      playCelebration(messages[i]);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+})();
