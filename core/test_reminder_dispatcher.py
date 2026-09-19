@@ -220,6 +220,8 @@ class DeadlinePlanningTests(SimpleTestCase):
             reminder_dispatcher, "next_dispatch_at", return_value=deadline
         ), mock.patch.object(reminder_dispatcher, "_dispatch_once") as dispatch, mock.patch.object(
             reminder_dispatcher, "_maybe_cleanup_notification_history"
+        ), mock.patch.object(
+            reminder_dispatcher.time, "monotonic", side_effect=[100.0, 100.0]
         ):
             wait_seconds = reminder_dispatcher._dispatch_step(now=now)
 
