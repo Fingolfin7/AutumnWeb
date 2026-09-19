@@ -206,6 +206,10 @@ def profile(request):
                     profile.set_api_key('claude', None)
                 elif p_form.cleaned_data.get('claude_api_key'):
                     profile.set_api_key('claude', p_form.cleaned_data.get('claude_api_key').strip())
+                if p_form.cleaned_data.get('clear_typesafe_api_key'):
+                    profile.set_api_key('typesafe', None)
+                elif p_form.cleaned_data.get('typesafe_api_key'):
+                    profile.set_api_key('typesafe', p_form.cleaned_data.get('typesafe_api_key').strip())
             profile.save()
             p_form.save()
             if profile.timezone != previous_timezone:
@@ -240,6 +244,7 @@ def profile(request):
         'openai': bool(profile.openai_api_key_enc),
         'openai_chatgpt': bool(profile.openai_chatgpt_token_enc),
         'claude': bool(profile.claude_api_key_enc),
+        'typesafe': bool(profile.typesafe_api_key_enc),
         'openai_server': bool(os.environ.get('OPENAI_API_KEY')),
     }
     have_keys['profile_credentials'] = any(

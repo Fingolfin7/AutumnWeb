@@ -20,6 +20,7 @@
     <script src="{% static 'core/js/timer_notes.js' %}?v={{ static_version.timer_notes }}" type="text/javascript"></script>
     <script src="{% static 'core/js/timer_reminders.js' %}?v={{ static_version.timer_reminders }}" type="text/javascript" defer></script>
     <script src="{% static 'core/js/dashboard_desk.js' %}?v={{ static_version.dashboard_desk }}" type="text/javascript" defer></script>
+    <script src="{% static 'core/js/jev_timer_recommendations.js' %}?v={{ static_version.jev_timer_recommendations }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -63,43 +64,66 @@
             </button>
 
             <div class="disclose-body">
+                <div id="jev-recommendations"
+                     data-jev-url="{% url 'jev_timer_recommendations' %}"
+                     hidden
+                     aria-live="polite"></div>
+
                 {% if timer_suggestions.commitments or timer_suggestions.habits or timer_suggestions.recent %}
 
                 {% if timer_suggestions.commitments %}
-                <div class="suggest-group">
-                    <p class="suggest-head"><i class="fas fa-bullseye text-yellow"></i> Commitment Push</p>
-                    <div class="band-list">
-                        {% for suggestion in timer_suggestions.commitments %}
-                        {% include 'core/partials/timer_suggestion_card.html' %}
-                        {% endfor %}
+                <div class="suggest-group disclose is-closed" data-disclose>
+                    <button class="disclose-head suggest-disclose-head" type="button" aria-expanded="false">
+                        <i class="fas fa-bullseye disclose-icon text-yellow"></i>
+                        <span class="disclose-title">Commitment Push</span>
+                        <i class="fas fa-chevron-down disclose-chevron"></i>
+                    </button>
+                    <div class="disclose-body">
+                        <div class="band-list">
+                            {% for suggestion in timer_suggestions.commitments %}
+                            {% include 'core/partials/timer_suggestion_card.html' %}
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
                 {% endif %}
 
                 {% if timer_suggestions.habits %}
-                <div class="suggest-group">
-                    <p class="suggest-head"><i class="fas fa-calendar-day text-blue"></i> Usually Now</p>
-                    <div class="band-list">
-                        {% for suggestion in timer_suggestions.habits %}
-                        {% include 'core/partials/timer_suggestion_card.html' %}
-                        {% endfor %}
+                <div class="suggest-group disclose is-closed" data-disclose>
+                    <button class="disclose-head suggest-disclose-head" type="button" aria-expanded="false">
+                        <i class="fas fa-calendar-day disclose-icon text-blue"></i>
+                        <span class="disclose-title">Usually Now</span>
+                        <i class="fas fa-chevron-down disclose-chevron"></i>
+                    </button>
+                    <div class="disclose-body">
+                        <div class="band-list">
+                            {% for suggestion in timer_suggestions.habits %}
+                            {% include 'core/partials/timer_suggestion_card.html' %}
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
                 {% endif %}
 
                 {% if timer_suggestions.recent %}
-                <div class="suggest-group">
-                    <p class="suggest-head"><i class="fas fa-history text-green"></i> Recent Presets</p>
-                    <div class="band-list">
-                        {% for suggestion in timer_suggestions.recent %}
-                        {% include 'core/partials/timer_suggestion_card.html' %}
-                        {% endfor %}
+                <div class="suggest-group disclose is-closed" data-disclose>
+                    <button class="disclose-head suggest-disclose-head" type="button" aria-expanded="false">
+                        <i class="fas fa-history disclose-icon text-green"></i>
+                        <span class="disclose-title">Recent Presets</span>
+                        <i class="fas fa-chevron-down disclose-chevron"></i>
+                    </button>
+                    <div class="disclose-body">
+                        <div class="band-list">
+                            {% for suggestion in timer_suggestions.recent %}
+                            {% include 'core/partials/timer_suggestion_card.html' %}
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
                 {% endif %}
 
                 {% else %}
-                <p class="empty">No suggestions yet. They appear once you have a few sessions to learn from.</p>
+                <p class="empty" id="deterministic-suggestions-empty">No suggestions yet. They appear once you have a few sessions to learn from.</p>
                 {% endif %}
             </div>
         </section>

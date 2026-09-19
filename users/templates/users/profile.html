@@ -379,6 +379,21 @@
                 </div>
                 {{ profile_form.claude_api_key.errors }}
             </div>
+
+            <div class="profile-key-item">
+                <div class="u-between u-gap-3">
+                    <label for="{{ profile_form.typesafe_api_key.id_for_label }}">TypeSafe / Jev</label>
+                    <span>{% if have_keys.typesafe %}<span class="text-green">Stored</span>{% else %}<span class="text-red">None</span>{% endif %}</span>
+                </div>
+                {{ profile_form.typesafe_api_key }}
+                <small class="muted">Used for Jev recommendations. The key is encrypted at rest and never shown again.</small>
+                <small class="muted">Jev receives recent session notes, relevant project descriptions, commitment progress, and year-to-date activity summaries from this account. Recommendations stay within your selected context.</small>
+                <div class="check-row">
+                    {{ profile_form.clear_typesafe_api_key }}
+                    <label for="{{ profile_form.clear_typesafe_api_key.id_for_label }}">Clear key</label>
+                </div>
+                {{ profile_form.typesafe_api_key.errors }}
+            </div>
         </div>
     </section>
     {% endif %}

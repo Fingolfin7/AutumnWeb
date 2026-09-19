@@ -2580,6 +2580,20 @@ img.brand-mark {
   font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
   color: var(--muted); font-weight: 600;
 }
+.suggest-head--jev {
+  color: var(--ink);
+  background: var(--raised-2);
+  border-bottom: 1px solid var(--brand-deep);
+}
+.suggest-disclose-head {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  background: var(--sunken);
+  color: inherit;
+}
+.suggest-disclose-head:hover { background: var(--raised); }
 .suggest {
   display: flex; align-items: center; gap: var(--s3);
   padding: var(--s3) var(--s4);

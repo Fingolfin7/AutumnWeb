@@ -120,9 +120,11 @@ class ProfileUpdateForm(forms.ModelForm):
     gemini_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'Gemini API Key', 'autocomplete': 'new-password'}))
     openai_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'OpenAI API Key', 'autocomplete': 'new-password'}))
     claude_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'Claude API Key', 'autocomplete': 'new-password'}))
+    typesafe_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'TypeSafe API Key', 'autocomplete': 'new-password'}))
     clear_gemini_api_key = forms.BooleanField(required=False, label='Clear Gemini Key')
     clear_openai_api_key = forms.BooleanField(required=False, label='Clear OpenAI Key')
     clear_claude_api_key = forms.BooleanField(required=False, label='Clear Claude Key')
+    clear_typesafe_api_key = forms.BooleanField(required=False, label='Clear TypeSafe Key')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -130,6 +132,7 @@ class ProfileUpdateForm(forms.ModelForm):
         self.fields['gemini_api_key'].initial = ''
         self.fields['openai_api_key'].initial = ''
         self.fields['claude_api_key'].initial = ''
+        self.fields['typesafe_api_key'].initial = ''
 
     def clean_background_dimming(self):
         value = self.cleaned_data.get('background_dimming')
@@ -171,5 +174,6 @@ class ProfileUpdateForm(forms.ModelForm):
                   'default_filter_value', 'default_filter_unit',
                   'insights_default_filter_value', 'insights_default_filter_unit',
                   'default_chart_project_count',
-                  'gemini_api_key', 'openai_api_key', 'claude_api_key',
-                  'clear_gemini_api_key', 'clear_openai_api_key', 'clear_claude_api_key']
+                  'gemini_api_key', 'openai_api_key', 'claude_api_key', 'typesafe_api_key',
+                  'clear_gemini_api_key', 'clear_openai_api_key', 'clear_claude_api_key',
+                  'clear_typesafe_api_key']

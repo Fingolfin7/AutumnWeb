@@ -13,6 +13,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from freezegun import freeze_time
 
 from core.models import Context, Projects, Sessions, SubProjects
 from core.templatetags.time_formats import hero_duration
@@ -317,6 +318,7 @@ class DashboardRendersFocusDeskTests(DashboardTestCase):
         self.assertContains(response, "core/css/focus_desk.css")
         self.assertNotContains(response, "core/css/style.css")
 
+    @freeze_time("2026-09-20 12:00:00+02:00")
     def test_dashboard_supplies_the_day_timeline(self):
         self._session(self.atlas, 10, subs=["auth"])
 
@@ -367,6 +369,7 @@ class TimelineFragmentTests(DashboardTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertIn("login", response.url)
 
+    @freeze_time("2026-09-20 12:00:00+02:00")
     def test_fragment_renders_the_timeline_alone(self):
         self._session(self.atlas, 10, subs=["auth"])
 

@@ -1,0 +1,15 @@
+{% comment %}
+  Jev's independently scored advice is injected after the timer page has
+  painted. Any supporting text is deterministic local context, not a claim
+  about the reason Jev selected the activity.
+{% endcomment %}
+<div class="suggest-group suggest-group--jev" data-jev-section>
+    <p class="suggest-head suggest-head--jev">
+        <i class="fas fa-lightbulb text-orange"></i> Jev Recommends
+    </p>
+    <div class="band-list">
+        {% for suggestion in jev_suggestions %}
+        {% include 'core/partials/timer_suggestion_card.html' %}
+        {% endfor %}
+    </div>
+</div>

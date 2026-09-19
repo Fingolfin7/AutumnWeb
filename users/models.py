@@ -65,6 +65,7 @@ class Profile(models.Model):
     openai_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     openai_chatgpt_token_enc = models.BinaryField(null=True, blank=True, editable=False)
     claude_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
+    typesafe_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     ai_features_enabled = models.BooleanField(
         # Off by default so a fresh account must not get AI access until the
         # operator grants it.
@@ -181,6 +182,7 @@ class Profile(models.Model):
             'openai': 'openai_api_key_enc',
             'openai_chatgpt': 'openai_chatgpt_token_enc',
             'claude': 'claude_api_key_enc',
+            'typesafe': 'typesafe_api_key_enc',
         }
         fname = field_map.get(provider.lower())
         if not fname:
@@ -197,6 +199,7 @@ class Profile(models.Model):
             'openai': 'openai_api_key_enc',
             'openai_chatgpt': 'openai_chatgpt_token_enc',
             'claude': 'claude_api_key_enc',
+            'typesafe': 'typesafe_api_key_enc',
         }
         fname = field_map.get(provider.lower())
         if not fname:

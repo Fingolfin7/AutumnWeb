@@ -1,4 +1,6 @@
 from collections import Counter
+import logging
+import os
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -10,11 +12,13 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.conf import settings
+from django.core.cache import cache
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import (
     ListView,
 )
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from core.commitments import (
     commitment_applies_to_project,
     commitment_applies_to_subproject,
@@ -38,6 +42,24 @@ from core.utils import (
     parse_stop_after_duration,
     stop_expired_timers,
 )
+
+try:
+    # The service is optional at development time. A missing service must not
+    # make the ordinary timer page or its deterministic suggestions fail.
+    from core.services.jev_recommendations import rank_timer_candidates
+    from core.services.jev_timer_context import (
+        build_jev_candidates as build_rich_jev_candidates,
+        build_jev_context as build_rich_jev_context,
+        jev_cache_key as rich_jev_cache_key,
+    )
+except ImportError:  # pragma: no cover - exercised in deployments without Jev
+    rank_timer_candidates = None
+    build_rich_jev_candidates = None
+    build_rich_jev_context = None
+    rich_jev_cache_key = None
+
+
+logger = logging.getLogger(__name__)
 
 
 ACTIVE_TIMER_FRAGMENT_TEMPLATES = {
@@ -481,6 +503,7 @@ def _build_timer_suggestion(
     subprojects,
     metric=None,
     progress=None,
+    jev_detail=None,
 ):
     subprojects = list(subprojects)
     return {
@@ -488,6 +511,7 @@ def _build_timer_suggestion(
         "icon": icon,
         "title": title,
         "detail": detail,
+        "jev_detail": jev_detail or detail,
         "project": project,
         "subprojects": subprojects,
         "subproject_names": [subproject.name for subproject in subprojects],
@@ -508,6 +532,13 @@ def _timer_recent_suggestions(recent_sessions, active_keys, limit=4):
 
         seen.add(key)
         ended_at = timezone.localtime(session.end_time)
+        days_ago = max((timezone.localdate() - ended_at.date()).days, 0)
+        if days_ago == 0:
+            jev_detail = "Used today"
+        elif days_ago == 1:
+            jev_detail = "Used yesterday"
+        else:
+            jev_detail = f"Used {days_ago} days ago"
         suggestions.append(
             _build_timer_suggestion(
                 kind="recent",
@@ -517,6 +548,7 @@ def _timer_recent_suggestions(recent_sessions, active_keys, limit=4):
                 project=session.project,
                 subprojects=session.subprojects.all(),
                 metric="recent",
+                jev_detail=jev_detail,
             )
         )
 
@@ -580,6 +612,10 @@ def _timer_habit_suggestions(recent_sessions, active_keys, now, limit=3):
                 project=session.project,
                 subprojects=session.subprojects.all(),
                 metric=f"{count}x",
+                jev_detail=(
+                    f"{count} matching session{plural} within the same weekday "
+                    "+/-2-hour window"
+                ),
             )
         )
 
@@ -685,6 +721,10 @@ def _timer_commitment_suggestions(
 
         seen.add(key)
         period_end = timezone.localtime(progress["period_end"]).strftime("%b %d")
+        days_remaining = max(
+            (timezone.localtime(progress["period_end"]).date() - timezone.localdate()).days,
+            0,
+        )
         suggestions.append(
             _build_timer_suggestion(
                 kind="commitment",
@@ -695,6 +735,10 @@ def _timer_commitment_suggestions(
                 subprojects=subprojects,
                 metric=f"{progress['percentage']}%",
                 progress=progress,
+                jev_detail=(
+                    f"{_commitment_remaining_label(progress)} with "
+                    f"{days_remaining} days remaining"
+                ),
             )
         )
 
@@ -736,3 +780,157 @@ def build_timer_suggestions(user, request):
         "habits": _timer_habit_suggestions(recent_sessions, active_keys, now),
         "recent": _timer_recent_suggestions(recent_sessions, active_keys),
     }
+
+
+# Jev is an advisory layer on top of the deterministic suggestions. Keep its
+# cache short and scoped to both the account and the exact candidate payload so
+# one account's ranking can never leak into another account or an old timer
+# state.
+JEV_CACHE_TIMEOUT = 10 * 60
+
+
+def _jev_api_key(user):
+    """Resolve the account credential without exposing it to templates/logs."""
+    profile = getattr(user, "profile", None)
+    if profile is None or not getattr(profile, "ai_features_enabled", False):
+        return None
+
+    try:
+        stored_key = profile.get_api_key("typesafe")
+    except Exception:
+        # Credential decryption failures should degrade to no Jev section.
+        stored_key = None
+    if stored_key:
+        return stored_key
+    # A local .env key is useful for development before the profile form has
+    # been used, but production must always use the account-tied credential.
+    if settings.DEBUG:
+        return os.environ.get("TYPESAFE_API_KEY") or os.environ.get("JEV_KEY")
+    return None
+
+
+def _jev_candidate_id(project, subprojects):
+    subproject_ids = ",".join(
+        str(subproject_id)
+        for subproject_id in sorted(subproject.id for subproject in subprojects)
+    )
+    return f"project:{project.id}:subprojects:{subproject_ids}"
+
+
+
+
+def _jev_suggestions(user, request):
+    api_key = _jev_api_key(user)
+    if not api_key or rank_timer_candidates is None:
+        return []
+
+    if build_rich_jev_candidates is None or build_rich_jev_context is None:
+        return []
+    try:
+        candidates = build_rich_jev_candidates(user, request)
+        if not candidates:
+            return []
+        context = build_rich_jev_context(user, request, candidates)
+    except Exception as exc:
+        logger.warning(
+            "Jev context unavailable category=%s",
+            type(exc).__name__,
+        )
+        return []
+    candidate_map = {candidate["id"]: candidate for candidate in candidates}
+    cache_key = rich_jev_cache_key(user, request, candidates, context)
+    cached = cache.get(cache_key, None)
+    if cached is None:
+        try:
+            result = rank_timer_candidates(
+                api_key=api_key,
+                candidates=candidates,
+                context=context,
+            )
+        except Exception as exc:
+            # Jev is optional advice; deterministic groups must remain usable.
+            logger.warning(
+                "Jev recommendation unavailable category=%s",
+                type(exc).__name__,
+            )
+            return []
+        rows = result.get("recommendations", []) if isinstance(result, dict) else []
+        ranked_ids = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            candidate_id = row.get("candidate_id")
+            candidate_key = str(candidate_id) if candidate_id is not None else ""
+            if candidate_key in candidate_map and candidate_key not in ranked_ids:
+                ranked_ids.append(candidate_key)
+            if len(ranked_ids) >= 3:
+                break
+        cache.set(cache_key, ranked_ids, JEV_CACHE_TIMEOUT)
+    else:
+        ranked_ids = cached
+
+    suggestions = []
+    running_project_ids = set(
+        Sessions.objects.filter(user=user, end_time__isnull=True).values_list(
+            "project_id", flat=True
+        )
+    )
+    for candidate_id in ranked_ids or []:
+        candidate = candidate_map.get(candidate_id)
+        if candidate is None:
+            continue
+        project = Projects.objects.filter(
+            user=user, pk=candidate["project_id"], status="active"
+        ).first()
+        if project is None:
+            continue
+        subprojects = list(
+            SubProjects.objects.filter(
+                user=user,
+                parent_project=project,
+                pk__in=candidate["subproject_ids"],
+            ).order_by("pk")
+        )
+        if {sub.id for sub in subprojects} != set(candidate["subproject_ids"]):
+            # The ranked combination changed while Jev was evaluating it.
+            continue
+        # Recheck the active-timer exclusion after the ranker returns. This
+        # prevents a timer started while the request was in flight showing up.
+        if project.id in running_project_ids:
+            continue
+        suggestions.append(
+            _build_timer_suggestion(
+                kind="jev",
+                icon="fa-lightbulb",
+                title=project.name,
+                detail=(
+                    f"Context: {candidate['reason']}"
+                    if candidate.get("reason")
+                    else ""
+                ),
+                project=project,
+                subprojects=subprojects,
+            )
+        )
+        if len(suggestions) >= 3:
+            break
+    return suggestions
+
+
+@login_required
+@require_GET
+def jev_timer_recommendations(request):
+    """Progressive Jev HTML fragment for the authenticated timer owner."""
+    suggestions = _jev_suggestions(request.user, request)
+    if not suggestions:
+        response = HttpResponse(status=204)
+        response["Cache-Control"] = "no-store"
+        return response
+    html = render_to_string(
+        "core/partials/jev_timer_recommendations.html",
+        {"jev_suggestions": suggestions},
+        request=request,
+    )
+    response = HttpResponse(html)
+    response["Cache-Control"] = "no-store"
+    return response
