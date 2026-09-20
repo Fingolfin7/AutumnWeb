@@ -115,6 +115,14 @@ class JevTimerRecommendationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         candidates = self.ranker_payload["candidates"]
+        self.assertContains(response, 'class="suggest-score"')
+        self.assertContains(response, 'aria-label="Jev score 3.50"')
+        with self._enable_key(), mock.patch(
+            "core.views.timers.rank_timer_candidates"
+        ) as cached_ranker:
+            cached_response = self.client.get(reverse("jev_timer_recommendations"))
+        cached_ranker.assert_not_called()
+        self.assertContains(cached_response, 'aria-label="Jev score 3.50"')
         self.assertTrue(candidates)
         self.assertIn(available.id, {candidate["project_id"] for candidate in candidates})
         self.assertNotIn(self.active.id, {candidate["project_id"] for candidate in candidates})

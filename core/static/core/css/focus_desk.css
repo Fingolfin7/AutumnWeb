@@ -2604,6 +2604,12 @@ img.brand-mark {
   overflow-wrap: anywhere;
 }
 .suggest-subs { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .3rem; }
+.suggest-score {
+  margin-left: .5rem;
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 400;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .suggest-detail { display: block; margin-top: .25rem; font-size: var(--fs-xs); color: var(--muted); }
 .suggest-metric {
   display: inline-block; margin-top: .25rem;

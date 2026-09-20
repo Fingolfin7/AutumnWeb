@@ -5,6 +5,9 @@
 <article class="band suggest suggest--{{ suggestion.kind }}">
     <div class="suggest-main">
         <span class="suggest-project">{{ suggestion.project.name }}</span>
+        {% if suggestion.kind == 'jev' and suggestion.jev_score != None %}
+        <span class="suggest-score" title="Jev score" aria-label="Jev score {{ suggestion.jev_score|floatformat:'2u' }}">{{ suggestion.jev_score|floatformat:'2u' }}</span>
+        {% endif %}
         {% if suggestion.subprojects %}
         <div class="suggest-subs">
             {% for subproject in suggestion.subprojects %}

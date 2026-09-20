@@ -838,7 +838,7 @@ def _jev_suggestions(user, request):
         )
         return []
     candidate_map = {candidate["id"]: candidate for candidate in candidates}
-    cache_key = rich_jev_cache_key(user, request, candidates, context)
+    cache_key = rich_jev_cache_key(user, request, candidates, context) + ":scores-v1"
     cached = cache.get(cache_key, None)
     if cached is None:
         try:
@@ -856,6 +856,7 @@ def _jev_suggestions(user, request):
             return []
         rows = result.get("recommendations", []) if isinstance(result, dict) else []
         ranked_ids = []
+        scores = {}
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -863,11 +864,13 @@ def _jev_suggestions(user, request):
             candidate_key = str(candidate_id) if candidate_id is not None else ""
             if candidate_key in candidate_map and candidate_key not in ranked_ids:
                 ranked_ids.append(candidate_key)
+                scores[candidate_key] = row.get("score")
             if len(ranked_ids) >= 3:
                 break
-        cache.set(cache_key, ranked_ids, JEV_CACHE_TIMEOUT)
+        cache.set(cache_key, {"ids": ranked_ids, "scores": scores}, JEV_CACHE_TIMEOUT)
     else:
-        ranked_ids = cached
+        ranked_ids = cached["ids"]
+        scores = cached["scores"]
 
     suggestions = []
     running_project_ids = set(
@@ -912,6 +915,7 @@ def _jev_suggestions(user, request):
                 subprojects=subprojects,
             )
         )
+        suggestions[-1]["jev_score"] = scores.get(candidate_id)
         if len(suggestions) >= 3:
             break
     return suggestions
