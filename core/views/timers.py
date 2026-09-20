@@ -828,8 +828,6 @@ def _jev_suggestions(user, request):
         return []
     try:
         candidates = build_rich_jev_candidates(user, request)
-        if not candidates:
-            return []
         context = build_rich_jev_context(user, request, candidates)
     except Exception as exc:
         logger.warning(
@@ -881,6 +879,13 @@ def _jev_suggestions(user, request):
     for candidate_id in ranked_ids or []:
         candidate = candidate_map.get(candidate_id)
         if candidate is None:
+            continue
+        if candidate_id == "no_activity":
+            suggestions.append({
+                "kind": "jev", "title": "Start nothing for now",
+                "no_activity": True, "jev_score": scores.get(candidate_id),
+                "detail": "No new timer. Leave this time open or continue what you're doing.",
+            })
             continue
         project = Projects.objects.filter(
             user=user, pk=candidate["project_id"], status="active"

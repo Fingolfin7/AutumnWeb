@@ -5,6 +5,15 @@ trying to predict what the user will click, and it does not start timers or
 change goals. The existing Commitment Push, Usually Now, and Recent Presets
 sections remain available, collapsed by default.
 
+An explicit `no_activity` candidate, shown as “Start nothing for now”, is
+evaluated alongside activities on the same 0–4 rubric. It means not starting
+a new tracked activity: a break, unstructured time, or continuing an existing
+activity are all possible interpretations. It never stops an existing timer
+and has no start action. Like activities, it must score at least 2.0 and rank
+within the top three to appear. One of the 120 candidate slots is reserved for
+this option, including when no eligible projects exist. The model is told not
+to assume fatigue or available time.
+
 ## Account and credentials
 
 Save a TypeSafe / Jev key in Profile, under AI connections. It uses the same

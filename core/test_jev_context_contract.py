@@ -39,7 +39,8 @@ class JevContextContractTests(TestCase):
         state = self.payload()["state"]
 
         self.assertEqual(len(state["recent_completed_sessions"]), 20)
-        self.assertEqual(len(state["candidates"]), 1)
+        self.assertEqual(len(state["candidates"]), 2)
+        self.assertEqual(state["candidates"][-1]["id"], "no_activity")
         self.assertIn("Complete evidence 0", json.dumps(state))
 
     def test_banked_fulfilled_subproject_with_no_history_stays_eligible(self):

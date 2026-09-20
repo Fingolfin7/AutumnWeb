@@ -4,7 +4,7 @@
 {% endcomment %}
 <article class="band suggest suggest--{{ suggestion.kind }}">
     <div class="suggest-main">
-        <span class="suggest-project">{{ suggestion.project.name }}</span>
+        <span class="suggest-project">{% if suggestion.no_activity %}{{ suggestion.title }}{% else %}{{ suggestion.project.name }}{% endif %}</span>
         {% if suggestion.kind == 'jev' and suggestion.jev_score != None %}
         <span class="suggest-score" title="Jev score" aria-label="Jev score {{ suggestion.jev_score|floatformat:'2u' }}">{{ suggestion.jev_score|floatformat:'2u' }}</span>
         {% endif %}
@@ -21,6 +21,7 @@
         {% endif %}
     </div>
 
+    {% if not suggestion.no_activity %}
     <form method="post" action="{% url 'start_timer' %}">
         {% csrf_token %}
         <input type="hidden" name="project" value="{{ suggestion.project.name }}">
@@ -31,4 +32,5 @@
             <i class="fas fa-play"></i><span class="sr-only">Start {{ suggestion.project.name }}</span>
         </button>
     </form>
+    {% endif %}
 </article>

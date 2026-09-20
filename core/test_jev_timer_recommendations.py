@@ -49,6 +49,22 @@ class JevTimerRecommendationTests(TestCase):
         response = self.client.get(reverse("jev_timer_recommendations"))
         self.assertEqual(response.status_code, 302)
 
+    def test_nothing_option_is_scored_and_has_no_timer_action_even_without_projects(self):
+        Projects.objects.filter(user=self.user).update(status="complete")
+
+        def ranker(**kwargs):
+            self.assertEqual([row["id"] for row in kwargs["candidates"]], ["no_activity"])
+            return {"recommendations": [{"candidate_id": "no_activity", "score": 3.75}]}
+
+        with self._enable_key(), mock.patch(
+            "core.views.timers.rank_timer_candidates", side_effect=ranker
+        ):
+            response = self.client.get(reverse("jev_timer_recommendations"))
+        self.assertContains(response, "Start nothing for now")
+        self.assertContains(response, 'aria-label="Jev score 3.75"')
+        self.assertNotContains(response, '<form')
+        self.assertFalse(Sessions.objects.filter(user=self.user).exists())
+
     def test_missing_key_returns_empty_fragment_without_calling_ranker(self):
         with mock.patch.dict(os.environ, {}, clear=True), mock.patch(
             "core.views.timers.rank_timer_candidates"

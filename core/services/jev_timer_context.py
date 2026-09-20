@@ -476,11 +476,12 @@ def build_jev_context(user, request, candidates):
         candidate["commitment_ids"] = links.get(candidate["id"], [])
 
     coverage = {
-        "candidate_count_before_cap": len(candidates),
+        "candidate_count_before_cap": len(candidates) + 1,
         "active_context_only": True,
         "running_projects_excluded": sorted(running_project_ids),
     }
-    omitted_count = max(len(candidates) - MAX_CANDIDATES, 0)
+    activity_limit = MAX_CANDIDATES - 1  # Reserve one place for starting nothing.
+    omitted_count = max(len(candidates) - activity_limit, 0)
     if omitted_count:
         candidates.sort(
             key=lambda candidate: (
@@ -490,9 +491,19 @@ def build_jev_context(user, request, candidates):
             )
         )
         coverage["omitted_candidate_ids"] = [
-            candidate["id"] for candidate in candidates[MAX_CANDIDATES:]
+            candidate["id"] for candidate in candidates[activity_limit:]
         ][:100]
-        candidates[:] = candidates[:MAX_CANDIDATES]
+        candidates[:] = candidates[:activity_limit]
+    candidates.append({
+        "id": "no_activity",
+        "project_id": None,
+        "project_name": "Start nothing for now",
+        "subproject_ids": [],
+        "subprojects": [],
+        "reason": "Do not start a new tracked activity now. This can mean taking a break, leaving time unstructured, or continuing an already-running activity. It does not stop any timer. Evaluate this as a valid option using the same evidence and rubric; do not assume fatigue or free time when unknown.",
+        "commitment_ids": [],
+        "signals": [],
+    })
     sent_ids = {candidate["id"] for candidate in candidates}
     for row in commitment_rows:
         row["eligible_candidate_ids"] = [
