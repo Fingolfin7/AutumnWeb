@@ -23,7 +23,7 @@ test('Jev renders independently while Luna waits, and Luna failure stays local',
     fetch,
   });
   assert.deepEqual(Object.keys(pending), ['jev', 'luna']);
-  assert.deepEqual(timers, [8000, 135000]);
+  assert.deepEqual(timers, [8000, 195000]);
   pending.jev.resolve({ status: 200, ok: true, text: async () => '<p>Jev advice</p>' });
   await new Promise(setImmediate);
   assert.equal(jev.innerHTML, '<p>Jev advice</p>');

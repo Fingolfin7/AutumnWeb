@@ -13,7 +13,7 @@
   var controller = window.AbortController ? new AbortController() : null;
   var timeout = window.setTimeout(function () {
     if (controller) { controller.abort(); }
-  }, isLuna ? 135000 : 8000);
+  }, isLuna ? 195000 : 8000);
 
   fetch(mount.getAttribute(isLuna ? "data-luna-url" : "data-jev-url"), {
     credentials: "same-origin",

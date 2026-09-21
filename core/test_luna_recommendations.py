@@ -25,6 +25,7 @@ class LunaServiceTests(SimpleTestCase):
             create.return_value.__iter__.return_value = iter(events)
             result = rank_luna_candidates({"openai_chatgpt": "test-key"}, [], {})
             request = create.call_args.kwargs
+            self.assertEqual(client.call_args.kwargs["timeout"], 120.0)
             self.assertEqual(request["reasoning"], {"effort": "xhigh"})
             self.assertEqual(request["model"], "gpt-5.6-luna")
             self.assertFalse(request["store"])
@@ -39,6 +40,13 @@ class LunaServiceTests(SimpleTestCase):
     def test_incomplete_stream_is_never_accepted_even_with_valid_json(self):
         with self.assertRaisesRegex(ValueError, "incomplete"):
             self.call([], streamed=True, status="incomplete")
+
+    def test_oauth_allows_slow_xhigh_completion_but_remains_bounded(self):
+        with mock.patch("core.services.luna_recommendations.time.monotonic", side_effect=[0, 75]):
+            self.assertEqual(self.call([]), {"recommendations": []})
+        with mock.patch("core.services.luna_recommendations.time.monotonic", side_effect=[0, 121]):
+            with self.assertRaises(TimeoutError):
+                self.call([])
 
     def test_nothing_is_a_valid_result_and_low_scores_are_filtered(self):
         row = {"candidate_id": "no_activity", "score": 3.2, "reason": "Covered commitments.", "next_step": ""}

@@ -18,8 +18,12 @@ up to three candidates scoring at least 2, with a short evidence-based reason
 and next step. Luna's self-assigned scores are not probability-weighted Jev
 scores and should not be interpreted as calibrated across providers.
 
-Requests load independently. Each Luna connection has a 60-second API timeout, no automatic
-SDK retries, and `store=False`. It consumes the OAuth backend's streaming response.
+Requests load independently. Luna allows 120 seconds for OAuth and 60 seconds for
+API-key fallback, with no automatic SDK retries and `store=False`. The browser
+allows 195 seconds for both attempts. It collects streamed text deltas, including
+when the OAuth terminal event omits output, and validates only completed responses.
+Logs record the successful auth route or failure category, never response content
+or credentials.
 The account/context/state-scoped ten-minute cache is separate from Jev's.
 Reasons render as escaped text. IDs and scores are validated and project
 ownership, activity status, subprojects and running timers are rechecked before

@@ -52,8 +52,9 @@ def _rank_once(credential, candidates, context, *, oauth):
         "required": ["recommendations"],
     }
     connection = {"base_url": CODEX_CHATGPT_BASE_URL} if oauth else {}
+    timeout = 120.0 if oauth else 60.0
     started = time.monotonic()
-    with OpenAI(api_key=credential, timeout=60.0, max_retries=0, **connection) as client:
+    with OpenAI(api_key=credential, timeout=timeout, max_retries=0, **connection) as client:
         events = client.responses.create(
             model=LUNA_MODEL, reasoning={"effort": LUNA_EFFORT},
             store=False, stream=True,
@@ -78,7 +79,7 @@ def _rank_once(credential, candidates, context, *, oauth):
         chunks = []
         with events:
             for event in events:
-                if time.monotonic() - started > 60:
+                if time.monotonic() - started > timeout:
                     raise TimeoutError("Luna response timed out")
                 if event.type == "response.output_text.delta":
                     chunks.append(event.delta)
