@@ -66,7 +66,7 @@
             <div class="disclose-body">
                 <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-secondary">Refresh recommendations</button>
+                    <button type="submit" class="btn btn--ghost">Refresh recommendations</button>
                     <a href="{% url 'recommendation_usage' %}">Usage &amp; cost review</a>
                 </form>
                 <div class="recommendation-comparison">

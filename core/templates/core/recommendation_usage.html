@@ -1,6 +1,6 @@
 {% extends 'core/base.html' %}
 {% block content %}
-<section class="slab">
+<section class="slab slab-pad">
   <h1>Recommendation usage</h1>
   <p>Last {{ days }} days · <a href="?days=7">7 days</a> · <a href="?days=30">30 days</a> · <a href="?days={{ days }}&amp;format=csv">Download CSV</a> · <a href="{% url 'timers' %}">Back to timers</a></p>
   <p>API-equivalent USD estimates, not an OAuth bill. Output includes reasoning tokens; reasoning is not charged twice. Missing usage is unknown, not zero. Failed attempts with reported usage are included. Totals may undercount failures without usage and unreported cache-write charges.</p>
