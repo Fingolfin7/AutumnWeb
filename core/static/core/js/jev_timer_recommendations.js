@@ -6,15 +6,16 @@
 (function () {
   "use strict";
 
-  var mount = document.querySelector("[data-jev-url]");
-  if (!mount || !window.fetch) { return; }
+  if (!window.fetch) { return; }
+  document.querySelectorAll("[data-jev-url], [data-luna-url]").forEach(function (mount) {
+  var isLuna = mount.hasAttribute("data-luna-url");
 
   var controller = window.AbortController ? new AbortController() : null;
   var timeout = window.setTimeout(function () {
     if (controller) { controller.abort(); }
-  }, 8000);
+  }, isLuna ? 135000 : 8000);
 
-  fetch(mount.getAttribute("data-jev-url"), {
+  fetch(mount.getAttribute(isLuna ? "data-luna-url" : "data-jev-url"), {
     credentials: "same-origin",
     headers: { "Accept": "text/html", "X-Requested-With": "XMLHttpRequest" },
     signal: controller ? controller.signal : undefined
@@ -24,16 +25,24 @@
       return response.text();
     })
     .then(function (html) {
-      if (!html || !html.trim()) { return; }
+      if (!html || !html.trim()) {
+        if (isLuna) { throw new Error("Advice unavailable"); }
+        return;
+      }
       mount.innerHTML = html;
       mount.hidden = false;
       var empty = document.getElementById("deterministic-suggestions-empty");
       if (empty) { empty.remove(); }
     })
     .catch(function () {
+      if (isLuna) {
+        var message = mount.querySelector(".suggest");
+        if (message) { message.textContent = "Luna is unavailable right now. Try again on your next visit."; }
+      }
       /* Jev is optional advice; keep the deterministic groups untouched. */
     })
     .finally(function () {
       window.clearTimeout(timeout);
     });
+  });
 })();

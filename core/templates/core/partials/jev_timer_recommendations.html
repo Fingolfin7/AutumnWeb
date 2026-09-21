@@ -3,13 +3,15 @@
   painted. Any supporting text is deterministic local context, not a claim
   about the reason Jev selected the activity.
 {% endcomment %}
-<div class="suggest-group suggest-group--jev" data-jev-section>
+<div class="suggest-group suggest-group--jev" {% if provider == 'luna' %}data-luna-section{% else %}data-jev-section{% endif %}>
     <p class="suggest-head suggest-head--jev">
-        <i class="fas fa-lightbulb text-orange"></i> Jev Recommends
+        <i class="fas fa-lightbulb text-orange"></i> {{ provider_label|default:'Jev' }} Recommends
     </p>
     <div class="band-list">
         {% for suggestion in jev_suggestions %}
         {% include 'core/partials/timer_suggestion_card.html' %}
+        {% empty %}
+        <p class="suggest">{{ advice_status }}</p>
         {% endfor %}
     </div>
 </div>

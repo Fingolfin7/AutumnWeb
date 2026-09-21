@@ -14,6 +14,18 @@ from users import codex_auth
 
 
 class CodexAuthTests(SimpleTestCase):
+    def test_shared_profile_token_refresh_saves_encrypted_bundle(self):
+        profile = Mock()
+        bundle = {"access_token": "old", "refresh_token": "refresh", "id_token": "id"}
+        renewed = {**bundle, "access_token": "new"}
+        profile.get_api_key.return_value = codex_auth.serialize_token_bundle(bundle)
+        with patch("users.codex_auth.access_token_expires_soon", return_value=True), patch(
+            "users.codex_auth.refresh_token_bundle", return_value=renewed
+        ):
+            self.assertEqual(codex_auth.get_profile_access_token(profile), "new")
+        profile.set_api_key.assert_called_once_with("openai_chatgpt", codex_auth.serialize_token_bundle(renewed))
+        profile.save.assert_called_once_with(update_fields=["openai_chatgpt_token_enc"])
+
     @patch("users.codex_auth.requests.post")
     def test_start_device_code_login_returns_session_payload(self, post):
         post.return_value = Mock(

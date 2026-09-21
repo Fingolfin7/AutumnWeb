@@ -6,7 +6,7 @@
     <div class="suggest-main">
         <span class="suggest-project">{% if suggestion.no_activity %}{{ suggestion.title }}{% else %}{{ suggestion.project.name }}{% endif %}</span>
         {% if suggestion.kind == 'jev' and suggestion.jev_score != None %}
-        <span class="suggest-score" title="Jev score" aria-label="Jev score {{ suggestion.jev_score|floatformat:'2u' }}">{{ suggestion.jev_score|floatformat:'2u' }}</span>
+        <span class="suggest-score" title="{{ suggestion.provider_label|default:'Jev' }} score" aria-label="{{ suggestion.provider_label|default:'Jev' }} score {{ suggestion.jev_score|floatformat:'2u' }}">{{ suggestion.jev_score|floatformat:'2u' }}</span>
         {% endif %}
         {% if suggestion.subprojects %}
         <div class="suggest-subs">

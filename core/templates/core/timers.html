@@ -64,10 +64,18 @@
             </button>
 
             <div class="disclose-body">
+                <div class="recommendation-comparison">
                 <div id="jev-recommendations"
                      data-jev-url="{% url 'jev_timer_recommendations' %}"
                      hidden
                      aria-live="polite"></div>
+                <div id="luna-recommendations"
+                     data-luna-url="{% url 'luna_timer_recommendations' %}"
+                     aria-live="polite">
+                    <p class="suggest-head suggest-head--jev">Luna Recommends</p>
+                    <p class="suggest">Considering your recent work…</p>
+                </div>
+                </div>
 
                 {% if timer_suggestions.commitments or timer_suggestions.habits or timer_suggestions.recent %}
 

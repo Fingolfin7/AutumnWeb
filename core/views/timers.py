@@ -819,9 +819,28 @@ def _jev_candidate_id(project, subprojects):
 
 
 
-def _jev_suggestions(user, request):
-    api_key = _jev_api_key(user)
-    if not api_key or rank_timer_candidates is None:
+def _jev_suggestions(user, request, provider="jev"):
+    ranker = rank_timer_candidates
+    if provider == "luna":
+        from core.services.luna_recommendations import rank_luna_candidates
+        from users.codex_auth import get_profile_access_token
+        ranker = rank_luna_candidates
+        profile = getattr(user, "profile", None)
+        api_key = {}
+        if profile and profile.ai_features_enabled:
+            for name, resolve in (("openai_chatgpt", lambda: get_profile_access_token(profile)),
+                                  ("openai", lambda: profile.get_api_key("openai"))):
+                try:
+                    value = resolve()
+                    if value:
+                        api_key[name] = value
+                except Exception:
+                    pass
+    else:
+        api_key = _jev_api_key(user)
+    if not api_key or ranker is None:
+        if provider == "luna":
+            request.luna_advice_status = "Enable AI features and connect ChatGPT in Profile (or save an OpenAI API key) to see Luna's recommendations."
         return []
 
     if build_rich_jev_candidates is None or build_rich_jev_context is None:
@@ -834,13 +853,15 @@ def _jev_suggestions(user, request):
             "Jev context unavailable category=%s",
             type(exc).__name__,
         )
+        if provider == "luna":
+            request.luna_advice_status = "Luna's context is unavailable right now."
         return []
     candidate_map = {candidate["id"]: candidate for candidate in candidates}
-    cache_key = rich_jev_cache_key(user, request, candidates, context) + ":scores-v1"
+    cache_key = rich_jev_cache_key(user, request, candidates, context) + f":{provider}:advice-v2"
     cached = cache.get(cache_key, None)
     if cached is None:
         try:
-            result = rank_timer_candidates(
+            result = ranker(
                 api_key=api_key,
                 candidates=candidates,
                 context=context,
@@ -848,13 +869,16 @@ def _jev_suggestions(user, request):
         except Exception as exc:
             # Jev is optional advice; deterministic groups must remain usable.
             logger.warning(
-                "Jev recommendation unavailable category=%s",
-                type(exc).__name__,
+                "%s recommendation unavailable category=%s",
+                provider, type(exc).__name__,
             )
+            if provider == "luna":
+                request.luna_advice_status = "Luna is unavailable right now. Try again on your next visit."
             return []
         rows = result.get("recommendations", []) if isinstance(result, dict) else []
         ranked_ids = []
         scores = {}
+        explanations = {}
         for row in rows:
             if not isinstance(row, dict):
                 continue
@@ -863,12 +887,17 @@ def _jev_suggestions(user, request):
             if candidate_key in candidate_map and candidate_key not in ranked_ids:
                 ranked_ids.append(candidate_key)
                 scores[candidate_key] = row.get("score")
+                if provider == "luna":
+                    explanations[candidate_key] = " ".join(
+                        part for part in (row.get("reason", ""), row.get("next_step", "")) if part
+                    )
             if len(ranked_ids) >= 3:
                 break
-        cache.set(cache_key, {"ids": ranked_ids, "scores": scores}, JEV_CACHE_TIMEOUT)
+        cache.set(cache_key, {"ids": ranked_ids, "scores": scores, "explanations": explanations}, JEV_CACHE_TIMEOUT)
     else:
         ranked_ids = cached["ids"]
         scores = cached["scores"]
+        explanations = cached["explanations"]
 
     suggestions = []
     running_project_ids = set(
@@ -923,7 +952,26 @@ def _jev_suggestions(user, request):
         suggestions[-1]["jev_score"] = scores.get(candidate_id)
         if len(suggestions) >= 3:
             break
+    for suggestion in suggestions:
+        suggestion["provider_label"] = "Luna" if provider == "luna" else "Jev"
+        if provider == "luna":
+            candidate_id = "no_activity" if suggestion.get("no_activity") else _jev_candidate_id(
+                suggestion["project"], suggestion["subprojects"]
+            )
+            suggestion["detail"] = explanations.get(candidate_id, suggestion.get("detail", ""))
     return suggestions
+
+
+@login_required
+@require_GET
+def luna_timer_recommendations(request):
+    suggestions = _jev_suggestions(request.user, request, provider="luna")
+    response = render(request, "core/partials/jev_timer_recommendations.html", {
+        "jev_suggestions": suggestions, "provider_label": "Luna", "provider": "luna",
+        "advice_status": getattr(request, "luna_advice_status", "No options met Luna's recommendation threshold right now."),
+    })
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @login_required

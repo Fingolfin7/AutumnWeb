@@ -448,19 +448,8 @@ class InsightsView(View):
         }
 
     def _get_openai_chatgpt_access_token(self, profile):
-        bundle = deserialize_token_bundle(profile.get_api_key("openai_chatgpt"))
-        if not bundle:
-            return None
-        if not access_token_expires_soon(bundle):
-            return bundle.get("access_token")
-        try:
-            refreshed = refresh_token_bundle(bundle)
-        except CodexAuthError:
-            return bundle.get("access_token")
-        if refreshed != bundle:
-            profile.set_api_key("openai_chatgpt", serialize_token_bundle(refreshed))
-            profile.save(update_fields=["openai_chatgpt_token_enc"])
-        return refreshed.get("access_token")
+        from users.codex_auth import get_profile_access_token
+        return get_profile_access_token(profile)
 
     def _validate_selection(self, provider_models, provider, model):
         if not provider or provider not in provider_models:
