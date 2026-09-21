@@ -1,0 +1,18 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<section class="slab">
+  <h1>Recommendation usage</h1>
+  <p>Last {{ days }} days · <a href="?days=7">7 days</a> · <a href="?days=30">30 days</a> · <a href="?days={{ days }}&amp;format=csv">Download CSV</a> · <a href="{% url 'timers' %}">Back to timers</a></p>
+  <p>API-equivalent USD estimates, not an OAuth bill. Output includes reasoning tokens; reasoning is not charged twice. Missing usage is unknown, not zero. Failed attempts with reported usage are included. Totals may undercount failures without usage and unreported cache-write charges.</p>
+  {% for row in summary %}
+  <section class="suggest-group">
+    <h2>{{ row.provider|title }} · {{ row.model }} {{ row.effort }} · {{ row.auth_route }}</h2>
+    <p>{{ row.calls }} provider attempts · {{ row.failures }} failed · average {{ row.average_ms|floatformat:0 }} ms</p>
+    <p>Input: {{ row.input_total|default_if_none:'unknown' }} · cached input: {{ row.cached_total|default_if_none:'unknown' }} · output: {{ row.output_total|default_if_none:'unknown' }} · reasoning (within output): {{ row.reasoning_total|default_if_none:'unknown' }}</p>
+    <p>Estimated cost: {% if row.cost_total != None %}${{ row.cost_total|floatformat:6 }}{% else %}unknown{% endif %} · usage reported for {{ row.known_usage }}/{{ row.calls }} attempts · cost estimated for {{ row.known_cost }}/{{ row.calls }}</p>
+  </section>
+  {% empty %}<p>No provider usage recorded yet. Tracking starts with this release; older calls cannot be reconstructed.</p>{% endfor %}
+  <h2>Cache hits (no provider call)</h2>
+  {% for hit in hits %}<p>{{ hit.provider|title }}: {{ hit.count }}</p>{% empty %}<p>No cache hits recorded yet.</p>{% endfor %}
+</section>
+{% endblock %}

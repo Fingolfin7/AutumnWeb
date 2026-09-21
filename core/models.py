@@ -22,6 +22,43 @@ status_choices = (
 User._meta.get_field('email')._unique = True  # make email field unique
 
 
+class RecommendationCache(models.Model):
+    """Shared per-account advice cache; leases deduplicate work across workers."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    provider = models.CharField(max_length=16)
+    scope = models.CharField(max_length=100)
+    fingerprint = models.CharField(max_length=64, blank=True)
+    result = models.JSONField(null=True)
+    generated_at = models.DateTimeField(null=True)
+    expires_at = models.DateTimeField(default=timezone.now)
+    lease_until = models.DateTimeField(default=timezone.now)
+    lease_token = models.CharField(max_length=36, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "provider", "scope"], name="unique_recommendation_scope")]
+
+
+class RecommendationUsage(models.Model):
+    """Content-free usage ledger. Unknown usage/cost remains NULL, not zero."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    provider = models.CharField(max_length=16)
+    event = models.CharField(max_length=16, default="attempt")
+    model = models.CharField(max_length=80, blank=True)
+    effort = models.CharField(max_length=16, blank=True)
+    auth_route = models.CharField(max_length=16, blank=True)
+    success = models.BooleanField(default=False)
+    error_category = models.CharField(max_length=80, blank=True)
+    duration_ms = models.PositiveIntegerField(default=0)
+    input_tokens = models.PositiveBigIntegerField(null=True)
+    cached_input_tokens = models.PositiveBigIntegerField(null=True)
+    cache_write_tokens = models.PositiveBigIntegerField(null=True)
+    output_tokens = models.PositiveBigIntegerField(null=True)
+    reasoning_tokens = models.PositiveBigIntegerField(null=True)
+    estimated_cost_usd = models.DecimalField(max_digits=16, decimal_places=8, null=True)
+    pricing = models.JSONField(default=dict)
+
+
 class Context(models.Model):
     """
     Hard scope for projects (e.g. Work, Personal, Study).

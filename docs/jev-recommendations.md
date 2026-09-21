@@ -24,13 +24,47 @@ allows 195 seconds for both attempts. It collects streamed text deltas, includin
 when the OAuth terminal event omits output, and validates only completed responses.
 Logs record the successful auth route or failure category, never response content
 or credentials.
-The account/context/state-scoped ten-minute cache is separate from Jev's.
+Both providers use a database-backed cache shared across server workers and
+deploys, isolated by account, provider, and selected context. Each result lasts
+30 minutes from completion. A fingerprint change (included project descriptions,
+session notes, commitments, running timers, candidate eligibility, or local date)
+triggers new advice on the next request. Exact clock and elapsed counters do not
+invalidate advice on every visit. There is no continuous background regeneration.
+One atomic seven-minute lease per scope deduplicates concurrent requests; waiting
+pages retry the fragment without launching another provider call. Failed requests
+have a 15-second cooldown, and expired leases can be reclaimed after worker loss.
+The Refresh recommendations button expires this account's cached advice without
+interrupting an already-running generation. It requires a CSRF-protected POST.
 Reasons render as escaped text. IDs and scores are validated and project
 ownership, activity status, subprojects and running timers are rechecked before
 rendering any start button. A missing key, empty recommendation result, and
 provider failure have distinct messages. Neither provider modifies timers.
 The comparison remains enabled until explicitly removed; there is no automatic
 winner selection or end-of-week removal.
+
+## Usage and cost review
+
+The timer page links to `/timers/recommendation-usage/`, an account-only review
+for the last 7 days (or 30 days; `days` accepts 1–90), with a CSV export. The
+database ledger records provider attempts separately from cache hits, including
+model, effort, OAuth/API route, duration, success/failure category, input/output
+tokens, cached input, reported cache writes, and reasoning tokens when available.
+An OAuth failure followed by API fallback is two attempts, including any usage
+reported before failure. Missing usage or costs remain NULL, never fabricated zero.
+No prompt, session-note copy, raw response, credential, or exception text is saved
+in the usage ledger. Cached recommendations themselves include their explanations.
+
+Luna stays on **xhigh**. Its cost is an **API-equivalent estimate**, not an OAuth
+bill or a prediction of subscription quota consumption. Reasoning is already
+included in output tokens and is not charged twice. Pricing snapshots are stored
+per attempt so historical estimates do not change when code/prices change.
+As checked on 2026-09-22, Luna standard rates per million tokens are $0.20 input,
+$0.02 cached input, $0.25 reported cache writes, and $1.20 output; above 272K input
+tokens the rates are $0.40/$0.04/$0.50/$1.80. Jev 1.13 input is $0.042/M and
+output is free. Sources: https://developers.openai.com/api/docs/models/gpt-5.6-luna
+and https://docs.typesafe.ai/models. Unreported cache-write charges are excluded;
+totals can undercount failed calls that never return usage. Tracking begins at
+deployment; there is no backfill or scheduled weekly report.
 
 Jev provides advisory suggestions for a sensible next use of time. It is not
 trying to predict what the user will click, and it does not start timers or

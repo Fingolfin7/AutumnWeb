@@ -2,6 +2,7 @@
 from django.urls import path, re_path
 from django.http import JsonResponse
 from core.views.charts import ChartsView
+from core.views.recommendation_usage import recommendation_usage, refresh_recommendations
 from core.views.commitments import (
     CreateCommitmentView,
     DeleteCommitmentView,
@@ -79,6 +80,8 @@ urlpatterns = [
     ),
     path("start_timer/", start_timer, name="start_timer"),
     path("timers/luna-recommendations/", luna_timer_recommendations, name="luna_timer_recommendations"),
+    path("timers/recommendation-usage/", recommendation_usage, name="recommendation_usage"),
+    path("timers/refresh-recommendations/", refresh_recommendations, name="refresh_recommendations"),
     path("stop_timer/<int:session_id>/", stop_timer, name="stop_timer"),
     path("timers/<int:session_id>/note/", update_timer_note, name="update_timer_note"),
     path("restart_timer/<int:session_id>/", restart_timer, name="restart_timer"),

@@ -107,3 +107,18 @@ class LunaViewTests(TestCase):
     def test_luna_requires_authentication(self):
         self.client.logout()
         self.assertEqual(self.client.get(reverse("luna_timer_recommendations")).status_code, 302)
+
+    def test_inflight_returns_retryable_response(self):
+        from core.services.recommendation_cache import RecommendationPending
+        with self._enable_key(), mock.patch("core.services.recommendation_cache.get_or_generate", side_effect=RecommendationPending):
+            response = self.client.get(reverse("luna_timer_recommendations"))
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response["Retry-After"], "5")
+
+    def test_project_description_edit_invalidates_persistent_result(self):
+        with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
+            self.client.get(reverse("luna_timer_recommendations"))
+            self.active.description = "A materially different project goal"
+            self.active.save(update_fields=["description"])
+            self.client.get(reverse("luna_timer_recommendations"))
+            self.assertEqual(ranker.call_count, 2)

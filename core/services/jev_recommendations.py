@@ -21,6 +21,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from typesafe_sdk import AsyncTypeSafeClient, RetryPolicy
+from .recommendation_usage import provider_attempt, capture_usage
 
 
 JEV_MODEL = "jev-1.13.0"
@@ -475,6 +476,11 @@ async def recommend_timer_candidates(
     candidates: Sequence[Mapping[str, Any]],
     context: Mapping[str, Any],
 ) -> dict[str, Any]:
+    with provider_attempt("jev", JEV_MODEL):
+        return await _recommend_timer_candidates(api_key, candidates, context)
+
+
+async def _recommend_timer_candidates(api_key, candidates, context):
     """Ask Jev for independent scores in one request and return top options."""
     if not isinstance(api_key, str) or not api_key.strip():
         raise JevRecommendationError("A Jev API key is required.")
@@ -497,6 +503,7 @@ async def recommend_timer_candidates(
     except Exception as exc:
         raise JevRecommendationError("Jev recommendation unavailable.") from exc
 
+    capture_usage(getattr(response, "usage", None))
     try:
         # Parse against the normalized payload so integer IDs, surrounding
         # whitespace, and other accepted input forms have one stable output

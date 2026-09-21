@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
-from django.core.cache import cache
 from django.shortcuts import get_object_or_404, render, redirect
 from django.views.generic import (
     ListView,
@@ -782,13 +781,6 @@ def build_timer_suggestions(user, request):
     }
 
 
-# Jev is an advisory layer on top of the deterministic suggestions. Keep its
-# cache short and scoped to both the account and the exact candidate payload so
-# one account's ranking can never leak into another account or an old timer
-# state.
-JEV_CACHE_TIMEOUT = 10 * 60
-
-
 def _jev_api_key(user):
     """Resolve the account credential without exposing it to templates/logs."""
     profile = getattr(user, "profile", None)
@@ -857,47 +849,44 @@ def _jev_suggestions(user, request, provider="jev"):
             request.luna_advice_status = "Luna's context is unavailable right now."
         return []
     candidate_map = {candidate["id"]: candidate for candidate in candidates}
-    cache_key = rich_jev_cache_key(user, request, candidates, context) + f":{provider}:advice-v2"
-    cached = cache.get(cache_key, None)
-    if cached is None:
-        try:
-            result = ranker(
+    from core.services.recommendation_cache import get_or_generate, RecommendationPending
+    selected = context.get("active_context") or {}
+    scope = f"{selected.get('mode', 'all')}:{selected.get('id') or 'all'}"
+    version = "luna:gpt-5.6-luna:xhigh:v3" if provider == "luna" else "jev:jev-1.13.0:v3"
+    cache_key = rich_jev_cache_key(user, request, candidates, context) + version
+    try:
+        result = get_or_generate(user, provider, scope, cache_key, lambda: ranker(
                 api_key=api_key,
                 candidates=candidates,
                 context=context,
-            )
-        except Exception as exc:
-            # Jev is optional advice; deterministic groups must remain usable.
-            logger.warning(
-                "%s recommendation unavailable category=%s",
-                provider, type(exc).__name__,
-            )
+            ))
+    except RecommendationPending:
+        request.recommendation_pending = True
+        return []
+    except Exception as exc:
+        # Advice is optional; deterministic groups must remain usable.
+        logger.warning("%s recommendation unavailable category=%s", provider, type(exc).__name__)
+        if provider == "luna":
+            request.luna_advice_status = "Luna is unavailable right now. Try again on your next visit."
+        return []
+    rows = result.get("recommendations", []) if isinstance(result, dict) else []
+    ranked_ids = []
+    scores = {}
+    explanations = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        candidate_id = row.get("candidate_id")
+        candidate_key = str(candidate_id) if candidate_id is not None else ""
+        if candidate_key in candidate_map and candidate_key not in ranked_ids:
+            ranked_ids.append(candidate_key)
+            scores[candidate_key] = row.get("score")
             if provider == "luna":
-                request.luna_advice_status = "Luna is unavailable right now. Try again on your next visit."
-            return []
-        rows = result.get("recommendations", []) if isinstance(result, dict) else []
-        ranked_ids = []
-        scores = {}
-        explanations = {}
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            candidate_id = row.get("candidate_id")
-            candidate_key = str(candidate_id) if candidate_id is not None else ""
-            if candidate_key in candidate_map and candidate_key not in ranked_ids:
-                ranked_ids.append(candidate_key)
-                scores[candidate_key] = row.get("score")
-                if provider == "luna":
-                    explanations[candidate_key] = " ".join(
-                        part for part in (row.get("reason", ""), row.get("next_step", "")) if part
-                    )
-            if len(ranked_ids) >= 3:
-                break
-        cache.set(cache_key, {"ids": ranked_ids, "scores": scores, "explanations": explanations}, JEV_CACHE_TIMEOUT)
-    else:
-        ranked_ids = cached["ids"]
-        scores = cached["scores"]
-        explanations = cached["explanations"]
+                explanations[candidate_key] = " ".join(
+                    part for part in (row.get("reason", ""), row.get("next_step", "")) if part
+                )
+        if len(ranked_ids) >= 3:
+            break
 
     suggestions = []
     running_project_ids = set(
@@ -966,6 +955,8 @@ def _jev_suggestions(user, request, provider="jev"):
 @require_GET
 def luna_timer_recommendations(request):
     suggestions = _jev_suggestions(request.user, request, provider="luna")
+    if getattr(request, "recommendation_pending", False):
+        return HttpResponse(status=202, headers={"Cache-Control": "no-store", "Retry-After": "5"})
     response = render(request, "core/partials/jev_timer_recommendations.html", {
         "jev_suggestions": suggestions, "provider_label": "Luna", "provider": "luna",
         "advice_status": getattr(request, "luna_advice_status", "No options met Luna's recommendation threshold right now."),
@@ -979,6 +970,8 @@ def luna_timer_recommendations(request):
 def jev_timer_recommendations(request):
     """Progressive Jev HTML fragment for the authenticated timer owner."""
     suggestions = _jev_suggestions(request.user, request)
+    if getattr(request, "recommendation_pending", False):
+        return HttpResponse(status=202, headers={"Cache-Control": "no-store", "Retry-After": "5"})
     if not suggestions:
         response = HttpResponse(status=204)
         response["Cache-Control"] = "no-store"

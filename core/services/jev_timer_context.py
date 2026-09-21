@@ -548,25 +548,28 @@ def build_jev_context(user, request, candidates):
 
 
 def jev_cache_key(user, request, candidates, context):
-    """Fingerprint rich state while bucketing volatile clock/elapsed values."""
+    """Fingerprint evidence; the persistent cache controls the 30-minute age.
+
+    Exact clock, sliding query boundaries and elapsed counters must not turn
+    every page load into a fresh provider call. Local date is still included.
+    """
     cache_context = json.loads(
         json.dumps(context, ensure_ascii=False, separators=(",", ":"), default=str)
     )
     now_data = cache_context.get("now", {})
     now_data.pop("local_datetime", None)
     now_data.pop("local_time", None)
+    now_data.pop("cache_bucket", None)
     history = cache_context.get("history_coverage", {})
     history.pop("from_inclusive", None)
     history.pop("to_exclusive", None)
     for timer in cache_context.get("running_timers", []):
         if "elapsed_minutes" in timer:
-            timer["elapsed_minutes"] = int(float(timer["elapsed_minutes"]) // 10) * 10
+            timer.pop("elapsed_minutes", None)
     for commitment in cache_context.get("commitments", []):
         commitment.pop("time_remaining_seconds", None)
         if "time_remaining_minutes" in commitment:
-            commitment["time_remaining_minutes"] = int(
-                float(commitment["time_remaining_minutes"]) // 10
-            ) * 10
+            commitment.pop("time_remaining_minutes", None)
     digest = hashlib.sha256(
         json.dumps(
             {"candidates": candidates, "context": cache_context},

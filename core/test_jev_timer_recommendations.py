@@ -365,6 +365,7 @@ class JevTimerRecommendationTests(TestCase):
         changed = json.loads(json.dumps(context))
         changed["now"]["local_datetime"] = "2099-01-01T01:02:03+00:00"
         changed["now"]["local_time"] = "01:02:03"
+        changed["now"]["cache_bucket"] += 1
         self.assertEqual(first, jev_cache_key(self.user, request, candidates, changed))
         changed["recent_completed_sessions"].append(
             {"id": 999, "project_id": self.active.id, "note": "new evidence"}

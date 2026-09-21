@@ -9,6 +9,7 @@ from openai import OpenAI
 from users.codex_auth import CODEX_CHATGPT_BASE_URL
 
 from .jev_recommendations import build_jev_payload, SCORE_RUBRIC, SCORE_THRESHOLD
+from .recommendation_usage import provider_attempt, capture_usage
 
 LUNA_MODEL = "gpt-5.6-luna"
 LUNA_EFFORT = "xhigh"
@@ -32,6 +33,11 @@ def rank_luna_candidates(api_key, candidates, context):
 
 
 def _rank_once(credential, candidates, context, *, oauth):
+    with provider_attempt("luna", LUNA_MODEL, LUNA_EFFORT, "oauth" if oauth else "api_key"):
+        return _rank_response(credential, candidates, context, oauth=oauth)
+
+
+def _rank_response(credential, candidates, context, *, oauth):
     state = build_jev_payload(candidates, context)["state"]
     ids = [candidate["id"] for candidate in state["candidates"]]
     schema = {
@@ -85,6 +91,7 @@ def _rank_once(credential, candidates, context, *, oauth):
                     chunks.append(event.delta)
                 elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
                     response = event.response
+                    capture_usage(getattr(response, "usage", None))
     if response is None or response.status != "completed":
         raise ValueError("Luna response incomplete")
     # The OAuth transport can omit output from its terminal event. As in

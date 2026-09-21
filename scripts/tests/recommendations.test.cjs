@@ -34,3 +34,24 @@ test('Jev renders independently while Luna waits, and Luna failure stays local',
   assert.match(message.textContent, /Luna is unavailable/);
   assert.equal(jev.innerHTML, '<p>Jev advice</p>');
 });
+
+test('pending generation is polled and rendered without blanking the panel', async () => {
+  const callbacks = [];
+  let calls = 0;
+  const mount = { innerHTML: 'Loading', hidden: false, hasAttribute: () => true,
+    getAttribute: () => 'luna', querySelector: () => ({ textContent: '' }) };
+  const fetch = async () => ++calls === 1 ? { status: 202 } : {
+    status: 200, ok: true, text: async () => '<p>Shared result</p>'
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../core/static/core/js/jev_timer_recommendations.js'), 'utf8'), {
+    window: { fetch, setTimeout: (cb, delay) => { if (delay === 5000) callbacks.push(cb); return delay; }, clearTimeout: () => {} },
+    document: { querySelectorAll: () => [mount], getElementById: () => null }, fetch,
+  });
+  await new Promise(setImmediate);
+  assert.equal(mount.innerHTML, 'Loading');
+  assert.equal(calls, 1);
+  callbacks.shift()();
+  await new Promise(setImmediate);
+  assert.equal(calls, 2);
+  assert.equal(mount.innerHTML, '<p>Shared result</p>');
+});
