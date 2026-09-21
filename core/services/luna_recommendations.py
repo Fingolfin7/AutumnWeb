@@ -1,6 +1,7 @@
 """Luna advice using the same bounded evidence and candidates as Jev."""
 
 import json
+import logging
 import math
 import time
 
@@ -11,6 +12,7 @@ from .jev_recommendations import build_jev_payload, SCORE_RUBRIC, SCORE_THRESHOL
 
 LUNA_MODEL = "gpt-5.6-luna"
 LUNA_EFFORT = "xhigh"
+logger = logging.getLogger(__name__)
 
 
 def rank_luna_candidates(api_key, candidates, context):
@@ -20,7 +22,8 @@ def rank_luna_candidates(api_key, candidates, context):
     if token:
         try:
             return _rank_once(token, candidates, context, oauth=True)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Luna OAuth attempt failed category=%s fallback=%s", type(exc).__name__, bool(fallback))
             if not fallback:
                 raise
     if not fallback:
@@ -72,15 +75,21 @@ def _rank_once(credential, candidates, context, *, oauth):
                              "strict": True, "schema": schema}},
         )
         response = None
+        chunks = []
         with events:
             for event in events:
                 if time.monotonic() - started > 60:
                     raise TimeoutError("Luna response timed out")
-                if event.type in {"response.completed", "response.incomplete", "response.failed"}:
+                if event.type == "response.output_text.delta":
+                    chunks.append(event.delta)
+                elif event.type in {"response.completed", "response.incomplete", "response.failed"}:
                     response = event.response
     if response is None or response.status != "completed":
         raise ValueError("Luna response incomplete")
-    rows = json.loads(response.output_text)["recommendations"]
+    # The OAuth transport can omit output from its terminal event. As in
+    # Insights, retain the text deltas instead of relying on that snapshot.
+    output = "".join(chunks) or response.output_text
+    rows = json.loads(output)["recommendations"]
     if not isinstance(rows, list) or len(rows) > 3:
         raise ValueError("Invalid Luna recommendations")
     seen = set()
@@ -96,6 +105,7 @@ def _rank_once(credential, candidates, context, *, oauth):
         for field, limit in (("reason", 400), ("next_step", 300)):
             if not isinstance(row[field], str) or len(row[field]) > limit:
                 raise ValueError("Invalid Luna explanation")
+    logger.info("Luna recommendations completed auth=%s", "oauth" if oauth else "api_key")
     return {"recommendations": sorted(
         [row for row in rows if row["score"] >= SCORE_THRESHOLD],
         key=lambda row: -row["score"],

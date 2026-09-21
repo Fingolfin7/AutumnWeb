@@ -10,15 +10,19 @@ from core import test_jev_timer_recommendations as jev_tests
 
 
 class LunaServiceTests(SimpleTestCase):
-    def call(self, rows):
+    def call(self, rows, *, streamed=False, status="completed"):
         state = {"candidates": [{"id": "no_activity"}], "recent_completed_sessions": []}
         with mock.patch("core.services.luna_recommendations.build_jev_payload", return_value={"state": state}), mock.patch(
             "core.services.luna_recommendations.OpenAI"
         ) as client:
             create = client.return_value.__enter__.return_value.responses.create
-            completed = SimpleNamespace(status="completed", output_text=json.dumps({"recommendations": rows}))
+            text = json.dumps({"recommendations": rows})
+            completed = SimpleNamespace(status=status, output_text="" if streamed else text)
+            events = ([SimpleNamespace(type="response.output_text.delta", delta=text[:20]),
+                       SimpleNamespace(type="response.output_text.delta", delta=text[20:])] if streamed else [])
+            events.append(SimpleNamespace(type="response." + status, response=completed))
             create.return_value.__enter__.return_value = create.return_value
-            create.return_value.__iter__.return_value = iter([SimpleNamespace(type="response.completed", response=completed)])
+            create.return_value.__iter__.return_value = iter(events)
             result = rank_luna_candidates({"openai_chatgpt": "test-key"}, [], {})
             request = create.call_args.kwargs
             self.assertEqual(request["reasoning"], {"effort": "xhigh"})
@@ -27,6 +31,14 @@ class LunaServiceTests(SimpleTestCase):
             self.assertTrue(request["stream"])
             self.assertEqual(json.loads(request["input"][0]["content"][0]["text"]), state)
             return result
+
+    def test_oauth_only_uses_streamed_text_when_terminal_output_is_empty(self):
+        row = {"candidate_id": "no_activity", "score": 3, "reason": "Rest.", "next_step": ""}
+        self.assertEqual(self.call([row], streamed=True)["recommendations"], [row])
+
+    def test_incomplete_stream_is_never_accepted_even_with_valid_json(self):
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            self.call([], streamed=True, status="incomplete")
 
     def test_nothing_is_a_valid_result_and_low_scores_are_filtered(self):
         row = {"candidate_id": "no_activity", "score": 3.2, "reason": "Covered commitments.", "next_step": ""}
