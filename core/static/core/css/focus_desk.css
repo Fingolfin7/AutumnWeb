@@ -2586,6 +2586,9 @@ img.brand-mark {
   border-bottom: 1px solid var(--brand-deep);
 }
 .recommendation-comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.desk.desk--recommendation-comparison { grid-template-columns: minmax(0, 1fr); }
+.desk--recommendation-comparison > .desk-side { position: static; }
+.recommendation-comparison .suggest-detail { overflow-wrap: anywhere; }
 .recommendation-comparison > div { min-width: 0; }
 .recommendation-comparison > div + div { border-left: 1px solid var(--hairline); }
 @media (max-width: 760px) {
