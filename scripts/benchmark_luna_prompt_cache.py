@@ -63,9 +63,9 @@ class _CaptureClient:
         return _CapturedEvents()
 
 
-def _request_for(state, original, *, explicit):
+def _request_for(state, original, *, layout):
     request = deepcopy(original)
-    if not explicit:
+    if layout == "current":
         request["input"][0]["content"][0]["text"] = json.dumps(state, ensure_ascii=False)
         return request
 
@@ -79,7 +79,8 @@ def _request_for(state, original, *, explicit):
     assert set(stable).isdisjoint(dynamic)
     assert set(stable) | set(dynamic) == set(state)
     # The pinned SDK predates this named parameter, but supports extra_body.
-    request["extra_body"] = {"prompt_cache_options": {"mode": "explicit"}}
+    if layout == "explicit":
+        request["extra_body"] = {"prompt_cache_options": {"mode": "explicit"}}
     request["input"] = [
         {"role": "user", "content": [{
             "type": "input_text", "text": json.dumps(stable, ensure_ascii=False),
@@ -120,6 +121,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("username")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--layouts", default="current,explicit")
     args = parser.parse_args()
     user = get_user_model().objects.get(username=args.username)
 
@@ -141,9 +143,12 @@ def main():
     if edited_session["recent_completed_sessions"]:
         edited_session["recent_completed_sessions"][0]["note"] += " [benchmark edit]"
     snapshots = (state, changed_time, edited_session)
+    layouts = args.layouts.split(",")
+    if any(layout not in {"current", "explicit", "breakpoint_only"} for layout in layouts):
+        raise ValueError("Unknown benchmark layout")
     for snapshot in snapshots:
-        for explicit in (False, True):
-            candidate_request = _request_for(snapshot, original, explicit=explicit)
+        for layout in layouts:
+            candidate_request = _request_for(snapshot, original, layout=layout)
             assert candidate_request["model"] == original["model"]
             assert candidate_request["reasoning"] == original["reasoning"]
     if args.dry_run:
@@ -161,17 +166,16 @@ def main():
                       "candidates": len(state["candidates"]), "sessions": len(state["recent_completed_sessions"])}),
           flush=True)
     with OpenAI(api_key=token, base_url=CODEX_CHATGPT_BASE_URL, timeout=150, max_retries=0) as client:
-        for layout in ("current", "explicit"):
+        for layout in layouts:
             for step, snapshot in zip(("cold", "time", "session"), snapshots):
-                request_data = _request_for(snapshot, original, explicit=(layout == "explicit"))
+                request_data = _request_for(snapshot, original, layout=layout)
                 try:
                     result = _call(client, request_data)
                 except Exception as exc:
-                    result = {"error_type": type(exc).__name__, "error_code": getattr(exc, "code", None)}
+                    result = {"error_type": type(exc).__name__, "error_code": getattr(exc, "code", None),
+                              "error_param": getattr(exc, "param", None)}
                     print(json.dumps({"layout": layout, "step": step, **result}), flush=True)
-                    if layout == "explicit":
-                        return
-                    continue
+                    break
                 print(json.dumps({"layout": layout, "step": step, **result}), flush=True)
 
 
