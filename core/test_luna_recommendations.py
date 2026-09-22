@@ -27,7 +27,7 @@ class LunaServiceTests(SimpleTestCase):
             request = create.call_args.kwargs
             self.assertEqual(client.call_args.kwargs["timeout"], 120.0)
             self.assertEqual(request["reasoning"], {"effort": "xhigh"})
-            self.assertEqual(request["model"], "gpt-5.6-luna")
+            self.assertEqual(request["model"], "gpt-6-luna")
             self.assertFalse(request["store"])
             self.assertTrue(request["stream"])
             self.assertEqual(json.loads(request["input"][0]["content"][0]["text"]), state)
@@ -122,3 +122,17 @@ class LunaViewTests(TestCase):
             self.active.save(update_fields=["description"])
             self.client.get(reverse("luna_timer_recommendations"))
             self.assertEqual(ranker.call_count, 2)
+
+    def test_habit_label_clock_change_does_not_regenerate_advice(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from core.models import Sessions
+        now = timezone.now().replace(hour=9, minute=1, second=0, microsecond=0)
+        Sessions.objects.create(user=self.user, project=self.active,
+                                start_time=now - timedelta(days=7),
+                                end_time=now - timedelta(days=7) + timedelta(minutes=20))
+        with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
+            for instant in (now, now + timedelta(minutes=5)):
+                with mock.patch("django.utils.timezone.now", return_value=instant):
+                    self.client.get(reverse("luna_timer_recommendations"))
+            self.assertEqual(ranker.call_count, 1)

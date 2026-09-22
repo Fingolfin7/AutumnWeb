@@ -62,19 +62,23 @@ def capture_usage(usage):
                           "as_of": "2026-09-22", "basis": "published API rate estimate",
                           "source": "https://docs.typesafe.ai/models"}
     # Reasoning tokens are already included in output_tokens: never add twice.
-    if row["model"] == "gpt-5.6-luna" and all(k in row for k in ("input_tokens", "output_tokens")):
+    if row["model"] in {"gpt-5.6-luna", "gpt-6-luna"} and all(k in row for k in ("input_tokens", "output_tokens")):
         inputs, outputs = row["input_tokens"], row["output_tokens"]
         cached = min(row.get("cached_input_tokens", 0), inputs)
         writes = min(row.get("cache_write_tokens", 0), inputs - cached)
         rates = {"input": "0.20", "cached": "0.02", "write": "0.25", "output": "1.20"}
         if inputs > 272000:
             rates = {"input": "0.40", "cached": "0.04", "write": "0.50", "output": "1.80"}
+        if row["model"] == "gpt-6-luna":
+            rates = {"input": "0.10", "cached": "0.01", "write": "0.125", "output": "0.50"}
+            if inputs > 272000:
+                rates = {"input": "0.20", "cached": "0.02", "write": "0.25", "output": "0.75"}
         cost = ((inputs - cached - writes) * Decimal(rates["input"])
                 + cached * Decimal(rates["cached"]) + writes * Decimal(rates["write"])
                 + outputs * Decimal(rates["output"])) / Decimal(1000000)
         row["estimated_cost_usd"] = cost.quantize(Decimal("0.00000001"))
-        row["pricing"] = {"usd_per_million": rates, "as_of": "2026-09-22",
+        row["pricing"] = {"usd_per_million": rates, "as_of": "2026-09-23",
                           "basis": "API-equivalent, not an OAuth bill",
-                          "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+                          "source": "https://developers.openai.com/api/docs/pricing",
                           "cache_detail_reported": details is not None,
                           "unreported_cache_writes": "not included"}

@@ -215,7 +215,7 @@ class JevTimerRecommendationTests(TestCase):
                 "Used today",
             ],
         )
-        self.assertEqual(candidate["reason"], "30 min remaining")
+        self.assertEqual(candidate["reason"], "30 min remaining with 6 days remaining")
 
     def test_ranked_result_renders_top_three_and_keeps_deterministic_reason(self):
         other = Projects.objects.create(

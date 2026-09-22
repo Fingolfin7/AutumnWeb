@@ -3,7 +3,7 @@
 ## Luna comparison
 
 The timer page also shows **Luna Recommends**, alongside Jev on desktop and
-stacked on mobile. It uses `gpt-5.6-luna` with `xhigh` reasoning through the
+stacked on mobile. It uses `gpt-6-luna` with `xhigh` reasoning through the
 same ChatGPT OAuth connection used by Insights, stored encrypted in Profile.
 The shared token helper refreshes and saves renewed credentials when needed.
 AI features must be enabled. OAuth is tried first; if it fails, Luna falls back
@@ -58,10 +58,11 @@ Luna stays on **xhigh**. Its cost is an **API-equivalent estimate**, not an OAut
 bill or a prediction of subscription quota consumption. Reasoning is already
 included in output tokens and is not charged twice. Pricing snapshots are stored
 per attempt so historical estimates do not change when code/prices change.
-As checked on 2026-09-22, Luna standard rates per million tokens are $0.20 input,
-$0.02 cached input, $0.25 reported cache writes, and $1.20 output; above 272K input
-tokens the rates are $0.40/$0.04/$0.50/$1.80. Jev 1.13 input is $0.042/M and
-output is free. Sources: https://developers.openai.com/api/docs/models/gpt-5.6-luna
+As checked on 2026-09-23, GPT-6 Luna standard rates per million tokens are $0.10 input,
+$0.01 cached input, $0.125 reported cache writes, and $0.50 output; above 272K input
+tokens the rates are $0.20/$0.02/$0.25/$0.75. Historical GPT-5.6 estimates retain
+their original pricing snapshots. Jev 1.13 input is $0.042/M and
+output is free. Sources: https://developers.openai.com/api/docs/pricing
 and https://docs.typesafe.ai/models. Unreported cache-write charges are excluded;
 totals can undercount failed calls that never return usage. Tracking begins at
 deployment; there is no backfill or scheduled weekly report.

@@ -11,7 +11,7 @@ from users.codex_auth import CODEX_CHATGPT_BASE_URL
 from .jev_recommendations import build_jev_payload, SCORE_RUBRIC, SCORE_THRESHOLD
 from .recommendation_usage import provider_attempt, capture_usage
 
-LUNA_MODEL = "gpt-5.6-luna"
+LUNA_MODEL = "gpt-6-luna"
 LUNA_EFFORT = "xhigh"
 logger = logging.getLogger(__name__)
 

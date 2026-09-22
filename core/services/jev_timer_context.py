@@ -287,7 +287,9 @@ def build_jev_candidates(user, request):
             if key in by_key:
                 by_key[key]["signals"].append(signal)
                 continue
-            reason = suggestion.get("detail") or ""
+            # The UI habit label contains HH:MM; use its stable evidence text.
+            # The model already receives the actual current time separately.
+            reason = suggestion.get("jev_detail") or suggestion.get("detail") or ""
             candidate = {
                 "id": _jev_candidate_id(project, subs),
                 "project_id": project.id,

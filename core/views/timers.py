@@ -852,7 +852,7 @@ def _jev_suggestions(user, request, provider="jev"):
     from core.services.recommendation_cache import get_or_generate, RecommendationPending
     selected = context.get("active_context") or {}
     scope = f"{selected.get('mode', 'all')}:{selected.get('id') or 'all'}"
-    version = "luna:gpt-5.6-luna:xhigh:v3" if provider == "luna" else "jev:jev-1.13.0:v3"
+    version = "luna:gpt-6-luna:xhigh:v3" if provider == "luna" else "jev:jev-1.13.0:v3"
     cache_key = rich_jev_cache_key(user, request, candidates, context) + version
     try:
         result = get_or_generate(user, provider, scope, cache_key, lambda: ranker(

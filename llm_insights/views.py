@@ -168,7 +168,7 @@ def get_chat_title_handler(selected_handler, api_keys):
     ):
         return selected_handler
     return get_llm_handler(
-        model="gpt-5.6-luna",
+        model="gpt-6-luna",
         api_keys=api_keys,
         reasoning_effort="high",
     )
@@ -402,9 +402,9 @@ class InsightsView(View):
             or self._has_env_api_key("OPENAI_API_KEY")
         ):
             provider_models["openai"] = [
-                ("gpt-5.6-luna", "GPT-5.6 Luna"),
-                ("gpt-5.6-sol", "GPT-5.6 Sol"),
-                ("gpt-5.6-terra", "GPT-5.6 Terra"),
+                ("gpt-6-luna", "GPT-6 Luna"),
+                ("gpt-6-sol", "GPT-6 Sol"),
+                ("gpt-6-astra", "GPT-6 Astra"),
                 ("gpt-5.5", "GPT-5.5"),
             ]
         if profile and profile.gemini_api_key_enc:
@@ -452,6 +452,13 @@ class InsightsView(View):
         return get_profile_access_token(profile)
 
     def _validate_selection(self, provider_models, provider, model):
+        if provider == "openai":
+            model = {
+                "gpt-5.6-luna": "gpt-6-luna",
+                "gpt-5.6-sol": "gpt-6-sol",
+                "gpt-5.6": "gpt-6-sol",
+                "gpt-5.6-terra": "gpt-6-sol",
+            }.get(model, model)
         if not provider or provider not in provider_models:
             provider = next(iter(provider_models.keys()))
         valid_models = provider_models[provider]
@@ -461,7 +468,7 @@ class InsightsView(View):
         return provider, model
 
     def _openai_reasoning_efforts(self, model):
-        if model and not model.startswith("gpt-5.6"):
+        if model and not model.startswith(("gpt-5.6", "gpt-6-")):
             return self.OPENAI_REASONING_EFFORTS[:-1]
         return self.OPENAI_REASONING_EFFORTS
 

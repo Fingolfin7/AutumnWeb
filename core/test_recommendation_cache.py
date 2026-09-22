@@ -115,6 +115,19 @@ class PersistentAdviceTests(TestCase):
 
 
 class UsageAccountingTests(SimpleTestCase):
+    def test_gpt_6_luna_rates_and_historical_5_6_rates_are_distinct(self):
+        usage = {"input_tokens": 1000, "output_tokens": 200,
+                 "input_tokens_details": {"cached_tokens": 500},
+                 "output_tokens_details": {"reasoning_tokens": 150}}
+        row = self.measure(usage, model="gpt-6-luna")
+        self.assertEqual(row["estimated_cost_usd"], Decimal("0.00015500"))
+        self.assertEqual(self.measure(usage)["estimated_cost_usd"], Decimal("0.00035000"))
+        row = self.measure({"input_tokens": 300000, "output_tokens": 1000}, model="gpt-6-luna")
+        self.assertEqual(row["estimated_cost_usd"], Decimal("0.06075000"))
+        row = self.measure({"input_tokens": 1000, "output_tokens": 0,
+                            "input_tokens_details": {"cache_creation_tokens": 1000}}, model="gpt-6-luna")
+        self.assertEqual(row["estimated_cost_usd"], Decimal("0.00012500"))
+
     def measure(self, usage, provider="luna", model="gpt-5.6-luna"):
         with collect_attempts() as attempts:
             with provider_attempt(provider, model, "xhigh", "oauth"):

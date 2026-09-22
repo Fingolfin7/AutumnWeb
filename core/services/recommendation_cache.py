@@ -20,7 +20,11 @@ class RecommendationPending(Exception):
 
 def get_or_generate(user, provider, scope, key, generate):
     fingerprint = hashlib.sha256(key.encode()).hexdigest()
-    row, _ = RecommendationCache.objects.get_or_create(user=user, provider=provider, scope=scope)
+    now = timezone.now()
+    row, _ = RecommendationCache.objects.get_or_create(
+        user=user, provider=provider, scope=scope,
+        defaults={"lease_until": now, "expires_at": now},
+    )
     now = timezone.now()
     if row.fingerprint == fingerprint and row.result is not None and row.expires_at > now:
         RecommendationUsage.objects.create(user=user, provider=provider, event="cache_hit", success=True)

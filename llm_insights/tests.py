@@ -66,9 +66,9 @@ class InsightsViewProviderModelsTests(TestCase):
         self.assertEqual(
             provider_models["openai"],
             [
-                ("gpt-5.6-luna", "GPT-5.6 Luna"),
-                ("gpt-5.6-sol", "GPT-5.6 Sol"),
-                ("gpt-5.6-terra", "GPT-5.6 Terra"),
+                ("gpt-6-luna", "GPT-6 Luna"),
+                ("gpt-6-sol", "GPT-6 Sol"),
+                ("gpt-6-astra", "GPT-6 Astra"),
                 ("gpt-5.5", "GPT-5.5"),
             ],
         )
@@ -95,7 +95,7 @@ class InsightsViewProviderModelsTests(TestCase):
         provider_models = self.view._provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
-        self.assertIn(("gpt-5.6-sol", "GPT-5.6 Sol"), provider_models["openai"])
+        self.assertIn(("gpt-6-sol", "GPT-6 Sol"), provider_models["openai"])
         self.assertNotIn("openai_chatgpt", provider_models)
 
     def test_openai_reasoning_effort_defaults_to_high(self):
@@ -111,17 +111,31 @@ class InsightsViewProviderModelsTests(TestCase):
             "xhigh",
         )
 
+    def test_saved_5_6_selections_upgrade_without_losing_tier(self):
+        models = {"openai": [("gpt-6-luna", "Luna"), ("gpt-6-sol", "Sol"), ("gpt-6-astra", "Astra")]}
+        for old, new in [("gpt-5.6-luna", "gpt-6-luna"),
+                         ("gpt-5.6-sol", "gpt-6-sol"),
+                         ("gpt-5.6-terra", "gpt-6-sol"),
+                         ("gpt-5.6", "gpt-6-sol")]:
+            with self.subTest(model=old):
+                self.assertEqual(self.view._validate_selection(models, "openai", old), ("openai", new))
+
+    def test_all_gpt_6_choices_preserve_xhigh_and_max(self):
+        for model in ("gpt-6-luna", "gpt-6-sol", "gpt-6-astra"):
+            for effort in ("xhigh", "max"):
+                self.assertEqual(self.view._validate_reasoning_effort("openai", effort, model), effort)
+
     def test_legacy_extra_high_reasoning_effort_is_normalized(self):
         self.assertEqual(
             self.view._validate_reasoning_effort(
-                "openai", "extra-high", "gpt-5.6-sol"
+                "openai", "extra-high", "gpt-6-sol"
             ),
             "xhigh",
         )
 
-    def test_max_reasoning_effort_is_only_available_for_gpt_5_6(self):
+    def test_max_reasoning_effort_is_available_for_gpt_6(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "max", "gpt-5.6-sol"),
+            self.view._validate_reasoning_effort("openai", "max", "gpt-6-sol"),
             "max",
         )
         self.assertEqual(
@@ -137,7 +151,7 @@ class InsightsViewProviderModelsTests(TestCase):
 
         self.assertEqual(
             self.view._validate_selection(provider_models, None, None),
-            ("openai", "gpt-5.6-luna"),
+            ("openai", "gpt-6-luna"),
         )
 
     def test_reasoning_effort_is_ignored_for_non_openai_providers(self):
@@ -280,15 +294,15 @@ class GetLlmHandlerTests(SimpleTestCase):
         self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX_WITH_API_FALLBACK)
 
     def test_openai_title_requests_always_use_luna(self):
-        handler = OpenAIHandler(model="gpt-5.6-terra")
+        handler = OpenAIHandler(model="gpt-6-astra")
 
         self.assertEqual(
             handler._api_title_response_kwargs("title this")["model"],
-            "gpt-5.6-luna",
+            "gpt-6-luna",
         )
         self.assertEqual(
             handler._codex_title_response_kwargs("title this")["model"],
-            "gpt-5.6-luna",
+            "gpt-6-luna",
         )
 
 
@@ -478,7 +492,7 @@ class OpenAIMessageAssemblyTests(SimpleTestCase):
         """A handler as the view builds it on turn 4: no session data of its
         own, history loaded from the database with two system snapshots — the
         original, and the one written by a filter change."""
-        handler = OpenAIHandler(model="gpt-5.6-luna", api_key="test-key")
+        handler = OpenAIHandler(model="gpt-6-luna", api_key="test-key")
         handler.set_conversation_history(
             [
                 {"role": "system", "content": "instructions\nSTALE-PAYLOAD"},
@@ -518,7 +532,7 @@ class OpenAIMessageAssemblyTests(SimpleTestCase):
 
     def test_xhigh_and_max_use_the_api_enum_values(self):
         handler = OpenAIHandler(
-            model="gpt-5.6-sol", api_key="test-key", reasoning_effort="xhigh"
+            model="gpt-6-sol", api_key="test-key", reasoning_effort="xhigh"
         )
         messages = [{"role": "user", "content": "q"}]
 
@@ -574,7 +588,7 @@ class CachedTokenAccountingTests(SimpleTestCase):
         self.assertEqual(usage, {"prompt": 7878, "response": 30, "cached": 1543})
 
     def test_openai_reads_cached_tokens_from_either_details_shape(self):
-        handler = OpenAIHandler(model="gpt-5.6-luna", api_key="test-key")
+        handler = OpenAIHandler(model="gpt-6-luna", api_key="test-key")
 
         responses_shape = handler._usage_from_api_response(
             SimpleNamespace(
@@ -651,7 +665,7 @@ class MultiTurnStateMachineTests(SimpleTestCase):
     def test_openai_sends_the_system_text_it_stores(self):
         # Regression: the update paths stored a notice-bearing snapshot but sent
         # a recomputed plain one, so turn 4's prefix could not match turn 3's.
-        handler = OpenAIHandler(model="gpt-5.6-luna", api_key="k")
+        handler = OpenAIHandler(model="gpt-6-luna", api_key="k")
         sent = {}
 
         async def fake_send(messages):

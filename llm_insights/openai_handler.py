@@ -10,7 +10,7 @@ from .base_handler import BaseLLMHandler
 
 
 class OpenAIHandler(BaseLLMHandler):
-    CHAT_TITLE_MODEL = "gpt-5.6-luna"
+    CHAT_TITLE_MODEL = "gpt-6-luna"
     REASONING_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
     AUTH_API = "api"
     AUTH_CODEX = "codex"
@@ -18,7 +18,7 @@ class OpenAIHandler(BaseLLMHandler):
 
     def __init__(
         self,
-        model="gpt-5.6-luna",
+        model="gpt-6-luna",
         api_key: str | None = None,
         codex_token: str | None = None,
         auth_mode: str | None = None,
