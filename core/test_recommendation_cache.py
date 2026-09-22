@@ -125,7 +125,7 @@ class UsageAccountingTests(SimpleTestCase):
         row = self.measure({"input_tokens": 300000, "output_tokens": 1000}, model="gpt-6-luna")
         self.assertEqual(row["estimated_cost_usd"], Decimal("0.06075000"))
         row = self.measure({"input_tokens": 1000, "output_tokens": 0,
-                            "input_tokens_details": {"cache_creation_tokens": 1000}}, model="gpt-6-luna")
+                            "input_tokens_details": {"cache_write_tokens": 1000}}, model="gpt-6-luna")
         self.assertEqual(row["estimated_cost_usd"], Decimal("0.00012500"))
 
     def measure(self, usage, provider="luna", model="gpt-5.6-luna"):
@@ -147,7 +147,7 @@ class UsageAccountingTests(SimpleTestCase):
 
     def test_reported_cache_writes_use_write_rate(self):
         row = self.measure({"input_tokens": 1000, "output_tokens": 0,
-                            "input_tokens_details": {"cached_tokens": 0, "cache_creation_tokens": 1000}})
+                            "input_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 1000}})
         self.assertEqual(row["estimated_cost_usd"], Decimal("0.00025000"))
 
     def test_jev_output_is_free(self):

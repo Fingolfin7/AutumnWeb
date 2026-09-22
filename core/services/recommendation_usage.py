@@ -50,7 +50,7 @@ def capture_usage(usage):
         "input_tokens": _get(usage, "input_tokens"),
         "output_tokens": _get(usage, "output_tokens"),
         "cached_input_tokens": _get(details, "cached_tokens"),
-        "cache_write_tokens": _get(details, "cache_creation_tokens"),
+        "cache_write_tokens": _get(details, "cache_write_tokens"),
         "reasoning_tokens": _get(output_details, "reasoning_tokens"),
     }
     for field, value in fields.items():
