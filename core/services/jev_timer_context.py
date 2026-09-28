@@ -6,10 +6,12 @@ import hashlib
 import json
 from datetime import datetime, timedelta
 
+from django.db.models import F, Prefetch, Subquery, Window
+from django.db.models.functions import RowNumber
 from django.utils import timezone
 
 from core.commitments import get_commitment_evaluation
-from core.models import Commitment, Projects, Sessions
+from core.models import Commitment, Projects, Sessions, SubProjects
 from core.utils import filter_by_active_context, get_active_context
 
 from .jev_recommendations import MAX_CANDIDATES
@@ -317,8 +319,13 @@ def build_jev_candidates(user, request):
                 end_time__gte=recent_start,
                 end_time__lt=timezone.now(),
             )
-            .select_related("project")
-            .prefetch_related("subprojects")
+            .only("id", "user_id", "project_id")
+            .prefetch_related(Prefetch(
+                "subprojects",
+                queryset=SubProjects.objects.only(
+                    "id", "name", "user_id", "parent_project_id"
+                ),
+            ))
             .order_by("-end_time", "-id"),
             request,
         )
@@ -415,8 +422,10 @@ def build_jev_context(user, request, candidates):
     missing = candidate_project_ids - recent_project_ids
     older = []
     if missing:
-        seen = set()
-        for session in (
+        # Rank only narrow columns in SQL. Pull full notes and relationships
+        # for one latest older session per missing project, not every older
+        # session in the account before discarding all but one in Python.
+        latest_older_ids = (
             Sessions.objects.filter(
                 user=user,
                 project__user=user,
@@ -424,13 +433,21 @@ def build_jev_context(user, request, candidates):
                 end_time__isnull=False,
                 end_time__lt=recent_start,
             )
+            .order_by()
+            .annotate(_project_rank=Window(
+                expression=RowNumber(),
+                partition_by=[F("project_id")],
+                order_by=[F("end_time").desc(), F("id").desc()],
+            ))
+            .filter(_project_rank=1)
+            .values("id")
+        )
+        older = list(
+            Sessions.objects.filter(pk__in=Subquery(latest_older_ids))
             .select_related("project__context")
             .prefetch_related("project__tags", "subprojects")
             .order_by("-end_time", "-id")
-        ):
-            if session.project_id not in seen:
-                older.append(session)
-                seen.add(session.project_id)
+        )
 
     running = list(
         Sessions.objects.filter(user=user, project__user=user, end_time__isnull=True)

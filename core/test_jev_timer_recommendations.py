@@ -11,7 +11,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Context, Projects, Sessions, SubProjects
+from core.models import Context, Projects, RecommendationCache, Sessions, SubProjects
 from core.services.jev_timer_context import (
     build_jev_candidates,
     build_jev_context,
@@ -149,6 +149,29 @@ class JevTimerRecommendationTests(TestCase):
         payload_text = json.dumps(self.ranker_payload)
         self.assertIn("recent_completed_sessions", payload_text)
         self.assertIn("running_timers", payload_text)
+
+    def test_pending_retry_skips_rich_context_until_lease_expires(self):
+        lease = RecommendationCache.objects.create(
+            user=self.user,
+            provider="jev",
+            scope="all:all",
+            lease_until=timezone.now() + timedelta(minutes=2),
+        )
+        with self._enable_key(), mock.patch(
+            "core.views.timers.build_rich_jev_candidates"
+        ) as candidates:
+            response = self.client.get(reverse("jev_timer_recommendations"))
+        self.assertEqual(response.status_code, 202)
+        candidates.assert_not_called()
+
+        lease.lease_until = timezone.now() - timedelta(seconds=1)
+        lease.save(update_fields=["lease_until"])
+        with self._enable_key(), mock.patch(
+            "core.views.timers.rank_timer_candidates",
+            return_value={"recommendations": []},
+        ) as ranker:
+            self.client.get(reverse("jev_timer_recommendations"))
+        ranker.assert_called_once()
 
     def test_duplicate_timer_combo_aggregates_all_local_signals(self):
         deterministic = {

@@ -18,6 +18,23 @@ class RecommendationPending(Exception):
     pass
 
 
+def generation_in_progress(user, provider, scope):
+    """Check an existing generation lease before rebuilding its rich context.
+
+    A leased row with no result makes ``get_or_generate`` raise
+    ``RecommendationPending`` for every fingerprint. This narrow existence
+    query lets five-second pending retries take the same path without loading
+    a user's session history again.
+    """
+    return RecommendationCache.objects.filter(
+        user=user,
+        provider=provider,
+        scope=scope,
+        result__isnull=True,
+        lease_until__gt=timezone.now(),
+    ).exists()
+
+
 def get_or_generate(user, provider, scope, key, generate):
     fingerprint = hashlib.sha256(key.encode()).hexdigest()
     now = timezone.now()

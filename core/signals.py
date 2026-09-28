@@ -26,7 +26,14 @@ from core.models import (
 )
 
 
-def _wake_reminder_dispatcher_after_commit(**kwargs):
+def _wake_reminder_dispatcher_after_commit(sender, update_fields=None, **kwargs):
+    # Editing a running timer's note changes neither its auto-stop deadline
+    # nor any reminder deadline. Avoid waking the dispatcher for that common
+    # save while keeping full saves and all deadline changes observable.
+    if sender is Sessions and update_fields is not None and set(update_fields) <= {
+        "note", "version"
+    }:
+        return
     # Import lazily: signals are loaded from CoreConfig.ready(), which also
     # owns dispatcher startup and must remain safe during app initialization.
     from core.services.reminder_dispatcher import wake_dispatcher_on_commit

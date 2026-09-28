@@ -179,7 +179,19 @@ class SessionMutationService:
             _validate_allocations(session, allocations)
         session.version = (session.version or 1) + 1
         session.full_clean()
-        session.save()
+        # A note-only edit cannot change any persisted reminder deadline.
+        # Persist just the note and optimistic version so the dispatcher signal
+        # can skip its otherwise unnecessary immediate database rescan.
+        note_only = (
+            note is not UNSET
+            and all(value is UNSET for field, value in updates.items() if field != "note")
+            and subprojects is UNSET
+            and allocations is UNSET
+        )
+        if note_only:
+            session.save(update_fields=["note", "version"])
+        else:
+            session.save()
         if allocations is not UNSET:
             _set_allocations(session, allocations)
         elif subprojects is not UNSET:
@@ -189,7 +201,8 @@ class SessionMutationService:
                 [(subproject, split[subproject.pk]) for subproject in final_subprojects],
             )
 
-        _mark_commitments_dirty(session.user_id)
+        if not note_only:
+            _mark_commitments_dirty(session.user_id)
         if was_active and session.end_time is not None:
             from core.services.reminders import cancel_timer_reminders, enqueue_auto_stop_event
 

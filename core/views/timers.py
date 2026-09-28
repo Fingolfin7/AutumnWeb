@@ -38,6 +38,7 @@ from core.views.allocations import parse_allocation_post
 from core.forms import StopTimerForm
 from core.utils import (
     filter_by_active_context,
+    get_active_context,
     parse_stop_after_duration,
     stop_expired_timers,
 )
@@ -837,7 +838,17 @@ def _jev_suggestions(user, request, provider="jev"):
 
     if build_rich_jev_candidates is None or build_rich_jev_context is None:
         return []
+    from core.services.recommendation_cache import (
+        generation_in_progress,
+        get_or_generate,
+        RecommendationPending,
+    )
     try:
+        selected_context, mode = get_active_context(request)
+        scope = f"{mode}:{selected_context.id if selected_context else 'all'}"
+        if generation_in_progress(user, provider, scope):
+            request.recommendation_pending = True
+            return []
         candidates = build_rich_jev_candidates(user, request)
         context = build_rich_jev_context(user, request, candidates)
     except Exception as exc:
@@ -849,9 +860,6 @@ def _jev_suggestions(user, request, provider="jev"):
             request.luna_advice_status = "Luna's context is unavailable right now."
         return []
     candidate_map = {candidate["id"]: candidate for candidate in candidates}
-    from core.services.recommendation_cache import get_or_generate, RecommendationPending
-    selected = context.get("active_context") or {}
-    scope = f"{selected.get('mode', 'all')}:{selected.get('id') or 'all'}"
     version = "luna:gpt-6-luna:xhigh:v3" if provider == "luna" else "jev:jev-1.13.0:v3"
     cache_key = rich_jev_cache_key(user, request, candidates, context) + version
     try:

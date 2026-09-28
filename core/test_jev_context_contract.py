@@ -116,3 +116,32 @@ class JevContextContractTests(TestCase):
         self.assertEqual([row["id"] for row in state["recent_completed_sessions"]], [recent.id])
         self.assertEqual([row["id"] for row in state["older_latest_sessions"]], [older.id])
         self.assertEqual(state["history_coverage"]["requested_days"], 30)
+
+    def test_older_continuity_uses_latest_session_per_project_with_id_tiebreak(self):
+        dormant = Projects.objects.create(user=self.user, name="Dormant")
+        other = Projects.objects.create(user=self.user, name="Also dormant")
+        end = timezone.now() - timedelta(days=45)
+        Sessions.objects.create(
+            user=self.user, project=dormant,
+            start_time=end - timedelta(days=1, minutes=40),
+            end_time=end - timedelta(days=1), note="Too old",
+        )
+        Sessions.objects.create(
+            user=self.user, project=dormant,
+            start_time=end - timedelta(minutes=30), end_time=end,
+            note="Same end, lower ID",
+        )
+        latest = Sessions.objects.create(
+            user=self.user, project=dormant,
+            start_time=end - timedelta(minutes=20), end_time=end,
+            note="Same end, higher ID",
+        )
+        other_latest = Sessions.objects.create(
+            user=self.user, project=other,
+            start_time=end - timedelta(days=2, minutes=20),
+            end_time=end - timedelta(days=2), note="Other project",
+        )
+
+        rows = self.payload()["state"]["older_latest_sessions"]
+        self.assertEqual([row["id"] for row in rows], [latest.id, other_latest.id])
+        self.assertEqual([row["note"] for row in rows], ["Same end, higher ID", "Other project"])

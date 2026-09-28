@@ -423,6 +423,26 @@ class PersistedDeadlineTests(TestCase):
         self.assertTrue(reminder_dispatcher._wake_event.is_set())
         self.assertEqual(next_dispatch_at(now=self.now), self.now)
 
+    def test_note_only_save_does_not_wake_dispatcher(self):
+        session = self.session()
+        reminder_dispatcher._wake_event.clear()
+        from core.services import SessionMutationService
+
+        with mock.patch("core.services.sessions._mark_commitments_dirty") as dirty:
+            with self.captureOnCommitCallbacks(execute=True):
+                SessionMutationService.mutate_session(
+                    session.pk,
+                    user=self.user,
+                    note="Updated without changing a deadline",
+                )
+        self.assertFalse(reminder_dispatcher._wake_event.is_set())
+        dirty.assert_not_called()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            session.auto_stop_at = self.now + timedelta(minutes=10)
+            session.save(update_fields=["auto_stop_at"])
+        self.assertTrue(reminder_dispatcher._wake_event.is_set())
+
 
 class StartDispatcherThreadTests(SimpleTestCase):
     def setUp(self):
