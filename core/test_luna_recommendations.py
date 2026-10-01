@@ -9,7 +9,7 @@ from datetime import timedelta
 from django.core.cache import cache
 from core.models import Projects, RecommendationCache, Sessions, SubProjects
 
-from core.services.luna_recommendations import rank_luna_candidates
+from core.services.luna_recommendations import LUNA_EFFORTS, rank_luna_candidates
 from core import test_timer_recommendation_context as context_tests
 
 
@@ -37,12 +37,13 @@ class LunaServiceTests(SimpleTestCase):
             self.assertEqual(json.loads(request["input"][0]["content"][0]["text"]), state)
             return result
 
-    def test_high_effort_is_sent_and_recorded_without_changing_evidence(self):
+    def test_all_efforts_are_sent_and_recorded_without_changing_evidence(self):
         from core.services.recommendation_usage import collect_attempts
-        with collect_attempts() as attempts:
-            self.assertEqual(self.call([], effort="high"), {"recommendations": []})
-        self.assertEqual(attempts[0]["effort"], "high")
-        self.assertTrue(attempts[0]["success"])
+        for effort in LUNA_EFFORTS:
+            with self.subTest(effort=effort), collect_attempts() as attempts:
+                self.assertEqual(self.call([], effort=effort), {"recommendations": []})
+                self.assertEqual(attempts[0]["effort"], effort)
+                self.assertTrue(attempts[0]["success"])
 
     def test_invalid_effort_never_calls_provider(self):
         with mock.patch("core.services.luna_recommendations.OpenAI") as client:
@@ -98,10 +99,29 @@ class LunaViewTests(TestCase):
         response = self.client.get(reverse("timers"))
         self.assertContains(response, 'data-luna-url="')
         self.assertContains(response, 'value="high" selected')
+        self.assertContains(response, 'class="select" id="luna-effort"')
+        self.assertContains(response, 'class="field-label" for="luna-effort"')
+        for effort in LUNA_EFFORTS:
+            self.assertContains(response, f'<option value="{effort}"')
         self.assertContains(response, "luna_timer_recommendations.js")
         self.assertNotContains(response, "jev")
         self.assertNotContains(response, "recommendation-comparison")
         self.assertEqual(self.client.get("/timers/jev-recommendations/").status_code, 404)
+
+    def test_all_efforts_save_and_generate_with_the_selected_effort(self):
+        field = self.user.profile._meta.get_field("luna_recommendation_effort")
+        self.assertEqual(tuple(value for value, _ in field.choices), LUNA_EFFORTS)
+        with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
+            for effort in LUNA_EFFORTS:
+                with self.subTest(effort=effort):
+                    response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": effort})
+                    self.assertEqual(response.status_code, 302)
+                    self.user.profile.refresh_from_db()
+                    self.assertEqual(self.user.profile.luna_recommendation_effort, effort)
+                    self.user.profile.full_clean()
+                    self.assertContains(self.client.get(reverse("timers")), f'value="{effort}" selected')
+                    self.client.get(reverse("luna_timer_recommendations"))
+                    self.assertEqual(ranker.call_args.kwargs["effort"], effort)
 
     def test_saved_effort_invalidates_cache_and_is_used_for_generation(self):
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:

@@ -67,14 +67,19 @@
                 <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest luna-recommendation-controls">
                     {% csrf_token %}
                     {% if user.profile.ai_features_enabled %}
-                    <label for="luna-effort">Luna effort</label>
-                    <select id="luna-effort" name="luna_effort">
-                        <option value="high" {% if user.profile.luna_recommendation_effort == 'high' %}selected{% endif %}>High</option>
-                        <option value="xhigh" {% if user.profile.luna_recommendation_effort == 'xhigh' %}selected{% endif %}>xHigh</option>
-                    </select>
+                    <div class="luna-effort-field">
+                        <label class="field-label" for="luna-effort">Reasoning effort</label>
+                        <select class="select" id="luna-effort" name="luna_effort">
+                            <option value="low" {% if user.profile.luna_recommendation_effort == 'low' %}selected{% endif %}>Low</option>
+                            <option value="medium" {% if user.profile.luna_recommendation_effort == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="high" {% if user.profile.luna_recommendation_effort == 'high' %}selected{% endif %}>High</option>
+                            <option value="xhigh" {% if user.profile.luna_recommendation_effort == 'xhigh' %}selected{% endif %}>xHigh</option>
+                            <option value="max" {% if user.profile.luna_recommendation_effort == 'max' %}selected{% endif %}>Max</option>
+                        </select>
+                    </div>
                     {% endif %}
                     <button type="submit" class="btn btn--ghost">Apply &amp; refresh</button>
-                    <a href="{% url 'recommendation_usage' %}">Usage &amp; cost review</a>
+                    <a class="luna-usage-link" href="{% url 'recommendation_usage' %}">Usage &amp; cost review <span aria-hidden="true">&rarr;</span></a>
                 </form>
                 <div id="luna-recommendations"
                      data-luna-url="{% url 'luna_timer_recommendations' %}"

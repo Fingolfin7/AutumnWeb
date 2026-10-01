@@ -68,8 +68,9 @@ class Profile(models.Model):
     typesafe_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     # Retired TypeSafe storage is retained for non-destructive compatibility.
     luna_recommendation_effort = models.CharField(
-        max_length=5, default="xhigh", db_default="xhigh",
-        choices=(("high", "High"), ("xhigh", "xHigh")),
+        max_length=6, default="xhigh", db_default="xhigh",
+        choices=(("low", "Low"), ("medium", "Medium"), ("high", "High"),
+                 ("xhigh", "xHigh"), ("max", "Max")),
     )
     ai_features_enabled = models.BooleanField(
         # Off by default so a fresh account must not get AI access until the

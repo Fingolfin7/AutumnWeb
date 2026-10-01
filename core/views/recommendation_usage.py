@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from core.models import RecommendationCache, RecommendationUsage
+from core.services.luna_recommendations import LUNA_EFFORTS
 
 
 @login_required
@@ -18,7 +19,7 @@ def refresh_recommendations(request):
     # Effort belongs to this account and only affects timer recommendations.
     effort = request.POST.get("luna_effort")
     if effort is not None:
-        if effort not in {"high", "xhigh"}:
+        if effort not in LUNA_EFFORTS:
             return HttpResponseBadRequest("Unsupported reasoning effort")
         profile = request.user.profile
         if not profile.ai_features_enabled:

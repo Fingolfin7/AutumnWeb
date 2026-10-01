@@ -13,7 +13,7 @@ from .recommendation_usage import provider_attempt, capture_usage
 
 LUNA_MODEL = "gpt-6-luna"
 LUNA_EFFORT = "xhigh"
-LUNA_EFFORTS = ("high", "xhigh")
+LUNA_EFFORTS = ("low", "medium", "high", "xhigh", "max")
 logger = logging.getLogger(__name__)
 
 

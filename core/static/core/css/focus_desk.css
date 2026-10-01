@@ -2594,8 +2594,22 @@ img.brand-mark {
   background: var(--raised-2);
   border-bottom: 1px solid var(--brand-deep);
 }
-.luna-recommendation-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); }
-.luna-recommendation-controls select { width: auto; }
+.suggest.luna-recommendation-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3);
+}
+.luna-effort-field { flex: 1 1 7rem; min-width: 0; }
+.luna-effort-field .select {
+  height: 2.75rem; padding: .6rem .75rem;
+  font-family: inherit; font-size: var(--fs-sm);
+}
+.luna-effort-field .select:hover { border-color: var(--hairline-2); }
+.luna-recommendation-controls .btn {
+  height: 2.75rem; padding: .6rem 1rem; white-space: nowrap;
+}
+.luna-usage-link {
+  flex-basis: 100%; color: var(--muted); font-size: var(--fs-xs);
+}
+.luna-usage-link:hover { color: var(--ink); text-decoration: underline; }
 #luna-recommendations .suggest-detail { overflow-wrap: anywhere; }
 .suggest-disclose-head {
   width: 100%;
