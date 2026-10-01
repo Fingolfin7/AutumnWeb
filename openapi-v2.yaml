@@ -811,6 +811,12 @@ paths:
         schema:
           type: string
       - in: query
+        name: search
+        schema:
+          type: string
+        description: Search project names, assigned subproject names, and session
+          notes.
+      - in: query
         name: start_date
         schema:
           type: string
