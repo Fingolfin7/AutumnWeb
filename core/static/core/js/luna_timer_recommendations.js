@@ -1,5 +1,5 @@
 /*
- * Jev's timer advice is deliberately progressive. The deterministic timer
+ * Luna's timer advice is deliberately progressive. The deterministic timer
  * page paints first; this request can be slow, unavailable, or unauthorized
  * without affecting the ordinary suggestion groups.
  */
@@ -7,17 +7,16 @@
   "use strict";
 
   if (!window.fetch) { return; }
-  document.querySelectorAll("[data-jev-url], [data-luna-url]").forEach(function (mount) {
-  var isLuna = mount.hasAttribute("data-luna-url");
+  document.querySelectorAll("[data-luna-url]").forEach(function (mount) {
 
   var controller = window.AbortController ? new AbortController() : null;
   var timeout = window.setTimeout(function () {
     if (controller) { controller.abort(); }
-  }, isLuna ? 195000 : 8000);
+  }, 195000);
 
-  var deadline = Date.now() + (isLuna ? 195000 : 8000);
+  var deadline = Date.now() + (195000);
   function load() {
-  return fetch(mount.getAttribute(isLuna ? "data-luna-url" : "data-jev-url"), {
+  return fetch(mount.getAttribute("data-luna-url"), {
     credentials: "same-origin",
     headers: { "Accept": "text/html", "X-Requested-With": "XMLHttpRequest" },
     signal: controller ? controller.signal : undefined
@@ -34,8 +33,7 @@
   load()
     .then(function (html) {
       if (!html || !html.trim()) {
-        if (isLuna) { throw new Error("Advice unavailable"); }
-        return;
+        throw new Error("Advice unavailable");
       }
       mount.innerHTML = html;
       mount.hidden = false;
@@ -43,11 +41,9 @@
       if (empty) { empty.remove(); }
     })
     .catch(function () {
-      if (isLuna) {
-        var message = mount.querySelector(".suggest");
-        if (message) { message.textContent = "Luna is unavailable right now. Try again on your next visit."; }
-      }
-      /* Jev is optional advice; keep the deterministic groups untouched. */
+      var message = mount.querySelector(".suggest");
+      if (message) { message.textContent = "Luna is unavailable right now. Try again on your next visit."; }
+      /* Luna is optional advice; keep the deterministic groups untouched. */
     })
     .finally(function () {
       window.clearTimeout(timeout);

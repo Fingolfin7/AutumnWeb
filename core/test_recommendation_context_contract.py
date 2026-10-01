@@ -1,4 +1,4 @@
-"""Independent integration checks for domain data crossing the Jev boundary."""
+"""Independent integration checks for domain data crossing the Recommendation boundary."""
 
 import json
 from datetime import timedelta
@@ -9,23 +9,23 @@ from django.utils import timezone
 from freezegun import freeze_time
 
 from core.models import Commitment, Projects, Sessions, SubProjects
-from core.services.jev_recommendations import build_jev_payload
-from core.services.jev_timer_context import build_jev_candidates, build_jev_context
+from core.services.recommendation_state import build_recommendation_state
+from core.services.timer_recommendation_context import build_recommendation_candidates, build_recommendation_context
 
 
 @freeze_time("2026-09-19 12:00:00+00:00")
-class JevContextContractTests(TestCase):
+class RecommendationContextContractTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user("jev-contract", email="contract@example.com")
+        self.user = User.objects.create_user("luna-contract", email="contract@example.com")
         self.project = Projects.objects.create(user=self.user, name="Own project")
-        self.request = RequestFactory().get("/timers/jev-recommendations/")
+        self.request = RequestFactory().get("/timers/luna-recommendations/")
         self.request.user = self.user
         self.request.session = {}
 
     def payload(self):
-        candidates = build_jev_candidates(self.user, self.request)
-        context = build_jev_context(self.user, self.request, candidates)
-        return build_jev_payload(candidates, context)
+        candidates = build_recommendation_candidates(self.user, self.request)
+        context = build_recommendation_context(self.user, self.request, candidates)
+        return build_recommendation_state(candidates, context)
 
     def test_frequent_same_combo_does_not_overflow_signal_limit(self):
         for index in range(20):
@@ -36,7 +36,7 @@ class JevContextContractTests(TestCase):
                 note=f"Complete evidence {index}",
             )
 
-        state = self.payload()["state"]
+        state = self.payload()
 
         self.assertEqual(len(state["recent_completed_sessions"]), 20)
         self.assertEqual(len(state["candidates"]), 2)
@@ -54,7 +54,7 @@ class JevContextContractTests(TestCase):
             banking_enabled=True, balance=60, start_date=timezone.localdate(),
         )
 
-        state = self.payload()["state"]
+        state = self.payload()
 
         row = next(row for row in state["commitments"] if row["id"] == commitment.id)
         self.assertEqual(row["actual"], 0)
@@ -69,7 +69,7 @@ class JevContextContractTests(TestCase):
         self.assertIn(sub.id, [item["id"] for item in candidate["subprojects"]])
 
     def test_other_account_and_malformed_foreign_links_never_supply_text(self):
-        other = User.objects.create_user("jev-other", email="other@example.com")
+        other = User.objects.create_user("luna-other", email="other@example.com")
         foreign = Projects.objects.create(
             user=other, name="FOREIGN_PROJECT", description="FOREIGN_DESCRIPTION",
         )
@@ -111,7 +111,7 @@ class JevContextContractTests(TestCase):
             end_time=boundary - timedelta(days=2), note="Older continuity",
         )
 
-        state = self.payload()["state"]
+        state = self.payload()
 
         self.assertEqual([row["id"] for row in state["recent_completed_sessions"]], [recent.id])
         self.assertEqual([row["id"] for row in state["older_latest_sessions"]], [older.id])
@@ -142,6 +142,6 @@ class JevContextContractTests(TestCase):
             end_time=end - timedelta(days=2), note="Other project",
         )
 
-        rows = self.payload()["state"]["older_latest_sessions"]
+        rows = self.payload()["older_latest_sessions"]
         self.assertEqual([row["id"] for row in rows], [latest.id, other_latest.id])
         self.assertEqual([row["note"] for row in rows], ["Same end, higher ID", "Other project"])

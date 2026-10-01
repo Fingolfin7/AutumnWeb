@@ -56,11 +56,6 @@ def capture_usage(usage):
     for field, value in fields.items():
         if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
             row[field] = value
-    if row["model"] == "jev-1.13.0" and "input_tokens" in row:
-        row["estimated_cost_usd"] = (Decimal(row["input_tokens"]) * Decimal("0.042") / Decimal(1000000)).quantize(Decimal("0.00000001"))
-        row["pricing"] = {"usd_per_million": {"input": "0.042", "output": "0"},
-                          "as_of": "2026-09-22", "basis": "published API rate estimate",
-                          "source": "https://docs.typesafe.ai/models"}
     # Reasoning tokens are already included in output_tokens: never add twice.
     if row["model"] in {"gpt-5.6-luna", "gpt-6-luna"} and all(k in row for k in ("input_tokens", "output_tokens")):
         inputs, outputs = row["input_tokens"], row["output_tokens"]

@@ -100,6 +100,17 @@ class PersistentAdviceTests(TestCase):
             self.assertNotContains(response, "secret-provider")
             self.assertContains(response, "luna" if suffix == "?format=csv" else "Luna")
 
+    def test_retired_provider_usage_remains_reviewable_with_original_price(self):
+        RecommendationUsage.objects.create(user=self.user, provider="jev", model="jev-1.13.0",
+            estimated_cost_usd=Decimal("0.00004200"), input_tokens=1000,
+            pricing={"basis": "historical", "usd_per_million": {"input": "0.042"}})
+        self.client.force_login(self.user)
+        url = reverse("recommendation_usage")
+        self.assertContains(self.client.get(url), "Jev")
+        response = self.client.get(url + "?format=csv")
+        self.assertContains(response, "0.00004200")
+        self.assertContains(response, "historical")
+
     def test_manual_refresh_requires_post_csrf_and_only_expires_own_cache(self):
         self.get()
         self.get(user=self.other)
@@ -149,10 +160,6 @@ class UsageAccountingTests(SimpleTestCase):
         row = self.measure({"input_tokens": 1000, "output_tokens": 0,
                             "input_tokens_details": {"cached_tokens": 0, "cache_write_tokens": 1000}})
         self.assertEqual(row["estimated_cost_usd"], Decimal("0.00025000"))
-
-    def test_jev_output_is_free(self):
-        row = self.measure({"input_tokens": 1000, "output_tokens": 100}, "jev", "jev-1.13.0")
-        self.assertEqual(row["estimated_cost_usd"], Decimal("0.00004200"))
 
     def test_long_context_rate_applies_to_whole_request(self):
         row = self.measure({"input_tokens": 300000, "output_tokens": 1000})

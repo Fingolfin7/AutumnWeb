@@ -1,0 +1,12 @@
+<div class="suggest-group suggest-group--luna" data-luna-section>
+    <p class="suggest-head suggest-head--luna">
+        <i class="fas fa-lightbulb text-orange"></i> Luna Recommends
+    </p>
+    <div class="band-list">
+        {% for suggestion in luna_suggestions %}
+        {% include 'core/partials/timer_suggestion_card.html' %}
+        {% empty %}
+        <p class="suggest">{{ advice_status }}</p>
+        {% endfor %}
+    </div>
+</div>

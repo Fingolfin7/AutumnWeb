@@ -48,7 +48,6 @@ from core.views.sessions import DeleteSessionView, SessionsListView, update_sess
 from core.views.timers import (
     TimerListView,
     active_timers_fragment,
-    jev_timer_recommendations,
     luna_timer_recommendations,
     remove_timer,
     restart_timer,
@@ -72,11 +71,6 @@ urlpatterns = [
         "timers/active-fragment/",
         active_timers_fragment,
         name="active_timers_fragment",
-    ),
-    path(
-        "timers/jev-recommendations/",
-        jev_timer_recommendations,
-        name="jev_timer_recommendations",
     ),
     path("start_timer/", start_timer, name="start_timer"),
     path("timers/luna-recommendations/", luna_timer_recommendations, name="luna_timer_recommendations"),

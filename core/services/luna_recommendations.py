@@ -1,4 +1,4 @@
-"""Luna advice using the same bounded evidence and candidates as Jev."""
+"""Luna advice using bounded, account-scoped timer evidence."""
 
 import json
 import logging
@@ -8,37 +8,40 @@ import time
 from openai import OpenAI
 from users.codex_auth import CODEX_CHATGPT_BASE_URL
 
-from .jev_recommendations import build_jev_payload, SCORE_RUBRIC, SCORE_THRESHOLD
+from .recommendation_state import build_recommendation_state, SCORE_RUBRIC, SCORE_THRESHOLD
 from .recommendation_usage import provider_attempt, capture_usage
 
 LUNA_MODEL = "gpt-6-luna"
 LUNA_EFFORT = "xhigh"
+LUNA_EFFORTS = ("high", "xhigh")
 logger = logging.getLogger(__name__)
 
 
-def rank_luna_candidates(api_key, candidates, context):
+def rank_luna_candidates(api_key, candidates, context, *, effort=LUNA_EFFORT):
     """OAuth first, with the account's API credential as a fallback."""
+    if effort not in LUNA_EFFORTS:
+        raise ValueError("Unsupported Luna reasoning effort")
     token = api_key.get("openai_chatgpt")
     fallback = api_key.get("openai")
     if token:
         try:
-            return _rank_once(token, candidates, context, oauth=True)
+            return _rank_once(token, candidates, context, oauth=True, effort=effort)
         except Exception as exc:
             logger.warning("Luna OAuth attempt failed category=%s fallback=%s", type(exc).__name__, bool(fallback))
             if not fallback:
                 raise
     if not fallback:
         raise ValueError("Luna credentials unavailable")
-    return _rank_once(fallback, candidates, context, oauth=False)
+    return _rank_once(fallback, candidates, context, oauth=False, effort=effort)
 
 
-def _rank_once(credential, candidates, context, *, oauth):
-    with provider_attempt("luna", LUNA_MODEL, LUNA_EFFORT, "oauth" if oauth else "api_key"):
-        return _rank_response(credential, candidates, context, oauth=oauth)
+def _rank_once(credential, candidates, context, *, oauth, effort=LUNA_EFFORT):
+    with provider_attempt("luna", LUNA_MODEL, effort, "oauth" if oauth else "api_key"):
+        return _rank_response(credential, candidates, context, oauth=oauth, effort=effort)
 
 
-def _rank_response(credential, candidates, context, *, oauth):
-    state = build_jev_payload(candidates, context)["state"]
+def _rank_response(credential, candidates, context, *, oauth, effort=LUNA_EFFORT):
+    state = build_recommendation_state(candidates, context)
     ids = [candidate["id"] for candidate in state["candidates"]]
     schema = {
         "type": "object", "additionalProperties": False,
@@ -62,7 +65,7 @@ def _rank_response(credential, candidates, context, *, oauth):
     started = time.monotonic()
     with OpenAI(api_key=credential, timeout=timeout, max_retries=0, **connection) as client:
         events = client.responses.create(
-            model=LUNA_MODEL, reasoning={"effort": LUNA_EFFORT},
+            model=LUNA_MODEL, reasoning={"effort": effort},
             store=False, stream=True,
             instructions=(
                 "Recommend up to three worthwhile next activities from the supplied candidates, "

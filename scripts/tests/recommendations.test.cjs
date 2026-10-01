@@ -4,35 +4,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-test('Jev renders independently while Luna waits, and Luna failure stays local', async () => {
+test('only Luna is fetched and failure leaves deterministic suggestions untouched', async () => {
   const pending = {};
   const timers = [];
   const message = { textContent: 'Considering your recent work…' };
-  const mount = (provider) => ({
-    hidden: provider === 'jev', innerHTML: '',
-    hasAttribute: (name) => name === `data-${provider}-url`,
-    getAttribute: () => provider,
-    querySelector: () => message,
-  });
-  const jev = mount('jev');
-  const luna = mount('luna');
+  const luna = { hidden: false, innerHTML: '', getAttribute: () => 'luna', querySelector: () => message };
   const fetch = (url) => new Promise((resolve, reject) => { pending[url] = { resolve, reject }; });
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../core/static/core/js/jev_timer_recommendations.js'), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../core/static/core/js/luna_timer_recommendations.js'), 'utf8'), {
     window: { fetch, setTimeout: (_, delay) => { timers.push(delay); return delay; }, clearTimeout: () => {} },
-    document: { querySelectorAll: () => [jev, luna], getElementById: () => null },
-    fetch,
+    document: { querySelectorAll: (selector) => { assert.equal(selector, '[data-luna-url]'); return [luna]; },
+                getElementById: () => null }, fetch,
   });
-  assert.deepEqual(Object.keys(pending), ['jev', 'luna']);
-  assert.deepEqual(timers, [8000, 195000]);
-  pending.jev.resolve({ status: 200, ok: true, text: async () => '<p>Jev advice</p>' });
-  await new Promise(setImmediate);
-  assert.equal(jev.innerHTML, '<p>Jev advice</p>');
-  assert.equal(jev.hidden, false);
-  assert.equal(luna.innerHTML, '');
+  assert.deepEqual(Object.keys(pending), ['luna']);
+  assert.deepEqual(timers, [195000]);
   pending.luna.reject(new Error('timeout'));
   await new Promise(setImmediate);
   assert.match(message.textContent, /Luna is unavailable/);
-  assert.equal(jev.innerHTML, '<p>Jev advice</p>');
+  assert.equal(luna.innerHTML, '');
 });
 
 test('pending generation is polled and rendered without blanking the panel', async () => {
@@ -43,7 +31,7 @@ test('pending generation is polled and rendered without blanking the panel', asy
   const fetch = async () => ++calls === 1 ? { status: 202 } : {
     status: 200, ok: true, text: async () => '<p>Shared result</p>'
   };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../core/static/core/js/jev_timer_recommendations.js'), 'utf8'), {
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../core/static/core/js/luna_timer_recommendations.js'), 'utf8'), {
     window: { fetch, setTimeout: (cb, delay) => { if (delay === 5000) callbacks.push(cb); return delay; }, clearTimeout: () => {} },
     document: { querySelectorAll: () => [mount], getElementById: () => null }, fetch,
   });

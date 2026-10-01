@@ -66,6 +66,11 @@ class Profile(models.Model):
     openai_chatgpt_token_enc = models.BinaryField(null=True, blank=True, editable=False)
     claude_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
     typesafe_api_key_enc = models.BinaryField(null=True, blank=True, editable=False)
+    # Retired TypeSafe storage is retained for non-destructive compatibility.
+    luna_recommendation_effort = models.CharField(
+        max_length=5, default="xhigh", db_default="xhigh",
+        choices=(("high", "High"), ("xhigh", "xHigh")),
+    )
     ai_features_enabled = models.BooleanField(
         # Off by default so a fresh account must not get AI access until the
         # operator grants it.

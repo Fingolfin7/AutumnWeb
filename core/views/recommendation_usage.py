@@ -4,7 +4,7 @@ from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg, Count, Q, Sum
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
@@ -15,8 +15,18 @@ from core.models import RecommendationCache, RecommendationUsage
 @login_required
 @require_POST
 def refresh_recommendations(request):
+    # Effort belongs to this account and only affects timer recommendations.
+    effort = request.POST.get("luna_effort")
+    if effort is not None:
+        if effort not in {"high", "xhigh"}:
+            return HttpResponseBadRequest("Unsupported reasoning effort")
+        profile = request.user.profile
+        if not profile.ai_features_enabled:
+            return HttpResponse(status=403)
+        profile.luna_recommendation_effort = effort
+        profile.save(update_fields=["luna_recommendation_effort"])
     # Keep any active lease: clicking twice must not launch duplicate calls.
-    RecommendationCache.objects.filter(user=request.user).update(expires_at=timezone.now())
+    RecommendationCache.objects.filter(user=request.user, provider="luna").update(expires_at=timezone.now())
     return redirect("timers")
 
 

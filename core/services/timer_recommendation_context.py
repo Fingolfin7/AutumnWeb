@@ -1,4 +1,4 @@
-"""Account-scoped rich context assembly for timer Jev recommendations."""
+"""Account-scoped rich context assembly for timer Luna recommendations."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from core.commitments import get_commitment_evaluation
 from core.models import Commitment, Projects, Sessions, SubProjects
 from core.utils import filter_by_active_context, get_active_context
 
-from .jev_recommendations import MAX_CANDIDATES
+from .recommendation_state import MAX_CANDIDATES
 
 
 def _iso(value):
@@ -221,10 +221,10 @@ def _commitment_row(commitment, evaluation, candidates, projects_by_id, now):
     }
 
 
-def build_jev_candidates(user, request):
+def build_recommendation_candidates(user, request):
     """Return active, selected-context candidates excluding all running projects."""
     from core.views.timers import (
-        _jev_candidate_id,
+        _recommendation_candidate_id,
         _session_combo_key,
         _timer_combo_key,
         build_timer_suggestions,
@@ -257,7 +257,7 @@ def build_jev_candidates(user, request):
                     by_key[key]["signals"].append(signal)
             return
         candidate = {
-            "id": _jev_candidate_id(project, subs),
+            "id": _recommendation_candidate_id(project, subs),
             "project_id": project.id,
             "project_name": project.name,
             "subproject_ids": [sub.id for sub in subs],
@@ -283,7 +283,7 @@ def build_jev_candidates(user, request):
                 continue
             signal = {
                 "kind": suggestion["kind"],
-                "detail": suggestion.get("jev_detail") or suggestion.get("detail") or "",
+                "detail": suggestion.get("recommendation_detail") or suggestion.get("detail") or "",
                 "metric": suggestion.get("metric"),
             }
             if key in by_key:
@@ -291,9 +291,9 @@ def build_jev_candidates(user, request):
                 continue
             # The UI habit label contains HH:MM; use its stable evidence text.
             # The model already receives the actual current time separately.
-            reason = suggestion.get("jev_detail") or suggestion.get("detail") or ""
+            reason = suggestion.get("recommendation_detail") or suggestion.get("detail") or ""
             candidate = {
-                "id": _jev_candidate_id(project, subs),
+                "id": _recommendation_candidate_id(project, subs),
                 "project_id": project.id,
                 "project_name": project.name,
                 "subproject_ids": [sub.id for sub in subs],
@@ -306,7 +306,7 @@ def build_jev_candidates(user, request):
             by_key[key] = candidate
 
     # Deterministic sections are intentionally small for the ordinary timer
-    # page. Jev's candidate pool also considers every recent combo so a useful
+    # page. Luna's candidate pool also considers every recent combo so a useful
     # subproject is not lost merely because it fell outside those UI limits.
     recent_start = timezone.now() - timedelta(days=30)
     active_by_id = {project.id: project for project in active_projects}
@@ -382,7 +382,7 @@ def build_jev_candidates(user, request):
         if key in active_keys or key in by_key:
             continue
         candidate = {
-            "id": _jev_candidate_id(project, []),
+            "id": _recommendation_candidate_id(project, []),
             "project_id": project.id,
             "project_name": project.name,
             "subproject_ids": [],
@@ -396,7 +396,7 @@ def build_jev_candidates(user, request):
     return candidates
 
 
-def build_jev_context(user, request, candidates):
+def build_recommendation_context(user, request, candidates):
     """Build the account-wide rich state used to score selected-context candidates."""
     now = timezone.now()
     local_now = timezone.localtime(now)
@@ -566,7 +566,7 @@ def build_jev_context(user, request, candidates):
     }
 
 
-def jev_cache_key(user, request, candidates, context):
+def recommendation_cache_key(user, request, candidates, context):
     """Fingerprint evidence; the persistent cache controls the 30-minute age.
 
     Exact clock, sliding query boundaries and elapsed counters must not turn
@@ -600,6 +600,6 @@ def jev_cache_key(user, request, candidates, context):
     ).hexdigest()
     selected = context.get("active_context") or {}
     return (
-        f"jev-timers:v2:{user.id}:{selected.get('mode', 'all')}:"
+        f"luna-timers:v3:{user.id}:{selected.get('mode', 'all')}:"
         f"{selected.get('id') or 'all'}:{digest}"
     )

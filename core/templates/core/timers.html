@@ -20,7 +20,7 @@
     <script src="{% static 'core/js/timer_notes.js' %}?v={{ static_version.timer_notes }}" type="text/javascript"></script>
     <script src="{% static 'core/js/timer_reminders.js' %}?v={{ static_version.timer_reminders }}" type="text/javascript" defer></script>
     <script src="{% static 'core/js/dashboard_desk.js' %}?v={{ static_version.dashboard_desk }}" type="text/javascript" defer></script>
-    <script src="{% static 'core/js/jev_timer_recommendations.js' %}?v={{ static_version.jev_timer_recommendations }}" type="text/javascript" defer></script>
+    <script src="{% static 'core/js/luna_timer_recommendations.js' %}?v={{ static_version.luna_timer_recommendations }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -34,7 +34,7 @@
 
 <div hidden>{% csrf_token %}</div>
 
-<div class="desk desk--recommendation-comparison">
+<div class="desk">
     <div class="desk-main">
         <section class="focus-deck" aria-label="Running timers">
             <div class="focus-track" data-focus-track>
@@ -64,22 +64,23 @@
             </button>
 
             <div class="disclose-body">
-                <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest">
+                <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest luna-recommendation-controls">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn--ghost">Refresh recommendations</button>
+                    {% if user.profile.ai_features_enabled %}
+                    <label for="luna-effort">Luna effort</label>
+                    <select id="luna-effort" name="luna_effort">
+                        <option value="high" {% if user.profile.luna_recommendation_effort == 'high' %}selected{% endif %}>High</option>
+                        <option value="xhigh" {% if user.profile.luna_recommendation_effort == 'xhigh' %}selected{% endif %}>xHigh</option>
+                    </select>
+                    {% endif %}
+                    <button type="submit" class="btn btn--ghost">Apply &amp; refresh</button>
                     <a href="{% url 'recommendation_usage' %}">Usage &amp; cost review</a>
                 </form>
-                <div class="recommendation-comparison">
-                <div id="jev-recommendations"
-                     data-jev-url="{% url 'jev_timer_recommendations' %}"
-                     hidden
-                     aria-live="polite"></div>
                 <div id="luna-recommendations"
                      data-luna-url="{% url 'luna_timer_recommendations' %}"
                      aria-live="polite">
-                    <p class="suggest-head suggest-head--jev">Luna Recommends</p>
+                    <p class="suggest-head suggest-head--luna">Luna Recommends</p>
                     <p class="suggest">Considering your recent work…</p>
-                </div>
                 </div>
 
                 {% if timer_suggestions.commitments or timer_suggestions.habits or timer_suggestions.recent %}

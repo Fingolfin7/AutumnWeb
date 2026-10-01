@@ -158,65 +158,21 @@ class ProfileSaveTests(TestCase):
         profile.refresh_from_db()
         self.assertIsNone(profile.get_api_key("typesafe"))
 
-    def test_profile_never_renders_stored_typesafe_key(self):
+    def test_retired_typesafe_key_is_not_exposed_or_changed_by_profile_form(self):
         profile = self.user.profile
-        profile.set_api_key("typesafe", "never-render-this-typesafe-key")
+        profile.set_api_key("typesafe", "legacy-key")
         profile.save(update_fields=["typesafe_api_key_enc"])
-
-        response = self.client.get(reverse("profile"))
-
-        self.assertContains(response, "TypeSafe / Jev")
-        self.assertNotContains(response, "never-render-this-typesafe-key")
-        self.assertContains(response, "Jev receives recent session notes")
-
-    def test_update_profile_saves_and_clears_typesafe_api_key(self):
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "username": self.user.username,
-                "email": self.user.email,
-                "typesafe_api_key": "  typesafe-profile-key  ",
-            },
-        )
-
-        self.assertRedirects(response, reverse("profile"))
-        self.user.profile.refresh_from_db()
-        self.assertEqual(self.user.profile.get_api_key("typesafe"), "typesafe-profile-key")
-
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "username": self.user.username,
-                "email": self.user.email,
-                "clear_typesafe_api_key": "on",
-            },
-        )
-
-        self.assertRedirects(response, reverse("profile"))
-        self.user.profile.refresh_from_db()
-        self.assertIsNone(self.user.profile.get_api_key("typesafe"))
-
-    def test_typesafe_api_key_is_hidden_and_ignored_when_ai_features_disabled(self):
-        profile = self.user.profile
-        profile.ai_features_enabled = False
-        profile.set_api_key("typesafe", None)
-        profile.save(update_fields=["ai_features_enabled", "typesafe_api_key_enc"])
-
         response = self.client.get(reverse("profile"))
         self.assertNotContains(response, "TypeSafe / Jev")
-
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "username": self.user.username,
-                "email": self.user.email,
-                "typesafe_api_key": "should-not-save",
-            },
-        )
-
+        self.assertNotContains(response, "legacy-key")
+        self.assertNotIn("typesafe_api_key", response.context["profile_form"].fields)
+        response = self.client.post(reverse("profile"), data={
+            "username": self.user.username, "email": self.user.email,
+            "typesafe_api_key": "ignored", "clear_typesafe_api_key": "on",
+        })
         self.assertRedirects(response, reverse("profile"))
         profile.refresh_from_db()
-        self.assertIsNone(profile.get_api_key("typesafe"))
+        self.assertEqual(profile.get_api_key("typesafe"), "legacy-key")
 
     def test_removing_background_image_clears_field_and_deletes_file_after_commit(self):
         profile = self.user.profile

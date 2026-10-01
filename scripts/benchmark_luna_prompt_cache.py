@@ -26,7 +26,7 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 from openai import OpenAI
 
-from core.services.jev_timer_context import build_jev_candidates, build_jev_context
+from core.services.timer_recommendation_context import build_recommendation_candidates, build_recommendation_context
 from core.services.luna_recommendations import _rank_response
 from users.codex_auth import CODEX_CHATGPT_BASE_URL, get_profile_access_token
 
@@ -128,8 +128,8 @@ def main():
     request = RequestFactory().get("/timers/")
     request.user = user
     request.session = {}
-    candidates = build_jev_candidates(user, request)
-    context = build_jev_context(user, request, candidates)
+    candidates = build_recommendation_candidates(user, request)
+    context = build_recommendation_context(user, request, candidates)
     with mock.patch("core.services.luna_recommendations.OpenAI", _CaptureClient):
         _rank_response("capture-only", candidates, context, oauth=True)
     original = _CaptureClient.captured
