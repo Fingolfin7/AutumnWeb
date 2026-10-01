@@ -6,22 +6,6 @@
 (function () {
   "use strict";
 
-  var effort = document.querySelector("[data-luna-saved-effort]");
-  function restoreSavedEffort() {
-    if (effort) { effort.value = effort.getAttribute("data-luna-saved-effort"); }
-  }
-  // Native form restoration can reuse a value from a different login. The
-  // account's server-rendered preference, not browser memory, is authoritative.
-  restoreSavedEffort();
-  window.addEventListener("pageshow", function (event) {
-    if (event.persisted) {
-      // A back/forward snapshot may also contain an obsolete account identity.
-      window.location.reload();
-    } else {
-      restoreSavedEffort();
-    }
-  });
-
   if (!window.fetch) { return; }
   document.querySelectorAll("[data-luna-url]").forEach(function (mount) {
 

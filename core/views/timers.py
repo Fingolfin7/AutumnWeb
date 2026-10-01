@@ -8,7 +8,6 @@ from django.db.models import Prefetch
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.utils.decorators import method_decorator
 from datetime import datetime, timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -17,7 +16,6 @@ from django.views.generic import (
     ListView,
 )
 from django.views.decorators.http import require_GET, require_POST
-from django.views.decorators.cache import never_cache
 from core.commitments import (
     commitment_applies_to_project,
     commitment_applies_to_subproject,
@@ -431,7 +429,6 @@ def remove_timer(request, session_id: int):
     return render(request, "core/remove_timer.html", context)
 
 
-@method_decorator(never_cache, name="dispatch")
 class TimerListView(LoginRequiredMixin, ListView):
     model = Sessions
     template_name = "core/timers.html"

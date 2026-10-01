@@ -11,8 +11,8 @@ test('only Luna is fetched and failure leaves deterministic suggestions untouche
   const luna = { hidden: false, innerHTML: '', getAttribute: () => 'luna', querySelector: () => message };
   const fetch = (url) => new Promise((resolve, reject) => { pending[url] = { resolve, reject }; });
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../core/static/core/js/luna_timer_recommendations.js'), 'utf8'), {
-    window: { fetch, addEventListener: () => {}, setTimeout: (_, delay) => { timers.push(delay); return delay; }, clearTimeout: () => {} },
-    document: { querySelector: () => null, querySelectorAll: (selector) => { assert.equal(selector, '[data-luna-url]'); return [luna]; },
+    window: { fetch, setTimeout: (_, delay) => { timers.push(delay); return delay; }, clearTimeout: () => {} },
+    document: { querySelectorAll: (selector) => { assert.equal(selector, '[data-luna-url]'); return [luna]; },
                 getElementById: () => null }, fetch,
   });
   assert.deepEqual(Object.keys(pending), ['luna']);
@@ -32,8 +32,8 @@ test('pending generation is polled and rendered without blanking the panel', asy
     status: 200, ok: true, text: async () => '<p>Shared result</p>'
   };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../core/static/core/js/luna_timer_recommendations.js'), 'utf8'), {
-    window: { fetch, addEventListener: () => {}, setTimeout: (cb, delay) => { if (delay === 5000) callbacks.push(cb); return delay; }, clearTimeout: () => {} },
-    document: { querySelector: () => null, querySelectorAll: () => [mount], getElementById: () => null }, fetch,
+    window: { fetch, setTimeout: (cb, delay) => { if (delay === 5000) callbacks.push(cb); return delay; }, clearTimeout: () => {} },
+    document: { querySelectorAll: () => [mount], getElementById: () => null }, fetch,
   });
   await new Promise(setImmediate);
   assert.equal(mount.innerHTML, 'Loading');
@@ -42,24 +42,4 @@ test('pending generation is polled and rendered without blanking the panel', asy
   await new Promise(setImmediate);
   assert.equal(calls, 2);
   assert.equal(mount.innerHTML, '<p>Shared result</p>');
-});
-
-test('effort uses the current account saved value instead of restored browser state', () => {
-  const source = fs.readFileSync(path.join(__dirname, '../../core/static/core/js/luna_timer_recommendations.js'), 'utf8');
-  for (const saved of ['high', 'xhigh']) {
-    const effort = { value: saved === 'high' ? 'xhigh' : 'high', getAttribute: () => saved };
-    let pageshow;
-    let reloads = 0;
-    vm.runInNewContext(source, {
-      window: { addEventListener: (type, cb) => { assert.equal(type, 'pageshow'); pageshow = cb; },
-                location: { reload: () => { reloads++; } } },
-      document: { querySelector: () => effort },
-    });
-    assert.equal(effort.value, saved);
-    effort.value = 'max';  // Simulate browser restoring the previous account's choice after script load.
-    pageshow({ persisted: false });
-    assert.equal(effort.value, saved);
-    pageshow({ persisted: true });
-    assert.equal(reloads, 1);  // Back/forward restores must re-check the signed-in account.
-  }
 });

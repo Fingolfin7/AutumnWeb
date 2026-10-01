@@ -24,10 +24,6 @@ def refresh_recommendations(request):
         profile = request.user.profile
         if not profile.ai_features_enabled:
             return HttpResponse(status=403)
-        # A tab rendered before a login switch must not update the new account.
-        # This is a mismatch guard, never a way to select the profile to update.
-        if request.POST.get("recommendation_account") != str(request.user.pk):
-            return HttpResponse("Your account changed. Reload Timers before changing reasoning effort.", status=409)
         profile.luna_recommendation_effort = effort
         profile.save(update_fields=["luna_recommendation_effort"])
     # Keep any active lease: clicking twice must not launch duplicate calls.
