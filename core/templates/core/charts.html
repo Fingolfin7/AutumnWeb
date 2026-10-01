@@ -32,7 +32,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2.3.0"></script>
     <!-- wordcloud plugin -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.0/wordcloud2.min.js"></script>
-    <!-- Project search -->
+    <!-- The separate project-name filter retains chart subproject breakdowns. -->
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script>window.AUTUM_CHART_PROJECT_COUNT = {{ default_chart_project_count|default:7 }};</script>
@@ -137,7 +137,13 @@
             <p class="sheet-title">Filter chart data</p>
 
             <div class="field">
-                <label for="project-search">Project name</label>
+                <label for="content-search">Search projects, subprojects, and session notes</label>
+                {{ search_form.search }}
+                {{ search_form.search.errors }}
+            </div>
+
+            <div class="field">
+                <label for="project-search">Project name (show subproject breakdown)</label>
                 {{ search_form.project_name }}
                 {{ search_form.project_name.errors }}
                 <div id="project-search-results"></div>

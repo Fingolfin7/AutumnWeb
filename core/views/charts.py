@@ -17,6 +17,7 @@ def ChartsView(request):
 
     search_form = SearchProjectForm(
         initial={
+            "search": request.GET.get("search"),
             "project_name": request.GET.get("project_name"),
             "start_date": request.GET.get("start_date") or default_start_date,
             "end_date": request.GET.get("end_date") or default_end_date,

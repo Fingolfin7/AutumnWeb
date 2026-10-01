@@ -11,7 +11,7 @@
   The list is the same object the dashboard shows, at full width: day groups of
   .band rows inside one .session-list slab.
 
-  The eight filters do NOT sit on the page. Per the nav model in
+  The additional filters do NOT sit on the page. Per the nav model in
   focus_desk.css, a page gets ONE search field plus a launcher that opens the
   filter .sheet; the applied filters are then echoed back as pills so a
   narrowed list never reads as an empty one. Everything is inside a single GET
@@ -24,8 +24,6 @@
 {% endcomment %}
 
 {% block head_includes %}
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-    <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script src="{% static 'core/js/option_pickers.js' %}?v={{ static_version.option_pickers }}" type="text/javascript" defer></script>
 {% endblock %}
@@ -42,14 +40,14 @@
 <form method="get" class="fields" id="search_form">
     <div class="searchbar">
         <i class="fas fa-search muted" aria-hidden="true"></i>
-        <label class="sr-only" for="project-search">Search by project</label>
-        {{ search_form.project_name }}
+        <label class="sr-only" for="content-search">Search projects, subprojects, and session notes</label>
+        {{ search_form.search }}
+        <button class="btn btn--primary" type="submit">Search</button>
         <button class="filter-launcher" type="button" data-sheet-open="filterSheet" aria-haspopup="dialog">
             <i class="fas fa-sliders-h"></i> Filters
             {% if active_filters %}<span class="filter-count">{{ active_filters|length }}</span>{% endif %}
         </button>
     </div>
-    <div id="project-search-results"></div>
 
     <p class="filter-summary">
         <span class="result-count">{{ result_count }}</span> session{{ result_count|pluralize }}

@@ -267,6 +267,10 @@ class ReportChartsView(V2APIView):
                 required=True,
             ),
             OpenApiParameter("project_name", OpenApiTypes.STR, OpenApiParameter.QUERY),
+            OpenApiParameter(
+                "search", OpenApiTypes.STR, OpenApiParameter.QUERY,
+                description="Search project names, assigned subproject names, and session notes.",
+            ),
             OpenApiParameter("context", OpenApiTypes.INT, OpenApiParameter.QUERY),
             OpenApiParameter("tags", OpenApiTypes.INT, OpenApiParameter.QUERY, many=True),
             OpenApiParameter(
@@ -342,7 +346,8 @@ class ReportChartsView(V2APIView):
         if chart_type in LEGACY_TALLY_CHARTS:
             return Response(
                 self._legacy_tally_payload(
-                    chart_type, sessions, want_subprojects, request.user
+                    chart_type, sessions, want_subprojects, request.user,
+                    search_active=bool((request.query_params.get("search") or "").strip()),
                 )
             )
         if chart_type == "treemap":
@@ -362,7 +367,9 @@ class ReportChartsView(V2APIView):
         return Response(payload)
 
     @staticmethod
-    def _legacy_tally_payload(chart_type, sessions, want_subprojects, user):
+    def _legacy_tally_payload(
+        chart_type, sessions, want_subprojects, user, *, search_active=False
+    ):
         """[{"name", "total_time"}] rows exactly as the removed v1 tallies."""
         if chart_type in ("pie", "bar") and want_subprojects:
             entries = ReportTalliesView._subproject_entries(sessions)
@@ -378,8 +385,13 @@ class ReportChartsView(V2APIView):
             # v1 shape: per-status project counts plus session time.
             from django.db.models import Min
 
+            projects = Projects.objects.filter(user=user)
+            if search_active:
+                projects = projects.filter(
+                    pk__in=sessions.order_by().values("project_id")
+                )
             status_counts = list(
-                Projects.objects.filter(user=user)
+                projects
                 .order_by()
                 .values("status")
                 .annotate(count=Count("pk", distinct=True), first=Min("name"))

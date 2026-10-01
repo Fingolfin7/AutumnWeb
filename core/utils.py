@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from django.http import HttpRequest
 from dateutil.relativedelta import relativedelta
 from core.models import Sessions, Projects, SubProjects, Context, Tag
+from core.search import search_sessions
 
 
 ACTIVE_CONTEXT_SESSION_KEY = "active_context_id"
@@ -260,11 +261,15 @@ def filter_sessions_by_params(
     # If params_override is provided, use it. Otherwise fall back to request.GET
     params = params_override if params_override is not None else request.GET
 
+    search_term = params.get("search")
     project_name = params.get("project_name")
     start_date = params.get("start_date")
     end_date = params.get("end_date")
     note_snippet = params.get("note_snippet")
     tags = _param_list(params, "tags")
+
+    if search_term:
+        sessions = search_sessions(sessions, search_term)
 
     if project_name:
         sessions = sessions.filter(project__name__icontains=project_name)
@@ -309,6 +314,7 @@ def filter_sessions_by_params(
 
 #: Free-text search params, in the order their pills should read.
 _TEXT_FILTER_LABELS = (
+    ("search", "Search"),
     ("project_name", "Project"),
     ("start_date", "From"),
     ("end_date", "To"),

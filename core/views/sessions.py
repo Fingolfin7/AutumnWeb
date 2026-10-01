@@ -187,6 +187,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
         context["title"] = "Sessions"
         context["search_form"] = SearchProjectForm(
             initial={
+                "search": self.request.GET.get("search"),
                 "project_name": self.request.GET.get("project_name"),
                 "start_date": self.request.GET.get("start_date"),
                 "end_date": self.request.GET.get("end_date"),

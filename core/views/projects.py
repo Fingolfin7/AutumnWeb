@@ -25,6 +25,7 @@ from core.celebrations import (
     project_total_minutes,
 )
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
+from core.search import search_projects
 from django.db.models import Prefetch
 from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.forms import (
@@ -60,6 +61,7 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
         context["search_form"] = SearchProjectForm(
             initial={
+                "search": self.request.GET.get("search"),
                 "project_name": self.request.GET.get("project_name"),
                 "start_date": self.request.GET.get("start_date"),
                 "end_date": self.request.GET.get("end_date"),
@@ -145,10 +147,13 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         )
 
         search_name = self.request.GET.get("project_name")
+        search_term = self.request.GET.get("search")
         start_date = self.request.GET.get("start_date")
         end_date = self.request.GET.get("end_date")
         tag_ids = self.request.GET.getlist("tags")
 
+        if search_term:
+            projects = search_projects(projects, search_term)
         if search_name:
             projects = filter_by_projects(projects, name=search_name)
 

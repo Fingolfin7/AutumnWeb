@@ -13,6 +13,17 @@ NOTIFICATION_WEEKDAY_CHOICES = (
 
 
 class SearchProjectForm(forms.Form):
+    search = forms.CharField(
+        required=False,
+        widget=forms.TextInput(
+            attrs={
+                'placeholder': 'Projects, subprojects, or notes',
+                'id': 'content-search',
+                'type': 'search',
+            }
+        ),
+    )
+
     project_name = forms.CharField(
         required=False,
         widget=forms.TextInput(
