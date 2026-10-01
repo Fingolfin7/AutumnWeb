@@ -44,6 +44,7 @@
     <script type="text/javascript" src="{% static 'core/js/jquery-3.6.0.min.js' %}"></script>
     <script type="text/javascript" src="{% static 'core/js/local_times.js' %}?v={{ static_version.local_times }}"></script>
     <script type="text/javascript" src="{% static 'core/js/background_dim.js' %}?v={{ static_version.background_dim }}" defer></script>
+    <script type="text/javascript" src="{% static 'core/js/apod_background.js' %}?v={{ static_version.apod_background }}" defer></script>
     <script type="text/javascript" src="{% static 'core/js/pwa.js' %}?v={{ static_version.pwa }}"></script>
     <script type="text/javascript" src="{% static 'core/js/page_loading.js' %}?v={{ static_version.page_loading }}"></script>
     <script type="text/javascript" src="{% static 'core/js/focus_desk.js' %}?v={{ static_version.focus_desk }}" defer></script>
@@ -63,8 +64,8 @@
         {% bing_background as bing_bg_url %}
         <body class="{% if bing_bg_url %}bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if bing_bg_url %}--workspace-bg-image: url('{{ bing_bg_url }}');{% endif %}" data-bg-url="{{ bing_bg_url }}">
     {% elif user.profile.automatic_background and user.profile.nasa_apod_background %}
-        {% nasa_apod_background as nasa_bg_url %}
-        <body class="{% if nasa_bg_url %}bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if nasa_bg_url %}--workspace-bg-image: url('{{ nasa_bg_url }}');{% endif %}" data-bg-url="{{ nasa_bg_url }}">
+        {% nasa_apod_media as apod %}
+        <body class="{% if apod.image_url %}bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if apod.image_url %}--workspace-bg-image: url('{{ apod.image_url }}');{% endif %}" data-bg-url="{{ apod.image_url }}">
     {% else %}
         <body style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }};">
     {% endif %}
@@ -72,6 +73,11 @@
     <body>
 {% endif %}
 
+{% if apod.video_url and apod.image_url %}
+<video class="workspace-bg-video" muted loop playsinline preload="none" poster="{{ apod.image_url }}" aria-hidden="true">
+    <source src="{{ apod.video_url }}" type="{% if '.webm' in apod.video_url %}video/webm{% else %}video/mp4{% endif %}">
+</video>
+{% endif %}
 <div class="app">
 
     {% with un=request.resolver_match.url_name %}

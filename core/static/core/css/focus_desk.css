@@ -317,6 +317,15 @@ body.bg-active::before {
   background-position: center center;
   background-size: cover;
 }
+.workspace-bg-video {
+  position: fixed; inset: 0; z-index: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-bg-video { display: none; }
+}
 body.bg-active::after {
   content: "";
   position: fixed; inset: 0; z-index: 1;

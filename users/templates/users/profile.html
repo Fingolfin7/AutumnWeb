@@ -178,12 +178,17 @@
                 </button>
                 {% endif %}
             {% elif user.profile.nasa_apod_background %}
-                {% nasa_apod_background as nasa_url %}
-                <h3 class="disclose-title">{% nasa_apod_title %}</h3>
-                <p class="focus-lede">{% nasa_apod_explanation %}</p>
-                {% if nasa_url %}
-                <button type="button" class="btn btn--ghost u-mt-4" title="Download NASA APOD image" aria-label="Download NASA APOD image" onclick="window.location.href='{% url 'download_background' %}'">
-                    <i class="fas fa-download"></i> Download background
+                {% nasa_apod_media as apod %}
+                <h3 class="disclose-title">{{ apod.title }}</h3>
+                <p class="focus-lede">{{ apod.explanation }}{% if apod.copyright and apod.copyright not in apod.explanation %} (© {{ apod.copyright }}){% endif %}</p>
+                {% if apod.media_type != 'image' and apod.page_url %}
+                <a class="btn btn--ghost u-mt-4" href="{{ apod.page_url }}" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-play"></i> {% if apod.media_type == 'video' %}Watch video{% else %}View APOD{% endif %} at NASA
+                </a>
+                {% endif %}
+                {% if apod.image_url %}
+                <button type="button" class="btn btn--ghost u-mt-4" title="Download NASA APOD {% if apod.media_type == 'image' %}image{% else %}preview{% endif %}" onclick="window.location.href='{% url 'download_background' %}'">
+                    <i class="fas fa-download"></i> Download {% if apod.media_type == 'image' %}background{% else %}preview{% endif %}
                 </button>
                 {% endif %}
             {% else %}
