@@ -64,12 +64,13 @@
             </button>
 
             <div class="disclose-body">
-                <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest luna-recommendation-controls">
+                <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest luna-recommendation-controls" autocomplete="off">
                     {% csrf_token %}
+                    <input type="hidden" name="recommendation_account" value="{{ user.pk }}">
                     {% if user.profile.ai_features_enabled %}
                     <div class="luna-effort-field">
-                        <label class="field-label" for="luna-effort">Reasoning effort</label>
-                        <select class="select" id="luna-effort" name="luna_effort">
+                        <label class="field-label" for="luna-effort-{{ user.pk }}">Reasoning effort</label>
+                        <select class="select" id="luna-effort-{{ user.pk }}" name="luna_effort" autocomplete="off" data-luna-saved-effort="{{ user.profile.luna_recommendation_effort }}">
                             <option value="low" {% if user.profile.luna_recommendation_effort == 'low' %}selected{% endif %}>Low</option>
                             <option value="medium" {% if user.profile.luna_recommendation_effort == 'medium' %}selected{% endif %}>Medium</option>
                             <option value="high" {% if user.profile.luna_recommendation_effort == 'high' %}selected{% endif %}>High</option>

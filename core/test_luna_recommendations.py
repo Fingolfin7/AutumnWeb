@@ -97,10 +97,13 @@ class LunaViewTests(TestCase):
         self.user.profile.luna_recommendation_effort = "high"
         self.user.profile.save(update_fields=["luna_recommendation_effort"])
         response = self.client.get(reverse("timers"))
+        self.assertIn("no-store", response["Cache-Control"])
         self.assertContains(response, 'data-luna-url="')
         self.assertContains(response, 'value="high" selected')
-        self.assertContains(response, 'class="select" id="luna-effort"')
-        self.assertContains(response, 'class="field-label" for="luna-effort"')
+        self.assertContains(response, f'class="select" id="luna-effort-{self.user.pk}"')
+        self.assertContains(response, f'class="field-label" for="luna-effort-{self.user.pk}"')
+        self.assertContains(response, 'data-luna-saved-effort="high"')
+        self.assertContains(response, f'name="recommendation_account" value="{self.user.pk}"')
         for effort in LUNA_EFFORTS:
             self.assertContains(response, f'<option value="{effort}"')
         self.assertContains(response, "luna_timer_recommendations.js")
@@ -114,7 +117,7 @@ class LunaViewTests(TestCase):
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
             for effort in LUNA_EFFORTS:
                 with self.subTest(effort=effort):
-                    response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": effort})
+                    response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": effort, "recommendation_account": self.user.pk})
                     self.assertEqual(response.status_code, 302)
                     self.user.profile.refresh_from_db()
                     self.assertEqual(self.user.profile.luna_recommendation_effort, effort)
@@ -127,7 +130,7 @@ class LunaViewTests(TestCase):
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
             self.client.get(reverse("luna_timer_recommendations"))
             self.assertEqual(ranker.call_args.kwargs["effort"], "xhigh")
-            response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"})
+            response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high", "recommendation_account": self.user.pk})
             self.assertRedirects(response, reverse("timers"))
             self.user.profile.refresh_from_db()
             self.assertEqual(self.user.profile.luna_recommendation_effort, "high")
@@ -142,7 +145,7 @@ class LunaViewTests(TestCase):
         from datetime import timedelta
         RecommendationCache.objects.create(user=self.user, provider="luna", scope="all:all",
             fingerprint="old-effort", result=None, lease_until=timezone.now() + timedelta(minutes=1))
-        self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"})
+        self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high", "recommendation_account": self.user.pk})
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
             self.assertEqual(self.client.get(reverse("luna_timer_recommendations")).status_code, 202)
             ranker.assert_not_called()
@@ -165,6 +168,58 @@ class LunaViewTests(TestCase):
         self.assertEqual(self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"}).status_code, 403)
         self.client.logout()
         self.assertEqual(self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"}).status_code, 302)
+
+    def test_effort_preferences_generation_and_caches_are_account_specific(self):
+        from django.contrib.auth.models import User
+        from django.test import Client
+        other = User.objects.create_user(username="other-luna", email="other-luna@example.com", password="pw")
+        other.profile.ai_features_enabled = True
+        other.profile.save(update_fields=["ai_features_enabled"])
+        other_client = Client()
+        other_client.force_login(other)
+        with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
+            self.client.get(reverse("luna_timer_recommendations"))
+            other_client.get(reverse("luna_timer_recommendations"))
+            other_cache = RecommendationCache.objects.get(user=other, provider="luna")
+            response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high", "recommendation_account": self.user.pk})
+            self.assertEqual(response.status_code, 302)
+            self.user.profile.refresh_from_db()
+            other.profile.refresh_from_db()
+            self.assertEqual(self.user.profile.luna_recommendation_effort, "high")
+            self.assertEqual(other.profile.luna_recommendation_effort, "xhigh")
+            other_cache.refresh_from_db()
+            self.assertGreater(other_cache.expires_at, timezone.now())
+            self.client.get(reverse("luna_timer_recommendations"))
+            self.assertEqual(ranker.call_args.kwargs["effort"], "high")
+            other_client.get(reverse("luna_timer_recommendations"))
+            self.assertEqual(ranker.call_count, 3)  # The other account still hits its own cache.
+            self.assertContains(other_client.get(reverse("timers")), 'value="xhigh" selected')
+            other_client.post(reverse("refresh_recommendations"), {"luna_effort": "max", "recommendation_account": other.pk})
+            other_client.get(reverse("luna_timer_recommendations"))
+            self.assertEqual(ranker.call_args.kwargs["effort"], "max")
+            self.user.profile.refresh_from_db()
+            self.assertEqual(self.user.profile.luna_recommendation_effort, "high")
+
+    def test_stale_tab_or_missing_account_cannot_write_after_login_switch(self):
+        from django.contrib.auth.models import User
+        other = User.objects.create_user(username="switched-luna", email="switched-luna@example.com", password="pw")
+        other.profile.ai_features_enabled = True
+        other.profile.save(update_fields=["ai_features_enabled"])
+        self.client.force_login(other)
+        expires = timezone.now() + timedelta(minutes=20)
+        RecommendationCache.objects.create(user=other, provider="luna", scope="all:all", expires_at=expires)
+        for account in (None, str(self.user.pk)):
+            with self.subTest(account=account):
+                payload = {"luna_effort": "high"}
+                if account is not None:
+                    payload["recommendation_account"] = account
+                response = self.client.post(reverse("refresh_recommendations"), payload)
+                self.assertEqual(response.status_code, 409)
+                other.profile.refresh_from_db()
+                self.assertEqual(other.profile.luna_recommendation_effort, "xhigh")
+                self.assertEqual(RecommendationCache.objects.get(user=other).expires_at, expires)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.luna_recommendation_effort, "xhigh")
 
     def test_luna_has_independent_cache_and_escaped_explanations(self):
         with self._enable_key() as key, mock.patch(
