@@ -214,6 +214,18 @@ and its checked-in OpenAPI document is [`openapi-v2.yaml`](openapi-v2.yaml).
 sleeping deployment. Browser push subscription and delivery are web routes,
 not part of the versioned API; their operational logging is described above.
 
+### Autumn MCP on Sites
+
+**Launched October 3, 2026:** Autumn now has an owner-private MCP plugin hosted
+on ChatGPT Sites, backed by the supported `/api/v2/` API. It exposes 47 tools
+for projects, sessions, timers, reports, commitments, metadata and account
+discovery. Each API tool accepts an explicit account name, allowing activity
+comparisons across accounts while keeping their credentials and IDs separate.
+
+See the [Sites launch and connection notes](docs/sites-mcp-launch.md) and the
+[hosted MCP source](integrations/sites-mcp/README.md). Autumn API tokens are
+stored as Sites server secrets, outside this repository.
+
 ---
 
 Built with care. Use it if it is useful to you.

@@ -1,0 +1,4018 @@
+[
+  {
+    "name": "list_commitments",
+    "method": "GET",
+    "path": "/api/v2/commitments/",
+    "parameters": [],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "list commitments in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "create_commitment",
+    "method": "POST",
+    "path": "/api/v2/commitments/",
+    "parameters": [],
+    "bodyKeys": [
+      "aggregation_type",
+      "project_id",
+      "subproject_id",
+      "context_id",
+      "tag_id",
+      "commitment_type",
+      "period",
+      "start_date",
+      "timezone",
+      "target_value",
+      "banking_enabled",
+      "max_balance",
+      "min_balance",
+      "active",
+      "include_project_ids",
+      "exclude_project_ids",
+      "include_subproject_ids",
+      "exclude_subproject_ids",
+      "include_context_ids",
+      "exclude_context_ids",
+      "include_tag_ids",
+      "exclude_tag_ids"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "aggregation_type": {
+          "enum": [
+            "project",
+            "subproject",
+            "context",
+            "tag"
+          ],
+          "type": "string",
+          "description": "* `project` - project\n* `subproject` - subproject\n* `context` - context\n* `tag` - tag"
+        },
+        "project_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "subproject_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "context_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tag_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "commitment_type": {
+          "enum": [
+            "time",
+            "sessions"
+          ],
+          "type": "string",
+          "description": "* `time` - time\n* `sessions` - sessions"
+        },
+        "period": {
+          "enum": [
+            "daily",
+            "weekly",
+            "fortnightly",
+            "monthly",
+            "quarterly",
+            "yearly"
+          ],
+          "type": "string",
+          "description": "* `daily` - daily\n* `weekly` - weekly\n* `fortnightly` - fortnightly\n* `monthly` - monthly\n* `quarterly` - quarterly\n* `yearly` - yearly"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "timezone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "target_value": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "banking_enabled": {
+          "type": "boolean"
+        },
+        "max_balance": {
+          "type": "integer"
+        },
+        "min_balance": {
+          "type": "integer"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "include_project_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_project_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "include_subproject_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_subproject_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "include_context_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_context_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "include_tag_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_tag_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "aggregation_type",
+        "target_value"
+      ],
+      "additionalProperties": false
+    },
+    "description": "create commitment in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_commitment",
+    "method": "GET",
+    "path": "/api/v2/commitments/{commitment_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "commitment_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "commitment_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "commitment_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "commitment_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "get commitment in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "update_commitment",
+    "method": "PATCH",
+    "path": "/api/v2/commitments/{commitment_id}",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer commitment version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "commitment_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "commitment_id"
+      }
+    ],
+    "bodyKeys": [
+      "aggregation_type",
+      "project_id",
+      "subproject_id",
+      "context_id",
+      "tag_id",
+      "commitment_type",
+      "period",
+      "start_date",
+      "timezone",
+      "target_value",
+      "banking_enabled",
+      "max_balance",
+      "min_balance",
+      "active",
+      "include_project_ids",
+      "exclude_project_ids",
+      "include_subproject_ids",
+      "exclude_subproject_ids",
+      "include_context_ids",
+      "exclude_context_ids",
+      "include_tag_ids",
+      "exclude_tag_ids"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer commitment version."
+        },
+        "commitment_id": {
+          "type": "integer"
+        },
+        "aggregation_type": {
+          "enum": [
+            "project",
+            "subproject",
+            "context",
+            "tag"
+          ],
+          "type": "string",
+          "description": "* `project` - project\n* `subproject` - subproject\n* `context` - context\n* `tag` - tag"
+        },
+        "project_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "subproject_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "context_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tag_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "commitment_type": {
+          "enum": [
+            "time",
+            "sessions"
+          ],
+          "type": "string",
+          "description": "* `time` - time\n* `sessions` - sessions"
+        },
+        "period": {
+          "enum": [
+            "daily",
+            "weekly",
+            "fortnightly",
+            "monthly",
+            "quarterly",
+            "yearly"
+          ],
+          "type": "string",
+          "description": "* `daily` - daily\n* `weekly` - weekly\n* `fortnightly` - fortnightly\n* `monthly` - monthly\n* `quarterly` - quarterly\n* `yearly` - yearly"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "timezone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "target_value": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "banking_enabled": {
+          "type": "boolean"
+        },
+        "max_balance": {
+          "type": "integer"
+        },
+        "min_balance": {
+          "type": "integer"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "include_project_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_project_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "include_subproject_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_subproject_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "include_context_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_context_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "include_tag_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "exclude_tag_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "commitment_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "update commitment in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "delete_commitment",
+    "method": "DELETE",
+    "path": "/api/v2/commitments/{commitment_id}",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer commitment version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "commitment_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "commitment_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer commitment version."
+        },
+        "commitment_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "commitment_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "delete commitment in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "commitments_adjustments_create",
+    "method": "POST",
+    "path": "/api/v2/commitments/{commitment_id}/adjustments/",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "commitment_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "commitment_id"
+      }
+    ],
+    "bodyKeys": [
+      "amount",
+      "reason"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "commitment_id": {
+          "type": "integer"
+        },
+        "amount": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string",
+          "default": ""
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "commitment_id",
+        "amount"
+      ],
+      "additionalProperties": false
+    },
+    "description": "commitments adjustments create in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "commitments_periods_list",
+    "method": "GET",
+    "path": "/api/v2/commitments/{commitment_id}/periods/",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "commitment_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "commitment_id"
+      },
+      {
+        "in": "query",
+        "name": "generation",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "argument": "generation"
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "maximum": 500,
+          "minimum": 1,
+          "default": 100
+        },
+        "argument": "limit"
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "argument": "offset"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "commitment_id": {
+          "type": "integer"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "limit": {
+          "type": "integer",
+          "maximum": 500,
+          "minimum": 1,
+          "default": 100
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "commitment_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "commitments periods list in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "restart_commitments",
+    "method": "POST",
+    "path": "/api/v2/commitments/{commitment_id}/restart/",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer commitment version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "commitment_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "commitment_id"
+      }
+    ],
+    "bodyKeys": [
+      "keep_balance",
+      "changes"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer commitment version."
+        },
+        "commitment_id": {
+          "type": "integer"
+        },
+        "keep_balance": {
+          "type": "boolean"
+        },
+        "changes": {
+          "type": "object",
+          "properties": {
+            "aggregation_type": {
+              "enum": [
+                "project",
+                "subproject",
+                "context",
+                "tag"
+              ],
+              "type": "string",
+              "description": "* `project` - project\n* `subproject` - subproject\n* `context` - context\n* `tag` - tag"
+            },
+            "project_id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "subproject_id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "context_id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "tag_id": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "commitment_type": {
+              "enum": [
+                "time",
+                "sessions"
+              ],
+              "type": "string",
+              "description": "* `time` - time\n* `sessions` - sessions"
+            },
+            "period": {
+              "enum": [
+                "daily",
+                "weekly",
+                "fortnightly",
+                "monthly",
+                "quarterly",
+                "yearly"
+              ],
+              "type": "string",
+              "description": "* `daily` - daily\n* `weekly` - weekly\n* `fortnightly` - fortnightly\n* `monthly` - monthly\n* `quarterly` - quarterly\n* `yearly` - yearly"
+            },
+            "start_date": {
+              "type": "string",
+              "format": "date"
+            },
+            "timezone": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "target_value": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "banking_enabled": {
+              "type": "boolean"
+            },
+            "max_balance": {
+              "type": "integer"
+            },
+            "min_balance": {
+              "type": "integer"
+            },
+            "active": {
+              "type": "boolean"
+            },
+            "include_project_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "exclude_project_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "include_subproject_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "exclude_subproject_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "include_context_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "exclude_context_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "include_tag_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "exclude_tag_ids": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "commitment_id",
+        "keep_balance"
+      ],
+      "additionalProperties": false
+    },
+    "description": "restart commitments in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_contexts",
+    "method": "GET",
+    "path": "/api/v2/contexts/",
+    "parameters": [],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "list contexts in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "create_context",
+    "method": "POST",
+    "path": "/api/v2/contexts/",
+    "parameters": [],
+    "bodyKeys": [
+      "name",
+      "description"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "create context in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "update_context",
+    "method": "PATCH",
+    "path": "/api/v2/contexts/{context_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "context_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "context_id"
+      }
+    ],
+    "bodyKeys": [
+      "name",
+      "description"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "context_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "update context in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "delete_context",
+    "method": "DELETE",
+    "path": "/api/v2/contexts/{context_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "context_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "context_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "context_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "delete context in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "export_data",
+    "method": "GET",
+    "path": "/api/v2/export/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "active",
+        "schema": {
+          "type": "boolean"
+        },
+        "argument": "active"
+      },
+      {
+        "in": "query",
+        "name": "autumn_compatible",
+        "schema": {
+          "type": "boolean",
+          "default": false
+        },
+        "argument": "autumn_compatible"
+      },
+      {
+        "in": "query",
+        "name": "compress",
+        "schema": {
+          "type": "boolean",
+          "default": false
+        },
+        "argument": "compress"
+      },
+      {
+        "in": "query",
+        "name": "context_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "argument": "end_date"
+      },
+      {
+        "in": "query",
+        "name": "exclude_project_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "exclude_project_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_subproject_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "exclude_subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_tag_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "exclude_tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "export_format",
+        "schema": {
+          "enum": [
+            "1",
+            "2"
+          ],
+          "type": "string",
+          "default": "2",
+          "minLength": 1
+        },
+        "description": "* `1` - 1\n* `2` - 2",
+        "argument": "export_format"
+      },
+      {
+        "in": "query",
+        "name": "note_snippet",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "note_snippet"
+      },
+      {
+        "in": "query",
+        "name": "project_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "project_ids"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "argument": "start_date"
+      },
+      {
+        "in": "query",
+        "name": "subproject_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "tag_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "tag_ids"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "autumn_compatible": {
+          "type": "boolean",
+          "default": false
+        },
+        "compress": {
+          "type": "boolean",
+          "default": false
+        },
+        "context_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "end_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "exclude_project_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_subproject_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_tag_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "export_format": {
+          "enum": [
+            "1",
+            "2"
+          ],
+          "type": "string",
+          "default": "2",
+          "minLength": 1,
+          "description": "* `1` - 1\n* `2` - 2"
+        },
+        "note_snippet": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "subproject_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "tag_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "export data in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "import_data",
+    "method": "POST",
+    "path": "/api/v2/import/",
+    "parameters": [],
+    "bodyKeys": [
+      "data",
+      "data_compressed",
+      "force",
+      "merge",
+      "tolerance",
+      "autumn_import",
+      "context"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "data": {},
+        "data_compressed": {
+          "type": "string"
+        },
+        "force": {
+          "type": "boolean",
+          "default": false
+        },
+        "merge": {
+          "type": "boolean",
+          "default": false
+        },
+        "tolerance": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 2
+        },
+        "autumn_import": {
+          "type": "boolean",
+          "default": false
+        },
+        "context": {
+          "type": "string"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Import Autumn data. This writes records; inspect the import options and preview before committing an import. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "me",
+    "method": "GET",
+    "path": "/api/v2/me/",
+    "parameters": [],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Get the authenticated Autumn account and API version. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_projects",
+    "method": "GET",
+    "path": "/api/v2/projects/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "context_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_project_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "exclude_project_ids"
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "maximum": 500,
+          "minimum": 1,
+          "default": 100
+        },
+        "argument": "limit"
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "argument": "offset"
+      },
+      {
+        "in": "query",
+        "name": "ordering",
+        "schema": {
+          "enum": [
+            "name",
+            "id"
+          ],
+          "type": "string",
+          "default": "name",
+          "minLength": 1
+        },
+        "description": "* `name` - name\n* `id` - id",
+        "argument": "ordering"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "status",
+        "schema": {
+          "enum": [
+            "active",
+            "paused",
+            "complete",
+            "archived"
+          ],
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "* `active` - active\n* `paused` - paused\n* `complete` - complete\n* `archived` - archived",
+        "argument": "status"
+      },
+      {
+        "in": "query",
+        "name": "tag_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "tag_ids"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_project_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "limit": {
+          "type": "integer",
+          "maximum": 500,
+          "minimum": 1,
+          "default": 100
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "ordering": {
+          "enum": [
+            "name",
+            "id"
+          ],
+          "type": "string",
+          "default": "name",
+          "minLength": 1,
+          "description": "* `name` - name\n* `id` - id"
+        },
+        "search": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "active",
+            "paused",
+            "complete",
+            "archived"
+          ],
+          "type": "string",
+          "minLength": 1,
+          "description": "* `active` - active\n* `paused` - paused\n* `complete` - complete\n* `archived` - archived"
+        },
+        "tag_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "List or search projects. Use search to resolve names to numeric IDs. Responses include count and total; advance the offset using the returned count until the total is covered. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "create_project",
+    "method": "POST",
+    "path": "/api/v2/projects/",
+    "parameters": [],
+    "bodyKeys": [
+      "name",
+      "description",
+      "status",
+      "context_id",
+      "tag_ids"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "allOf": [
+            {
+              "enum": [
+                "active",
+                "paused",
+                "complete",
+                "archived"
+              ],
+              "type": "string",
+              "description": "* `active` - active\n* `paused` - paused\n* `complete` - complete\n* `archived` - archived"
+            }
+          ],
+          "default": "active"
+        },
+        "context_id": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tag_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "description": "create project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_project",
+    "method": "GET",
+    "path": "/api/v2/projects/{project_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "project_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "project_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "get project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "update_project",
+    "method": "PATCH",
+    "path": "/api/v2/projects/{project_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "project_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "project_id"
+      }
+    ],
+    "bodyKeys": [
+      "name",
+      "description",
+      "status",
+      "context_id",
+      "tag_ids",
+      "start_date"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "paused",
+            "complete",
+            "archived"
+          ],
+          "type": "string",
+          "description": "* `active` - active\n* `paused` - paused\n* `complete` - complete\n* `archived` - archived"
+        },
+        "context_id": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tag_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "update project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "delete_project",
+    "method": "DELETE",
+    "path": "/api/v2/projects/{project_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "project_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "project_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "delete project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "subprojects",
+    "method": "GET",
+    "path": "/api/v2/projects/{project_id}/subprojects/",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "project_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "project_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "subprojects in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "create_subproject",
+    "method": "POST",
+    "path": "/api/v2/projects/{project_id}/subprojects/",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "project_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "project_id"
+      }
+    ],
+    "bodyKeys": [
+      "name",
+      "description"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "project_id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "description": "create subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "merge_projects",
+    "method": "POST",
+    "path": "/api/v2/projects/merge/",
+    "parameters": [],
+    "bodyKeys": [
+      "source_ids",
+      "new_name"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "new_name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "new_name",
+        "source_ids"
+      ],
+      "additionalProperties": false
+    },
+    "description": "merge projects in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "reports_charts_list",
+    "method": "GET",
+    "path": "/api/v2/reports/charts/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "active",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Filter by active state (true or false).",
+        "argument": "active"
+      },
+      {
+        "in": "query",
+        "name": "aggregate",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "For heatmap charts, return server-aggregated weekday/hour cells instead of raw session intervals.",
+        "argument": "aggregate"
+      },
+      {
+        "in": "query",
+        "name": "chart_type",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "calendar",
+            "cumulative",
+            "heatmap",
+            "histogram",
+            "line",
+            "scatter",
+            "stacked_area",
+            "wordcloud"
+          ]
+        },
+        "required": true,
+        "argument": "chart_type"
+      },
+      {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "integer"
+        },
+        "argument": "context"
+      },
+      {
+        "in": "query",
+        "name": "context_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated context IDs.",
+        "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "end_date"
+      },
+      {
+        "in": "query",
+        "name": "exclude_project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs to exclude.",
+        "argument": "exclude_project_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_projects",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "argument": "exclude_projects"
+      },
+      {
+        "in": "query",
+        "name": "exclude_subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs to exclude.",
+        "argument": "exclude_subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs to exclude.",
+        "argument": "exclude_tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "include_projects",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "argument": "include_projects"
+      },
+      {
+        "in": "query",
+        "name": "note_snippet",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Case-insensitive note substring.",
+        "argument": "note_snippet"
+      },
+      {
+        "in": "query",
+        "name": "project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs.",
+        "argument": "project_ids"
+      },
+      {
+        "in": "query",
+        "name": "project_name",
+        "schema": {
+          "type": "string"
+        },
+        "argument": "project_name"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Search project names, assigned subproject names, and session notes.",
+        "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "start_date"
+      },
+      {
+        "in": "query",
+        "name": "subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs.",
+        "argument": "subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs.",
+        "argument": "tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "tags",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "argument": "tags"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "string",
+          "description": "Filter by active state (true or false)."
+        },
+        "aggregate": {
+          "type": "boolean",
+          "description": "For heatmap charts, return server-aggregated weekday/hour cells instead of raw session intervals."
+        },
+        "chart_type": {
+          "type": "string",
+          "enum": [
+            "calendar",
+            "cumulative",
+            "heatmap",
+            "histogram",
+            "line",
+            "scatter",
+            "stacked_area",
+            "wordcloud"
+          ]
+        },
+        "context": {
+          "type": "integer"
+        },
+        "context_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "end_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "exclude_project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_projects": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "exclude_subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "include_projects": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "note_snippet": {
+          "type": "string",
+          "description": "Case-insensitive note substring."
+        },
+        "project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "project_name": {
+          "type": "string"
+        },
+        "search": {
+          "type": "string",
+          "description": "Search project names, assigned subproject names, and session notes."
+        },
+        "start_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "chart_type"
+      ],
+      "additionalProperties": false
+    },
+    "description": "reports charts list in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "reports_hierarchy_retrieve",
+    "method": "GET",
+    "path": "/api/v2/reports/hierarchy/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "active",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Filter by active state (true or false).",
+        "argument": "active"
+      },
+      {
+        "in": "query",
+        "name": "context_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated context IDs.",
+        "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "end_date"
+      },
+      {
+        "in": "query",
+        "name": "exclude_project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs to exclude.",
+        "argument": "exclude_project_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs to exclude.",
+        "argument": "exclude_subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs to exclude.",
+        "argument": "exclude_tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "note_snippet",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Case-insensitive note substring.",
+        "argument": "note_snippet"
+      },
+      {
+        "in": "query",
+        "name": "project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs.",
+        "argument": "project_ids"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "start_date"
+      },
+      {
+        "in": "query",
+        "name": "subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs.",
+        "argument": "subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs.",
+        "argument": "tag_ids"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "string",
+          "description": "Filter by active state (true or false)."
+        },
+        "context_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "end_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "exclude_project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "note_snippet": {
+          "type": "string",
+          "description": "Case-insensitive note substring."
+        },
+        "project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "start_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "reports hierarchy retrieve in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "reports_tallies_retrieve",
+    "method": "GET",
+    "path": "/api/v2/reports/tallies/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "active",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Filter by active state (true or false).",
+        "argument": "active"
+      },
+      {
+        "in": "query",
+        "name": "by",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "context",
+            "project",
+            "status",
+            "subproject",
+            "tag"
+          ]
+        },
+        "required": true,
+        "argument": "by"
+      },
+      {
+        "in": "query",
+        "name": "context_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated context IDs.",
+        "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "end_date"
+      },
+      {
+        "in": "query",
+        "name": "exclude_project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs to exclude.",
+        "argument": "exclude_project_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs to exclude.",
+        "argument": "exclude_subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs to exclude.",
+        "argument": "exclude_tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "note_snippet",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Case-insensitive note substring.",
+        "argument": "note_snippet"
+      },
+      {
+        "in": "query",
+        "name": "project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs.",
+        "argument": "project_ids"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "start_date"
+      },
+      {
+        "in": "query",
+        "name": "subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs.",
+        "argument": "subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs.",
+        "argument": "tag_ids"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "string",
+          "description": "Filter by active state (true or false)."
+        },
+        "by": {
+          "type": "string",
+          "enum": [
+            "context",
+            "project",
+            "status",
+            "subproject",
+            "tag"
+          ]
+        },
+        "context_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "end_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "exclude_project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "note_snippet": {
+          "type": "string",
+          "description": "Case-insensitive note substring."
+        },
+        "project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "start_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "by"
+      ],
+      "additionalProperties": false
+    },
+    "description": "reports tallies retrieve in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "reports_totals_retrieve",
+    "method": "GET",
+    "path": "/api/v2/reports/totals/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "active",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Filter by active state (true or false).",
+        "argument": "active"
+      },
+      {
+        "in": "query",
+        "name": "context_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated context IDs.",
+        "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "end_date"
+      },
+      {
+        "in": "query",
+        "name": "exclude_project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs to exclude.",
+        "argument": "exclude_project_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs to exclude.",
+        "argument": "exclude_subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs to exclude.",
+        "argument": "exclude_tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "note_snippet",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Case-insensitive note substring.",
+        "argument": "note_snippet"
+      },
+      {
+        "in": "query",
+        "name": "project_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated project IDs.",
+        "argument": "project_ids"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Inclusive local date in YYYY-MM-DD format.",
+        "argument": "start_date"
+      },
+      {
+        "in": "query",
+        "name": "subproject_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated subproject IDs.",
+        "argument": "subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "tag_ids",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Comma-separated tag IDs.",
+        "argument": "tag_ids"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "string",
+          "description": "Filter by active state (true or false)."
+        },
+        "context_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "end_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "exclude_project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "note_snippet": {
+          "type": "string",
+          "description": "Case-insensitive note substring."
+        },
+        "project_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "start_date": {
+          "type": "string",
+          "description": "Inclusive local date in YYYY-MM-DD format."
+        },
+        "subproject_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "tag_ids": {
+          "type": "string",
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "reports totals retrieve in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_sessions",
+    "method": "GET",
+    "path": "/api/v2/sessions/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "active",
+        "schema": {
+          "type": "boolean"
+        },
+        "argument": "active"
+      },
+      {
+        "in": "query",
+        "name": "context_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "argument": "end_date"
+      },
+      {
+        "in": "query",
+        "name": "exclude_project_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "exclude_project_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_subproject_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "exclude_subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "exclude_tag_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "exclude_tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "include",
+        "schema": {
+          "enum": [
+            "note"
+          ],
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "* `note` - note",
+        "argument": "include"
+      },
+      {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "maximum": 500,
+          "minimum": 1,
+          "default": 100
+        },
+        "argument": "limit"
+      },
+      {
+        "in": "query",
+        "name": "note_snippet",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "note_snippet"
+      },
+      {
+        "in": "query",
+        "name": "offset",
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "argument": "offset"
+      },
+      {
+        "in": "query",
+        "name": "project_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "project_ids"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "argument": "start_date"
+      },
+      {
+        "in": "query",
+        "name": "subproject_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "subproject_ids"
+      },
+      {
+        "in": "query",
+        "name": "tag_ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "uuid",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "argument": "uuid"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "boolean"
+        },
+        "context_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "end_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "exclude_project_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_subproject_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "exclude_tag_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "include": {
+          "enum": [
+            "note"
+          ],
+          "type": "string",
+          "minLength": 1,
+          "description": "* `note` - note"
+        },
+        "limit": {
+          "type": "integer",
+          "maximum": 500,
+          "minimum": 1,
+          "default": 100
+        },
+        "note_snippet": {
+          "type": "string",
+          "minLength": 1
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "project_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "subproject_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "tag_ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "uuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Search completed or active sessions by IDs, dates or note_snippet. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "track",
+    "method": "POST",
+    "path": "/api/v2/sessions/",
+    "parameters": [],
+    "bodyKeys": [
+      "project_id",
+      "start",
+      "end",
+      "subproject_ids",
+      "note",
+      "uuid",
+      "subproject_allocations"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 instant; a timestamp without an offset is interpreted as UTC."
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 instant; a timestamp without an offset is interpreted as UTC."
+        },
+        "subproject_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "subproject_allocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subproject_id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "allocation_bp": {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 1
+              }
+            },
+            "required": [
+              "allocation_bp",
+              "subproject_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "end",
+        "project_id",
+        "start"
+      ],
+      "additionalProperties": false
+    },
+    "description": "Record a completed past session with project_id, start and end. Always supply an explicit timezone offset. Resolve project and subproject IDs first. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_session",
+    "method": "GET",
+    "path": "/api/v2/sessions/{session_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "session_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "session_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "get session in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "update_session",
+    "method": "PATCH",
+    "path": "/api/v2/sessions/{session_id}",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer session version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "session_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "session_id"
+      }
+    ],
+    "bodyKeys": [
+      "project_id",
+      "start",
+      "end",
+      "subproject_ids",
+      "note",
+      "subproject_allocations"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer session version."
+        },
+        "session_id": {
+          "type": "integer"
+        },
+        "project_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 instant; a timestamp without an offset is interpreted as UTC."
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 instant; a timestamp without an offset is interpreted as UTC."
+        },
+        "subproject_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subproject_allocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subproject_id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "allocation_bp": {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 1
+              }
+            },
+            "required": [
+              "allocation_bp",
+              "subproject_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "update session in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "delete_session",
+    "method": "DELETE",
+    "path": "/api/v2/sessions/{session_id}",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer session version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "session_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "session_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer session version."
+        },
+        "session_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "delete session in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "get_subproject",
+    "method": "GET",
+    "path": "/api/v2/subprojects/{subproject_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "subproject_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "subproject_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "subproject_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "subproject_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "get subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "update_subproject",
+    "method": "PATCH",
+    "path": "/api/v2/subprojects/{subproject_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "subproject_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "subproject_id"
+      }
+    ],
+    "bodyKeys": [
+      "name",
+      "description"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "subproject_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "description": {
+          "type": "string"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "subproject_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "update subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "delete_subproject",
+    "method": "DELETE",
+    "path": "/api/v2/subprojects/{subproject_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "subproject_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "subproject_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "subproject_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "subproject_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "delete subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "merge_subprojects",
+    "method": "POST",
+    "path": "/api/v2/subprojects/merge/",
+    "parameters": [],
+    "bodyKeys": [
+      "project_id",
+      "source_ids",
+      "new_name"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "new_name": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "new_name",
+        "project_id",
+        "source_ids"
+      ],
+      "additionalProperties": false
+    },
+    "description": "merge subprojects in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_tags",
+    "method": "GET",
+    "path": "/api/v2/tags/",
+    "parameters": [],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "list tags in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "create_tag",
+    "method": "POST",
+    "path": "/api/v2/tags/",
+    "parameters": [],
+    "bodyKeys": [
+      "name",
+      "color"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 20
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "create tag in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "update_tag",
+    "method": "PATCH",
+    "path": "/api/v2/tags/{tag_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "tag_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "tag_id"
+      }
+    ],
+    "bodyKeys": [
+      "name",
+      "color"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tag_id": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "color": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 20
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "tag_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "update tag in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "delete_tag",
+    "method": "DELETE",
+    "path": "/api/v2/tags/{tag_id}",
+    "parameters": [
+      {
+        "in": "path",
+        "name": "tag_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "tag_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tag_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "tag_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "delete tag in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "status",
+    "method": "GET",
+    "path": "/api/v2/timers/",
+    "parameters": [],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "List active timers with elapsed minutes and their session IDs. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "start",
+    "method": "POST",
+    "path": "/api/v2/timers/",
+    "parameters": [],
+    "bodyKeys": [
+      "project_id",
+      "subproject_ids",
+      "note",
+      "stop_after_minutes",
+      "start",
+      "uuid"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "subproject_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stop_after_minutes": {
+          "type": "number",
+          "maximum": 10080,
+          "minimum": 0.000001
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 instant; a timestamp without an offset is interpreted as UTC."
+        },
+        "uuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "project_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "Start a live timer now. Resolve the project ID with list_projects first. stop_after_minutes sets an optional automatic stop. Use track for past work. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "update_timer",
+    "method": "PATCH",
+    "path": "/api/v2/timers/{session_id}",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer session version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "session_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "session_id"
+      }
+    ],
+    "bodyKeys": [
+      "note"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer session version."
+        },
+        "session_id": {
+          "type": "integer"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "update timer in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "delete_timer",
+    "method": "DELETE",
+    "path": "/api/v2/timers/{session_id}",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer session version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "session_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "session_id"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer session version."
+        },
+        "session_id": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "delete timer in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "restart",
+    "method": "POST",
+    "path": "/api/v2/timers/{session_id}/restart/",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer session version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "session_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "session_id"
+      }
+    ],
+    "bodyKeys": [
+      "start"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer session version."
+        },
+        "session_id": {
+          "type": "integer"
+        },
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 instant; a timestamp without an offset is interpreted as UTC."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "Restart a timer by session_id. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "stop",
+    "method": "POST",
+    "path": "/api/v2/timers/{session_id}/stop/",
+    "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer session version.",
+        "argument": "expected_version"
+      },
+      {
+        "in": "path",
+        "name": "session_id",
+        "schema": {
+          "type": "integer"
+        },
+        "required": true,
+        "argument": "session_id"
+      }
+    ],
+    "bodyKeys": [
+      "end",
+      "note",
+      "subproject_allocations"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer session version."
+        },
+        "session_id": {
+          "type": "integer"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 instant; a timestamp without an offset is interpreted as UTC."
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subproject_allocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "subproject_id": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "allocation_bp": {
+                "type": "integer",
+                "maximum": 10000,
+                "minimum": 1
+              }
+            },
+            "required": [
+              "allocation_bp",
+              "subproject_id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "description": "Stop a live timer by session_id. Use status to find active timer IDs. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  }
+]
