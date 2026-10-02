@@ -6,13 +6,19 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "miniflare": "^4.20260730.0"
   },
   "name": "autumn-sites-mcp",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "pretest": "node scripts/build.mjs"
+  },
+  "overrides": {
+    "undici": "^7.29.1",
+    "sharp": "^0.35.4"
   }
 }

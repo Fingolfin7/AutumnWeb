@@ -81,7 +81,7 @@ test('API reads preserve v2 filters, notes and pagination', async () => {
     assert.equal(url.searchParams.get('include'), 'note');
     assert.equal(url.searchParams.get('offset'), '100');
     assert.equal(init.headers.Authorization, 'Token test-token');
-    assert.equal(init.redirect, 'error');
+    assert.equal(init.redirect, 'manual');
     return Response.json({ count: 150, limit: 100, offset: 100, results: [{ note: 'Preserved' }] });
   });
   const call = await payload(await worker.fetch(request('tools/call', { name: 'list_sessions', arguments: { project_ids: '7,8', include: 'note', offset: 100 } }), env));
@@ -147,4 +147,23 @@ test('unknown accounts do not fall back to the default', async () => {
   const output = await payload(await worker.fetch(request('tools/call', { name: 'me', arguments: { account: 'unknown' } }), env));
   assert.equal(output.result.isError, true);
   assert.match(output.result.structuredContent.error, /Unknown Autumn account/);
+});
+test('redirects are rejected without forwarding credentials to another origin', async () => {
+  let calls = 0;
+  const output = await callAutumn(operations.find(o => o.name === 'me'), {}, env, async (url, init) => {
+    calls++;
+    assert.equal(url.origin, 'https://autumn.example');
+    assert.equal(init.redirect, 'manual');
+    return new Response(null, { status: 302, headers: { location: 'https://other.example/' } });
+  });
+  assert.equal(calls, 1);
+  assert.equal(output.isError, true);
+  assert.match(output.structuredContent.error, /unexpected redirect/);
+});
+test('network exceptions expose useful causes without tokens or query values', async () => {
+  const output = await callAutumn(operations.find(o => o.name === 'me'), {}, env, async () => { throw new TypeError('Failed test-token at https://autumn.example/api/v2/me/?note_snippet=private-note'); });
+  assert.equal(output.isError, true);
+  assert.equal(output.structuredContent.cause.type, 'TypeError');
+  assert.ok(!JSON.stringify(output).includes(token));
+  assert.ok(!JSON.stringify(output).includes('private-note'));
 });

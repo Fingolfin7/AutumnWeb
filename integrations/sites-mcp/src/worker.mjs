@@ -84,10 +84,12 @@ export async function callAutumn(op, args, env, fetcher = fetch) {
   const url = new URL(path, base);
   url.search = query.toString();
   const body = Object.fromEntries(op.bodyKeys.filter(key => args[key] !== undefined).map(key => [key, args[key]]));
-  const init = { method: op.method, headers, redirect: 'error', signal: AbortSignal.timeout(45000) };
+  // The Workers runtime supports manual/follow; it rejects redirect="error".
+  const init = { method: op.method, headers, redirect: 'manual', signal: AbortSignal.timeout(45000) };
   if (op.bodyKeys.length) { headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body); }
   try {
     const response = await fetcher(url, init);
+    if (response.status >= 300 && response.status < 400) return respond({ error: `Autumn returned an unexpected redirect (HTTP ${response.status}).` }, true);
     if (response.status === 204) return respond({ ok: true });
     const text = await response.text();
     let data;
@@ -95,8 +97,9 @@ export async function callAutumn(op, args, env, fetcher = fetch) {
     // Never return the server credential even if an upstream error reflects it.
     const safe = JSON.parse(JSON.stringify(data).replaceAll(account.token, '[redacted]'));
     return respond(typeof safe === 'object' && safe !== null && !Array.isArray(safe) ? safe : { data: safe }, !response.ok);
-  } catch {
-    return respond({ error: op.method === 'GET' ? 'Autumn could not be reached. Try again shortly.' : 'Autumn did not confirm the change. Check the current state before retrying; it may already have succeeded.' }, true);
+  } catch (error) {
+    const detail = String(error?.message ?? 'Unknown request failure').replaceAll(account.token, '[redacted]').replace(/https?:\/\/[^\s"'<>]+/g, value => { try { const address = new URL(value); return address.origin + address.pathname; } catch { return '[url]'; } }).slice(0, 500);
+    return respond({ error: op.method === 'GET' ? 'Autumn could not be reached. Try again shortly.' : 'Autumn did not confirm the change. Check the current state before retrying; it may already have succeeded.', cause: { type: String(error?.name ?? 'Error'), message: detail } }, true);
   }
 }
 function makeHandler(env, fetcher) {

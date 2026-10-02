@@ -67,3 +67,13 @@ For future updates, refresh the OpenAPI contract from AutumnWeb, run `npm ci`,
 `npm run build` and `npm test`, then publish through the same Sites project.
 After publication, verify a read-only tool through the connected ChatGPT plugin;
 a successful deployment alone does not prove client tool discovery.
+
+The hosted runtime also rejected the initial `redirect: "error"` fetch option
+before sending an API request, while the same bundle passed its Node-based
+live reads. Outbound requests now use `redirect: "manual"` and reject HTTP 3xx
+responses without forwarding credentials. Tests run the bundled server in
+workerd through Miniflare as well as Node. Use
+`node scripts/verify-live.mjs --workers` for read-only runtime verification
+against the owner's locally configured accounts. Network failures return
+sanitized exception details rather than hiding every cause behind an
+availability message.
