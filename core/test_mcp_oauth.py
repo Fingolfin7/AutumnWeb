@@ -266,3 +266,25 @@ class MCPOAuthTests(TestCase):
             jwt = self.client.post("/oauth/token/", {"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
                                                     "client_id": self.client_id, "assertion": "untrusted"})
             self.assertEqual(jwt.status_code, 400)
+
+    def test_additional_account_owner_can_withdraw_the_link(self):
+        self.link()
+        token = self.token(self.authorize([self.owner, self.extra]))["access_token"]
+        link = MCPAccountLink.objects.get()
+        self.client.force_login(self.other)
+        self.client.post("/mcp/connections/", {"action": "revoke-link", "id": link.pk})
+        self.assertEqual(self.rpc(token).status_code, 200)
+        self.client.force_login(self.extra)
+        self.assertContains(self.client.get("/mcp/connections/"), "Revoke access for oauth-owner")
+        self.client.post("/mcp/connections/", {"action": "revoke-link", "id": link.pk})
+        self.assertEqual(self.rpc(token).status_code, 401)
+        self.assertFalse(MCPAccountLink.objects.exists())
+
+    def test_fixed_account_credentials_are_not_accepted(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        token = "autumn_mcp_retired_test_credential"
+        MCPGrant.objects.create(owner=self.owner, name="Retired connection", default_account=self.owner.username,
+                                token_digest=hashlib.sha256(token.encode()).hexdigest(),
+                                expires_at=timezone.now() + timedelta(days=1))
+        self.assertEqual(self.rpc(token).status_code, 401)

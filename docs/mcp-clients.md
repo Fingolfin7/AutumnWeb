@@ -16,7 +16,7 @@ Both clients open Autumn's normal sign-in page. An existing signed-in session ca
 
 To add another account, choose **Sign in to another Autumn account** during consent, or use **Profile → Manage MCP connections**. Enter that account's Autumn username/email and password. This proves access without changing the primary session or saving the password/API key. Return to consent and select the additional account. A linked account is available to choose; it is not automatically shared with every client.
 
-Manage and revoke clients or unlink accounts at [MCP connections](https://autumn-lg0b.onrender.com/mcp/connections/). Unlinking revokes affected connections immediately; reconnect them to choose the remaining accounts. Another Autumn user sees only their own account and accounts they personally signed into.
+Manage and revoke clients or unlink accounts at [MCP connections](https://autumn-lg0b.onrender.com/mcp/connections/). Unlinking revokes affected connections immediately; reconnect them to choose the remaining accounts. The additional account's owner can also sign in and withdraw access from this page. Another Autumn user sees only their own account and accounts they personally signed into.
 
 ## Tools and account selection
 

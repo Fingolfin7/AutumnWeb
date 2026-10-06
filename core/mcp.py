@@ -1,5 +1,4 @@
 """One stateless Streamable HTTP MCP, with user-consented OAuth account access."""
-import hashlib
 import io
 import json
 import logging
@@ -152,11 +151,7 @@ def mcp_endpoint(request):
     auth = request.headers.get("Authorization", "").split()
     token = auth[1] if len(auth) == 2 and auth[0].lower() == "bearer" else ""
     grant = None
-    if token.startswith("autumn_mcp_") and len(token) <= 128 and getattr(settings, "MCP_LEGACY_BEARER_ENABLED", True):
-        grant = MCPGrant.objects.filter(token_digest=hashlib.sha256(token.encode()).hexdigest(),
-                                        revoked_at__isnull=True, expires_at__gt=timezone.now(),
-                                        owner__is_active=True).first()
-    elif token:
+    if token:
         valid, oauth_request = get_oauthlib_core().verify_request(request, scopes=["autumn:read"])
         if (valid and oauth_request.user and oauth_request.user.is_active
                 and oauth_request.access_token.resource == [settings.MCP_RESOURCE]

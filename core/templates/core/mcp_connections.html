@@ -7,6 +7,8 @@
   <p><a href="{% url 'mcp-link-account' %}">Sign in to another Autumn account</a></p>
   <h2>Additional accounts</h2>
   {% for link in links %}<form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="action" value="unlink"><input type="hidden" name="id" value="{{ link.pk }}"><span>{{ link.user.username }}</span><button type="submit" class="btn btn--ghost">Unlink {{ link.user.username }}</button></form>{% empty %}<p>No additional accounts linked.</p>{% endfor %}
+  {% if linked_by %}<h2>Access to this account</h2><p>These users signed into this account to link it. You can withdraw their access here.</p>
+  {% for link in linked_by %}<form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="action" value="revoke-link"><input type="hidden" name="id" value="{{ link.pk }}"><span>{{ link.owner.username }}</span><button type="submit" class="btn btn--ghost">Revoke access for {{ link.owner.username }}</button></form>{% endfor %}{% endif %}
   <h2>Connected clients</h2>
   {% for grant in grants %}<article><h3>{{ grant.name }}</h3><p>{% for account in grant.accounts.all %}{{ account.name }}{% if not forloop.last %}, {% endif %}{% endfor %} · {% if grant.allow_writes %}Read and change records{% else %}Read-only{% endif %} · Expires {{ grant.expires_at|date:'j M Y' }}</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="revoke"><input type="hidden" name="id" value="{{ grant.pk }}"><button type="submit" class="btn btn--ghost">Revoke {{ grant.name }}</button></form></article>{% empty %}<p>No active connections. Start a connection from ChatGPT or Claude.</p>{% endfor %}
 </section>

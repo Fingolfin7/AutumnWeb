@@ -56,6 +56,15 @@ def revoke_tokens(owner, application):
     Grant.objects.filter(user=owner, application=application).delete()
 
 
+def revoke_link(link):
+    for grant in MCPGrant.objects.filter(owner=link.owner, oauth_application__isnull=False,
+                                         accounts__user=link.user).distinct():
+        revoke_tokens(link.owner, grant.oauth_application)
+        grant.revoked_at = timezone.now()
+        grant.save(update_fields=["revoked_at"])
+    link.delete()
+
+
 def _limited(request, purpose, limit):
     identity = f"{request.META.get('REMOTE_ADDR', '')}:{getattr(request.user, 'pk', '')}"
     key = "mcp:" + purpose + ":" + hashlib.sha256(identity.encode()).hexdigest()
@@ -198,20 +207,23 @@ def link_account(request):
 @login_required
 def connections(request):
     if request.method == "POST":
+        submitted_id = request.POST.get("id", "")
+        record_id = int(submitted_id) if submitted_id.isascii() and submitted_id.isdecimal() and len(submitted_id) <= 18 else None
         with transaction.atomic():
             User.objects.select_for_update().get(pk=request.user.pk)
             if request.POST.get("action") == "unlink":
-                link = MCPAccountLink.objects.filter(owner=request.user, pk=request.POST.get("id")).first()
+                link = MCPAccountLink.objects.filter(owner=request.user, pk=record_id).first()
                 if link:
-                    for grant in MCPGrant.objects.filter(owner=request.user, oauth_application__isnull=False,
-                                                          accounts__user=link.user):
-                        revoke_tokens(request.user, grant.oauth_application)
-                        grant.revoked_at = timezone.now()
-                        grant.save(update_fields=["revoked_at"])
-                    link.delete()
+                    revoke_link(link)
                     messages.success(request, "Account unlinked. Affected connections have been revoked; reconnect to choose accounts again.")
+            elif request.POST.get("action") == "revoke-link":
+                # The additional account's owner can also withdraw access.
+                link = MCPAccountLink.objects.filter(user=request.user, pk=record_id).first()
+                if link:
+                    revoke_link(link)
+                    messages.success(request, "Access to this account has been revoked.")
             elif request.POST.get("action") == "revoke":
-                grant = MCPGrant.objects.filter(owner=request.user, pk=request.POST.get("id"), oauth_application__isnull=False).first()
+                grant = MCPGrant.objects.filter(owner=request.user, pk=record_id, oauth_application__isnull=False).first()
                 if grant:
                     revoke_tokens(request.user, grant.oauth_application)
                     grant.revoked_at = timezone.now()
@@ -220,6 +232,7 @@ def connections(request):
         return redirect("mcp-connections")
     response = render(request, "core/mcp_connections.html", {
         "endpoint": settings.MCP_RESOURCE, "links": request.user.mcp_account_links.select_related("user"),
+        "linked_by": request.user.mcp_linked_by.select_related("owner"),
         "grants": request.user.mcp_grants.filter(oauth_application__isnull=False, revoked_at__isnull=True,
                                                expires_at__gt=timezone.now()).prefetch_related("accounts"),
     })
