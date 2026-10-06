@@ -14,7 +14,9 @@ In Claude, add a custom connector using the same URL, select OAuth sign-in, and 
 
 Both clients open Autumn's normal sign-in page. An existing signed-in session can be used. Choose at least one account, a default account, and whether the client may change records. Access is read-only by default and lasts up to 90 days. Sign in again to renew it; after it expires, refresh is refused and the client has to ask for consent again.
 
-To permit writing, the client's authorization request must include both `autumn:read` and `autumn:write`, then you must tick **Allow changes to records in these accounts**. MCP discovery advertises both scopes without a read-only challenge overriding them. If the consent page says the app requested only read access, cancel that attempt and start a fresh connection from the app; a client caching the old scope may need its connector disconnected and reconnected or recreated. Autumn never adds write permission to a read-only request, and existing connections are not upgraded automatically.
+To permit writing, the client's authorization request must include both `autumn:read` and `autumn:write`, then you must tick **Allow changes to records in these accounts**. MCP discovery advertises both scopes and all tools, even for a read-only connection. Each tool declares its required OAuth scopes. ChatGPT uses selected tools' scope tags ahead of default scopes when every selected tool has tags; hiding write tools therefore prevents write consent from being requested.
+
+For an existing ChatGPT plugin, refresh its tools in the app's settings before reconnecting, and keep the desired write tools enabled. Reinstalling alone can reuse the plugin's cached tool definitions. If consent still says the app requested only read access, cancel and check the plugin's selected tools and OAuth settings. A refused write returns an OAuth `insufficient_scope` challenge asking for both scopes so compatible clients can start fresh consent. Autumn never adds write permission to a read-only request, and existing connections are not upgraded automatically.
 
 The consent page shows where the client's details are published (for clients that identify themselves with a metadata URL, such as Claude) and the host Autumn sends the answer to. App names are supplied by the apps themselves and are not checked by Autumn, so compare those hosts with the app you started from.
 
@@ -28,7 +30,7 @@ Manage and revoke clients or unlink accounts at [MCP connections](https://autumn
 
 Call `list_accounts` first. Every API tool accepts an optional `account` name returned by that tool. Omission uses the connection's chosen default. Set it explicitly when comparing accounts; an unknown/unavailable account never falls back to another one. Resolve numeric IDs in the same account. Responses identify `_autumn_account`; durations are minutes, timestamps include timezone offsets, and paginated reads expose count/total.
 
-Read-only consent hides mutation tools and rejects write calls. With explicit write consent, the server exposes 46 API-v2 operations plus `list_accounts`. Existing API ownership checks remain enforced.
+The server exposes the same 46 API-v2 operations plus `list_accounts` for either permission level, so clients can discover their scopes before asking for additional consent. Read-only tokens still cannot change records: both the token's write scope and the user's active write consent are required at execution. Existing API ownership checks remain enforced.
 
 ## Implementation and security
 

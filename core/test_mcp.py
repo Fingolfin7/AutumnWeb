@@ -97,13 +97,41 @@ class MCPTests(TestCase):
 
     def test_discovery_and_read_only_scope(self):
         tools = self.rpc("tools/list").json()["result"]["tools"]
-        self.assertTrue(all(tool["annotations"]["readOnlyHint"] for tool in tools))
+        self.assertEqual(len(tools), 47)
+        for tool in tools:
+            scopes = ["autumn:read"] + ([] if tool["annotations"]["readOnlyHint"] else ["autumn:write"])
+            self.assertEqual(tool["securitySchemes"], [{"type": "oauth2", "scopes": scopes}])
+            self.assertEqual(tool["_meta"]["securitySchemes"], tool["securitySchemes"])
         self.assertNotIn(self.token, json.dumps(tools))
         self.assertTrue(self.tool("create_project", {"name": "denied"})["isError"])
         self.assertFalse(Projects.objects.exists())
         self.grant.allow_writes = True
         self.grant.save()
-        self.assertEqual(len(self.rpc("tools/list").json()["result"]["tools"]), 47)
+        self.assertEqual(self.rpc("tools/list").json()["result"]["tools"], tools)
+
+    def test_read_only_write_returns_oauth_step_up_in_both_protocols(self):
+        self.grant.allow_writes = True
+        self.grant.save()
+        # Even a writable grant cannot turn an existing read-only token into a writer.
+        AccessToken.objects.filter(application=self.grant.oauth_application).update(scope="autumn:read")
+        meta = {"io.modelcontextprotocol/protocolVersion": "2026-07-28",
+                "io.modelcontextprotocol/clientInfo": {"name": "client", "version": "1"},
+                "io.modelcontextprotocol/clientCapabilities": {}}
+        for metadata, version in [({}, "2025-11-25"), ({"_meta": meta}, "2026-07-28")]:
+            result = self.rpc("tools/call", {"name": "create_project", "arguments": {"name": "denied"}, **metadata},
+                              HTTP_MCP_PROTOCOL_VERSION=version).json()["result"]
+            self.assertTrue(result["isError"])
+            challenge = result["_meta"]["mcp/www_authenticate"]
+            self.assertEqual(len(challenge), 1)
+            self.assertIn('error="insufficient_scope"', challenge[0])
+            self.assertIn('scope="autumn:read autumn:write"', challenge[0])
+            self.assertIn("resource_metadata=", challenge[0])
+            if metadata:
+                self.assertIn("io.modelcontextprotocol/serverInfo", result["_meta"])
+        self.assertFalse(Projects.objects.exists())
+        self.grant.refresh_from_db()
+        self.assertTrue(self.grant.allow_writes)
+        self.assertEqual(AccessToken.objects.get(application=self.grant.oauth_application).scope, "autumn:read")
 
     def test_per_call_account_isolation_and_permissions(self):
         accounts = self.tool("list_accounts")["structuredContent"]

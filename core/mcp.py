@@ -117,8 +117,16 @@ def _call(grant, name, args):
                          for item in accounts],
         })
     op = BY_NAME.get(name)
-    if not op or (not grant.allow_writes and op["method"] != "GET"):
+    if not op:
         return _tool_result({"error": "Tool is unavailable for this connector."}, True)
+    if not grant.allow_writes and op["method"] != "GET":
+        result = _tool_result({"error": "This connection is read-only. Reconnect and allow changes to use this tool."}, True)
+        result["_meta"] = {"mcp/www_authenticate": [
+            f'Bearer resource_metadata="{settings.MCP_ORIGIN}/.well-known/oauth-protected-resource/mcp", '
+            'error="insufficient_scope", error_description="Allow changes to Autumn records to use this tool", '
+            'scope="autumn:read autumn:write"'
+        ]}
+        return result
     if not VALIDATORS[name].is_valid(args):
         # Do not reflect submitted values, which could accidentally contain credentials.
         return _tool_result({"error": "Invalid tool arguments. Follow the tool's input schema."}, True)
@@ -239,11 +247,13 @@ def mcp_endpoint(request):
     elif method == "tools/list":
         if params.get("cursor"):
             return _error(request_id, -32602, "Invalid cursor.")
+        # Clients derive requested OAuth scopes from this catalog. Keep capabilities
+        # discoverable on read-only tokens; _call still enforces consent and token scope.
         value = {"tools": [{"name": "list_accounts", "description": "List your authorized accounts, default, access and expiry. No credentials are returned.",
                             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
                             "annotations": {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}},
                            *[{key: op[key] for key in ("name", "description", "inputSchema", "annotations")}
-                             for op in OPERATIONS if grant.allow_writes or op["method"] == "GET"]]}
+                             for op in OPERATIONS]]}
     elif method == "tools/call":
         if not isinstance(params.get("name"), str) or not isinstance(params.get("arguments", {}), dict):
             return _error(request_id, -32602, "Invalid tool call.")
@@ -256,7 +266,7 @@ def mcp_endpoint(request):
             tool["securitySchemes"] = [{"type": "oauth2", "scopes": scopes}]
             tool["_meta"] = {"securitySchemes": tool["securitySchemes"]}
     if modern:
-        value = {**value, "resultType": "complete", "_meta": {META_PREFIX + "serverInfo": {"name": "Autumn", "version": "2.0.0"}}}
+        value = {**value, "resultType": "complete", "_meta": {**value.get("_meta", {}), META_PREFIX + "serverInfo": {"name": "Autumn", "version": "2.0.0"}}}
         if method == "tools/list":
             value.update(ttlMs=0, cacheScope="private")
     return _response({"jsonrpc": "2.0", "id": request_id, "result": value})

@@ -126,6 +126,29 @@ class MCPOAuthTests(TestCase):
             self.assertEqual(page.status_code, 200)
             self.assertEqual('name="allow_writes"' in page.content.decode(), "autumn:write" in expected)
 
+    def test_chatgpt_tool_scope_selection_can_reauthorize_a_read_only_connection(self):
+        read_token = self.token(self.authorize(scope="autumn:read"))["access_token"]
+        tools = self.rpc(read_token, method="tools/list").json()["result"]["tools"]
+        # ChatGPT prefers the selected tools' OAuth scope tags over default scopes
+        # when every selected tool has tags. Hiding write tools traps it at read-only.
+        requested = sorted({scope for tool in tools for scheme in tool["securitySchemes"]
+                            for scope in scheme["scopes"]})
+        self.assertEqual(requested, ["autumn:read", "autumn:write"])
+        query = {**self.query, "scope": " ".join(requested)}
+        page = self.client.get("/oauth/authorize/", query)
+        self.assertContains(page, 'name="allow_writes"')
+        self.assertFalse(page.context["form"].fields["allow_writes"].initial)
+        denied = self.rpc(read_token, params={"name": "create_project", "arguments": {"name": "denied"}}).json()["result"]
+        self.assertTrue(denied["isError"])
+        self.assertIn('scope="autumn:read autumn:write"', denied["_meta"]["mcp/www_authenticate"][0])
+        self.assertFalse(Projects.objects.exists())
+        self.assertFalse(MCPGrant.objects.get().allow_writes)
+        write_token = self.token(self.authorize(writes=True, scope=query["scope"]))["access_token"]
+        created = self.rpc(write_token, params={"name": "create_project", "arguments": {"name": "allowed"}}).json()["result"]
+        self.assertFalse(created.get("isError", False))
+        self.assertEqual(Projects.objects.get().user, self.owner)
+        self.assertEqual(self.rpc(read_token).status_code, 401)
+
     def test_new_user_has_only_their_own_account_and_consent_is_always_shown(self):
         response = self.client.get("/oauth/authorize/", self.query)
         self.assertEqual(response.status_code, 200)
