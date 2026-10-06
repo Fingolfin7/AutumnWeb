@@ -214,19 +214,17 @@ and its checked-in OpenAPI document is [`openapi-v2.yaml`](openapi-v2.yaml).
 sleeping deployment. Browser push subscription and delivery are web routes,
 not part of the versioned API; their operational logging is described above.
 
-### Autumn MCP on Sites
+### Autumn MCP
 
-**Launched October 3, 2026:** Autumn now has an owner-private MCP plugin hosted
-on ChatGPT Sites, backed by the supported `/api/v2/` API. It exposes 47 tools
-for projects, sessions, timers, reports, commitments, metadata and account
-discovery. Each API tool accepts an explicit account name, allowing activity
-comparisons across accounts while keeping their credentials and IDs separate.
+**Launched October 3 on Sites; consolidated October 6, 2026:** ChatGPT and
+Claude share one MCP endpoint in Autumn: `https://autumn-lg0b.onrender.com/mcp`.
+Users sign into Autumn, choose one or more accounts they have signed into,
+select read-only or read/write access, and can revoke connections from Profile.
+There are no preset account credentials. All API tools select accounts per call
+and preserve account ownership checks. The local CLI remains available.
 
-See the [Sites launch and connection notes](docs/sites-mcp-launch.md) and the
-[hosted MCP source](integrations/sites-mcp/README.md). Autumn API tokens are
-stored as Sites server secrets, outside this repository.
-
-**October 6, 2026:** Claude and other MCP clients can also connect to Autumn's existing Render service using dedicated account-scoped connector credentials. See [MCP client setup](docs/mcp-clients.md).
+See [MCP client setup](docs/mcp-clients.md), the [Sites launch note](docs/sites-mcp-launch.md),
+and the [shared tool contract](integrations/mcp/README.md).
 
 ---
 

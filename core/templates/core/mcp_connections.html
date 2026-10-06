@@ -1,0 +1,13 @@
+{% extends 'users/base.html' %}
+{% block content %}
+<div class="desk-head auth-card"><div><p class="page-eyebrow">Autumn MCP</p><h1 class="page-title">MCP connections</h1></div></div>
+<section class="slab slab-pad auth-card">
+  <p>Use this server URL in ChatGPT or Claude and select OAuth sign-in:</p><p><code>{{ endpoint }}</code></p>
+  <p>Your primary account is <strong>{{ user.username }}</strong>. Additional accounts are available only after you sign in to them and select them when connecting.</p>
+  <p><a href="{% url 'mcp-link-account' %}">Sign in to another Autumn account</a></p>
+  <h2>Additional accounts</h2>
+  {% for link in links %}<form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="action" value="unlink"><input type="hidden" name="id" value="{{ link.pk }}"><span>{{ link.user.username }}</span><button type="submit" class="btn btn--ghost">Unlink {{ link.user.username }}</button></form>{% empty %}<p>No additional accounts linked.</p>{% endfor %}
+  <h2>Connected clients</h2>
+  {% for grant in grants %}<article><h3>{{ grant.name }}</h3><p>{% for account in grant.accounts.all %}{{ account.name }}{% if not forloop.last %}, {% endif %}{% endfor %} · {% if grant.allow_writes %}Read and change records{% else %}Read-only{% endif %} · Expires {{ grant.expires_at|date:'j M Y' }}</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="revoke"><input type="hidden" name="id" value="{{ grant.pk }}"><button type="submit" class="btn btn--ghost">Revoke {{ grant.name }}</button></form></article>{% empty %}<p>No active connections. Start a connection from ChatGPT or Claude.</p>{% endfor %}
+</section>
+{% endblock %}

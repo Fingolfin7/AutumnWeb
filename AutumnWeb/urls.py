@@ -23,12 +23,20 @@ from django.contrib.auth import views as auth_views
 from rest_framework.authtoken.views import obtain_auth_token
 from core import pwa
 from core.mcp import mcp_endpoint
+from core import mcp_oauth
+from oauth2_provider.views import OAuthServerMetadataView, OAuthProtectedResourceMetadataView
 from users import views as user_views
 from users.forms import UserLoginForm
 
 
 urlpatterns = [
     path("mcp", mcp_endpoint, name="mcp"),
+    path(".well-known/oauth-authorization-server", OAuthServerMetadataView.as_view()),
+    path(".well-known/oauth-protected-resource", OAuthProtectedResourceMetadataView.as_view()),
+    path(".well-known/oauth-protected-resource/mcp", OAuthProtectedResourceMetadataView.as_view()),
+    path("oauth/", include(mcp_oauth.oauth_patterns)),
+    path("mcp/accounts/add/", mcp_oauth.link_account, name="mcp-link-account"),
+    path("mcp/connections/", mcp_oauth.connections, name="mcp-connections"),
     path("api/v2/", include("core.api_v2.urls")),
     path("admin/", admin.site.urls),
     path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),

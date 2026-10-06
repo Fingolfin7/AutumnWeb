@@ -12,7 +12,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -188,7 +188,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -231,7 +231,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -435,7 +435,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -490,7 +490,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -542,7 +542,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -630,7 +630,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -823,7 +823,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -853,7 +853,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -897,7 +897,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -954,7 +954,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -996,7 +996,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -1225,7 +1225,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -1284,7 +1284,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -1311,7 +1311,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -1478,7 +1478,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -1551,7 +1551,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -1593,7 +1593,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -1681,7 +1681,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -1723,7 +1723,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -1765,7 +1765,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -1817,7 +1817,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -1863,7 +1863,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -2168,7 +2168,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -2341,7 +2341,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -2538,7 +2538,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -2711,7 +2711,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -2953,7 +2953,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -3045,7 +3045,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3089,7 +3089,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3204,7 +3204,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3259,7 +3259,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3301,7 +3301,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3353,7 +3353,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3395,7 +3395,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3445,7 +3445,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3476,7 +3476,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -3521,7 +3521,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -3579,7 +3579,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3621,7 +3621,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3650,7 +3650,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [],
@@ -3719,7 +3719,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3786,7 +3786,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3841,7 +3841,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3903,7 +3903,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [
@@ -3999,7 +3999,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128,
-          "description": "Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts."
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
         }
       },
       "required": [

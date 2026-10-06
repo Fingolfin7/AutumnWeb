@@ -6,21 +6,28 @@ from datetime import timedelta
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import Client, LiveServerTestCase, TestCase
+from django.test import Client, LiveServerTestCase, TestCase, override_settings
+from oauth2_provider.models import AccessToken, Application
 from django.utils import timezone
 
-from core.models import MCPGrant, MCPGrantAccount, Projects
+from core.models import MCPAccountLink, MCPGrant, MCPGrantAccount, Projects
 
 
+@override_settings(MCP_RESOURCE="http://testserver/mcp")
 class MCPTests(TestCase):
     def setUp(self):
         self.kuda = User.objects.create_user(username="mcp-kuda", email="mcp-kuda@example.com")
         self.henry = User.objects.create_user(username="mcp-henry", email="mcp-henry@example.com")
         self.stranger = User.objects.create_user(username="mcp-other", email="mcp-other@example.com")
-        self.token = "autumn_mcp_test-secret"
+        self.token = "oauth-test-secret"
+        application = Application.objects.create(name="fixture", client_type="public", authorization_grant_type="authorization-code")
         self.grant = MCPGrant.objects.create(owner=self.kuda, name="test", default_account="kuda",
-                                            token_digest=hashlib.sha256(self.token.encode()).hexdigest(),
+                                            oauth_application=application,
                                             expires_at=timezone.now() + timedelta(days=90))
+        AccessToken.objects.create(user=self.kuda, application=application, token=self.token,
+                                   scope="autumn:read autumn:write", resource=["http://testserver/mcp"],
+                                   expires=timezone.now() + timedelta(hours=1))
+        MCPAccountLink.objects.create(owner=self.kuda, user=self.henry)
         MCPGrantAccount.objects.create(grant=self.grant, user=self.kuda, name="kuda")
         MCPGrantAccount.objects.create(grant=self.grant, user=self.henry, name="Henry")
         self.headers = {"HTTP_AUTHORIZATION": "Bearer " + self.token,
@@ -135,22 +142,12 @@ class MCPTests(TestCase):
         client = Client(enforce_csrf_checks=True)
         self.assertEqual(client.post("/mcp", json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"}), content_type="application/json", **self.headers).status_code, 200)
 
-    def test_management_command_mints_only_digests_and_revokes(self):
-        output = io.StringIO()
-        call_command("mcp_grant", "create", owner=self.kuda.username, account=["kuda=" + self.kuda.username, "Henry=" + self.henry.username], stdout=output)
-        issued = json.loads(output.getvalue())
-        grant = MCPGrant.objects.get(pk=issued["grant_id"])
-        self.assertNotEqual(grant.token_digest, issued["token"])
-        self.assertEqual(grant.token_digest, hashlib.sha256(issued["token"].encode()).hexdigest())
-        self.assertFalse(grant.allow_writes)
+    def test_management_listing_and_revocation_do_not_expose_tokens(self):
         listing = io.StringIO()
         call_command("mcp_grant", "list", stdout=listing)
-        self.assertNotIn(issued["token"], listing.getvalue())
-        call_command("mcp_grant", "revoke", grant_id=grant.id, stdout=io.StringIO())
-        grant.refresh_from_db()
-        self.assertIsNotNone(grant.revoked_at)
-        with self.assertRaises(CommandError):
-            call_command("mcp_grant", "create", owner=self.kuda.username, account=["A=" + self.kuda.username, "a=" + self.henry.username], stdout=io.StringIO())
+        self.assertNotIn(self.token, listing.getvalue())
+        call_command("mcp_grant", "revoke", grant_id=self.grant.id, stdout=io.StringIO())
+        self.assertEqual(self.rpc("tools/list").status_code, 401)
 
 
 class MCPOfficialClientTests(LiveServerTestCase):
@@ -163,14 +160,22 @@ class MCPOfficialClientTests(LiveServerTestCase):
         from pathlib import Path
         from django.conf import settings
 
-        root = Path(settings.BASE_DIR) / "integrations/sites-mcp"
+        root = Path(settings.BASE_DIR) / "integrations/mcp"
         if not shutil.which("node") or not (root / "node_modules/@modelcontextprotocol/sdk").exists():
-            self.skipTest("Run npm ci in integrations/sites-mcp for the official client check")
+            self.skipTest("Run npm ci in integrations/mcp for the official client check")
         users = [User.objects.create_user(username=name, email=name + "@example.com") for name in ["client-kuda", "client-henry"]]
-        token = "autumn_mcp_fixture-secret"
+        resource = self.live_server_url + "/mcp"
+        resource_override = override_settings(MCP_RESOURCE=resource)
+        resource_override.enable()
+        self.addCleanup(resource_override.disable)
+        token = "oauth-fixture-secret"
+        application = Application.objects.create(name="SDK fixture", client_type="public", authorization_grant_type="authorization-code")
         grant = MCPGrant.objects.create(owner=users[0], name="client fixture", default_account="kuda",
-                                       token_digest=hashlib.sha256(token.encode()).hexdigest(),
+                                       oauth_application=application,
                                        expires_at=timezone.now() + timedelta(days=1))
+        MCPAccountLink.objects.create(owner=users[0], user=users[1])
+        AccessToken.objects.create(user=users[0], application=application, token=token, scope="autumn:read",
+                                   resource=[resource], expires=timezone.now() + timedelta(hours=1))
         for alias, user in zip(["kuda", "Henry"], users):
             MCPGrantAccount.objects.create(grant=grant, user=user, name=alias)
         with tempfile.TemporaryDirectory() as directory:

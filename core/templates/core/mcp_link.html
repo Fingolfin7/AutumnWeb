@@ -1,0 +1,15 @@
+{% extends 'users/base.html' %}
+{% block content %}
+<div class="desk-head auth-card"><div><p class="page-eyebrow">Autumn MCP</p><h1 class="page-title">Add an account</h1></div></div>
+<section class="slab slab-pad auth-card">
+  <p>Sign in to the additional Autumn account. You stay signed in as {{ user.username }}. Its password is used to verify access and is never saved by MCP.</p>
+  {% if limited %}<p role="alert">Too many attempts. Try again in 15 minutes.</p>{% endif %}
+  <form method="post" class="fields">
+    {% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+    {{ form.non_field_errors }}
+    <div class="field">{{ form.username.label_tag }}{{ form.username.errors }}{{ form.username }}</div>
+    <div class="field">{{ form.password.label_tag }}{{ form.password.errors }}{{ form.password }}</div>
+    <div class="form-actions"><a class="btn btn--ghost" href="{{ next }}">Cancel</a><button class="btn btn--primary" type="submit">Sign in and add account</button></div>
+  </form>
+</section>
+{% endblock %}

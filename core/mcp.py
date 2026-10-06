@@ -1,9 +1,4 @@
-"""Stateless Streamable HTTP MCP, using the same generated API-v2 tool contract as Sites.
-
-The dedicated bearer capability authorizes specific accounts. API dispatch stays
-inside Django and retains API ownership checks; no outbound URL or API token is accepted.
-Sites' managed OAuth and owner checks remain independent and unchanged.
-"""
+"""One stateless Streamable HTTP MCP, with user-consented OAuth account access."""
 import hashlib
 import io
 import json
@@ -21,8 +16,9 @@ from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from jsonschema import Draft202012Validator
 from rest_framework.authentication import BaseAuthentication
+from oauth2_provider.oauth2_backends import get_oauthlib_core
 
-from core.models import MCPGrant
+from core.models import MCPAccountLink, MCPGrant
 
 logger = logging.getLogger(__name__)
 MAX_BODY = 1024 * 1024
@@ -30,7 +26,7 @@ VERSIONS = {"2025-03-26", "2025-06-18", "2025-11-25"}
 LATEST_VERSION = "2025-11-25"
 MODERN_VERSION = "2026-07-28"
 META_PREFIX = "io.modelcontextprotocol/"
-OPERATIONS = json.loads((Path(settings.BASE_DIR) / "integrations/sites-mcp/src/operations.json").read_text())
+OPERATIONS = json.loads((Path(settings.BASE_DIR) / "integrations/mcp/src/operations.json").read_text())
 BY_NAME = {op["name"]: op for op in OPERATIONS}
 VALIDATORS = {op["name"]: Draft202012Validator(op["inputSchema"]) for op in OPERATIONS}
 INSTRUCTIONS = (
@@ -106,6 +102,11 @@ def _dispatch(op, args, user):
 
 
 def _call(grant, name, args):
+    accounts = grant.accounts.select_related("user", "user__profile").filter(user__is_active=True)
+    if grant.oauth_application_id:
+        # Unlinking an account takes effect even for an already-issued access token.
+        linked = set(MCPAccountLink.objects.filter(owner=grant.owner).values_list("user_id", flat=True))
+        accounts = [item for item in accounts if item.user_id == grant.owner_id or item.user_id in linked]
     if name == "list_accounts":
         if args:
             return _tool_result({"error": "list_accounts accepts no arguments."}, True)
@@ -114,7 +115,7 @@ def _call(grant, name, args):
             "access": "read_write" if grant.allow_writes else "read_only",
             "expires_at": grant.expires_at.isoformat(),
             "accounts": [{"name": item.name, "username": item.user.username, "timezone": str(_zone(item.user))}
-                         for item in grant.accounts.select_related("user", "user__profile") if item.user.is_active],
+                         for item in accounts],
         })
     op = BY_NAME.get(name)
     if not op or (not grant.allow_writes and op["method"] != "GET"):
@@ -123,7 +124,7 @@ def _call(grant, name, args):
         # Do not reflect submitted values, which could accidentally contain credentials.
         return _tool_result({"error": "Invalid tool arguments. Follow the tool's input schema."}, True)
     requested = args.get("account", grant.default_account)
-    account = next((item for item in grant.accounts.select_related("user", "user__profile")
+    account = next((item for item in accounts
                     if item.name.casefold() == requested.casefold() and item.user.is_active), None)
     if account is None:
         return _tool_result({"error": "Unknown or unavailable account. Use list_accounts."}, True)
@@ -151,14 +152,22 @@ def mcp_endpoint(request):
     auth = request.headers.get("Authorization", "").split()
     token = auth[1] if len(auth) == 2 and auth[0].lower() == "bearer" else ""
     grant = None
-    if token.startswith("autumn_mcp_") and len(token) <= 128:
+    if token.startswith("autumn_mcp_") and len(token) <= 128 and getattr(settings, "MCP_LEGACY_BEARER_ENABLED", True):
         grant = MCPGrant.objects.filter(token_digest=hashlib.sha256(token.encode()).hexdigest(),
                                         revoked_at__isnull=True, expires_at__gt=timezone.now(),
                                         owner__is_active=True).first()
+    elif token:
+        valid, oauth_request = get_oauthlib_core().verify_request(request, scopes=["autumn:read"])
+        if (valid and oauth_request.user and oauth_request.user.is_active
+                and oauth_request.access_token.resource == [settings.MCP_RESOURCE]
+                and request.build_absolute_uri(request.path) == settings.MCP_RESOURCE):
+            grant = MCPGrant.objects.filter(owner=oauth_request.user, oauth_application=oauth_request.client,
+                                            revoked_at__isnull=True, expires_at__gt=timezone.now()).first()
+            if grant:
+                grant.allow_writes = grant.allow_writes and "autumn:write" in oauth_request.scopes
     if grant is None:
-        response = _error(None, -32001, "A valid Autumn MCP connector credential is required.", 401)
-        # Static bearer auth intentionally advertises no OAuth provider or DCR endpoint.
-        response["WWW-Authenticate"] = 'Bearer realm="Autumn MCP"'
+        response = _error(None, -32001, "Sign in to Autumn to connect your accounts.", 401)
+        response["WWW-Authenticate"] = f'Bearer resource_metadata="{settings.MCP_ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="autumn:read"'
         return response
     if request.method != "POST":
         response = HttpResponse(status=405)
@@ -199,8 +208,9 @@ def mcp_endpoint(request):
             return _response(payload, 400)
         info = meta.get(META_PREFIX + "clientInfo")
         capabilities = meta.get(META_PREFIX + "clientCapabilities")
-        if (version != modern_claim or request.headers.get("MCP-Method") != method
-                or (method == "tools/call" and request.headers.get("MCP-Name") != params.get("name"))
+        if (request.headers.get("MCP-Protocol-Version", modern_claim) != modern_claim
+                or request.headers.get("MCP-Method", method) != method
+                or (method == "tools/call" and request.headers.get("MCP-Name", params.get("name")) != params.get("name"))
                 or not isinstance(info, dict) or not isinstance(info.get("name"), str)
                 or not isinstance(info.get("version"), str) or not isinstance(capabilities, dict)):
             return _error(request_id, -32600, "Invalid or conflicting MCP metadata.", 400)
@@ -223,7 +233,7 @@ def mcp_endpoint(request):
         requested = params["protocolVersion"]
         value = {"protocolVersion": requested if requested in VERSIONS else LATEST_VERSION,
                  "capabilities": {"tools": {"listChanged": False}},
-                 "serverInfo": {"name": "Autumn", "version": "1.1.0"}, "instructions": INSTRUCTIONS}
+                 "serverInfo": {"name": "Autumn", "version": "2.0.0"}, "instructions": INSTRUCTIONS}
     elif method == "ping":
         value = {}
     elif method == "tools/list":
@@ -240,8 +250,13 @@ def mcp_endpoint(request):
         value = _call(grant, params["name"], params.get("arguments", {}))
     else:
         return _error(request_id, -32601, "Method not found.")
+    if method == "tools/list":
+        for tool in value["tools"]:
+            scopes = ["autumn:read"] + ([] if tool["annotations"]["readOnlyHint"] else ["autumn:write"])
+            tool["securitySchemes"] = [{"type": "oauth2", "scopes": scopes}]
+            tool["_meta"] = {"securitySchemes": tool["securitySchemes"]}
     if modern:
-        value = {**value, "resultType": "complete", "_meta": {META_PREFIX + "serverInfo": {"name": "Autumn", "version": "1.1.0"}}}
+        value = {**value, "resultType": "complete", "_meta": {META_PREFIX + "serverInfo": {"name": "Autumn", "version": "2.0.0"}}}
         if method == "tools/list":
             value.update(ttlMs=0, cacheScope="private")
     return _response({"jsonrpc": "2.0", "id": request_id, "result": value})

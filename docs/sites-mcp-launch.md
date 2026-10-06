@@ -1,81 +1,15 @@
-# Autumn MCP on ChatGPT Sites
+# Autumn MCP launch and consolidation
 
-Launch date: October 3, 2026.
+Autumn MCP first launched privately on ChatGPT Sites on October 3, 2026. The original owner-only Worker used configured API credentials for two accounts. A separate Django endpoint was later added for Claude.
 
-October 6 interoperability update: the working Sites plugin remains the ChatGPT connection. Claude and other clients supporting bearer headers can use Autumn's independent MCP endpoint on the existing Render service, with separate account-scoped, expiring, revocable credentials. Both legacy initialization and modern `2026-07-28` requests are supported. See [client setup](mcp-clients.md).
+On October 6, 2026, these implementations were consolidated into the Autumn application's single OAuth MCP endpoint:
 
-Autumn's remote MCP server is hosted privately on ChatGPT Sites. It uses Autumn
-API v2 and exposes 46 API operations plus `list_accounts`: projects,
-subprojects, saved sessions, live timers, contexts, tags, reports, commitments,
-export and import. The existing packaged Python MCP server remains the local
-client entry point.
+`https://autumn-lg0b.onrender.com/mcp`
 
-## Connection and accounts
+ChatGPT and Claude now use the same server and sign-in flow. Every user signs into Autumn and explicitly chooses their own accounts and permissions. Additional accounts require signing in to them; no personal/work accounts or API keys are preset. The local Autumn CLI remains available for CLI workflows.
 
-The owner's deployment is [Autumn MCP](https://autumn-mcp.fingolfin7.chatgpt.site).
-Its MCP endpoint is `/mcp`. In ChatGPT, open Plugins → Personal → Created by you
-and install or connect Autumn MCP. Start a new conversation and select the
-plugin after reconnecting or refreshing its tools.
+The former Sites deployment is retained privately as a connection guide after migration. It no longer hosts an MCP server or stores Autumn account credentials. Its old plugin must be replaced by a custom MCP plugin connected to the shared endpoint.
 
-Call `list_accounts` to discover configured names. Every API tool accepts
-optional `account`; omission uses the configured default. Examples:
+See [client setup and account management](mcp-clients.md). Server code lives in `core/mcp.py` and `core/mcp_oauth.py`; the generated API-v2 contract and interoperability clients live in [`integrations/mcp`](../integrations/mcp/README.md).
 
-- `me(account="kuda")`
-- `list_sessions(account="Henry", start_date="2026-10-01", end_date="2026-12-31", include="note")`
-
-Each response includes `_autumn_account`. Account selection belongs to each
-request; it does not change shared server state or the local CLI's selected
-account. Resolve project, session, subproject, context and tag IDs separately
-for each account. Unknown names fail without falling back to another account.
-Use `total`, `count`, `limit` and `offset` to retrieve the complete requested
-history. Durations remain in minutes and timestamps should carry an explicit
-timezone offset.
-
-## Runtime configuration
-
-Source: [`integrations/sites-mcp`](../integrations/sites-mcp/README.md).
-
-Sites stores these runtime values:
-
-- `AUTUMN_ACCOUNTS_JSON`: a secret mapping account names to their Autumn server,
-  API token, username and timezone.
-- `AUTUMN_DEFAULT_ACCOUNT`: the account used when a call omits `account`.
-- `AUTUMN_OWNER_EMAIL`: the verified ChatGPT email permitted to use the tools.
-
-The account JSON structure is documented with empty tokens in
-[`.env.example`](../integrations/sites-mcp/.env.example). Every data-bearing
-request requires both the trusted Sites user identity and the permitted email.
-Discovery is free of private data. Source, browser pages and account-discovery
-responses contain no API tokens. A Sites service credential does not substitute
-for the owner's identity.
-
-## Discovery compatibility and verification
-
-The first ChatGPT discovery attempt returned HTTP 400: the client advertised
-MCP `2026-07-28` without the routing headers required by the SDK. The Worker now
-supplies missing `Mcp-Method` and `Mcp-Name` from the JSON-RPC request. It
-preserves explicit header values so conflicts still fail validation.
-Traditional wire-format clients advertising that revision negotiate the
-supported `2025-11-25` format. Owner authorization is preserved on both paths.
-
-Regression coverage checks both discovery formats, missing routing headers,
-explicit routing conflicts, account isolation, rejected unknown accounts,
-schema validation, note and pagination filters, optimistic concurrency,
-credential redaction, and uncertain writes without automatic retries. The
-bundled Worker also passed live identity, project, session and timer reads for
-both configured accounts. Writes were checked with mock API responses.
-
-For future updates, refresh the OpenAPI contract from AutumnWeb, run `npm ci`,
-`npm run build` and `npm test`, then publish through the same Sites project.
-After publication, verify a read-only tool through the connected ChatGPT plugin;
-a successful deployment alone does not prove client tool discovery.
-
-The hosted runtime also rejected the initial `redirect: "error"` fetch option
-before sending an API request, while the same bundle passed its Node-based
-live reads. Outbound requests now use `redirect: "manual"` and reject HTTP 3xx
-responses without forwarding credentials. Tests run the bundled server in
-workerd through Miniflare as well as Node. Use
-`node scripts/verify-live.mjs --workers` for read-only runtime verification
-against the owner's locally configured accounts. Network failures return
-sanitized exception details rather than hiding every cause behind an
-availability message.
+The original launch exposed 46 API operations plus `list_accounts`. The shared server preserves these tools, per-request account selection, API ownership checks, minute-based durations, timezone handling, pagination, and compatibility with both traditional and modern MCP discovery.

@@ -178,5 +178,6 @@ characterization/.meta-*.tmp
 .claude/settings.local.json
 /resource-snapshots/
 
-# Managed Sites checkout; GitHub source lives under integrations/sites-mcp.
+# Managed Sites checkout (retired MCP connection guide).
 /hosted-autumn-mcp/
+/.autumn-mcp-*.log

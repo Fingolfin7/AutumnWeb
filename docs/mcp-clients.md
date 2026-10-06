@@ -1,49 +1,41 @@
 # Autumn MCP clients
 
-Autumn has two secure remote MCP connections using the same API-v2 tool contract:
+Autumn has one remote MCP server for ChatGPT, Claude, and other OAuth-capable clients:
 
-| Client | Endpoint | Authentication |
-| --- | --- | --- |
-| ChatGPT / installed Autumn Sites plugin | `https://autumn-mcp.fingolfin7.chatgpt.site/mcp` | Existing Sites-managed OAuth and owner identity |
-| Claude, clients supporting fixed request headers | `https://autumn-lg0b.onrender.com/mcp` | Dedicated Autumn MCP bearer credential |
+`https://autumn-lg0b.onrender.com/mcp`
 
-The Sites audience and owner authorization remain unchanged. Its OpenAI OAuth metadata currently advertises neither Dynamic Client Registration nor Client ID Metadata Documents. Claude detects a required pre-registered OAuth client. Do not put the Site's own sign-in client ID into Claude, copy OpenAI session tokens, spoof Sites identity headers, or use a Sites service bypass token as a user credential.
+It runs inside the existing Autumn application. There are no preset personal or work accounts and no server-wide account switch. Each connection belongs to the signed-in Autumn user and has its own chosen accounts and permissions.
 
-The independent endpoint runs on the existing Autumn Render service. It requires authentication for discovery and calls, offers stateless Streamable HTTP, and supports modern `2026-07-28` per-request metadata and `server/discover`, alongside `2025-03-26`, `2025-06-18`, or `2025-11-25` initialization. Newer traditional initialization requests negotiate `2025-11-25`. Modern routing-header conflicts fail; results identify the server and discovery caches are private with zero TTL. GET and DELETE return 405 because it provides no persistent SSE stream or session. JSON responses preserve API-v2 fields and errors. Anonymous callers, expired/revoked credentials, inactive users, invalid origins, unknown accounts and invalid arguments fail closed.
+## Connect
 
-## Create and revoke a credential
+In ChatGPT, create a custom MCP plugin with the URL above and OAuth authentication. Leave static client credentials empty; client metadata or automatic registration is supported. Install/connect the resulting plugin.
 
-An Autumn deployment administrator creates a separate credential for each client. This privileged command explicitly binds aliases to existing users; it must not be exposed as an unrestricted web API.
+In Claude, add a custom connector using the same URL, select OAuth sign-in, and use Claude's published client identity or automatic registration. Do not add a fixed Authorization header.
 
-```powershell
-python manage.py mcp_grant create --owner kuda --name Claude --account kuda=kuda --account Henry=Henry --default-account kuda
-```
+Both clients open Autumn's normal sign-in page. An existing signed-in session can be used. Choose at least one account, a default account, and whether the client may change records. Access is read-only by default and lasts up to 90 days. Sign in again to renew it.
 
-The command returns a token once. Store the output outside the repository in a private file or password manager. The database stores only its SHA-256 digest and authorized account bindings. Default access is read-only, expires after 90 days, and omits mutation tools. Use `--allow-writes` only for a client intended to have the same mutation capabilities as the Sites connector. `--expires-days` accepts 1–365. Account IDs and ownership checks are enforced by the existing API views; each request selects an account independently. Existing Autumn API keys are not transmitted to the MCP client.
+To add another account, choose **Sign in to another Autumn account** during consent, or use **Profile → Manage MCP connections**. Enter that account's Autumn username/email and password. This proves access without changing the primary session or saving the password/API key. Return to consent and select the additional account. A linked account is available to choose; it is not automatically shared with every client.
 
-```powershell
-python manage.py mcp_grant list --owner kuda
-python manage.py mcp_grant revoke --grant-id <id>
-```
+Manage and revoke clients or unlink accounts at [MCP connections](https://autumn-lg0b.onrender.com/mcp/connections/). Unlinking revokes affected connections immediately; reconnect them to choose the remaining accounts. Another Autumn user sees only their own account and accounts they personally signed into.
 
-Revocation takes effect on the next HTTP request. Deleting/deactivating a bound user removes that account's access; deactivating the grant owner denies the entire connection. Connector credentials cannot authenticate to ordinary Autumn API endpoints.
+## Tools and account selection
 
-## Claude
+Call `list_accounts` first. Every API tool accepts an optional `account` name returned by that tool. Omission uses the connection's chosen default. Set it explicitly when comparing accounts; an unknown/unavailable account never falls back to another one. Resolve numeric IDs in the same account. Responses identify `_autumn_account`; durations are minutes, timestamps include timezone offsets, and paginated reads expose count/total.
 
-In Customize → Connectors → Add custom connector, use the independent endpoint. Select **No sign-in** (Claude's label for fixed-header credentials, not anonymous server access). Add a request header named `Authorization` with value `Bearer <dedicated MCP token>`. Claude stores the value encrypted. Do not paste the secret into a chat. Add the connector and enable it for a new conversation. Verify with `list_accounts`, then `me` explicitly for each account. Remote connectors are associated with the Claude account and work in Claude Desktop as well as the web; the network connection originates from Anthropic.
+Read-only consent hides mutation tools and rejects write calls. With explicit write consent, the server exposes 46 API-v2 operations plus `list_accounts`. Existing API ownership checks remain enforced.
 
-## Other harnesses
+## Implementation and security
 
-Use Streamable HTTP and send the bearer header on every request. For clients with environment-backed headers, keep the token out of checked-in configuration. OAuth-only clients cannot use the independent endpoint's fixed-header authentication; the existing Sites plugin remains the supported ChatGPT route. The Python stdio entry point and local Autumn CLI remain available.
+The only server implementation is `core/mcp.py`, with self-service consent in `core/mcp_oauth.py`. `integrations/mcp` contains the generated API-v2 tool contract and official-client verification, not another server. Local Autumn CLI workflows remain independent.
 
-Run the independent verification client from `integrations/sites-mcp`:
+OAuth is provided by django-oauth-toolkit 3.4.1: authorization code with S256 PKCE, automatic registration and client metadata, resource-bound tokens, issuer validation, one-hour access tokens, rotating refresh tokens with replay protection, and hashed token storage. Account consent and account linking require session authentication and CSRF protection. Discovery metadata is public; data and MCP tool discovery require a valid bearer token and active user consent. The MCP endpoint does not accept browser session cookies as authentication.
 
-```powershell
-npm ci
-node scripts/verify-remote.mjs C:/path/outside/repository/credential.json
-node scripts/verify-remote.mjs C:/path/outside/repository/credential.json --modern
-```
+Transport supports modern `2026-07-28` per-request metadata alongside traditional initialization revisions `2025-03-26`, `2025-06-18`, and `2025-11-25`. Missing optional routing headers are derived from the validated request, while conflicting supplied headers fail. Requests and discovery are stateless; GET/DELETE return 405, private discovery has zero TTL, and uncertain writes are never retried automatically.
 
-The private file contains `{"url":"https://autumn-lg0b.onrender.com/mcp","token":"<secret>"}`. Verification uses the official MCP v1 client (legacy) and v2 client pinned to `2026-07-28`, with harmless reads for each available account; it prints checks, not private records or credentials. Django tests exercise both real clients against a live test server, API dispatch, account permissions, transport negotiation, scoped writes, expiry and revocation. Keep the existing Sites/workerd tests for ChatGPT compatibility.
+## Verification
 
-References: [Claude custom connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp), [MCP Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports).
+Run `python manage.py test core.test_mcp core.test_mcp_oauth` for real OAuth exchange, account isolation, proof of account access, read/write consent, PKCE/code replay, refresh replay, revocation, CSRF and official MCP v1/v2 client checks. Install the verification clients with `npm ci` in `integrations/mcp`.
+
+The optional `scripts/verify-remote.mjs` consumes a private file outside the repository containing a current OAuth access token and URL. It makes harmless identity/project/session/timer reads and prints check results rather than private rows or tokens. Never paste credentials into chats or commit them.
+
+References: [OpenAI MCP authentication](https://developers.openai.com/plugins/build/auth), [django-oauth-toolkit security settings](https://django-oauth-toolkit.readthedocs.io/en/3.4.1/settings.html).

@@ -1,6 +1,5 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { parse } from 'yaml';
-import { build } from 'esbuild';
 
 const spec = parse(await readFile(new URL('../openapi-v2.yaml', import.meta.url), 'utf8'));
 function schema(value) {
@@ -49,7 +48,7 @@ for (const [path, item] of Object.entries(spec.paths)) for (const [method, opera
     Object.assign(input.properties, resolved.properties);
     input.required.push(...(resolved.required ?? []));
   }
-  input.properties.account = { type: 'string', minLength: 1, maxLength: 128, description: 'Autumn account name from list_accounts, for example kuda or Henry. Omit to use the configured default. Set explicitly when comparing accounts.' };
+  input.properties.account = { type: 'string', minLength: 1, maxLength: 128, description: 'Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts.' };
   const readOnly = method === 'get';
   operations.push({ name, method: method.toUpperCase(), path, parameters, bodyKeys: body ? Object.keys(schema(body).properties ?? {}) : [], inputSchema: input,
     description: (descriptions[name] ?? `${name.replaceAll('_', ' ')} in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset.${parameters.some(p => p.name === 'If-Match') ? ' Supply expected_version from the current resource to prevent overwriting concurrent edits.' : ''}`) + ' Set account explicitly for another Autumn account; resolve IDs in that same account.',
@@ -57,7 +56,4 @@ for (const [path, item] of Object.entries(spec.paths)) for (const [method, opera
 }
 if (new Set(operations.map(o => o.name)).size !== operations.length) throw new Error('Duplicate MCP tool names');
 await writeFile(new URL('../src/operations.json', import.meta.url), JSON.stringify(operations, null, 2) + '\n');
-await mkdir('dist/server', { recursive: true });
-await mkdir('dist/client', { recursive: true });
-await build({ entryPoints: ['src/worker.mjs'], bundle: true, format: 'esm', platform: 'browser', conditions: ['workerd', 'browser'], outfile: 'dist/server/index.js', target: 'es2022', minify: true });
-console.log(`Built Autumn MCP with ${operations.length} API v2 tools.`);
+console.log(`Generated ${operations.length} API v2 tools for the shared Django MCP.`);

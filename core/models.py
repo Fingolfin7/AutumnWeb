@@ -23,15 +23,30 @@ User._meta.get_field('email')._unique = True  # make email field unique
 
 
 class MCPGrant(models.Model):
-    """Revocable MCP capability. Only a digest of the bearer secret is stored."""
+    """Accounts and permissions consented to by one user for one OAuth client."""
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="mcp_grants")
     name = models.CharField(max_length=100)
-    token_digest = models.CharField(max_length=64, unique=True)
+    token_digest = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    oauth_application = models.ForeignKey("oauth2_provider.Application", null=True, blank=True,
+                                          on_delete=models.CASCADE, related_name="autumn_grants")
     default_account = models.CharField(max_length=128)
     allow_writes = models.BooleanField(default=False)
     created_at = models.DateTimeField(default=timezone.now)
     expires_at = models.DateTimeField()
     revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["owner", "oauth_application"], name="mcp_owner_application_unique")]
+
+
+class MCPAccountLink(models.Model):
+    """Additional account ownership proved by signing in; no password or API key."""
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="mcp_account_links")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="mcp_linked_by")
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["owner", "user"], name="mcp_owner_link_unique")]
 
 
 class MCPGrantAccount(models.Model):

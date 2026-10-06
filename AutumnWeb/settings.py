@@ -130,6 +130,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "rest_framework",
     "rest_framework.authtoken",  # for JWT token authentication
+    "oauth2_provider",
     "drf_spectacular",
     "crispy_forms",
     "crispy_bootstrap4",
@@ -460,6 +461,42 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_REDIRECT_URL = "home"
 LOGIN_URL = "login"
+
+# One public MCP endpoint for all clients. Tokens are issued after account consent.
+MCP_ORIGIN = env("MCP_ORIGIN", default="https://autumn-lg0b.onrender.com").rstrip("/")
+MCP_RESOURCE = MCP_ORIGIN + "/mcp"
+OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+OAUTH2_PROVIDER = {
+    "OIDC_ISS_ENDPOINT": MCP_ORIGIN,
+    "SCOPES": {"autumn:read": "Read the selected Autumn accounts", "autumn:write": "Change records in the selected Autumn accounts"},
+    "DEFAULT_SCOPES": ["autumn:read", "autumn:write"],
+    "PKCE_REQUIRED": True,
+    "REQUEST_APPROVAL_PROMPT": "force",
+    "ACCESS_TOKEN_EXPIRE_SECONDS": 3600,
+    "AUTHORIZATION_CODE_EXPIRE_SECONDS": 300,
+    "REFRESH_TOKEN_EXPIRE_SECONDS": 90 * 86400,
+    "ROTATE_REFRESH_TOKEN": True,
+    "REFRESH_TOKEN_REUSE_PROTECTION": True,
+    "ALLOWED_REDIRECT_URI_SCHEMES": ["https"],
+    "OAUTH2_RESPONSE_TYPES_SUPPORTED": ["code"],
+    "OAUTH2_GRANT_TYPES_SUPPORTED": ["authorization_code", "refresh_token"],
+    "OAUTH2_TOKEN_ENDPOINT_AUTH_METHODS_SUPPORTED": ["none", "client_secret_basic", "client_secret_post"],
+    "DCR_ENABLED": True,
+    "DCR_REGISTRATION_PERMISSION_CLASSES": ["oauth2_provider.dcr.AllowAllDCRPermission"],
+    "CIMD_ENABLED": True,
+    "OAUTH2_PROTECTED_RESOURCE_IDENTIFIER": MCP_RESOURCE,
+    "OAUTH2_PROTECTED_RESOURCE_AUTHORIZATION_SERVERS": [MCP_ORIGIN],
+    "OAUTH2_PROTECTED_RESOURCE_NAME": "Autumn MCP",
+    "OAUTH2_PROTECTED_RESOURCE_BEARER_METHODS_SUPPORTED": ["header"],
+    **{key: True for key in [
+        "COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT", "COMPLIANT_BCP_RFC9700_PASSWORD_GRANT",
+        "COMPLIANT_BCP_RFC9700_PKCE_METHOD", "COMPLIANT_BCP_RFC9700_PKCE_REQUIRED",
+        "COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT", "COMPLIANT_BCP_RFC9700_AUTHZ_RESPONSE_ISS",
+        "COMPLIANT_BCP_RFC9700_TOKEN_STORAGE", "COMPLIANT_BCP_RFC9700_REFRESH_TOKEN",
+        "COMPLIANT_BCP_RFC9700_REDIRECT_URI_SCHEME", "COMPLIANT_BCP_RFC9700_REDIRECT_URI_MATCHING",
+    ]},
+}
 
 # Optional social authentication. Provider credentials live in the deployment
 # environment rather than the database, so database backups do not contain

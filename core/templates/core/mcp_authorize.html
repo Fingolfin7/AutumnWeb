@@ -1,0 +1,18 @@
+{% extends 'users/base.html' %}
+{% block content %}
+<div class="desk-head auth-card"><div><p class="page-eyebrow">Autumn MCP</p><h1 class="page-title">Connect your accounts</h1></div></div>
+<section class="slab slab-pad auth-card">
+  <p>Signed in as <strong>{{ user.username }}</strong>. Choose the accounts <strong>{{ application.name|default:'this client' }}</strong> can access.</p>
+  <form method="post" class="fields">
+    {% csrf_token %}
+    {% for field in form.hidden_fields %}{{ field }}{{ field.errors }}{% endfor %}
+    {{ form.non_field_errors }}
+    <div class="field"><fieldset><legend>Accounts to share</legend>{{ form.accounts.errors }}{{ form.accounts }}</fieldset></div>
+    <p><a href="{{ link_url }}">Sign in to another Autumn account</a></p>
+    <div class="field">{{ form.default_account.label_tag }}{{ form.default_account.errors }}{{ form.default_account }}</div>
+    {% if 'autumn:write' in form.scope.value %}<div class="field"><label>{{ form.allow_writes }} {{ form.allow_writes.label }}</label></div>{% endif %}
+    <p>Access is read-only unless you allow changes. This connection expires in 90 days. Revoke it anytime from <a href="{% url 'mcp-connections' %}" target="_blank" rel="noopener">MCP connections</a>.</p>
+    <div class="form-actions"><button class="btn btn--ghost" type="submit" name="allow" value="">Cancel</button><button class="btn btn--primary" type="submit" name="allow" value="true">Connect selected accounts</button></div>
+  </form>
+</section>
+{% endblock %}
