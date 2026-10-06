@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from django.conf import settings
@@ -8,8 +9,10 @@ from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import Client, TestCase, override_settings
 from oauth2_provider.models import AccessToken, Application, Grant, RefreshToken
+from oauth2_provider.cimd import CIMDError
 
 from core.models import MCPAccountLink, MCPGrant, MCPGrantAccount, Projects
+from core.mcp_oauth import MCPMetadataFetcher
 
 
 @override_settings(MCP_ORIGIN="http://testserver", MCP_RESOURCE="http://testserver/mcp")
@@ -230,3 +233,36 @@ class MCPOAuthTests(TestCase):
         response = self.rpc(token, "tools/list", {"_meta": meta})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["result"]["resultType"], "complete")
+
+    def test_published_client_identity_can_advertise_additional_grants(self):
+        with patch("oauth2_provider.cimd.SafeMetadataFetcher.fetch", return_value=({"grant_types": [
+            "authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"]}, 300)):
+            metadata, age = MCPMetadataFetcher().fetch("https://client.example/metadata")
+            self.assertEqual(metadata["grant_types"], ["authorization_code", "refresh_token"])
+            self.assertEqual(age, 300)
+        for grants in [["password"], "authorization_code", [{"authorization_code": True}]]:
+            with patch("oauth2_provider.cimd.SafeMetadataFetcher.fetch", return_value=({"grant_types": grants}, 300)):
+                with self.assertRaises(CIMDError):
+                    MCPMetadataFetcher().fetch("https://client.example/metadata")
+
+    def test_invalid_client_identity_shows_an_error_instead_of_empty_consent(self):
+        response = self.client.get("/oauth/authorize/", {**self.query, "client_id": "not-a-client"})
+        self.assertContains(response, "Unable to connect", status_code=400)
+
+    def test_published_claude_metadata_completes_code_flow_without_enabling_jwt_grants(self):
+        self.client_id = "https://client.example/oauth/metadata"
+        self.query["client_id"] = self.client_id
+        metadata = {"client_id": self.client_id, "client_name": "Published client",
+                    "redirect_uris": [self.query["redirect_uri"]], "token_endpoint_auth_method": "none",
+                    "grant_types": ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"],
+                    "response_types": ["code"]}
+        with patch("oauth2_provider.cimd.SafeMetadataFetcher.fetch", return_value=(metadata, 300)):
+            response = self.client.get("/oauth/authorize/", self.query)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context["application"].name, "Published client")
+            self.assertEqual(list(response.context["form"].fields["accounts"].queryset), [self.owner])
+            token = self.token()["access_token"]
+            self.assertEqual(self.rpc(token).status_code, 200)
+            jwt = self.client.post("/oauth/token/", {"grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                                                    "client_id": self.client_id, "assertion": "untrusted"})
+            self.assertEqual(jwt.status_code, 400)

@@ -19,11 +19,24 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.csrf import csrf_exempt
 from oauth2_provider.forms import AllowForm
+from oauth2_provider.cimd import CIMDError, SafeMetadataFetcher
 from oauth2_provider.models import AccessToken, Application, Grant, RefreshToken
 from oauth2_provider.views import AuthorizationView, DynamicClientRegistrationView, DynamicClientRegistrationManagementView, RevokeTokenView, TokenView
 
 from core.models import MCPAccountLink, MCPGrant, MCPGrantAccount
 from users.forms import UserLoginForm
+
+
+class MCPMetadataFetcher(SafeMetadataFetcher):
+    """Keep hardened fetching; select the code flow from multi-flow client metadata."""
+    def fetch(self, client_id):
+        metadata, max_age = super().fetch(client_id)
+        grants = metadata.get("grant_types", ["authorization_code"])
+        if not isinstance(grants, list) or not all(isinstance(grant, str) for grant in grants) or "authorization_code" not in grants:
+            raise CIMDError("This MCP requires authorization_code client support")
+        # Claude also advertises jwt-bearer. It is not a grant this server accepts.
+        metadata = {**metadata, "grant_types": [grant for grant in grants if grant in {"authorization_code", "refresh_token"}]}
+        return metadata, max_age
 
 
 def available_accounts(user):
