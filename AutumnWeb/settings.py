@@ -486,6 +486,8 @@ OAUTH2_PROVIDER = {
     "DCR_REGISTRATION_PERMISSION_CLASSES": ["oauth2_provider.dcr.AllowAllDCRPermission"],
     "CIMD_ENABLED": True,
     "CIMD_METADATA_FETCHER": "core.mcp_oauth.MCPMetadataFetcher",
+    # Refresh also requires the user's live, unexpired MCP consent and an active account.
+    "OAUTH2_VALIDATOR_CLASS": "core.mcp_oauth.MCPOAuth2Validator",
     "OAUTH2_PROTECTED_RESOURCE_IDENTIFIER": MCP_RESOURCE,
     "OAUTH2_PROTECTED_RESOURCE_AUTHORIZATION_SERVERS": [MCP_ORIGIN],
     "OAUTH2_PROTECTED_RESOURCE_NAME": "Autumn MCP",

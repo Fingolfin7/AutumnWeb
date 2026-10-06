@@ -14,11 +14,18 @@
     </div>
 </div>
 
-<section class="slab slab-pad u-mb-4">
+<section class="slab slab-pad">
     <p class="page-eyebrow">ChatGPT and Claude</p>
     <h2 class="disclose-title">Autumn MCP</h2>
-    <p>Connect your Autumn accounts, choose permissions, and manage access.</p>
-    <a class="btn btn--ghost" href="{% url 'mcp-connections' %}">Manage MCP connections</a>
+
+    <div class="profile-codex-panel">
+        <p class="focus-lede">Let ChatGPT, Claude and other MCP apps use your Autumn accounts. You choose the accounts and whether they can change records, and you can revoke access anytime.</p>
+        <div class="form-actions">
+            <a class="btn btn--ghost" href="{% url 'mcp-connections' %}">
+                <i class="fas fa-plug" aria-hidden="true"></i> Manage MCP connections
+            </a>
+        </div>
+    </div>
 </section>
 
 <form method="post" enctype="multipart/form-data" class="fields profile-page">

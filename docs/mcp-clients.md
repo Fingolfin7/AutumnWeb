@@ -12,9 +12,13 @@ In ChatGPT, create a custom MCP plugin with the URL above and OAuth authenticati
 
 In Claude, add a custom connector using the same URL, select OAuth sign-in, and use Claude's published client identity or automatic registration. Do not add a fixed Authorization header.
 
-Both clients open Autumn's normal sign-in page. An existing signed-in session can be used. Choose at least one account, a default account, and whether the client may change records. Access is read-only by default and lasts up to 90 days. Sign in again to renew it.
+Both clients open Autumn's normal sign-in page. An existing signed-in session can be used. Choose at least one account, a default account, and whether the client may change records. Access is read-only by default and lasts up to 90 days. Sign in again to renew it; after it expires, refresh is refused and the client has to ask for consent again.
 
-To add another account, choose **Sign in to another Autumn account** during consent, or use **Profile → Manage MCP connections**. Enter that account's Autumn username/email and password. This proves access without changing the primary session or saving the password/API key. Return to consent and select the additional account. A linked account is available to choose; it is not automatically shared with every client.
+The consent page shows where the client's details are published (for clients that identify themselves with a metadata URL, such as Claude) and the host Autumn sends the answer to. App names are supplied by the apps themselves and are not checked by Autumn, so compare those hosts with the app you started from.
+
+Each Autumn user has one connection per client. Consenting again for the same client replaces that user's earlier connection for it, including its accounts and permissions, and signs out the earlier tokens. For example, connecting the same published client from a second account in that client takes over from the first.
+
+To add another account, choose **Sign in to another Autumn account** during consent, or use **Profile → Manage MCP connections**. Enter that account's Autumn username/email and password. This proves access without changing the primary session or saving the password/API key. Return to consent and select the additional account. A linked account is available to choose; it is not automatically shared with every client. An account that signs in only with Google or GitHub has no Autumn password, so it needs one before it can be added this way.
 
 Manage and revoke clients or unlink accounts at [MCP connections](https://autumn-lg0b.onrender.com/mcp/connections/). Unlinking revokes affected connections immediately; reconnect them to choose the remaining accounts. The additional account's owner can also sign in and withdraw access from this page. Another Autumn user sees only their own account and accounts they personally signed into.
 

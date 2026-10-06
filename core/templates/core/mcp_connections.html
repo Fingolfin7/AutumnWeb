@@ -1,15 +1,173 @@
-{% extends 'users/base.html' %}
-{% block content %}
-<div class="desk-head auth-card"><div><p class="page-eyebrow">Autumn MCP</p><h1 class="page-title">MCP connections</h1></div></div>
-<section class="slab slab-pad auth-card">
-  <p>Use this server URL in ChatGPT or Claude and select OAuth sign-in:</p><p><code>{{ endpoint }}</code></p>
-  <p>Your primary account is <strong>{{ user.username }}</strong>. Additional accounts are available only after you sign in to them and select them when connecting.</p>
-  <p><a href="{% url 'mcp-link-account' %}">Sign in to another Autumn account</a></p>
-  <h2>Additional accounts</h2>
-  {% for link in links %}<form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="action" value="unlink"><input type="hidden" name="id" value="{{ link.pk }}"><span>{{ link.user.username }}</span><button type="submit" class="btn btn--ghost">Unlink {{ link.user.username }}</button></form>{% empty %}<p>No additional accounts linked.</p>{% endfor %}
-  {% if linked_by %}<h2>Access to this account</h2><p>These users signed into this account to link it. You can withdraw their access here.</p>
-  {% for link in linked_by %}<form method="post" class="form-actions">{% csrf_token %}<input type="hidden" name="action" value="revoke-link"><input type="hidden" name="id" value="{{ link.pk }}"><span>{{ link.owner.username }}</span><button type="submit" class="btn btn--ghost">Revoke access for {{ link.owner.username }}</button></form>{% endfor %}{% endif %}
-  <h2>Connected clients</h2>
-  {% for grant in grants %}<article><h3>{{ grant.name }}</h3><p>{% for account in grant.accounts.all %}{{ account.name }}{% if not forloop.last %}, {% endif %}{% endfor %} · {% if grant.allow_writes %}Read and change records{% else %}Read-only{% endif %} · Expires {{ grant.expires_at|date:'j M Y' }}</p><form method="post">{% csrf_token %}<input type="hidden" name="action" value="revoke"><input type="hidden" name="id" value="{{ grant.pk }}"><button type="submit" class="btn btn--ghost">Revoke {{ grant.name }}</button></form></article>{% empty %}<p>No active connections. Start a connection from ChatGPT or Claude.</p>{% endfor %}
-</section>
+{% extends 'core/mcp_base.html' %}
+
+{% block mcp_title %}MCP connections{% endblock %}
+{% block mcp_width %}wide{% endblock %}
+
+{% block mcp_heading %}MCP connections{% endblock %}
+
+{% block mcp_lede %}
+<p class="mcp-lede">Apps such as ChatGPT and Claude that can use your Autumn data, and the accounts they can reach. You’re signed in as <strong class="mcp-name">{{ user.username }}</strong>.</p>
+{% endblock %}
+
+{% block mcp_body %}
+<div class="mcp-desk">
+    <div class="mcp-desk-main">
+        <section class="mcp-panel" aria-labelledby="mcp-apps-title">
+            <header class="mcp-panel-head">
+                <h2 id="mcp-apps-title" class="mcp-panel-title">Connected apps</h2>
+                {% if grants %}<span class="mcp-count">{{ grants|length }} active</span>{% endif %}
+            </header>
+
+            {% if grants %}
+            <ul class="mcp-list">
+                {% for grant in grants %}
+                <li class="mcp-grant">
+                    <div class="mcp-grant-head">
+                        <h3 class="mcp-grant-name">{{ grant.name }}</h3>
+                        {% if grant.allow_writes %}
+                        <span class="mcp-badge mcp-badge--write"><i class="fas fa-pen" aria-hidden="true"></i> Can change records</span>
+                        {% else %}
+                        <span class="mcp-badge"><i class="fas fa-eye" aria-hidden="true"></i> Read-only</span>
+                        {% endif %}
+                    </div>
+
+                    <dl class="mcp-grant-facts">
+                        <div class="mcp-fact">
+                            <dt>Accounts</dt>
+                            <dd>
+                                <ul class="mcp-chips">
+                                    {% for account in grant.accounts.all %}
+                                    <li class="mcp-chip{% if account.name == grant.default_account %} mcp-chip--default{% endif %}">{{ account.name }}{% if account.name == grant.default_account %} <span class="mcp-chip-note">default</span>{% endif %}</li>
+                                    {% endfor %}
+                                </ul>
+                            </dd>
+                        </div>
+                        <div class="mcp-fact">
+                            <dt>Expires</dt>
+                            <dd>
+                                <time datetime="{{ grant.expires_at|date:'c' }}">{{ grant.expires_at|date:'j M Y' }}</time>
+                                <span class="mcp-fact-sub">{{ grant.expires_at|timeuntil }} left</span>
+                            </dd>
+                        </div>
+                    </dl>
+
+                    <form method="post" class="mcp-row-action" data-mcp-confirm="Revoke {{ grant.name }}? It loses access to your Autumn accounts straight away.">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="revoke">
+                        <input type="hidden" name="id" value="{{ grant.pk }}">
+                        <button type="submit" class="btn btn--ghost mcp-btn-danger">
+                            <i class="fas fa-times-circle" aria-hidden="true"></i> Revoke<span class="sr-only"> {{ grant.name }}</span>
+                        </button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="mcp-empty">
+                <p class="mcp-empty-title">No apps are connected.</p>
+                <p>Add Autumn in ChatGPT, Claude or another MCP app using the <a href="#mcp-setup">server URL</a>. You’ll choose accounts and permissions when you connect.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        {% if linked_by %}
+        <section class="mcp-panel" aria-labelledby="mcp-access-title">
+            <header class="mcp-panel-head">
+                <h2 id="mcp-access-title" class="mcp-panel-title">Access to this account</h2>
+            </header>
+            <p class="mcp-panel-note">These Autumn users signed in to <strong class="mcp-name">{{ user.username }}</strong> to add it to their own MCP connections. Revoking removes the link and immediately ends any of their connections that include this account.</p>
+            <ul class="mcp-list">
+                {% for link in linked_by %}
+                <li class="mcp-row">
+                    <span class="mcp-tile" aria-hidden="true">{{ link.owner.username|first|upper }}</span>
+                    <span class="mcp-account-text">
+                        <span class="mcp-account-name">{{ link.owner.username }}</span>
+                        <span class="mcp-account-role">Added {{ link.created_at|date:'j M Y' }}</span>
+                    </span>
+                    <form method="post" class="mcp-row-action" data-mcp-confirm="Revoke access for {{ link.owner.username }}? Their connections that include {{ user.username }} stop working straight away.">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="revoke-link">
+                        <input type="hidden" name="id" value="{{ link.pk }}">
+                        <button type="submit" class="btn btn--ghost mcp-btn-danger">Revoke access for {{ link.owner.username }}</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        </section>
+        {% endif %}
+    </div>
+
+    <div class="mcp-desk-side">
+        <section class="mcp-panel" id="mcp-setup" aria-labelledby="mcp-setup-title">
+            <header class="mcp-panel-head">
+                <h2 id="mcp-setup-title" class="mcp-panel-title">Connect a new app</h2>
+            </header>
+            <div class="mcp-panel-body">
+                <ol class="mcp-steps">
+                    <li>
+                        <p>In ChatGPT, Claude or another MCP app, add a custom connector with this server URL:</p>
+                        <div class="mcp-endpoint">
+                            <code id="mcp-endpoint" class="mcp-endpoint-value">{{ endpoint }}</code>
+                            <button type="button" class="btn btn--quiet mcp-copy" data-mcp-copy="mcp-endpoint" hidden>
+                                <i class="far fa-copy" aria-hidden="true"></i> <span data-mcp-copy-label>Copy</span>
+                            </button>
+                        </div>
+                        <span class="sr-only" aria-live="polite" data-mcp-copy-status></span>
+                    </li>
+                    <li><p>When it asks how to sign in, choose OAuth.</p></li>
+                    <li><p>Sign in to Autumn, tick the accounts to share, and decide whether it may change records.</p></li>
+                </ol>
+                <p class="mcp-footnote">
+                    <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+                    <span>Each connection lasts 90 days. Connect again to renew it or to change its accounts.</span>
+                </p>
+            </div>
+        </section>
+
+        <section class="mcp-panel" aria-labelledby="mcp-accounts-title">
+            <header class="mcp-panel-head">
+                <h2 id="mcp-accounts-title" class="mcp-panel-title">Your accounts</h2>
+            </header>
+            <p class="mcp-panel-note">Apps can reach only the accounts listed here, and only the ones you tick when connecting.</p>
+            <ul class="mcp-list">
+                <li class="mcp-row">
+                    <span class="mcp-tile mcp-tile--primary" aria-hidden="true">{{ user.username|first|upper }}</span>
+                    <span class="mcp-account-text">
+                        <span class="mcp-account-name">{{ user.username }}<span class="mcp-flag">Primary</span></span>
+                        <span class="mcp-account-role">Signed in now</span>
+                    </span>
+                </li>
+                {% for link in links %}
+                <li class="mcp-row">
+                    <span class="mcp-tile" aria-hidden="true">{{ link.user.username|first|upper }}</span>
+                    <span class="mcp-account-text">
+                        <span class="mcp-account-name">{{ link.user.username }}</span>
+                        <span class="mcp-account-role">Added {{ link.created_at|date:'j M Y' }}</span>
+                    </span>
+                    <form method="post" class="mcp-row-action" data-mcp-confirm="Unlink {{ link.user.username }}? Connections that include it are revoked, and you’ll need to connect them again.">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="unlink">
+                        <input type="hidden" name="id" value="{{ link.pk }}">
+                        <button type="submit" class="btn btn--ghost mcp-btn-danger">
+                            <i class="fas fa-unlink" aria-hidden="true"></i> Unlink<span class="sr-only"> {{ link.user.username }}</span>
+                        </button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+            <div class="mcp-panel-foot">
+                {% if not links %}
+                <p class="mcp-panel-foot-note">No other accounts added. Add one to use several Autumn accounts through a single connection.</p>
+                {% endif %}
+                <a class="mcp-add" href="{% url 'mcp-link-account' %}">
+                    <span class="mcp-add-icon" aria-hidden="true"><i class="fas fa-plus"></i></span>
+                    <span class="mcp-account-text">
+                        <span class="mcp-add-title">Sign in to another Autumn account</span>
+                        <span class="mcp-account-role">Its password is checked, not saved. You stay signed in as {{ user.username }}.</span>
+                    </span>
+                </a>
+            </div>
+        </section>
+    </div>
+</div>
 {% endblock %}

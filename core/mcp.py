@@ -162,7 +162,9 @@ def mcp_endpoint(request):
                 grant.allow_writes = grant.allow_writes and "autumn:write" in oauth_request.scopes
     if grant is None:
         response = _error(None, -32001, "Sign in to Autumn to connect your accounts.", 401)
-        response["WWW-Authenticate"] = f'Bearer resource_metadata="{settings.MCP_ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="autumn:read"'
+        # RFC 6750: name the error only when a token was actually presented.
+        response["WWW-Authenticate"] = (f'Bearer resource_metadata="{settings.MCP_ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="autumn:read"'
+                                        + (', error="invalid_token"' if token else ""))
         return response
     if request.method != "POST":
         response = HttpResponse(status=405)

@@ -1,7 +1,7 @@
 """Self-service OAuth consent and account linking for the single Autumn MCP."""
 import hashlib
 from datetime import timedelta
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 from django import forms
 from django.conf import settings
@@ -16,11 +16,13 @@ from django.shortcuts import redirect, render
 from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.debug import sensitive_post_parameters
 from django.views.decorators.csrf import csrf_exempt
 from oauth2_provider.forms import AllowForm
 from oauth2_provider.cimd import CIMDError, SafeMetadataFetcher
 from oauth2_provider.models import AccessToken, Application, Grant, RefreshToken
+from oauth2_provider.oauth2_validators import OAuth2Validator
 from oauth2_provider.views import AuthorizationView, DynamicClientRegistrationView, DynamicClientRegistrationManagementView, RevokeTokenView, TokenView
 
 from core.models import MCPAccountLink, MCPGrant, MCPGrantAccount
@@ -37,6 +39,42 @@ class MCPMetadataFetcher(SafeMetadataFetcher):
         # Claude also advertises jwt-bearer. It is not a grant this server accepts.
         metadata = {**metadata, "grant_types": [grant for grant in grants if grant in {"authorization_code", "refresh_token"}]}
         return metadata, max_age
+
+
+class MCPOAuth2Validator(OAuth2Validator):
+    """Library refresh checks first; then the Autumn consent behind the token must still be live.
+
+    Every client of this server is issued tokens only through MCP account consent, so a refresh
+    without an active, unexpired MCPGrant for that owner and client, or for an inactive owner,
+    is refused (invalid_grant), and standard clients start a new consent instead.
+    """
+    def validate_refresh_token(self, refresh_token, client, request, *args, **kwargs):
+        if not super().validate_refresh_token(refresh_token, client, request, *args, **kwargs):
+            return False
+        user = request.user
+        return bool(user is not None and user.is_active and MCPGrant.objects.filter(
+            owner=user, oauth_application=client, revoked_at__isnull=True, expires_at__gt=timezone.now(),
+        ).exists())
+
+
+# Fields of AllowForm that carry the client's authorization request.
+OAUTH_REQUEST_FIELDS = ("client_id", "redirect_uri", "response_type", "scope", "state", "code_challenge",
+                        "code_challenge_method", "nonce", "claims", "resource")
+
+
+def display_host(uri):
+    """Host (and port) only. Paths and queries can carry state, so they are never shown."""
+    try:
+        parts = urlsplit(uri or "")
+        host, port = parts.hostname, parts.port
+        # Punycode keeps look-alike Unicode hosts visibly distinct.
+        host = host.encode("idna").decode("ascii") if host else ""
+    except (ValueError, UnicodeError):
+        return ""
+    if parts.scheme not in {"http", "https"} or not host:
+        return ""
+    host = f"[{host}]" if ":" in host else host
+    return f"{host}:{port}" if port else host
 
 
 def available_accounts(user):
@@ -139,8 +177,30 @@ class MCPAuthorizationView(AuthorizationView):
         context = super().get_context_data(**kwargs)
         if "application" not in context:
             context["application"] = Application.objects.filter(client_id=self.request.POST.get("client_id", "")).first()
-        context["link_url"] = reverse("mcp-link-account") + "?next=" + quote(self.request.get_full_path(), safe="")
+        application, form = context.get("application"), context.get("form")
+        # Who is asking and where the answer goes, so a self-chosen name cannot pass for another app.
+        if application is not None:
+            source = application.registration_source
+            context["client_host"] = display_host(application.client_id) if source == Application.RegistrationSource.CIMD else ""
+            context["name_self_supplied"] = source in {Application.RegistrationSource.DCR, Application.RegistrationSource.CIMD}
+        context["redirect_host"] = display_host(form["redirect_uri"].value()) if form is not None and "redirect_uri" in form.fields else ""
+        back = self.consent_path(form)
+        context["link_url"] = reverse("mcp-link-account") + (f"?next={quote(back, safe='')}" if back else "")
         return context
+
+    def consent_path(self, form):
+        """Where adding an account returns to: this same authorization request, re-validated on GET."""
+        if self.request.method == "GET" or "client_id" in self.request.GET:
+            return self.request.get_full_path()
+        if form is None or not form.is_bound:
+            return ""
+        # A POST to the bare endpoint: rebuild the request from its hidden fields only, never
+        # account choices, passwords or the CSRF token.
+        params = []
+        for name in OAUTH_REQUEST_FIELDS:
+            value = form.data.get(name, "")
+            params.extend((name, item) for item in (value.split() if name == "resource" else [value]) if item)
+        return reverse("oauth2_provider:authorize") + "?" + urlencode(params) if params else ""
 
     def form_valid(self, form):
         if not form.cleaned_data["allow"]:
@@ -179,20 +239,28 @@ class MCPRegistrationView(DynamicClientRegistrationView):
 
 
 def _return_to(request):
+    """A same-site relative path, returned unchanged; anything else goes to the connections page."""
     target = request.POST.get("next", request.GET.get("next", ""))
-    return target if target.startswith("/") and not target.startswith("//") and "\\" not in target else reverse("mcp-connections")
+    # Browsers drop tabs and newlines from URLs, so "/\t/host" in an href would leave the site.
+    if (target.startswith("/") and not target.startswith("//") and "\\" not in target
+            and not any(ord(char) < 32 or ord(char) == 127 for char in target)
+            and url_has_allowed_host_and_scheme(target, allowed_hosts=set())):
+        return target
+    return reverse("mcp-connections")
 
 
 @login_required
 @sensitive_post_parameters("password")
 def link_account(request):
     target = _return_to(request)
+    if request.method == "POST" and _limited(request, "link", 10):
+        # Checked before any bound form exists: validating or rendering one runs authenticate(),
+        # which would hash the password and reveal whether it was right.
+        response = render(request, "core/mcp_link.html", {"next": target, "limited": True}, status=429)
+        response["Cache-Control"] = "no-store"
+        return response
     form = UserLoginForm(request=request, data=request.POST if request.method == "POST" else None)
     if request.method == "POST":
-        if _limited(request, "link", 10):
-            response = render(request, "core/mcp_link.html", {"form": form, "next": target, "limited": True}, status=429)
-            response["Cache-Control"] = "no-store"
-            return response
         if form.is_valid():
             account = form.get_user()
             if account != request.user:

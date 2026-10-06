@@ -1,0 +1,39 @@
+{% extends 'users/base.html' %}
+{% load static %}
+{% comment %}
+  Shared frame for the Autumn MCP pages: consent (mcp_authorize), adding an
+  account (mcp_link) and managing access (mcp_connections).
+
+  Page styling lives in core/css/mcp.css so focus_desk.css stays unchanged.
+  core/js/mcp.js is progressive enhancement only (revoke confirmation, copy
+  button, default-account hints); every form here works without it.
+
+  Blocks:
+    mcp_title    <title> text
+    mcp_width    "narrow" (single column) or "wide" (two-track desk)
+    mcp_heading  the page <h1>
+    mcp_lede     optional paragraph under the heading
+    mcp_body     the page itself
+{% endcomment %}
+
+{% block title %}{% block mcp_title %}Autumn MCP{% endblock %} | Autumn{% endblock %}
+
+{% block head_includes %}
+<link rel="stylesheet" href="{% static 'core/css/mcp.css' %}?v={{ static_version.mcp }}">
+{% endblock %}
+
+{% block content %}
+<div class="mcp mcp--{% block mcp_width %}narrow{% endblock %}">
+    <header class="mcp-head">
+        <p class="page-eyebrow">Autumn MCP</p>
+        <h1 class="page-title mcp-title">{% block mcp_heading %}{% endblock %}</h1>
+        {% block mcp_lede %}{% endblock %}
+    </header>
+
+    {% block mcp_body %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'core/js/mcp.js' %}?v={{ static_version.mcp }}" defer></script>
+{% endblock %}

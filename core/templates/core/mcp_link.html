@@ -1,15 +1,77 @@
-{% extends 'users/base.html' %}
-{% block content %}
-<div class="desk-head auth-card"><div><p class="page-eyebrow">Autumn MCP</p><h1 class="page-title">Add an account</h1></div></div>
-<section class="slab slab-pad auth-card">
-  <p>Sign in to the additional Autumn account. You stay signed in as {{ user.username }}. Its password is used to verify access and is never saved by MCP.</p>
-  {% if limited %}<p role="alert">Too many attempts. Try again in 15 minutes.</p>{% endif %}
-  <form method="post" class="fields">
-    {% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
-    {{ form.non_field_errors }}
-    <div class="field">{{ form.username.label_tag }}{{ form.username.errors }}{{ form.username }}</div>
-    <div class="field">{{ form.password.label_tag }}{{ form.password.errors }}{{ form.password }}</div>
-    <div class="form-actions"><a class="btn btn--ghost" href="{{ next }}">Cancel</a><button class="btn btn--primary" type="submit">Sign in and add account</button></div>
-  </form>
+{% extends 'core/mcp_base.html' %}
+
+{% block mcp_title %}Add an account{% endblock %}
+
+{% block mcp_heading %}Add another Autumn account{% endblock %}
+
+{% block mcp_lede %}
+<p class="mcp-lede">Sign in to the account you want to share, so you can tick it when you connect ChatGPT, Claude or another MCP app.</p>
+{% endblock %}
+
+{% block mcp_body %}
+<section class="mcp-panel" aria-label="Sign in to the additional account">
+    <ul class="mcp-section mcp-facts">
+        <li>
+            <span class="mcp-facts-icon" aria-hidden="true"><i class="fas fa-user-check"></i></span>
+            <div>
+                <strong class="mcp-name">You stay signed in as {{ user.username }}.</strong>
+                This doesn’t switch accounts. It only proves the other account is yours.
+            </div>
+        </li>
+        <li>
+            <span class="mcp-facts-icon" aria-hidden="true"><i class="fas fa-key"></i></span>
+            <div>
+                <strong>The password is checked, not saved.</strong>
+                Autumn verifies it once and keeps only a link between the two accounts.
+            </div>
+        </li>
+    </ul>
+
+    {% comment %}
+      When throttled, the view checks the limit before building any form and
+      sends none: validating or rendering a bound sign-in form (even its
+      widgets, which read form.errors for aria-invalid) runs authenticate()
+      and would reveal whether the password was right.
+    {% endcomment %}
+    {% if limited %}
+    <div class="mcp-section">
+        <div class="mcp-alert mcp-alert--warn" role="alert">
+            <i class="fas fa-hourglass-half mcp-alert-icon" aria-hidden="true"></i>
+            <div>
+                <p class="mcp-alert-title">Too many attempts. Try again in 15 minutes.</p>
+                <p class="mcp-alert-detail">Sign-in here is paused to protect your accounts. No account was added.</p>
+            </div>
+        </div>
+        <div class="form-actions mcp-actions">
+            <a class="btn btn--ghost" href="{{ next }}">Go back</a>
+        </div>
+    </div>
+    {% else %}
+    <form method="post" class="fields mcp-section">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+
+        {% if form.non_field_errors %}
+        <div class="mcp-alert mcp-form-alert" role="alert">
+            <i class="fas fa-exclamation-circle mcp-alert-icon" aria-hidden="true"></i>
+            <div>{{ form.non_field_errors }}</div>
+        </div>
+        {% endif %}
+
+        <div class="field">{{ form.username.label_tag }}{{ form.username.errors }}{{ form.username }}</div>
+        <div class="field">{{ form.password.label_tag }}{{ form.password.errors }}{{ form.password }}</div>
+
+        <div class="form-actions mcp-actions">
+            <a class="btn btn--ghost" href="{{ next }}">Cancel</a>
+            <button class="btn btn--primary" type="submit">
+                <i class="fas fa-user-plus" aria-hidden="true"></i> Sign in and add account
+            </button>
+        </div>
+    </form>
+    {% endif %}
+
+    <p class="mcp-section mcp-footnote">
+        <i class="fas fa-unlink" aria-hidden="true"></i>
+        <span>An added account stays available until it’s unlinked in <a href="{% url 'mcp-connections' %}">MCP connections</a>, from this account or from the added one.</span>
+    </p>
 </section>
 {% endblock %}

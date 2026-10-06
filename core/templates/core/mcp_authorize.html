@@ -1,23 +1,166 @@
-{% extends 'users/base.html' %}
-{% block content %}
-<div class="desk-head auth-card"><div><p class="page-eyebrow">Autumn MCP</p><h1 class="page-title">Connect your accounts</h1></div></div>
-<section class="slab slab-pad auth-card">
-  {% if error %}
-  <p role="alert">Unable to connect: {{ error.error }}. {{ error.description }}</p>
-  <p>Return to the client, check its OAuth settings, and try connecting again.</p>
-  {% else %}
-  <p>Signed in as <strong>{{ user.username }}</strong>. Choose the accounts <strong>{{ application.name|default:'this client' }}</strong> can access.</p>
-  <form method="post" class="fields">
-    {% csrf_token %}
-    {% for field in form.hidden_fields %}{{ field }}{{ field.errors }}{% endfor %}
-    {{ form.non_field_errors }}
-    <div class="field"><fieldset><legend>Accounts to share</legend>{{ form.accounts.errors }}{{ form.accounts }}</fieldset></div>
-    <p><a href="{{ link_url }}">Sign in to another Autumn account</a></p>
-    <div class="field">{{ form.default_account.label_tag }}{{ form.default_account.errors }}{{ form.default_account }}</div>
-    {% if 'autumn:write' in form.scope.value %}<div class="field"><label>{{ form.allow_writes }} {{ form.allow_writes.label }}</label></div>{% endif %}
-    <p>Access is read-only unless you allow changes. This connection expires in 90 days. Revoke it anytime from <a href="{% url 'mcp-connections' %}" target="_blank" rel="noopener">MCP connections</a>.</p>
-    <div class="form-actions"><button class="btn btn--ghost" type="submit" name="allow" value="">Cancel</button><button class="btn btn--primary" type="submit" name="allow" value="true">Connect selected accounts</button></div>
-  </form>
-  {% endif %}
+{% extends 'core/mcp_base.html' %}
+
+{% block mcp_title %}{% if error %}Unable to connect{% else %}Connect {{ application.name|default:'an app' }}{% endif %}{% endblock %}
+
+{% block mcp_heading %}{% if error %}Unable to connect{% else %}Allow {{ application.name|default:'this client' }} to use your Autumn accounts?{% endif %}{% endblock %}
+
+{% block mcp_lede %}
+{% if error %}
+<p class="mcp-lede">The app’s connection request couldn’t be accepted, so no access was granted.</p>
+{% else %}
+<p class="mcp-lede">You’re signed in as <strong class="mcp-name">{{ user.username }}</strong>. Choose the accounts it can use and what it’s allowed to do. Nothing is shared until you select Connect.</p>
+{% if client_host or redirect_host or name_self_supplied %}
+<div class="mcp-identity">
+    <dl class="mcp-identity-facts">
+        {% if client_host %}
+        <div class="mcp-identity-fact">
+            <dt>App details published at</dt>
+            <dd><span class="mcp-identity-host">{{ client_host }}</span></dd>
+        </div>
+        {% endif %}
+        {% if redirect_host %}
+        <div class="mcp-identity-fact">
+            <dt>Your answer is sent to</dt>
+            <dd><span class="mcp-identity-host">{{ redirect_host }}</span></dd>
+        </div>
+        {% endif %}
+    </dl>
+    {% if name_self_supplied %}
+    <p class="mcp-identity-note">{% if client_host %}The name “{{ application.name|default:'this client' }}” comes from the details published at {{ client_host }}.{% else %}The name “{{ application.name|default:'this client' }}” was supplied by the app itself when it registered.{% endif %} Autumn doesn’t check app names{% if client_host or redirect_host %}, so rely on the {% if client_host and redirect_host %}addresses{% else %}address{% endif %} above{% endif %}. Connect only if you started this from an app you trust.</p>
+    {% endif %}
+</div>
+{% endif %}
+{% endif %}
+{% endblock %}
+
+{% block mcp_body %}
+{% if error %}
+<section class="mcp-panel" aria-labelledby="mcp-error-next">
+    <div class="mcp-section">
+        <div class="mcp-alert" role="alert">
+            <i class="fas fa-exclamation-circle mcp-alert-icon" aria-hidden="true"></i>
+            <div>
+                <p class="mcp-alert-title">{{ error.description|default:'The connection request could not be verified.' }}</p>
+                {% if error.error %}<p class="mcp-alert-detail">Error code: <code>{{ error.error }}</code></p>{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="mcp-section">
+        <h2 id="mcp-error-next" class="mcp-section-title">What to do next</h2>
+        <ol class="mcp-steps">
+            <li><p>Go back to ChatGPT, Claude or the app you were connecting.</p></li>
+            <li><p>Check the connection’s OAuth sign-in settings.</p></li>
+            <li><p>Start the connection again from that app.</p></li>
+        </ol>
+        <div class="form-actions mcp-actions">
+            <a class="btn btn--ghost" href="{% url 'mcp-connections' %}">Open MCP connections</a>
+        </div>
+    </div>
 </section>
+{% else %}
+<form method="post" class="fields mcp-panel" data-mcp-consent>
+    {% csrf_token %}
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+
+    {% if form.errors %}
+    <div class="mcp-section">
+        <div class="mcp-alert" role="alert">
+            <i class="fas fa-exclamation-circle mcp-alert-icon" aria-hidden="true"></i>
+            <div>
+                <p class="mcp-alert-title">Nothing was connected. Fix the items marked below, then select Connect again.</p>
+                {{ form.non_field_errors }}
+                {% for field in form.hidden_fields %}{% if field.errors %}
+                <ul class="errorlist">{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}</ul>
+                {% endif %}{% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <fieldset class="mcp-section mcp-fieldset"{% if form.accounts.errors %} aria-describedby="mcp-accounts-errors"{% endif %}>
+        <legend class="mcp-section-title">{{ form.accounts.label }}</legend>
+        <p class="mcp-section-note">It can only use the accounts you tick. Each keeps its own projects, sessions and settings.</p>
+        <div id="mcp-accounts-errors">{{ form.accounts.errors }}</div>
+
+        <div class="mcp-choices" id="{{ form.accounts.auto_id }}">
+            {% for option in form.accounts %}
+            <label class="mcp-choice" for="{{ option.id_for_label }}" data-mcp-account>
+                {{ option.tag }}
+                <span class="mcp-tile" aria-hidden="true">{{ option.choice_label|first|upper }}</span>
+                <span class="mcp-account-text">
+                    <span class="mcp-account-name">{{ option.choice_label }}<span class="mcp-flag" data-mcp-default-flag hidden>Default</span></span>
+                    <span class="mcp-account-role">{% if option.data.value == user.pk %}Signed in now{% else %}Added account{% endif %}</span>
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+        <p class="mcp-hint" data-mcp-accounts-hint aria-live="polite"></p>
+
+        <a class="mcp-add mcp-add--indent" href="{{ link_url }}">
+            <span class="mcp-add-icon" aria-hidden="true"><i class="fas fa-plus"></i></span>
+            <span class="mcp-account-text">
+                <span class="mcp-add-title">Sign in to another Autumn account</span>
+                <span class="mcp-account-role">You’ll come back here to finish. You stay signed in as {{ user.username }}.</span>
+            </span>
+        </a>
+    </fieldset>
+
+    <div class="mcp-section">
+        <label class="mcp-section-title" for="{{ form.default_account.id_for_label }}">{{ form.default_account.label }}</label>
+        <p class="mcp-section-note">Used when a request doesn’t name an account. Pick one of the accounts you’re sharing.</p>
+        {{ form.default_account.errors }}
+        <div class="mcp-select">{{ form.default_account }}</div>
+        <p class="mcp-hint" data-mcp-default-hint aria-live="polite"></p>
+    </div>
+
+    <div class="mcp-section">
+        <h2 class="mcp-section-title">What it can do</h2>
+        <ul class="mcp-perms">
+            <li class="mcp-perm mcp-perm--on">
+                <span class="mcp-perm-icon" aria-hidden="true"><i class="fas fa-eye"></i></span>
+                <span class="mcp-perm-text">
+                    <span class="mcp-perm-name">Read your records</span>
+                    <span class="mcp-perm-desc">Projects, sessions, timers, totals and commitments in the accounts you share.</span>
+                </span>
+                <span class="mcp-perm-state"><i class="fas fa-check" aria-hidden="true"></i> Always included</span>
+            </li>
+            {% if 'autumn:write' in form.scope.value %}
+            <li>
+                <label class="mcp-perm mcp-perm--choice" for="{{ form.allow_writes.id_for_label }}">
+                    {{ form.allow_writes }}
+                    <span class="mcp-perm-text">
+                        <span class="mcp-perm-name">{{ form.allow_writes.label }}</span>
+                        <span class="mcp-perm-desc">Lets it start and stop timers, log and edit sessions, and create, change or delete projects and other records, including importing data. Leave this off to keep the connection read-only.</span>
+                    </span>
+                    <span class="mcp-perm-state mcp-perm-state--toggle" aria-hidden="true"><span class="mcp-when-off">Off</span><span class="mcp-when-on">Allowed</span></span>
+                </label>
+                {{ form.allow_writes.errors }}
+            </li>
+            {% else %}
+            <li class="mcp-perm mcp-perm--off">
+                <span class="mcp-perm-icon" aria-hidden="true"><i class="fas fa-ban"></i></span>
+                <span class="mcp-perm-text">
+                    <span class="mcp-perm-name">Change records</span>
+                    <span class="mcp-perm-desc">Not requested. This app asked for read-only access.</span>
+                </span>
+                <span class="mcp-perm-state">Not included</span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <div class="mcp-section">
+        <p class="mcp-footnote">
+            <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+            <span>Access lasts 90 days, then the app has to ask again. Revoke it sooner anytime from <a href="{% url 'mcp-connections' %}" target="_blank" rel="noopener">MCP connections<span class="sr-only"> (opens in a new tab)</span></a>.</span>
+        </p>
+        <div class="form-actions mcp-actions">
+            <button class="btn btn--ghost" type="submit" name="allow" value="">Cancel</button>
+            <button class="btn btn--primary" type="submit" name="allow" value="true">
+                <i class="fas fa-link" aria-hidden="true"></i> Connect selected accounts
+            </button>
+        </div>
+    </div>
+</form>
+{% endif %}
 {% endblock %}
