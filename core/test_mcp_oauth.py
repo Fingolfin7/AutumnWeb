@@ -81,10 +81,50 @@ class MCPOAuthTests(TestCase):
         self.assertIn("none", auth["token_endpoint_auth_methods_supported"])
         resource = self.client.get("/.well-known/oauth-protected-resource/mcp").json()
         self.assertEqual(resource["resource"], settings.OAUTH2_PROVIDER["OAUTH2_PROTECTED_RESOURCE_IDENTIFIER"])
+        self.assertEqual(set(resource["scopes_supported"]), {"autumn:read", "autumn:write"})
         self.assertEqual(self.rpc("").status_code, 401)
         self.assertIn("resource_metadata=", self.rpc("")["WWW-Authenticate"])
+        # MCP clients prefer a challenge's scope over resource metadata. Restricting
+        # discovery to read here would hide the optional write choice during consent.
+        self.assertNotIn("scope=", self.rpc("")["WWW-Authenticate"])
         self.assertNotIn("error=", self.rpc("")["WWW-Authenticate"])
         self.assertIn('error="invalid_token"', self.rpc("not-a-token")["WWW-Authenticate"])
+
+    def test_client_requested_read_only_cannot_be_escalated_by_the_consent_checkbox(self):
+        page = self.client.get("/oauth/authorize/", {**self.query, "scope": "autumn:read"})
+        self.assertNotContains(page, 'name="allow_writes"')
+        token = self.token(self.authorize(writes=True, scope="autumn:read"))
+        self.assertEqual(token["scope"], "autumn:read")
+        self.assertFalse(MCPGrant.objects.get().allow_writes)
+        result = self.rpc(token["access_token"], params={"name": "create_project", "arguments": {"name": "denied"}}).json()["result"]
+        self.assertTrue(result["isError"])
+        self.assertFalse(Projects.objects.exists())
+
+    def test_official_sdk_discovery_can_request_optional_write_consent(self):
+        import shutil
+        import subprocess
+        from pathlib import Path
+
+        root = Path(settings.BASE_DIR) / "integrations/mcp"
+        if not shutil.which("node") or not (root / "node_modules/@modelcontextprotocol/sdk").exists():
+            self.skipTest("Run npm ci in integrations/mcp for official SDK scope verification")
+        challenge = self.rpc("")["WWW-Authenticate"]
+        discovery = {
+            "challenge": challenge,
+            "resourceMetadata": self.client.get("/.well-known/oauth-protected-resource/mcp").json(),
+            "authorizationMetadata": self.client.get("/.well-known/oauth-authorization-server").json(),
+        }
+        for header, expected in [(challenge, {"autumn:read", "autumn:write"}),
+                                  (challenge + ', scope="autumn:read"', {"autumn:read"})]:
+            discovery["challenge"] = header
+            result = subprocess.run(["node", "scripts/verify-scope-discovery.mjs"], cwd=root,
+                                    input=json.dumps(discovery), capture_output=True, text=True, timeout=20)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            requested = json.loads(result.stdout)["scope"]
+            self.assertEqual(set(requested.split()), expected)
+            page = self.client.get("/oauth/authorize/", {**self.query, "scope": requested})
+            self.assertEqual(page.status_code, 200)
+            self.assertEqual('name="allow_writes"' in page.content.decode(), "autumn:write" in expected)
 
     def test_new_user_has_only_their_own_account_and_consent_is_always_shown(self):
         response = self.client.get("/oauth/authorize/", self.query)

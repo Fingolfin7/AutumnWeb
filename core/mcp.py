@@ -162,8 +162,11 @@ def mcp_endpoint(request):
                 grant.allow_writes = grant.allow_writes and "autumn:write" in oauth_request.scopes
     if grant is None:
         response = _error(None, -32001, "Sign in to Autumn to connect your accounts.", 401)
+        # Let clients discover the supported read/write scopes from resource metadata.
+        # A read-only challenge overrides that metadata and makes write consent unreachable.
+        # Consent still narrows the token to read-only unless the user explicitly opts in.
         # RFC 6750: name the error only when a token was actually presented.
-        response["WWW-Authenticate"] = (f'Bearer resource_metadata="{settings.MCP_ORIGIN}/.well-known/oauth-protected-resource/mcp", scope="autumn:read"'
+        response["WWW-Authenticate"] = (f'Bearer resource_metadata="{settings.MCP_ORIGIN}/.well-known/oauth-protected-resource/mcp"'
                                         + (', error="invalid_token"' if token else ""))
         return response
     if request.method != "POST":

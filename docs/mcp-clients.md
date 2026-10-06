@@ -14,6 +14,8 @@ In Claude, add a custom connector using the same URL, select OAuth sign-in, and 
 
 Both clients open Autumn's normal sign-in page. An existing signed-in session can be used. Choose at least one account, a default account, and whether the client may change records. Access is read-only by default and lasts up to 90 days. Sign in again to renew it; after it expires, refresh is refused and the client has to ask for consent again.
 
+To permit writing, the client's authorization request must include both `autumn:read` and `autumn:write`, then you must tick **Allow changes to records in these accounts**. MCP discovery advertises both scopes without a read-only challenge overriding them. If the consent page says the app requested only read access, cancel that attempt and start a fresh connection from the app; a client caching the old scope may need its connector disconnected and reconnected or recreated. Autumn never adds write permission to a read-only request, and existing connections are not upgraded automatically.
+
 The consent page shows where the client's details are published (for clients that identify themselves with a metadata URL, such as Claude) and the host Autumn sends the answer to. App names are supplied by the apps themselves and are not checked by Autumn, so compare those hosts with the app you started from.
 
 Each Autumn user has one connection per client. Consenting again for the same client replaces that user's earlier connection for it, including its accounts and permissions, and signs out the earlier tokens. For example, connecting the same published client from a second account in that client takes over from the first.
