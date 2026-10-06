@@ -226,6 +226,8 @@ See the [Sites launch and connection notes](docs/sites-mcp-launch.md) and the
 [hosted MCP source](integrations/sites-mcp/README.md). Autumn API tokens are
 stored as Sites server secrets, outside this repository.
 
+**October 6, 2026:** Claude and other MCP clients can also connect to Autumn's existing Render service using dedicated account-scoped connector credentials. See [MCP client setup](docs/mcp-clients.md).
+
 ---
 
 Built with care. Use it if it is useful to you.

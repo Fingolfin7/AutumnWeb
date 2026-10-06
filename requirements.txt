@@ -1,5 +1,6 @@
 Django==5.2.16
 djangorestframework==3.17.2
+jsonschema==4.26.0
 drf-spectacular==0.30.0
 django-crispy-forms==2.4
 crispy-bootstrap4==2024.10

@@ -6,6 +6,8 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "^2.3.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "esbuild": "^0.28.2",
     "miniflare": "^4.20260730.0"
   },

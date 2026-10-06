@@ -22,11 +22,13 @@ from django.urls import path, include, reverse_lazy, re_path
 from django.contrib.auth import views as auth_views
 from rest_framework.authtoken.views import obtain_auth_token
 from core import pwa
+from core.mcp import mcp_endpoint
 from users import views as user_views
 from users.forms import UserLoginForm
 
 
 urlpatterns = [
+    path("mcp", mcp_endpoint, name="mcp"),
     path("api/v2/", include("core.api_v2.urls")),
     path("admin/", admin.site.urls),
     path("manifest.webmanifest", pwa.manifest, name="pwa_manifest"),

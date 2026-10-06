@@ -22,6 +22,27 @@ status_choices = (
 User._meta.get_field('email')._unique = True  # make email field unique
 
 
+class MCPGrant(models.Model):
+    """Revocable MCP capability. Only a digest of the bearer secret is stored."""
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="mcp_grants")
+    name = models.CharField(max_length=100)
+    token_digest = models.CharField(max_length=64, unique=True)
+    default_account = models.CharField(max_length=128)
+    allow_writes = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+
+class MCPGrantAccount(models.Model):
+    grant = models.ForeignKey(MCPGrant, on_delete=models.CASCADE, related_name="accounts")
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=128)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["grant", "name"], name="unique_mcp_grant_account")]
+
+
 class RecommendationCache(models.Model):
     """Shared per-account advice cache; leases deduplicate work across workers."""
     user = models.ForeignKey(User, on_delete=models.CASCADE)

@@ -2,6 +2,8 @@
 
 Private, owner-only remote MCP tools backed by Autumn API v2. The Python MCP entry point in the parent repo remains available for local clients.
 
+Claude and other clients supporting fixed bearer headers can use Autumn's independent `/mcp` endpoint on its existing Render service. It reuses this generated tool contract with separate account-scoped, revocable credentials. See [client setup](https://github.com/Fingolfin7/AutumnWeb/blob/master/docs/mcp-clients.md). The Sites OAuth and owner-only access remain unchanged.
+
 The Worker exposes all 46 operations in the checked-in OpenAPI contract plus `list_accounts`: projects, subprojects, sessions, timers, contexts, tags, reports, commitments, export and import. Names and inputs are generated from `openapi-v2.yaml`. Tools use native API v2 numeric IDs and response shapes, rather than the older compact facade. Search projects before writing; use returned IDs. Session reads support `include=note`, and list responses preserve pagination.
 
 Every API tool accepts optional `account`, such as `kuda` or `Henry`. Omission uses `AUTUMN_DEFAULT_ACCOUNT`. Call `list_accounts` to discover configured names. Every API response includes `_autumn_account`. Explicit account selection is isolated per request, supports concurrent comparisons, and never changes the local CLI account or a shared server setting. Resolve IDs separately in each account. Unknown account names fail without falling back to another account.

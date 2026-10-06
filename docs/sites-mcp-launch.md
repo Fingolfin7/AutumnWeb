@@ -2,6 +2,8 @@
 
 Launch date: October 3, 2026.
 
+October 6 interoperability update: the working Sites plugin remains the ChatGPT connection. Claude and other clients supporting bearer headers can use Autumn's independent MCP endpoint on the existing Render service, with separate account-scoped, expiring, revocable credentials. Both legacy initialization and modern `2026-07-28` requests are supported. See [client setup](mcp-clients.md).
+
 Autumn's remote MCP server is hosted privately on ChatGPT Sites. It uses Autumn
 API v2 and exposes 46 API operations plus `list_accounts`: projects,
 subprojects, saved sessions, live timers, contexts, tags, reports, commitments,
