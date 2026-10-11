@@ -90,7 +90,7 @@ PUSH_RETRY_BASE_SECONDS = env.int("PUSH_RETRY_BASE_SECONDS", default=30)
 
 # Cosine cutoff for "Related" Sessions search results; see
 # scripts/semantic_search_eval.py for how to choose it.
-SEMANTIC_SEARCH_MIN_SIMILARITY = env.float("SEMANTIC_SEARCH_MIN_SIMILARITY", default=0.35)
+SEMANTIC_SEARCH_MIN_SIMILARITY = env.float("SEMANTIC_SEARCH_MIN_SIMILARITY", default=0.45)
 PUSH_CLAIM_LEASE_SECONDS = env.int("PUSH_CLAIM_LEASE_SECONDS", default=120)
 # Opt-in in-process dispatcher thread.  Off by default: the bounded
 # ``dispatch_timer_reminders`` cron command stays the alternative delivery path.

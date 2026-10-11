@@ -33,9 +33,9 @@ MAX_QUERY_CHARS = 500
 QUERY_TIMEOUT_SECONDS = 4.0
 SYNC_TIMEOUT_SECONDS = 60.0
 QUERY_CACHE_SECONDS = 15 * 60
-# Chosen from scripts/semantic_search_eval.py; override with
-# SEMANTIC_SEARCH_MIN_SIMILARITY once it has been run against real labels.
-DEFAULT_MIN_SIMILARITY = 0.35
+# Best F0.5 in scripts/semantic_search_eval.py (fictional corpus) with nothing
+# shown for the no-match query; override with SEMANTIC_SEARCH_MIN_SIMILARITY.
+DEFAULT_MIN_SIMILARITY = 0.45
 CANDIDATE_LIMIT = 50
 RELATED_LIMIT = 5
 RRF_K = 60
