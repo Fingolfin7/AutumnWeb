@@ -32,13 +32,14 @@ def search_projects(projects, term):
     )
 
 
-def search_sessions(sessions, term, *, user=None, related=False):
+def search_sessions(sessions, term, *, user=None, related=False, outcome=None):
     """Find sessions by project, assigned subproject, or their own note.
 
     With ``related`` (and the ``user`` whose OpenAI key pays for the query),
     sessions that match the term by meaning are added; see
     core.services.semantic_search. ``sessions`` must already carry every other
-    filter, because related matches are drawn from it.
+    filter, because related matches are drawn from it. ``outcome`` (a
+    RelatedOutcome) records whether they could be added.
     """
     term = (term or "").strip()
     if not term:
@@ -56,13 +57,17 @@ def search_sessions(sessions, term, *, user=None, related=False):
         | Q(search_subproject=True)
         | Q(note__icontains=term)
     )
-    if not (related and user is not None):
+    if not related:
+        return keyword
+    if user is None:
+        if outcome is not None:
+            outcome.requested = True
         return keyword
 
     from core.services.semantic_search import related_session_ids
 
     # Counted, not previewed: every match above the cutoff, no cap.
-    extra = related_session_ids(user, sessions, keyword, term, limit=None)
+    extra = related_session_ids(user, sessions, keyword, term, limit=None, outcome=outcome)
     return with_extra(sessions, keyword, extra)
 
 

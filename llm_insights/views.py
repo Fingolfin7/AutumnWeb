@@ -7,7 +7,7 @@ from django.db import close_old_connections, transaction
 from core.models import Sessions
 from core.forms import SearchProjectForm
 from core.search import is_truthy
-from core.services.semantic_search import semantic_search_available
+from core.services.semantic_search import RelatedOutcome, semantic_search_available
 from core.templatetags.markdown_render import markdown as render_markdown
 from core.utils import (
     filter_sessions_by_params,
@@ -612,15 +612,16 @@ class InsightsView(View):
             # Use our enhanced filter function with overrides if needed
             # For new chats (chat_id is None), we ALWAYS use current_filters (from URL)
             # For existing chats, we use stored filters unless explicit override in URL
+            related = RelatedOutcome()
             if using_stored_filters or not chat_id:
                 qs = filter_sessions_by_params(
-                    request, qs, params_override=current_filters, user=user
+                    request, qs, params_override=current_filters, user=user, outcome=related
                 )
             else:
                 # Fallback to standard request.GET processing if we have explicit filters
                 # (which match current_filters anyway, but logic flows better)
                 qs = filter_sessions_by_params(
-                    request, qs, params_override=current_filters, user=user
+                    request, qs, params_override=current_filters, user=user, outcome=related
                 )
 
             session_count = qs.count()
@@ -691,7 +692,7 @@ class InsightsView(View):
                 # async caller because it queries. Same helper as Sessions,
                 # Projects and Charts.
                 "active_filters": summarise_search_filters(
-                    request, user, related=semantic
+                    request, user, related=semantic, related_unavailable=related.unavailable
                 ),
                 "semantic_search_available": semantic,
             }

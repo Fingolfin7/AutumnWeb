@@ -15,7 +15,7 @@ from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Projects, SessionEmbedding, Sessions
+from core.models import Projects, RecommendationUsage, SessionEmbedding, Sessions
 from core.services import semantic_search
 from core.services.semantic_search import DIMENSIONS
 from core.test_semantic_search import FakeOpenAI, SemanticSearchTestCase
@@ -241,6 +241,7 @@ class ReviewRegressionTests(SemanticSearchTestCase):
                 response = self._search("sign-in failure")
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.context["related_sessions"], [])
+            cache.delete(semantic_search._cooldown_key(self.user))
             with self.assertLogs("core.services.semantic_search", "WARNING"):
                 response = self.client.get(reverse("projects"), {"search": "sign-in failure"})
             self.assertEqual(response.status_code, 200)
@@ -297,3 +298,84 @@ class ReviewRegressionTests(SemanticSearchTestCase):
         keyword = self.client.get(url, {"search": "sign-in failure"}).json()
         related = self.client.get(url, {"search": "sign-in failure", "related": "true"}).json()
         self.assertLess(_session_count(keyword), _session_count(related))
+
+
+class FailureHandlingTests(SemanticSearchTestCase):
+    """A broken key or provider costs one timeout, and the pages say so."""
+
+    def setUp(self):
+        super().setUp()
+        self._sync()
+        FakeOpenAI.instances = []
+
+    def _calls(self):
+        return len(FakeOpenAI.all_inputs())
+
+    def test_failure_starts_a_cooldown_without_further_calls(self):
+        FakeOpenAI.fail = True
+        with self.assertLogs("core.services.semantic_search", "WARNING"):
+            self._search("sign-in failure")
+        self.assertEqual(self._calls(), 1)
+        # Another search, even with different words, skips the provider.
+        self.assertEqual(self._related("oauth outage"), [])
+        self.assertEqual(self._calls(), 1)
+        self.assertEqual(RecommendationUsage.objects.filter(user=self.user, success=False).count(), 1)
+
+        FakeOpenAI.fail = False
+        cache.delete(semantic_search._cooldown_key(self.user))
+        self.assertEqual(self._related("sign-in failure"), [self.oauth.pk])
+
+    def test_cooldown_is_per_account(self):
+        other = self._user("semantic-cooldown-other", "other-key")
+        self._session(Projects.objects.create(user=other, name="Auth"), "OAuth login repair", user=other)
+        self._sync()
+        FakeOpenAI.fail = True
+        with self.assertLogs("core.services.semantic_search", "WARNING"):
+            self._search("sign-in failure")
+        FakeOpenAI.fail = False
+        self.client.force_login(other)
+        before = self._calls()
+        self._search("sign-in failure")
+        self.assertEqual(self._calls(), before + 1)
+
+    def test_api_header_reports_whether_related_was_included(self):
+        url = reverse("api_v2:sessions")
+        params = {"search": "sign-in failure", "related": "true"}
+        self.assertEqual(self.client.get(url, params)["X-Autumn-Related"], "included")
+        self.assertNotIn("X-Autumn-Related", self.client.get(url, {"search": "sign-in failure"}))
+
+        cache.clear()
+        FakeOpenAI.fail = True
+        with self.assertLogs("core.services.semantic_search", "WARNING"):
+            response = self.client.get(url, params)
+        self.assertEqual(response["X-Autumn-Related"], "unavailable")
+        self.assertEqual([row["id"] for row in response.json()["sessions"]], [self.failure_note.pk])
+
+        charts = self.client.get(reverse("api_v2:report-charts"), {"chart_type": "pie", **params})
+        self.assertEqual(charts["X-Autumn-Related"], "unavailable")
+        projects = self.client.get(reverse("api_v2:projects"), {"search": "sign-in", "related": "true"})
+        self.assertEqual(projects["X-Autumn-Related"], "unavailable")
+
+    def test_api_header_is_unavailable_without_a_key(self):
+        self.user.profile.ai_features_enabled = False
+        self.user.profile.save()
+        response = self.client.get(
+            reverse("api_v2:report-totals"), {"search": "sign-in failure", "related": "true"}
+        )
+        self.assertEqual(response["X-Autumn-Related"], "unavailable")
+        self.assertEqual(response.json()["session_count"], 1)
+
+    def test_insights_pill_says_when_related_is_unavailable(self):
+        url = reverse("insights")
+        params = {"search": "sign-in failure", "related": "on", "filter": "true"}
+        response = self.client.get(url, params)
+        self.assertContains(response, 'id="related-pill"')
+        self.assertContains(response, "Including <b>related</b>")
+
+        cache.clear()
+        FakeOpenAI.fail = True
+        with self.assertLogs("core.services.semantic_search", "WARNING"):
+            response = self.client.get(url, params)
+        self.assertEqual(response.context["session_count"], 1)
+        self.assertContains(response, "Related <b>unavailable</b>")
+        self.assertContains(response, "only keyword matches are counted")

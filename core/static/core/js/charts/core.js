@@ -152,7 +152,8 @@ function get_project_data(type, start_date = "", end_date = "", search_term = ""
             url: url,
             type: 'GET',
             dataType: 'json',
-            success: function(data) {
+            success: function(data, _status, xhr) {
+                updateRelatedPill(xhr.getResponseHeader('X-Autumn-Related'));
                 resolve(data);
             },
             error: function(error) {
@@ -164,6 +165,24 @@ function get_project_data(type, start_date = "", end_date = "", search_term = ""
 
     chartDataCache.set(url, request);
     return request;
+}
+
+/**
+ * The "Including related" pill says when the server had to count keyword
+ * matches only (no OpenAI key, nothing embedded yet, or the provider failing).
+ */
+function updateRelatedPill(state) {
+    const pill = document.getElementById('related-pill');
+    if (!pill || !state) return;
+    const unavailable = state === 'unavailable';
+    const value = document.createElement('b');
+    value.textContent = unavailable ? 'unavailable' : 'related';
+    pill.replaceChildren(document.createTextNode(unavailable ? 'Related ' : 'Including '), value);
+    if (unavailable) {
+        pill.title = "Meaning-based matches couldn't be added right now, so only keyword matches are counted.";
+    } else {
+        pill.removeAttribute('title');
+    }
 }
 
 // ============================================================================

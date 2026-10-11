@@ -50,6 +50,29 @@ def v2_exception_handler(exc, context):
     return None
 
 
+RELATED_HEADER = "X-Autumn-Related"
+
+
+def related_outcome(request):
+    """The request's RelatedOutcome, reported back in the X-Autumn-Related header."""
+    from core.services.semantic_search import RelatedOutcome
+
+    outcome = getattr(request, "_related_outcome", None)
+    if outcome is None:
+        outcome = request._related_outcome = RelatedOutcome()
+    return outcome
+
+
 class V2APIView(APIView):
     def get_exception_handler(self):
         return v2_exception_handler
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        # With search + related=true: "included", or "unavailable" when the
+        # result is keyword-only (no key, AI off, nothing embedded yet, or
+        # the provider failing).
+        outcome = getattr(request, "_related_outcome", None)
+        if outcome is not None and outcome.requested and response.status_code < 400:
+            response[RELATED_HEADER] = "unavailable" if outcome.unavailable else "included"
+        return response

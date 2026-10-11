@@ -10,7 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from core.api_helpers import _apply_exclude_filters, _apply_tag_filters
-from core.api_v2.exceptions import V2APIView
+from core.api_v2.exceptions import V2APIView, related_outcome
 from core.api_v2.filters import SessionFilterSpec
 from core.api_v2.serializers import (
     ChartPayloadRowSerializer,
@@ -95,7 +95,9 @@ def _filtered_completed_sessions(request):
         user=request.user,
         end_time__isnull=False,
     )
-    sessions = _session_filter(request).apply(sessions, user=request.user)
+    sessions = _session_filter(request).apply(
+        sessions, user=request.user, outcome=related_outcome(request)
+    )
     return Sessions.objects.filter(pk__in=sessions.order_by().values("pk")).order_by()
 
 
@@ -353,7 +355,11 @@ class ReportChartsView(V2APIView):
         )
         if spec.search is not None:
             sessions = search_sessions(
-                sessions, spec.search, user=request.user, related=spec.related
+                sessions,
+                spec.search,
+                user=request.user,
+                related=spec.related,
+                outcome=related_outcome(request),
             )
         sessions = Sessions.objects.filter(
             pk__in=sessions.order_by().values("pk")

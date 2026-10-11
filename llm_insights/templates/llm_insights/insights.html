@@ -76,7 +76,7 @@
     {% if active_filters %}
     <p class="filter-summary">
         {% for item in active_filters %}
-        <span class="filter-pill">{{ item.label }} <b>{{ item.value }}</b></span>
+        <span class="filter-pill"{% if item.id %} id="{{ item.id }}"{% endif %}{% if item.title %} title="{{ item.title }}"{% endif %}>{{ item.label }} <b>{{ item.value }}</b></span>
         {% endfor %}
         <a class="btn btn--quiet" href="{% url 'insights' %}">Clear</a>
     </p>

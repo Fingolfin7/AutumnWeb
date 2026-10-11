@@ -41,6 +41,9 @@ MAX_QUERY_CHARS = 500
 QUERY_TIMEOUT_SECONDS = 4.0
 SYNC_TIMEOUT_SECONDS = 60.0
 QUERY_CACHE_SECONDS = 15 * 60
+# After a failed query embedding, that account skips semantic search for this
+# long instead of waiting out the timeout on every search.
+FAILURE_COOLDOWN_SECONDS = 5 * 60
 # Best F0.5 in scripts/semantic_search_eval.py (fictional corpus) with nothing
 # shown for the no-match query; override with SEMANTIC_SEARCH_MIN_SIMILARITY.
 DEFAULT_MIN_SIMILARITY = 0.45
@@ -406,18 +409,29 @@ def query_vector(user, embedder, term):
     return decode_vector(data)
 
 
+def _cooldown_key(user):
+    return f"semantic-search:cooldown:{user.pk}"
+
+
 def _query_vector_or_none(user, term):
-    """The query's vector, or None on any failure, including building the client."""
+    """The query's vector, or None on any failure, including building the client.
+
+    A failure starts a short per-account cooldown, so while a key is broken
+    or the provider is down, searches don't each wait out the timeout again.
+    """
     try:
         cached = cache.get(_query_cache_key(user, term))
         if cached is not None:
             return decode_vector(cached)
+        if cache.get(_cooldown_key(user)):
+            return None
         embedder = embedder_for(user)
         if embedder is None:
             return None
         return query_vector(user, embedder, term)
     except Exception as exc:
         logger.warning("semantic_search_unavailable", extra={"user_id": user.pk, "error_category": type(exc).__name__})
+        cache.set(_cooldown_key(user), True, FAILURE_COOLDOWN_SECONDS)
         return None
 
 
@@ -458,7 +472,23 @@ def _clean_term(term):
     return (term or "").strip()[:MAX_QUERY_CHARS]
 
 
-def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT):
+@dataclass
+class RelatedOutcome:
+    """Whether related matches that were asked for could actually be added.
+
+    Pass one down to the search so the page or response can say when a total
+    is keyword-only because meaning-based matching was unavailable (no key,
+    AI off, nothing embedded yet, or the provider failing).
+    """
+    requested: bool = False
+    included: bool = False
+
+    @property
+    def unavailable(self):
+        return self.requested and not self.included
+
+
+def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT, outcome=None):
     """Ids of sessions in ``sessions`` that mean ``term`` but keyword search missed.
 
     ``limit=None`` returns every one above the cutoff.
@@ -469,7 +499,11 @@ def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED
     their reciprocal-rank-fusion order is simply their similarity order.
     """
     term = _clean_term(term)
-    if not term or not semantic_search_available(user):
+    if not term:
+        return []
+    if outcome is not None:
+        outcome.requested = True
+    if not semantic_search_available(user):
         return []
     ids, digests, matrix = load_vectors(user, sessions)
     if not ids:
@@ -477,6 +511,8 @@ def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED
     vector = _query_vector_or_none(user, term)
     if vector is None:
         return []
+    if outcome is not None:
+        outcome.included = True
     candidates = [pk for pk, _ in semantic_ranking(ids, matrix, vector, cutoff=min_similarity(), limit=None)]
 
     def keep(chunk):
@@ -500,7 +536,7 @@ def find_related_sessions(user, sessions, keyword_sessions, term, *, limit=RELAT
     return [found[pk] for pk in related if pk in found]
 
 
-def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED_LIMIT):
+def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED_LIMIT, outcome=None):
     """Ids of projects in ``projects`` that mean ``term`` but keyword search missed.
 
     A project scores the better of its own vector (name, subprojects,
@@ -509,7 +545,11 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
     returns every one above the cutoff.
     """
     term = _clean_term(term)
-    if not term or not semantic_search_available(user):
+    if not term:
+        return []
+    if outcome is not None:
+        outcome.requested = True
+    if not semantic_search_available(user):
         return []
     project_ids, project_digests, project_matrix = load_project_vectors(user, projects)
     session_ids, session_digests, session_matrix = load_vectors(
@@ -523,6 +563,8 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
     vector = _query_vector_or_none(user, term)
     if vector is None:
         return []
+    if outcome is not None:
+        outcome.included = True
 
     # Every fresh score is aggregated per project before anything is cut.
     cutoff = min_similarity()

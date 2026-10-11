@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
 
-from core.api_v2.exceptions import V2APIView, _envelope
+from core.api_v2.exceptions import V2APIView, _envelope, related_outcome
 from core.api_v2.filters import SessionFilterSpec
 from core.export2 import build_format2_export
 from core.importer import run_import
@@ -127,6 +127,7 @@ class ExportView(V2APIView):
         queryset = spec.apply(
             Sessions.objects.filter(user=request.user, end_time__isnull=False),
             user=request.user,
+            outcome=related_outcome(request),
         )
         if request.query_params.get("export_format") == "1":
             autumn_compatible = serializers.BooleanField(

@@ -133,7 +133,7 @@ class SessionFilterSpec:
             raise ValidationError(errors)
         return cls(**values)
 
-    def apply(self, queryset, *, user=None):
+    def apply(self, queryset, *, user=None, outcome=None):
         """Narrow ``queryset``; ``user`` is needed only for related=true."""
         if self.project_ids is not None:
             queryset = queryset.filter(project_id__in=self.project_ids)
@@ -186,6 +186,6 @@ class SessionFilterSpec:
         # Last: related matches are drawn from what the other filters left.
         if self.search is not None:
             queryset = search_sessions(
-                queryset, self.search, user=user, related=self.related
+                queryset, self.search, user=user, related=self.related, outcome=outcome
             )
         return queryset

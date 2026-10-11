@@ -255,7 +255,7 @@ def filter_by_active_context(
 
 
 def filter_sessions_by_params(
-    request, sessions: QuerySet[Sessions], params_override=None, *, user=None
+    request, sessions: QuerySet[Sessions], params_override=None, *, user=None, outcome=None
 ) -> QuerySet:
     # Determine the correct query parameters attribute safely
     # If params_override is provided, use it. Otherwise fall back to request.GET
@@ -314,6 +314,7 @@ def filter_sessions_by_params(
             search_term,
             user=user or getattr(request, "user", None),
             related=is_truthy(params.get("related")),
+            outcome=outcome,
         )
 
     return sessions
@@ -329,7 +330,9 @@ _TEXT_FILTER_LABELS = (
 )
 
 
-def summarise_search_filters(request, user, *, related=False) -> list[dict]:
+def summarise_search_filters(
+    request, user, *, related=False, related_unavailable=False
+) -> list[dict]:
     """Label/value pairs for the filters currently narrowing a list page.
 
     The Focus Desk nav model puts filters behind a sheet, so the page itself
@@ -337,7 +340,9 @@ def summarise_search_filters(request, user, *, related=False) -> list[dict]:
     back empty looks broken rather than narrow. Ids are resolved to names,
     scoped to ``user``: a pill reading "Context 3" tells nobody anything, and
     another user's id must resolve to nothing at all. ``related`` is for the
-    pages whose filter sheet has the "Include related" toggle.
+    pages whose filter sheet has the "Include related" toggle;
+    ``related_unavailable`` turns its pill into "Related unavailable" when the
+    counted set is keyword-only after all.
     """
 
     def names_for(model, ids):
@@ -358,7 +363,9 @@ def summarise_search_filters(request, user, *, related=False) -> list[dict]:
     ]
 
     if related and params.get("search") and is_truthy(params.get("related")):
-        summary.append({"label": "Including", "value": "related"})
+        summary.append(
+            related_pill(unavailable=related_unavailable)
+        )
 
     for label, names in (
         ("Context", names_for(Context, [params.get("context") or ""])),
@@ -370,6 +377,23 @@ def summarise_search_filters(request, user, *, related=False) -> list[dict]:
             summary.append({"label": label, "value": names})
 
     return summary
+
+
+RELATED_UNAVAILABLE_TITLE = (
+    "Meaning-based matches couldn't be added right now, so only keyword matches are counted."
+)
+
+
+def related_pill(*, unavailable=False) -> dict:
+    """The "Include related" filter pill; Charts' JS flips it to the second form."""
+    if unavailable:
+        return {
+            "label": "Related",
+            "value": "unavailable",
+            "id": "related-pill",
+            "title": RELATED_UNAVAILABLE_TITLE,
+        }
+    return {"label": "Including", "value": "related", "id": "related-pill"}
 
 
 def _param_list(params, key) -> list:

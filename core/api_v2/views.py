@@ -14,7 +14,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from core.api_v2.exceptions import V2APIView, _envelope
+from core.api_v2.exceptions import V2APIView, _envelope, related_outcome
 from core.api_v2.filters import SessionFilterSpec
 from core.api_v2.serializers import (
     ContextListResponseSerializer,
@@ -896,6 +896,7 @@ class SessionsView(V2APIView):
         queryset = spec.apply(
             _session_queryset(request.user).filter(end_time__isnull=False),
             user=request.user,
+            outcome=related_outcome(request),
         ).order_by("-end_time", "-id")
         total = queryset.count()
         sessions = list(queryset[offset : offset + limit])
@@ -1123,6 +1124,7 @@ class ProjectsView(V2APIView):
                         matches,
                         data["search"],
                         limit=None,
+                        outcome=related_outcome(request),
                     ),
                 )
             queryset = matches
