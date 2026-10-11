@@ -16,6 +16,8 @@ from core.models import Context, Projects, SubProjects, Sessions, Tag
 from core.services import SessionMutationService, UNSET
 from core.views.allocations import parse_allocation_post
 from core.forms import SearchProjectForm, UpdateSessionForm
+from core.search import search_sessions
+from core.services.semantic_search import find_related_sessions
 from core.utils import (
     build_exclude_project_meta,
     filter_by_active_context,
@@ -219,9 +221,11 @@ class SessionsListView(LoginRequiredMixin, ListView):
             build_exclude_project_meta(self.request.user)
         )
 
+        context["related_sessions"] = self._related_sessions(page)
+
         return context
 
-    def get_queryset(self):
+    def _scoped_sessions(self):
         sessions = (
             Sessions.objects.filter(end_time__isnull=False, user=self.request.user)
             .select_related("project")
@@ -230,11 +234,28 @@ class SessionsListView(LoginRequiredMixin, ListView):
 
         # Allow explicit ?context= to override the global active context
         override_context_id = self.request.GET.get("context")
-        sessions = filter_by_active_context(
+        return filter_by_active_context(
             sessions, self.request, override_context_id=override_context_id
         )
 
-        return filter_sessions_by_params(self.request, sessions)
+    def get_queryset(self):
+        return filter_sessions_by_params(self.request, self._scoped_sessions())
+
+    def _related_sessions(self, page):
+        """Meaning-based matches the keyword list missed, on its first page."""
+        term = (self.request.GET.get("search") or "").strip()
+        if not term or (page and page.number != 1):
+            return []
+        # Every filter except the keyword term, so related results obey the
+        # same dates, context, tags and project picks as the list above.
+        params = self.request.GET.copy()
+        params.pop("search", None)
+        sessions = filter_sessions_by_params(
+            self.request, self._scoped_sessions(), params_override=params
+        )
+        return find_related_sessions(
+            self.request.user, sessions, search_sessions(sessions, term), term
+        )
 
 
 class DeleteSessionView(LoginRequiredMixin, DeleteView):

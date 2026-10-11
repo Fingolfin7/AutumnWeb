@@ -6,6 +6,7 @@ import time
 
 _attempts = ContextVar("recommendation_attempts", default=None)
 _current = ContextVar("recommendation_attempt", default=None)
+EMBEDDING_USD_PER_MILLION = {"text-embedding-3-small": "0.02"}
 
 
 @contextmanager
@@ -53,9 +54,18 @@ def capture_usage(usage):
         "cache_write_tokens": _get(details, "cache_write_tokens"),
         "reasoning_tokens": _get(output_details, "reasoning_tokens"),
     }
+    if fields["input_tokens"] is None:
+        # Embedding responses report prompt_tokens and nothing else.
+        fields["input_tokens"] = _get(usage, "prompt_tokens")
     for field, value in fields.items():
         if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
             row[field] = value
+    if row["model"] in EMBEDDING_USD_PER_MILLION and "input_tokens" in row:
+        rate = EMBEDDING_USD_PER_MILLION[row["model"]]
+        cost = row["input_tokens"] * Decimal(rate) / Decimal(1000000)
+        row["estimated_cost_usd"] = cost.quantize(Decimal("0.00000001"))
+        row["pricing"] = {"usd_per_million": {"input": rate}, "as_of": "2026-10-11",
+                          "source": "https://developers.openai.com/api/docs/pricing"}
     # Reasoning tokens are already included in output_tokens: never add twice.
     if row["model"] in {"gpt-5.6-luna", "gpt-6-luna"} and all(k in row for k in ("input_tokens", "output_tokens")):
         inputs, outputs = row["input_tokens"], row["output_tokens"]

@@ -1,0 +1,50 @@
+{% load time_formats %}
+{% load markdown_render %}
+{% comment %}
+  One session row of the Sessions list. show_date prefixes the day for rows
+  that are not under a day heading (the Related list).
+{% endcomment %}
+<li class="band swipe" id="session-{{ session.id }}">
+    <div class="swipe-track">
+        <div class="swipe-face session">
+            <div class="session-mid">
+                {% if show_date %}<span class="session-time session-day">{{ session.end_time|date:"j M Y" }}</span>{% endif %}
+                <span class="session-time">{{ session.start_time|time_formatter }}</span>
+                <span class="session-arrow">&rarr;</span>
+                <span class="session-time">{{ session.end_time|time_formatter }}</span>
+                {% if session.crosses_dst_transition %}
+                <span class="badge-dst" title="Session crosses a daylight savings transition">DST</span>
+                {% endif %}
+            </div>
+            <div class="session-top">
+                <a class="session-project" href="{% url 'update_project' session.project.id %}">{{ session.project.name }}</a>
+                {% for subproject in session.subprojects.all %}
+                <a class="sub-chip" href="{% url 'update_subproject' subproject.id %}">{{ subproject.name }}</a>
+                {% endfor %}
+            </div>
+            {% if session.note %}
+            <div class="session-note" id="note-{{ session.id }}">{{ session.note|markdown|safe }}</div>
+            {% endif %}
+            <span class="session-dur">{{ session.duration|duration_formatter }}</span>
+        </div>
+        <div class="swipe-actions">
+            <form method="post" action="{% url 'start_timer' %}">
+                {% csrf_token %}
+                <input type="hidden" name="project" value="{{ session.project.name }}">
+                {% for sub in session.subprojects.all %}
+                <input type="hidden" name="subprojects" value="{{ sub.name }}">
+                {% endfor %}
+                <button class="btn-icon" type="submit" title="Restart this project + subprojects">
+                    <i class="fas fa-redo"></i><span class="sr-only">Restart</span>
+                </button>
+            </form>
+            <a class="btn-icon" href="{% url 'update_session' session.id %}" title="Edit session">
+                <i class="fas fa-pen"></i><span class="sr-only">Edit session</span>
+            </a>
+            <a class="btn-icon btn-icon--danger" href="{% url 'delete_session' session.id %}" title="Delete session">
+                <i class="fas fa-trash"></i><span class="sr-only">Delete session</span>
+            </a>
+        </div>
+    </div>
+    <span class="swipe-hint"></span>
+</li>

@@ -373,6 +373,21 @@ class Sessions(models.Model):
         return self._compute_crosses_dst_transition(self.start_time, self.end_time)
 
 
+class SessionEmbedding(models.Model):
+    """A session's search vector, written only by `manage.py embed_sessions`.
+
+    `text_digest` hashes the exact text that was embedded (project name,
+    subproject names and note), so a note edit or a rename makes the row stale
+    whatever write path caused it; nothing has to mark it.
+    """
+    session = models.OneToOneField(Sessions, on_delete=models.CASCADE, related_name='embedding')
+    model = models.CharField(max_length=64)
+    text_digest = models.CharField(max_length=64)
+    # Little-endian float32, L2-normalised.
+    vector = models.BinaryField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class PushSubscription(models.Model):
     """A browser push subscription owned by one account.
 

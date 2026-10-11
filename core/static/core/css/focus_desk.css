@@ -897,6 +897,8 @@ body.bg-active .dim-control { display: flex; }
   color: var(--time); letter-spacing: -.01em;
 }
 .session-arrow { color: var(--muted); }
+/* Related rows sit under no day heading, so they carry the day themselves. */
+.session-day { flex-basis: 100%; }
 .sub-chip {
   display: inline-flex; align-items: center;
   padding: .12rem .5rem; border-radius: var(--r-pill);
