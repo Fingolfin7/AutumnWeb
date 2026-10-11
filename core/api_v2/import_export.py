@@ -114,7 +114,8 @@ class ExportView(V2APIView):
             raise ValidationError({"compress": exc.detail}) from exc
         spec = SessionFilterSpec.from_query_params(request.query_params, request.user)
         queryset = spec.apply(
-            Sessions.objects.filter(user=request.user, end_time__isnull=False)
+            Sessions.objects.filter(user=request.user, end_time__isnull=False),
+            user=request.user,
         )
         if request.query_params.get("export_format") == "1":
             autumn_compatible = serializers.BooleanField(

@@ -4,6 +4,8 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 
 from core.forms import SearchProjectForm
+from core.search import is_truthy
+from core.services.semantic_search import semantic_search_available
 from core.utils import build_exclude_project_meta, summarise_search_filters
 
 
@@ -15,9 +17,11 @@ def ChartsView(request):
         request.user.profile.default_filter_date_range()
     )
 
+    semantic = semantic_search_available(request.user)
     search_form = SearchProjectForm(
         initial={
             "search": request.GET.get("search"),
+            "related": is_truthy(request.GET.get("related")),
             "project_name": request.GET.get("project_name"),
             "start_date": request.GET.get("start_date") or default_start_date,
             "end_date": request.GET.get("end_date") or default_end_date,
@@ -37,6 +41,7 @@ def ChartsView(request):
         "exclude_project_meta_json": json.dumps(build_exclude_project_meta(request.user)),
         # The narrowing controls live in a sheet, so the page echoes back what
         # is currently applied — see summarise_search_filters.
-        "active_filters": summarise_search_filters(request, request.user),
+        "active_filters": summarise_search_filters(request, request.user, related=semantic),
+        "semantic_search_available": semantic,
     }
     return render(request, "core/charts.html", context)

@@ -239,7 +239,13 @@ class SessionsListView(LoginRequiredMixin, ListView):
         )
 
     def get_queryset(self):
-        return filter_sessions_by_params(self.request, self._scoped_sessions())
+        # The list stays keyword-only; meaning-based matches have their own
+        # "Related" section below it rather than the Charts toggle.
+        params = self.request.GET.copy()
+        params.pop("related", None)
+        return filter_sessions_by_params(
+            self.request, self._scoped_sessions(), params_override=params
+        )
 
     def _related_sessions(self, page):
         """Meaning-based matches the keyword list missed, on its first page."""
@@ -250,6 +256,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
         # same dates, context, tags and project picks as the list above.
         params = self.request.GET.copy()
         params.pop("search", None)
+        params.pop("related", None)
         sessions = filter_sessions_by_params(
             self.request, self._scoped_sessions(), params_override=params
         )

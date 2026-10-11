@@ -1,16 +1,16 @@
-"""Meaning-based retrieval for Sessions search.
+"""Meaning-based retrieval for Sessions and Projects search.
 
-Session vectors are written only by ``manage.py embed_sessions``; a search
-embeds just the query. Every path degrades to ordinary keyword search: AI
-features off, no OpenAI key, no vectors yet, or any provider failure yields no
-related sessions and never an error.
+Vectors are written only by ``manage.py embed_sessions``; a search embeds just
+the query. Every path degrades to ordinary keyword search: AI features off, no
+OpenAI key, no vectors yet, or any provider failure yields no related results
+and never an error.
 
 Staleness is derived, not flagged: each vector stores a digest of the exact
 text it was built from, so a note edit or a project/subproject rename makes it
 stale whichever write path caused it (forms, API, import, merges, bulk
-updates). Stale vectors are re-embedded by the next sync and are never shown.
+updates). Stale vectors are re-embedded by the next sync and are never used.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import logging
 
@@ -19,7 +19,15 @@ from django.core.cache import cache
 from django.db import IntegrityError, transaction
 from django.db.models.functions import Substr
 
-from core.models import RecommendationUsage, SessionEmbedding, SessionSubproject, Sessions
+from core.models import (
+    ProjectEmbedding,
+    Projects,
+    RecommendationUsage,
+    SessionEmbedding,
+    SessionSubproject,
+    Sessions,
+    SubProjects,
+)
 from core.services.recommendation_usage import capture_usage, collect_attempts, provider_attempt
 
 logger = logging.getLogger(__name__)
@@ -38,6 +46,9 @@ QUERY_CACHE_SECONDS = 15 * 60
 DEFAULT_MIN_SIMILARITY = 0.45
 CANDIDATE_LIMIT = 50
 RELATED_LIMIT = 5
+# When related matches are counted (Charts/Insights "Include related", the
+# API's related=true) rather than listed, at most this many are added.
+INCLUDED_LIMIT = 200
 RRF_K = 60
 
 
@@ -45,18 +56,32 @@ def min_similarity():
     return float(getattr(settings, "SEMANTIC_SEARCH_MIN_SIMILARITY", DEFAULT_MIN_SIMILARITY))
 
 
+def semantic_search_available(user):
+    """Whether a search could use meaning at all; decides if the toggle shows."""
+    profile = getattr(user, "profile", None)
+    return bool(profile and profile.ai_features_enabled and profile.openai_api_key_enc)
+
+
 # ---------------------------------------------------------------- evidence --
+
+def _join(first, names, text):
+    parts = [first or ""]
+    names = ", ".join(sorted({name for name in names if name}))
+    if names:
+        parts.append(names)
+    text = (text or "").strip()
+    if text:
+        parts.append(text)
+    return "\n".join(parts)[:MAX_INPUT_CHARS]
+
 
 def session_text(project_name, subproject_names, note):
     """The evidence keyword search reads, in one bounded string."""
-    parts = [project_name or ""]
-    names = ", ".join(sorted({name for name in subproject_names if name}))
-    if names:
-        parts.append(names)
-    note = (note or "").strip()
-    if note:
-        parts.append(note)
-    return "\n".join(parts)[:MAX_INPUT_CHARS]
+    return _join(project_name, subproject_names, note)
+
+
+def project_text(name, subproject_names, description):
+    return _join(name, subproject_names, description)
 
 
 def text_digest(text):
@@ -73,6 +98,19 @@ def session_texts(sessions):
     return {
         pk: session_text(project_name, subprojects.get(pk, ()), note)
         for pk, project_name, note in rows
+    }
+
+
+def project_texts(projects):
+    """Map project id -> embedding text for a queryset of projects."""
+    rows = projects.order_by().values_list("pk", "name", Substr("description", 1, MAX_INPUT_CHARS))
+    subprojects = {}
+    children = SubProjects.objects.filter(parent_project__in=projects.order_by().values("pk"))
+    for project_id, name in children.values_list("parent_project_id", "name"):
+        subprojects.setdefault(project_id, []).append(name)
+    return {
+        pk: project_text(name, subprojects.get(pk, ()), description)
+        for pk, name, description in rows
     }
 
 
@@ -150,20 +188,49 @@ class SyncResult:
     pending_chars: int = 0
 
 
-def sync_embeddings(user, embedder, *, batch_size=100, limit=None, dry_run=False):
-    """Embed the user's completed sessions whose vector is missing or stale.
+@dataclass
+class SyncReport:
+    sessions: SyncResult = field(default_factory=SyncResult)
+    projects: SyncResult = field(default_factory=SyncResult)
 
-    Idempotent: unchanged sessions are skipped by digest. Newest sessions go
-    first so a ``limit``-bounded run covers recent work. Each batch commits on
-    its own, so a failure keeps earlier progress and the next run resumes.
+
+def sync_embeddings(user, embedder, *, batch_size=100, limit=None, dry_run=False):
+    """Embed the user's completed sessions and projects whose vector is missing or stale.
+
+    Idempotent: unchanged records are skipped by digest. Newest records go
+    first so a ``limit``-bounded run (per kind) covers recent work. Each batch
+    commits on its own, so a failure keeps earlier progress and the next run
+    resumes.
     """
-    texts = session_texts(Sessions.objects.filter(user=user, end_time__isnull=False))
-    stored = {
-        session_id: (model, digest)
-        for session_id, model, digest in SessionEmbedding.objects.filter(
-            session__user=user
-        ).values_list("session_id", "model", "text_digest")
-    }
+    sessions = _sync(
+        user,
+        embedder,
+        texts=session_texts(Sessions.objects.filter(user=user, end_time__isnull=False)),
+        stored=SessionEmbedding.objects.filter(session__user=user).values_list(
+            "session_id", "model", "text_digest"
+        ),
+        write=_write_sessions,
+        batch_size=batch_size,
+        limit=limit,
+        dry_run=dry_run,
+    )
+    projects = _sync(
+        user,
+        embedder,
+        texts=project_texts(Projects.objects.filter(user=user)),
+        stored=ProjectEmbedding.objects.filter(project__user=user).values_list(
+            "project_id", "model", "text_digest"
+        ),
+        write=_write_projects,
+        batch_size=batch_size,
+        limit=limit,
+        dry_run=dry_run,
+    )
+    return SyncReport(sessions=sessions, projects=projects)
+
+
+def _sync(user, embedder, *, texts, stored, write, batch_size, limit, dry_run):
+    stored = {pk: (model, digest) for pk, model, digest in stored}
     todo = []
     for pk in sorted(texts, reverse=True):
         digest = text_digest(texts[pk])
@@ -184,28 +251,53 @@ def sync_embeddings(user, embedder, *, batch_size=100, limit=None, dry_run=False
                 vectors = embedder.embed([text for _, text, _ in batch])
             finally:
                 _record_usage(user, attempts)
-        rows = [
-            SessionEmbedding(session_id=pk, model=MODEL, text_digest=digest, vector=encode_vector(vector))
-            for (pk, _, digest), vector in zip(batch, vectors)
-        ]
-        result.embedded += _write(user, rows)
+        rows = [(pk, digest, encode_vector(vector)) for (pk, _, digest), vector in zip(batch, vectors)]
+        result.embedded += write(user, rows)
     return result
 
 
-def _write(user, rows):
-    # Sessions deleted while the batch was at the provider are dropped; a row
-    # whose text changed meanwhile carries the old digest and stays stale.
+def _write_sessions(user, rows):
     live = set(
-        Sessions.objects.filter(pk__in=[row.session_id for row in rows], user=user)
-        .values_list("pk", flat=True)
+        Sessions.objects.filter(pk__in=[pk for pk, _, _ in rows], user=user).values_list("pk", flat=True)
     )
-    rows = [row for row in rows if row.session_id in live]
+    return _upsert(
+        user,
+        SessionEmbedding,
+        "session",
+        [
+            SessionEmbedding(session_id=pk, model=MODEL, text_digest=digest, vector=vector)
+            for pk, digest, vector in rows
+            if pk in live
+        ],
+    )
+
+
+def _write_projects(user, rows):
+    live = set(
+        Projects.objects.filter(pk__in=[pk for pk, _, _ in rows], user=user).values_list("pk", flat=True)
+    )
+    return _upsert(
+        user,
+        ProjectEmbedding,
+        "project",
+        [
+            ProjectEmbedding(project_id=pk, model=MODEL, text_digest=digest, vector=vector)
+            for pk, digest, vector in rows
+            if pk in live
+        ],
+    )
+
+
+def _upsert(user, model, unique_field, rows):
+    # Records deleted while the batch was at the provider are dropped by the
+    # callers; one whose text changed meanwhile carries the old digest and
+    # stays stale.
     try:
         with transaction.atomic():
-            SessionEmbedding.objects.bulk_create(
+            model.objects.bulk_create(
                 rows,
                 update_conflicts=True,
-                unique_fields=["session"],
+                unique_fields=[unique_field],
                 update_fields=["model", "text_digest", "vector", "updated_at"],
             )
     except IntegrityError:
@@ -226,22 +318,14 @@ def reciprocal_rank_fusion(rankings, k=RRF_K):
     return sorted(scores, key=lambda item: (-scores[item], first_seen[item]))
 
 
-def load_vectors(user, sessions):
-    """Current-model vectors for the user's sessions within ``sessions``."""
-    rows = (
-        SessionEmbedding.objects.filter(
-            session__user=user, model=MODEL, session__in=sessions.order_by().values("pk")
-        )
-        .order_by("session_id")
-        .values_list("session_id", "text_digest", "vector")
-    )
+def _matrix(rows):
     ids, digests, chunks = [], {}, []
-    for session_id, digest, data in rows:
+    for pk, digest, data in rows:
         data = bytes(data)
         if len(data) != VECTOR_BYTES:
             continue
-        ids.append(session_id)
-        digests[session_id] = digest
+        ids.append(pk)
+        digests[pk] = digest
         chunks.append(data)
     if not ids:
         return [], {}, None
@@ -250,8 +334,32 @@ def load_vectors(user, sessions):
     return ids, digests, matrix
 
 
+def load_vectors(user, sessions):
+    """Current-model vectors for the user's sessions within ``sessions``."""
+    return _matrix(
+        SessionEmbedding.objects.filter(
+            session__user=user, model=MODEL, session__in=sessions.order_by().values("pk")
+        )
+        .order_by("session_id")
+        .values_list("session_id", "text_digest", "vector")
+    )
+
+
+def load_project_vectors(user, projects):
+    """Current-model vectors for the user's projects within ``projects``."""
+    return _matrix(
+        ProjectEmbedding.objects.filter(
+            project__user=user, model=MODEL, project__in=projects.order_by().values("pk")
+        )
+        .order_by("project_id")
+        .values_list("project_id", "text_digest", "vector")
+    )
+
+
 def semantic_ranking(ids, matrix, query_vector, *, cutoff, limit=CANDIDATE_LIMIT):
-    """[(session_id, cosine)] at or above ``cutoff``, best first."""
+    """[(id, cosine)] at or above ``cutoff``, best first."""
+    if matrix is None:
+        return []
     np = _numpy()
     scores = matrix @ query_vector
     ranked = []
@@ -281,22 +389,39 @@ def query_vector(user, embedder, term):
     return decode_vector(data)
 
 
+def _query_vector_or_none(user, embedder, term):
+    try:
+        return query_vector(user, embedder, term)
+    except Exception as exc:
+        logger.warning("semantic_search_unavailable", extra={"user_id": user.pk, "error_category": type(exc).__name__})
+        return None
+
+
 def fresh_ids(user, ids, digests):
     """Those of ``ids`` whose vector still matches the session's current text."""
     texts = session_texts(Sessions.objects.filter(pk__in=ids, user=user, end_time__isnull=False))
     return {pk for pk, text in texts.items() if digests.get(pk) == text_digest(text)}
 
 
-def find_related_sessions(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT):
-    """Sessions in ``sessions`` that mean ``term`` but keyword search missed.
+def fresh_project_ids(user, ids, digests):
+    """Those of ``ids`` whose vector still matches the project's current text."""
+    texts = project_texts(Projects.objects.filter(pk__in=ids, user=user))
+    return {pk for pk, text in texts.items() if digests.get(pk) == text_digest(text)}
 
-    ``sessions`` must already carry the page's ownership and filters (dates,
+
+def _clean_term(term):
+    return (term or "").strip()[:MAX_QUERY_CHARS]
+
+
+def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT):
+    """Ids of sessions in ``sessions`` that mean ``term`` but keyword search missed.
+
+    ``sessions`` must already carry the caller's ownership and filters (dates,
     context, tags, project include/exclude); ``keyword_sessions`` is the same
-    set narrowed by the keyword term. On the page the keyword list is left
-    as-is, so these are its semantic-only additions: with no keyword rank
+    set narrowed by the keyword term. Best match first. With no keyword rank,
     their reciprocal-rank-fusion order is simply their similarity order.
     """
-    term = (term or "").strip()[:MAX_QUERY_CHARS]
+    term = _clean_term(term)
     if not term:
         return []
     embedder = embedder_for(user)
@@ -305,19 +430,22 @@ def find_related_sessions(user, sessions, keyword_sessions, term, *, limit=RELAT
     ids, digests, matrix = load_vectors(user, sessions)
     if not ids:
         return []
-    try:
-        vector = query_vector(user, embedder, term)
-    except Exception as exc:
-        logger.warning("semantic_search_unavailable", extra={"user_id": user.pk, "error_category": type(exc).__name__})
+    vector = _query_vector_or_none(user, embedder, term)
+    if vector is None:
         return []
-    hits = semantic_ranking(ids, matrix, vector, cutoff=min_similarity())
+    hits = semantic_ranking(ids, matrix, vector, cutoff=min_similarity(), limit=max(limit, CANDIDATE_LIMIT))
     if not hits:
         return []
     candidates = [pk for pk, _ in hits]
     keyword = set(keyword_sessions.filter(pk__in=candidates).values_list("pk", flat=True))
     candidates = [pk for pk in candidates if pk not in keyword]
     current = fresh_ids(user, candidates, digests)
-    related = [pk for pk in candidates if pk in current][:limit]
+    return [pk for pk in candidates if pk in current][:limit]
+
+
+def find_related_sessions(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT):
+    """The sessions of ``related_session_ids``, ready to render."""
+    related = related_session_ids(user, sessions, keyword_sessions, term, limit=limit)
     if not related:
         return []
     found = {
@@ -327,3 +455,51 @@ def find_related_sessions(user, sessions, keyword_sessions, term, *, limit=RELAT
         .prefetch_related("subprojects")
     }
     return [found[pk] for pk in related if pk in found]
+
+
+def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED_LIMIT):
+    """Ids of projects in ``projects`` that mean ``term`` but keyword search missed.
+
+    A project scores the better of its own vector (name, subprojects,
+    description) and its best-matching session, mirroring keyword search,
+    which also matches projects through their session notes.
+    """
+    term = _clean_term(term)
+    if not term:
+        return []
+    embedder = embedder_for(user)
+    if embedder is None:
+        return []
+    project_ids, project_digests, project_matrix = load_project_vectors(user, projects)
+    session_ids, session_digests, session_matrix = load_vectors(
+        user,
+        Sessions.objects.filter(
+            user=user, end_time__isnull=False, project__in=projects.order_by().values("pk")
+        ),
+    )
+    if not project_ids and not session_ids:
+        return []
+    vector = _query_vector_or_none(user, embedder, term)
+    if vector is None:
+        return []
+
+    cutoff = min_similarity()
+    scores = {}
+    project_hits = semantic_ranking(project_ids, project_matrix, vector, cutoff=cutoff)
+    current = fresh_project_ids(user, [pk for pk, _ in project_hits], project_digests)
+    for pk, score in project_hits:
+        if pk in current:
+            scores[pk] = max(scores.get(pk, score), score)
+    session_hits = dict(semantic_ranking(session_ids, session_matrix, vector, cutoff=cutoff))
+    current = fresh_ids(user, list(session_hits), session_digests)
+    for session_id, project_id in Sessions.objects.filter(pk__in=current, user=user).values_list(
+        "pk", "project_id"
+    ):
+        score = session_hits[session_id]
+        scores[project_id] = max(scores.get(project_id, score), score)
+    if not scores:
+        return []
+
+    keyword = set(keyword_projects.filter(pk__in=list(scores)).values_list("pk", flat=True))
+    ranked = sorted((pk for pk in scores if pk not in keyword), key=lambda pk: (-scores[pk], pk))
+    return ranked[:limit]

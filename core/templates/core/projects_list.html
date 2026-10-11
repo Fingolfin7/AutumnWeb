@@ -116,55 +116,7 @@
             {# also the sessions, timers, tags and commitments list shape.   #}
             <ul class="band-list band-list--grid">
                 {% for project in status_group.projects %}
-                <li class="band project" id="project-{{ project.id }}">
-                    <div class="u-grow">
-                        <div class="project-top">
-                            <a class="project-name" href="{% url 'update_project' project.id %}">{{ project.name }}</a>
-                            {% if project.id in running_project_ids %}
-                            {# Starting a second timer on the same project is #}
-                            {# allowed, so this is a statement of fact rather #}
-                            {# than a warning — it just stops the start       #}
-                            {# button being a silent double-start.            #}
-                            <a class="project-running" href="{% url 'timers' %}" title="A timer is already running on this project">
-                                <span class="live-dot"></span> running
-                            </a>
-                            {% endif %}
-                        </div>
-
-                        {% if project.context or project.tags.all %}
-                        <div class="project-meta">
-                            {% if project.context %}
-                            <a class="context-chip" href="{% url 'update_context' project.context.id %}">{{ project.context.name }}</a>
-                            {% endif %}
-                            {% for tag in project.tags.all %}
-                            <a class="tag-chip" href="{% url 'update_tag' tag.id %}"{% if tag.color %} style="--tag: {{ tag.color }}"{% endif %}>{{ tag.name }}</a>
-                            {% endfor %}
-                        </div>
-                        {% endif %}
-
-                        <p class="project-total">{{ project.total_time|min_formatter_two }}</p>
-                        <p class="project-dates">{{ project.start_date|date_formatter }} &rarr; {{ project.last_updated|date_formatter }}</p>
-
-                        {% with progress=commitment_progress|get_item:project.id %}
-                        {% if progress %}
-                        <div class="project-commit">
-                            <div class="meter">
-                                <div class="meter-fill {{ progress.status }}" style="width: {{ progress.percentage|floatformat:0 }}%"></div>
-                            </div>
-                        </div>
-                        {% endif %}
-                        {% endwith %}
-                    </div>
-
-                    <form method="post" action="{% url 'start_timer' %}">
-                        {% csrf_token %}
-                        <input type="hidden" name="project" value="{{ project.name }}">
-                        <button class="project-start{% if project.id in running_project_ids %} is-running{% endif %}" type="submit"
-                                title="{% if project.id in running_project_ids %}Start ANOTHER timer on {{ project.name }} — one is already running{% else %}Start a timer on {{ project.name }}{% endif %}">
-                            <i class="fas fa-play"></i><span class="sr-only">{% if project.id in running_project_ids %}Start another timer on {{ project.name }}, one is already running{% else %}Start a timer on {{ project.name }}{% endif %}</span>
-                        </button>
-                    </form>
-                </li>
+                {% include 'core/partials/project_band.html' %}
                 {% endfor %}
             </ul>
         </div>
@@ -178,6 +130,17 @@
     {% else %}
     <p class="empty">No projects yet. <a href="{% url 'create_project' %}">Create one</a> to start tracking.</p>
     {% endif %}
+</section>
+{% endif %}
+
+{% if related_projects %}
+<section class="slab" aria-label="Related projects">
+    <header class="day-head"><span class="day-date">Related</span></header>
+    <ul class="band-list band-list--grid">
+        {% for project in related_projects %}
+        {% include 'core/partials/project_band.html' %}
+        {% endfor %}
+    </ul>
 </section>
 {% endif %}
 

@@ -388,6 +388,20 @@ class SessionEmbedding(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class ProjectEmbedding(models.Model):
+    """A project's search vector (name, description and subproject names).
+
+    Written by `manage.py embed_sessions` alongside the session vectors and
+    made stale by its digest the same way.
+    """
+    project = models.OneToOneField(Projects, on_delete=models.CASCADE, related_name='embedding')
+    model = models.CharField(max_length=64)
+    text_digest = models.CharField(max_length=64)
+    # Little-endian float32, L2-normalised.
+    vector = models.BinaryField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class PushSubscription(models.Model):
     """A browser push subscription owned by one account.
 

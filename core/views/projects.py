@@ -26,6 +26,7 @@ from core.celebrations import (
 )
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 from core.search import search_projects
+from core.services.semantic_search import related_project_ids
 from django.db.models import Prefetch
 from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.forms import (
@@ -77,7 +78,9 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         )
 
         ungrouped_projects = list(context["object_list"])
-        for project in ungrouped_projects:
+        related_projects = self._related_projects()
+        context["related_projects"] = related_projects
+        for project in ungrouped_projects + related_projects:
             project.total_time = project.derived_total_time
             project.last_updated = project.derived_last_updated
 
@@ -86,7 +89,7 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
         # Build commitment progress data for all projects with active commitments
         commitment_progress = {}
-        for project in ungrouped_projects:
+        for project in ungrouped_projects + related_projects:
             try:
                 commitment = project.commitment
                 if commitment and commitment.active:
@@ -140,7 +143,8 @@ class ProjectsListView(LoginRequiredMixin, ListView):
 
         return context
 
-    def get_queryset(self):
+    def _scoped_projects(self):
+        """Every filter on the page except the search term."""
         projects = Projects.objects.filter(user=self.request.user)
 
         # Allow explicit ?context= to override global active context
@@ -150,13 +154,10 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         )
 
         search_name = self.request.GET.get("project_name")
-        search_term = self.request.GET.get("search")
         start_date = self.request.GET.get("start_date")
         end_date = self.request.GET.get("end_date")
         tag_ids = self.request.GET.getlist("tags")
 
-        if search_term:
-            projects = search_projects(projects, search_term)
         if search_name:
             projects = filter_by_projects(projects, name=search_name)
 
@@ -183,12 +184,41 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         if exclude_ids:
             projects = projects.exclude(id__in=exclude_ids)
 
+        return projects
+
+    @staticmethod
+    def _for_display(projects):
         return (
             annotate_project_totals(projects)
             .select_related("context", "commitment")
             .prefetch_related("tags")
-            .order_by("-derived_last_updated")
         )
+
+    def get_queryset(self):
+        projects = self._scoped_projects()
+        search_term = self.request.GET.get("search")
+        if search_term:
+            projects = search_projects(projects, search_term)
+        return self._for_display(projects).order_by("-derived_last_updated")
+
+    def _related_projects(self):
+        """Meaning-based matches the keyword search missed, best first."""
+        term = (self.request.GET.get("search") or "").strip()
+        if not term:
+            return []
+        projects = self._scoped_projects()
+        related = related_project_ids(
+            self.request.user, projects, search_projects(projects, term), term
+        )
+        if not related:
+            return []
+        found = {
+            project.pk: project
+            for project in self._for_display(
+                Projects.objects.filter(pk__in=related, user=self.request.user)
+            )
+        }
+        return [found[pk] for pk in related if pk in found]
 
 
 class CreateProjectView(LoginRequiredMixin, CreateView):

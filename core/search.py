@@ -32,8 +32,14 @@ def search_projects(projects, term):
     )
 
 
-def search_sessions(sessions, term):
-    """Find sessions by project, assigned subproject, or their own note."""
+def search_sessions(sessions, term, *, user=None, related=False):
+    """Find sessions by project, assigned subproject, or their own note.
+
+    With ``related`` (and the ``user`` whose OpenAI key pays for the query),
+    sessions that match the term by meaning are added; see
+    core.services.semantic_search. ``sessions`` must already carry every other
+    filter, because related matches are drawn from it.
+    """
     term = (term or "").strip()
     if not term:
         return sessions
@@ -43,10 +49,31 @@ def search_sessions(sessions, term):
         subproject__user_id=OuterRef("user_id"),
         subproject__name__icontains=term,
     )
-    return sessions.alias(
+    keyword = sessions.alias(
         search_subproject=Exists(matching_subprojects)
     ).filter(
         Q(project__name__icontains=term)
         | Q(search_subproject=True)
         | Q(note__icontains=term)
     )
+    if not (related and user is not None):
+        return keyword
+
+    from core.services.semantic_search import INCLUDED_LIMIT, related_session_ids
+
+    extra = related_session_ids(user, sessions, keyword, term, limit=INCLUDED_LIMIT)
+    return with_extra(sessions, keyword, extra)
+
+
+def with_extra(queryset, matches, extra_ids):
+    """``matches`` plus the rows of ``queryset`` whose ids are ``extra_ids``."""
+    if not extra_ids:
+        return matches
+    return queryset.filter(
+        Q(pk__in=matches.order_by().values("pk")) | Q(pk__in=list(extra_ids))
+    )
+
+
+def is_truthy(value):
+    """Checkbox and query-string booleans: on/true/1/yes."""
+    return str(value or "").strip().lower() in {"on", "true", "1", "yes"}

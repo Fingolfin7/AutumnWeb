@@ -109,7 +109,7 @@ function invalidateChartData() {
     chartDataCache.clear();
 }
 
-function get_project_data(type, start_date = "", end_date = "", search_term = "", context_id = "", tag_ids = [], exclude_ids = [], include_ids = [], project_name = "") {
+function get_project_data(type, start_date = "", end_date = "", search_term = "", context_id = "", tag_ids = [], exclude_ids = [], include_ids = [], project_name = "", include_related = false) {
     // Every chart type is served by the v2 charts endpoint; the server picks
     // the payload shape from chart_type (legacy tally/hierarchy shapes for
     // pie/bar/context/status/bubble/treemap/radar).
@@ -121,6 +121,7 @@ function get_project_data(type, start_date = "", end_date = "", search_term = ""
     qs.set('chart_type', type);
     if (type === 'heatmap') qs.set('aggregate', 'true');
     if (search_term) qs.set('search', search_term);
+    if (search_term && include_related) qs.set('related', 'true');
     if (project_name) qs.set('project_name', project_name);
     if (start_date) qs.set('start_date', start_date);
     if (end_date) qs.set('end_date', end_date);
@@ -256,6 +257,8 @@ function render() {
     end_date = end_date || "";
 
     let search_term = ($('#content-search').val() || '').trim();
+    // "Include related sessions" only renders when semantic search is available.
+    const include_related = $('#related-search').is(':checked');
     let project_name = ($('#project-search').val() || '').trim();
 
     let context_id = String($('#context-filter').val() || '').trim();
@@ -278,7 +281,7 @@ function render() {
     const exclude_ids = checkedProjectIds('exclude_projects');
     const include_ids = checkedProjectIds('include_projects');
 
-    get_project_data(type, start_date, end_date, search_term, context_id, tag_ids, exclude_ids, include_ids, project_name)
+    get_project_data(type, start_date, end_date, search_term, context_id, tag_ids, exclude_ids, include_ids, project_name, include_related)
         .then(data => {
             if (generation !== renderGeneration) return;
 

@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from core.models import Context, Projects, SubProjects, Tag
+from core.search import search_sessions
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,8 @@ class SessionFilterSpec:
     active: bool | None = None
     note_snippet: str | None = None
     uuid: UUID | None = None
+    search: str | None = None
+    related: bool = False
 
     @classmethod
     def from_query_params(cls, qp, user):
@@ -101,6 +104,15 @@ class SessionFilterSpec:
         raw_note = qp.get("note_snippet")
         values["note_snippet"] = raw_note if raw_note not in (None, "") else None
 
+        values["search"] = (qp.get("search") or "").strip() or None
+        raw_related = qp.get("related")
+        if raw_related in (None, "") or str(raw_related).lower() == "false":
+            values["related"] = False
+        elif str(raw_related).lower() == "true":
+            values["related"] = True
+        else:
+            errors["related"] = ["Enter true or false."]
+
         raw_uuid = qp.get("uuid")
         if raw_uuid in (None, ""):
             values["uuid"] = None
@@ -121,7 +133,8 @@ class SessionFilterSpec:
             raise ValidationError(errors)
         return cls(**values)
 
-    def apply(self, queryset):
+    def apply(self, queryset, *, user=None):
+        """Narrow ``queryset``; ``user`` is needed only for related=true."""
         if self.project_ids is not None:
             queryset = queryset.filter(project_id__in=self.project_ids)
         if self.subproject_ids is not None:
@@ -169,4 +182,10 @@ class SessionFilterSpec:
             )
         ):
             queryset = queryset.distinct()
+
+        # Last: related matches are drawn from what the other filters left.
+        if self.search is not None:
+            queryset = search_sessions(
+                queryset, self.search, user=user, related=self.related
+            )
         return queryset

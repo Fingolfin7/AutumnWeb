@@ -209,6 +209,17 @@ class SessionListQuerySerializer(serializers.Serializer):
     end_date = serializers.DateField(required=False)
     active = serializers.BooleanField(required=False)
     note_snippet = serializers.CharField(required=False)
+    search = serializers.CharField(
+        required=False,
+        help_text="Search project names, assigned subproject names and session notes.",
+    )
+    related = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "With search, also include completed sessions that match it by meaning. "
+            "Needs AI features and an OpenAI key on the account; otherwise ignored."
+        ),
+    )
     uuid = serializers.UUIDField(required=False)
 
 
@@ -627,6 +638,14 @@ class ProjectListQuerySerializer(serializers.Serializer):
         required=False, choices=("active", "paused", "complete", "archived")
     )
     search = serializers.CharField(required=False)
+    related = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "With search, also include projects that match it by meaning (their "
+            "name, subprojects, description or session notes). Needs AI features "
+            "and an OpenAI key on the account; otherwise ignored."
+        ),
+    )
     context_ids = serializers.CharField(required=False)
     tag_ids = serializers.CharField(required=False)
     exclude_project_ids = serializers.CharField(required=False)

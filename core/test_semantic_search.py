@@ -34,6 +34,7 @@ from core.services.semantic_search import (
     decode_vector,
     encode_vector,
     load_vectors,
+    project_text,
     reciprocal_rank_fusion,
     session_text,
 )
@@ -183,7 +184,7 @@ class RelatedSessionsTests(SemanticSearchTestCase):
         self._sync()
         self._search("sign-in failure")
         rows = RecommendationUsage.objects.filter(user=self.user, model=MODEL)
-        self.assertEqual(rows.count(), 2)  # one sync batch, one query
+        self.assertEqual(rows.count(), 3)  # sessions batch, projects batch, one query
         self.assertTrue(all(row.success and row.input_tokens for row in rows))
         self.assertTrue(all(row.estimated_cost_usd is not None for row in rows))
 
@@ -209,6 +210,9 @@ class IsolationTests(SemanticSearchTestCase):
             expected = {
                 session_text(s.project.name, [sp.name for sp in s.subprojects.all()], s.note)
                 for s in Sessions.objects.filter(user=owner)
+            } | {
+                project_text(p.name, [sp.name for sp in p.subprojects.all()], p.description)
+                for p in Projects.objects.filter(user=owner)
             }
             self.assertEqual(set(texts), expected)
 
@@ -276,16 +280,26 @@ class StalenessTests(SemanticSearchTestCase):
         self.assertIn("Watered the orchard", texts[0])
         self.assertEqual(self._related("sign-in failure"), [])
 
-    def test_project_rename_restales_its_sessions(self):
+    def test_project_rename_restales_its_sessions_and_itself(self):
         Projects.objects.filter(pk=self.identity.pk).update(name="Identity Platform")
         texts = self._resynced_texts()
-        self.assertEqual(len(texts), 2)
+        self.assertEqual(len(texts), 3)  # two sessions and the project
         self.assertTrue(all(text.startswith("Identity Platform\n") for text in texts))
 
     def test_subproject_rename_restales_its_sessions(self):
         SubProjects.objects.filter(pk=self.tokens.pk).update(name="Refresh tokens")
         texts = self._resynced_texts()
-        self.assertEqual(texts, [session_text("Identity", ["Refresh tokens"], self.oauth.note)])
+        self.assertEqual(
+            texts,
+            [
+                session_text("Identity", ["Refresh tokens"], self.oauth.note),
+                project_text("Identity", ["Refresh tokens"], None),
+            ],
+        )
+
+    def test_project_description_edit_restales_only_the_project(self):
+        Projects.objects.filter(pk=self.garden.pk).update(description="Orchard care")
+        self.assertEqual(self._resynced_texts(), [project_text("Garden", [], "Orchard care")])
 
     def test_model_change_restales_everything(self):
         SessionEmbedding.objects.update(model="older-model")
@@ -341,13 +355,15 @@ class FallbackTests(SemanticSearchTestCase):
 
     def test_dry_run_calls_nothing(self):
         out = self._sync("--dry-run")
-        self.assertIn("3 to embed", out)
+        self.assertIn("3 sessions (0 current, 3 to embed)", out)
+        self.assertIn("2 projects (0 current, 2 to embed)", out)
         self.assertEqual(FakeOpenAI.all_inputs(), [])
         self.assertFalse(SessionEmbedding.objects.exists())
 
     def test_limit_takes_newest_first_and_batches(self):
         self._sync("--limit", "2", "--batch-size", "1")
-        self.assertEqual(len(FakeOpenAI.all_inputs()), 2)
+        # Two sessions and (the limit is per kind) both projects, one per batch.
+        self.assertEqual(len(FakeOpenAI.all_inputs()), 4)
         self.assertEqual(
             set(SessionEmbedding.objects.values_list("session_id", flat=True)),
             {self.plants.pk, self.failure_note.pk},

@@ -50,6 +50,8 @@ from core.api_v2.serializers import (
 )
 from core.commitments import mutation_affects_ledger
 from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
+from core.search import with_extra
+from core.services.semantic_search import INCLUDED_LIMIT, related_project_ids
 from core.services import (
     DestructiveMutationService,
     DestructiveOperationError,
@@ -892,7 +894,8 @@ class SessionsView(V2APIView):
 
         spec = SessionFilterSpec.from_query_params(request.query_params, request.user)
         queryset = spec.apply(
-            _session_queryset(request.user).filter(end_time__isnull=False)
+            _session_queryset(request.user).filter(end_time__isnull=False),
+            user=request.user,
         ).order_by("-end_time", "-id")
         total = queryset.count()
         sessions = list(queryset[offset : offset + limit])
@@ -1101,14 +1104,28 @@ class ProjectsView(V2APIView):
         queryset = _project_queryset(request.user)
         if "status" in data:
             queryset = queryset.filter(status=data["status"])
-        if data.get("search"):
-            queryset = queryset.filter(name__icontains=data["search"])
         if context_ids is not None:
             queryset = queryset.filter(context_id__in=context_ids)
         if tag_ids is not None:
             queryset = queryset.filter(tags__id__in=tag_ids).distinct()
         if excluded_ids is not None:
             queryset = queryset.exclude(pk__in=excluded_ids)
+        # Last: related matches are drawn from what the other filters left.
+        if data.get("search"):
+            matches = queryset.filter(name__icontains=data["search"])
+            if data.get("related"):
+                matches = with_extra(
+                    queryset,
+                    matches,
+                    related_project_ids(
+                        request.user,
+                        queryset,
+                        matches,
+                        data["search"],
+                        limit=INCLUDED_LIMIT,
+                    ),
+                )
+            queryset = matches
         ordering = data["ordering"]
         queryset = (
             queryset.order_by(ordering, "id")

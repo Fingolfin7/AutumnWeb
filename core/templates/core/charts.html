@@ -137,6 +137,13 @@
                 {{ search_form.search.errors }}
             </div>
 
+            {% if semantic_search_available %}
+            <div class="check-row">
+                {{ search_form.related }}
+                <label for="related-search">Include related sessions</label>
+            </div>
+            {% endif %}
+
             <div class="field">
                 <label for="project-search">Project name (show subproject breakdown)</label>
                 {{ search_form.project_name }}

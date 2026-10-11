@@ -1386,6 +1386,15 @@
       },
       {
         "in": "query",
+        "name": "related",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "With search, also include projects that match it by meaning (their name, subprojects, description or session notes). Needs AI features and an OpenAI key on the account; otherwise ignored.",
+        "argument": "related"
+      },
+      {
+        "in": "query",
         "name": "search",
         "schema": {
           "type": "string",
@@ -1454,6 +1463,10 @@
           "minLength": 1,
           "description": "* `name` - name\n* `id` - id"
         },
+        "related": {
+          "type": "boolean",
+          "description": "With search, also include projects that match it by meaning (their name, subprojects, description or session notes). Needs AI features and an OpenAI key on the account; otherwise ignored."
+        },
         "search": {
           "type": "string",
           "minLength": 1
@@ -1484,7 +1497,7 @@
       "required": [],
       "additionalProperties": false
     },
-    "description": "List or search projects. Use search to resolve names to numeric IDs. Responses include count and total; advance the offset using the returned count until the total is covered. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "List or search projects. Use search to resolve names to numeric IDs; add related=true to also find projects that match the search by meaning. Responses include count and total; advance the offset using the returned count until the total is covered. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -2025,11 +2038,20 @@
       },
       {
         "in": "query",
+        "name": "related",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored.",
+        "argument": "related"
+      },
+      {
+        "in": "query",
         "name": "search",
         "schema": {
           "type": "string"
         },
-        "description": "Search project names, assigned subproject names, and session notes.",
+        "description": "Search project names, assigned subproject names and session notes.",
         "argument": "search"
       },
       {
@@ -2142,9 +2164,13 @@
         "project_name": {
           "type": "string"
         },
+        "related": {
+          "type": "boolean",
+          "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored."
+        },
         "search": {
           "type": "string",
-          "description": "Search project names, assigned subproject names, and session notes."
+          "description": "Search project names, assigned subproject names and session notes."
         },
         "start_date": {
           "type": "string",
@@ -2263,6 +2289,24 @@
       },
       {
         "in": "query",
+        "name": "related",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored.",
+        "argument": "related"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Search project names, assigned subproject names and session notes.",
+        "argument": "search"
+      },
+      {
+        "in": "query",
         "name": "start_date",
         "schema": {
           "type": "string"
@@ -2324,6 +2368,14 @@
         "project_ids": {
           "type": "string",
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "related": {
+          "type": "boolean",
+          "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored."
+        },
+        "search": {
+          "type": "string",
+          "description": "Search project names, assigned subproject names and session notes."
         },
         "start_date": {
           "type": "string",
@@ -2450,6 +2502,24 @@
       },
       {
         "in": "query",
+        "name": "related",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored.",
+        "argument": "related"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Search project names, assigned subproject names and session notes.",
+        "argument": "search"
+      },
+      {
+        "in": "query",
         "name": "start_date",
         "schema": {
           "type": "string"
@@ -2521,6 +2591,14 @@
         "project_ids": {
           "type": "string",
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "related": {
+          "type": "boolean",
+          "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored."
+        },
+        "search": {
+          "type": "string",
+          "description": "Search project names, assigned subproject names and session notes."
         },
         "start_date": {
           "type": "string",
@@ -2633,6 +2711,24 @@
       },
       {
         "in": "query",
+        "name": "related",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored.",
+        "argument": "related"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Search project names, assigned subproject names and session notes.",
+        "argument": "search"
+      },
+      {
+        "in": "query",
         "name": "start_date",
         "schema": {
           "type": "string"
@@ -2694,6 +2790,14 @@
         "project_ids": {
           "type": "string",
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "related": {
+          "type": "boolean",
+          "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored."
+        },
+        "search": {
+          "type": "string",
+          "description": "Search project names, assigned subproject names and session notes."
         },
         "start_date": {
           "type": "string",
@@ -2837,6 +2941,25 @@
       },
       {
         "in": "query",
+        "name": "related",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored.",
+        "argument": "related"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Search project names, assigned subproject names and session notes.",
+        "argument": "search"
+      },
+      {
+        "in": "query",
         "name": "start_date",
         "schema": {
           "type": "string",
@@ -2931,6 +3054,15 @@
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
         },
+        "related": {
+          "type": "boolean",
+          "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored."
+        },
+        "search": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Search project names, assigned subproject names and session notes."
+        },
         "start_date": {
           "type": "string",
           "format": "date"
@@ -2959,7 +3091,7 @@
       "required": [],
       "additionalProperties": false
     },
-    "description": "Search completed or active sessions by IDs, dates or note_snippet. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Add related=true with search to also include sessions that match it by meaning. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": true,
       "destructiveHint": false,

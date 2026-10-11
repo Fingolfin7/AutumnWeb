@@ -6,6 +6,8 @@ from django.http import StreamingHttpResponse
 from django.db import close_old_connections, transaction
 from core.models import Sessions
 from core.forms import SearchProjectForm
+from core.search import is_truthy
+from core.services.semantic_search import semantic_search_available
 from core.templatetags.markdown_render import markdown as render_markdown
 from core.utils import (
     filter_sessions_by_params,
@@ -486,7 +488,15 @@ class InsightsView(View):
     def _extract_filter_params(self, request):
         """Extract relevant filter params from request.GET or request.POST"""
         params = {}
-        keys = ["project_name", "start_date", "end_date", "note_snippet", "context"]
+        keys = [
+            "search",
+            "related",
+            "project_name",
+            "start_date",
+            "end_date",
+            "note_snippet",
+            "context",
+        ]
         # Get scalar values
         for key in keys:
             val = request.GET.get(key) or request.POST.get(key)
@@ -533,6 +543,7 @@ class InsightsView(View):
             using_stored_filters = False
 
             filter_keys = [
+                "search",
                 "project_name",
                 "start_date",
                 "end_date",
@@ -603,13 +614,13 @@ class InsightsView(View):
             # For existing chats, we use stored filters unless explicit override in URL
             if using_stored_filters or not chat_id:
                 qs = filter_sessions_by_params(
-                    request, qs, params_override=current_filters
+                    request, qs, params_override=current_filters, user=user
                 )
             else:
                 # Fallback to standard request.GET processing if we have explicit filters
                 # (which match current_filters anyway, but logic flows better)
                 qs = filter_sessions_by_params(
-                    request, qs, params_override=current_filters
+                    request, qs, params_override=current_filters, user=user
                 )
 
             session_count = qs.count()
@@ -619,9 +630,12 @@ class InsightsView(View):
             sessions = list(qs)
             provider_models = self._provider_models(user)
 
+            semantic = semantic_search_available(user)
             # Build form initial data from current_filters
             search_form = SearchProjectForm(
                 initial={
+                    "search": current_filters.get("search"),
+                    "related": is_truthy(current_filters.get("related")),
                     "project_name": current_filters.get("project_name"),
                     "start_date": current_filters.get("start_date"),
                     "end_date": current_filters.get("end_date"),
@@ -676,7 +690,10 @@ class InsightsView(View):
                 # otherwise reads as broken. Resolved here rather than in the
                 # async caller because it queries. Same helper as Sessions,
                 # Projects and Charts.
-                "active_filters": summarise_search_filters(request, user),
+                "active_filters": summarise_search_filters(
+                    request, user, related=semantic
+                ),
+                "semantic_search_available": semantic,
             }
 
         data = await sync_to_async(get_all_sync_data)()
@@ -754,6 +771,7 @@ class InsightsView(View):
             "openai_connection_source": data["openai_connection_source"],
             "exclude_project_meta_json": data["exclude_project_meta_json"],
             "active_filters": data["active_filters"],
+            "semantic_search_available": data["semantic_search_available"],
         }
         return await sync_to_async(render)(
             request, "llm_insights/insights.html", context
@@ -771,6 +789,7 @@ class InsightsView(View):
             current_filters = chat_obj.filters
         elif not chat_obj:
             filter_keys = [
+                "search",
                 "project_name",
                 "start_date",
                 "end_date",
@@ -792,7 +811,7 @@ class InsightsView(View):
 
         ctx_id = current_filters.get("context")
         qs = filter_by_active_context(qs, request, override_context_id=ctx_id)
-        qs = filter_sessions_by_params(request, qs, params_override=current_filters)
+        qs = filter_sessions_by_params(request, qs, params_override=current_filters, user=user)
 
         sessions = list(qs)
         sessions_updated = request.session.get("sessions_updated", False)
@@ -1099,6 +1118,7 @@ class InsightsView(View):
             # Apply defaults for New Chat if no filters provided (same logic as GET)
             elif not chat_obj:
                 filter_keys = [
+                    "search",
                     "project_name",
                     "start_date",
                     "end_date",
@@ -1124,11 +1144,11 @@ class InsightsView(View):
 
             if using_stored_filters:
                 qs = filter_sessions_by_params(
-                    request, qs, params_override=current_filters
+                    request, qs, params_override=current_filters, user=user
                 )
             else:
                 qs = filter_sessions_by_params(
-                    request, qs, params_override=current_filters
+                    request, qs, params_override=current_filters, user=user
                 )  # Use POST params
 
             session_count = qs.count()

@@ -24,6 +24,13 @@ class SearchProjectForm(forms.Form):
         ),
     )
 
+    # Charts and Insights only, and only when semantic search is available:
+    # count sessions that match the search by meaning, not just by words.
+    related = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'id': 'related-search'}),
+    )
+
     project_name = forms.CharField(
         required=False,
         widget=forms.TextInput(

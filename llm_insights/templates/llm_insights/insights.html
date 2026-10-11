@@ -95,6 +95,19 @@
             <p class="sheet-title">Filter sessions</p>
 
             <div class="field">
+                <label for="content-search">Search projects, subprojects, and session notes</label>
+                {{ search_form.search }}
+                {{ search_form.search.errors }}
+            </div>
+
+            {% if semantic_search_available %}
+            <div class="check-row">
+                {{ search_form.related }}
+                <label for="related-search">Include related sessions</label>
+            </div>
+            {% endif %}
+
+            <div class="field">
                 <label for="project-search">Project name</label>
                 {{ search_form.project_name }}
                 {{ search_form.project_name.errors }}

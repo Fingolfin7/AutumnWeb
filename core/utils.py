@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 from django.http import HttpRequest
 from dateutil.relativedelta import relativedelta
 from core.models import Sessions, Projects, SubProjects, Context, Tag
-from core.search import search_sessions
+from core.search import is_truthy, search_sessions
 
 
 ACTIVE_CONTEXT_SESSION_KEY = "active_context_id"
@@ -255,7 +255,7 @@ def filter_by_active_context(
 
 
 def filter_sessions_by_params(
-    request, sessions: QuerySet[Sessions], params_override=None
+    request, sessions: QuerySet[Sessions], params_override=None, *, user=None
 ) -> QuerySet:
     # Determine the correct query parameters attribute safely
     # If params_override is provided, use it. Otherwise fall back to request.GET
@@ -267,9 +267,6 @@ def filter_sessions_by_params(
     end_date = params.get("end_date")
     note_snippet = params.get("note_snippet")
     tags = _param_list(params, "tags")
-
-    if search_term:
-        sessions = search_sessions(sessions, search_term)
 
     if project_name:
         sessions = sessions.filter(project__name__icontains=project_name)
@@ -309,6 +306,16 @@ def filter_sessions_by_params(
     if exclude_ids:
         sessions = sessions.exclude(project__id__in=exclude_ids)
 
+    # Last, because "related" (Charts/Insights "Include related") draws its
+    # meaning-based matches from everything the other filters left.
+    if search_term:
+        sessions = search_sessions(
+            sessions,
+            search_term,
+            user=user or getattr(request, "user", None),
+            related=is_truthy(params.get("related")),
+        )
+
     return sessions
 
 
@@ -322,14 +329,15 @@ _TEXT_FILTER_LABELS = (
 )
 
 
-def summarise_search_filters(request, user) -> list[dict]:
+def summarise_search_filters(request, user, *, related=False) -> list[dict]:
     """Label/value pairs for the filters currently narrowing a list page.
 
     The Focus Desk nav model puts filters behind a sheet, so the page itself
     has to say what is being hidden — otherwise a filtered list that comes
     back empty looks broken rather than narrow. Ids are resolved to names,
     scoped to ``user``: a pill reading "Context 3" tells nobody anything, and
-    another user's id must resolve to nothing at all.
+    another user's id must resolve to nothing at all. ``related`` is for the
+    pages whose filter sheet has the "Include related" toggle.
     """
 
     def names_for(model, ids):
@@ -348,6 +356,9 @@ def summarise_search_filters(request, user) -> list[dict]:
         for key, label in _TEXT_FILTER_LABELS
         if params.get(key)
     ]
+
+    if related and params.get("search") and is_truthy(params.get("related")):
+        summary.append({"label": "Including", "value": "related"})
 
     for label, names in (
         ("Context", names_for(Context, [params.get("context") or ""])),

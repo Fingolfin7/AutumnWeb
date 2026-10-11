@@ -51,6 +51,18 @@ FILTER_PARAMETERS = [
         ("end_date", "Inclusive local date in YYYY-MM-DD format."),
         ("active", "Filter by active state (true or false)."),
         ("note_snippet", "Case-insensitive note substring."),
+        ("search", "Search project names, assigned subproject names and session notes."),
+    )
+] + [
+    OpenApiParameter(
+        name="related",
+        type=OpenApiTypes.BOOL,
+        location=OpenApiParameter.QUERY,
+        required=False,
+        description=(
+            "With search, also include completed sessions that match it by meaning. "
+            "Needs AI features and an OpenAI key on the account; otherwise ignored."
+        ),
     )
 ]
 
@@ -71,8 +83,13 @@ def _numerator_minutes(numerator):
     return round(numerator / BASIS_POINTS / 60_000_000.0, 2)
 
 
-def _session_filter(request):
-    return SessionFilterSpec.from_query_params(request.query_params, request.user)
+def _session_filter(request, *, without=()):
+    params = request.query_params
+    if without:
+        params = params.copy()
+        for key in without:
+            params.pop(key, None)
+    return SessionFilterSpec.from_query_params(params, request.user)
 
 
 def _filtered_completed_sessions(request):
@@ -80,7 +97,7 @@ def _filtered_completed_sessions(request):
         user=request.user,
         end_time__isnull=False,
     )
-    sessions = _session_filter(request).apply(sessions)
+    sessions = _session_filter(request).apply(sessions, user=request.user)
     return Sessions.objects.filter(pk__in=sessions.order_by().values("pk")).order_by()
 
 
@@ -267,10 +284,6 @@ class ReportChartsView(V2APIView):
                 required=True,
             ),
             OpenApiParameter("project_name", OpenApiTypes.STR, OpenApiParameter.QUERY),
-            OpenApiParameter(
-                "search", OpenApiTypes.STR, OpenApiParameter.QUERY,
-                description="Search project names, assigned subproject names, and session notes.",
-            ),
             OpenApiParameter("context", OpenApiTypes.INT, OpenApiParameter.QUERY),
             OpenApiParameter("tags", OpenApiTypes.INT, OpenApiParameter.QUERY, many=True),
             OpenApiParameter(
@@ -306,7 +319,9 @@ class ReportChartsView(V2APIView):
             user=request.user,
             end_time__isnull=False,
         )
-        sessions = _session_filter(request).apply(sessions)
+        # search/related are left to filter_sessions_by_params below, which
+        # applies them after every other filter.
+        sessions = _session_filter(request, without=("search", "related")).apply(sessions)
 
         # The web page still selects projects by name and uses its established
         # context/tag/exclusion controls. Dates are deliberately omitted here:

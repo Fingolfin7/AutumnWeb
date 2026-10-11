@@ -1,4 +1,4 @@
-"""Embed completed sessions whose search vector is missing or stale."""
+"""Embed completed sessions and projects whose search vector is missing or stale."""
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
@@ -13,7 +13,7 @@ from core.services.semantic_search import (
 
 class Command(BaseCommand):
     help = (
-        "Embed new and changed session notes for meaning-based Sessions search. "
+        "Embed new and changed sessions and projects for meaning-based search. "
         "Only accounts with AI features on and an OpenAI API key are processed, "
         "each with its own key. Safe to re-run; suitable for cron."
     )
@@ -30,7 +30,7 @@ class Command(BaseCommand):
             "--limit",
             type=int,
             default=None,
-            help="At most this many sessions per user per run (newest first).",
+            help="At most this many sessions, and this many projects, per user per run (newest first).",
         )
 
     def handle(self, *args, **options):
@@ -69,15 +69,16 @@ class Command(BaseCommand):
                 # The category only: provider errors can echo request content.
                 self.stderr.write(f"{user.username}: embedding failed ({type(exc).__name__}).")
                 continue
+            parts = []
+            for label, kind in (("sessions", result.sessions), ("projects", result.projects)):
+                done = (
+                    f"{kind.pending} to embed" if options["dry_run"] else f"{kind.embedded} embedded"
+                )
+                parts.append(f"{kind.total} {label} ({kind.fresh} current, {done})")
+            line = f"{user.username}: " + "; ".join(parts)
             if options["dry_run"]:
-                self.stdout.write(
-                    f"{user.username}: {result.total} sessions, {result.fresh} current, "
-                    f"{result.pending} to embed (~{result.pending_chars // 4} tokens, {MODEL})."
-                )
-            else:
-                self.stdout.write(
-                    f"{user.username}: {result.total} sessions, {result.fresh} current, "
-                    f"{result.embedded} embedded."
-                )
+                chars = result.sessions.pending_chars + result.projects.pending_chars
+                line += f"; ~{chars // 4} tokens, {MODEL}"
+            self.stdout.write(line + ".")
         if failures:
             raise CommandError(f"Embedding failed for {failures} user(s).")
