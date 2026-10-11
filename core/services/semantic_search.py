@@ -45,10 +45,11 @@ QUERY_CACHE_SECONDS = 15 * 60
 # shown for the no-match query; override with SEMANTIC_SEARCH_MIN_SIMILARITY.
 DEFAULT_MIN_SIMILARITY = 0.45
 CANDIDATE_LIMIT = 50
+# The "Related" sections preview this many. When related matches are counted
+# instead (Charts/Insights "Include related", the API's related=true), callers
+# pass limit=None: every match above the cutoff counts, so a total is never
+# silently truncated. The cutoff is the only relevance control.
 RELATED_LIMIT = 5
-# When related matches are counted (Charts/Insights "Include related", the
-# API's related=true) rather than listed, at most this many are added.
-INCLUDED_LIMIT = 200
 RRF_K = 60
 
 
@@ -357,7 +358,7 @@ def load_project_vectors(user, projects):
 
 
 def semantic_ranking(ids, matrix, query_vector, *, cutoff, limit=CANDIDATE_LIMIT):
-    """[(id, cosine)] at or above ``cutoff``, best first."""
+    """[(id, cosine)] at or above ``cutoff``, best first; ``limit=None`` keeps all."""
     if matrix is None:
         return []
     np = _numpy()
@@ -365,7 +366,7 @@ def semantic_ranking(ids, matrix, query_vector, *, cutoff, limit=CANDIDATE_LIMIT
     ranked = []
     for index in np.argsort(-scores, kind="stable"):
         score = float(scores[index])
-        if score < cutoff or len(ranked) >= limit:
+        if score < cutoff or (limit is not None and len(ranked) >= limit):
             break
         ranked.append((ids[index], score))
     return ranked
@@ -416,6 +417,8 @@ def _clean_term(term):
 def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT):
     """Ids of sessions in ``sessions`` that mean ``term`` but keyword search missed.
 
+    ``limit=None`` returns every one above the cutoff.
+
     ``sessions`` must already carry the caller's ownership and filters (dates,
     context, tags, project include/exclude); ``keyword_sessions`` is the same
     set narrowed by the keyword term. Best match first. With no keyword rank,
@@ -433,7 +436,10 @@ def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED
     vector = _query_vector_or_none(user, embedder, term)
     if vector is None:
         return []
-    hits = semantic_ranking(ids, matrix, vector, cutoff=min_similarity(), limit=max(limit, CANDIDATE_LIMIT))
+    # Keyword matches and stale vectors are dropped after ranking, so a
+    # preview ranks a few more than it shows.
+    candidate_limit = None if limit is None else max(limit, CANDIDATE_LIMIT)
+    hits = semantic_ranking(ids, matrix, vector, cutoff=min_similarity(), limit=candidate_limit)
     if not hits:
         return []
     candidates = [pk for pk, _ in hits]
@@ -462,7 +468,8 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
 
     A project scores the better of its own vector (name, subprojects,
     description) and its best-matching session, mirroring keyword search,
-    which also matches projects through their session notes.
+    which also matches projects through their session notes. ``limit=None``
+    returns every one above the cutoff.
     """
     term = _clean_term(term)
     if not term:
@@ -485,12 +492,14 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
 
     cutoff = min_similarity()
     scores = {}
-    project_hits = semantic_ranking(project_ids, project_matrix, vector, cutoff=cutoff)
+    project_hits = semantic_ranking(project_ids, project_matrix, vector, cutoff=cutoff, limit=None)
     current = fresh_project_ids(user, [pk for pk, _ in project_hits], project_digests)
     for pk, score in project_hits:
         if pk in current:
             scores[pk] = max(scores.get(pk, score), score)
-    session_hits = dict(semantic_ranking(session_ids, session_matrix, vector, cutoff=cutoff))
+    session_hits = dict(
+        semantic_ranking(session_ids, session_matrix, vector, cutoff=cutoff, limit=None)
+    )
     current = fresh_ids(user, list(session_hits), session_digests)
     for session_id, project_id in Sessions.objects.filter(pk__in=current, user=user).values_list(
         "pk", "project_id"

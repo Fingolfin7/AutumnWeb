@@ -159,6 +159,14 @@ class ApiRelatedTests(SemanticSearchTestCase):
             [],
         )
 
+    def test_counted_related_matches_are_not_capped(self):
+        # More than any preview/candidate limit: every match above the cutoff counts.
+        extra = [self._session(self.garden, f"OAuth login check {i}", days_ago=30 + i) for i in range(60)]
+        self._sync()
+        ids = self._session_ids(search="sign-in failure", related="true", limit=500)
+        self.assertEqual(len(ids), 2 + len(extra))
+        self.assertTrue({s.pk for s in extra} <= set(ids))
+
     def test_invalid_related_is_rejected(self):
         response = self._sessions(search="x", related="maybe")
         self.assertEqual(response.status_code, 400)

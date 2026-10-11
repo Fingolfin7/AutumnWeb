@@ -51,7 +51,7 @@ from core.api_v2.serializers import (
 from core.commitments import mutation_affects_ledger
 from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
 from core.search import with_extra
-from core.services.semantic_search import INCLUDED_LIMIT, related_project_ids
+from core.services.semantic_search import related_project_ids
 from core.services import (
     DestructiveMutationService,
     DestructiveOperationError,
@@ -1122,7 +1122,7 @@ class ProjectsView(V2APIView):
                         queryset,
                         matches,
                         data["search"],
-                        limit=INCLUDED_LIMIT,
+                        limit=None,
                     ),
                 )
             queryset = matches

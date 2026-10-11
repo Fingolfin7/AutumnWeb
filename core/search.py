@@ -59,9 +59,10 @@ def search_sessions(sessions, term, *, user=None, related=False):
     if not (related and user is not None):
         return keyword
 
-    from core.services.semantic_search import INCLUDED_LIMIT, related_session_ids
+    from core.services.semantic_search import related_session_ids
 
-    extra = related_session_ids(user, sessions, keyword, term, limit=INCLUDED_LIMIT)
+    # Counted, not previewed: every match above the cutoff, no cap.
+    extra = related_session_ids(user, sessions, keyword, term, limit=None)
     return with_extra(sessions, keyword, extra)
 
 
