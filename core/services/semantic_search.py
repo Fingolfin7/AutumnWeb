@@ -332,6 +332,16 @@ def _matrix(rows):
         return [], {}, None
     np = _numpy()
     matrix = np.frombuffer(b"".join(chunks), dtype="<f4").reshape(len(ids), DIMENSIONS)
+    # Stored vectors are unit length; anything else (NaN, inf, zero, a
+    # corrupted blob of the right size) would compare as "similar" or worse.
+    with np.errstate(all="ignore"):
+        usable = np.isfinite(matrix).all(axis=1) & (np.abs(np.linalg.norm(matrix, axis=1) - 1.0) < 1e-3)
+    if not usable.all():
+        ids = [pk for pk, ok in zip(ids, usable) if ok]
+        digests = {pk: digests[pk] for pk in ids}
+        matrix = matrix[usable]
+        if not ids:
+            return [], {}, None
     return ids, digests, matrix
 
 
@@ -362,21 +372,27 @@ def semantic_ranking(ids, matrix, query_vector, *, cutoff, limit=CANDIDATE_LIMIT
     if matrix is None:
         return []
     np = _numpy()
-    scores = matrix @ query_vector
+    with np.errstate(all="ignore"):
+        scores = matrix @ query_vector
+    scores = np.where(np.isfinite(scores), scores, -np.inf)
     ranked = []
     for index in np.argsort(-scores, kind="stable"):
         score = float(scores[index])
-        if score < cutoff or (limit is not None and len(ranked) >= limit):
+        if not score >= cutoff or (limit is not None and len(ranked) >= limit):
             break
         ranked.append((ids[index], score))
     return ranked
 
 
-def query_vector(user, embedder, term):
-    """Embed the query once per user and wording for a short while."""
-    key = "semantic-search:q:" + hashlib.sha256(
+def _query_cache_key(user, term):
+    return "semantic-search:q:" + hashlib.sha256(
         f"{user.pk}\0{MODEL}\0{DIMENSIONS}\0{term}".encode("utf-8")
     ).hexdigest()
+
+
+def query_vector(user, embedder, term):
+    """Embed the query once per user and wording for a short while."""
+    key = _query_cache_key(user, term)
     cached = cache.get(key)
     if cached is not None:
         return decode_vector(cached)
@@ -390,8 +406,15 @@ def query_vector(user, embedder, term):
     return decode_vector(data)
 
 
-def _query_vector_or_none(user, embedder, term):
+def _query_vector_or_none(user, term):
+    """The query's vector, or None on any failure, including building the client."""
     try:
+        cached = cache.get(_query_cache_key(user, term))
+        if cached is not None:
+            return decode_vector(cached)
+        embedder = embedder_for(user)
+        if embedder is None:
+            return None
         return query_vector(user, embedder, term)
     except Exception as exc:
         logger.warning("semantic_search_unavailable", extra={"user_id": user.pk, "error_category": type(exc).__name__})
@@ -410,6 +433,27 @@ def fresh_project_ids(user, ids, digests):
     return {pk for pk, text in texts.items() if digests.get(pk) == text_digest(text)}
 
 
+def _chunks(ids, size):
+    for start in range(0, len(ids), size):
+        yield ids[start:start + size]
+
+
+def _select(candidates, keep, limit):
+    """The best-first ``candidates`` that ``keep`` accepts, up to ``limit``.
+
+    Works through the ranking in chunks, so rejected candidates (keyword
+    matches, stale vectors) never use up a preview's slots, and each query's
+    id list stays bounded.
+    """
+    chosen = []
+    for chunk in _chunks(candidates, CANDIDATE_LIMIT if limit is not None else 500):
+        accepted = keep(chunk)
+        chosen.extend(pk for pk in chunk if pk in accepted)
+        if limit is not None and len(chosen) >= limit:
+            return chosen[:limit]
+    return chosen
+
+
 def _clean_term(term):
     return (term or "").strip()[:MAX_QUERY_CHARS]
 
@@ -425,28 +469,21 @@ def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED
     their reciprocal-rank-fusion order is simply their similarity order.
     """
     term = _clean_term(term)
-    if not term:
-        return []
-    embedder = embedder_for(user)
-    if embedder is None:
+    if not term or not semantic_search_available(user):
         return []
     ids, digests, matrix = load_vectors(user, sessions)
     if not ids:
         return []
-    vector = _query_vector_or_none(user, embedder, term)
+    vector = _query_vector_or_none(user, term)
     if vector is None:
         return []
-    # Keyword matches and stale vectors are dropped after ranking, so a
-    # preview ranks a few more than it shows.
-    candidate_limit = None if limit is None else max(limit, CANDIDATE_LIMIT)
-    hits = semantic_ranking(ids, matrix, vector, cutoff=min_similarity(), limit=candidate_limit)
-    if not hits:
-        return []
-    candidates = [pk for pk, _ in hits]
-    keyword = set(keyword_sessions.filter(pk__in=candidates).values_list("pk", flat=True))
-    candidates = [pk for pk in candidates if pk not in keyword]
-    current = fresh_ids(user, candidates, digests)
-    return [pk for pk in candidates if pk in current][:limit]
+    candidates = [pk for pk, _ in semantic_ranking(ids, matrix, vector, cutoff=min_similarity(), limit=None)]
+
+    def keep(chunk):
+        keyword = set(keyword_sessions.filter(pk__in=chunk).values_list("pk", flat=True))
+        return fresh_ids(user, [pk for pk in chunk if pk not in keyword], digests)
+
+    return _select(candidates, keep, limit)
 
 
 def find_related_sessions(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT):
@@ -472,10 +509,7 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
     returns every one above the cutoff.
     """
     term = _clean_term(term)
-    if not term:
-        return []
-    embedder = embedder_for(user)
-    if embedder is None:
+    if not term or not semantic_search_available(user):
         return []
     project_ids, project_digests, project_matrix = load_project_vectors(user, projects)
     session_ids, session_digests, session_matrix = load_vectors(
@@ -486,29 +520,32 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
     )
     if not project_ids and not session_ids:
         return []
-    vector = _query_vector_or_none(user, embedder, term)
+    vector = _query_vector_or_none(user, term)
     if vector is None:
         return []
 
+    # Every fresh score is aggregated per project before anything is cut.
     cutoff = min_similarity()
     scores = {}
-    project_hits = semantic_ranking(project_ids, project_matrix, vector, cutoff=cutoff, limit=None)
-    current = fresh_project_ids(user, [pk for pk, _ in project_hits], project_digests)
-    for pk, score in project_hits:
-        if pk in current:
-            scores[pk] = max(scores.get(pk, score), score)
-    session_hits = dict(
-        semantic_ranking(session_ids, session_matrix, vector, cutoff=cutoff, limit=None)
-    )
-    current = fresh_ids(user, list(session_hits), session_digests)
-    for session_id, project_id in Sessions.objects.filter(pk__in=current, user=user).values_list(
-        "pk", "project_id"
-    ):
-        score = session_hits[session_id]
-        scores[project_id] = max(scores.get(project_id, score), score)
+    project_hits = dict(semantic_ranking(project_ids, project_matrix, vector, cutoff=cutoff, limit=None))
+    for chunk in _chunks(list(project_hits), 500):
+        for pk in fresh_project_ids(user, chunk, project_digests):
+            scores[pk] = max(scores.get(pk, project_hits[pk]), project_hits[pk])
+    session_hits = dict(semantic_ranking(session_ids, session_matrix, vector, cutoff=cutoff, limit=None))
+    for chunk in _chunks(list(session_hits), 500):
+        current = fresh_ids(user, chunk, session_digests)
+        for session_id, project_id in Sessions.objects.filter(pk__in=current, user=user).values_list(
+            "pk", "project_id"
+        ):
+            score = session_hits[session_id]
+            scores[project_id] = max(scores.get(project_id, score), score)
     if not scores:
         return []
 
-    keyword = set(keyword_projects.filter(pk__in=list(scores)).values_list("pk", flat=True))
-    ranked = sorted((pk for pk in scores if pk not in keyword), key=lambda pk: (-scores[pk], pk))
-    return ranked[:limit]
+    ranked = sorted(scores, key=lambda pk: (-scores[pk], pk))
+
+    def keep(chunk):
+        keyword = set(keyword_projects.filter(pk__in=chunk).values_list("pk", flat=True))
+        return {pk for pk in chunk if pk not in keyword}
+
+    return _select(ranked, keep, limit)

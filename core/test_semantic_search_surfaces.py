@@ -5,11 +5,29 @@ failure" keyword-matches only one Identity note, while the "Repaired OAuth
 token refresh" session and OAuth-flavoured projects match it by meaning.
 """
 
+import json
+from pathlib import Path
+from unittest import mock
+
+import numpy
+from django.conf import settings
+from django.core.cache import cache
 from django.urls import reverse
 from django.utils import timezone
 
-from core.models import Projects
+from core.models import Projects, SessionEmbedding, Sessions
+from core.services import semantic_search
+from core.services.semantic_search import DIMENSIONS
 from core.test_semantic_search import FakeOpenAI, SemanticSearchTestCase
+
+
+def semantic_mcp_operations():
+    path = Path(settings.BASE_DIR) / "integrations/mcp/src/operations.json"
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _session_count(document):
+    return sum(len(project["sessions"]) for project in document["projects"])
 
 
 class ProjectsRelatedTests(SemanticSearchTestCase):
@@ -207,3 +225,75 @@ class ApiRelatedTests(SemanticSearchTestCase):
             reverse("api_v2:projects"), {"search": "sign-in", "related": "true"}
         ).json()["projects"]
         self.assertNotIn(foreign_project.pk, [row["id"] for row in projects])
+
+
+class ReviewRegressionTests(SemanticSearchTestCase):
+    """Cases from the code review: each failed before its fix."""
+
+    def setUp(self):
+        super().setUp()
+        self._sync()
+
+    def test_client_construction_failure_falls_back_to_keywords(self):
+        cache.clear()
+        with mock.patch.object(semantic_search, "Embedder", side_effect=ValueError("bad proxy")):
+            with self.assertLogs("core.services.semantic_search", "WARNING"):
+                response = self._search("sign-in failure")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context["related_sessions"], [])
+            with self.assertLogs("core.services.semantic_search", "WARNING"):
+                response = self.client.get(reverse("projects"), {"search": "sign-in failure"})
+            self.assertEqual(response.status_code, 200)
+
+    def test_keyword_matches_do_not_use_up_the_related_preview(self):
+        # 55 keyword matches outrank the paraphrase; it must still be found.
+        for i in range(55):
+            self._session(self.identity, f"Sign-in failure triage {i}", days_ago=20 + i)
+        self._sync()
+        self.assertEqual(self._related("sign-in failure"), [self.oauth.pk])
+
+    def test_stale_vectors_do_not_use_up_the_related_preview(self):
+        stale = [self._session(self.garden, f"OAuth login fix {i}", days_ago=20 + i) for i in range(55)]
+        self._sync()
+        Sessions.objects.filter(pk__in=[s.pk for s in stale]).update(note="Watered the orchard")
+        self.assertEqual(self._related("sign-in failure"), [self.oauth.pk])
+
+    def test_every_related_project_is_counted_by_the_api(self):
+        for i in range(60):
+            Projects.objects.create(user=self.user, name=f"Login service {i}", description="OAuth")
+        self._sync()
+        response = self.client.get(
+            reverse("api_v2:projects"), {"search": "sign-in", "related": "true", "limit": 500}
+        )
+        self.assertEqual(response.json()["total"], 61)  # the 60 and Identity
+
+    def test_corrupt_vector_of_the_right_size_is_ignored(self):
+        nan = numpy.full(DIMENSIONS, numpy.nan, dtype="<f4").tobytes()
+        SessionEmbedding.objects.filter(session=self.plants).update(vector=nan)
+        response = self.client.get(
+            reverse("api_v2:sessions"), {"search": "sign-in failure", "related": "true"}
+        )
+        self.assertNotIn(self.plants.pk, [row["id"] for row in response.json()["sessions"]])
+        ids, _, _ = semantic_search.load_vectors(self.user, Sessions.objects.filter(user=self.user))
+        self.assertNotIn(self.plants.pk, ids)
+
+    def test_charts_api_validates_related_strictly(self):
+        for value in ("maybe", "1"):
+            with self.subTest(value=value):
+                response = self.client.get(
+                    reverse("api_v2:report-charts"),
+                    {"chart_type": "pie", "search": "sign-in failure", "related": value},
+                )
+                self.assertEqual(response.status_code, 400)
+
+    def test_export_documents_search_and_related(self):
+        operations = {op["name"]: op for op in semantic_mcp_operations()}
+        properties = operations["export_data"]["inputSchema"]["properties"]
+        self.assertIn("search", properties)
+        self.assertIn("related", properties)
+
+    def test_export_applies_search_and_related(self):
+        url = reverse("api_v2:export")
+        keyword = self.client.get(url, {"search": "sign-in failure"}).json()
+        related = self.client.get(url, {"search": "sign-in failure", "related": "true"}).json()
+        self.assertLess(_session_count(keyword), _session_count(related))

@@ -1123,6 +1123,25 @@
       },
       {
         "in": "query",
+        "name": "related",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored.",
+        "argument": "related"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Search project names, assigned subproject names and session notes.",
+        "argument": "search"
+      },
+      {
+        "in": "query",
         "name": "start_date",
         "schema": {
           "type": "string",
@@ -1206,6 +1225,15 @@
           "type": "string",
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "related": {
+          "type": "boolean",
+          "description": "With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored."
+        },
+        "search": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Search project names, assigned subproject names and session notes."
         },
         "start_date": {
           "type": "string",

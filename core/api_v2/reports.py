@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from django.db.models import Count, DurationField, ExpressionWrapper, F, Sum
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -19,6 +21,7 @@ from core.api_v2.serializers import (
 from core.attribution import BASIS_POINTS, hierarchy_child_credit, report_attribution
 from core.chart_reports import SUPPORTED_CHARTS, build_chart_payload
 from core.models import Context, Projects, Sessions
+from core.search import search_sessions
 from core.totals import annotate_project_totals, rounded_session_minutes
 from core.utils import filter_by_active_context, filter_sessions_by_params
 
@@ -83,13 +86,8 @@ def _numerator_minutes(numerator):
     return round(numerator / BASIS_POINTS / 60_000_000.0, 2)
 
 
-def _session_filter(request, *, without=()):
-    params = request.query_params
-    if without:
-        params = params.copy()
-        for key in without:
-            params.pop(key, None)
-    return SessionFilterSpec.from_query_params(params, request.user)
+def _session_filter(request):
+    return SessionFilterSpec.from_query_params(request.query_params, request.user)
 
 
 def _filtered_completed_sessions(request):
@@ -319,16 +317,18 @@ class ReportChartsView(V2APIView):
             user=request.user,
             end_time__isnull=False,
         )
-        # search/related are left to filter_sessions_by_params below, which
-        # applies them after every other filter.
-        sessions = _session_filter(request, without=("search", "related")).apply(sessions)
+        # The whole spec is validated (related must be true/false here too),
+        # but its search runs last, after the legacy filters below, because
+        # related matches are drawn from what every other filter left.
+        spec = _session_filter(request)
+        sessions = replace(spec, search=None).apply(sessions)
 
         # The web page still selects projects by name and uses its established
         # context/tag/exclusion controls. Dates are deliberately omitted here:
         # SessionFilterSpec above is their sole parser and applies user-TZ days.
         legacy_params = request.query_params.copy()
-        legacy_params.pop("start_date", None)
-        legacy_params.pop("end_date", None)
+        for key in ("start_date", "end_date", "search", "related"):
+            legacy_params.pop(key, None)
         sessions = filter_by_active_context(
             sessions,
             request,
@@ -351,6 +351,10 @@ class ReportChartsView(V2APIView):
             sessions,
             params_override=legacy_params,
         )
+        if spec.search is not None:
+            sessions = search_sessions(
+                sessions, spec.search, user=request.user, related=spec.related
+            )
         sessions = Sessions.objects.filter(
             pk__in=sessions.order_by().values("pk")
         ).order_by()

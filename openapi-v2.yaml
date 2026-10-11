@@ -398,6 +398,18 @@ paths:
           type: string
           minLength: 1
       - in: query
+        name: related
+        schema:
+          type: boolean
+        description: With search, also include completed sessions that match it by
+          meaning. Needs AI features and an OpenAI key on the account; otherwise ignored.
+      - in: query
+        name: search
+        schema:
+          type: string
+          minLength: 1
+        description: Search project names, assigned subproject names and session notes.
+      - in: query
         name: start_date
         schema:
           type: string

@@ -52,11 +52,11 @@ class Command(BaseCommand):
 
         failures = 0
         for user in users:
-            embedder = embedder_for(user, timeout=SYNC_TIMEOUT_SECONDS, max_retries=2)
-            if embedder is None:
-                self.stdout.write(f"{user.username}: OpenAI key unreadable; skipped.")
-                continue
             try:
+                embedder = embedder_for(user, timeout=SYNC_TIMEOUT_SECONDS, max_retries=2)
+                if embedder is None:
+                    self.stdout.write(f"{user.username}: OpenAI key unreadable; skipped.")
+                    continue
                 result = sync_embeddings(
                     user,
                     embedder,

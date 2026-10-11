@@ -27,6 +27,17 @@ class ExportQuerySerializer(serializers.Serializer):
     end_date = serializers.DateField(required=False)
     active = serializers.BooleanField(required=False)
     note_snippet = serializers.CharField(required=False)
+    search = serializers.CharField(
+        required=False,
+        help_text="Search project names, assigned subproject names and session notes.",
+    )
+    related = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "With search, also include completed sessions that match it by meaning. "
+            "Needs AI features and an OpenAI key on the account; otherwise ignored."
+        ),
+    )
     compress = serializers.BooleanField(required=False, default=False)
     # "format" collides with DRF's renderer-override query param.
     export_format = serializers.ChoiceField(required=False, choices=("1", "2"), default="2")
