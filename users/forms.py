@@ -7,8 +7,8 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, User
 class UserRegisterForm(UserCreationForm):
     username = forms.CharField(widget=forms.TextInput(attrs={'placeholder': 'Username', 'class': 'full-width'}))
     email = forms.EmailField(widget=forms.EmailInput(attrs={'placeholder': 'example@domain.com', 'class': 'full-width'}),)
-    password1 = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': 'Enter Password', 'class': 'full-width'}))
-    password2 = forms.CharField(label='Confirm Password',
+    password1 = forms.CharField(widget=forms.PasswordInput(attrs={'placeholder': 'Password', 'class': 'full-width'}))
+    password2 = forms.CharField(label='Confirm password',
                                 widget=forms.PasswordInput(attrs={
                                     'placeholder': 'Confirm Password',
                                     'class': 'full-width'
@@ -20,11 +20,11 @@ class UserRegisterForm(UserCreationForm):
 
 
 class UserLoginForm(AuthenticationForm):
-    username = UsernameField(widget=forms.TextInput(attrs={'placeholder': 'Username or Email', 'class': 'full-width'}),
-                             label="Username or Email")
+    username = UsernameField(widget=forms.TextInput(attrs={'placeholder': 'Username or email', 'class': 'full-width'}),
+                             label="Username or email")
     password = forms.CharField(widget=forms.PasswordInput(
-        attrs={'placeholder': 'Enter Password', 'class': 'full-width', 'autocomplete': 'on', 'id': 'password'}),
-        label="Enter Password")
+        attrs={'placeholder': 'Password', 'class': 'full-width', 'autocomplete': 'on', 'id': 'password'}),
+        label="Password")
 
 
 class UserUpdateForm(forms.ModelForm):
@@ -43,12 +43,12 @@ class ProfileUpdateForm(forms.ModelForm):
         label='Timezone',
         help_text='IANA timezone name, for example Europe/Prague.',
     )
-    automatic_background = forms.BooleanField(required=False, label='Automatically Set Background Image')
+    automatic_background = forms.BooleanField(required=False, label='Automatic background')
     background_dimming = forms.IntegerField(
         min_value=0,
         max_value=85,
         required=False,
-        label='Background Dimming',
+        label='Dimming',
         widget=forms.NumberInput(attrs={
             'type': 'range',
             'min': '0',
@@ -59,8 +59,8 @@ class ProfileUpdateForm(forms.ModelForm):
     )
 
     BACKGROUND_CHOICES = [
-        ('bing', 'Use Bing Wallpaper as Background'),
-        ('nasa', 'Use NASA APOD as Background'),
+        ('bing', 'Bing daily wallpaper'),
+        ('nasa', 'NASA picture of the day'),
     ]
     background_choice = forms.ChoiceField(
         choices=BACKGROUND_CHOICES,
@@ -68,7 +68,7 @@ class ProfileUpdateForm(forms.ModelForm):
         required=False,
     )
 
-    background_image = forms.ImageField(label='Background Image', required=False, widget=forms.FileInput())
+    background_image = forms.ImageField(label='Background image', required=False, widget=forms.FileInput())
     remove_background_image = forms.BooleanField(required=False, label='Remove current background image')
     default_filter_value = forms.IntegerField(
         min_value=1,

@@ -10,8 +10,7 @@
 {% block content %}
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">New timer</p>
-        <h1 class="page-title">What are you working on?</h1>
+        <h1 class="page-title">New timer</h1>
     </div>
 </div>
 
@@ -52,10 +51,6 @@
         </section>
 
         <section class="slab slab-pad">
-            <p class="field-label">
-                <i class="fas fa-hourglass-half" aria-hidden="true"></i>
-                Stop after <span class="muted">(optional)</span>
-            </p>
             <label class="check-row">
                 <input type="checkbox" id="auto-stop-enabled" name="auto_stop_enabled" value="1">
                 <span>Stop this timer automatically</span>
@@ -87,34 +82,27 @@
     <div class="desk-side">
         <section class="slab slab-pad rm-block" data-rm-block data-mode="none">
             <fieldset class="rm-fieldset">
-                <legend class="field-label rm-legend">
-                    <i class="fas fa-bell" aria-hidden="true"></i>
-                    Remind me <span class="muted">(optional)</span>
-                </legend>
-                <p class="rm-lede">A reminder belongs to this timer. It ends when the timer stops and never stops the timer itself.</p>
+                <legend class="field-label rm-legend">Reminder</legend>
 
                 <div class="rm-modes" role="radiogroup" aria-label="Reminder timing">
                     <label class="rm-mode">
                         <input type="radio" name="reminder_mode" value="none" data-rm-mode checked>
-                        <span class="rm-mode-face"><span class="rm-mode-name">None</span><span class="rm-mode-hint">no reminder</span></span>
+                        <span class="rm-mode-face"><span class="rm-mode-name">None</span></span>
                     </label>
                     <label class="rm-mode">
                         <input type="radio" name="reminder_mode" value="after" data-rm-mode>
-                        <span class="rm-mode-face"><span class="rm-mode-name">Once after</span><span class="rm-mode-hint">one nudge</span></span>
+                        <span class="rm-mode-face"><span class="rm-mode-name">Once after</span></span>
                     </label>
                     <label class="rm-mode">
                         <input type="radio" name="reminder_mode" value="interval" data-rm-mode>
-                        <span class="rm-mode-face"><span class="rm-mode-name">Every</span><span class="rm-mode-hint">repeats</span></span>
+                        <span class="rm-mode-face"><span class="rm-mode-name">Every</span></span>
                     </label>
                     <label class="rm-mode">
                         <input type="radio" name="reminder_mode" value="at" data-rm-mode>
-                        <span class="rm-mode-face"><span class="rm-mode-name">At</span><span class="rm-mode-hint">clock time</span></span>
+                        <span class="rm-mode-face"><span class="rm-mode-name">At</span></span>
                     </label>
                 </div>
 
-                <div class="rm-panel rm-panel--none">
-                    <p class="rm-note">No reminder. The timer runs quietly until you stop it.</p>
-                </div>
                 <div class="rm-panel rm-panel--after" data-rm-panel="after">
                     <div class="two-up">
                         <div class="field">
@@ -130,7 +118,6 @@
                             </select>
                         </div>
                     </div>
-                    <p class="rm-note">Fires once, then the rule is done.</p>
                 </div>
                 <div class="rm-panel rm-panel--interval" data-rm-panel="interval">
                     <div class="two-up">
@@ -147,7 +134,6 @@
                             </select>
                         </div>
                     </div>
-                    <p class="rm-note">Missed occurrences are skipped rather than delivered as a catch-up burst. One minute is the shortest interval.</p>
                 </div>
                 <div class="rm-panel rm-panel--at" data-rm-panel="at">
                     <div class="field">
@@ -155,11 +141,7 @@
                         <input type="datetime-local" id="reminder-at" name="reminder_at"
                                step="60" aria-describedby="reminder-timezone" disabled>
                     </div>
-                    <p class="rm-tz" id="reminder-timezone" data-rm-timezone>
-                        Read as a local time in your profile timezone
-                        (<strong data-rm-profile-zone>{{ request.user.profile.timezone|default:'UTC' }}</strong>).
-                    </p>
-                    <p class="rm-note">If a clock change makes that time skip or repeat, Autumn asks for another time instead of guessing which one you meant.</p>
+                    <p class="rm-note" id="reminder-timezone" data-rm-timezone>Your profile timezone: {{ request.user.profile.timezone|default:'UTC' }}</p>
                 </div>
 
                 <figure class="rm-rail" data-rm-rail aria-labelledby="rm-rail-title">
@@ -180,7 +162,7 @@
                 </figure>
 
                 <div class="field rm-message-field">
-                    <label for="reminder-message">Message <span class="muted">(optional)</span></label>
+                    <label for="reminder-message">Message</label>
                     <input type="text" id="reminder-message" name="reminder_message"
                            maxlength="240" placeholder="Time to check in"
                            aria-describedby="reminder-message-help">
@@ -197,7 +179,7 @@
                         <span class="rm-perm-dot" aria-hidden="true"></span>
                         <p class="rm-perm-text" data-perm-text>
                             <span class="rm-perm-title">Notifications are not enabled.</span>
-                            <span class="rm-perm-detail">Choose Enable only if you want reminders to reach you when Autumn is not the front tab.</span>
+                            <span class="rm-perm-detail">Needed for reminders while Autumn is in the background.</span>
                         </p>
                         <button type="button" class="btn btn--quiet rm-perm-action" data-perm-action>Enable notifications</button>
                         <button type="button" class="btn btn--ghost rm-perm-unsubscribe" data-perm-unsubscribe hidden>Turn off</button>

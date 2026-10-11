@@ -7,7 +7,6 @@
 
 <div class="desk-head auth-card">
     <div>
-        <p class="page-eyebrow">Welcome back</p>
         <h1 class="page-title">Log in</h1>
     </div>
 </div>
@@ -17,13 +16,13 @@
 
     <div class="field">
         {{ form.username.errors }}
-        {{ form.username.label_tag }}
+        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
         {{ form.username }}
     </div>
 
     <div class="field">
         {{ form.password.errors }}
-        {{ form.password.label_tag }}
+        <label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
         {{ form.password }}
     </div>
 

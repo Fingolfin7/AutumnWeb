@@ -13,7 +13,6 @@
 {% block content %}
 <div class="desk-head auth-card">
     <div>
-        <p class="page-eyebrow">Finish account setup</p>
         <h1 class="page-title">Continue with {{ account.get_provider.name }}</h1>
     </div>
 </div>
@@ -31,7 +30,7 @@
     {% for field in form %}
     <div class="field">
         {{ field.errors }}
-        {{ field.label_tag }}
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
         {{ field }}
         {% if field.help_text %}
         <small class="muted">{{ field.help_text }}</small>

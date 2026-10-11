@@ -6,7 +6,6 @@
 
 <div class="desk-head auth-card">
     <div>
-        <p class="page-eyebrow">New account</p>
         <h1 class="page-title">Register</h1>
     </div>
 </div>
@@ -16,25 +15,25 @@
 
     <div class="field">
         {{ form.username.errors }}
-        {{ form.username.label_tag }}
+        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
         {{ form.username }}
     </div>
 
     <div class="field">
         {{ form.email.errors }}
-        {{ form.email.label_tag }}
+        <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
         {{ form.email }}
     </div>
 
     <div class="field">
         {{ form.password1.errors }}
-        {{ form.password1.label_tag }}
+        <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
         {{ form.password1 }}
     </div>
 
     <div class="field">
         {{ form.password2.errors }}
-        {{ form.password2.label_tag }}
+        <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
         {{ form.password2 }}
     </div>
 

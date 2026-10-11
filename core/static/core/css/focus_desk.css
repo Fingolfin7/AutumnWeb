@@ -56,14 +56,14 @@
    DESK CLASSES (added on top of the v1 index below)
      .desk  .desk-main  .desk-side  .desk-head
 
-   TIMELINE     .fd-tl-slab .fd-tl-head .fd-tl-title .fd-tl-total
+   TIMELINE     .fd-tl-slab .fd-tl-head .fd-tl-total
                 .fd-tl .fd-tl-axis .fd-tl-lab .fd-tl-lab--minor
                 .fd-tl-plot .fd-tl-lane .fd-tl-head-cell .fd-tl-name
                 .fd-tl-fig .fd-tl-track .fd-tl-block .fd-tl-block.is-live
                 .fd-tl-b-lab .fd-tl-b-dur
                 .fd-tl-tip .fd-tl-tip--flip .fd-tl-tip-note .fd-tl-tip-link
                 .fd-tl-nowlayer .fd-tl-now .fd-tl-now-flag .fd-tl-gap
-                .fd-tl-caption .fd-tl-empty
+                .fd-tl-empty
 
    TYPE SCALE  (root 16px; body runs 17px — large type is part of the thesis)
    ----------
@@ -98,7 +98,7 @@
                 .disclose-body
    Focus card   .focus-deck .focus-track .focus-cards .focus-card
                 .focus-card--start
-                .focus-eyebrow .live-dot .focus-project .focus-project--plain
+                .focus-eyebrow .live-dot .focus-project
                 .focus-subs .focus-lede .focus-quick
                 .focus-time .focus-time .num .focus-time .unit
                 .focus-autostop .focus-autostop-bar .focus-autostop-fill
@@ -117,8 +117,8 @@
                 .period-strip .period-cell (+ .met .banked .missed .current)
    Activity     .activity .range-tabs .range-tab .range-tab.is-active
                 .cal .cal-head .cal-head span .cal-grid .cal-cell
-                .cal-cell.is-active .cal-cell.is-inactive .cal-caption
-   Sessions     .day-group .day-head .day-date .day-total .day-note
+                .cal-cell.is-active .cal-cell.is-inactive
+   Sessions     .day-group .day-head .day-date .day-total
                 .swipe .swipe-track .swipe-face .swipe-actions .swipe-hint
                 .session .session-top .session-project .session-dur
                 .session-mid .session-time .session-arrow
@@ -298,6 +298,9 @@ body {
   );
 }
 h1,h2,h3,h4,p,ul,ol,figure { margin: 0; }
+/* The hidden attribute must win over component display rules (.btn is
+   inline-flex), or JS that toggles `hidden` silently shows the element. */
+[hidden] { display: none !important; }
 ul,ol { list-style: none; padding: 0; }
 a { color: inherit; text-decoration: none; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
@@ -471,6 +474,7 @@ body.bg-active .dim-control { display: flex; }
    At >=1000px they share one line (see the desktop layer). */
 .desk-head { margin-bottom: var(--s5); }
 .desk-head .stat-strip { margin-top: var(--s4); }
+.desk-head--stats .stat-strip { margin-top: 0; flex: 1 1 auto; }
 
 /* -------------------------------------------------------------- TABBAR --- */
 .tabbar {
@@ -671,12 +675,21 @@ body.bg-active .dim-control { display: flex; }
 /* Stop is the one primary action on a running card; it takes the leftovers. */
 .focus-stop { flex: 1 1 auto; }
 
+/* No heading: recent combinations on the left, the start button on the
+   right, wrapping to a stack when there is no room. */
 .focus-card--start {
-  display: flex; flex-direction: column; justify-content: center;
+  display: flex; flex-wrap: wrap; align-items: center; align-content: center; justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s4);
   background: rgba(18,21,24,.72);
   box-shadow: var(--edge), var(--e1), inset 0 0 0 1px var(--hairline);
   text-align: left;
 }
+.focus-card--start .focus-quick { margin-top: 0; }
+.focus-card--start .focus-actions { margin-top: 0; margin-left: auto; }
+/* With no recent combinations to offer, the button is the whole card. */
+.focus-card--start .focus-actions:only-child { flex: 1 1 100%; margin-left: 0; }
+.focus-card--start .focus-actions:only-child .btn { width: 100%; }
 .focus-card--start .focus-time { color: var(--muted); }
 .quick-chip {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -692,7 +705,6 @@ body.bg-active .dim-control { display: flex; }
    the cards stay direct children of .focus-track and keep their layout. */
 .focus-cards { display: contents; }
 
-.focus-project--plain { color: var(--ink); }
 .focus-lede { margin-top: var(--s2); font-size: var(--fs-sm); color: var(--muted); }
 .focus-quick { margin-top: var(--s4); gap: .4rem; }
 /* each chip posts its own start form; the form must not become a flex item */
@@ -722,11 +734,11 @@ body.bg-active .dim-control { display: flex; }
 .stat:nth-child(-n+2) { border-top: 0; }
 .stat:nth-child(odd) { border-left: 0; }
 .stat-label {
-  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
+  display: block; font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
   color: var(--muted); font-weight: 600;
 }
 .stat-value {
-  margin-top: .3rem; font-family: var(--font-mono);
+  display: block; margin-top: .3rem; font-family: var(--font-mono);
   font-variant-numeric: tabular-nums; font-size: var(--fs-md);
   font-weight: 600; letter-spacing: -.02em;
   text-wrap: balance;              /* "5 hours / 12 minutes", never orphaned */
@@ -825,7 +837,6 @@ body.bg-active .dim-control { display: flex; }
 }
 .cal-cell.is-active   { background: rgba(124,163,106,.32); color: var(--duration); box-shadow: inset 0 0 0 1px rgba(124,163,106,.35); }
 .cal-cell.is-inactive { background: var(--sunken); color: var(--muted); }
-.cal-caption { margin-top: var(--s3); font-size: var(--fs-xs); color: var(--muted); }
 
 /* ------------------------------------------------------- SESSIONS / DAYS -- */
 .day-group + .day-group { border-top: 1px solid var(--hairline); }
@@ -839,7 +850,6 @@ body.bg-active .dim-control { display: flex; }
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   font-size: var(--fs-sm); color: var(--duration); margin-left: auto;
 }
-.day-note { flex-basis: 100%; font-size: var(--fs-label); color: var(--muted); letter-spacing: .04em; }
 
 /* Swipe-to-reveal row actions. CSS-only on touch (scroll-snap); on pointer
    devices the actions simply sit at the right and fade in on hover.        */
@@ -1304,8 +1314,6 @@ body.bg-active .dim-control { display: flex; }
 .nx-title { margin: 0; font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
 .nx-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); margin-bottom: var(--s4); }
 .nx-prose { max-width: 48rem; margin: var(--s4) 0 0; color: var(--muted); line-height: 1.55; }
-.nx-rail-key { color: var(--muted); font-size: var(--fs-xs); white-space: nowrap; }
-.nx-dot { display: inline-block; width: .55rem; height: .55rem; margin-right: .3rem; border-radius: 50%; background: var(--brand); }
 .nx-rail { display: grid; gap: 0; overflow: hidden; border: 1px solid var(--hairline); border-radius: var(--r-sm); background: var(--sunken); }
 .nx-lane { display: grid; grid-template-columns: minmax(8.5rem, 12rem) minmax(0, 1fr); min-height: 5.5rem; }
 .nx-lane + .nx-lane { border-top: 1px solid var(--hairline); }
@@ -1369,7 +1377,6 @@ body.bg-active .dim-control { display: flex; }
 .nx-status { flex: 0 0 auto; padding: .2rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs); }
 .nx-status--met { color: var(--duration); background: color-mix(in srgb, var(--duration) 13%, transparent); }
 .nx-status--open { color: var(--note); background: color-mix(in srgb, var(--note) 13%, transparent); }
-.nx-review-rail { margin-bottom: var(--s5); }
 .nx-rail--past .nx-event--past { flex-basis: 15rem; border-left-color: var(--muted); background: color-mix(in srgb, var(--muted) 7%, transparent); }
 .nx-rail--past .nx-event--past strong { font-size: var(--fs-sm); }
 .nx-confirm { max-width: 42rem; }
@@ -1440,8 +1447,10 @@ body.bg-active .dim-control { display: flex; }
   .session-list .swipe-track { display: block; overflow: visible; scroll-snap-type: none; }
   .session-list .swipe-face { flex: initial; }
   .session-list .swipe-hint { display: none; }
+  /* Hover actions sit just left of the duration column (5.5rem + gap), over
+     the tail of the note, so the duration is never covered. */
   .session-list .swipe-actions {
-    position: absolute; top: 50%; right: var(--s4); transform: translateY(-50%);
+    position: absolute; top: 50%; right: calc(var(--s4) * 2 + 5.5rem); transform: translateY(-50%);
     padding: 0 0 0 var(--s5); gap: .3rem;
     opacity: 0; pointer-events: none;
     background: linear-gradient(to right, rgba(18,21,24,0) 0, rgba(20,24,27,.96) 18%);
@@ -1490,32 +1499,20 @@ body.bg-active .dim-control { display: flex; }
    so this one slab opts out. */
 .fd-tl-slab { padding: var(--s4) var(--s5) var(--s5); overflow: visible; }
 
+/* Tracked total on the left, range tabs on the right. The window itself
+   needs no title: the axis directly below already labels it. */
 .fd-tl-head {
-  display: flex; align-items: flex-end; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   gap: var(--s4); flex-wrap: wrap; margin-bottom: var(--s4);
 }
-.fd-tl-title {
-  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
-  font-size: var(--fs-lg); font-weight: 600; color: var(--time);
-  letter-spacing: .01em;
-}
-/* The mockup put demo range tabs here. The real chart is one day, so the
-   right-hand slot carries the day's tracked total instead — a fact, not a
-   control that does nothing. */
 .fd-tl-total {
   font-family: var(--font-mono); font-variant-numeric: tabular-nums;
   font-size: var(--fs-lg); font-weight: 600; color: var(--duration);
-  text-align: right;
 }
 .fd-tl-total .fd-tl-total-label {
   display: block; font-family: var(--font-ui);
   font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
   color: var(--muted); font-weight: 600;
-}
-/* Tracked total above, range tabs below — both right-aligned against the
-   title on the left. */
-.fd-tl-head-right {
-  display: flex; flex-direction: column; align-items: flex-end; gap: var(--s2);
 }
 
 .fd-tl { --fd-gutter: 12rem; }
@@ -1811,10 +1808,6 @@ body.bg-active .dim-control { display: flex; }
   font-size: var(--fs-xs); color: var(--muted); white-space: nowrap;
 }
 
-.fd-tl-caption {
-  margin-top: var(--s4); margin-left: var(--fd-gutter);
-  font-size: var(--fs-xs); color: var(--muted);
-}
 
 /* A day with nothing on it. The axis is still drawn — an empty chart with a
    scale reads as "nothing yet", a missing chart reads as "broken". */
@@ -1830,7 +1823,7 @@ body.bg-active .dim-control { display: flex; }
 @media (max-width: 1100px) { .fd-tl { --fd-gutter: 9rem; } }
 @media (max-width: 780px) {
   .fd-tl { --fd-gutter: 0rem; }
-  .fd-tl-axis, .fd-tl-nowlayer, .fd-tl-caption, .fd-tl-empty { margin-left: 0; }
+  .fd-tl-axis, .fd-tl-nowlayer,, .fd-tl-empty { margin-left: 0; }
   /* 17 hour labels will not fit on a phone — thin them to every second one */
   .fd-tl-lab--minor { display: none; }
   .fd-tl-lane { grid-template-columns: 1fr; }
@@ -1980,6 +1973,17 @@ img.brand-mark {
   display: inline; text-transform: none; letter-spacing: normal;
   font-size: var(--fs-sm); color: var(--ink); margin: 0;
 }
+/* A label that wraps its own checkbox, and the reminder mode faces, name an
+   option; they are not field captions. */
+.fields label.check-row, .fields label.rm-mode {
+  text-transform: none; letter-spacing: normal; margin-bottom: 0;
+}
+.fields label.check-row { display: flex; font-size: var(--fs-sm); color: var(--ink); }
+/* A notification category is a whole-row toggle, not a field caption. */
+.fields label.nx-switch {
+  display: flex; text-transform: none; letter-spacing: normal;
+  font-size: inherit; margin-bottom: 0;
+}
 .fields input[type="checkbox"], .fields input[type="radio"] {
   width: auto; accent-color: var(--brand-deep); margin: 0;
 }
@@ -2120,12 +2124,29 @@ img.brand-mark {
 .commitment-rule-dropdown > summary { list-style: none; cursor: pointer; }
 .commitment-rule-dropdown > summary::-webkit-details-marker { display: none; }
 .commitment-rule-dropdown > summary::after {
-  content: "078";                                   /* chevron-down       */
+  content: "\f078";                                   /* chevron-down       */
   font-family: "Font Awesome 5 Free"; font-weight: 900;
   font-size: .625rem; color: var(--muted);
   transition: transform .18s var(--ease);
 }
 .commitment-rule-dropdown[open] > summary::after { transform: rotate(180deg); }
+
+/* The six rule pickers fold behind one "Rules" summary; most commitments
+   never use them. The form opens it when any rule is already set. */
+.commitment-rules > summary {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: .5rem;
+  font-weight: 600;
+}
+.commitment-rules > summary::-webkit-details-marker { display: none; }
+.commitment-rules > summary::after {
+  content: "\f078"; margin-left: auto;
+  font-family: "Font Awesome 5 Free"; font-weight: 900;
+  font-size: .625rem; color: var(--muted);
+  transition: transform .18s var(--ease);
+}
+.commitment-rules[open] > summary::after { transform: rotate(180deg); }
+.commitment-rules[open] > summary { margin-bottom: var(--s4); }
 
 /* Two fields that belong together on one line once there is room — start and
    end times, from and to dates. */
@@ -2147,8 +2168,7 @@ img.brand-mark {
 .rm-block { position: relative; }
 .rm-fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
 .rm-legend { display: flex; align-items: center; gap: .45rem; padding: 0; margin-bottom: .35rem; }
-.rm-lede { max-width: 44ch; margin-bottom: var(--s4); color: var(--ink-2); font-size: var(--fs-sm); line-height: 1.45; }
-.rm-modes { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); margin-bottom: var(--s4); }
+.rm-modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s2); margin-bottom: var(--s4); }
 .rm-mode { position: relative; display: block; min-width: 0; margin: 0; color: var(--ink); font-size: inherit; letter-spacing: normal; text-transform: none; }
 .rm-mode input {
   position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%;
@@ -2156,30 +2176,25 @@ img.brand-mark {
 }
 .fields .rm-mode input { width: 100%; margin: 0; }
 .rm-mode-face {
-  display: flex; min-height: var(--tap); flex-direction: column; justify-content: center; gap: .1rem;
-  padding: .55rem .85rem; border-radius: var(--r-md); background: var(--raised);
+  display: flex; min-height: var(--tap); flex-direction: column; justify-content: center; align-items: center; gap: .1rem;
+  padding: .55rem .5rem; text-align: center; border-radius: var(--r-md); background: var(--raised);
   box-shadow: var(--edge), inset 0 0 0 1px transparent;
   transition: background .16s var(--ease), box-shadow .16s var(--ease), color .16s var(--ease);
 }
 .rm-mode-name { font-size: var(--fs-sm); font-weight: 650; letter-spacing: -.005em; }
-.rm-mode-hint { color: var(--muted); font-size: var(--fs-xs); }
 .rm-mode:hover .rm-mode-face { background: var(--raised-2); }
 .rm-mode input:checked ~ .rm-mode-face { background: rgba(209,139,76,.14); box-shadow: var(--edge), inset 0 0 0 1px rgba(209,139,76,.45); }
 .rm-mode input:checked ~ .rm-mode-face .rm-mode-name { color: var(--brand); }
 .rm-mode input:focus-visible ~ .rm-mode-face { box-shadow: var(--edge), inset 0 0 0 1px rgba(209,139,76,.45), var(--focus-ring); }
 .rm-panel { display: none; }
 .rm-panel[hidden] { display: none !important; }
-.rm-block[data-mode="none"] .rm-panel--none,
+/* With no reminder chosen, the preview and message have nothing to say. */
+.rm-block[data-mode="none"] .rm-rail,
+.rm-block[data-mode="none"] .rm-message-field { display: none; }
 .rm-block[data-mode="after"] .rm-panel--after,
 .rm-block[data-mode="interval"] .rm-panel--interval,
 .rm-block[data-mode="at"] .rm-panel--at { display: block; }
 .rm-note { max-width: 52ch; margin-top: .1rem; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
-.rm-tz {
-  margin-bottom: .5rem; padding: .6rem .75rem; border-radius: var(--r-sm);
-  background: var(--sunken); box-shadow: inset 0 0 0 1px var(--hairline);
-  color: var(--ink-2); font-size: var(--fs-sm); line-height: 1.45;
-}
-.rm-tz strong { color: var(--time); font-weight: 600; }
 .rm-rail {
   margin: var(--s5) 0 var(--s4); padding: var(--s4) var(--s4) var(--s3);
   border-radius: var(--r-md); background: linear-gradient(180deg, rgba(198,178,118,.055), rgba(198,178,118,.015));
@@ -2594,20 +2609,18 @@ img.brand-mark {
   background: var(--raised-2);
   border-bottom: 1px solid var(--brand-deep);
 }
+/* One quiet row under Luna's list: effort, refresh, usage. */
 .suggest.luna-recommendation-controls {
-  display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3);
+  display: flex; align-items: center; gap: var(--s2);
+  padding-top: var(--s2); padding-bottom: var(--s2);
 }
-.luna-effort-field { flex: 1 1 7rem; min-width: 0; }
-.luna-effort-field .select {
-  height: 2.75rem; padding: .6rem .75rem;
-  font-family: inherit; font-size: var(--fs-sm);
+.luna-recommendation-controls .select {
+  width: auto; height: 2.25rem; padding: .3rem .6rem;
+  font-family: inherit; font-size: var(--fs-xs);
 }
-.luna-effort-field .select:hover { border-color: var(--hairline-2); }
-.luna-recommendation-controls .btn {
-  height: 2.75rem; padding: .6rem 1rem; white-space: nowrap;
-}
+.luna-recommendation-controls .select:hover { border-color: var(--hairline-2); }
 .luna-usage-link {
-  flex-basis: 100%; color: var(--muted); font-size: var(--fs-xs);
+  margin-left: auto; color: var(--muted); font-size: var(--fs-xs);
 }
 .luna-usage-link:hover { color: var(--ink); text-decoration: underline; }
 #luna-recommendations .suggest-detail { overflow-wrap: anywhere; }
@@ -2797,11 +2810,11 @@ img.brand-mark {
 /* The chart-type picker is this page's primary control, so it stays on the
    page rather than going in the filter sheet with the narrowing controls. */
 .chart-bar {
-  display: flex; align-items: flex-end; gap: var(--s3); flex-wrap: wrap;
+  display: flex; align-items: center; gap: var(--s2);
   margin-bottom: var(--s4);
 }
-.chart-bar .field { margin-bottom: 0; flex: 1 1 14rem; min-width: 0; }
-.chart-bar .btn { flex: 0 0 auto; }
+.chart-bar .field { margin-bottom: 0; flex: 0 1 18rem; min-width: 0; }
+.chart-bar .btn-icon { flex: 0 0 auto; }
 
 /* ============================================================================
    IMPORT STREAM + AUTH + PROFILE                                  (10 / 11)
@@ -3113,10 +3126,9 @@ img.brand-mark {
    insights.html before renaming any of them.
    ==========================================================================*/
 .chat-layout {
-  /* Phone/tablet, re-measured at 375x812 after the date range replaced the
-     search box above: that bar wraps to ~106px here, against ~54px before,
-     so the chrome above the slab grew by about 46px. */
-  --chat-h: clamp(26rem, calc(100dvh - 24.5rem), 58rem);
+  /* Phone/tablet. Was 24.5rem with a page title above the date range; the
+     title is gone (the nav names the page); re-measured at 390x900. */
+  --chat-h: clamp(26rem, calc(100dvh - 22.25rem), 58rem);
   display: flex;
   height: var(--chat-h);
   margin-bottom: var(--s4);
@@ -3370,11 +3382,10 @@ img.brand-mark {
 .empty-state-container .empty { padding: 0; max-width: 26rem; }
 
 @media (min-width: 1000px) {
-  /* Measured at 1440x900: 264px above the slab (sticky header + nav pill +
-     page title + searchbar) and 80px below it (its own margin, screen-pad's
-     bottom, body's bottom). 344px ≈ 21.5rem; 22rem leaves slack for the extra
-     row a filter-pill summary adds. */
-  .chat-layout { --chat-h: clamp(26rem, calc(100dvh - 22rem), 58rem); }
+  /* Measured at 1440x900: 197px above the slab (sticky header + nav pill +
+     searchbar) and 80px below it (its own margin, screen-pad's bottom, body's
+     bottom). 277px ≈ 17.3rem; 17.5rem leaves a little slack. */
+  .chat-layout { --chat-h: clamp(26rem, calc(100dvh - 17.5rem), 58rem); }
   .chat-sidebar { flex-basis: 17rem; }
 }
 

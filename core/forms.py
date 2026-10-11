@@ -153,7 +153,7 @@ class CreateProjectForm(forms.ModelForm):
         fields = ['name', 'description', 'context', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Project Name', 'class': 'half-width'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width', 'required': False}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'rows': 3, 'class': 'half-width', 'required': False}),
             'context': forms.Select(attrs={'class': 'half-width'}),
             'tags': forms.CheckboxSelectMultiple(),  # ✅ updated
         }
@@ -178,7 +178,7 @@ class CreateSubProjectForm(forms.ModelForm):
         fields = ['name', 'description', 'parent_project']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Subproject Name'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'required': False}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'rows': 3, 'required': False}),
             'parent_project': forms.TextInput(attrs={'id': 'parent_project', 'hidden': True}),
         }
 
@@ -189,7 +189,7 @@ class UpdateProjectForm(forms.ModelForm):
         fields = ['name', 'description', 'status', 'context', 'tags']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Project Name', 'class': 'half-width'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width', 'required': False}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'rows': 3, 'class': 'half-width', 'required': False}),
             'status': forms.Select(attrs={'placeholder': 'Status', 'class': 'half-width'}),
             'context': forms.Select(attrs={'class': 'half-width'}),
             'tags': forms.CheckboxSelectMultiple(),  # ✅ updated
@@ -209,7 +209,7 @@ class UpdateSubProjectForm(forms.ModelForm):
         fields = ['name', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Subproject Name'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'required': False}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'rows': 3, 'required': False}),
         }
 
 
@@ -610,7 +610,7 @@ class ContextForm(forms.ModelForm):
         fields = ['name', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'Context Name', 'class': 'half-width'}),
-            'description': forms.Textarea(attrs={'placeholder': 'Description', 'class': 'half-width', 'required': False}),
+            'description': forms.Textarea(attrs={'placeholder': 'Description', 'rows': 3, 'class': 'half-width', 'required': False}),
         }
 
 
@@ -628,6 +628,7 @@ class CommitmentForm(forms.ModelForm):
     aggregation_type = forms.ChoiceField(
         choices=[('context', 'Context'), ('tag', 'Tag'), ('project', 'Project'), ('subproject', 'Subproject')],
         required=False,
+        label='Applies to',
         widget=forms.Select(attrs={'class': 'half-width'}),
     )
     project = forms.ModelChoiceField(queryset=Projects.objects.none(), required=False, widget=forms.Select(attrs={'class': 'half-width'}))
@@ -709,10 +710,10 @@ class CommitmentForm(forms.ModelForm):
             'banking_enabled': forms.CheckboxInput(),
         }
         labels = {
-            'aggregation_type': 'Aggregation Type',
-            'commitment_type': 'Commitment Type',
+            'aggregation_type': 'Applies to',
+            'commitment_type': 'Measure',
             'period': 'Period',
-            'start_date': 'Start Date',
+            'start_date': 'Start date',
             'target': 'Target',
             'include_projects': 'Only include projects',
             'exclude_projects': 'Exclude projects',
@@ -722,13 +723,12 @@ class CommitmentForm(forms.ModelForm):
             'exclude_contexts': 'Exclude contexts',
             'include_tags': 'Only include tags',
             'exclude_tags': 'Exclude tags',
-            'banking_enabled': 'Enable Time Banking',
-            'max_balance': 'Max Balance (surplus cap)',
-            'min_balance': 'Min Balance (deficit cap)',
+            'banking_enabled': 'Enable time banking',
+            'max_balance': 'Surplus cap',
+            'min_balance': 'Deficit cap',
         }
         help_texts = {
             'target': 'Minutes for time-based, count for session-based',
-            'start_date': 'Commitment calculations begin from this date (inclusive).',
             'include_projects': 'If set, only sessions in these projects count.',
             'exclude_projects': 'Sessions in these projects never count.',
             'include_subprojects': 'If set, only sessions containing these subprojects count.',
@@ -737,8 +737,8 @@ class CommitmentForm(forms.ModelForm):
             'exclude_contexts': 'Sessions under projects in these contexts are removed.',
             'include_tags': 'If set, only sessions under projects with these tags count.',
             'exclude_tags': 'Sessions under projects with these tags are removed.',
-            'max_balance': 'Maximum surplus that can be banked (in minutes or sessions)',
-            'min_balance': 'Maximum deficit allowed (negative value)',
+            'max_balance': 'Most that can be banked',
+            'min_balance': 'Largest deficit allowed (negative)',
         }
 
     def __init__(self, *args, **kwargs):

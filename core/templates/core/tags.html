@@ -4,21 +4,13 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Add flexible labels to projects</p>
         <h1 class="page-title">Tags</h1>
     </div>
 </div>
 
 <div class="split">
-    <section id="tags-list" class="slab disclose" data-disclose>
-        <button class="disclose-head" type="button" aria-expanded="true">
-            <i class="fas fa-tags disclose-icon text-orange"></i>
-            <span class="disclose-title">Existing tags</span>
-            <span class="disclose-summary">{{ tags|length }}</span>
-            <i class="fas fa-chevron-down disclose-chevron"></i>
-        </button>
-
-        <div class="disclose-body">
+    <section id="tags-list" class="slab" aria-label="Tags">
+        <div>
             {% if tags %}
             <ul class="band-list">
                 {% for tag in tags %}
@@ -43,8 +35,6 @@
         {{ form.non_field_errors }}
 
         <section class="slab slab-pad">
-            <p class="field-label">New tag</p>
-
             <div class="field">
                 <label for="id_name">Name</label>
                 {{ form.name }}

@@ -75,7 +75,6 @@
 
                 {% if item.rule_lines %}
                 <div class="commit-rules">
-                    <p class="commit-rules-title">Rule composition</p>
                     {% for line in item.rule_lines %}
                     <p class="commit-rule-line">{{ line }}</p>
                     {% endfor %}
@@ -93,7 +92,6 @@
         {% else %}
         <p class="empty">
             No commitments apply to this {{ commitment_entity_label|default:'item' }} yet.
-            <a href="{{ add_commitment_url }}">Add one</a> to hold yourself to a rhythm.
         </p>
         {% endif %}
 

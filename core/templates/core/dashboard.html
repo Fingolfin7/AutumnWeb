@@ -10,8 +10,8 @@
   ----------------------------------------------------------------------------
   Layout, top to bottom:
 
-    .desk-head   date + greeting on the left, the four quick stats on the
-                 right. One line on the desk, stacked on a phone.
+    .desk-head   the four quick stats. The nav already says where you are,
+                 so there is no page title above them.
     HERO         full width, because both halves are wide objects:
                    .focus-deck  what am I doing right now
                    timeline     what has today looked like
@@ -34,12 +34,8 @@
 
 {% block content %}
 
-<div class="desk-head">
-    <div>
-        <p class="page-eyebrow">{{ timeline.date|day_date_formatter }}</p>
-        <h1 class="page-title">{{ greeting }}, {{ user.username }}</h1>
-    </div>
-
+<h1 class="sr-only">Home</h1>
+<div class="desk-head desk-head--stats">
     <section class="stat-strip" aria-label="Quick stats">
         <div class="stat">
             <p class="stat-label">Today</p>
@@ -69,10 +65,6 @@
         {% include 'core/partials/active_timers_dashboard.html' with timers=active_timers %}
 
         <article class="focus-card focus-card--start" aria-label="Start a new timer">
-            <p class="focus-eyebrow">{% if active_timers %}Nothing else running{% else %}Nothing running{% endif %}</p>
-            <h2 class="focus-project focus-project--plain">Start something</h2>
-            <p class="focus-lede">Pick up where you left off, or choose any project.</p>
-
             {% if quick_starts %}
             <div class="focus-subs focus-quick">
                 {% for session in quick_starts %}
@@ -94,7 +86,7 @@
             {% endif %}
 
             <div class="focus-actions">
-                <a class="btn btn--primary btn--lg btn--block" href="{% url 'start_timer' %}">
+                <a class="btn btn--primary btn--lg" href="{% url 'start_timer' %}">
                     <i class="fas fa-play"></i> Start a timer
                 </a>
             </div>
@@ -130,7 +122,6 @@
                     <header class="day-head">
                         <span class="day-date">{{ date|day_date_formatter }}</span>
                         <span class="day-total">{{ data.total_duration|duration_formatter }}</span>
-                        <span class="day-note">{{ data.sessions|length }} session{{ data.sessions|length|pluralize }}</span>
                     </header>
 
                     <ul class="band-list">
@@ -298,7 +289,6 @@
                             {% endfor %}
                         </div>
                     </div>
-                    <p class="cal-caption" data-cal-caption>Last 14 days activity</p>
                 </div>
             </div>
         </section>

@@ -25,12 +25,7 @@
 
 {% block content %}
 
-<div class="desk-head">
-    <div>
-        <p class="page-eyebrow">On the clock</p>
-        <h1 class="page-title">Timers</h1>
-    </div>
-</div>
+<h1 class="sr-only">Timers</h1>
 
 <div hidden>{% csrf_token %}</div>
 
@@ -41,11 +36,8 @@
                 {% include 'core/partials/active_timers_timers.html' with timers=timers %}
 
                 <article class="focus-card focus-card--start" aria-label="Start a new timer">
-                    <p class="focus-eyebrow">{% if timers %}Nothing else running{% else %}Nothing running{% endif %}</p>
-                    <h2 class="focus-project focus-project--plain">Start something</h2>
-                    <p class="focus-lede">Choose a project, and optionally a limit to stop it at.</p>
                     <div class="focus-actions">
-                        <a class="btn btn--primary btn--lg btn--block" href="{% url 'start_timer' %}">
+                        <a class="btn btn--primary btn--lg" href="{% url 'start_timer' %}">
                             <i class="fas fa-play"></i> New timer
                         </a>
                     </div>
@@ -64,29 +56,29 @@
             </button>
 
             <div class="disclose-body">
-                <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest luna-recommendation-controls">
-                    {% csrf_token %}
-                    {% if user.profile.ai_features_enabled %}
-                    <div class="luna-effort-field">
-                        <label class="field-label" for="luna-effort">Reasoning effort</label>
-                        <select class="select" id="luna-effort" name="luna_effort">
-                            <option value="low" {% if user.profile.luna_recommendation_effort == 'low' %}selected{% endif %}>Low</option>
-                            <option value="medium" {% if user.profile.luna_recommendation_effort == 'medium' %}selected{% endif %}>Medium</option>
-                            <option value="high" {% if user.profile.luna_recommendation_effort == 'high' %}selected{% endif %}>High</option>
-                            <option value="xhigh" {% if user.profile.luna_recommendation_effort == 'xhigh' %}selected{% endif %}>xHigh</option>
-                            <option value="max" {% if user.profile.luna_recommendation_effort == 'max' %}selected{% endif %}>Max</option>
-                        </select>
-                    </div>
-                    {% endif %}
-                    <button type="submit" class="btn btn--ghost">Apply &amp; refresh</button>
-                    <a class="luna-usage-link" href="{% url 'recommendation_usage' %}">Usage &amp; cost review <span aria-hidden="true">&rarr;</span></a>
-                </form>
                 <div id="luna-recommendations"
                      data-luna-url="{% url 'luna_timer_recommendations' %}"
                      aria-live="polite">
                     <p class="suggest-head suggest-head--luna">Luna Recommends</p>
                     <p class="suggest">Considering your recent work…</p>
                 </div>
+                <form method="post" action="{% url 'refresh_recommendations' %}" class="suggest luna-recommendation-controls">
+                    {% csrf_token %}
+                    {% if user.profile.ai_features_enabled %}
+                    <label class="sr-only" for="luna-effort">Reasoning effort</label>
+                    <select class="select" id="luna-effort" name="luna_effort" title="Reasoning effort">
+                        <option value="low" {% if user.profile.luna_recommendation_effort == 'low' %}selected{% endif %}>Low effort</option>
+                        <option value="medium" {% if user.profile.luna_recommendation_effort == 'medium' %}selected{% endif %}>Medium effort</option>
+                        <option value="high" {% if user.profile.luna_recommendation_effort == 'high' %}selected{% endif %}>High effort</option>
+                        <option value="xhigh" {% if user.profile.luna_recommendation_effort == 'xhigh' %}selected{% endif %}>xHigh effort</option>
+                        <option value="max" {% if user.profile.luna_recommendation_effort == 'max' %}selected{% endif %}>Max effort</option>
+                    </select>
+                    {% endif %}
+                    <button type="submit" class="btn-icon" title="Refresh recommendations">
+                        <i class="fas fa-sync-alt"></i><span class="sr-only">Refresh recommendations</span>
+                    </button>
+                    <a class="luna-usage-link" href="{% url 'recommendation_usage' %}">Usage</a>
+                </form>
 
                 {% if timer_suggestions.commitments or timer_suggestions.habits or timer_suggestions.recent %}
 

@@ -82,10 +82,8 @@ def _list_names(qs):
 
 
 def build_commitment_rule_lines(commitment: Commitment) -> list[str]:
-    lines = [
-        f"Scope: {commitment.get_aggregation_type_display()} = {commitment.target_name}"
-    ]
-
+    """Plain-English include/exclude rules. Empty when the whole scope counts;
+    the scope itself is already the heading wherever these lines are shown."""
     rule_parts = []
     for label, include_qs, exclude_qs in [
         ("Tags", commitment.include_tags.all(), commitment.exclude_tags.all()),
@@ -112,12 +110,7 @@ def build_commitment_rule_lines(commitment: Commitment) -> list[str]:
         if exclude_names:
             rule_parts.append(f"Exclude {label}: {', '.join(exclude_names)}")
 
-    if not rule_parts:
-        lines.append("Rules: all sessions in scope count.")
-    else:
-        lines.extend(rule_parts)
-
-    return lines
+    return rule_parts
 
 
 def build_commitment_panel_items(commitments):

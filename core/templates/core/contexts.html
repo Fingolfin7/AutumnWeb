@@ -4,21 +4,13 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Organise projects by setting</p>
         <h1 class="page-title">Contexts</h1>
     </div>
 </div>
 
 <div class="split">
-    <section id="contexts-list" class="slab disclose" data-disclose>
-        <button class="disclose-head" type="button" aria-expanded="true">
-            <i class="fas fa-layer-group disclose-icon text-orange"></i>
-            <span class="disclose-title">Existing contexts</span>
-            <span class="disclose-summary">{{ contexts|length }}</span>
-            <i class="fas fa-chevron-down disclose-chevron"></i>
-        </button>
-
-        <div class="disclose-body">
+    <section id="contexts-list" class="slab" aria-label="Contexts">
+        <div>
             {% if contexts %}
             <ul class="band-list">
                 {% for ctx in contexts %}
@@ -41,8 +33,6 @@
         {{ form.non_field_errors }}
 
         <section class="slab slab-pad">
-            <p class="field-label">New context</p>
-
             <div class="field">
                 <label for="id_name">Name</label>
                 {{ form.name }}

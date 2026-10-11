@@ -27,27 +27,20 @@
          data-timeline-range="{{ timeline.range_key }}"
          data-timeline-window="{{ timeline.window_start_iso }}|{{ timeline.window_end_iso }}">
     <header class="fd-tl-head">
-        <div>
-            <p class="page-eyebrow">{% if timeline.is_multi_day %}Range{% else %}Today{% endif %}</p>
-            <h2 class="fd-tl-title">{{ timeline.range_title }}</h2>
-        </div>
-
-        <div class="fd-tl-head-right">
-            <p class="fd-tl-total">
-                <span class="fd-tl-total-label">Tracked{% if not timeline.is_multi_day %} today{% endif %}</span>
-                {{ timeline.tracked_minutes|duration_formatter }}
-            </p>
-            <div class="range-tabs" role="tablist" aria-label="Timeline range">
-                <button class="range-tab {% if timeline.range_key == 'today' %}is-active{% endif %}" type="button"
-                        role="tab" data-tlrange="today"
-                        {% if timeline.range_key == 'today' %}aria-selected="true"{% endif %}>Today</button>
-                <button class="range-tab {% if timeline.range_key == 'd3' %}is-active{% endif %}" type="button"
-                        role="tab" data-tlrange="d3"
-                        {% if timeline.range_key == 'd3' %}aria-selected="true"{% endif %}>3 days</button>
-                <button class="range-tab {% if timeline.range_key == 'wk' %}is-active{% endif %}" type="button"
-                        role="tab" data-tlrange="wk"
-                        {% if timeline.range_key == 'wk' %}aria-selected="true"{% endif %}>Week</button>
-            </div>
+        <p class="fd-tl-total" title="{{ timeline.range_title }}">
+            <span class="fd-tl-total-label">Tracked{% if not timeline.is_multi_day %} today{% endif %}</span>
+            {{ timeline.tracked_minutes|duration_formatter }}
+        </p>
+        <div class="range-tabs" role="tablist" aria-label="Timeline range">
+            <button class="range-tab {% if timeline.range_key == 'today' %}is-active{% endif %}" type="button"
+                    role="tab" data-tlrange="today"
+                    {% if timeline.range_key == 'today' %}aria-selected="true"{% endif %}>Today</button>
+            <button class="range-tab {% if timeline.range_key == 'd3' %}is-active{% endif %}" type="button"
+                    role="tab" data-tlrange="d3"
+                    {% if timeline.range_key == 'd3' %}aria-selected="true"{% endif %}>3 days</button>
+            <button class="range-tab {% if timeline.range_key == 'wk' %}is-active{% endif %}" type="button"
+                    role="tab" data-tlrange="wk"
+                    {% if timeline.range_key == 'wk' %}aria-selected="true"{% endif %}>Week</button>
         </div>
     </header>
 
@@ -141,7 +134,6 @@
             </div>
         </div>
 
-        <p class="fd-tl-caption">Empty track is untracked time &mdash; the backdrop shows through it.</p>
         {% else %}
         <p class="fd-tl-empty">
             {% if timeline.is_multi_day %}Nothing tracked in this range.{% else %}Nothing tracked today yet.{% endif %}

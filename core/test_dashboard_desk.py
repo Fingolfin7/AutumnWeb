@@ -21,7 +21,6 @@ from core.views.dashboard import (
     QUICK_START_LIMIT,
     build_quick_starts,
     get_recent_dashboard_sessions,
-    greeting_for,
     select_recent_dashboard_sessions,
 )
 
@@ -68,14 +67,6 @@ class HeroDurationTests(TestCase):
             hero_duration(0),
             [{"value": 0, "unit": "minutes"}, {"value": 0, "unit": "seconds"}],
         )
-
-
-class GreetingTests(TestCase):
-    def test_greeting_follows_the_local_clock(self):
-        day = timezone.localtime(timezone.now()).replace(minute=0, second=0, microsecond=0)
-        self.assertEqual(greeting_for(day.replace(hour=8)), "Good morning")
-        self.assertEqual(greeting_for(day.replace(hour=14)), "Good afternoon")
-        self.assertEqual(greeting_for(day.replace(hour=21)), "Good evening")
 
 
 class DashboardTestCase(TestCase):

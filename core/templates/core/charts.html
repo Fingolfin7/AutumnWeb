@@ -49,12 +49,7 @@
 
 {% block content %}
 
-<div class="desk-head">
-    <div>
-        <p class="page-eyebrow">Where the time went</p>
-        <h1 class="page-title">Charts</h1>
-    </div>
-</div>
+<h1 class="sr-only">Charts</h1>
 
 <form method="get" class="fields" id="search_form">
     {% comment %}
@@ -91,7 +86,7 @@
 
     <div class="chart-bar">
         <div class="field">
-            <label for="chart_type">Chart</label>
+            <label class="sr-only" for="chart_type">Chart</label>
             <select id="chart_type" name="chart_type" data-selected="{{ request.GET.chart_type|default:'pie' }}">
                 <optgroup label="Basic">
                     <option value="pie">Pie</option>
@@ -124,9 +119,9 @@
                 </optgroup>
             </select>
         </div>
-        <button type="button" class="btn btn--primary" id="refresh-chart"
+        <button type="button" class="btn-icon" id="refresh-chart"
                 title="Re-fetch this chart's data, picking up anything tracked since the page loaded">
-            <i class="fas fa-sync-alt"></i> Refresh
+            <i class="fas fa-sync-alt"></i><span class="sr-only">Refresh</span>
         </button>
     </div>
 

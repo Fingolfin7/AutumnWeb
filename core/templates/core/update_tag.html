@@ -5,7 +5,6 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Tag</p>
         <h1 class="page-title">{{ tag.name }}</h1>
     </div>
 </div>
@@ -17,13 +16,13 @@
     <div class="split">
         <section class="slab slab-pad">
             <div class="field">
-                {{ form.name.label_tag }}
+                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
                 {{ form.name }}
                 {{ form.name.errors }}
             </div>
 
             <div class="field">
-                {{ form.color.label_tag }}
+                <label for="{{ form.color.id_for_label }}">{{ form.color.label }}</label>
                 {{ form.color }}
                 {{ form.color.errors }}
             </div>
@@ -42,7 +41,6 @@
         </section>
 
         <section class="slab slab-pad">
-            <p class="field-label">At a glance</p>
 
             <div class="field">
                 <label for="tag-context-select">Context</label>

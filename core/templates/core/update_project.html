@@ -29,7 +29,6 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Project</p>
         <h1 class="page-title text-red">{{ project.name }}</h1>
     </div>
 </div>
@@ -41,13 +40,13 @@
 
         <section class="slab slab-pad">
             <div class="field">
-                {{ form.name.label_tag }}
+                <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
                 {{ form.name }}
                 {{ form.name.errors }}
             </div>
 
             <div class="field">
-                {{ form.status.label_tag }}
+                <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
                 {{ form.status }}
                 {{ form.status.errors }}
             </div>
@@ -59,7 +58,7 @@
             </div>
 
             <div class="field">
-                {{ form.context.label_tag }}
+                <label for="{{ form.context.id_for_label }}">{{ form.context.label }}</label>
                 {{ form.context }}
                 {{ form.context.errors }}
             </div>
@@ -86,7 +85,6 @@
     </form>
 
     <section class="slab slab-pad">
-        <p class="field-label">At a glance</p>
         <div class="meta-list">
             <div class="meta-row">
                 <span class="meta-label">Total time</span>
@@ -148,7 +146,7 @@
             {% endfor %}
         </ul>
         {% else %}
-        <p class="empty">No subprojects yet. <a href="{% url 'create_subproject' project.id %}">Create one</a> to break this project down.</p>
+        <p class="empty">No subprojects yet.</p>
         {% endif %}
 
         <div class="slab-foot action-row">

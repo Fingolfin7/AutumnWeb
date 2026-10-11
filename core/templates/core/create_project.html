@@ -9,8 +9,7 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">New project</p>
-        <h1 class="page-title">Create a project</h1>
+        <h1 class="page-title">New project</h1>
     </div>
 </div>
 
@@ -20,7 +19,7 @@
 
     <section class="slab slab-pad">
         <div class="field">
-            {{ form.name.label_tag }}
+            <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
             {{ form.name }}
             {{ form.name.errors }}
         </div>
@@ -32,7 +31,7 @@
         </div>
 
         <div class="field">
-            {{ form.context.label_tag }}
+            <label for="{{ form.context.id_for_label }}">{{ form.context.label }}</label>
             {{ form.context }}
             {{ form.context.errors }}
         </div>

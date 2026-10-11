@@ -1,31 +1,28 @@
 {% extends 'core/base.html' %}
 {% load static tz %}
 
-{% block title %}Your Autumn week{% endblock %}
+{% block title %}Weekly review{% endblock %}
 
 {% block content %}
 <div class="desk-head nx-page-head">
     <div>
-        <p class="page-eyebrow">Weekly review</p>
-        <h1 class="page-title">Last week, in focus</h1>
-        <p class="nx-lede"><span class="mono">{{ summary.week_start_label|date:"D j M" }}</span> — <span class="mono">{{ summary.week_end_label|date:"D j M Y" }}</span> · {{ summary.timezone }}</p>
+        <h1 class="page-title">Weekly review</h1>
+        <p class="nx-lede"><span class="mono">{{ summary.week_start_label|date:"D j M" }}</span> — <span class="mono">{{ summary.week_end_label|date:"D j M Y" }}</span>{% if request.GET.week %} · <a href="{% url 'weekly_review' %}">Latest week</a>{% endif %}</p>
     </div>
 </div>
 
 <section class="slab slab-pad nx-review-hero" aria-labelledby="review-summary-title">
-    <p class="field-label">A quiet account of the week</p>
     <h2 class="nx-review-number" id="review-summary-title">{{ summary.duration_label }}</h2>
     <p class="nx-review-sub">across {{ summary.project_count }} project{{ summary.project_count|pluralize }}</p>
     <div class="stat-strip nx-review-stats">
         <div class="stat"><span class="stat-label">Sessions</span><strong class="stat-value">{{ summary.session_count }}</strong></div>
         <div class="stat"><span class="stat-label">Commitments met</span><strong class="stat-value">{{ summary.met_count }} / {{ summary.eligible_count }}</strong></div>
-        <div class="stat"><span class="stat-label">Timezone</span><strong class="stat-value mono">{{ summary.timezone }}</strong></div>
     </div>
 </section>
 
 <div class="nx-review-grid">
     <section class="slab" aria-labelledby="projects-title">
-        <div class="slab-pad nx-section-head"><div><p class="field-label">Where the time went</p><h2 class="nx-title" id="projects-title">Projects</h2></div></div>
+        <div class="slab-pad nx-section-head"><h2 class="nx-title" id="projects-title">Projects</h2></div>
         {% if summary.per_project %}
         <div class="band-list">
             {% for project in summary.per_project %}
@@ -40,7 +37,7 @@
     </section>
 
     <section class="slab" aria-labelledby="commitments-title">
-        <div class="slab-pad nx-section-head"><div><p class="field-label">What closed</p><h2 class="nx-title" id="commitments-title">Commitments</h2></div></div>
+        <div class="slab-pad nx-section-head"><h2 class="nx-title" id="commitments-title">Commitments</h2></div>
         {% if summary.details %}
         <div class="band-list">
             {% for item in summary.details %}
@@ -58,12 +55,4 @@
     </section>
 </div>
 
-<section class="slab slab-pad nx-review-rail" aria-labelledby="past-rail-title">
-    <div class="nx-section-head"><div><p class="field-label">The same signal, in past tense</p><h2 class="nx-title" id="past-rail-title">Your week at a glance</h2></div><a class="btn btn--quiet" href="{% url 'weekly_review' %}">Current week</a></div>
-    <div class="nx-rail nx-rail--past" role="list" aria-label="Summary lanes from the reviewed week">
-        <div class="nx-lane nx-lane--planned" role="listitem"><div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">↳</span><h3>Planned time</h3></div><p class="nx-event nx-event--past"><strong>{{ summary.session_count }} completed sessions</strong><span>{{ summary.duration_label }} recorded</span></p></div>
-        <div class="nx-lane nx-lane--check" role="listitem"><div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">□</span><h3>Commitment checks</h3></div><p class="nx-event nx-event--past"><strong>{{ summary.met_count }} of {{ summary.eligible_count }} met</strong><span>Periods that closed this week</span></p></div>
-        <div class="nx-lane nx-lane--review" role="listitem"><div class="nx-lane-label"><span class="nx-lane-mark" aria-hidden="true">◷</span><h3>Weekly review</h3></div><p class="nx-event nx-event--past"><strong>Seven local days</strong><span>Recomputed from completed sessions</span></p></div>
-    </div>
-</section>
 {% endblock %}

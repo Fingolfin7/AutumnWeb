@@ -39,16 +39,6 @@ RECENT_SESSION_EXPANSION_THRESHOLD = 3
 RECENT_SESSION_EXPANSION_LIMIT = 5
 
 
-def greeting_for(moment):
-    """Time-of-day greeting for the dashboard title, in the user's timezone."""
-    hour = timezone.localtime(moment).hour
-    if hour < 12:
-        return "Good morning"
-    if hour < 18:
-        return "Good afternoon"
-    return "Good evening"
-
-
 def _combo_key(session):
     """Identity of a timer combination: one project plus its subprojects."""
     return (session.project_id, frozenset(sub.id for sub in session.subprojects.all()))
@@ -216,7 +206,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # 4. Quick stats
         now = timezone.now()
-        context["greeting"] = greeting_for(now)
         local_today = timezone.localdate(now)
         today_start = timezone.make_aware(datetime.combine(local_today, time.min))
         week_start = today_start - timedelta(days=local_today.weekday())

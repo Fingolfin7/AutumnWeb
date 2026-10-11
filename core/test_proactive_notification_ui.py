@@ -62,10 +62,11 @@ class ProactiveNotificationUITests(TestCase):
 
         self.client.force_login(self.user)
         response = self.client.get(reverse("notifications"))
-        self.assertContains(response, "How Autumn interrupts you")
-        self.assertContains(response, "You planned CMG prep for 18:30.")
-        self.assertContains(response, "Exercise: 1 session remaining; period ends Sunday.")
+        self.assertContains(response, '<h1 class="page-title">Notifications</h1>')
+        self.assertContains(response, "Commitment checks")
         self.assertContains(response, "Nothing scheduled for the next seven days.")
+        # The category toggles used to carry invented example sentences.
+        self.assertNotContains(response, "You planned CMG prep for 18:30.")
         self.assertTrue(NotificationPreference.objects.filter(user=self.user).exists())
 
     def test_preference_post_schedules_enabled_categories_and_rejects_early_check(self):

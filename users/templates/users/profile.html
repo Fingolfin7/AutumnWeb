@@ -9,40 +9,20 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Account and workspace</p>
         <h1 class="page-title">Profile</h1>
     </div>
 </div>
-
-<section class="slab slab-pad">
-    <p class="page-eyebrow">ChatGPT and Claude</p>
-    <h2 class="disclose-title">Autumn MCP</h2>
-
-    <div class="profile-codex-panel">
-        <p class="focus-lede">Let ChatGPT, Claude and other MCP apps use your Autumn accounts. You choose the accounts and whether they can change records, and you can revoke access anytime.</p>
-        <div class="form-actions">
-            <a class="btn btn--ghost" href="{% url 'mcp-connections' %}">
-                <i class="fas fa-plug" aria-hidden="true"></i> Manage MCP connections
-            </a>
-        </div>
-    </div>
-</section>
 
 <form method="post" enctype="multipart/form-data" class="fields profile-page">
     {% csrf_token %}
 
     <section class="slab slab-pad">
-        <p class="field-label">Account</p>
-
         <div class="profile-account-grid">
             <div class="profile-avatar-panel">
                 <img class="profile-pic profile-avatar-large" src="{{ user.profile.image_url }}" alt="{{ user.username }} profile picture">
                 <div class="field">
-                    <label for="{{ profile_form.image.id_for_label }}">
-                        <i class="fas fa-cloud-upload-alt text-orange"></i> Upload profile image
-                    </label>
+                    <label for="{{ profile_form.image.id_for_label }}">Profile image</label>
                     {{ profile_form.image }}
-                    <small id="profile-image-filename" class="muted">No new image selected</small>
                     {{ profile_form.image.errors }}
                 </div>
             </div>
@@ -51,20 +31,20 @@
                 <div class="two-up">
                     <div class="field">
                         {{ user_form.username.errors }}
-                        {{ user_form.username.label_tag }}
+                        <label for="{{ user_form.username.id_for_label }}">{{ user_form.username.label }}</label>
                         {{ user_form.username }}
                     </div>
 
                     <div class="field">
                         {{ user_form.email.errors }}
-                        {{ user_form.email.label_tag }}
+                        <label for="{{ user_form.email.id_for_label }}">{{ user_form.email.label }}</label>
                         {{ user_form.email }}
                     </div>
                 </div>
 
                 <div class="field">
                     {{ profile_form.timezone.errors }}
-                    {{ profile_form.timezone.label_tag }}
+                    <label for="{{ profile_form.timezone.id_for_label }}">{{ profile_form.timezone.label }}</label>
                     {{ profile_form.timezone }}
                     <small class="muted">{{ profile_form.timezone.help_text }}</small>
                 </div>
@@ -75,11 +55,8 @@
     {% if social_auth_connections %}
     <section class="slab slab-pad">
         <div class="u-between u-wrap u-gap-3">
-            <div>
-                <p class="page-eyebrow">Sign-in methods</p>
-                <h2 class="disclose-title">Connected accounts</h2>
-            </div>
-            <span class="muted">Connecting and disconnecting take effect immediately</span>
+            <h2 class="disclose-title">Connected accounts</h2>
+            <span class="muted">Changes apply immediately</span>
         </div>
 
         {% if not user.has_usable_password %}
@@ -101,26 +78,16 @@
                         {{ connection.name }}
                     </h3>
                     {% if connection.account %}
+                    {% if not connection.enabled %}
                     <p class="focus-lede">
-                        {% if connection.enabled %}
-                        Log in with {{ connection.name }}{% if user.has_usable_password %} or with your Autumn password{% endif %}.
-                        {% else %}
                         {{ connection.name }} is no longer configured on this Autumn
                         instance, so it cannot log you in until an administrator sets it
                         up again.
-                        {% endif %}
                     </p>
+                    {% endif %}
                     <span class="context-chip profile-auth-chip {% if connection.enabled %}text-green{% else %}text-yellow{% endif %}">
                         <i class="fas {% if connection.enabled %}fa-check-circle{% else %}fa-exclamation-circle{% endif %}" aria-hidden="true"></i>
                         Connected{% if connection.display_identity %} as {{ connection.display_identity }}{% endif %}
-                    </span>
-                    {% else %}
-                    <p class="focus-lede">
-                        Link {{ connection.name }} here, while you are logged in. Autumn never
-                        matches an account by email address on its own.
-                    </p>
-                    <span class="context-chip profile-auth-chip">
-                        <i class="fas fa-circle" aria-hidden="true"></i> Not connected
                     </span>
                     {% endif %}
                 </div>
@@ -143,10 +110,7 @@
 
     <section class="slab slab-pad">
         <div class="u-between u-wrap u-gap-3">
-            <div>
-                <p class="page-eyebrow">Background</p>
-                <h2 class="disclose-title">Workspace image</h2>
-            </div>
+            <h2 class="disclose-title">Background</h2>
             <div>
                 <div class="check-row">
                     {{ profile_form.automatic_background }}
@@ -172,16 +136,11 @@
                 <output id="background-dimming-value" class="mono text-cyan" for="{{ profile_form.background_dimming.id_for_label }}">{{ profile_form.background_dimming.value|default:user.profile.background_dimming }}%</output>
             </div>
             {{ profile_form.background_dimming }}
-            <div class="u-between u-gap-3 muted">
-                <small>Brighter photo</small>
-                <small>Darker interface</small>
-            </div>
             {{ profile_form.background_dimming.errors }}
         </div>
 
         {% if user.profile.automatic_background %}
         <div class="background-context profile-background-context">
-            <p class="field-label">About background</p>
             {% if user.profile.bing_background %}
                 {% bing_background as bing_url %}
                 <h3 class="disclose-title">{% bing_background_title %}</h3>
@@ -213,9 +172,7 @@
 
         <div class="uploaded_backgrounds profile-background-upload">
             <div class="field">
-                <label for="{{ profile_form.background_image.id_for_label }}">
-                    <i class="fas fa-cloud-upload-alt text-orange"></i> Upload background
-                </label>
+                <label for="{{ profile_form.background_image.id_for_label }}">Upload background</label>
                 {{ profile_form.background_image }}
                 {{ profile_form.background_image.errors }}
             </div>
@@ -224,7 +181,6 @@
             <div class="profile-current-background">
                 <img src="{{ user.profile.background_image.url }}" alt="Current background">
                 <div>
-                    <p class="field-label">Current background</p>
                     <div class="check-row">
                         {{ profile_form.remove_background_image }}
                         <label for="{{ profile_form.remove_background_image.id_for_label }}">{{ profile_form.remove_background_image.label }}</label>
@@ -241,49 +197,38 @@
 
     <section class="slab slab-pad">
         <div class="u-between u-wrap u-gap-3">
-            <div>
-                <p class="page-eyebrow">Preferences</p>
-                <h2 class="disclose-title">Defaults</h2>
-            </div>
-            <span class="muted">Independent starting points for each workflow</span>
+            <h2 class="disclose-title">Defaults</h2>
         </div>
 
         <div class="profile-defaults-grid">
             <div class="profile-default-item">
-                <label for="{{ profile_form.default_filter_value.id_for_label }}">
-                    <i class="fa fa-calendar-alt text-cyan"></i> App date range
-                </label>
+                <label for="{{ profile_form.default_filter_value.id_for_label }}">Date range</label>
                 <div class="profile-default-control">
                     {{ profile_form.default_filter_value }}
                     {{ profile_form.default_filter_unit }}
                 </div>
-                <p class="muted">Charts and other date-filtered pages will look back this far from today.</p>
+                <p class="muted">Charts and other date-filtered pages</p>
                 {{ profile_form.default_filter_value.errors }}
                 {{ profile_form.default_filter_unit.errors }}
             </div>
 
             <div class="profile-default-item">
-                <label for="{{ profile_form.insights_default_filter_value.id_for_label }}">
-                    <i class="fa fa-lightbulb text-yellow"></i> Insights date range
-                </label>
+                <label for="{{ profile_form.insights_default_filter_value.id_for_label }}">Insights date range</label>
                 <div class="profile-default-control">
                     {{ profile_form.insights_default_filter_value }}
                     {{ profile_form.insights_default_filter_unit }}
                 </div>
-                <p class="muted">New Insights chats will begin with this separate analysis window.</p>
                 {{ profile_form.insights_default_filter_value.errors }}
                 {{ profile_form.insights_default_filter_unit.errors }}
             </div>
 
             <div class="profile-default-item">
-                <label for="{{ profile_form.default_chart_project_count.id_for_label }}">
-                    <i class="fa fa-chart-pie text-green"></i> Projects per chart
-                </label>
+                <label for="{{ profile_form.default_chart_project_count.id_for_label }}">Projects per chart</label>
                 <div class="profile-default-control">
                     {{ profile_form.default_chart_project_count }}
                     <span class="muted">projects</span>
                 </div>
-                <p class="muted">Additional project series are combined into Other. Maximum 100.</p>
+                <p class="muted">The rest are grouped as Other (max 100)</p>
                 {{ profile_form.default_chart_project_count.errors }}
             </div>
         </div>
@@ -292,18 +237,14 @@
     {% if ai_features_enabled %}
     <section class="slab slab-pad">
         <div class="u-between u-wrap u-gap-3">
-            <div>
-                <p class="page-eyebrow text-blue">Insights</p>
-                <h2 class="disclose-title">LLM connections</h2>
-            </div>
+            <h2 class="disclose-title">LLM connections</h2>
             <span class="muted"><i class="fas fa-lock"></i> Encrypted at rest</span>
         </div>
 
         <div class="profile-codex-panel">
             <div>
-                <p class="field-label text-blue">Primary OpenAI bucket</p>
                 <h3 class="disclose-title">Codex login</h3>
-                <p class="focus-lede">OpenAI models use Codex first when connected. A profile API key is kept as fallback.</p>
+                <p class="focus-lede">OpenAI models use Codex first, then the API key below.</p>
                 {% if have_keys.openai_chatgpt %}
                 <span class="context-chip text-green">
                     <i class="fas fa-check-circle"></i>
@@ -410,6 +351,20 @@
     </div>
 </form>
 
+<section class="slab slab-pad">
+    <div class="profile-codex-panel">
+        <div>
+            <h2 class="disclose-title">Autumn MCP</h2>
+            <p class="focus-lede">Let ChatGPT, Claude and other MCP apps use your Autumn data.</p>
+        </div>
+        <div class="form-actions">
+            <a class="btn btn--ghost" href="{% url 'mcp-connections' %}">
+                <i class="fas fa-plug" aria-hidden="true"></i> Manage connections
+            </a>
+        </div>
+    </div>
+</section>
+
 {% comment %}
   Form owners for the buttons in "Connected accounts". The buttons stay where
   they belong visually, inside the profile form, and the `form` attribute makes
@@ -428,7 +383,6 @@
 
 <script>
     $('#id_image').on('change',function(){
-        let fileName = $(this).val().split('\\').pop();
         if (this.files && this.files[0]) {
             let reader = new FileReader();
             reader.onload = function (e) {
@@ -436,7 +390,6 @@
             }
             reader.readAsDataURL(this.files[0]);
         }
-        $('#profile-image-filename').text(fileName || 'No new image selected');
     });
 
     function updateBackgroundDimmingPreview(value) {

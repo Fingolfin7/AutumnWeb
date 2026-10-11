@@ -100,7 +100,7 @@ class LunaViewTests(TestCase):
         self.assertContains(response, 'data-luna-url="')
         self.assertContains(response, 'value="high" selected')
         self.assertContains(response, 'class="select" id="luna-effort"')
-        self.assertContains(response, 'class="field-label" for="luna-effort"')
+        self.assertContains(response, 'class="sr-only" for="luna-effort"')
         for effort in LUNA_EFFORTS:
             self.assertContains(response, f'<option value="{effort}"')
         self.assertContains(response, "luna_timer_recommendations.js")

@@ -29,7 +29,6 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Stopping</p>
         <h1 class="page-title text-red">{{ timer.project.name }}</h1>
     </div>
 </div>
@@ -61,12 +60,12 @@
     <section class="slab slab-pad">
         <div class="two-up">
             <div class="field">
-                {{ form.start_time.label_tag }}
+                <label for="{{ form.start_time.id_for_label }}">{{ form.start_time.label }}</label>
                 {{ form.start_time }}
                 {{ form.start_time.errors }}
             </div>
             <div class="field">
-                {{ form.end_time.label_tag }}
+                <label for="{{ form.end_time.id_for_label }}">{{ form.end_time.label }}</label>
                 {{ form.end_time }}
                 {{ form.end_time.errors }}
             </div>

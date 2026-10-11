@@ -9,8 +9,7 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Bring work into Autumn</p>
-        <h1 class="page-title">Import data</h1>
+        <h1 class="page-title">Import</h1>
     </div>
 </div>
 
@@ -19,59 +18,51 @@
 
     <div class="split">
         <section id="import_options" class="slab slab-pad">
-            <p class="field-label">JSON source</p>
-
             <div class="field">
-                <label for="{{ form.file.id_for_label }}">
-                    <i class="fas fa-cloud-upload-alt text-orange"></i> Upload JSON file
-                </label>
+                <label for="{{ form.file.id_for_label }}">JSON file</label>
                 {{ form.file }}
                 {{ form.file.errors }}
             </div>
 
-            <p class="field-label u-mt-4">Import destination</p>
-
             <div class="field">
-                {{ form.import_context.label_tag }}
+                <label for="{{ form.import_context.id_for_label }}">{{ form.import_context.label }}</label>
                 {{ form.import_context }}
                 {{ form.import_context.errors }}
             </div>
 
             <div class="field">
-                {{ form.import_context_new.label_tag }}
+                <label for="{{ form.import_context_new.id_for_label }}">{{ form.import_context_new.label }}</label>
                 {{ form.import_context_new }}
                 <small class="muted">{{ form.import_context_new.help_text }}</small>
                 {{ form.import_context_new.errors }}
             </div>
 
-            <p class="field-label u-mt-4">Import behavior</p>
-
-            <div class="check-row">
+            <div class="check-row u-mt-4">
                 {{ form.autumn_import }}
-                {{ form.autumn_import.label_tag }}
+                <label for="{{ form.autumn_import.id_for_label }}">{{ form.autumn_import.label }}</label>
             </div>
             {{ form.autumn_import.errors }}
 
             <div class="check-row">
                 {{ form.force }}
-                {{ form.force.label_tag }}
+                <label for="{{ form.force.id_for_label }}">{{ form.force.label }}</label>
             </div>
             {{ form.force.errors }}
 
             <div class="check-row">
                 {{ form.merge }}
-                {{ form.merge.label_tag }}
+                <label for="{{ form.merge.id_for_label }}">{{ form.merge.label }}</label>
             </div>
             {{ form.merge.errors }}
 
             <div class="check-row">
                 {{ form.verbose }}
-                {{ form.verbose.label_tag }}
+                <label for="{{ form.verbose.id_for_label }}">{{ form.verbose.label }}</label>
             </div>
             {{ form.verbose.errors }}
 
             <div class="field u-mt-4">
-                {{ form.tolerance.label_tag }}
+                <label for="{{ form.tolerance.id_for_label }}">{{ form.tolerance.label }}</label>
                 {{ form.tolerance }}
                 {{ form.tolerance.errors }}
             </div>
@@ -84,7 +75,6 @@
         </section>
 
         <section class="slab slab-pad stream-output" id="output-section" aria-live="polite">
-            <p class="field-label">Import progress</p>
             <h2 class="disclose-title">Importing <span id="output-title" class="text-orange"></span></h2>
 
             <div id="progress-bar" class="meter stream-progress">

@@ -39,9 +39,9 @@
             if (Notification.permission === "denied") {
                 setState(container, "denied", "Notifications are blocked.", "Allow notifications for this site in your browser settings, then try again.", "", "");
             } else if (Notification.permission === "granted" && subscription) {
-                setState(container, "granted", "Notifications are on for this browser.", "Reminders can arrive even when Autumn is not the front tab.", "Send a test", "test");
+                setState(container, "granted", "Notifications are on for this browser.", "", "Send a test", "test");
             } else {
-                setState(container, "default", "Notifications are not enabled.", "Choose Enable only if you want reminders to reach you when Autumn is not the front tab.", "Enable notifications", "enable");
+                setState(container, "default", "Notifications are not enabled.", "Needed for reminders while Autumn is in the background.", "Enable notifications", "enable");
             }
         }).catch(function () {
             var statusNode = container.querySelector("[data-perm-status]");

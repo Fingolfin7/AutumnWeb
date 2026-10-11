@@ -279,7 +279,6 @@
      its real weekday column so the grid stays aligned to Mon–Sun. */
   function setActivityRange(days) {
     var grid = document.querySelector("[data-cal-grid]");
-    var caption = document.querySelector("[data-cal-caption]");
     if (!grid) { return; }
 
     var cells = Array.prototype.slice.call(grid.querySelectorAll(".cal-cell"));
@@ -295,7 +294,6 @@
     if (first) {
       first.style.gridColumnStart = String(parseInt(first.dataset.weekday || "0", 10) + 1);
     }
-    if (caption) { caption.textContent = "Last " + days + " days activity"; }
   }
 
   document.addEventListener("click", function (event) {

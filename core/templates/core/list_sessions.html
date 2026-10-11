@@ -30,12 +30,7 @@
 
 {% block content %}
 
-<div class="desk-head">
-    <div>
-        <p class="page-eyebrow">Everything you have tracked</p>
-        <h1 class="page-title">Sessions</h1>
-    </div>
-</div>
+<h1 class="sr-only">Sessions</h1>
 
 <form method="get" class="fields" id="search_form">
     <div class="searchbar">
@@ -119,7 +114,6 @@
         <header class="day-head">
             <span class="day-date">{{ date|day_date_formatter }}</span>
             <span class="day-total">{{ data.total_duration|duration_formatter }}</span>
-            <span class="day-note">{{ data.sessions|length }} session{{ data.sessions|length|pluralize }}</span>
         </header>
 
         <ul class="band-list">

@@ -5,8 +5,7 @@
 {% block content %}
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">New commitment</p>
-        <h1 class="page-title">Choose a rhythm to protect</h1>
+        <h1 class="page-title">New commitment</h1>
     </div>
 </div>
 
@@ -16,10 +15,9 @@
     <div class="split">
         <div id="input-fields">
             <section class="slab slab-pad">
-                <p class="field-label">Scope</p>
 
                 <div class="field">
-                    {{ form.aggregation_type.label_tag }}
+                    <label for="{{ form.aggregation_type.id_for_label }}">{{ form.aggregation_type.label }}</label>
                     {{ form.aggregation_type }}
                     {{ form.aggregation_type.errors }}
                 </div>
@@ -32,32 +30,31 @@
                 </div>
 
                 <div class="commitment-target-field" data-target-type="context" hidden>
-                    {{ form.context.label_tag }}
+                    <label for="{{ form.context.id_for_label }}">{{ form.context.label }}</label>
                     {{ form.context }}
                     {{ form.context.errors }}
                 </div>
                 <div class="commitment-target-field" data-target-type="tag" hidden>
-                    {{ form.tag.label_tag }}
+                    <label for="{{ form.tag.id_for_label }}">{{ form.tag.label }}</label>
                     {{ form.tag }}
                     {{ form.tag.errors }}
                 </div>
                 <div class="commitment-target-field" data-target-type="project" hidden>
-                    {{ form.project.label_tag }}
+                    <label for="{{ form.project.id_for_label }}">{{ form.project.label }}</label>
                     {{ form.project }}
                     {{ form.project.errors }}
                 </div>
                 <div class="commitment-target-field" data-target-type="subproject" hidden>
-                    {{ form.subproject.label_tag }}
+                    <label for="{{ form.subproject.id_for_label }}">{{ form.subproject.label }}</label>
                     {{ form.subproject }}
                     {{ form.subproject.errors }}
                 </div>
             </section>
 
-            <section class="slab slab-pad">
-                <p class="field-label">Composable rules</p>
-                <p class="muted">Include lists narrow the scope; exclude lists remove matching sessions.</p>
+            <details class="slab slab-pad commitment-rules"{% if form.include_projects.value or form.exclude_projects.value or form.include_subprojects.value or form.exclude_subprojects.value or form.include_tags.value or form.exclude_tags.value %} open{% endif %}>
+                <summary class="commitment-rules-summary">Rules <span class="muted">(optional)</span></summary>
 
-                <div class="field commitment-rule-group u-mt-4" data-dimension="project">
+                <div class="field commitment-rule-group" data-dimension="project">
                     <label for="id_include_projects">Only include projects</label>
                     <details class="commitment-rule-dropdown">
                         <summary class="filter-launcher tag-summary">Select projects</summary>
@@ -74,7 +71,6 @@
                             </div>
                         </div>
                     </details>
-                    <small class="muted">{{ form.include_projects.help_text }}</small>
                     {{ form.include_projects.errors }}
                 </div>
 
@@ -95,7 +91,6 @@
                             </div>
                         </div>
                     </details>
-                    <small class="muted">{{ form.exclude_projects.help_text }}</small>
                     {{ form.exclude_projects.errors }}
                 </div>
 
@@ -116,7 +111,6 @@
                             </div>
                         </div>
                     </details>
-                    <small class="muted">{{ form.include_subprojects.help_text }}</small>
                     {{ form.include_subprojects.errors }}
                 </div>
 
@@ -137,7 +131,6 @@
                             </div>
                         </div>
                     </details>
-                    <small class="muted">{{ form.exclude_subprojects.help_text }}</small>
                     {{ form.exclude_subprojects.errors }}
                 </div>
 
@@ -158,7 +151,6 @@
                             </div>
                         </div>
                     </details>
-                    <small class="muted">{{ form.include_tags.help_text }}</small>
                     {{ form.include_tags.errors }}
                 </div>
 
@@ -179,33 +171,30 @@
                             </div>
                         </div>
                     </details>
-                    <small class="muted">{{ form.exclude_tags.help_text }}</small>
                     {{ form.exclude_tags.errors }}
                 </div>
-            </section>
+            </details>
 
             <section class="slab slab-pad">
-                <p class="field-label">Target</p>
 
                 <div class="two-up">
                     <div class="field">
-                        {{ form.commitment_type.label_tag }}
+                        <label for="{{ form.commitment_type.id_for_label }}">{{ form.commitment_type.label }}</label>
                         {{ form.commitment_type }}
                         {{ form.commitment_type.errors }}
                     </div>
                     <div class="field">
-                        {{ form.period.label_tag }}
+                        <label for="{{ form.period.id_for_label }}">{{ form.period.label }}</label>
                         {{ form.period }}
                         {{ form.period.errors }}
                     </div>
                     <div class="field">
-                        {{ form.start_date.label_tag }}
+                        <label for="{{ form.start_date.id_for_label }}">{{ form.start_date.label }}</label>
                         {{ form.start_date }}
-                        <small class="muted">{{ form.start_date.help_text }}</small>
                         {{ form.start_date.errors }}
                     </div>
                     <div class="field">
-                        {{ form.target.label_tag }}
+                        <label for="{{ form.target.id_for_label }}">{{ form.target.label }}</label>
                         {{ form.target }}
                         <small class="help-text muted">{{ form.target.help_text }}</small>
                         {{ form.target.errors }}
@@ -214,13 +203,11 @@
             </section>
 
             <section class="slab slab-pad">
-                <p class="field-label">Time banking</p>
 
                 <div class="check-row">
                     {{ form.banking_enabled }}
                     <label for="{{ form.banking_enabled.id_for_label }}">Enable time banking</label>
                 </div>
-                <small class="muted">Carry surplus or deficit between periods.</small>
                 {{ form.banking_enabled.errors }}
 
                 {% if form.notifications_enabled %}
@@ -234,13 +221,13 @@
 
                 <div class="two-up u-mt-4">
                     <div class="field">
-                        {{ form.max_balance.label_tag }}
+                        <label for="{{ form.max_balance.id_for_label }}">{{ form.max_balance.label }}</label>
                         {{ form.max_balance }}
                         <small class="muted">{{ form.max_balance.help_text }}</small>
                         {{ form.max_balance.errors }}
                     </div>
                     <div class="field">
-                        {{ form.min_balance.label_tag }}
+                        <label for="{{ form.min_balance.id_for_label }}">{{ form.min_balance.label }}</label>
                         {{ form.min_balance }}
                         <small class="muted">{{ form.min_balance.help_text }}</small>
                         {{ form.min_balance.errors }}
@@ -260,27 +247,6 @@
             </section>
         </div>
 
-        <aside id="help-info" class="slab slab-pad">
-            <p class="field-label"><i class="fa fa-info-circle text-orange"></i> About commitments</p>
-            <div class="meta-list">
-                <div>
-                    <p class="meta-label">Time-based</p>
-                    <p>Set a target number of minutes per period.</p>
-                </div>
-                <div>
-                    <p class="meta-label">Session-based</p>
-                    <p>Set a target number of sessions per period.</p>
-                </div>
-                <div>
-                    <p class="meta-label">Composable rules</p>
-                    <p>Narrow a broad scope to selected projects, subprojects, or tags, then exclude anything that should not count.</p>
-                </div>
-                <div>
-                    <p class="meta-label">Time banking</p>
-                    <p>Carry surplus or deficit into the next period to balance busy and quiet weeks.</p>
-                </div>
-            </div>
-        </aside>
     </div>
 </form>
 {% endblock %}

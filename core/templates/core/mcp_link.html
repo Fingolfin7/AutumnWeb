@@ -57,8 +57,8 @@
         </div>
         {% endif %}
 
-        <div class="field">{{ form.username.label_tag }}{{ form.username.errors }}{{ form.username }}</div>
-        <div class="field">{{ form.password.label_tag }}{{ form.password.errors }}{{ form.password }}</div>
+        <div class="field"><label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>{{ form.username.errors }}{{ form.username }}</div>
+        <div class="field"><label for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>{{ form.password.errors }}{{ form.password }}</div>
 
         <div class="form-actions mcp-actions">
             <a class="btn btn--ghost" href="{{ next }}">Cancel</a>

@@ -12,7 +12,6 @@
 {% block content %}
 <div class="desk-head auth-card">
     <div>
-        <p class="page-eyebrow">{% if process == 'connect' %}Sign-in methods{% else %}External sign-in{% endif %}</p>
         <h1 class="page-title">
             {% if process == 'connect' %}Connect {{ provider.name }}{% else %}Continue with {{ provider.name }}{% endif %}
         </h1>

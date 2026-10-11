@@ -70,15 +70,12 @@
     function updateTimezonePreview(form) {
         var input = form.querySelector("#reminder-at");
         var preview = form.querySelector("[data-rm-timezone]");
-        var zoneNode = form.querySelector("[data-rm-profile-zone]");
-        if (!input || !preview || !zoneNode) return;
-        var zone = form.dataset.profileTimezone || zoneNode.textContent.trim() || "UTC";
+        if (!input || !preview) return;
+        var zone = form.dataset.profileTimezone || "UTC";
         var value = input.value;
-        if (value) {
-            preview.textContent = "Read as " + dateLabel(value) + " in " + zone + " (your profile timezone).";
-        } else {
-            preview.textContent = "Read as a local time in your profile timezone (" + zone + ").";
-        }
+        preview.textContent = value
+            ? dateLabel(value) + ", " + zone + " (profile timezone)"
+            : "Your profile timezone: " + zone;
     }
 
     function updateRail(form) {
@@ -201,9 +198,9 @@
             if (permission === "denied") {
                 setPermissionState(container, "denied", "Notifications are blocked.", "Allow notifications for this site in your browser settings, then try again.", "", "");
             } else if (permission === "granted" && localSubscription) {
-                setPermissionState(container, "granted", "Notifications are on for this browser.", "Reminders can arrive even when Autumn is not the front tab.", "Send a test", "test");
+                setPermissionState(container, "granted", "Notifications are on for this browser.", "", "Send a test", "test");
             } else {
-                setPermissionState(container, "default", "Notifications are not enabled.", "Choose Enable only if you want reminders to reach you when Autumn is not the front tab.", "Enable notifications", "enable");
+                setPermissionState(container, "default", "Notifications are not enabled.", "Needed for reminders while Autumn is in the background.", "Enable notifications", "enable");
             }
         }).catch(function () {
             if (statusNode) statusNode.textContent = "Notification status is temporarily unavailable.";

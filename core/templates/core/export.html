@@ -15,8 +15,7 @@
 
 <div class="desk-head">
     <div>
-        <p class="page-eyebrow">Take your history with you</p>
-        <h1 class="page-title">Export data</h1>
+        <h1 class="page-title">Export</h1>
     </div>
 </div>
 
@@ -27,60 +26,48 @@
         <div class="split">
             <div>
                 <section class="slab slab-pad">
-                    <p class="field-label">Date and context</p>
-
                     <div class="two-up">
                         <div class="field">
-                            <label for="{{ form.start_date.id_for_label }}">
-                                <i class="fa fa-calendar text-cyan"></i> Start date
-                            </label>
+                            <label for="{{ form.start_date.id_for_label }}">Start date</label>
                             {{ form.start_date }}
                             {{ form.start_date.errors }}
                         </div>
 
                         <div class="field">
-                            <label for="{{ form.end_date.id_for_label }}">
-                                <i class="fa fa-calendar text-cyan"></i> End date
-                            </label>
+                            <label for="{{ form.end_date.id_for_label }}">End date</label>
                             {{ form.end_date }}
                             {{ form.end_date.errors }}
                         </div>
                     </div>
 
                     <div class="field">
-                        <label for="{{ form.context.id_for_label }}">
-                            <i class="fa fa-layer-group text-orange"></i> Context
-                        </label>
+                        <label for="{{ form.context.id_for_label }}">Context</label>
                         {{ form.context }}
                         {{ form.context.errors }}
                     </div>
 
                     {% if form.tags|length %}
-                    {% include 'core/partials/option_picker.html' with field=form.tags label="Tags" icon="fa-tags" icon_class="text-orange" empty_text="No tags match that search." %}
+                    {% include 'core/partials/option_picker.html' with field=form.tags label="Tags" empty_text="No tags match that search." %}
                     {% else %}
                     <div class="field">
-                        <span class="field-label"><i class="fa fa-tags text-orange"></i> Tags</span>
+                        <span class="field-label">Tags</span>
                         <p class="empty">No tags are available. <a href="{% url 'tags' %}">Create one</a> to filter exports by label.</p>
                         {{ form.tags.errors }}
                     </div>
                     {% endif %}
-                </section>
-
-                <section class="slab slab-pad">
-                    <p class="field-label">Projects</p>
 
                     <div id="search_projects" class="field">
-                        <label for="project-search"><i class="fa fa-search text-red"></i> Project name</label>
+                        <label for="project-search">Project name</label>
                         {{ form.project_name }}
                         {{ form.project_name.errors }}
                         <div id="project-search-results"></div>
                     </div>
 
                     {% if form.exclude_projects|length %}
-                    {% include 'core/partials/project_picker.html' with include_field=form.include_projects exclude_field=form.exclude_projects icon="fa-filter" icon_class="text-red" %}
+                    {% include 'core/partials/project_picker.html' with include_field=form.include_projects exclude_field=form.exclude_projects %}
                     {% else %}
                     <div class="field">
-                        <span class="field-label"><i class="fa fa-filter text-red"></i> Projects</span>
+                        <span class="field-label">Projects</span>
                         <p class="empty">No projects are available. <a href="{% url 'create_project' %}">Create one</a> before exporting project data.</p>
                         {{ form.exclude_projects.errors }}
                     </div>
@@ -89,10 +76,8 @@
             </div>
 
             <section class="slab slab-pad">
-                <p class="field-label">File options</p>
-
                 <div class="field">
-                    {{ form.output_file.label_tag }}
+                    <label for="{{ form.output_file.id_for_label }}">{{ form.output_file.label }}</label>
                     {{ form.output_file }}
                     {{ form.output_file.errors }}
                 </div>
@@ -111,13 +96,13 @@
 
                 <div class="check-row">
                     {{ form.compress }}
-                    {{ form.compress.label_tag }}
+                    <label for="{{ form.compress.id_for_label }}">{{ form.compress.label }}</label>
                 </div>
                 {{ form.compress.errors }}
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn--primary btn--lg btn--block">
-                        <i class="fa fa-file-export"></i> Export projects
+                        <i class="fa fa-file-export"></i> Export
                     </button>
                 </div>
             </section>
