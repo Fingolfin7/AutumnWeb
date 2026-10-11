@@ -18,9 +18,13 @@ class ContentSearchTests(TestCase):
         other_user = User.objects.create_user(
             "other-search-user", email="other-search@example.com", password="pw"
         )
-        self.alpha = Projects.objects.create(user=self.user, name="Atlas")
+        self.alpha = Projects.objects.create(
+            user=self.user, name="Atlas", description="Identity management and SSO"
+        )
         self.beta = Projects.objects.create(user=self.user, name="Garden")
-        foreign = Projects.objects.create(user=other_user, name="Secret Atlas")
+        foreign = Projects.objects.create(
+            user=other_user, name="Secret Atlas", description="Private identity management"
+        )
 
         self.alpha_sub = SubProjects.objects.create(
             user=self.user, parent_project=self.alpha, name="Invoices"
@@ -50,6 +54,7 @@ class ContentSearchTests(TestCase):
             ("Invoices", {self.alpha.pk, self.beta.pk}),
             ("unused ledger", {self.beta.pk}),
             ("PAYMENTS", {self.alpha.pk}),
+            ("  IDENTITY management  ", {self.alpha.pk}),
             ("private", set()),
         )
         for term, expected in cases:
@@ -68,6 +73,7 @@ class ContentSearchTests(TestCase):
             ("payments", {self.alpha_session.pk}),
             ("unused ledger", set()),
             ("private", set()),
+            ("identity management", set()),
         )
         for term, expected in cases:
             with self.subTest(term=term):
@@ -92,9 +98,12 @@ class ContentSearchTests(TestCase):
             with self.subTest(page=page):
                 response = self.client.get(reverse(page), {"search": "payments"})
                 self.assertContains(response, 'name="search"')
-                self.assertContains(
-                    response, "Search projects, subprojects, and session notes"
+                scope = (
+                    "Search project names and descriptions, subprojects, and session notes"
+                    if page == "projects"
+                    else "Search projects, subprojects, and session notes"
                 )
+                self.assertContains(response, scope)
                 self.assertIn(
                     {"label": "Search", "value": "payments"},
                     response.context["active_filters"],

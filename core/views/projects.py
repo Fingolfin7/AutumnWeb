@@ -72,6 +72,9 @@ class ProjectsListView(LoginRequiredMixin, ListView):
             },
             user=self.request.user,
         )
+        context["search_form"].fields["search"].widget.attrs["placeholder"] = (
+            "Names, descriptions, or notes"
+        )
 
         ungrouped_projects = list(context["object_list"])
         for project in ungrouped_projects:

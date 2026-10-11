@@ -6,7 +6,7 @@ from core.models import SessionSubproject, Sessions, SubProjects
 
 
 def search_projects(projects, term):
-    """Find projects with a matching name, child name, or session note."""
+    """Find projects by name, description, child name, or session note."""
     term = (term or "").strip()
     if not term:
         return projects
@@ -26,6 +26,7 @@ def search_projects(projects, term):
         search_note=Exists(matching_notes),
     ).filter(
         Q(name__icontains=term)
+        | Q(description__icontains=term)
         | Q(search_subproject=True)
         | Q(search_note=True)
     )
