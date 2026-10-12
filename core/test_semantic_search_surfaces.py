@@ -379,3 +379,23 @@ class FailureHandlingTests(SemanticSearchTestCase):
         self.assertEqual(response.context["session_count"], 1)
         self.assertContains(response, "Related <b>unavailable</b>")
         self.assertContains(response, "only keyword matches are counted")
+
+
+class LargeRelatedSetTests(SemanticSearchTestCase):
+    def test_tens_of_thousands_of_related_ids_fit_in_one_query(self):
+        # Past SQLite's 32,766-variable statement limit; ids that don't exist
+        # (or aren't in scope) simply match nothing.
+        many = [self.oauth.pk] + list(range(10**6, 10**6 + 40_000))
+        with mock.patch.object(semantic_search, "related_session_ids", return_value=many):
+            response = self.client.get(
+                reverse("api_v2:sessions"), {"search": "sign-in failure", "related": "true"}
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(
+                [row["id"] for row in response.json()["sessions"]],
+                [self.failure_note.pk, self.oauth.pk],
+            )
+            totals = self.client.get(
+                reverse("api_v2:report-totals"), {"search": "sign-in failure", "related": "true"}
+            )
+            self.assertEqual(totals.json()["session_count"], 2)

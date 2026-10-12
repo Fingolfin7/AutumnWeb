@@ -1,6 +1,10 @@
 """Shared search semantics for pages that browse tracked work."""
 
+import json
+
+from django.db import connections
 from django.db.models import Exists, OuterRef, Q
+from django.db.models.expressions import RawSQL
 
 from core.models import SessionSubproject, Sessions, SubProjects
 
@@ -76,8 +80,25 @@ def with_extra(queryset, matches, extra_ids):
     if not extra_ids:
         return matches
     return queryset.filter(
-        Q(pk__in=matches.order_by().values("pk")) | Q(pk__in=list(extra_ids))
+        Q(pk__in=matches.order_by().values("pk"))
+        | Q(pk__in=id_set(extra_ids, using=queryset.db))
     )
+
+
+def id_set(ids, *, using="default"):
+    """Any number of ids as ONE query parameter, for ``pk__in``.
+
+    Counted related matches are uncapped, and a plain ``pk__in=[...]`` binds
+    one variable per id: SQLite rejects a statement past 32,766 of them (999
+    on older builds). A JSON array (SQLite) or an array (PostgreSQL) is one.
+    """
+    ids = [int(pk) for pk in ids]
+    vendor = connections[using].vendor
+    if vendor == "postgresql":
+        return RawSQL("SELECT unnest(%s::bigint[])", [ids])
+    if vendor == "sqlite":
+        return RawSQL("SELECT value FROM json_each(%s)", [json.dumps(ids)])
+    return ids
 
 
 def is_truthy(value):
