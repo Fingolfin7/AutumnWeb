@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 EDIT_DELAY_SECONDS = 10.0
 SEARCH_RECHECK_SECONDS = 10 * 60
 FAILURE_BACKOFF_SECONDS = 5 * 60
+FAILURE_RETRIES = 3
 
 
 def is_web_process(argv, environ):
@@ -55,7 +56,8 @@ class SyncQueue:
 
     ``run(user_id)`` performs one sync and returns whether it succeeded. A
     failed account waits ``FAILURE_BACKOFF_SECONDS`` before its next run, so a
-    broken key isn't retried on every edit.
+    broken key isn't retried on every edit, and is retried on its own up to
+    ``FAILURE_RETRIES`` times so a passing outage doesn't leave it stale.
     """
 
     def __init__(self, run, *, clock=time.monotonic):
@@ -63,8 +65,9 @@ class SyncQueue:
         self._clock = clock
         self._lock = threading.Condition()
         self._due = {}  # user id -> when its sync should run
-        self._checked = {}  # user id -> when its last sync finished
+        self._checked = {}  # user id -> when its last successful sync finished
         self._blocked = {}  # user id -> end of its failure backoff
+        self._failures = {}  # user id -> consecutive failed syncs
 
     def request(self, user_id, *, delay=EDIT_DELAY_SECONDS, recheck=False):
         """Ask for a sync of ``user_id``; a pending request absorbs this one.
@@ -102,11 +105,20 @@ class SyncQueue:
             succeeded = self._run(user_id)
             with self._lock:
                 now = self._clock()
-                self._checked[user_id] = now
                 if succeeded:
+                    self._checked[user_id] = now
                     self._blocked.pop(user_id, None)
-                else:
-                    self._blocked[user_id] = now + FAILURE_BACKOFF_SECONDS
+                    self._failures.pop(user_id, None)
+                    continue
+                failures = self._failures.get(user_id, 0) + 1
+                self._failures[user_id] = failures
+                blocked = now + FAILURE_BACKOFF_SECONDS
+                self._blocked[user_id] = blocked
+                if user_id in self._due:
+                    # An edit made during the failed run waits out the backoff too.
+                    self._due[user_id] = max(self._due[user_id], blocked)
+                elif failures <= FAILURE_RETRIES:
+                    self._due[user_id] = blocked
 
     def _wait(self):
         with self._lock:

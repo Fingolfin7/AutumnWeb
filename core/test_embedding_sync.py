@@ -19,6 +19,7 @@ from core.services import embedding_sync
 from core.services.embedding_sync import (
     EDIT_DELAY_SECONDS,
     FAILURE_BACKOFF_SECONDS,
+    FAILURE_RETRIES,
     SEARCH_RECHECK_SECONDS,
     SyncQueue,
     is_web_process,
@@ -98,6 +99,68 @@ class SyncQueueTests(SimpleTestCase):
         self.queue.request(7)
         self._advance(EDIT_DELAY_SECONDS)
         self.assertEqual(self.runs, [7, 7, 7])
+
+    def test_a_failed_sync_retries_on_its_own_a_few_times(self):
+        self.succeed = False
+        self.queue.request(7)
+        self._advance(EDIT_DELAY_SECONDS)
+        for _ in range(FAILURE_RETRIES + 2):
+            self._advance(FAILURE_BACKOFF_SECONDS)
+        self.assertEqual(self.runs, [7] * (1 + FAILURE_RETRIES))
+        self.assertEqual(self.queue.pending(), {})
+        # A new edit still gets its run, and success resets the count.
+        self.succeed = True
+        self.queue.request(7)
+        self._advance(EDIT_DELAY_SECONDS)
+        self.assertEqual(len(self.runs), 2 + FAILURE_RETRIES)
+
+    def test_a_transient_failure_recovers_without_another_request(self):
+        self.succeed = False
+        self.queue.request(7)
+        self._advance(EDIT_DELAY_SECONDS)
+        self.succeed = True
+        self._advance(FAILURE_BACKOFF_SECONDS)
+        self.assertEqual(self.runs, [7, 7])
+        self.assertEqual(self.queue.pending(), {})
+
+    def test_an_edit_during_a_failing_run_waits_out_the_backoff(self):
+        def run(user_id):
+            self.runs.append(user_id)
+            queue.request(user_id, delay=0)  # an edit lands while the sync fails
+            return False
+
+        queue = SyncQueue(run, clock=self.clock)
+        queue.request(7)
+        self.clock.now += EDIT_DELAY_SECONDS
+        queue.run_due()
+        self.clock.now += FAILURE_BACKOFF_SECONDS - 1
+        queue.run_due()
+        self.assertEqual(self.runs, [7])
+        self.clock.now += 1
+        queue.run_due()
+        self.assertEqual(self.runs, [7, 7])
+
+    def test_a_failed_sync_does_not_count_as_a_recheck(self):
+        self.succeed = False
+        self.queue.request(7)
+        self._advance(EDIT_DELAY_SECONDS)
+        self.succeed = True
+        self._advance(FAILURE_BACKOFF_SECONDS)  # the automatic retry succeeds
+        self.queue.request(7, recheck=True)
+        self._advance(EDIT_DELAY_SECONDS)
+        self.assertEqual(self.runs, [7, 7])  # checked by the retry, so skipped
+
+        queue = SyncQueue(lambda user_id: self.runs.append(user_id) or False, clock=self.clock)
+        self.runs.clear()
+        for _ in range(FAILURE_RETRIES + 1):
+            queue.request(7)
+            self.clock.now += FAILURE_BACKOFF_SECONDS + EDIT_DELAY_SECONDS
+            queue.run_due()
+        runs = len(self.runs)
+        queue.request(7, recheck=True)  # never succeeded: a search still asks
+        self.clock.now += FAILURE_BACKOFF_SECONDS + EDIT_DELAY_SECONDS
+        queue.run_due()
+        self.assertEqual(len(self.runs), runs + 1)
 
     def test_a_search_rechecks_an_account_at_most_every_window(self):
         self.queue.request(7, recheck=True)  # never checked: runs
