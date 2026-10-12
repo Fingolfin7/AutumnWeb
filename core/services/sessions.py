@@ -254,6 +254,11 @@ class SessionMutationService:
                         pk=session_id
                     )
                     _mark_commitments_dirty(session.user_id)
+                    # The update() bypasses post_save, so ask for the newly
+                    # completed session's search vector here.
+                    from core.services.embedding_sync import request_sync_on_commit
+
+                    request_sync_on_commit(session.user_id)
                     from core.services.reminders import (
                         cancel_timer_reminders,
                         enqueue_auto_stop_event,

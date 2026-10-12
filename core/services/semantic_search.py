@@ -1,9 +1,10 @@
 """Meaning-based retrieval for Sessions and Projects search.
 
-Vectors are written only by ``manage.py embed_sessions``; a search embeds just
-the query. Every path degrades to ordinary keyword search: AI features off, no
-OpenAI key, no vectors yet, or any provider failure yields no related results
-and never an error.
+Vectors are written in the background shortly after edits
+(``core.services.embedding_sync``) and by ``manage.py embed_sessions``; a
+search embeds just the query. Every path degrades to ordinary keyword search:
+AI features off, no OpenAI key, no vectors yet, or any provider failure yields
+no related results and never an error.
 
 Staleness is derived, not flagged: each vector stores a digest of the exact
 text it was built from, so a note edit or a project/subproject rename makes it
@@ -28,6 +29,7 @@ from core.models import (
     Sessions,
     SubProjects,
 )
+from core.services.embedding_sync import request_sync
 from core.services.recommendation_usage import capture_usage, collect_attempts, provider_attempt
 
 logger = logging.getLogger(__name__)
@@ -305,7 +307,7 @@ def _upsert(user, model, unique_field, rows):
                 update_fields=["model", "text_digest", "vector", "updated_at"],
             )
     except IntegrityError:
-        logger.warning("semantic_sync_batch_skipped", extra={"user_id": user.pk, "rows": len(rows)})
+        logger.warning("semantic_sync_batch_skipped user_id=%s rows=%s", user.pk, len(rows))
         return 0
     return len(rows)
 
@@ -430,7 +432,9 @@ def _query_vector_or_none(user, term):
             return None
         return query_vector(user, embedder, term)
     except Exception as exc:
-        logger.warning("semantic_search_unavailable", extra={"user_id": user.pk, "error_category": type(exc).__name__})
+        logger.warning(
+            "semantic_search_unavailable user_id=%s error_category=%s", user.pk, type(exc).__name__
+        )
         cache.set(_cooldown_key(user), True, FAILURE_COOLDOWN_SECONDS)
         return None
 
@@ -505,6 +509,8 @@ def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED
         outcome.requested = True
     if not semantic_search_available(user):
         return []
+    # Catch up on writes no edit hook saw (e.g. a CLI import on the server).
+    request_sync(user.pk, recheck=True)
     ids, digests, matrix = load_vectors(user, sessions)
     if not ids:
         return []
@@ -551,6 +557,8 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
         outcome.requested = True
     if not semantic_search_available(user):
         return []
+    # Catch up on writes no edit hook saw (e.g. a CLI import on the server).
+    request_sync(user.pk, recheck=True)
     project_ids, project_digests, project_matrix = load_project_vectors(user, projects)
     session_ids, session_digests, session_matrix = load_vectors(
         user,

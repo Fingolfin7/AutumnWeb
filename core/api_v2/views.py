@@ -51,6 +51,7 @@ from core.api_v2.serializers import (
 from core.commitments import mutation_affects_ledger
 from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
 from core.search import with_extra
+from core.services.embedding_sync import request_sync_on_commit
 from core.services.semantic_search import related_project_ids
 from core.services import (
     DestructiveMutationService,
@@ -1238,6 +1239,10 @@ class ProjectDetailView(V2APIView):
                     updates["start_date"] = _as_start_datetime(data["start_date"])
                 if updates:
                     Projects.objects.filter(pk=project.pk).update(**updates)
+                if "description" in updates:
+                    # update() bypasses post_save; the description is
+                    # part of the project's search text.
+                    request_sync_on_commit(request.user.pk)
                 if tags is not None:
                     project.tags.set(tags)
         except DestructiveOperationError as exc:

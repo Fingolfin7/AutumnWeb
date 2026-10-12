@@ -15,7 +15,8 @@ class Command(BaseCommand):
     help = (
         "Embed new and changed sessions and projects for meaning-based search. "
         "Only accounts with AI features on and an OpenAI API key are processed, "
-        "each with its own key. Safe to re-run; suitable for cron."
+        "each with its own key. Web processes already do this in the background "
+        "after edits; use this for backfills and repair. Safe to re-run."
     )
 
     def add_arguments(self, parser):

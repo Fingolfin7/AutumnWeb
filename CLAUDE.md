@@ -37,7 +37,7 @@ python manage.py export <username> --output_file=<path>
 python manage.py import <username> --input_file=<path>
 python manage.py clear --username=<user>  # Delete all project data (omit --username for all users)
 python manage.py clear_temp_uploads --older-than-hours=24 [--dry-run]  # Sweep abandoned import uploads from MEDIA_ROOT/temp
-python manage.py embed_sessions [--username=<user>] [--dry-run] [--limit=N]  # Embed new/changed sessions and projects for semantic search (cron)
+python manage.py embed_sessions [--username=<user>] [--dry-run] [--limit=N]  # Embed new/changed sessions and projects for semantic search (backfill/repair; web processes do it after edits)
 python scripts/semantic_search_eval.py [--keyword-only]  # Keyword vs hybrid search on fictional records; needs OPENAI_API_KEY
 ```
 
@@ -94,7 +94,7 @@ Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate
 - `core/api_v2/` - versioned REST API package (`views`, `serializers`, `reports`, `commitments`, `contexts_tags`, `filters`, `import_export`); `openapi-v2.yaml` is the checked-in schema artifact
 - `core/importer.py` - Shared `iter_import` generator and `run_import` wrapper used by web and API imports
 - `core/temp_uploads.py` - Staging of web-import uploads under `MEDIA_ROOT/temp` between the import POST and the stream GET, plus their cleanup
-- `core/services/semantic_search.py` - meaning-based search: OpenAI `text-embedding-3-small` (512 dims) vectors in `SessionEmbedding`/`ProjectEmbedding`, written only by `embed_sessions` with each user's own OpenAI key while `ai_features_enabled`; a search embeds just the query and falls back to keyword results on any failure. A vector is stale when its stored text digest no longer matches the record's current text (project/subproject names plus the note or description). Lists (Sessions, Projects) show a separate "Related" section; Charts and Insights count related sessions only with the "Include related sessions" toggle (`related=on`); API v2 sessions/reports/projects take `search` + `related=true` and answer with an `X-Autumn-Related: included|unavailable` header (Charts' JS flips its "Including related" pill from it; Insights does the same server-side). A failed query embedding starts a 5-minute per-account cooldown (`FAILURE_COOLDOWN_SECONDS`). `core.search.search_sessions(..., user=, related=)` applies it and must run after every other filter, since related matches are drawn from what the filters left
+- `core/services/semantic_search.py` - meaning-based search: OpenAI `text-embedding-3-small` (512 dims) vectors in `SessionEmbedding`/`ProjectEmbedding`, written with each user's own OpenAI key while `ai_features_enabled`, by `core/services/embedding_sync.py` (a daemon thread in each web process re-embeds an account ~10 s after edits, requested via `core/signals.py` and `request_sync_on_commit` on `update()` paths that bypass signals; related searches also recheck an account every 10 min) and by `embed_sessions` for backfills; a search embeds just the query and falls back to keyword results on any failure. A vector is stale when its stored text digest no longer matches the record's current text (project/subproject names plus the note or description). Lists (Sessions, Projects) show a separate "Related" section; Charts and Insights count related sessions only with the "Include related sessions" toggle (`related=on`); API v2 sessions/reports/projects take `search` + `related=true` and answer with an `X-Autumn-Related: included|unavailable` header (Charts' JS flips its "Including related" pill from it; Insights does the same server-side). A failed query embedding starts a 5-minute per-account cooldown (`FAILURE_COOLDOWN_SECONDS`). `core.search.search_sessions(..., user=, related=)` applies it and must run after every other filter, since related matches are drawn from what the filters left
 - `core/urls.py` - URL routing, including `/healthz/`
 - `core/utils.py` (~20KB) - Helper functions, date parsing, data formatting
 - `users/models.py` - Profile model with encrypted API key get/set methods
@@ -125,6 +125,7 @@ PUSH_VAPID_SUBJECT=mailto:admin@example.com
 PUSH_ALLOWED_ENDPOINT_SUFFIXES=fcm.googleapis.com,push.services.mozilla.com,notify.windows.com,push.apple.com
 RUN_REMINDER_DISPATCHER=FALSE  # TRUE runs the dispatcher thread inside the web process
 SEMANTIC_SEARCH_MIN_SIMILARITY=0.45  # Cosine cutoff for Sessions "Related" results
+SEMANTIC_SYNC_ON_WRITE=TRUE  # Background re-embedding after edits in web processes
 PUSH_DISPATCH_SAFETY_RESCAN_SECONDS=900  # Durable fallback; minimum 300 seconds
 PUSH_MAX_ATTEMPTS=5  # Maximum attempts per device before terminal failure
 PUSH_RETRY_BASE_SECONDS=30  # Exponential-backoff base for transient failures

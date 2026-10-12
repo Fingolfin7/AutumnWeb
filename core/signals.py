@@ -22,8 +22,10 @@ from core.models import (
     Projects,
     ScheduledReminder,
     Sessions,
+    SubProjects,
     TimerReminder,
 )
+from users.models import Profile
 
 
 def _wake_reminder_dispatcher_after_commit(sender, update_fields=None, **kwargs):
@@ -98,3 +100,39 @@ def cancel_scheduled_reminder_events_before_delete(sender, instance, **kwargs):
 @receiver(pre_delete, sender=Commitment)
 def cancel_commitment_events_before_delete(sender, instance, **kwargs):
     _cancel_pending_source_events(commitment_id=instance.pk)
+
+
+# Search vectors: any edit that can change a record's embedded text queues a
+# background re-embed of the account (core.services.embedding_sync), which
+# finds the stale vectors by digest. Running timers aren't embedded yet, and
+# deleting a session or project just cascades its vector away.
+def _request_embedding_sync(sender, instance, **kwargs):
+    if sender is Sessions and instance.end_time is None:
+        return
+    from core.services.embedding_sync import request_sync_on_commit
+
+    request_sync_on_commit(instance.user_id)
+
+
+for _embedded_model in (Sessions, Projects, SubProjects):
+    post_save.connect(
+        _request_embedding_sync,
+        sender=_embedded_model,
+        dispatch_uid=f"request_embedding_sync_save_{_embedded_model._meta.label_lower}",
+    )
+# A deleted subproject drops its name from its sessions' and project's text.
+post_delete.connect(
+    _request_embedding_sync,
+    sender=SubProjects,
+    dispatch_uid="request_embedding_sync_delete_core.subprojects",
+)
+
+
+@receiver(post_save, sender=Profile)
+def request_embedding_sync_for_profile(sender, instance, **kwargs):
+    # Turning AI features on or saving an OpenAI key embeds the account
+    # without waiting for its next edit.
+    if instance.ai_features_enabled and instance.openai_api_key_enc:
+        from core.services.embedding_sync import request_sync_on_commit
+
+        request_sync_on_commit(instance.user_id)
