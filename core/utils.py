@@ -362,7 +362,7 @@ def summarise_search_filters(
         if params.get(key)
     ]
 
-    if related and params.get("search") and is_truthy(params.get("related")):
+    if related and (params.get("search") or "").strip() and is_truthy(params.get("related")):
         summary.append(
             related_pill(unavailable=related_unavailable)
         )

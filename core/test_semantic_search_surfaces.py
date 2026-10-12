@@ -118,6 +118,10 @@ class IncludeRelatedTests(SemanticSearchTestCase):
         self.assertNotContains(response, 'id="related-search"')
         self.assertNotContains(response, "Including")
 
+    def test_blank_search_does_not_claim_related(self):
+        response = self.client.get(reverse("charts"), {"search": "   ", "related": "on"})
+        self.assertNotContains(response, 'id="related-pill"')
+
     def test_charts_ignore_related_when_ai_is_off(self):
         self.user.profile.ai_features_enabled = False
         self.user.profile.save()

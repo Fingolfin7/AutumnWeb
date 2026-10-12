@@ -62,3 +62,14 @@ test('a page without the pill is left alone', () => {
   charts.removePill();
   assert.doesNotThrow(() => charts.context.updateRelatedPill('unavailable'));
 });
+
+test('a response that outlived a Refresh does not overwrite the newer state', async () => {
+  const charts = loadCharts();
+  const old = charts.fetch('pie');
+  charts.context.invalidateChartData();
+  const fresh = charts.fetch('pie'); charts.reply(1, 'included'); await fresh;
+  charts.reply(0, 'unavailable'); await old;
+  charts.fetch('bar'); // switch away (still loading)...
+  await charts.fetch('pie'); charts.showCurrent(); // ...and back to the cached pie
+  assert.equal(charts.pill().text, 'Including related');
+});

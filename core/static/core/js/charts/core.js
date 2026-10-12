@@ -159,7 +159,12 @@ function get_project_data(type, start_date = "", end_date = "", search_term = ""
             type: 'GET',
             dataType: 'json',
             success: function(data, _status, xhr) {
-                relatedStateByUrl.set(url, xhr.getResponseHeader('X-Autumn-Related'));
+                // Only while this is still the cached request for the URL: a
+                // response that outlived a Refresh must not overwrite the
+                // state of the newer payload.
+                if (chartDataCache.get(url) === request) {
+                    relatedStateByUrl.set(url, xhr.getResponseHeader('X-Autumn-Related'));
+                }
                 resolve(data);
             },
             error: function(error) {
