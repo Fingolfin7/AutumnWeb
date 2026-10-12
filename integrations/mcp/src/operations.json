@@ -2960,6 +2960,21 @@
       },
       {
         "in": "query",
+        "name": "ordering",
+        "schema": {
+          "enum": [
+            "relevance",
+            "newest"
+          ],
+          "type": "string",
+          "default": "relevance",
+          "minLength": 1
+        },
+        "description": "relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. Without search the two are the same.\n\n* `relevance` - relevance\n* `newest` - newest",
+        "argument": "ordering"
+      },
+      {
+        "in": "query",
         "name": "project_ids",
         "schema": {
           "type": "string",
@@ -3077,6 +3092,16 @@
           "minimum": 0,
           "default": 0
         },
+        "ordering": {
+          "enum": [
+            "relevance",
+            "newest"
+          ],
+          "type": "string",
+          "default": "relevance",
+          "minLength": 1,
+          "description": "relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. Without search the two are the same.\n\n* `relevance` - relevance\n* `newest` - newest"
+        },
         "project_ids": {
           "type": "string",
           "minLength": 1,
@@ -3119,7 +3144,7 @@
       "required": [],
       "additionalProperties": false
     },
-    "description": "Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Add related=true with search to also include sessions that match it by meaning. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Add related=true with search to also include sessions that match it by meaning: the match field of each result says direct (the text contains the search) or related, and the default relevance ordering lists direct matches newest first, then related ones best first, as the Sessions page does; ordering=newest sorts all by date. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": true,
       "destructiveHint": false,

@@ -402,6 +402,30 @@ class ProjectEmbedding(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class SessionPassageEmbedding(models.Model):
+    """The vector of one passage of a long session note.
+
+    One vector for a whole note blends everything in it, so a sentence that
+    answers a search can be outweighed by the rest of a long log. Notes that
+    split into more than one passage get these too, and a session scores the
+    better of its whole vector and its best passage. `text_digest` hashes the
+    session's full passage source (header and note), so all of a session's
+    passages go stale together and are replaced together.
+    """
+    session = models.ForeignKey(Sessions, on_delete=models.CASCADE, related_name='passage_embeddings')
+    position = models.PositiveSmallIntegerField()
+    model = models.CharField(max_length=64)
+    text_digest = models.CharField(max_length=64)
+    # Little-endian float32, L2-normalised.
+    vector = models.BinaryField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['session', 'position'], name='unique_session_passage'),
+        ]
+
+
 class PushSubscription(models.Model):
     """A browser push subscription owned by one account.
 

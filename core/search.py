@@ -1,9 +1,11 @@
 """Shared search semantics for pages that browse tracked work."""
 
 import json
+from dataclasses import dataclass, field
+from functools import cached_property
 
 from django.db import connections
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef, Q, QuerySet
 from django.db.models.expressions import RawSQL
 
 from core.models import SessionSubproject, Sessions, SubProjects
@@ -36,43 +38,110 @@ def search_projects(projects, term):
     )
 
 
-def search_sessions(sessions, term, *, user=None, related=False, outcome=None):
-    """Find sessions by project, assigned subproject, or their own note.
+#: The one order for session lists: newest first, ties by id.
+SESSION_ORDER = ("-end_time", "-id")
 
-    With ``related`` (and the ``user`` whose OpenAI key pays for the query),
-    sessions that match the term by meaning are added; see
-    core.services.semantic_search. ``sessions`` must already carry every other
-    filter, because related matches are drawn from it. ``outcome`` (a
-    RelatedOutcome) records whether they could be added.
+DIRECT = "direct"
+RELATED = "related"
+
+
+@dataclass
+class SessionSearch:
+    """One Sessions search, shared by the Sessions page and API v2 (and so MCP).
+
+    ``direct`` is the keyword matches; ``related_ids`` the sessions that match
+    the term by meaning but not by keyword, best first, every one above the
+    similarity cutoff. Ranked order is the direct matches newest first, then
+    the related ones best first, so an equivalent request lists the same
+    sessions in the same order wherever it is made; each interface only
+    chooses how much of it to show at a time.
     """
+
+    sessions: QuerySet
+    direct: QuerySet
+    related_ids: list = field(default_factory=list)
+
+    @cached_property
+    def direct_total(self):
+        return self.direct.count()
+
+    @property
+    def total(self):
+        return self.direct_total + len(self.related_ids)
+
+    def combined(self):
+        """Direct and related matches as one queryset, in no particular order."""
+        return with_extra(self.sessions, self.direct, self.related_ids)
+
+    def related_sessions(self, ids):
+        """The sessions of ``ids`` (some of ``related_ids``), in that order."""
+        found = {session.pk: session for session in self.sessions.filter(pk__in=list(ids))}
+        return [found[pk] for pk in ids if pk in found]
+
+    def page(self, offset, limit):
+        """[(session, DIRECT|RELATED)] for ``offset``..``offset + limit`` of the ranked order."""
+        rows = []
+        if offset < self.direct_total:
+            direct = self.direct.order_by(*SESSION_ORDER)[offset : offset + limit]
+            rows.extend((session, DIRECT) for session in direct)
+        start = max(offset - self.direct_total, 0)
+        wanted = self.related_ids[start : start + limit - len(rows)]
+        rows.extend((session, RELATED) for session in self.related_sessions(wanted))
+        return rows
+
+
+def keyword_sessions(sessions, term):
+    """Sessions whose project, assigned subproject or own note contains ``term``."""
     term = (term or "").strip()
     if not term:
         return sessions
-
     matching_subprojects = SessionSubproject.objects.filter(
         session_id=OuterRef("pk"),
         subproject__user_id=OuterRef("user_id"),
         subproject__name__icontains=term,
     )
-    keyword = sessions.alias(
+    return sessions.alias(
         search_subproject=Exists(matching_subprojects)
     ).filter(
         Q(project__name__icontains=term)
         | Q(search_subproject=True)
         | Q(note__icontains=term)
     )
-    if not related:
-        return keyword
-    if user is None:
-        if outcome is not None:
-            outcome.requested = True
-        return keyword
 
-    from core.services.semantic_search import related_session_ids
 
-    # Counted, not previewed: every match above the cutoff, no cap.
-    extra = related_session_ids(user, sessions, keyword, term, limit=None, outcome=outcome)
-    return with_extra(sessions, keyword, extra)
+def rank_sessions(sessions, term, *, user=None, related=False, outcome=None):
+    """The SessionSearch of ``term`` within ``sessions``.
+
+    With ``related`` (and the ``user`` whose OpenAI key pays for the query),
+    every session that matches the term by meaning is added after the keyword
+    matches; see core.services.semantic_search. ``sessions`` must already
+    carry every other filter, because related matches are drawn from it.
+    ``outcome`` (a RelatedOutcome) records whether they could be added.
+    """
+    term = (term or "").strip()
+    direct = keyword_sessions(sessions, term)
+    related_ids = []
+    if term and related:
+        if user is None:
+            if outcome is not None:
+                outcome.requested = True
+        else:
+            from core.services.semantic_search import related_session_ids
+
+            # Counted, not previewed: every match above the cutoff, no cap.
+            related_ids = related_session_ids(
+                user, sessions, direct, term, limit=None, outcome=outcome
+            )
+    return SessionSearch(sessions=sessions, direct=direct, related_ids=related_ids)
+
+
+def search_sessions(sessions, term, *, user=None, related=False, outcome=None):
+    """``rank_sessions`` as one unordered queryset, for totals and charts."""
+    if not (term or "").strip():
+        return sessions
+    return rank_sessions(
+        sessions, term, user=user, related=related, outcome=outcome
+    ).combined()
 
 
 def with_extra(queryset, matches, extra_ids):

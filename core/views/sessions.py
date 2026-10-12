@@ -7,6 +7,7 @@ from django.utils import timezone
 from datetime import datetime
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.views.generic import (
     ListView,
@@ -16,8 +17,8 @@ from core.models import Context, Projects, SubProjects, Sessions, Tag
 from core.services import SessionMutationService, UNSET
 from core.views.allocations import parse_allocation_post
 from core.forms import SearchProjectForm, UpdateSessionForm
-from core.search import search_sessions
-from core.services.semantic_search import find_related_sessions
+from core.search import SESSION_ORDER, rank_sessions
+from core.services.semantic_search import RELATED_LIMIT
 from core.utils import (
     build_exclude_project_meta,
     filter_by_active_context,
@@ -181,7 +182,6 @@ class SessionsListView(LoginRequiredMixin, ListView):
     model = Sessions
     template_name = "core/list_sessions.html"
     context_object_name = "sessions"
-    ordering = ["-end_time"]
     paginate_by = 7
 
     def get_context_data(self, **kwargs):
@@ -221,7 +221,7 @@ class SessionsListView(LoginRequiredMixin, ListView):
             build_exclude_project_meta(self.request.user)
         )
 
-        context["related_sessions"] = self._related_sessions(page)
+        context.update(self._related_context())
 
         return context
 
@@ -239,30 +239,36 @@ class SessionsListView(LoginRequiredMixin, ListView):
         )
 
     def get_queryset(self):
-        # The list stays keyword-only; meaning-based matches have their own
-        # "Related" section below it rather than the Charts toggle.
-        params = self.request.GET.copy()
-        params.pop("related", None)
-        return filter_sessions_by_params(
-            self.request, self._scoped_sessions(), params_override=params
-        )
-
-    def _related_sessions(self, page):
-        """Meaning-based matches the keyword list missed, on its first page."""
-        term = (self.request.GET.get("search") or "").strip()
-        if not term or (page and page.number != 1):
-            return []
-        # Every filter except the keyword term, so related results obey the
-        # same dates, context, tags and project picks as the list above.
+        # One shared search (core.search.rank_sessions, as API v2 and MCP use):
+        # the list holds the direct keyword matches, and the "Related" section
+        # below it the meaning-based ones, best first, paged on its own.
+        # Every filter except the keyword term narrows both.
         params = self.request.GET.copy()
         params.pop("search", None)
         params.pop("related", None)
         sessions = filter_sessions_by_params(
             self.request, self._scoped_sessions(), params_override=params
         )
-        return find_related_sessions(
-            self.request.user, sessions, search_sessions(sessions, term), term
+        self.search = rank_sessions(
+            sessions,
+            self.request.GET.get("search"),
+            user=self.request.user,
+            related=True,
         )
+        return self.search.direct.order_by(*SESSION_ORDER)
+
+    def _related_context(self):
+        """Every related match above the cutoff, a page of them at a time."""
+        related_ids = self.search.related_ids
+        if not related_ids:
+            return {"related_sessions": [], "related_page": None}
+        page = Paginator(related_ids, RELATED_LIMIT).get_page(
+            self.request.GET.get("related_page")
+        )
+        return {
+            "related_sessions": self.search.related_sessions(page.object_list),
+            "related_page": page,
+        }
 
 
 class DeleteSessionView(LoginRequiredMixin, DeleteView):

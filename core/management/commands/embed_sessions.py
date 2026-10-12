@@ -71,14 +71,22 @@ class Command(BaseCommand):
                 self.stderr.write(f"{user.username}: embedding failed ({type(exc).__name__}).")
                 continue
             parts = []
-            for label, kind in (("sessions", result.sessions), ("projects", result.projects)):
+            for label, kind in (
+                ("sessions", result.sessions),
+                ("projects", result.projects),
+                ("long notes in passages", result.passages),
+            ):
                 done = (
                     f"{kind.pending} to embed" if options["dry_run"] else f"{kind.embedded} embedded"
                 )
                 parts.append(f"{kind.total} {label} ({kind.fresh} current, {done})")
             line = f"{user.username}: " + "; ".join(parts)
             if options["dry_run"]:
-                chars = result.sessions.pending_chars + result.projects.pending_chars
+                chars = (
+                    result.sessions.pending_chars
+                    + result.projects.pending_chars
+                    + result.passages.pending_chars
+                )
                 line += f"; ~{chars // 4} tokens, {MODEL}"
             self.stdout.write(line + ".")
         if failures:

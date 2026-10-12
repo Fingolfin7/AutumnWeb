@@ -184,10 +184,21 @@ class TimerListResponseSerializer(serializers.Serializer):
     timers = SessionResourceSerializer(many=True)
 
 
+class SessionListItemSerializer(SessionResourceSerializer):
+    match = serializers.ChoiceField(
+        choices=("direct", "related"),
+        required=False,
+        help_text=(
+            "With search: direct when the session's project, subproject or note "
+            "contains the search text, related when it matches only by meaning."
+        ),
+    )
+
+
 class SessionListResponseSerializer(serializers.Serializer):
     count = serializers.IntegerField()
     total = serializers.IntegerField()
-    sessions = SessionResourceSerializer(many=True)
+    sessions = SessionListItemSerializer(many=True)
 
 
 class CommitmentHistoryWarningSerializer(serializers.Serializer):
@@ -218,6 +229,16 @@ class SessionListQuerySerializer(serializers.Serializer):
         help_text=(
             "With search, also include completed sessions that match it by meaning. "
             "Needs AI features and an OpenAI key on the account; otherwise ignored."
+        ),
+    )
+    ordering = serializers.ChoiceField(
+        required=False,
+        default="relevance",
+        choices=("relevance", "newest"),
+        help_text=(
+            "relevance (default): direct matches newest first, then related "
+            "matches best first, the order the Sessions page shows. newest: all "
+            "by end time, newest first. Without search the two are the same."
         ),
     )
     uuid = serializers.UUIDField(required=False)

@@ -160,10 +160,12 @@ def sync_account(user_id):
             return True
         report = sync_embeddings(user, embedder)
         logger.info(
-            "semantic_sync user_id=%s sessions_embedded=%s projects_embedded=%s",
+            "semantic_sync user_id=%s sessions_embedded=%s projects_embedded=%s "
+            "passage_sessions_embedded=%s",
             user_id,
             report.sessions.embedded,
             report.projects.embedded,
+            report.passages.embedded,
         )
         return True
     except Exception as exc:

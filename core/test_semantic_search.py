@@ -162,7 +162,7 @@ class RelatedSessionsTests(SemanticSearchTestCase):
         self.assertEqual(response.context["related_sessions"], [])
         self.assertNotContains(response, "Related sessions")
 
-    def test_related_only_on_first_page_and_list_is_unchanged(self):
+    def test_related_pages_on_its_own_and_list_is_unchanged(self):
         for day in range(10):
             self._session(self.identity, f"Sign-in failure triage {day}", days_ago=20 + day)
         self._sync()
@@ -170,8 +170,9 @@ class RelatedSessionsTests(SemanticSearchTestCase):
         self.assertTrue(first.context["is_paginated"])
         self.assertEqual(first.context["result_count"], 11)
         self.assertEqual([s.pk for s in first.context["related_sessions"]], [self.oauth.pk])
+        # The list's pager leaves the Related section where it was.
         second = self._search("sign-in failure", page=2)
-        self.assertEqual(second.context["related_sessions"], [])
+        self.assertEqual([s.pk for s in second.context["related_sessions"]], [self.oauth.pk])
 
     def test_query_vector_is_cached(self):
         self._sync()

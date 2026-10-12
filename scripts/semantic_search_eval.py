@@ -18,6 +18,10 @@ It reports, per query and in aggregate, recall and top-5 for:
 and sweeps the similarity cutoff, recommending the one with the best
 precision-weighted F0.5 for the Related section that still shows nothing for
 the no-match query.
+
+Sessions score as in production: the better of the whole-note vector and the
+best passage of a long note. Pass --whole-only to score whole notes alone and
+compare (b9 buries the relevant sentence in a long log).
 """
 
 import argparse
@@ -50,9 +54,8 @@ from core.services.semantic_search import (  # noqa: E402
     Embedder,
     decode_vector,
     encode_vector,
-    load_vectors,
     reciprocal_rank_fusion,
-    semantic_ranking,
+    session_scores,
     sync_embeddings,
 )
 
@@ -66,6 +69,10 @@ CORPUS = {
     "b6": ("Atlas Billing", ["Payments"], "Updated payment method icons on the checkout page.", 5),
     "b7": ("Atlas Billing", [], "Customer reported being charged twice for one order; traced it to a double submit on checkout.", 8),
     "b8": ("Atlas Billing", ["Invoices"], "Monthly invoice export for accounting.", 3),
+    "b9": ("Atlas Billing", [], "Sprint review prep. Updated the changelog, triaged six tickets and paired on "
+           "the checkout redesign. Reviewed two pull requests and cleaned up stale feature flags. "
+           "Support forwarded a customer whose card was billed two times for a single order, so I logged "
+           "it for tomorrow. Finished by tidying the team wiki and the onboarding checklist.", 1),
     "i1": ("Identity", ["SSO"], "Configured SAML metadata for the Acme tenant.", 25),
     "i2": ("Identity", ["SSO"], "Rotated the signing certificate.", 10),
     "i3": ("Identity", ["Login"], "Repaired OAuth token refresh so sessions stop expiring after an hour.", 45),
@@ -108,7 +115,7 @@ QUERIES = [
     ("refund", {"b3": 3, "b4": 3}),
     ("payment retry", {"b1": 3, "b5": 3}),
     ("sign-in failure", {"i3": 3, "i4": 3, "i5": 2}),
-    ("charged twice", {"b1": 3, "b7": 3, "b2": 1}),
+    ("charged twice", {"b1": 3, "b7": 3, "b9": 2, "b2": 1}),
     ("database connection switching", {"p1": 3, "p5": 2}),
     ("health check", {"p3": 3}),
     ("fixed login", {"i4": 3, "i3": 2, "i5": 1}),
@@ -224,11 +231,14 @@ def run(args):
             sys.exit("Set OPENAI_API_KEY, or pass --keyword-only for the baseline alone.")
         embedder = Embedder(api_key, timeout=60, max_retries=2)
         sync_embeddings(user, embedder)
-        ids, _, matrix = load_vectors(user, Sessions.objects.filter(user=user))
+        sessions = Sessions.objects.filter(user=user)
         query_vectors = embedder.embed([term for term, _ in QUERIES])
         for (term, _), vector in zip(QUERIES, query_vectors):
-            ranked = semantic_ranking(ids, matrix, decode_vector(encode_vector(vector)), cutoff=-1.0, limit=len(ids))
-            semantic[term] = [(keys[pk], score) for pk, score in ranked]
+            scores = session_scores(
+                user, sessions, decode_vector(encode_vector(vector)), cutoff=-1.0, passages=not args.whole_only
+            )
+            ranked = sorted(scores, key=lambda pk: (-scores[pk], pk))
+            semantic[term] = [(keys[pk], scores[pk]) for pk in ranked]
         usage = RecommendationUsage.objects.filter(user=user)
         print(f"Provider calls: {usage.count()}, input tokens: {sum(u.input_tokens or 0 for u in usage)}, "
               f"estimated cost: ${sum(u.estimated_cost_usd or 0 for u in usage):.6f}\n")
@@ -285,6 +295,7 @@ def run(args):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--keyword-only", action="store_true", help="No provider call; keyword baseline only.")
+    parser.add_argument("--whole-only", action="store_true", help="Score whole notes only, without passages.")
     parser.add_argument("--cutoff", type=float, help="Report at this cutoff instead of the recommended one.")
     parser.add_argument("--json", help="Also write full results to this file.")
     args = parser.parse_args(argv)

@@ -50,7 +50,7 @@ from core.api_v2.serializers import (
 )
 from core.commitments import mutation_affects_ledger
 from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
-from core.search import with_extra
+from core.search import DIRECT, RELATED, SESSION_ORDER, with_extra
 from core.services.embedding_sync import request_sync_on_commit
 from core.services.semantic_search import related_project_ids
 from core.services import (
@@ -884,7 +884,7 @@ class SessionsView(V2APIView):
         pagination = SessionListQuerySerializer(
             data={
                 key: request.query_params[key]
-                for key in ("limit", "offset", "include")
+                for key in ("limit", "offset", "include", "ordering")
                 if key in request.query_params
             }
         )
@@ -894,23 +894,31 @@ class SessionsView(V2APIView):
         include_note = pagination.validated_data.get("include") == "note"
 
         spec = SessionFilterSpec.from_query_params(request.query_params, request.user)
-        queryset = spec.apply(
+        # The Sessions page's search (core.search.rank_sessions), so equivalent
+        # requests return the same sessions in the same order.
+        search = spec.rank(
             _session_queryset(request.user).filter(end_time__isnull=False),
             user=request.user,
             outcome=related_outcome(request),
-        ).order_by("-end_time", "-id")
-        total = queryset.count()
-        sessions = list(queryset[offset : offset + limit])
-        return Response(
-            {
-                "count": len(sessions),
-                "total": total,
-                "sessions": [
-                    _serialize(session, include_note=include_note)
-                    for session in sessions
-                ],
-            }
         )
+        if pagination.validated_data["ordering"] == "newest":
+            queryset = search.combined().order_by(*SESSION_ORDER)
+            total = queryset.count()
+            related = set(search.related_ids)
+            rows = [
+                (session, RELATED if session.pk in related else DIRECT)
+                for session in queryset[offset : offset + limit]
+            ]
+        else:
+            total = search.total
+            rows = search.page(offset, limit)
+        sessions = []
+        for session, match in rows:
+            row = _serialize(session, include_note=include_note)
+            if spec.search is not None:
+                row["match"] = match
+            sessions.append(row)
+        return Response({"count": len(sessions), "total": total, "sessions": sessions})
 
     @extend_schema(
         request=SessionTrackRequestSerializer,

@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from core.models import Context, Projects, SubProjects, Tag
-from core.search import search_sessions
+from core.search import rank_sessions, search_sessions
 
 
 @dataclass(frozen=True)
@@ -135,6 +135,26 @@ class SessionFilterSpec:
 
     def apply(self, queryset, *, user=None, outcome=None):
         """Narrow ``queryset``; ``user`` is needed only for related=true."""
+        queryset = self._filter(queryset)
+        # Last: related matches are drawn from what the other filters left.
+        if self.search is not None:
+            queryset = search_sessions(
+                queryset, self.search, user=user, related=self.related, outcome=outcome
+            )
+        return queryset
+
+    def rank(self, queryset, *, user=None, outcome=None):
+        """The core.search.SessionSearch of these filters and ``search``."""
+        return rank_sessions(
+            self._filter(queryset),
+            self.search,
+            user=user,
+            related=self.related,
+            outcome=outcome,
+        )
+
+    def _filter(self, queryset):
+        """Every filter but ``search``."""
         if self.project_ids is not None:
             queryset = queryset.filter(project_id__in=self.project_ids)
         if self.subproject_ids is not None:
@@ -182,10 +202,4 @@ class SessionFilterSpec:
             )
         ):
             queryset = queryset.distinct()
-
-        # Last: related matches are drawn from what the other filters left.
-        if self.search is not None:
-            queryset = search_sessions(
-                queryset, self.search, user=user, related=self.related, outcome=outcome
-            )
         return queryset

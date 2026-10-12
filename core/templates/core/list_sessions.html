@@ -158,12 +158,32 @@
 
 {% if related_sessions %}
 <section class="slab session-list" aria-label="Related sessions">
-    <header class="day-head"><span class="day-date">Related</span></header>
+    <header class="day-head">
+        <span class="day-date">Related</span>
+        <span class="day-total">{% if related_page.paginator.num_pages > 1 %}{{ related_page.start_index }}–{{ related_page.end_index }} of {% endif %}{{ related_page.paginator.count }}</span>
+    </header>
     <ul class="band-list">
         {% for session in related_sessions %}
         {% include 'core/partials/session_band.html' with show_date=True %}
         {% endfor %}
     </ul>
+    {% if related_page.paginator.num_pages > 1 %}
+    <nav class="pager" aria-label="Related pages">
+        {% if related_page.has_previous %}
+        <a class="pager-btn" href="?{% param_replace related_page=related_page.previous_page_number %}" aria-label="Previous related"><i class="fas fa-angle-left"></i></a>
+        {% endif %}
+        {% for num in related_page.paginator.page_range %}
+            {% if related_page.number == num %}
+            <a class="pager-btn is-current" href="?{% param_replace related_page=num %}" aria-current="page">{{ num }}</a>
+            {% elif num > related_page.number|add:'-2' and num < related_page.number|add:'2' %}
+            <a class="pager-btn" href="?{% param_replace related_page=num %}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if related_page.has_next %}
+        <a class="pager-btn" href="?{% param_replace related_page=related_page.next_page_number %}" aria-label="More related"><i class="fas fa-angle-right"></i></a>
+        {% endif %}
+    </nav>
+    {% endif %}
 </section>
 {% endif %}
 

@@ -1196,6 +1196,20 @@ paths:
           minimum: 0
           default: 0
       - in: query
+        name: ordering
+        schema:
+          enum:
+          - relevance
+          - newest
+          type: string
+          default: relevance
+          minLength: 1
+        description: |-
+          relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. Without search the two are the same.
+
+          * `relevance` - relevance
+          * `newest` - newest
+      - in: query
         name: project_ids
         schema:
           type: string
@@ -2477,6 +2491,14 @@ components:
       description: |-
         * `subproject` - subproject
         * `residual` - residual
+    MatchEnum:
+      enum:
+      - direct
+      - related
+      type: string
+      description: |-
+        * `direct` - direct
+        * `related` - related
     Me:
       type: object
       properties:
@@ -2950,6 +2972,79 @@ components:
       required:
       - session_count
       - total_minutes
+    SessionListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        uuid:
+          type: string
+          format: uuid
+          nullable: true
+        version:
+          type: integer
+        project:
+          $ref: '#/components/schemas/ProjectSummary'
+        subproject_allocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectAllocation'
+          readOnly: true
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        active:
+          type: boolean
+          readOnly: true
+        auto_stop_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        duration_minutes:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        elapsed_minutes:
+          type: number
+          format: double
+          nullable: true
+          readOnly: true
+        note:
+          type: string
+          nullable: true
+        commitment_history_unaffected:
+          type: boolean
+        match:
+          allOf:
+          - $ref: '#/components/schemas/MatchEnum'
+          description: |-
+            With search: direct when the session's project, subproject or note contains the search text, related when it matches only by meaning.
+
+            * `direct` - direct
+            * `related` - related
+      required:
+      - active
+      - auto_stop_at
+      - duration_minutes
+      - elapsed_minutes
+      - end
+      - id
+      - project
+      - start
+      - subproject_allocations
+      - uuid
+      - version
     SessionListResponse:
       type: object
       properties:
@@ -2960,7 +3055,7 @@ components:
         sessions:
           type: array
           items:
-            $ref: '#/components/schemas/SessionResource'
+            $ref: '#/components/schemas/SessionListItem'
       required:
       - count
       - sessions
