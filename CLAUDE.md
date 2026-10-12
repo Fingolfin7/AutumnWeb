@@ -26,7 +26,7 @@ python manage.py migrate
 # Run all tests
 pip install -r requirements-dev.txt
 python manage.py test
-node --test scripts/tests/polling.test.cjs
+node --test scripts/tests/polling.test.cjs scripts/tests/recommendations.test.cjs scripts/tests/charts_related.test.cjs
 
 # Run specific test file
 python manage.py test core.tests.test_parse_date_or_datetime_iso

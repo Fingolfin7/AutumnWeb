@@ -99,6 +99,10 @@ function consolidateTopN(data, topN = getProjectLimit(), timeKey = 'total_time')
 // ============================================================================
 
 const chartDataCache = new Map();
+// X-Autumn-Related per URL, kept beside the cached payload, and the URL of the
+// latest request so render() can show the state of the chart it displays.
+const relatedStateByUrl = new Map();
+let lastChartDataUrl = null;
 
 /**
  * Drop every cached payload so the next render re-fetches.
@@ -107,6 +111,7 @@ const chartDataCache = new Map();
  */
 function invalidateChartData() {
     chartDataCache.clear();
+    relatedStateByUrl.clear();
 }
 
 function get_project_data(type, start_date = "", end_date = "", search_term = "", context_id = "", tag_ids = [], exclude_ids = [], include_ids = [], project_name = "", include_related = false) {
@@ -143,6 +148,7 @@ function get_project_data(type, start_date = "", end_date = "", search_term = ""
 
     console.log('Fetching chart data:', url);
 
+    lastChartDataUrl = url;
     if (chartDataCache.has(url)) {
         return chartDataCache.get(url);
     }
@@ -153,7 +159,7 @@ function get_project_data(type, start_date = "", end_date = "", search_term = ""
             type: 'GET',
             dataType: 'json',
             success: function(data, _status, xhr) {
-                updateRelatedPill(xhr.getResponseHeader('X-Autumn-Related'));
+                relatedStateByUrl.set(url, xhr.getResponseHeader('X-Autumn-Related'));
                 resolve(data);
             },
             error: function(error) {
@@ -303,6 +309,8 @@ function render() {
     get_project_data(type, start_date, end_date, search_term, context_id, tag_ids, exclude_ids, include_ids, project_name, include_related)
         .then(data => {
             if (generation !== renderGeneration) return;
+            // Only the current generation's response, cached or fresh.
+            updateRelatedPill(relatedStateByUrl.get(lastChartDataUrl));
 
             // Handle empty data
             const isEmptyHistogram = type === 'histogram'
