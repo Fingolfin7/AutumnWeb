@@ -1,4 +1,5 @@
 from datetime import datetime, time, timedelta, timezone as datetime_timezone
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
@@ -29,6 +30,9 @@ from core.api_v2.serializers import (
     ProjectMergeRequestSerializer,
     ProjectPatchRequestSerializer,
     ProjectResourceSerializer,
+    PreferencesRequestSerializer,
+    PreferencesResponseSerializer,
+    ResourceIncludeQuerySerializer,
     SessionListQuerySerializer,
     SessionListResponseSerializer,
     SessionPatchRequestSerializer,
@@ -102,10 +106,41 @@ def _get_session(user, session_id):
         raise NotFound(f"Session {session_id} not found.") from exc
 
 
-def _serialize(session, *, include_note=True):
+def _serialize(session, *, include_note=True, include_note_html=False):
     return SessionResourceSerializer(
-        session, context={"include_note": include_note}
+        session,
+        context={
+            "include_note": include_note,
+            "include_note_html": include_note_html,
+        },
     ).data
+
+
+def _context_request(request):
+    """Return a request-like context selector from the explicit ?context= parameter."""
+    raw_value = request.query_params.get("context")
+    # API clients (CLI, MCP, the web app) state their scope explicitly. The
+    # browser session's header switch must not silently narrow what
+    # `autumn status` or an MCP `status` call sees, so no parameter means all.
+    if raw_value is None:
+        return SimpleNamespace(user=request.user, session={"active_context_id": "all"})
+    value = str(raw_value).strip()
+    if not value or value.lower() == "all":
+        return SimpleNamespace(user=request.user, session={"active_context_id": "all"})
+    try:
+        context_id = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            {"context": ["Enter a context ID or 'all'."]}
+        ) from exc
+    if not Context.objects.filter(user=request.user, pk=context_id).exists():
+        raise ValidationError(
+            {"context": ["Context does not belong to this user."]}
+        )
+    return SimpleNamespace(
+        user=request.user,
+        session={"active_context_id": str(context_id)},
+    )
 
 
 def _parse_if_match(request):

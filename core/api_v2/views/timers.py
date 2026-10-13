@@ -1,21 +1,60 @@
 from .base import *
+import hashlib
+
+from core.utils import filter_by_active_context
+from core.models import TimerReminder
+from core.api_v2.serializers import TimerReminderListSerializer
+
+
 class TimersView(V2APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses=TimerListResponseSerializer)
+    @extend_schema(
+        parameters=[ResourceIncludeQuerySerializer],
+        responses=TimerListResponseSerializer,
+    )
     def get(self, request):
-        stop_expired_timers(request.user)
-        timers = list(
-            _session_queryset(request.user)
-            .filter(end_time__isnull=True)
-            .order_by("-start_time", "-id")
-        )
-        return Response(
-            {
-                "count": len(timers),
-                "timers": [_serialize(timer) for timer in timers],
+        query = ResourceIncludeQuerySerializer(
+            data={
+                key: request.query_params[key]
+                for key in ("include", "context")
+                if key in request.query_params
             }
         )
+        query.is_valid(raise_exception=True)
+        include = set(query.validated_data.get("include", []))
+        stop_expired_timers(request.user)
+        context_request = _context_request(request)
+        timers = list(
+            filter_by_active_context(
+                _session_queryset(request.user).filter(end_time__isnull=True),
+                context_request,
+            )
+            .order_by("-start_time", "-id")
+        )
+        context_key = context_request.session.get("active_context_id", "all")
+        etag_source = f"{context_key}|" + ",".join(
+            f"{timer.pk}:{timer.version}" for timer in timers
+        )
+        etag = f'W/"{hashlib.sha256(etag_source.encode()).hexdigest()}"'
+        if request.headers.get("If-None-Match") == etag:
+            response = Response(status=status.HTTP_304_NOT_MODIFIED)
+            response["ETag"] = etag
+            return response
+        response = Response(
+            {
+                "count": len(timers),
+                "timers": [
+                    _serialize(
+                        timer,
+                        include_note_html="note_html" in include,
+                    )
+                    for timer in timers
+                ],
+            }
+        )
+        response["ETag"] = etag
+        return response
 
     @extend_schema(
         request=TimerStartRequestSerializer,
@@ -217,6 +256,58 @@ class TimerDetailView(V2APIView):
             )
         except StaleVersionError as exc:
             return _version_conflict(exc.current)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class TimerRemindersView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=TimerReminderListSerializer)
+    def get(self, request, session_id):
+        _get_session(request.user, session_id)
+        reminders = list(
+            TimerReminder.objects.filter(
+                session_id=session_id,
+                session__user=request.user,
+                active=True,
+            ).order_by("next_fire_at", "id")
+        )
+        return Response(
+            {
+                "count": len(reminders),
+                "reminders": TimerReminderListSerializer(
+                    {"count": len(reminders), "reminders": reminders}
+                ).data["reminders"],
+            }
+        )
+
+
+class TimerReminderDetailView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=None,
+        responses={204: OpenApiResponse(description="Reminder cancelled.")},
+    )
+    def delete(self, request, session_id, reminder_id):
+        with transaction.atomic():
+            reminder = (
+                TimerReminder.objects.select_for_update()
+                .filter(
+                    pk=reminder_id,
+                    session_id=session_id,
+                    session__user=request.user,
+                    active=True,
+                )
+                .first()
+            )
+            if reminder is not None:
+                reminder.active = False
+                reminder.next_fire_at = None
+                reminder.cancelled_at = timezone.now().replace(microsecond=0)
+                reminder.save(
+                    update_fields=["active", "next_fire_at", "cancelled_at"]
+                )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

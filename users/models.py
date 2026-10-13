@@ -48,6 +48,13 @@ def get_fernet():
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    active_context = models.ForeignKey(
+        "core.Context",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
     image = models.ImageField(default='default.jpg', upload_to='profile_pics')
     timezone = models.CharField(
         max_length=64,

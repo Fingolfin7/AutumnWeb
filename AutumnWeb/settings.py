@@ -169,6 +169,10 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "Autumn API v2",
     "VERSION": "2.0.0",
     "PREPROCESSING_HOOKS": ["core.api_v2.schema.v2_endpoints_only"],
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "core.api_v2.schema.mark_mcp_operations",
+    ],
 }
 
 

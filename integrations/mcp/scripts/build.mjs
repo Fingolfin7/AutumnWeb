@@ -15,7 +15,7 @@ function schema(value) {
   if (value.nullable) return { anyOf: [result, { type: 'null' }] };
   return result;
 }
-const overrides = { me_retrieve: 'me', timers_retrieve: 'status', timers_create: 'start', timers_stop_create: 'stop', timers_restart_create: 'restart', timers_partial_update: 'update_timer', timers_destroy: 'delete_timer', sessions_create: 'track', project_subprojects_list: 'subprojects', project_subprojects_create: 'create_subproject', export_retrieve: 'export_data', import_create: 'import_data' };
+const overrides = { me_retrieve: 'me', timers_retrieve: 'status', timers_create: 'start', timers_stop_create: 'stop', timers_restart_create: 'restart', timers_partial_update: 'update_timer', timers_destroy: 'delete_timer', sessions_create: 'track', project_subprojects_list: 'subprojects', project_subprojects_create: 'create_subproject', export_retrieve: 'export_data', import_create: 'import_data', reports_timeline_retrieve: 'get_timeline', recommendations_timers_retrieve: 'timer_suggestions', recommendations_luna_retrieve: 'luna_recommendations' };
 const descriptions = {
   me: 'Get the authenticated Autumn account and API version.',
   start: 'Start a live timer now. Resolve the project ID with list_projects first. stop_after_minutes sets an optional automatic stop. Use track for past work.',
@@ -26,10 +26,17 @@ const descriptions = {
   list_projects: 'List or search projects. Use search to resolve names to numeric IDs; add related=true to also find projects that match the search by meaning. Responses include count and total; advance the offset using the returned count until the total is covered.',
   list_sessions: 'Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Add related=true with search to also include sessions that match it by meaning: the match field of each result says direct (the text contains the search) or related, and the default relevance ordering lists direct matches newest first, then related ones best first, as the Sessions page does; ordering=newest sorts all by date. Set include="note" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history.',
   import_data: 'Import Autumn data. This writes records; inspect the import options and preview before committing an import.',
+  get_dashboard: 'Get the Autumn home dashboard in one read: activity streak, active timers, quick starts, recent sessions with rendered notes, commitments, and today timeline.',
+  get_timeline: 'Get timeline lanes and session segments for a local date range, optionally scoped to one context.',
+  timer_suggestions: 'Get fast deterministic timer suggestions from recent work, habits, and commitments, optionally scoped to one context.',
+  luna_recommendations: 'Get Luna timer recommendations. A 202 response means generation is still in progress and should be retried after the supplied delay.',
 };
 const operations = [];
 for (const [path, item] of Object.entries(spec.paths)) for (const [method, operation] of Object.entries(item)) {
   if (!operation.operationId) continue;
+  const mcpExposure = operation['x-autumn-mcp'];
+  if (!['include', 'exclude'].includes(mcpExposure)) throw new Error(`Missing x-autumn-mcp on ${method.toUpperCase()} ${path} (${operation.operationId})`);
+  if (mcpExposure === 'exclude') continue;
   const [resource, ...actionParts] = operation.operationId.split('_');
   const action = actionParts.join('_');
   const prefix = { list: 'list', retrieve: 'get', create: 'create', partial_update: 'update', destroy: 'delete', merge: 'merge', restart: 'restart' }[action];

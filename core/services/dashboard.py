@@ -85,8 +85,21 @@ def get_recent_dashboard_sessions(user):
     return select_recent_dashboard_sessions(sessions.iterator(chunk_size=100))
 
 
-def build_dashboard_timeline(user, range_key=DEFAULT_RANGE):
-    return build_timeline(user, range_key)
+def build_dashboard_timeline(
+    user,
+    range_key=DEFAULT_RANGE,
+    *,
+    start_date=None,
+    end_date=None,
+    context=None,
+):
+    return build_timeline(
+        user,
+        range_key,
+        end_day=end_date,
+        start_day=start_date,
+        context=context,
+    )
 
 
 def build_dashboard(user, *, context=None, now=None) -> dict:

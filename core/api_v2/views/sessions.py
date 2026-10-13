@@ -18,7 +18,9 @@ class SessionsView(V2APIView):
         pagination.is_valid(raise_exception=True)
         limit = pagination.validated_data["limit"]
         offset = pagination.validated_data["offset"]
-        include_note = pagination.validated_data.get("include") == "note"
+        include = set(pagination.validated_data.get("include", []))
+        include_note = "note" in include
+        include_note_html = "note_html" in include
 
         spec = SessionFilterSpec.from_query_params(request.query_params, request.user)
         # The Sessions page's search (core.search.rank_sessions), so equivalent
@@ -41,7 +43,11 @@ class SessionsView(V2APIView):
             rows = search.page(offset, limit)
         sessions = []
         for session, match in rows:
-            row = _serialize(session, include_note=include_note)
+            row = _serialize(
+                session,
+                include_note=include_note,
+                include_note_html=include_note_html,
+            )
             if spec.search is not None:
                 row["match"] = match
             sessions.append(row)

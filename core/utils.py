@@ -193,8 +193,16 @@ def get_active_context(
     context_id = override_context_id
 
     if context_id is None:
-        # Fall back to session
-        context_id = request.session.get(ACTIVE_CONTEXT_SESSION_KEY)
+        # The session is the immediate browser override. A fresh browser
+        # session falls back to the durable profile preference, so the header
+        # switch survives logging in on another device. API requests never
+        # inherit it: the CLI, MCP and web app state their scope explicitly.
+        if ACTIVE_CONTEXT_SESSION_KEY in request.session:
+            context_id = request.session.get(ACTIVE_CONTEXT_SESSION_KEY)
+        elif not getattr(request, "path", "").startswith("/api/"):
+            context_id = getattr(
+                getattr(request.user, "profile", None), "active_context_id", None
+            )
 
     if not context_id or str(context_id).lower() == "all":
         return None, "all"
