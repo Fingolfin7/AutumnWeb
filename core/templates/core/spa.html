@@ -1,0 +1,37 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en-US" class="dark">
+<head>
+    <title>Autumn</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="Autumn is a time management application">
+    <meta name="theme-color" content="#101214">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Autumn">
+    <link rel="manifest" href="{% url 'pwa_manifest' %}">
+    <link rel="apple-touch-icon" href="{% static 'core/images/icons/autumn-icon-192.png' %}">
+    <link rel="shortcut icon" href="{% static 'core/images/new_autumn_leaf_transparent_slanted.png' %}" type="image/png">
+    <link rel="stylesheet" href="{% static 'core/css/focus_desk.css' %}?v={{ static_version.focus_desk }}">
+    {% for href in assets.styles %}<link rel="stylesheet" href="{{ href }}">
+    {% endfor %}{% for href in assets.preloads %}<link rel="modulepreload" href="{{ href }}">
+    {% endfor %}
+    {{ bootstrap|json_script:"autumn-bootstrap" }}
+    {% if assets.dev %}
+    <script type="module">
+        import RefreshRuntime from "{{ assets.dev_server }}/@react-refresh";
+        RefreshRuntime.injectIntoGlobalHook(window);
+        window.$RefreshReg$ = () => {};
+        window.$RefreshSig$ = () => (type) => type;
+        window.__vite_plugin_react_preamble_installed__ = true;
+    </script>
+    <script type="module" src="{{ assets.dev_server }}/@vite/client"></script>
+    {% endif %}
+    {% for src in assets.scripts %}<script type="module" src="{{ src }}"></script>
+    {% endfor %}
+</head>
+{% include 'core/partials/shell_body_open.html' %}
+<div id="root"></div>
+<noscript><p class="empty">Autumn needs JavaScript enabled.</p></noscript>
+</body>
+</html>

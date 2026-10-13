@@ -137,3 +137,17 @@ elif getattr(settings, "SERVE_MEDIA", False) and not getattr(settings, "USE_S3",
             r"^media/(?P<path>.*)$", media_serve, {"document_root": settings.MEDIA_ROOT}
         ),
     ]
+
+# The React app (frontend/) owns every path nothing above matched. It must stay
+# LAST: server-rendered pages listed earlier win, so a page moves to React when
+# its Django route is deleted. Asset, API and protocol prefixes are excluded so
+# a missing file 404s instead of returning the app's HTML.
+from core.spa import spa  # noqa: E402
+
+urlpatterns += [
+    re_path(
+        r"^(?!api/|static/|media/|admin/|oauth/|mcp|\.well-known/|healthz/|service-worker\.js|manifest\.webmanifest).*$",
+        spa,
+        name="spa",
+    ),
+]

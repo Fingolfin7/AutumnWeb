@@ -57,27 +57,7 @@
   else Bing daily, else NASA APOD. .bg-active is added ONLY when a photo
   actually resolved, so the ::before/::after layers stay off otherwise.
 {% endcomment %}
-{% if user.is_authenticated %}
-    {% if user.profile.background_image and not user.profile.automatic_background %}
-        <body class="bg-active" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; --workspace-bg-image: url('{{ user.profile.background_image.url }}');" data-bg-url="{{ user.profile.background_image.url }}">
-    {% elif user.profile.automatic_background and user.profile.bing_background %}
-        {% bing_background as bing_bg_url %}
-        <body class="{% if bing_bg_url %}bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if bing_bg_url %}--workspace-bg-image: url('{{ bing_bg_url }}');{% endif %}" data-bg-url="{{ bing_bg_url }}">
-    {% elif user.profile.automatic_background and user.profile.nasa_apod_background %}
-        {% nasa_apod_media as apod %}
-        <body class="{% if apod.image_url %}bg-active{% endif %}" style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }}; {% if apod.image_url %}--workspace-bg-image: url('{{ apod.image_url }}');{% endif %}" data-bg-url="{{ apod.image_url }}">
-    {% else %}
-        <body style="--background-dim-opacity: {{ user.profile.background_dimming_alpha }};">
-    {% endif %}
-{% else %}
-    <body>
-{% endif %}
-
-{% if apod.video_url and apod.image_url %}
-<video class="workspace-bg-video" muted loop playsinline preload="none" poster="{{ apod.image_url }}" aria-hidden="true">
-    <source src="{{ apod.video_url }}" type="{% if '.webm' in apod.video_url %}video/webm{% else %}video/mp4{% endif %}">
-</video>
-{% endif %}
+{% include 'core/partials/shell_body_open.html' %}
 <div class="app">
 
     {% with un=request.resolver_match.url_name %}

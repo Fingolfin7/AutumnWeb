@@ -181,3 +181,10 @@ characterization/.meta-*.tmp
 # Managed Sites checkout (retired MCP connection guide).
 /hosted-autumn-mcp/
 /.autumn-mcp-*.log
+
+# ts-react frontend
+!frontend/src/lib/
+frontend/node_modules/
+frontend/test-results/
+frontend/playwright-report/
+core/static/app/

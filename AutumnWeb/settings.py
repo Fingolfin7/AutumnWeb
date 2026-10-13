@@ -444,6 +444,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
+# Development only: load the React app from Vite's dev server (hot reload)
+# instead of the built bundle in core/static/app/. Example: http://localhost:5173
+VITE_DEV_SERVER = env("VITE_DEV_SERVER", default="")
+
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static" if not DEBUG else "staticfiles")
 
