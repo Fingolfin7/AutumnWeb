@@ -60,6 +60,8 @@ from core.views.timers import (
 def healthz(request):
     return JsonResponse({"status": "ok"})
 
+from core.spa import spa
+
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     # pages
@@ -131,7 +133,7 @@ urlpatterns = [
         DeleteSubProjectView.as_view(),
         name="delete_subproject",
     ),
-    path("sessions/", SessionsListView.as_view(), name="sessions"),
+    path("sessions/", spa, name="sessions"),
     path("update_session/<int:session_id>/", update_session, name="update_session"),
     path(
         "update_session/<uuid:session_uuid>/",

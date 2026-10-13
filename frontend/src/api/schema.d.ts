@@ -116,6 +116,22 @@ export interface paths {
         patch: operations["contexts_partial_update"];
         trace?: never;
     };
+    "/api/v2/dashboard/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["dashboard_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/export/": {
         parameters: {
             query?: never;
@@ -162,6 +178,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/preferences/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me_preferences_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["me_preferences_partial_update"];
         trace?: never;
     };
     "/api/v2/projects/": {
@@ -228,6 +260,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/recommendations/luna/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recommendations_luna_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/recommendations/luna/refresh/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recommendations_luna_refresh_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/recommendations/timers/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recommendations_timers_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/recommendations/usage/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["recommendations_usage_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/reports/charts/": {
         parameters: {
             query?: never;
@@ -268,6 +364,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["reports_tallies_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/reports/timeline/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_timeline_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -420,6 +532,38 @@ export interface paths {
         patch: operations["timers_partial_update"];
         trace?: never;
     };
+    "/api/v2/timers/{session_id}/reminders/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["timers_reminders_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/timers/{session_id}/reminders/{reminder_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["timers_reminders_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/timers/{session_id}/restart/": {
         parameters: {
             query?: never;
@@ -464,6 +608,19 @@ export interface components {
          * @enum {string}
          */
         AggregationTypeEnum: "project" | "subproject" | "context" | "tag";
+        Background: {
+            mode: components["schemas"]["BackgroundModeEnum"];
+            image_url: string | null;
+            video_url: string | null;
+        };
+        /**
+         * @description * `upload` - upload
+         *     * `bing` - bing
+         *     * `apod` - apod
+         *     * `none` - none
+         * @enum {string}
+         */
+        BackgroundModeEnum: "upload" | "bing" | "apod" | "none";
         /**
          * @description * `project` - project
          *     * `subproject` - subproject
@@ -689,6 +846,12 @@ export interface components {
          * @enum {string}
          */
         CommitmentTypeEnum: "time" | "sessions";
+        ConfiguredApiKeys: {
+            gemini: boolean;
+            openai: boolean;
+            openai_chatgpt: boolean;
+            claude: boolean;
+        };
         ContextListResponse: {
             count: number;
             contexts: components["schemas"]["ContextResource"][];
@@ -708,6 +871,115 @@ export interface components {
             name?: string;
             description?: string | null;
         };
+        DashboardActivityDay: {
+            /** Format: date */
+            date: string;
+            active: boolean;
+            weekday: number;
+        };
+        DashboardCommitment: {
+            commitment: components["schemas"]["CommitmentResource"];
+            progress: components["schemas"]["DashboardCommitmentProgress"];
+            streak: components["schemas"]["DashboardCommitmentStreak"];
+        };
+        DashboardCommitmentPeriod: {
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            period_start: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            effective_period_start: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            period_end: string;
+            /** Format: double */
+            actual: number;
+            /** Format: double */
+            target: number;
+            is_current: boolean;
+            met: boolean;
+            saved_by_bank: boolean;
+        };
+        DashboardCommitmentProgress: {
+            /** Format: double */
+            actual: number;
+            /** Format: double */
+            target: number;
+            /** Format: double */
+            percentage: number;
+            /** Format: double */
+            balance: number;
+            /** Format: double */
+            current_surplus: number;
+            status: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            period_start: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            effective_period_start: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            period_end: string;
+            commitment_type: string;
+            period: string;
+        };
+        DashboardCommitmentStreak: {
+            current_streak: number;
+            periods: components["schemas"]["DashboardCommitmentPeriod"][];
+        };
+        DashboardQuickStart: {
+            project: components["schemas"]["ProjectSummary"];
+            subprojects: components["schemas"]["ProjectSummary"][];
+            label: string;
+        };
+        DashboardRecentDay: {
+            /** Format: date */
+            date: string;
+            /** Format: double */
+            total_minutes: number;
+            sessions: components["schemas"]["SessionResource"][];
+        };
+        DashboardResponse: {
+            /** Format: double */
+            today_total: number;
+            /** Format: double */
+            week_total: number;
+            active_timers_count: number;
+            daily_streak: components["schemas"]["DashboardStreak"];
+            active_timers: components["schemas"]["SessionResource"][];
+            quick_starts: components["schemas"]["DashboardQuickStart"][];
+            recent_sessions: components["schemas"]["DashboardRecentDay"][];
+            commitments: components["schemas"]["DashboardCommitment"][];
+            timeline: components["schemas"]["TimelineResponse"];
+        };
+        DashboardStreak: {
+            current_streak: number;
+            recent_days: components["schemas"]["DashboardActivityDay"][];
+        };
+        /**
+         * @description * `days` - days
+         *     * `weeks` - weeks
+         *     * `months` - months
+         *     * `years` - years
+         *     * `month_to_date` - month_to_date
+         *     * `quarter_to_date` - quarter_to_date
+         *     * `year_to_date` - year_to_date
+         * @enum {string}
+         */
+        DefaultFilterUnitEnum: "days" | "weeks" | "months" | "years" | "month_to_date" | "quarter_to_date" | "year_to_date";
         Format2Document: {
             format: number;
             projects: components["schemas"]["Format2Project"][];
@@ -762,11 +1034,51 @@ export interface components {
             conflicts: string[];
         };
         /**
+         * @description * `days` - days
+         *     * `weeks` - weeks
+         *     * `months` - months
+         *     * `years` - years
+         *     * `month_to_date` - month_to_date
+         *     * `quarter_to_date` - quarter_to_date
+         *     * `year_to_date` - year_to_date
+         * @enum {string}
+         */
+        InsightsDefaultFilterUnitEnum: "days" | "weeks" | "months" | "years" | "month_to_date" | "quarter_to_date" | "year_to_date";
+        /**
          * @description * `subproject` - subproject
          *     * `residual` - residual
          * @enum {string}
          */
-        KindEnum: "subproject" | "residual";
+        Kind0e1Enum: "subproject" | "residual";
+        /**
+         * @description * `low` - low
+         *     * `medium` - medium
+         *     * `high` - high
+         *     * `xhigh` - xhigh
+         *     * `max` - max
+         * @enum {string}
+         */
+        LunaEffortEnum: "low" | "medium" | "high" | "xhigh" | "max";
+        /**
+         * @description * `low` - low
+         *     * `medium` - medium
+         *     * `high` - high
+         *     * `xhigh` - xhigh
+         *     * `max` - max
+         * @enum {string}
+         */
+        LunaRecommendationEffortEnum: "low" | "medium" | "high" | "xhigh" | "max";
+        LunaRecommendations: {
+            suggestions: components["schemas"]["TimerSuggestion"][];
+            advice_status: string;
+        };
+        LunaRefreshRequest: {
+            luna_effort?: components["schemas"]["LunaEffortEnum"];
+        };
+        LunaRefreshResponse: {
+            refreshed: boolean;
+            luna_recommendation_effort: string;
+        };
         /**
          * @description * `direct` - direct
          *     * `related` - related
@@ -816,6 +1128,21 @@ export interface components {
             name?: string;
             description?: string | null;
         };
+        PatchedPreferencesRequest: {
+            timezone?: string;
+            default_filter_value?: number;
+            default_filter_unit?: components["schemas"]["DefaultFilterUnitEnum"];
+            insights_default_filter_value?: number;
+            insights_default_filter_unit?: components["schemas"]["InsightsDefaultFilterUnitEnum"];
+            default_chart_project_count?: number;
+            background_dimming?: number;
+            automatic_background?: boolean;
+            bing_background?: boolean;
+            nasa_apod_background?: boolean;
+            luna_recommendation_effort?: components["schemas"]["LunaRecommendationEffortEnum"];
+            ai_features_enabled?: boolean;
+            active_context_id?: number | null;
+        };
         PatchedProjectPatchRequest: {
             name?: string;
             description?: string;
@@ -862,6 +1189,31 @@ export interface components {
          * @enum {string}
          */
         PeriodEnum: "daily" | "weekly" | "fortnightly" | "monthly" | "quarterly" | "yearly";
+        PreferenceContext: {
+            id: number;
+            name: string;
+            color: string | null;
+        };
+        PreferencesResponse: {
+            timezone: string;
+            default_filter_value: number;
+            default_filter_unit: string;
+            insights_default_filter_value: number;
+            insights_default_filter_unit: string;
+            default_chart_project_count: number;
+            background_dimming: number;
+            automatic_background: boolean;
+            bing_background: boolean;
+            nasa_apod_background: boolean;
+            luna_recommendation_effort: string;
+            ai_features_enabled: boolean;
+            active_context_id: number | null;
+            insights_access_enabled: boolean;
+            avatar_url: string;
+            background: components["schemas"]["Background"];
+            configured_api_keys: components["schemas"]["ConfiguredApiKeys"];
+            contexts: components["schemas"]["PreferenceContext"][];
+        };
         ProjectCreateRequest: {
             name: string;
             description?: string;
@@ -914,11 +1266,42 @@ export interface components {
             id: number;
             name: string;
         };
+        RecommendationCacheHit: {
+            provider: string;
+            count: number;
+        };
+        RecommendationUsageRequest: {
+            /** @default 7 */
+            days: number;
+        };
+        RecommendationUsageResponse: {
+            days: number;
+            summary: components["schemas"]["RecommendationUsageSummary"][];
+            cache_hits: components["schemas"]["RecommendationCacheHit"][];
+        };
+        RecommendationUsageSummary: {
+            provider: string;
+            model: string | null;
+            effort: string | null;
+            auth_route: string | null;
+            calls: number;
+            failures: number;
+            known_usage: number;
+            known_cost: number;
+            input_total: number | null;
+            cached_total: number | null;
+            output_total: number | null;
+            reasoning_total: number | null;
+            /** Format: decimal */
+            cost_total: string | null;
+            /** Format: double */
+            average_ms: number | null;
+        };
         ReportHierarchy: {
             projects: components["schemas"]["ReportHierarchyProject"][];
         };
         ReportHierarchyChild: {
-            kind: components["schemas"]["KindEnum"];
+            kind: components["schemas"]["Kind0e1Enum"];
             project_id?: number;
             id: number | null;
             name: string | null;
@@ -937,7 +1320,7 @@ export interface components {
             entries: components["schemas"]["ReportTallyEntry"][];
         };
         ReportTallyEntry: {
-            kind?: components["schemas"]["KindEnum"];
+            kind?: components["schemas"]["Kind0e1Enum"];
             project_id?: number;
             id: number | null;
             name: string | null;
@@ -978,6 +1361,7 @@ export interface components {
             /** Format: double */
             readonly elapsed_minutes: number | null;
             note?: string | null;
+            readonly note_html: string;
             commitment_history_unaffected?: boolean;
             /**
              * @description With search: direct when the session's project, subproject or note contains the search text, related when it matches only by meaning.
@@ -1020,6 +1404,7 @@ export interface components {
             /** Format: double */
             readonly elapsed_minutes: number | null;
             note?: string | null;
+            readonly note_html: string;
             commitment_history_unaffected?: boolean;
         };
         SessionTrackRequest: {
@@ -1100,10 +1485,124 @@ export interface components {
             name?: string;
             color?: string | null;
         };
+        TimelineBlock: {
+            session_id: number;
+            is_live: boolean;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            start: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            end: string | null;
+            /** Format: double */
+            minutes: number;
+            duration_label: string;
+            label: string;
+            note_html: string;
+            /** Format: double */
+            start_pct: number;
+            /** Format: double */
+            end_pct: number;
+            /** Format: double */
+            width_pct: number;
+        };
+        TimelineGap: {
+            minutes: number;
+            label: string;
+            /** Format: double */
+            start_pct: number;
+            /** Format: double */
+            width_pct: number;
+        };
+        TimelineLane: {
+            project: components["schemas"]["ProjectSummary"];
+            colour: string;
+            /** Format: double */
+            total_minutes: number;
+            /** Format: double */
+            live_minutes: number;
+            total_label: string | null;
+            live_label: string | null;
+            blocks: components["schemas"]["TimelineBlock"][];
+        };
+        TimelineResponse: {
+            range_key: string;
+            range_title: string;
+            is_multi_day: boolean;
+            /** Format: double */
+            tracked_minutes: number;
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            window_start: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            window_end: string;
+            window_start_hour: number | null;
+            window_end_hour: number | null;
+            ticks: components["schemas"]["TimelineTick"][];
+            /** Format: double */
+            grid_pct: number;
+            lanes: components["schemas"]["TimelineLane"][];
+            gaps: components["schemas"]["TimelineGap"][];
+            /** Format: double */
+            now_pct: number | null;
+            now_label: string | null;
+        };
+        TimelineTick: {
+            label: string;
+            /** Format: double */
+            x_pct: number;
+            minor: boolean;
+        };
         TimerListResponse: {
             count: number;
             timers: components["schemas"]["SessionResource"][];
         };
+        TimerReminder: {
+            id: number;
+            session_id: number;
+            mode: components["schemas"]["TimerReminderModeEnum"];
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            next_fire_at: string;
+            interval_seconds: number | null;
+            message: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            last_fired_at: string | null;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            created_at: string;
+        };
+        TimerReminderList: {
+            count: number;
+            reminders: components["schemas"]["TimerReminder"][];
+        };
+        /**
+         * @description * `after` - after
+         *     * `at` - at
+         *     * `interval` - interval
+         * @enum {string}
+         */
+        TimerReminderModeEnum: "after" | "at" | "interval";
         TimerRestartRequest: {
             /**
              * Format: date-time
@@ -1134,6 +1633,32 @@ export interface components {
             note?: string | null;
             subproject_allocations?: components["schemas"]["SubprojectAllocationWrite"][];
         };
+        TimerSuggestion: {
+            kind: components["schemas"]["TimerSuggestionKindEnum"];
+            label: string;
+            detail: string;
+            recommendation_detail?: string;
+            icon?: string;
+            project: components["schemas"]["ProjectSummary"] | null;
+            subprojects: components["schemas"]["ProjectSummary"][];
+            metric?: string | null;
+            /** Format: double */
+            recommendation_score?: number | null;
+            no_activity?: boolean;
+        };
+        TimerSuggestionGroups: {
+            commitments: components["schemas"]["TimerSuggestion"][];
+            habits: components["schemas"]["TimerSuggestion"][];
+            recent: components["schemas"]["TimerSuggestion"][];
+        };
+        /**
+         * @description * `recent` - recent
+         *     * `habit` - habit
+         *     * `commitment` - commitment
+         *     * `luna` - luna
+         * @enum {string}
+         */
+        TimerSuggestionKindEnum: "recent" | "habit" | "commitment" | "luna";
     };
     responses: never;
     parameters: never;
@@ -1434,6 +1959,28 @@ export interface operations {
             };
         };
     };
+    dashboard_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Context ID or 'all'; defaults to all contexts. */
+                context?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
+                };
+            };
+        };
+    };
     export_retrieve: {
         parameters: {
             query?: {
@@ -1516,6 +2063,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+        };
+    };
+    me_preferences_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesResponse"];
+                };
+            };
+        };
+    };
+    me_preferences_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedPreferencesRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedPreferencesRequest"];
+                "multipart/form-data": components["schemas"]["PatchedPreferencesRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesResponse"];
                 };
             };
         };
@@ -1726,6 +2317,108 @@ export interface operations {
             };
         };
     };
+    recommendations_luna_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Context ID or 'all'; defaults to all contexts. */
+                context?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LunaRecommendations"];
+                };
+            };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LunaRecommendations"];
+                };
+            };
+        };
+    };
+    recommendations_luna_refresh_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["LunaRefreshRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["LunaRefreshRequest"];
+                "multipart/form-data": components["schemas"]["LunaRefreshRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LunaRefreshResponse"];
+                };
+            };
+        };
+    };
+    recommendations_timers_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Context ID or 'all'; defaults to all contexts. */
+                context?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimerSuggestionGroups"];
+                };
+            };
+        };
+    };
+    recommendations_usage_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RecommendationUsageRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["RecommendationUsageRequest"];
+                "multipart/form-data": components["schemas"]["RecommendationUsageRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecommendationUsageResponse"];
+                };
+            };
+        };
+    };
     reports_charts_list: {
         parameters: {
             query: {
@@ -1873,6 +2566,29 @@ export interface operations {
             };
         };
     };
+    reports_timeline_retrieve: {
+        parameters: {
+            query?: {
+                context?: string;
+                end?: string;
+                start?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineResponse"];
+                };
+            };
+        };
+    };
     reports_totals_retrieve: {
         parameters: {
             query?: {
@@ -1928,8 +2644,7 @@ export interface operations {
                 exclude_project_ids?: string;
                 exclude_subproject_ids?: string;
                 exclude_tag_ids?: string;
-                /** @description * `note` - note */
-                include?: "note";
+                include?: string;
                 limit?: number;
                 note_snippet?: string;
                 offset?: number;
@@ -2267,7 +2982,10 @@ export interface operations {
     };
     timers_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                context?: string;
+                include?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2367,6 +3085,48 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SessionResource"];
                 };
+            };
+        };
+    };
+    timers_reminders_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimerReminderList"];
+                };
+            };
+        };
+    };
+    timers_reminders_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reminder_id: number;
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reminder cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

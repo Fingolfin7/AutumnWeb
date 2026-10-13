@@ -2,9 +2,13 @@ import type { components } from "./schema";
 
 type S = components["schemas"];
 
-export type Session = S["SessionListItem"];
-export type SessionResource = S["SessionResource"];
-export type Timer = S["SessionResource"];
+/* note_html is only present when asked for with include=note_html; the
+   schema marks every read-only field required, so loosen it here. */
+type WithOptionalNoteHtml<T> = Omit<T, "note_html"> & { note_html?: string | null };
+
+export type Session = WithOptionalNoteHtml<S["SessionListItem"]>;
+export type SessionResource = WithOptionalNoteHtml<S["SessionResource"]>;
+export type Timer = SessionResource;
 export type Project = S["ProjectResource"];
 export type ProjectDetail = S["ProjectDetailResource"];
 export type ProjectSummary = S["ProjectSummary"];

@@ -11,6 +11,8 @@ export interface PageEntry {
   title: string;
 }
 
-export const pages: PageEntry[] = [];
+export const pages: PageEntry[] = [
+  { path: "/sessions/", title: "Sessions", load: () => import("@/features/sessions/SessionsPage") },
+];
 
 export const appRoutePatterns: string[] = pages.map((page) => page.path);

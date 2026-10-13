@@ -57,16 +57,18 @@ export function Sheet({
   onClose,
   title,
   children,
+  className,
 }: {
   open: boolean;
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  className?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   useModalFocus(open, onClose, panel);
   return createPortal(
-    <div className={`sheet${open ? " is-open" : ""}`} role="dialog" aria-modal="true" aria-label={title} aria-hidden={!open}>
+    <div className={`sheet${className ? " " + className : ""}${open ? " is-open" : ""}`} role="dialog" aria-modal="true" aria-label={title} aria-hidden={!open}>
       <div className="sheet-scrim" onClick={onClose} />
       <div className="sheet-panel" ref={panel} tabIndex={-1}>
         <div className="sheet-grab" />

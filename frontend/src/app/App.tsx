@@ -8,6 +8,7 @@ import { pages } from "./routePatterns";
 import { Skeleton } from "@/components/states";
 import { NotFound } from "./NotFound";
 import { ApiError } from "@/api/errors";
+import { useCrossTabSync } from "@/api/sync";
 
 export function makeQueryClient() {
   return new QueryClient({
@@ -37,6 +38,7 @@ function ProgressBar() {
 }
 
 function Layout() {
+  useCrossTabSync();
   return (
     <ActiveContextProvider>
       <ProgressBar />
