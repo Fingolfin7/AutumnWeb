@@ -2005,7 +2005,7 @@ class ActiveTimersFragmentTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
 
-    @patch("core.views.timers.build_timer_suggestions")
+    @patch("core.services.timer_suggestions.build_timer_suggestions")
     def test_timers_fragment_renders_active_timer_only(self, build_timer_suggestions):
         active = self.create_active_session()
         Sessions.objects.create(

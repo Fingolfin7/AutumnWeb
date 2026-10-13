@@ -223,11 +223,11 @@ def _commitment_row(commitment, evaluation, candidates, projects_by_id, now):
 
 def build_recommendation_candidates(user, request):
     """Return active, selected-context candidates excluding all running projects."""
-    from core.views.timers import (
-        _recommendation_candidate_id,
-        _session_combo_key,
-        _timer_combo_key,
+    from core.services.timer_suggestions import (
         build_timer_suggestions,
+        recommendation_candidate_id,
+        session_combo_key,
+        timer_combo_key,
     )
 
     active_projects = list(
@@ -245,19 +245,19 @@ def build_recommendation_candidates(user, request):
         .prefetch_related("subprojects")
     )
     running_projects = {timer.project_id for timer in active_timers}
-    active_keys = {_session_combo_key(timer) for timer in active_timers}
+    active_keys = {session_combo_key(timer) for timer in active_timers}
     suggestions = build_timer_suggestions(user, request)
     candidates, by_key = [], {}
 
     def add_combo(project, subs, *, signal=None, reason=""):
-        key = _timer_combo_key(project, subs)
+        key = timer_combo_key(project, subs)
         if key in active_keys or project.id in running_projects or key in by_key:
             if key in by_key and signal:
                 if signal not in by_key[key]["signals"]:
                     by_key[key]["signals"].append(signal)
             return
         candidate = {
-            "id": _recommendation_candidate_id(project, subs),
+            "id": recommendation_candidate_id(project, subs),
             "project_id": project.id,
             "project_name": project.name,
             "subproject_ids": [sub.id for sub in subs],
@@ -278,7 +278,7 @@ def build_recommendation_candidates(user, request):
                 for sub in (suggestion.get("subprojects") or [])
                 if sub.user_id == user.id and sub.parent_project_id == project.id
             ]
-            key = _timer_combo_key(project, subs)
+            key = timer_combo_key(project, subs)
             if key in active_keys:
                 continue
             signal = {
@@ -293,7 +293,7 @@ def build_recommendation_candidates(user, request):
             # The model already receives the actual current time separately.
             reason = suggestion.get("recommendation_detail") or suggestion.get("detail") or ""
             candidate = {
-                "id": _recommendation_candidate_id(project, subs),
+                "id": recommendation_candidate_id(project, subs),
                 "project_id": project.id,
                 "project_name": project.name,
                 "subproject_ids": [sub.id for sub in subs],
@@ -378,11 +378,11 @@ def build_recommendation_candidates(user, request):
     for project in active_projects:
         if project.id in running_projects:
             continue
-        key = _timer_combo_key(project, [])
+        key = timer_combo_key(project, [])
         if key in active_keys or key in by_key:
             continue
         candidate = {
-            "id": _recommendation_candidate_id(project, []),
+            "id": recommendation_candidate_id(project, []),
             "project_id": project.id,
             "project_name": project.name,
             "subproject_ids": [],
