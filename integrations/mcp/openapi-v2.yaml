@@ -19,6 +19,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommitmentListResponse'
           description: ''
+      x-autumn-mcp: include
     post:
       operationId: commitments_create
       tags:
@@ -46,6 +47,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommitmentResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/commitments/{commitment_id}:
     get:
       operationId: commitments_retrieve
@@ -68,6 +70,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommitmentResource'
           description: ''
+      x-autumn-mcp: include
     patch:
       operationId: commitments_partial_update
       parameters:
@@ -105,6 +108,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommitmentResource'
           description: ''
+      x-autumn-mcp: include
     delete:
       operationId: commitments_destroy
       parameters:
@@ -127,6 +131,7 @@ paths:
       responses:
         '204':
           description: Commitment deleted.
+      x-autumn-mcp: include
   /api/v2/commitments/{commitment_id}/adjustments/:
     post:
       operationId: commitments_adjustments_create
@@ -161,6 +166,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommitmentAdjustmentResponse'
           description: ''
+      x-autumn-mcp: include
   /api/v2/commitments/{commitment_id}/periods/:
     get:
       operationId: commitments_periods_list
@@ -201,6 +207,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommitmentPeriodListResponse'
           description: ''
+      x-autumn-mcp: include
   /api/v2/commitments/{commitment_id}/restart/:
     post:
       operationId: commitments_restart
@@ -240,6 +247,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommitmentResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/contexts/:
     get:
       operationId: contexts_list
@@ -256,6 +264,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContextListResponse'
           description: ''
+      x-autumn-mcp: include
     post:
       operationId: contexts_create
       tags:
@@ -282,6 +291,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContextResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/contexts/{context_id}:
     patch:
       operationId: contexts_partial_update
@@ -315,6 +325,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ContextResource'
           description: ''
+      x-autumn-mcp: include
     delete:
       operationId: contexts_destroy
       parameters:
@@ -332,6 +343,30 @@ paths:
       responses:
         '204':
           description: Context deleted.
+      x-autumn-mcp: include
+  /api/v2/dashboard/:
+    get:
+      operationId: dashboard_retrieve
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: string
+        description: Context ID or 'all'; defaults to all contexts.
+      tags:
+      - dashboard
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardResponse'
+          description: ''
+      x-autumn-mcp: include
   /api/v2/export/:
     get:
       operationId: export_retrieve
@@ -437,6 +472,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Format2Document'
           description: ''
+      x-autumn-mcp: include
   /api/v2/import/:
     post:
       operationId: import_create
@@ -464,6 +500,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ImportSummary'
           description: ''
+      x-autumn-mcp: include
   /api/v2/me/:
     get:
       operationId: me_retrieve
@@ -480,6 +517,51 @@ paths:
               schema:
                 $ref: '#/components/schemas/Me'
           description: ''
+      x-autumn-mcp: include
+  /api/v2/me/preferences/:
+    get:
+      operationId: me_preferences_retrieve
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferencesResponse'
+          description: ''
+      x-autumn-mcp: exclude
+    patch:
+      operationId: me_preferences_partial_update
+      tags:
+      - me
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPreferencesRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPreferencesRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPreferencesRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferencesResponse'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/projects/:
     get:
       operationId: projects_list
@@ -564,6 +646,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectListResponse'
           description: ''
+      x-autumn-mcp: include
     post:
       operationId: projects_create
       tags:
@@ -591,6 +674,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/projects/{project_id}:
     get:
       operationId: projects_retrieve
@@ -613,6 +697,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectDetailResource'
           description: ''
+      x-autumn-mcp: include
     patch:
       operationId: projects_partial_update
       parameters:
@@ -645,6 +730,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectResource'
           description: ''
+      x-autumn-mcp: include
     delete:
       operationId: projects_destroy
       parameters:
@@ -662,6 +748,7 @@ paths:
       responses:
         '204':
           description: Project deleted.
+      x-autumn-mcp: include
   /api/v2/projects/{project_id}/subprojects/:
     get:
       operationId: project_subprojects_list
@@ -684,6 +771,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubprojectListResponse'
           description: ''
+      x-autumn-mcp: include
     post:
       operationId: project_subprojects_create
       parameters:
@@ -717,6 +805,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubprojectResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/projects/merge/:
     post:
       operationId: projects_merge
@@ -745,6 +834,115 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProjectResource'
           description: ''
+      x-autumn-mcp: include
+  /api/v2/recommendations/luna/:
+    get:
+      operationId: recommendations_luna_retrieve
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: string
+        description: Context ID or 'all'; defaults to all contexts.
+      tags:
+      - recommendations
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LunaRecommendations'
+          description: ''
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LunaRecommendations'
+          description: ''
+      x-autumn-mcp: include
+  /api/v2/recommendations/luna/refresh/:
+    post:
+      operationId: recommendations_luna_refresh_create
+      tags:
+      - recommendations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LunaRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LunaRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LunaRefreshRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LunaRefreshResponse'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/recommendations/timers/:
+    get:
+      operationId: recommendations_timers_retrieve
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: string
+        description: Context ID or 'all'; defaults to all contexts.
+      tags:
+      - recommendations
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimerSuggestionGroups'
+          description: ''
+      x-autumn-mcp: include
+  /api/v2/recommendations/usage/:
+    post:
+      operationId: recommendations_usage_create
+      tags:
+      - recommendations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecommendationUsageRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RecommendationUsageRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RecommendationUsageRequest'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecommendationUsageResponse'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/reports/charts/:
     get:
       operationId: reports_charts_list
@@ -876,6 +1074,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/ChartPayloadRow'
           description: ''
+      x-autumn-mcp: include
   /api/v2/reports/hierarchy/:
     get:
       operationId: reports_hierarchy_retrieve
@@ -959,6 +1158,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReportHierarchy'
           description: ''
+      x-autumn-mcp: include
   /api/v2/reports/tallies/:
     get:
       operationId: reports_tallies_retrieve
@@ -1053,6 +1253,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReportTallies'
           description: ''
+      x-autumn-mcp: include
+  /api/v2/reports/timeline/:
+    get:
+      operationId: reports_timeline_retrieve
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: end
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: start
+        schema:
+          type: string
+          format: date
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelineResponse'
+          description: ''
+      x-autumn-mcp: include
   /api/v2/reports/totals/:
     get:
       operationId: reports_totals_retrieve
@@ -1136,6 +1370,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ReportTotals'
           description: ''
+      x-autumn-mcp: include
   /api/v2/sessions/:
     get:
       operationId: sessions_list
@@ -1172,11 +1407,8 @@ paths:
       - in: query
         name: include
         schema:
-          enum:
-          - note
           type: string
           minLength: 1
-        description: '* `note` - note'
       - in: query
         name: limit
         schema:
@@ -1259,6 +1491,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionListResponse'
           description: ''
+      x-autumn-mcp: include
     post:
       operationId: sessions_create
       tags:
@@ -1292,6 +1525,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/sessions/{session_id}:
     get:
       operationId: sessions_retrieve
@@ -1314,6 +1548,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
+      x-autumn-mcp: include
     patch:
       operationId: sessions_partial_update
       parameters:
@@ -1351,6 +1586,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
+      x-autumn-mcp: include
     delete:
       operationId: sessions_destroy
       parameters:
@@ -1379,6 +1615,7 @@ paths:
           description: ''
         '204':
           description: Session deleted.
+      x-autumn-mcp: include
   /api/v2/subprojects/{subproject_id}:
     get:
       operationId: subprojects_retrieve
@@ -1401,6 +1638,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubprojectResource'
           description: ''
+      x-autumn-mcp: include
     patch:
       operationId: subprojects_partial_update
       parameters:
@@ -1433,6 +1671,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubprojectResource'
           description: ''
+      x-autumn-mcp: include
     delete:
       operationId: subprojects_destroy
       parameters:
@@ -1450,6 +1689,7 @@ paths:
       responses:
         '204':
           description: Subproject deleted.
+      x-autumn-mcp: include
   /api/v2/subprojects/merge/:
     post:
       operationId: subprojects_merge
@@ -1478,6 +1718,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SubprojectResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/tags/:
     get:
       operationId: tags_list
@@ -1494,6 +1735,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TagListResponse'
           description: ''
+      x-autumn-mcp: include
     post:
       operationId: tags_create
       tags:
@@ -1520,6 +1762,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TagResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/tags/{tag_id}:
     patch:
       operationId: tags_partial_update
@@ -1553,6 +1796,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TagResource'
           description: ''
+      x-autumn-mcp: include
     delete:
       operationId: tags_destroy
       parameters:
@@ -1570,9 +1814,21 @@ paths:
       responses:
         '204':
           description: Tag deleted.
+      x-autumn-mcp: include
   /api/v2/timers/:
     get:
       operationId: timers_retrieve
+      parameters:
+      - in: query
+        name: context
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: include
+        schema:
+          type: string
+          minLength: 1
       tags:
       - timers
       security:
@@ -1586,6 +1842,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TimerListResponse'
           description: ''
+      x-autumn-mcp: include
     post:
       operationId: timers_create
       tags:
@@ -1619,6 +1876,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/timers/{session_id}:
     patch:
       operationId: timers_partial_update
@@ -1657,6 +1915,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
+      x-autumn-mcp: include
     delete:
       operationId: timers_destroy
       parameters:
@@ -1679,6 +1938,54 @@ paths:
       responses:
         '204':
           description: Timer deleted.
+      x-autumn-mcp: include
+  /api/v2/timers/{session_id}/reminders/:
+    get:
+      operationId: timers_reminders_retrieve
+      parameters:
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimerReminderList'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/timers/{session_id}/reminders/{reminder_id}:
+    delete:
+      operationId: timers_reminders_destroy
+      parameters:
+      - in: path
+        name: reminder_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: session_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - timers
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Reminder cancelled.
+      x-autumn-mcp: exclude
   /api/v2/timers/{session_id}/restart/:
     post:
       operationId: timers_restart_create
@@ -1717,6 +2024,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
+      x-autumn-mcp: include
   /api/v2/timers/{session_id}/stop/:
     post:
       operationId: timers_stop_create
@@ -1755,6 +2063,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SessionResource'
           description: ''
+      x-autumn-mcp: include
 components:
   schemas:
     AggregationTypeEnum:
@@ -1769,6 +2078,33 @@ components:
         * `subproject` - subproject
         * `context` - context
         * `tag` - tag
+    Background:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/BackgroundModeEnum'
+        image_url:
+          type: string
+          nullable: true
+        video_url:
+          type: string
+          nullable: true
+      required:
+      - image_url
+      - mode
+      - video_url
+    BackgroundModeEnum:
+      enum:
+      - upload
+      - bing
+      - apod
+      - none
+      type: string
+      description: |-
+        * `upload` - upload
+        * `bing` - bing
+        * `apod` - apod
+        * `none` - none
     ByEnum:
       enum:
       - project
@@ -2293,6 +2629,22 @@ components:
       description: |-
         * `time` - time
         * `sessions` - sessions
+    ConfiguredApiKeys:
+      type: object
+      properties:
+        gemini:
+          type: boolean
+        openai:
+          type: boolean
+        openai_chatgpt:
+          type: boolean
+        claude:
+          type: boolean
+      required:
+      - claude
+      - gemini
+      - openai
+      - openai_chatgpt
     ContextListResponse:
       type: object
       properties:
@@ -2344,6 +2696,240 @@ components:
         description:
           type: string
           nullable: true
+    DashboardActivityDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        active:
+          type: boolean
+        weekday:
+          type: integer
+          maximum: 6
+          minimum: 0
+      required:
+      - active
+      - date
+      - weekday
+    DashboardCommitment:
+      type: object
+      properties:
+        commitment:
+          $ref: '#/components/schemas/CommitmentResource'
+        progress:
+          $ref: '#/components/schemas/DashboardCommitmentProgress'
+        streak:
+          $ref: '#/components/schemas/DashboardCommitmentStreak'
+      required:
+      - commitment
+      - progress
+      - streak
+    DashboardCommitmentPeriod:
+      type: object
+      properties:
+        period_start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        effective_period_start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        period_end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        actual:
+          type: number
+          format: double
+        target:
+          type: number
+          format: double
+        is_current:
+          type: boolean
+        met:
+          type: boolean
+        saved_by_bank:
+          type: boolean
+      required:
+      - actual
+      - effective_period_start
+      - is_current
+      - met
+      - period_end
+      - period_start
+      - saved_by_bank
+      - target
+    DashboardCommitmentProgress:
+      type: object
+      properties:
+        actual:
+          type: number
+          format: double
+        target:
+          type: number
+          format: double
+        percentage:
+          type: number
+          format: double
+        balance:
+          type: number
+          format: double
+        current_surplus:
+          type: number
+          format: double
+        status:
+          type: string
+        period_start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        effective_period_start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        period_end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        commitment_type:
+          type: string
+        period:
+          type: string
+      required:
+      - actual
+      - balance
+      - commitment_type
+      - current_surplus
+      - effective_period_start
+      - percentage
+      - period
+      - period_end
+      - period_start
+      - status
+      - target
+    DashboardCommitmentStreak:
+      type: object
+      properties:
+        current_streak:
+          type: integer
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardCommitmentPeriod'
+      required:
+      - current_streak
+      - periods
+    DashboardQuickStart:
+      type: object
+      properties:
+        project:
+          $ref: '#/components/schemas/ProjectSummary'
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectSummary'
+        label:
+          type: string
+      required:
+      - label
+      - project
+      - subprojects
+    DashboardRecentDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        total_minutes:
+          type: number
+          format: double
+        sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResource'
+      required:
+      - date
+      - sessions
+      - total_minutes
+    DashboardResponse:
+      type: object
+      properties:
+        today_total:
+          type: number
+          format: double
+        week_total:
+          type: number
+          format: double
+        active_timers_count:
+          type: integer
+        daily_streak:
+          $ref: '#/components/schemas/DashboardStreak'
+        active_timers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SessionResource'
+        quick_starts:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardQuickStart'
+        recent_sessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardRecentDay'
+        commitments:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardCommitment'
+        timeline:
+          $ref: '#/components/schemas/TimelineResponse'
+      required:
+      - active_timers
+      - active_timers_count
+      - commitments
+      - daily_streak
+      - quick_starts
+      - recent_sessions
+      - timeline
+      - today_total
+      - week_total
+    DashboardStreak:
+      type: object
+      properties:
+        current_streak:
+          type: integer
+        recent_days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardActivityDay'
+      required:
+      - current_streak
+      - recent_days
+    DefaultFilterUnitEnum:
+      enum:
+      - days
+      - weeks
+      - months
+      - years
+      - month_to_date
+      - quarter_to_date
+      - year_to_date
+      type: string
+      description: |-
+        * `days` - days
+        * `weeks` - weeks
+        * `months` - months
+        * `years` - years
+        * `month_to_date` - month_to_date
+        * `quarter_to_date` - quarter_to_date
+        * `year_to_date` - year_to_date
     Format2Document:
       type: object
       properties:
@@ -2483,7 +3069,25 @@ components:
       - projects_updated
       - sessions_imported
       - sessions_skipped
-    KindEnum:
+    InsightsDefaultFilterUnitEnum:
+      enum:
+      - days
+      - weeks
+      - months
+      - years
+      - month_to_date
+      - quarter_to_date
+      - year_to_date
+      type: string
+      description: |-
+        * `days` - days
+        * `weeks` - weeks
+        * `months` - months
+        * `years` - years
+        * `month_to_date` - month_to_date
+        * `quarter_to_date` - quarter_to_date
+        * `year_to_date` - year_to_date
+    Kind0e1Enum:
       enum:
       - subproject
       - residual
@@ -2491,6 +3095,61 @@ components:
       description: |-
         * `subproject` - subproject
         * `residual` - residual
+    LunaEffortEnum:
+      enum:
+      - low
+      - medium
+      - high
+      - xhigh
+      - max
+      type: string
+      description: |-
+        * `low` - low
+        * `medium` - medium
+        * `high` - high
+        * `xhigh` - xhigh
+        * `max` - max
+    LunaRecommendationEffortEnum:
+      enum:
+      - low
+      - medium
+      - high
+      - xhigh
+      - max
+      type: string
+      description: |-
+        * `low` - low
+        * `medium` - medium
+        * `high` - high
+        * `xhigh` - xhigh
+        * `max` - max
+    LunaRecommendations:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimerSuggestion'
+        advice_status:
+          type: string
+      required:
+      - advice_status
+      - suggestions
+    LunaRefreshRequest:
+      type: object
+      properties:
+        luna_effort:
+          $ref: '#/components/schemas/LunaEffortEnum'
+    LunaRefreshResponse:
+      type: object
+      properties:
+        refreshed:
+          type: boolean
+        luna_recommendation_effort:
+          type: string
+      required:
+      - luna_recommendation_effort
+      - refreshed
     MatchEnum:
       enum:
       - direct
@@ -2624,6 +3283,46 @@ components:
         description:
           type: string
           nullable: true
+    PatchedPreferencesRequest:
+      type: object
+      properties:
+        timezone:
+          type: string
+          maxLength: 64
+        default_filter_value:
+          type: integer
+          maximum: 1000
+          minimum: 1
+        default_filter_unit:
+          $ref: '#/components/schemas/DefaultFilterUnitEnum'
+        insights_default_filter_value:
+          type: integer
+          maximum: 1000
+          minimum: 1
+        insights_default_filter_unit:
+          $ref: '#/components/schemas/InsightsDefaultFilterUnitEnum'
+        default_chart_project_count:
+          type: integer
+          maximum: 100
+          minimum: 1
+        background_dimming:
+          type: integer
+          maximum: 85
+          minimum: 0
+        automatic_background:
+          type: boolean
+        bing_background:
+          type: boolean
+        nasa_apod_background:
+          type: boolean
+        luna_recommendation_effort:
+          $ref: '#/components/schemas/LunaRecommendationEffortEnum'
+        ai_features_enabled:
+          type: boolean
+        active_context_id:
+          type: integer
+          minimum: 1
+          nullable: true
     PatchedProjectPatchRequest:
       type: object
       properties:
@@ -2714,6 +3413,81 @@ components:
         * `monthly` - monthly
         * `quarterly` - quarterly
         * `yearly` - yearly
+    PreferenceContext:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          nullable: true
+      required:
+      - color
+      - id
+      - name
+    PreferencesResponse:
+      type: object
+      properties:
+        timezone:
+          type: string
+        default_filter_value:
+          type: integer
+        default_filter_unit:
+          type: string
+        insights_default_filter_value:
+          type: integer
+        insights_default_filter_unit:
+          type: string
+        default_chart_project_count:
+          type: integer
+        background_dimming:
+          type: integer
+        automatic_background:
+          type: boolean
+        bing_background:
+          type: boolean
+        nasa_apod_background:
+          type: boolean
+        luna_recommendation_effort:
+          type: string
+        ai_features_enabled:
+          type: boolean
+        active_context_id:
+          type: integer
+          nullable: true
+        insights_access_enabled:
+          type: boolean
+        avatar_url:
+          type: string
+        background:
+          $ref: '#/components/schemas/Background'
+        configured_api_keys:
+          $ref: '#/components/schemas/ConfiguredApiKeys'
+        contexts:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreferenceContext'
+      required:
+      - active_context_id
+      - ai_features_enabled
+      - automatic_background
+      - avatar_url
+      - background
+      - background_dimming
+      - bing_background
+      - configured_api_keys
+      - contexts
+      - default_chart_project_count
+      - default_filter_unit
+      - default_filter_value
+      - insights_access_enabled
+      - insights_default_filter_unit
+      - insights_default_filter_value
+      - luna_recommendation_effort
+      - nasa_apod_background
+      - timezone
     ProjectCreateRequest:
       type: object
       properties:
@@ -2878,6 +3652,99 @@ components:
       required:
       - id
       - name
+    RecommendationCacheHit:
+      type: object
+      properties:
+        provider:
+          type: string
+        count:
+          type: integer
+      required:
+      - count
+      - provider
+    RecommendationUsageRequest:
+      type: object
+      properties:
+        days:
+          type: integer
+          maximum: 90
+          minimum: 1
+          default: 7
+    RecommendationUsageResponse:
+      type: object
+      properties:
+        days:
+          type: integer
+        summary:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendationUsageSummary'
+        cache_hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecommendationCacheHit'
+      required:
+      - cache_hits
+      - days
+      - summary
+    RecommendationUsageSummary:
+      type: object
+      properties:
+        provider:
+          type: string
+        model:
+          type: string
+          nullable: true
+        effort:
+          type: string
+          nullable: true
+        auth_route:
+          type: string
+          nullable: true
+        calls:
+          type: integer
+        failures:
+          type: integer
+        known_usage:
+          type: integer
+        known_cost:
+          type: integer
+        input_total:
+          type: integer
+          nullable: true
+        cached_total:
+          type: integer
+          nullable: true
+        output_total:
+          type: integer
+          nullable: true
+        reasoning_total:
+          type: integer
+          nullable: true
+        cost_total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,8})?$
+          nullable: true
+        average_ms:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - auth_route
+      - average_ms
+      - cached_total
+      - calls
+      - cost_total
+      - effort
+      - failures
+      - input_total
+      - known_cost
+      - known_usage
+      - model
+      - output_total
+      - provider
+      - reasoning_total
     ReportHierarchy:
       type: object
       properties:
@@ -2891,7 +3758,7 @@ components:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/Kind0e1Enum'
         project_id:
           type: integer
         id:
@@ -2943,7 +3810,7 @@ components:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/KindEnum'
+          $ref: '#/components/schemas/Kind0e1Enum'
         project_id:
           type: integer
         id:
@@ -3023,6 +3890,9 @@ components:
         note:
           type: string
           nullable: true
+        note_html:
+          type: string
+          readOnly: true
         commitment_history_unaffected:
           type: boolean
         match:
@@ -3040,6 +3910,7 @@ components:
       - elapsed_minutes
       - end
       - id
+      - note_html
       - project
       - start
       - subproject_allocations
@@ -3111,6 +3982,9 @@ components:
         note:
           type: string
           nullable: true
+        note_html:
+          type: string
+          readOnly: true
         commitment_history_unaffected:
           type: boolean
       required:
@@ -3120,6 +3994,7 @@ components:
       - elapsed_minutes
       - end
       - id
+      - note_html
       - project
       - start
       - subproject_allocations
@@ -3323,6 +4198,190 @@ components:
           type: string
           nullable: true
           maxLength: 20
+    TimelineBlock:
+      type: object
+      properties:
+        session_id:
+          type: integer
+        is_live:
+          type: boolean
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        minutes:
+          type: number
+          format: double
+        duration_label:
+          type: string
+        label:
+          type: string
+        note_html:
+          type: string
+        start_pct:
+          type: number
+          format: double
+        end_pct:
+          type: number
+          format: double
+        width_pct:
+          type: number
+          format: double
+      required:
+      - duration_label
+      - end
+      - end_pct
+      - is_live
+      - label
+      - minutes
+      - note_html
+      - session_id
+      - start
+      - start_pct
+      - width_pct
+    TimelineGap:
+      type: object
+      properties:
+        minutes:
+          type: integer
+        label:
+          type: string
+        start_pct:
+          type: number
+          format: double
+        width_pct:
+          type: number
+          format: double
+      required:
+      - label
+      - minutes
+      - start_pct
+      - width_pct
+    TimelineLane:
+      type: object
+      properties:
+        project:
+          $ref: '#/components/schemas/ProjectSummary'
+        colour:
+          type: string
+        total_minutes:
+          type: number
+          format: double
+        live_minutes:
+          type: number
+          format: double
+        total_label:
+          type: string
+          nullable: true
+        live_label:
+          type: string
+          nullable: true
+        blocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineBlock'
+      required:
+      - blocks
+      - colour
+      - live_label
+      - live_minutes
+      - project
+      - total_label
+      - total_minutes
+    TimelineResponse:
+      type: object
+      properties:
+        range_key:
+          type: string
+        range_title:
+          type: string
+        is_multi_day:
+          type: boolean
+        tracked_minutes:
+          type: number
+          format: double
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        window_start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        window_end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        window_start_hour:
+          type: integer
+          nullable: true
+        window_end_hour:
+          type: integer
+          nullable: true
+        ticks:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineTick'
+        grid_pct:
+          type: number
+          format: double
+        lanes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineLane'
+        gaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineGap'
+        now_pct:
+          type: number
+          format: double
+          nullable: true
+        now_label:
+          type: string
+          nullable: true
+      required:
+      - end_date
+      - gaps
+      - grid_pct
+      - is_multi_day
+      - lanes
+      - now_label
+      - now_pct
+      - range_key
+      - range_title
+      - start_date
+      - ticks
+      - tracked_minutes
+      - window_end
+      - window_end_hour
+      - window_start
+      - window_start_hour
+    TimelineTick:
+      type: object
+      properties:
+        label:
+          type: string
+        x_pct:
+          type: number
+          format: double
+        minor:
+          type: boolean
+      required:
+      - label
+      - minor
+      - x_pct
     TimerListResponse:
       type: object
       properties:
@@ -3335,6 +4394,67 @@ components:
       required:
       - count
       - timers
+    TimerReminder:
+      type: object
+      properties:
+        id:
+          type: integer
+        session_id:
+          type: integer
+        mode:
+          $ref: '#/components/schemas/TimerReminderModeEnum'
+        next_fire_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        interval_seconds:
+          type: integer
+          nullable: true
+        message:
+          type: string
+        last_fired_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        created_at:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+      required:
+      - created_at
+      - id
+      - interval_seconds
+      - last_fired_at
+      - message
+      - mode
+      - next_fire_at
+      - session_id
+    TimerReminderList:
+      type: object
+      properties:
+        count:
+          type: integer
+        reminders:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimerReminder'
+      required:
+      - count
+      - reminders
+    TimerReminderModeEnum:
+      enum:
+      - after
+      - at
+      - interval
+      type: string
+      description: |-
+        * `after` - after
+        * `at` - at
+        * `interval` - interval
     TimerRestartRequest:
       type: object
       properties:
@@ -3387,6 +4507,73 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SubprojectAllocationWrite'
+    TimerSuggestion:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/TimerSuggestionKindEnum'
+        label:
+          type: string
+        detail:
+          type: string
+        recommendation_detail:
+          type: string
+        icon:
+          type: string
+        project:
+          allOf:
+          - $ref: '#/components/schemas/ProjectSummary'
+          nullable: true
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectSummary'
+        metric:
+          type: string
+          nullable: true
+        recommendation_score:
+          type: number
+          format: double
+          nullable: true
+        no_activity:
+          type: boolean
+      required:
+      - detail
+      - kind
+      - label
+      - project
+      - subprojects
+    TimerSuggestionGroups:
+      type: object
+      properties:
+        commitments:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimerSuggestion'
+        habits:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimerSuggestion'
+        recent:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimerSuggestion'
+      required:
+      - commitments
+      - habits
+      - recent
+    TimerSuggestionKindEnum:
+      enum:
+      - recent
+      - habit
+      - commitment
+      - luna
+      type: string
+      description: |-
+        * `recent` - recent
+        * `habit` - habit
+        * `commitment` - commitment
+        * `luna` - luna
   securitySchemes:
     basicAuth:
       type: http

@@ -5,6 +5,8 @@ from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from core.templatetags.markdown_render import markdown as render_markdown
+
 
 def _local_date(value):
     if value is None:
@@ -76,6 +78,7 @@ class SessionResourceSerializer(serializers.Serializer):
     duration_minutes = serializers.SerializerMethodField()
     elapsed_minutes = serializers.SerializerMethodField()
     note = serializers.CharField(allow_null=True, required=False)
+    note_html = serializers.SerializerMethodField(required=False)
     commitment_history_unaffected = serializers.BooleanField(required=False)
 
     @extend_schema_field(SubprojectAllocationSerializer(many=True))
@@ -116,10 +119,16 @@ class SessionResourceSerializer(serializers.Serializer):
             2,
         )
 
+    @extend_schema_field(serializers.CharField())
+    def get_note_html(self, session):
+        return render_markdown(session.note or "")
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if not self.context.get("include_note", True):
             data.pop("note", None)
+        if not self.context.get("include_note_html", False):
+            data.pop("note_html", None)
         return data
 
 
@@ -184,6 +193,28 @@ class TimerListResponseSerializer(serializers.Serializer):
     timers = SessionResourceSerializer(many=True)
 
 
+def _parse_resource_include(value):
+    values = [item.strip() for item in value.split(",")]
+    if any(not item for item in values) or len(values) != len(set(values)):
+        raise serializers.ValidationError(
+            "Enter a comma-separated list without blanks or duplicates."
+        )
+    unknown = sorted(set(values) - {"note", "note_html"})
+    if unknown:
+        raise serializers.ValidationError(
+            f"Unsupported include value: {', '.join(unknown)}."
+        )
+    return values
+
+
+class ResourceIncludeQuerySerializer(serializers.Serializer):
+    include = serializers.CharField(required=False, allow_blank=False)
+    context = serializers.CharField(required=False, allow_blank=False)
+
+    def validate_include(self, value):
+        return _parse_resource_include(value)
+
+
 class SessionListItemSerializer(SessionResourceSerializer):
     match = serializers.ChoiceField(
         choices=("direct", "related"),
@@ -208,7 +239,7 @@ class CommitmentHistoryWarningSerializer(serializers.Serializer):
 class SessionListQuerySerializer(serializers.Serializer):
     limit = serializers.IntegerField(required=False, default=100, min_value=1, max_value=500)
     offset = serializers.IntegerField(required=False, default=0, min_value=0)
-    include = serializers.ChoiceField(required=False, choices=("note",))
+    include = serializers.CharField(required=False, allow_blank=False)
     project_ids = serializers.CharField(required=False)
     subproject_ids = serializers.CharField(required=False)
     context_ids = serializers.CharField(required=False)
@@ -231,6 +262,9 @@ class SessionListQuerySerializer(serializers.Serializer):
             "Needs AI features and an OpenAI key on the account; otherwise ignored."
         ),
     )
+
+    def validate_include(self, value):
+        return _parse_resource_include(value)
     ordering = serializers.ChoiceField(
         required=False,
         default="relevance",
@@ -777,3 +811,323 @@ class ChartPayloadRowSerializer(serializers.Serializer):
     weekday = serializers.IntegerField(required=False, min_value=0, max_value=6)
     hour = serializers.IntegerField(required=False, min_value=0, max_value=23)
     average_hours = serializers.FloatField(required=False, min_value=0)
+
+
+class PreferenceContextSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    color = serializers.CharField(allow_null=True)
+
+
+class BackgroundSerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(choices=("upload", "bing", "apod", "none"))
+    image_url = serializers.CharField(allow_null=True)
+    video_url = serializers.CharField(allow_null=True)
+
+
+class ConfiguredApiKeysSerializer(serializers.Serializer):
+    gemini = serializers.BooleanField()
+    openai = serializers.BooleanField()
+    openai_chatgpt = serializers.BooleanField()
+    claude = serializers.BooleanField()
+
+
+class PreferencesRequestSerializer(serializers.Serializer):
+    timezone = serializers.CharField(required=False, max_length=64)
+    default_filter_value = serializers.IntegerField(required=False, min_value=1, max_value=1000)
+    default_filter_unit = serializers.ChoiceField(
+        required=False,
+        choices=(
+            "days", "weeks", "months", "years", "month_to_date",
+            "quarter_to_date", "year_to_date",
+        ),
+    )
+    insights_default_filter_value = serializers.IntegerField(
+        required=False, min_value=1, max_value=1000
+    )
+    insights_default_filter_unit = serializers.ChoiceField(
+        required=False,
+        choices=(
+            "days", "weeks", "months", "years", "month_to_date",
+            "quarter_to_date", "year_to_date",
+        ),
+    )
+    default_chart_project_count = serializers.IntegerField(
+        required=False, min_value=1, max_value=100
+    )
+    background_dimming = serializers.IntegerField(required=False, min_value=0, max_value=85)
+    automatic_background = serializers.BooleanField(required=False)
+    bing_background = serializers.BooleanField(required=False)
+    nasa_apod_background = serializers.BooleanField(required=False)
+    luna_recommendation_effort = serializers.ChoiceField(
+        required=False, choices=("low", "medium", "high", "xhigh", "max")
+    )
+    ai_features_enabled = serializers.BooleanField(required=False)
+    active_context_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
+
+    def validate_background_dimming(self, value):
+        if value % 5:
+            raise serializers.ValidationError("Use increments of 5.")
+        return value
+
+    def validate_timezone(self, value):
+        from users.models import validate_iana_timezone
+
+        try:
+            validate_iana_timezone(value)
+        except Exception as exc:
+            raise serializers.ValidationError("Enter a valid IANA timezone.") from exc
+        return value
+
+    def validate(self, attrs):
+        if not attrs:
+            raise serializers.ValidationError("Provide at least one preference.")
+        if attrs.get("bing_background") and attrs.get("nasa_apod_background"):
+            raise serializers.ValidationError(
+                "Bing and NASA APOD backgrounds cannot both be enabled."
+            )
+        return attrs
+
+
+class PreferencesResponseSerializer(PreferencesRequestSerializer):
+    timezone = serializers.CharField()
+    default_filter_value = serializers.IntegerField()
+    default_filter_unit = serializers.CharField()
+    insights_default_filter_value = serializers.IntegerField()
+    insights_default_filter_unit = serializers.CharField()
+    default_chart_project_count = serializers.IntegerField()
+    background_dimming = serializers.IntegerField()
+    automatic_background = serializers.BooleanField()
+    bing_background = serializers.BooleanField()
+    nasa_apod_background = serializers.BooleanField()
+    luna_recommendation_effort = serializers.CharField()
+    ai_features_enabled = serializers.BooleanField()
+    active_context_id = serializers.IntegerField(allow_null=True)
+    insights_access_enabled = serializers.BooleanField()
+    avatar_url = serializers.CharField()
+    background = BackgroundSerializer()
+    configured_api_keys = ConfiguredApiKeysSerializer()
+    contexts = PreferenceContextSerializer(many=True)
+
+
+class TimerSuggestionSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=("recent", "habit", "commitment", "luna"))
+    label = serializers.CharField()
+    detail = serializers.CharField(allow_blank=True)
+    recommendation_detail = serializers.CharField(allow_blank=True, required=False)
+    icon = serializers.CharField(allow_blank=True, required=False)
+    project = ProjectSummarySerializer(allow_null=True)
+    subprojects = ProjectSummarySerializer(many=True)
+    metric = serializers.CharField(allow_null=True, required=False)
+    recommendation_score = serializers.FloatField(allow_null=True, required=False)
+    no_activity = serializers.BooleanField(required=False)
+
+
+class TimerSuggestionGroupsSerializer(serializers.Serializer):
+    commitments = TimerSuggestionSerializer(many=True)
+    habits = TimerSuggestionSerializer(many=True)
+    recent = TimerSuggestionSerializer(many=True)
+
+
+class LunaRecommendationsSerializer(serializers.Serializer):
+    suggestions = TimerSuggestionSerializer(many=True)
+    advice_status = serializers.CharField()
+
+
+class LunaRefreshRequestSerializer(serializers.Serializer):
+    luna_effort = serializers.ChoiceField(
+        required=False, choices=("low", "medium", "high", "xhigh", "max")
+    )
+
+
+class LunaRefreshResponseSerializer(serializers.Serializer):
+    refreshed = serializers.BooleanField()
+    luna_recommendation_effort = serializers.CharField()
+
+
+class RecommendationUsageRequestSerializer(serializers.Serializer):
+    days = serializers.IntegerField(required=False, default=7, min_value=1, max_value=90)
+
+
+class RecommendationUsageSummarySerializer(serializers.Serializer):
+    provider = serializers.CharField()
+    model = serializers.CharField(allow_null=True)
+    effort = serializers.CharField(allow_null=True)
+    auth_route = serializers.CharField(allow_null=True)
+    calls = serializers.IntegerField()
+    failures = serializers.IntegerField()
+    known_usage = serializers.IntegerField()
+    known_cost = serializers.IntegerField()
+    input_total = serializers.IntegerField(allow_null=True)
+    cached_total = serializers.IntegerField(allow_null=True)
+    output_total = serializers.IntegerField(allow_null=True)
+    reasoning_total = serializers.IntegerField(allow_null=True)
+    cost_total = serializers.DecimalField(max_digits=16, decimal_places=8, allow_null=True)
+    average_ms = serializers.FloatField(allow_null=True)
+
+
+class RecommendationCacheHitSerializer(serializers.Serializer):
+    provider = serializers.CharField()
+    count = serializers.IntegerField()
+
+
+class RecommendationUsageResponseSerializer(serializers.Serializer):
+    days = serializers.IntegerField()
+    summary = RecommendationUsageSummarySerializer(many=True)
+    cache_hits = RecommendationCacheHitSerializer(many=True)
+
+
+class TimerReminderSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    session_id = serializers.IntegerField()
+    mode = serializers.ChoiceField(choices=("after", "at", "interval"))
+    next_fire_at = UTCDateTimeField()
+    interval_seconds = serializers.IntegerField(allow_null=True)
+    message = serializers.CharField(allow_blank=True)
+    last_fired_at = UTCDateTimeField(allow_null=True)
+    created_at = UTCDateTimeField()
+
+
+class TimerReminderListSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    reminders = TimerReminderSerializer(many=True)
+
+
+class TimelineTickSerializer(serializers.Serializer):
+    label = serializers.CharField()
+    x_pct = serializers.FloatField()
+    minor = serializers.BooleanField()
+
+
+class TimelineGapSerializer(serializers.Serializer):
+    minutes = serializers.IntegerField()
+    label = serializers.CharField()
+    start_pct = serializers.FloatField()
+    width_pct = serializers.FloatField()
+
+
+class TimelineBlockSerializer(serializers.Serializer):
+    session_id = serializers.IntegerField()
+    is_live = serializers.BooleanField()
+    start = UTCDateTimeField()
+    end = UTCDateTimeField(allow_null=True)
+    minutes = serializers.FloatField()
+    duration_label = serializers.CharField()
+    label = serializers.CharField(allow_blank=True)
+    note_html = serializers.CharField()
+    start_pct = serializers.FloatField()
+    end_pct = serializers.FloatField()
+    width_pct = serializers.FloatField()
+
+
+class TimelineLaneSerializer(serializers.Serializer):
+    project = ProjectSummarySerializer()
+    colour = serializers.CharField()
+    total_minutes = serializers.FloatField()
+    live_minutes = serializers.FloatField()
+    total_label = serializers.CharField(allow_null=True)
+    live_label = serializers.CharField(allow_null=True)
+    blocks = TimelineBlockSerializer(many=True)
+
+
+class TimelineResponseSerializer(serializers.Serializer):
+    range_key = serializers.CharField()
+    range_title = serializers.CharField()
+    is_multi_day = serializers.BooleanField()
+    tracked_minutes = serializers.FloatField()
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
+    window_start = UTCDateTimeField()
+    window_end = UTCDateTimeField()
+    window_start_hour = serializers.IntegerField(allow_null=True)
+    window_end_hour = serializers.IntegerField(allow_null=True)
+    ticks = TimelineTickSerializer(many=True)
+    grid_pct = serializers.FloatField()
+    lanes = TimelineLaneSerializer(many=True)
+    gaps = TimelineGapSerializer(many=True)
+    now_pct = serializers.FloatField(allow_null=True)
+    now_label = serializers.CharField(allow_null=True)
+
+
+class TimelineQuerySerializer(serializers.Serializer):
+    start = serializers.DateField(required=False)
+    end = serializers.DateField(required=False)
+    context = serializers.CharField(required=False, allow_blank=False)
+
+    def validate(self, attrs):
+        if ("start" in attrs) != ("end" in attrs):
+            raise serializers.ValidationError("Provide start and end together.")
+        if attrs.get("start") and attrs["start"] > attrs["end"]:
+            raise serializers.ValidationError("start must be on or before end.")
+        return attrs
+
+
+class DashboardActivityDaySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    active = serializers.BooleanField()
+    weekday = serializers.IntegerField(min_value=0, max_value=6)
+
+
+class DashboardStreakSerializer(serializers.Serializer):
+    current_streak = serializers.IntegerField()
+    recent_days = DashboardActivityDaySerializer(many=True)
+
+
+class DashboardQuickStartSerializer(serializers.Serializer):
+    project = ProjectSummarySerializer()
+    subprojects = ProjectSummarySerializer(many=True)
+    label = serializers.CharField()
+
+
+class DashboardRecentDaySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    total_minutes = serializers.FloatField()
+    sessions = SessionResourceSerializer(many=True)
+
+
+class DashboardCommitmentProgressSerializer(serializers.Serializer):
+    actual = serializers.FloatField()
+    target = serializers.FloatField()
+    percentage = serializers.FloatField()
+    balance = serializers.FloatField()
+    current_surplus = serializers.FloatField()
+    status = serializers.CharField()
+    period_start = UTCDateTimeField()
+    effective_period_start = UTCDateTimeField()
+    period_end = UTCDateTimeField()
+    commitment_type = serializers.CharField()
+    period = serializers.CharField()
+
+
+class DashboardCommitmentPeriodSerializer(serializers.Serializer):
+    period_start = UTCDateTimeField()
+    effective_period_start = UTCDateTimeField()
+    period_end = UTCDateTimeField()
+    actual = serializers.FloatField()
+    target = serializers.FloatField()
+    is_current = serializers.BooleanField()
+    met = serializers.BooleanField()
+    saved_by_bank = serializers.BooleanField()
+
+
+class DashboardCommitmentStreakSerializer(serializers.Serializer):
+    current_streak = serializers.IntegerField()
+    periods = DashboardCommitmentPeriodSerializer(many=True)
+
+
+class DashboardCommitmentSerializer(serializers.Serializer):
+    commitment = CommitmentResourceSerializer()
+    progress = DashboardCommitmentProgressSerializer()
+    streak = DashboardCommitmentStreakSerializer()
+
+
+class DashboardResponseSerializer(serializers.Serializer):
+    today_total = serializers.FloatField()
+    week_total = serializers.FloatField()
+    active_timers_count = serializers.IntegerField()
+    daily_streak = DashboardStreakSerializer()
+    active_timers = SessionResourceSerializer(many=True)
+    quick_starts = DashboardQuickStartSerializer(many=True)
+    recent_sessions = DashboardRecentDaySerializer(many=True)
+    commitments = DashboardCommitmentSerializer(many=True)
+    timeline = TimelineResponseSerializer()

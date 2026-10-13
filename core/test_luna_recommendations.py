@@ -315,7 +315,7 @@ class LunaViewTests(TestCase):
             lease_until=timezone.now() + timedelta(minutes=2),
         )
         with self._enable_key(), mock.patch(
-            "core.views.timers.build_recommendation_candidates"
+            "core.services.timer_suggestions.build_recommendation_candidates"
         ) as candidates:
             response = self.client.get(reverse("luna_timer_recommendations"))
         self.assertEqual(response.status_code, 202)
@@ -366,7 +366,7 @@ class LunaViewTests(TestCase):
         }
 
         with self._enable_key(), mock.patch(
-            "core.views.timers.build_timer_suggestions", return_value=deterministic
+            "core.services.timer_suggestions.build_timer_suggestions", return_value=deterministic
         ), mock.patch(
             "core.services.luna_recommendations.rank_luna_candidates",
             side_effect=lambda **kwargs: {

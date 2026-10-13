@@ -17,7 +17,7 @@ from freezegun import freeze_time
 
 from core.models import Context, Projects, Sessions, SubProjects
 from core.templatetags.time_formats import hero_duration
-from core.views.dashboard import (
+from core.services.dashboard import (
     QUICK_START_LIMIT,
     build_quick_starts,
     get_recent_dashboard_sessions,
@@ -295,7 +295,7 @@ class DashboardRendersFocusDeskTests(DashboardTestCase):
             end_time=now - timedelta(hours=1),
         )
 
-        with patch("core.views.dashboard.timezone.now", return_value=now):
+        with patch("core.services.dashboard.timezone.now", return_value=now):
             response = self.client.get(reverse("home"))
 
         self.assertEqual(response.context["today_total"], 30.0)

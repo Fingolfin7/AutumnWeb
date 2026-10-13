@@ -72,6 +72,9 @@ def switch_context(request):
             except (Context.DoesNotExist, ValueError, TypeError):
                 context_id = "all"
         store_active_context(request, context_id)
+        profile = request.user.profile
+        profile.active_context_id = None if context_id == "all" else int(context_id)
+        profile.save(update_fields=["active_context"])
         next_url = (
             request.POST.get("next")
             or request.META.get("HTTP_REFERER")
@@ -86,6 +89,9 @@ def switch_context(request):
 
     # Fallback GET handler – treat like resetting to All
     store_active_context(request, "all")
+    profile = request.user.profile
+    profile.active_context = None
+    profile.save(update_fields=["active_context"])
     return redirect("home")
 
 

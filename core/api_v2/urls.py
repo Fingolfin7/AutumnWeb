@@ -3,14 +3,22 @@ from django.urls import path
 from core.api_v2.views import (
     ContextDetailView,
     ContextsView,
+    DashboardAPIView,
     MeView,
+    PreferencesView,
     ProjectDetailView,
     ProjectMergeView,
     ProjectsView,
     ProjectSubprojectsView,
+    LunaRecommendationsRefreshView,
+    LunaRecommendationsView,
+    RecommendationUsageView,
     SessionDetailView,
     SessionsView,
     TimerDetailView,
+    TimerReminderDetailView,
+    TimerRemindersView,
+    TimerRecommendationsView,
     TimerRestartView,
     TimersView,
     TimerStopView,
@@ -18,6 +26,7 @@ from core.api_v2.views import (
     SubprojectMergeView,
     TagDetailView,
     TagsView,
+    TimelineAPIView,
 )
 from core.api_v2.commitments import (
     CommitmentAdjustmentsView,
@@ -39,6 +48,29 @@ app_name = "api_v2"
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
+    path("me/preferences/", PreferencesView.as_view(), name="me-preferences"),
+    path("dashboard/", DashboardAPIView.as_view(), name="dashboard"),
+    path("reports/timeline/", TimelineAPIView.as_view(), name="report-timeline"),
+    path(
+        "recommendations/timers/",
+        TimerRecommendationsView.as_view(),
+        name="timer-recommendations",
+    ),
+    path(
+        "recommendations/luna/",
+        LunaRecommendationsView.as_view(),
+        name="luna-recommendations",
+    ),
+    path(
+        "recommendations/luna/refresh/",
+        LunaRecommendationsRefreshView.as_view(),
+        name="luna-recommendations-refresh",
+    ),
+    path(
+        "recommendations/usage/",
+        RecommendationUsageView.as_view(),
+        name="recommendation-usage",
+    ),
     path("export/", ExportView.as_view(), name="export"),
     path("import/", ImportView.as_view(), name="import"),
     path("commitments/", CommitmentsView.as_view(), name="commitments"),
@@ -80,6 +112,16 @@ urlpatterns = [
     path("reports/charts/", ReportChartsView.as_view(), name="report-charts"),
     path("timers/", TimersView.as_view(), name="timers"),
     path("timers/<int:session_id>", TimerDetailView.as_view(), name="timer-detail"),
+    path(
+        "timers/<int:session_id>/reminders/",
+        TimerRemindersView.as_view(),
+        name="timer-reminders",
+    ),
+    path(
+        "timers/<int:session_id>/reminders/<int:reminder_id>",
+        TimerReminderDetailView.as_view(),
+        name="timer-reminder-detail",
+    ),
     path(
         "timers/<int:session_id>/stop/",
         TimerStopView.as_view(),
