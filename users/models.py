@@ -104,6 +104,14 @@ class Profile(models.Model):
         validators=[MinValueValidator(1), MaxValueValidator(100)],
         help_text="Number of projects shown individually before the remainder are grouped as Other.",
     )
+    # Blank follows the server's SEMANTIC_SEARCH_MIN_SIMILARITY; bounds match
+    # core.services.semantic_search.SIMILARITY_FLOOR/CEILING.
+    related_similarity = models.FloatField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0.25), MaxValueValidator(0.60)],
+        help_text="How close a meaning-based match must be to count as related (0.25-0.60).",
+    )
 
     def __str__(self):
         return f"{self.user.username} Profile"

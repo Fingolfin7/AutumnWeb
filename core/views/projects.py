@@ -5,6 +5,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.paginator import Paginator
 from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.views.generic import (
     ListView,
@@ -26,7 +27,7 @@ from core.celebrations import (
 )
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 from core.search import search_projects
-from core.services.semantic_search import related_project_ids
+from core.services.semantic_search import RELATED_LIMIT, RelatedOutcome, related_project_ids
 from django.db.models import Prefetch
 from core.totals import annotate_project_totals, annotate_subproject_totals
 from core.forms import (
@@ -43,6 +44,8 @@ from core.utils import (
     filter_by_active_context,
     filter_by_projects,
     parse_date_or_datetime,
+    requested_similarity,
+    similarity_slider,
     summarise_search_filters,
 )
 from core.services import (
@@ -80,6 +83,14 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         ungrouped_projects = list(context["object_list"])
         related_projects = self._related_projects()
         context["related_projects"] = related_projects
+        context["related_page"] = self.related_page
+        context["related_slider"] = (
+            similarity_slider(
+                self.request.user, value=self.related_cutoff, outcome=self.related_outcome
+            )
+            if self.related_outcome.included
+            else None
+        )
         for project in ungrouped_projects + related_projects:
             project.total_time = project.derived_total_time
             project.last_updated = project.derived_last_updated
@@ -202,16 +213,31 @@ class ProjectsListView(LoginRequiredMixin, ListView):
         return self._for_display(projects).order_by("-derived_last_updated")
 
     def _related_projects(self):
-        """Meaning-based matches the keyword search missed, best first."""
+        """Meaning-based matches the keyword search missed, best first: every
+        one above the cutoff, a page of them at a time (?related_page=), as
+        the Sessions page shows them."""
+        self.related_cutoff = requested_similarity(self.request.GET)
+        self.related_outcome = RelatedOutcome(collect_scores=True)
+        self.related_page = None
         term = (self.request.GET.get("search") or "").strip()
         if not term:
             return []
         projects = self._scoped_projects()
-        related = related_project_ids(
-            self.request.user, projects, search_projects(projects, term), term
+        related_ids = related_project_ids(
+            self.request.user,
+            projects,
+            search_projects(projects, term),
+            term,
+            limit=None,
+            cutoff=self.related_cutoff,
+            outcome=self.related_outcome,
         )
-        if not related:
+        if not related_ids:
             return []
+        self.related_page = Paginator(related_ids, RELATED_LIMIT).get_page(
+            self.request.GET.get("related_page")
+        )
+        related = list(self.related_page.object_list)
         found = {
             project.pk: project
             for project in self._for_display(

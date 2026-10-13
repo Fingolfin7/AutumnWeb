@@ -6,7 +6,12 @@ from django.shortcuts import render
 from core.forms import SearchProjectForm
 from core.search import is_truthy
 from core.services.semantic_search import semantic_search_available
-from core.utils import build_exclude_project_meta, summarise_search_filters
+from core.utils import (
+    build_exclude_project_meta,
+    requested_similarity,
+    similarity_slider,
+    summarise_search_filters,
+)
 
 
 @login_required
@@ -43,5 +48,12 @@ def ChartsView(request):
         # is currently applied — see summarise_search_filters.
         "active_filters": summarise_search_filters(request, request.user, related=semantic),
         "semantic_search_available": semantic,
+        # Sets ?similarity= with the other filters; the chart's data request
+        # passes it on from the URL.
+        "related_slider": similarity_slider(
+            request.user, value=requested_similarity(request.GET), field_name="similarity"
+        )
+        if semantic
+        else None,
     }
     return render(request, "core/charts.html", context)

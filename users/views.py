@@ -20,6 +20,8 @@ from allauth.socialaccount.models import SocialAccount
 from allauth.socialaccount.providers.github import views as github_oauth_views
 from allauth.socialaccount.providers.google import views as google_oauth_views
 from .context_processors import configured_social_providers
+from core.services.semantic_search import semantic_search_available, server_min_similarity
+from core.utils import similarity_slider
 import logging
 import mimetypes
 import os
@@ -282,6 +284,14 @@ def profile(request):
         'openai_chatgpt_device_code': request.session.get('openai_chatgpt_device_code') if ai_features_enabled else None,
         'openai_chatgpt_summary': token_bundle_summary(openai_chatgpt_bundle),
         'social_auth_connections': social_auth_connections,
+        # The Related slider's starting point on every search, when meaning-
+        # based search is possible at all.
+        'related_slider': similarity_slider(
+            request.user,
+            field_name='related_similarity',
+            default=server_min_similarity(),
+            default_label="Autumn's default",
+        ) if semantic_search_available(request.user) else None,
     }
     return render(request, 'users/profile.html', context)
 

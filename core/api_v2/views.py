@@ -1133,6 +1133,9 @@ class ProjectsView(V2APIView):
                         matches,
                         data["search"],
                         limit=None,
+                        cutoff=(
+                            round(data["similarity"], 2) if "similarity" in data else None
+                        ),
                         outcome=related_outcome(request),
                     ),
                 )

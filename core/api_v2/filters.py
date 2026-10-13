@@ -7,6 +7,7 @@ from rest_framework.exceptions import ValidationError
 
 from core.models import Context, Projects, SubProjects, Tag
 from core.search import rank_sessions, search_sessions
+from core.services.semantic_search import parse_similarity
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,7 @@ class SessionFilterSpec:
     uuid: UUID | None = None
     search: str | None = None
     related: bool = False
+    similarity: float | None = None
 
     @classmethod
     def from_query_params(cls, qp, user):
@@ -113,6 +115,11 @@ class SessionFilterSpec:
         else:
             errors["related"] = ["Enter true or false."]
 
+        try:
+            values["similarity"] = parse_similarity(qp.get("similarity"))
+        except (TypeError, ValueError):
+            errors["similarity"] = ["Enter a number from 0.25 to 0.60."]
+
         raw_uuid = qp.get("uuid")
         if raw_uuid in (None, ""):
             values["uuid"] = None
@@ -139,7 +146,12 @@ class SessionFilterSpec:
         # Last: related matches are drawn from what the other filters left.
         if self.search is not None:
             queryset = search_sessions(
-                queryset, self.search, user=user, related=self.related, outcome=outcome
+                queryset,
+                self.search,
+                user=user,
+                related=self.related,
+                cutoff=self.similarity,
+                outcome=outcome,
             )
         return queryset
 
@@ -150,6 +162,7 @@ class SessionFilterSpec:
             self.search,
             user=user,
             related=self.related,
+            cutoff=self.similarity,
             outcome=outcome,
         )
 

@@ -314,10 +314,72 @@ def filter_sessions_by_params(
             search_term,
             user=user or getattr(request, "user", None),
             related=is_truthy(params.get("related")),
+            cutoff=requested_similarity(params),
             outcome=outcome,
         )
 
     return sessions
+
+
+def requested_similarity(params):
+    """A page's ?similarity= cutoff, or None when absent or invalid (then the
+    account's default applies)."""
+    from core.services.semantic_search import parse_similarity
+
+    try:
+        return parse_similarity(params.get("similarity"))
+    except (TypeError, ValueError):
+        return None
+
+
+def similarity_slider(
+    user, *, value=None, outcome=None, field_name=None, default=None, default_label="Your default"
+):
+    """Context for core/partials/similarity_slider.html, the Related slider.
+
+    ``value`` is the cutoff in use (default: the account's). With an
+    ``outcome`` that collected scores, the slider shows how many related
+    matches each position keeps, and suggests a looser cutoff when nothing
+    passes. ``field_name`` makes it a form field (Charts/Insights filter
+    sheets, Profile) instead of re-running the page's search when moved.
+    ``default`` (the account's cutoff unless given) is the marked tick.
+    """
+    import math
+
+    from core.services import semantic_search as semantic
+
+    floor, ceiling = semantic.SIMILARITY_FLOOR, semantic.SIMILARITY_CEILING
+
+    def position(cutoff):
+        return round((cutoff - floor) / (ceiling - floor) * 100, 2)
+
+    default = round(semantic.min_similarity(user) if default is None else default, 2)
+    account_default = round(semantic.min_similarity(user), 2)
+    value = account_default if value is None else value
+    slider = {
+        "value": value,
+        "default": default,
+        "default_position": position(default) if floor <= default <= ceiling else None,
+        "default_label": default_label,
+        "floor": floor,
+        "ceiling": ceiling,
+        "step": semantic.SIMILARITY_STEP,
+        "marks": [
+            {"label": label, "value": cutoff, "position": position(cutoff)}
+            for label, cutoff in semantic.SIMILARITY_MARKS
+        ],
+        "field_name": field_name,
+    }
+    if outcome is not None and outcome.included and outcome.collect_scores:
+        slider["counts_json"] = json.dumps(outcome.counts())
+        slider["count"] = sum(1 for score in outcome.scores if score >= value)
+        best = outcome.best
+        slider["best"] = best
+        if best is not None and best < value:
+            slider["loosen_to"] = max(floor, math.floor(best * 100 + 1e-9) / 100)
+        # Folded away (collapsible) unless there is something to do with it.
+        slider["open"] = slider["count"] == 0 or value != account_default
+    return slider
 
 
 #: Free-text search params, in the order their pills should read.
@@ -366,6 +428,13 @@ def summarise_search_filters(
         summary.append(
             related_pill(unavailable=related_unavailable)
         )
+        from core.services.semantic_search import min_similarity
+
+        # The cutoff decides the related total, so it is always on show.
+        cutoff = requested_similarity(params)
+        if cutoff is None:
+            cutoff = min_similarity(user)
+        summary.append({"label": "Closeness", "value": f"{cutoff:.2f}"})
 
     for label, names in (
         ("Context", names_for(Context, [params.get("context") or ""])),

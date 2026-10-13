@@ -8,6 +8,7 @@ from drf_spectacular.utils import extend_schema
 
 from core.api_v2.exceptions import V2APIView, _envelope, related_outcome
 from core.api_v2.filters import SessionFilterSpec
+from core.api_v2.serializers import SEARCH_HELP, similarity_field
 from core.export2 import build_format2_export
 from core.importer import run_import
 from core.importer2 import Format2ConflictError, Format2ValidationError
@@ -29,7 +30,7 @@ class ExportQuerySerializer(serializers.Serializer):
     note_snippet = serializers.CharField(required=False)
     search = serializers.CharField(
         required=False,
-        help_text="Search project names, assigned subproject names and session notes.",
+        help_text=SEARCH_HELP,
     )
     related = serializers.BooleanField(
         required=False,
@@ -38,6 +39,7 @@ class ExportQuerySerializer(serializers.Serializer):
             "Needs AI features and an OpenAI key on the account; otherwise ignored."
         ),
     )
+    similarity = similarity_field()
     compress = serializers.BooleanField(required=False, default=False)
     # "format" collides with DRF's renderer-override query param.
     export_format = serializers.ChoiceField(required=False, choices=("1", "2"), default="2")

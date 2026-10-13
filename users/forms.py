@@ -115,6 +115,15 @@ class ProfileUpdateForm(forms.ModelForm):
             'class': 'profile-default-number',
         }),
     )
+    # Set by the Related slider on the profile page (AI section); a value
+    # equal to the server default is stored as "follow the server".
+    related_similarity = forms.FloatField(
+        min_value=0.25,
+        max_value=0.60,
+        required=False,
+        label='Related match closeness',
+        widget=forms.HiddenInput(),
+    )
 
     # New API key fields (write-only)
     gemini_api_key = forms.CharField(required=False, widget=forms.PasswordInput(render_value=False, attrs={'placeholder': 'Gemini API Key', 'autocomplete': 'new-password'}))
@@ -165,11 +174,23 @@ class ProfileUpdateForm(forms.ModelForm):
     def clean_default_chart_project_count(self):
         return self._preserve_profile_default('default_chart_project_count')
 
+    def clean_related_similarity(self):
+        from core.services.semantic_search import server_min_similarity
+
+        if self.add_prefix('related_similarity') not in self.data:
+            # Not on the page (AI features off): keep what was there.
+            return self.instance.related_similarity if self.instance.pk else None
+        value = self.cleaned_data.get('related_similarity')
+        if value is None:
+            return None
+        value = round(value, 2)
+        return None if value == round(server_min_similarity(), 2) else value
+
     class Meta:
         model = Profile
         fields = ['image', 'timezone', 'automatic_background', 'background_dimming', 'background_image', 'remove_background_image',
                   'default_filter_value', 'default_filter_unit',
                   'insights_default_filter_value', 'insights_default_filter_unit',
-                  'default_chart_project_count',
+                  'default_chart_project_count', 'related_similarity',
                   'gemini_api_key', 'openai_api_key', 'claude_api_key',
                   'clear_gemini_api_key', 'clear_openai_api_key', 'clear_claude_api_key']

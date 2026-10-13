@@ -13,6 +13,8 @@ from core.utils import (
     filter_sessions_by_params,
     filter_by_active_context,
     build_exclude_project_meta,
+    requested_similarity,
+    similarity_slider,
     summarise_search_filters,
 )
 from .llm_handlers import get_llm_handler
@@ -491,6 +493,7 @@ class InsightsView(View):
         keys = [
             "search",
             "related",
+            "similarity",
             "project_name",
             "start_date",
             "end_date",
@@ -695,6 +698,13 @@ class InsightsView(View):
                     request, user, related=semantic, related_unavailable=related.unavailable
                 ),
                 "semantic_search_available": semantic,
+                "related_slider": similarity_slider(
+                    user,
+                    value=requested_similarity(current_filters),
+                    field_name="similarity",
+                )
+                if semantic
+                else None,
             }
 
         data = await sync_to_async(get_all_sync_data)()
@@ -773,6 +783,7 @@ class InsightsView(View):
             "exclude_project_meta_json": data["exclude_project_meta_json"],
             "active_filters": data["active_filters"],
             "semantic_search_available": data["semantic_search_available"],
+            "related_slider": data["related_slider"],
         }
         return await sync_to_async(render)(
             request, "llm_insights/insights.html", context

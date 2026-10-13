@@ -13,6 +13,8 @@ from core.api_helpers import _apply_exclude_filters, _apply_tag_filters
 from core.api_v2.exceptions import V2APIView, related_outcome
 from core.api_v2.filters import SessionFilterSpec
 from core.api_v2.serializers import (
+    SEARCH_HELP,
+    SIMILARITY_HELP,
     ChartPayloadRowSerializer,
     ReportHierarchySerializer,
     ReportTalliesSerializer,
@@ -54,7 +56,7 @@ FILTER_PARAMETERS = [
         ("end_date", "Inclusive local date in YYYY-MM-DD format."),
         ("active", "Filter by active state (true or false)."),
         ("note_snippet", "Case-insensitive note substring."),
-        ("search", "Search project names, assigned subproject names and session notes."),
+        ("search", SEARCH_HELP),
     )
 ] + [
     OpenApiParameter(
@@ -66,7 +68,14 @@ FILTER_PARAMETERS = [
             "With search, also include completed sessions that match it by meaning. "
             "Needs AI features and an OpenAI key on the account; otherwise ignored."
         ),
-    )
+    ),
+    OpenApiParameter(
+        name="similarity",
+        type=OpenApiTypes.DOUBLE,
+        location=OpenApiParameter.QUERY,
+        required=False,
+        description=SIMILARITY_HELP,
+    ),
 ]
 
 
@@ -329,7 +338,7 @@ class ReportChartsView(V2APIView):
         # context/tag/exclusion controls. Dates are deliberately omitted here:
         # SessionFilterSpec above is their sole parser and applies user-TZ days.
         legacy_params = request.query_params.copy()
-        for key in ("start_date", "end_date", "search", "related"):
+        for key in ("start_date", "end_date", "search", "related", "similarity"):
             legacy_params.pop(key, None)
         sessions = filter_by_active_context(
             sessions,
@@ -359,6 +368,7 @@ class ReportChartsView(V2APIView):
                 spec.search,
                 user=request.user,
                 related=spec.related,
+                cutoff=spec.similarity,
                 outcome=related_outcome(request),
             )
         sessions = Sessions.objects.filter(

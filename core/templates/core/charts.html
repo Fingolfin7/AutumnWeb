@@ -34,6 +34,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.0/wordcloud2.min.js"></script>
     <!-- The separate project-name filter retains chart subproject breakdowns. -->
     <script src="{% static 'core/js/search_projects.js' %}?v={{ static_version.search_projects }}" type="text/javascript"></script>
+    <script src="{% static 'core/js/similarity_slider.js' %}?v={{ static_version.similarity_slider }}" type="text/javascript" defer></script>
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script>window.AUTUM_CHART_PROJECT_COUNT = {{ default_chart_project_count|default:7 }};</script>
     <script src="{% static 'core/js/option_pickers.js' %}?v={{ static_version.option_pickers }}" type="text/javascript" defer></script>
@@ -142,6 +143,7 @@
                 {{ search_form.related }}
                 <label for="related-search">Include related sessions</label>
             </div>
+            {% include 'core/partials/similarity_slider.html' with slider=related_slider slider_id='related-similarity' omit_default=True %}
             {% endif %}
 
             <div class="field">

@@ -5,6 +5,25 @@ from django.utils.dateparse import parse_datetime
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+SEARCH_HELP = (
+    "Search project names, assigned subproject names and session notes. Every word "
+    "must appear (in any of them, in any order); put a phrase in double quotes to "
+    "match it as written. Common words such as \"it\" and \"the\" are ignored."
+)
+SIMILARITY_HELP = (
+    "How close a meaning-based match must be to count as related, from 0.25 "
+    "(loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless "
+    "changed in Profile). Only used with search and related=true; the cutoff "
+    "applied is echoed in the X-Autumn-Related-Similarity header."
+)
+
+
+def similarity_field():
+    """The related-match cutoff parameter (core.services.semantic_search bounds)."""
+    return serializers.FloatField(
+        required=False, min_value=0.25, max_value=0.60, help_text=SIMILARITY_HELP
+    )
+
 
 def _local_date(value):
     if value is None:
@@ -222,7 +241,7 @@ class SessionListQuerySerializer(serializers.Serializer):
     note_snippet = serializers.CharField(required=False)
     search = serializers.CharField(
         required=False,
-        help_text="Search project names, assigned subproject names and session notes.",
+        help_text=SEARCH_HELP,
     )
     related = serializers.BooleanField(
         required=False,
@@ -231,6 +250,7 @@ class SessionListQuerySerializer(serializers.Serializer):
             "Needs AI features and an OpenAI key on the account; otherwise ignored."
         ),
     )
+    similarity = similarity_field()
     ordering = serializers.ChoiceField(
         required=False,
         default="relevance",
@@ -667,6 +687,7 @@ class ProjectListQuerySerializer(serializers.Serializer):
             "and an OpenAI key on the account; otherwise ignored."
         ),
     )
+    similarity = similarity_field()
     context_ids = serializers.CharField(required=False)
     tag_ids = serializers.CharField(required=False)
     exclude_project_ids = serializers.CharField(required=False)
