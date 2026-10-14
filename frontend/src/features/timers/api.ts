@@ -21,7 +21,9 @@ export const TIMER_POLL_MS = 15_000;
 const etagCache = new Map<string, { etag: string; timers: Timer[] }>();
 
 export async function fetchTimers(context?: string): Promise<Timer[]> {
-  const url = context ? `/api/v2/timers/?context=${encodeURIComponent(context)}` : "/api/v2/timers/";
+  /* Reminders ride along (and are covered by the ETag), so the cards need no
+     request of their own. */
+  const url = `/api/v2/timers/?include=reminders${context ? `&context=${encodeURIComponent(context)}` : ""}`;
   const cached = etagCache.get(url);
   const headers: Record<string, string> = { "X-Requested-With": "XMLHttpRequest", Accept: "application/json" };
   if (cached) headers["If-None-Match"] = cached.etag;

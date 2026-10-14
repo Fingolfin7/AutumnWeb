@@ -1,9 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { faBell, faStopwatch, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { api, unwrap } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import { useToast } from "@/app/toasts";
+import { keys } from "@/api/keys";
+import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
 
 const MODE_LABEL: Record<string, string> = { after: "Once after", interval: "Every", at: "At" };
@@ -17,18 +19,12 @@ function nextLabel(iso: string) {
   })}`;
 }
 
-/* A running timer's pending reminders with Cancel (.rm-live). */
-export function TimerReminders({ timer, notifyOnAutoStop }: { timer: Timer; notifyOnAutoStop?: boolean }) {
+/* A running timer's pending reminders with Cancel (.rm-live). They come
+   embedded in the timers list (?include=reminders). */
+export function TimerReminders({ timer }: { timer: Timer }) {
   const client = useQueryClient();
+  const invalidate = useInvalidate();
   const toast = useToast();
-  const key = ["timers", "reminders", timer.id];
-  const reminders = useQuery({
-    queryKey: key,
-    enabled: timer.id > 0,
-    staleTime: 60_000,
-    queryFn: async () =>
-      (await unwrap(api.GET("/api/v2/timers/{session_id}/reminders/", { params: { path: { session_id: timer.id } } }))).reminders,
-  });
   const cancel = useMutation({
     mutationFn: (reminderId: number) =>
       unwrap(
@@ -36,11 +32,19 @@ export function TimerReminders({ timer, notifyOnAutoStop }: { timer: Timer; noti
           params: { path: { session_id: timer.id, reminder_id: reminderId } },
         }),
       ),
-    onSuccess: () => client.invalidateQueries({ queryKey: key }),
+    onMutate: (reminderId) => {
+      client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) =>
+        list?.map((t) =>
+          t.id === timer.id ? { ...t, active_reminders: (t.active_reminders ?? []).filter((r) => r.id !== reminderId) } : t,
+        ),
+      );
+    },
     onError: (error) => toast.error(`Couldn't cancel the reminder: ${errorMessage(error)}`),
+    onSettled: () => invalidate("timers"),
   });
 
-  const list = reminders.data ?? [];
+  const list = timer.active_reminders ?? [];
+  const notifyOnAutoStop = timer.notify_on_auto_stop;
   if (!list.length && !notifyOnAutoStop) return null;
   return (
     <div className="rm-live" aria-label="Timer reminders">

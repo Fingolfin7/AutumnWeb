@@ -55,7 +55,7 @@ function TimerCard({ timer, now }: { timer: Timer; now: number }) {
   const stash = useRef<() => void>(() => undefined);
   return (
     <FocusCard timer={timer} now={now} beforeStop={() => stash.current()}>
-      <TimerReminders timer={timer} notifyOnAutoStop={(timer as Timer & { notify_on_auto_stop?: boolean }).notify_on_auto_stop} />
+      <TimerReminders timer={timer} />
       <TimerNoteEditor
         timer={timer}
         registerStash={(fn) => {
