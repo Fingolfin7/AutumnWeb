@@ -4742,7 +4742,6 @@ components:
             $ref: '#/components/schemas/SubprojectResource'
           readOnly: true
       required:
-      - celebration
       - context
       - description
       - id
@@ -4827,7 +4826,6 @@ components:
           nullable: true
           readOnly: true
       required:
-      - celebration
       - context
       - description
       - id
@@ -5323,14 +5321,11 @@ components:
             * `related` - related
       required:
       - active
-      - active_reminders
       - auto_stop_at
-      - celebration
       - duration_minutes
       - elapsed_minutes
       - end
       - id
-      - note_html
       - notify_on_auto_stop
       - project
       - start
@@ -5422,14 +5417,11 @@ components:
           readOnly: true
       required:
       - active
-      - active_reminders
       - auto_stop_at
-      - celebration
       - duration_minutes
       - elapsed_minutes
       - end
       - id
-      - note_html
       - notify_on_auto_stop
       - project
       - start

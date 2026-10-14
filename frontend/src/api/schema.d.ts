@@ -164,6 +164,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/import/uploads/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["import_uploads_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/import/uploads/{upload_id}/stream/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["import_uploads_stream_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/insights/chats/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["insights_chats_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/insights/chats/{chat_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["insights_chats_retrieve"];
+        put?: never;
+        post?: never;
+        delete: operations["insights_chats_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/insights/options/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["insights_options_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/insights/stream/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["insights_stream_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/me/": {
         parameters: {
             query?: never;
@@ -175,6 +271,102 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/account/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me_account_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["me_account_partial_update"];
+        trace?: never;
+    };
+    "/api/v2/me/api-keys/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["me_api_keys_update"];
+        post?: never;
+        delete: operations["me_api_keys_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/avatar/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["me_avatar_update"];
+        post?: never;
+        delete: operations["me_avatar_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/background/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["me_background_update"];
+        post?: never;
+        delete: operations["me_background_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/background/download/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me_background_download_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/chatgpt-login/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me_chatgpt_login_retrieve"];
+        put?: never;
+        post: operations["me_chatgpt_login_create"];
+        delete: operations["me_chatgpt_login_destroy"];
         options?: never;
         head?: never;
         patch?: never;
@@ -194,6 +386,102 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["me_preferences_partial_update"];
+        trace?: never;
+    };
+    "/api/v2/me/social-accounts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["me_social_accounts_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/me/social-accounts/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["me_social_accounts_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/notifications/preferences/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["notifications_preferences_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["notifications_preferences_partial_update"];
+        trace?: never;
+    };
+    "/api/v2/notifications/schedules/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["notifications_schedules_list"];
+        put?: never;
+        post: operations["notifications_schedules_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/notifications/schedules/{schedule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["notifications_schedules_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["notifications_schedules_partial_update"];
+        trace?: never;
+    };
+    "/api/v2/notifications/schedules/{schedule_id}/snooze/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["notifications_schedules_snooze_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v2/projects/": {
@@ -254,6 +542,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["projects_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/push/status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["push_status_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/push/subscriptions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_subscriptions_create"];
+        delete: operations["push_subscriptions_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/push/test/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["push_test_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -396,6 +732,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["reports_totals_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/reports/weekly-review/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reports_weekly_review_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
@@ -600,6 +952,13 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Account: {
+            username: string;
+            /** Format: email */
+            email: string;
+            first_name: string;
+            last_name: string;
+        };
         /**
          * @description * `project` - project
          *     * `subproject` - subproject
@@ -608,6 +967,9 @@ export interface components {
          * @enum {string}
          */
         AggregationTypeEnum: "project" | "subproject" | "context" | "tag";
+        ApiKeyRequest: {
+            key: string;
+        };
         Background: {
             mode: components["schemas"]["BackgroundModeEnum"];
             image_url: string | null;
@@ -630,6 +992,23 @@ export interface components {
          * @enum {string}
          */
         ByEnum: "project" | "subproject" | "context" | "status" | "tag";
+        /**
+         * @description * `once` - once
+         *     * `daily` - daily
+         *     * `weekly` - weekly
+         * @enum {string}
+         */
+        CadenceEnum: "once" | "daily" | "weekly";
+        Celebration: {
+            kind: components["schemas"]["CelebrationKindEnum"];
+            message: string;
+        };
+        /**
+         * @description * `progress` - progress
+         *     * `completion` - completion
+         * @enum {string}
+         */
+        CelebrationKindEnum: "progress" | "completion";
         ChartPayloadRow: {
             /** Format: date-time */
             x?: string;
@@ -653,10 +1032,37 @@ export interface components {
             /** Format: double */
             average_hours?: number;
         };
+        ChatGPTLogin: {
+            status: components["schemas"]["ChatGPTLoginStatusEnum"];
+            user_code?: string;
+            /** Format: uri */
+            verification_url?: string;
+            interval?: number;
+            /** Format: date-time */
+            expires_at?: string | null;
+            /** Format: email */
+            email?: string | null;
+            plan?: string | null;
+            account_id?: string | null;
+        };
+        /**
+         * @description * `pending` - pending
+         *     * `connected` - connected
+         *     * `disconnected` - disconnected
+         * @enum {string}
+         */
+        ChatGPTLoginStatusEnum: "pending" | "connected" | "disconnected";
+        /**
+         * @description * `15m` - 15m
+         *     * `1h` - 1h
+         *     * `tomorrow` - tomorrow
+         * @enum {string}
+         */
+        ChoiceEnum: "15m" | "1h" | "tomorrow";
         CommitmentAdjustmentRequest: {
             amount: number;
             /** @default  */
-            reason: string;
+            reason?: string;
         };
         CommitmentAdjustmentResponse: {
             seq: number;
@@ -846,6 +1252,9 @@ export interface components {
          * @enum {string}
          */
         CommitmentTypeEnum: "time" | "sessions";
+        Configured: {
+            configured: boolean;
+        };
         ConfiguredApiKeys: {
             gemini: boolean;
             openai: boolean;
@@ -979,7 +1388,7 @@ export interface components {
          *     * `year_to_date` - year_to_date
          * @enum {string}
          */
-        DefaultFilterUnitEnum: "days" | "weeks" | "months" | "years" | "month_to_date" | "quarter_to_date" | "year_to_date";
+        FilterUnitEnum: "days" | "weeks" | "months" | "years" | "month_to_date" | "quarter_to_date" | "year_to_date";
         Format2Document: {
             format: number;
             projects: components["schemas"]["Format2Project"][];
@@ -990,7 +1399,7 @@ export interface components {
         };
         Format2Project: {
             name: string;
-            status: components["schemas"]["StatusEnum"];
+            status: components["schemas"]["ProjectStatusEnum"];
             description: string;
             context: string | null;
             tags: string[];
@@ -1013,17 +1422,21 @@ export interface components {
             name: string;
             description: string;
         };
+        ImageUpload: {
+            /** Format: uri */
+            image: string;
+        };
         ImportRequest: {
             data?: unknown;
             data_compressed?: string;
             /** @default false */
-            force: boolean;
+            force?: boolean;
             /** @default false */
-            merge: boolean;
+            merge?: boolean;
             /** @default 2 */
-            tolerance: number;
+            tolerance?: number;
             /** @default false */
-            autumn_import: boolean;
+            autumn_import?: boolean;
             context?: string;
         };
         ImportSummary: {
@@ -1033,23 +1446,134 @@ export interface components {
             sessions_skipped: number;
             conflicts: string[];
         };
-        /**
-         * @description * `days` - days
-         *     * `weeks` - weeks
-         *     * `months` - months
-         *     * `years` - years
-         *     * `month_to_date` - month_to_date
-         *     * `quarter_to_date` - quarter_to_date
-         *     * `year_to_date` - year_to_date
-         * @enum {string}
-         */
-        InsightsDefaultFilterUnitEnum: "days" | "weeks" | "months" | "years" | "month_to_date" | "quarter_to_date" | "year_to_date";
-        /**
-         * @description * `subproject` - subproject
-         *     * `residual` - residual
-         * @enum {string}
-         */
-        Kind0e1Enum: "subproject" | "residual";
+        ImportUploadRequest: {
+            /** Format: uri */
+            file: string;
+            /** @default false */
+            autumn_import?: boolean;
+            /** @default false */
+            force?: boolean;
+            /** @default true */
+            merge?: boolean;
+            /**
+             * Format: double
+             * @default 0.5
+             */
+            tolerance?: number;
+            /** @default false */
+            verbose?: boolean;
+            import_context?: number | null;
+            import_context_new?: string;
+        };
+        ImportUploadResponse: {
+            /** Format: uuid */
+            upload_id: string;
+        };
+        InsightChatDetail: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            model: string;
+            readonly filters: components["schemas"]["InsightFilters"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            messages: components["schemas"]["InsightMessage"][];
+        };
+        InsightChatGroup: {
+            label: string;
+            chats: components["schemas"]["InsightChatSummary"][];
+        };
+        InsightChatList: {
+            groups: components["schemas"]["InsightChatGroup"][];
+        };
+        InsightChatSummary: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        InsightFilters: {
+            search?: string;
+            related?: string;
+            project_name?: string;
+            /** Format: date */
+            start_date?: string;
+            /** Format: date */
+            end_date?: string;
+            note_snippet?: string;
+            context?: number;
+            tags?: number[];
+            include_projects?: number[];
+            exclude_projects?: number[];
+            reasoning_effort?: string;
+        };
+        InsightMessage: {
+            role: components["schemas"]["RoleEnum"];
+            content: string;
+            html: string;
+            /** Format: date-time */
+            created_at: string;
+            metadata: components["schemas"]["InsightMessageMetadata"];
+        };
+        InsightMessageMetadata: {
+            sources?: components["schemas"]["InsightSource"][];
+            model?: string;
+            usage?: components["schemas"]["InsightUsage"];
+            auth_source?: string;
+            error?: boolean;
+            error_message?: string;
+            refusal?: boolean;
+        };
+        InsightModelOption: {
+            value: string;
+            label: string;
+            reasoning_efforts: string[];
+        };
+        InsightOptions: {
+            providers: components["schemas"]["InsightProviderOption"][];
+            /** Format: date */
+            default_start_date: string;
+            /** Format: date */
+            default_end_date: string;
+        };
+        InsightProviderOption: {
+            provider: string;
+            models: components["schemas"]["InsightModelOption"][];
+        };
+        InsightSource: {
+            /** Format: uri */
+            link: string;
+            title: string;
+        };
+        InsightStreamRequest: {
+            /** Format: uuid */
+            chat_id?: string;
+            message: string;
+            provider?: string;
+            model?: string;
+            reasoning_effort?: string;
+            search?: string;
+            related?: boolean;
+            project_name?: string;
+            /** Format: date */
+            start_date?: string;
+            /** Format: date */
+            end_date?: string;
+            note_snippet?: string;
+            context?: number;
+            tags?: number[];
+            include_projects?: number[];
+            exclude_projects?: number[];
+        };
+        InsightUsage: {
+            prompt?: number;
+            response?: number;
+            cached?: number;
+            total?: number;
+        };
         /**
          * @description * `low` - low
          *     * `medium` - medium
@@ -1059,15 +1583,6 @@ export interface components {
          * @enum {string}
          */
         LunaEffortEnum: "low" | "medium" | "high" | "xhigh" | "max";
-        /**
-         * @description * `low` - low
-         *     * `medium` - medium
-         *     * `high` - high
-         *     * `xhigh` - xhigh
-         *     * `max` - max
-         * @enum {string}
-         */
-        LunaRecommendationEffortEnum: "low" | "medium" | "high" | "xhigh" | "max";
         LunaRecommendations: {
             suggestions: components["schemas"]["TimerSuggestion"][];
             advice_status: string;
@@ -1095,9 +1610,34 @@ export interface components {
             username: string;
             timezone: string;
         };
+        MediaStatus: {
+            url: string | null;
+        };
         NamedResource: {
             id: number;
             name: string;
+        };
+        NotificationPreference: {
+            scheduled_reminders_enabled: boolean;
+            commitment_checks_enabled: boolean;
+            weekly_review_enabled: boolean;
+            /** Format: time */
+            commitment_check_time: string;
+            weekly_review_weekday: number;
+            /** Format: time */
+            weekly_review_time: string;
+            /** Format: date-time */
+            next_commitment_check_at: string | null;
+            /** Format: date-time */
+            next_weekly_review_at: string | null;
+            version: number;
+        };
+        PatchedAccountPatch: {
+            username?: string;
+            /** Format: email */
+            email?: string;
+            first_name?: string;
+            last_name?: string;
         };
         PatchedCommitmentChangesRequest: {
             aggregation_type?: components["schemas"]["AggregationTypeEnum"];
@@ -1128,29 +1668,53 @@ export interface components {
             name?: string;
             description?: string | null;
         };
+        PatchedNotificationPreferencePatch: {
+            scheduled_reminders_enabled?: boolean;
+            commitment_checks_enabled?: boolean;
+            weekly_review_enabled?: boolean;
+            /** Format: time */
+            commitment_check_time?: string;
+            weekly_review_weekday?: number;
+            /** Format: time */
+            weekly_review_time?: string;
+        };
         PatchedPreferencesRequest: {
             timezone?: string;
             default_filter_value?: number;
-            default_filter_unit?: components["schemas"]["DefaultFilterUnitEnum"];
+            default_filter_unit?: components["schemas"]["FilterUnitEnum"];
             insights_default_filter_value?: number;
-            insights_default_filter_unit?: components["schemas"]["InsightsDefaultFilterUnitEnum"];
+            insights_default_filter_unit?: components["schemas"]["FilterUnitEnum"];
             default_chart_project_count?: number;
             background_dimming?: number;
             automatic_background?: boolean;
             bing_background?: boolean;
             nasa_apod_background?: boolean;
-            luna_recommendation_effort?: components["schemas"]["LunaRecommendationEffortEnum"];
+            luna_recommendation_effort?: components["schemas"]["LunaEffortEnum"];
             ai_features_enabled?: boolean;
             active_context_id?: number | null;
         };
         PatchedProjectPatchRequest: {
             name?: string;
             description?: string;
-            status?: components["schemas"]["StatusEnum"];
+            status?: components["schemas"]["ProjectStatusEnum"];
             context_id?: number | null;
             tag_ids?: number[];
             /** Format: date */
             start_date?: string;
+        };
+        PatchedSchedulePatch: {
+            target?: components["schemas"]["TargetEnum"];
+            project?: number | null;
+            context?: number | null;
+            tag?: number | null;
+            subprojects?: number[];
+            /** Format: date */
+            local_date?: string;
+            /** Format: time */
+            local_time?: string;
+            cadence?: components["schemas"]["CadenceEnum"];
+            message?: string;
+            version?: number;
         };
         PatchedSessionPatchRequest: {
             project_id?: number;
@@ -1218,14 +1782,14 @@ export interface components {
             name: string;
             description?: string;
             /** @default active */
-            status: components["schemas"]["StatusEnum"];
+            status?: components["schemas"]["ProjectStatusEnum"];
             context_id?: number | null;
             tag_ids?: number[];
         };
         ProjectDetailResource: {
             id: number;
             name: string;
-            status: components["schemas"]["StatusEnum"];
+            status: components["schemas"]["ProjectStatusEnum"];
             readonly description: string;
             context: components["schemas"]["NamedResource"] | null;
             readonly tags: components["schemas"]["NamedResource"][];
@@ -1236,6 +1800,7 @@ export interface components {
             /** Format: double */
             readonly total_minutes: number;
             session_count: number;
+            readonly celebration?: components["schemas"]["Celebration"] | null;
             readonly subprojects: components["schemas"]["SubprojectResource"][];
         };
         ProjectListResponse: {
@@ -1250,7 +1815,7 @@ export interface components {
         ProjectResource: {
             id: number;
             name: string;
-            status: components["schemas"]["StatusEnum"];
+            status: components["schemas"]["ProjectStatusEnum"];
             readonly description: string;
             context: components["schemas"]["NamedResource"] | null;
             readonly tags: components["schemas"]["NamedResource"][];
@@ -1261,10 +1826,44 @@ export interface components {
             /** Format: double */
             readonly total_minutes: number;
             session_count: number;
+            readonly celebration?: components["schemas"]["Celebration"] | null;
         };
+        /**
+         * @description * `active` - active
+         *     * `paused` - paused
+         *     * `complete` - complete
+         *     * `archived` - archived
+         * @enum {string}
+         */
+        ProjectStatusEnum: "active" | "paused" | "complete" | "archived";
         ProjectSummary: {
             id: number;
             name: string;
+        };
+        PushKeys: {
+            p256dh: string;
+            auth: string;
+        };
+        PushStatus: {
+            available: boolean;
+            public_key: string | null;
+            configuration_error: string | null;
+            subscriptions: number;
+            subscribed: boolean;
+        };
+        PushSubscriptionRequest: {
+            /** Format: uri */
+            endpoint: string;
+            expirationTime?: number | null;
+            keys: components["schemas"]["PushKeys"];
+        };
+        PushSubscriptionResponse: {
+            id: number;
+            active: boolean;
+        };
+        PushTestResponse: {
+            queued: boolean;
+            event_id: number;
         };
         RecommendationCacheHit: {
             provider: string;
@@ -1272,7 +1871,7 @@ export interface components {
         };
         RecommendationUsageRequest: {
             /** @default 7 */
-            days: number;
+            days?: number;
         };
         RecommendationUsageResponse: {
             days: number;
@@ -1301,13 +1900,19 @@ export interface components {
             projects: components["schemas"]["ReportHierarchyProject"][];
         };
         ReportHierarchyChild: {
-            kind: components["schemas"]["Kind0e1Enum"];
+            kind: components["schemas"]["ReportHierarchyKindEnum"];
             project_id?: number;
             id: number | null;
             name: string | null;
             /** Format: double */
             total_minutes: number;
         };
+        /**
+         * @description * `subproject` - subproject
+         *     * `residual` - residual
+         * @enum {string}
+         */
+        ReportHierarchyKindEnum: "subproject" | "residual";
         ReportHierarchyProject: {
             id: number;
             name: string;
@@ -1320,7 +1925,7 @@ export interface components {
             entries: components["schemas"]["ReportTallyEntry"][];
         };
         ReportTallyEntry: {
-            kind?: components["schemas"]["Kind0e1Enum"];
+            kind?: components["schemas"]["ReportHierarchyKindEnum"];
             project_id?: number;
             id: number | null;
             name: string | null;
@@ -1332,6 +1937,55 @@ export interface components {
             /** Format: double */
             total_minutes: number;
             session_count: number;
+        };
+        /**
+         * @description * `system` - system
+         *     * `user` - user
+         *     * `assistant` - assistant
+         * @enum {string}
+         */
+        RoleEnum: "system" | "user" | "assistant";
+        Schedule: {
+            id: number;
+            target: string;
+            target_resource: components["schemas"]["ScheduleNamedResource"];
+            subprojects: components["schemas"]["ScheduleNamedResource"][];
+            message: string;
+            cadence: string;
+            timezone: string;
+            /** Format: date */
+            local_date: string;
+            /** Format: time */
+            local_time: string;
+            /** Format: date-time */
+            next_fire_at: string | null;
+            /** Format: date-time */
+            snoozed_until: string | null;
+            active: boolean;
+            version: number;
+        };
+        ScheduleList: {
+            count: number;
+            schedules: components["schemas"]["Schedule"][];
+            upcoming: components["schemas"]["Schedule"][];
+        };
+        ScheduleNamedResource: {
+            id: number;
+            name: string;
+        };
+        ScheduleWrite: {
+            target: components["schemas"]["TargetEnum"];
+            project?: number | null;
+            context?: number | null;
+            tag?: number | null;
+            subprojects?: number[];
+            /** Format: date */
+            local_date: string;
+            /** Format: time */
+            local_time: string;
+            cadence: components["schemas"]["CadenceEnum"];
+            message?: string;
+            version?: number;
         };
         SessionListItem: {
             id: number;
@@ -1356,13 +2010,16 @@ export interface components {
              * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
              */
             auto_stop_at: string | null;
+            notify_on_auto_stop: boolean;
             /** Format: double */
             readonly duration_minutes: number | null;
             /** Format: double */
             readonly elapsed_minutes: number | null;
             note?: string | null;
-            readonly note_html: string;
+            readonly note_html?: string;
             commitment_history_unaffected?: boolean;
+            readonly active_reminders?: components["schemas"]["TimerReminder"][];
+            readonly celebration?: components["schemas"]["Celebration"] | null;
             /**
              * @description With search: direct when the session's project, subproject or note contains the search text, related when it matches only by meaning.
              *
@@ -1399,13 +2056,16 @@ export interface components {
              * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
              */
             auto_stop_at: string | null;
+            notify_on_auto_stop: boolean;
             /** Format: double */
             readonly duration_minutes: number | null;
             /** Format: double */
             readonly elapsed_minutes: number | null;
             note?: string | null;
-            readonly note_html: string;
+            readonly note_html?: string;
             commitment_history_unaffected?: boolean;
+            readonly active_reminders?: components["schemas"]["TimerReminder"][];
+            readonly celebration?: components["schemas"]["Celebration"] | null;
         };
         SessionTrackRequest: {
             project_id: number;
@@ -1425,14 +2085,21 @@ export interface components {
             uuid?: string;
             subproject_allocations?: components["schemas"]["SubprojectAllocationWrite"][];
         };
-        /**
-         * @description * `active` - active
-         *     * `paused` - paused
-         *     * `complete` - complete
-         *     * `archived` - archived
-         * @enum {string}
-         */
-        StatusEnum: "active" | "paused" | "complete" | "archived";
+        SnoozeRequest: {
+            choice: components["schemas"]["ChoiceEnum"];
+            version: number;
+        };
+        SocialAccount: {
+            provider: string;
+            name: string;
+            connected: boolean;
+            available: boolean;
+            identity: string;
+            login_url: string | null;
+        };
+        SocialAccounts: {
+            accounts: components["schemas"]["SocialAccount"][];
+        };
         SubprojectAllocation: {
             subproject_id: number;
             name: string;
@@ -1485,6 +2152,13 @@ export interface components {
             name?: string;
             color?: string | null;
         };
+        /**
+         * @description * `project` - project
+         *     * `context` - context
+         *     * `tag` - tag
+         * @enum {string}
+         */
+        TargetEnum: "project" | "context" | "tag";
         TimelineBlock: {
             session_id: number;
             is_live: boolean;
@@ -1592,6 +2266,15 @@ export interface components {
              */
             created_at: string;
         };
+        TimerReminderCreate: {
+            mode: components["schemas"]["TimerReminderModeEnum"];
+            /** Format: double */
+            amount?: number;
+            unit?: components["schemas"]["UnitEnum"];
+            /** Format: date-time */
+            at?: string;
+            message?: string;
+        };
         TimerReminderList: {
             count: number;
             reminders: components["schemas"]["TimerReminder"][];
@@ -1623,6 +2306,9 @@ export interface components {
             start?: string;
             /** Format: uuid */
             uuid?: string;
+            /** @default false */
+            notify_on_auto_stop?: boolean;
+            reminder?: components["schemas"]["TimerReminderCreate"];
         };
         TimerStopRequest: {
             /**
@@ -1659,6 +2345,62 @@ export interface components {
          * @enum {string}
          */
         TimerSuggestionKindEnum: "recent" | "habit" | "commitment" | "luna";
+        /**
+         * @description * `minutes` - minutes
+         *     * `hours` - hours
+         * @enum {string}
+         */
+        UnitEnum: "minutes" | "hours";
+        WeeklyCommitment: {
+            commitment_id: number;
+            target_name: string;
+            period_count: number;
+            met_period_count: number;
+            met: boolean;
+            periods: components["schemas"]["WeeklyPeriod"][];
+        };
+        WeeklyPeriod: {
+            /** Format: double */
+            actual: number;
+            /** Format: double */
+            target: number;
+            /** Format: double */
+            balance: number;
+            banking_enabled: boolean;
+            met: boolean;
+            saved_by_bank: boolean;
+            /** Format: date-time */
+            period_start: string;
+            /** Format: date-time */
+            period_end: string;
+        };
+        WeeklyProject: {
+            project_id: number;
+            project_name: string;
+            /** Format: double */
+            total_minutes: number;
+            session_count: number;
+        };
+        WeeklyReview: {
+            /** Format: date-time */
+            window_start: string;
+            /** Format: date-time */
+            window_end: string;
+            timezone: string;
+            /** Format: date */
+            week_start: string;
+            /** Format: date */
+            week_end: string;
+            /** Format: double */
+            total_minutes: number;
+            duration_label: string;
+            project_count: number;
+            session_count: number;
+            per_project: components["schemas"]["WeeklyProject"][];
+            met_count: number;
+            eligible_count: number;
+            details: components["schemas"]["WeeklyCommitment"][];
+        };
     };
     responses: never;
     parameters: never;
@@ -1999,6 +2741,7 @@ export interface operations {
                 export_format?: "1" | "2";
                 note_snippet?: string;
                 project_ids?: string;
+                project_name?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
                 /** @description Search project names, assigned subproject names and session notes. */
@@ -2048,6 +2791,158 @@ export interface operations {
             };
         };
     };
+    import_uploads_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportUploadRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ImportUploadRequest"];
+                "multipart/form-data": components["schemas"]["ImportUploadRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportUploadResponse"];
+                };
+            };
+        };
+    };
+    import_uploads_stream_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                upload_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent default message events. Each data payload is a JSON object with a message string containing an import progress, completion, skipped-project, or Error line from iter_import. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+        };
+    };
+    insights_chats_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightChatList"];
+                };
+            };
+        };
+    };
+    insights_chats_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightChatDetail"];
+                };
+            };
+        };
+    };
+    insights_chats_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    insights_options_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightOptions"];
+                };
+            };
+        };
+    };
+    insights_stream_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsightStreamRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["InsightStreamRequest"];
+                "multipart/form-data": components["schemas"]["InsightStreamRequest"];
+            };
+        };
+        responses: {
+            /** @description Server-sent events. Emits chat (chat identifiers/URLs), delta (content fragment), done (final content, rendered HTML, sources, usage and model), error, plus keep-alive comment lines. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+        };
+    };
     me_retrieve: {
         parameters: {
             query?: never;
@@ -2064,6 +2959,257 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Me"];
                 };
+            };
+        };
+    };
+    me_account_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+        };
+    };
+    me_account_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedAccountPatch"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedAccountPatch"];
+                "multipart/form-data": components["schemas"]["PatchedAccountPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Account"];
+                };
+            };
+        };
+    };
+    me_api_keys_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApiKeyRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["ApiKeyRequest"];
+                "multipart/form-data": components["schemas"]["ApiKeyRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Configured"];
+                };
+            };
+        };
+    };
+    me_api_keys_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_avatar_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImageUpload"];
+                "application/x-www-form-urlencoded": components["schemas"]["ImageUpload"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaStatus"];
+                };
+            };
+        };
+    };
+    me_avatar_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_background_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["ImageUpload"];
+                "application/x-www-form-urlencoded": components["schemas"]["ImageUpload"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaStatus"];
+                };
+            };
+        };
+    };
+    me_background_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    me_background_download_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current automatic or uploaded background file download. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+        };
+    };
+    me_chatgpt_login_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGPTLogin"];
+                };
+            };
+        };
+    };
+    me_chatgpt_login_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGPTLogin"];
+                };
+            };
+        };
+    };
+    me_chatgpt_login_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2107,6 +3253,207 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreferencesResponse"];
+                };
+            };
+        };
+    };
+    me_social_accounts_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SocialAccounts"];
+                };
+            };
+        };
+    };
+    me_social_accounts_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Social account disconnected. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    notifications_preferences_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreference"];
+                };
+            };
+        };
+    };
+    notifications_preferences_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedNotificationPreferencePatch"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedNotificationPreferencePatch"];
+                "multipart/form-data": components["schemas"]["PatchedNotificationPreferencePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreference"];
+                };
+            };
+        };
+    };
+    notifications_schedules_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleList"];
+                };
+            };
+        };
+    };
+    notifications_schedules_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleWrite"];
+                "application/x-www-form-urlencoded": components["schemas"]["ScheduleWrite"];
+                "multipart/form-data": components["schemas"]["ScheduleWrite"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+        };
+    };
+    notifications_schedules_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Schedule cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    notifications_schedules_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedSchedulePatch"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedSchedulePatch"];
+                "multipart/form-data": components["schemas"]["PatchedSchedulePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
+                };
+            };
+        };
+    };
+    notifications_schedules_snooze_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnoozeRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["SnoozeRequest"];
+                "multipart/form-data": components["schemas"]["SnoozeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Schedule"];
                 };
             };
         };
@@ -2313,6 +3660,87 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectResource"];
+                };
+            };
+        };
+    };
+    push_status_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushStatus"];
+                };
+            };
+        };
+    };
+    push_subscriptions_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PushSubscriptionRequest"];
+                "multipart/form-data": components["schemas"]["PushSubscriptionRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscriptionResponse"];
+                };
+            };
+        };
+    };
+    push_subscriptions_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No response body */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    push_test_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushTestResponse"];
                 };
             };
         };
@@ -2631,6 +4059,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReportTotals"];
+                };
+            };
+        };
+    };
+    reports_weekly_review_retrieve: {
+        parameters: {
+            query?: {
+                week?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyReview"];
                 };
             };
         };

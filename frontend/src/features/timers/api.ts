@@ -105,6 +105,7 @@ export function pendingTimer(op: QueuedStart): Timer {
     duration_minutes: null,
     elapsed_minutes: 0,
     note: (op.body.note as string | null | undefined) ?? null,
+    notify_on_auto_stop: op.body.notify_on_auto_stop === true,
     pending_sync: true,
   };
 }
@@ -124,11 +125,7 @@ export function useStartTimer() {
       const body = { ...rest, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() };
       try {
         return await unwrap(
-          api.POST("/api/v2/timers/", {
-            /* notify_on_auto_stop / reminder are newer optional fields; the
-               cast goes away once the regenerated schema has them. */
-            body: body as never,
-          }),
+          api.POST("/api/v2/timers/", { body }),
         );
       } catch (error) {
         if (!isOffline(error)) throw error;
@@ -162,6 +159,7 @@ export function useStartTimer() {
           duration_minutes: null,
           elapsed_minutes: 0,
           note: input.note ?? null,
+          notify_on_auto_stop: input.notify_on_auto_stop ?? false,
         };
         client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) => [...(list ?? []), placeholder]);
       }

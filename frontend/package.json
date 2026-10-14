@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "gen:api": "openapi-typescript ../openapi-v2.yaml -o src/api/schema.d.ts"
+    "gen:api": "openapi-typescript ../openapi-v2.yaml -o src/api/schema.d.ts --default-non-nullable false"
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.15.4",

@@ -187,6 +187,7 @@ SPECTACULAR_SETTINGS = {
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",
         "core.api_v2.schema.mark_mcp_operations",
+        "core.api_v2.schema.relax_conditional_fields",
     ],
 }
 

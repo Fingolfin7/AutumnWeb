@@ -169,10 +169,17 @@ class SessionResourceSerializer(serializers.Serializer):
 
     @extend_schema_field(serializers.CharField())
     def get_note_html(self, session):
+        # Dropped in to_representation unless asked for; skip the rendering.
+        if not self.context.get("include_note_html", False):
+            return None
         return render_markdown(session.note or "")
 
     @extend_schema_field(TimerReminderSerializer(many=True))
     def get_active_reminders(self, session):
+        # Dropped in to_representation unless asked for; without this guard
+        # every listed session would run its own reminders query.
+        if not self.context.get("include_reminders", False):
+            return []
         reminders = getattr(session, "active_reminders", None)
         if reminders is None:
             reminders = session.reminders.filter(active=True).order_by("next_fire_at", "id")

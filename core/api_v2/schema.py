@@ -115,3 +115,33 @@ def mark_mcp_operations(result, generator, request, public):
                     f"{method.upper()} {path} ({operation_id})"
                 )
     return result
+
+
+# Response fields a serializer drops unless asked for (?include=) or unless
+# they apply (a celebration only follows a stop or completion). drf-spectacular
+# marks every read-only field required, which would tell typed clients they
+# are always present.
+CONDITIONAL_RESPONSE_FIELDS = {
+    "SessionResource": {"note_html", "active_reminders", "celebration"},
+    "SessionListItem": {"note_html", "active_reminders", "celebration"},
+    "ProjectResource": {"celebration"},
+    "ProjectDetailResource": {"celebration"},
+}
+
+
+def relax_conditional_fields(result, generator, request, public):
+    """Mark CONDITIONAL_RESPONSE_FIELDS optional in their components."""
+    schemas = result.get("components", {}).get("schemas", {})
+    for name, fields in CONDITIONAL_RESPONSE_FIELDS.items():
+        component = schemas.get(name)
+        if component is None:
+            raise RuntimeError(f"OpenAPI component {name} is missing")
+        missing = fields - set(component.get("properties", {}))
+        if missing:
+            raise RuntimeError(f"{name} has no {sorted(missing)}")
+        required = [field for field in component.get("required", []) if field not in fields]
+        if required:
+            component["required"] = required
+        else:
+            component.pop("required", None)
+    return result
