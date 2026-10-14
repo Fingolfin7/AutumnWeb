@@ -228,8 +228,7 @@ class PassageSearchTests(SemanticSearchTestCase):
         self.assertEqual(ids, [self.failure_note.pk, self.oauth.pk, self.long.pk])
 
     def test_a_project_is_related_through_a_passage(self):
-        response = self.client.get(reverse("projects"), {"search": "sign-in failure"})
-        self.assertIn(self.garden.pk, [p.pk for p in response.context["related_projects"]])
+        self.assertIn(self.garden.pk, self._related_projects("sign-in failure"))
 
     def test_other_accounts_passages_never_appear(self):
         other = self._user("semantic-passages-other", "other-key")

@@ -138,41 +138,71 @@ class SemanticSearchTestCase(TestCase):
         return out.getvalue()
 
     def _search(self, term, **params):
-        return self.client.get(reverse("sessions"), {"search": term, **params})
+        """GET /api/v2/sessions/ with related matches switched on."""
+        response = self.client.get(
+            reverse("api_v2:sessions"), {"search": term, "related": "true", "limit": 500, **params}
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        return response
+
+    def _matches(self, term, kind, **params):
+        rows = self._search(term, **params).json()["sessions"]
+        return [row["id"] for row in rows if row["match"] == kind]
+
+    def _direct(self, term, **params):
+        return self._matches(term, "direct", **params)
+
+    def _project_ids(self, term, *, related=True, **params):
+        response = self.client.get(
+            reverse("api_v2:projects"),
+            {"search": term, "related": "true" if related else "false", "limit": 500, **params},
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        return [row["id"] for row in response.json()["projects"]]
+
+    def _related_projects(self, term, **params):
+        """Projects /api/v2/projects/ adds for ``related=true`` (a set)."""
+        keyword = set(self._project_ids(term, related=False, **params))
+        return {pk for pk in self._project_ids(term, **params) if pk not in keyword}
 
     def _related(self, term, **params):
-        return [session.pk for session in self._search(term, **params).context["related_sessions"]]
+        return self._matches(term, "related", **params)
 
 
 class RelatedSessionsTests(SemanticSearchTestCase):
     def test_paraphrase_missed_by_keywords_is_related(self):
         self._sync()
-        response = self._search("sign-in failure")
+        payload = self._search("sign-in failure", include="note").json()
 
         # Keyword results are exactly what they were; only the note that says
-        # the words matches them.
-        self.assertEqual([s.pk for s in response.context["object_list"]], [self.failure_note.pk])
-        self.assertEqual([s.pk for s in response.context["related_sessions"]], [self.oauth.pk])
-        self.assertContains(response, 'aria-label="Related sessions"')
-        self.assertContains(response, "Repaired OAuth token refresh")
+        # the words matches them. Related ones follow, labelled as such.
+        self.assertEqual(
+            [(row["id"], row["match"]) for row in payload["sessions"]],
+            [(self.failure_note.pk, "direct"), (self.oauth.pk, "related")],
+        )
+        self.assertEqual(payload["sessions"][1]["note"], "Repaired OAuth token refresh")
 
     def test_unrelated_query_shows_no_related_section(self):
         self._sync()
-        response = self._search("nonexistent lighthouse project")
-        self.assertEqual(response.context["related_sessions"], [])
-        self.assertNotContains(response, "Related sessions")
+        payload = self._search("nonexistent lighthouse project").json()
+        self.assertEqual(payload["sessions"], [])
+        self.assertEqual(payload["total"], 0)
 
-    def test_related_pages_on_its_own_and_list_is_unchanged(self):
+    def test_related_follows_every_direct_match_when_paging(self):
         for day in range(10):
             self._session(self.identity, f"Sign-in failure triage {day}", days_ago=20 + day)
         self._sync()
-        first = self._search("sign-in failure")
-        self.assertTrue(first.context["is_paginated"])
-        self.assertEqual(first.context["result_count"], 11)
-        self.assertEqual([s.pk for s in first.context["related_sessions"]], [self.oauth.pk])
-        # The list's pager leaves the Related section where it was.
-        second = self._search("sign-in failure", page=2)
-        self.assertEqual([s.pk for s in second.context["related_sessions"]], [self.oauth.pk])
+        everything = self._search("sign-in failure").json()
+        self.assertEqual(everything["total"], 12)  # 11 direct, then the related one
+        paged = []
+        for offset in (0, 5, 10):
+            paged += [
+                (row["id"], row["match"])
+                for row in self._search("sign-in failure", offset=offset, limit=5).json()["sessions"]
+            ]
+        self.assertEqual(paged, [(row["id"], row["match"]) for row in everything["sessions"]])
+        self.assertEqual(paged[-1], (self.oauth.pk, "related"))
+        self.assertEqual({match for _, match in paged[:-1]}, {"direct"})
 
     def test_query_vector_is_cached(self):
         self._sync()
@@ -236,12 +266,12 @@ class FilterTests(SemanticSearchTestCase):
             ({}, [self.oauth.pk]),
             ({"start_date": old}, []),
             ({"end_date": old}, [self.oauth.pk]),
-            ({"context": str(self.home.pk)}, []),
-            ({"context": str(self.work.pk)}, [self.oauth.pk]),
-            ({"tags": str(self.security.pk)}, [self.oauth.pk]),
-            ({"exclude_projects": str(self.identity.pk)}, []),
-            ({"include_projects": str(self.garden.pk)}, []),
-            ({"include_projects": str(self.identity.pk)}, [self.oauth.pk]),
+            ({"context_ids": str(self.home.pk)}, []),
+            ({"context_ids": str(self.work.pk)}, [self.oauth.pk]),
+            ({"tag_ids": str(self.security.pk)}, [self.oauth.pk]),
+            ({"exclude_project_ids": str(self.identity.pk)}, []),
+            ({"project_ids": str(self.garden.pk)}, []),
+            ({"project_ids": str(self.identity.pk)}, [self.oauth.pk]),
             ({"note_snippet": "plants"}, []),
         )
         for params, expected in cases:
@@ -250,9 +280,8 @@ class FilterTests(SemanticSearchTestCase):
 
     def test_keyword_matches_are_not_repeated_as_related(self):
         # "oauth" matches the note by substring, so it is a keyword result.
-        response = self._search("oauth")
-        self.assertIn(self.oauth.pk, [s.pk for s in response.context["object_list"]])
-        self.assertNotIn(self.oauth.pk, [s.pk for s in response.context["related_sessions"]])
+        self.assertIn(self.oauth.pk, self._direct("oauth"))
+        self.assertNotIn(self.oauth.pk, self._related("oauth"))
 
 
 class StalenessTests(SemanticSearchTestCase):
@@ -318,9 +347,11 @@ class FallbackTests(SemanticSearchTestCase):
                 profile.set_api_key("openai", key)
                 profile.save()
                 response = self._search("sign-in failure")
-                self.assertEqual([s.pk for s in response.context["object_list"]], [self.failure_note.pk])
-                self.assertEqual(response.context["related_sessions"], [])
-                self.assertNotContains(response, "Related sessions")
+                self.assertEqual(response["X-Autumn-Related"], "unavailable")
+                self.assertEqual(
+                    [(row["id"], row["match"]) for row in response.json()["sessions"]],
+                    [(self.failure_note.pk, "direct")],
+                )
         self.assertEqual(FakeOpenAI.instances, [])
 
     def test_command_skips_accounts_without_ai_or_key(self):
@@ -343,8 +374,11 @@ class FallbackTests(SemanticSearchTestCase):
         with self.assertLogs("core.services.semantic_search", "WARNING"):
             response = self._search("sign-in failure")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual([s.pk for s in response.context["object_list"]], [self.failure_note.pk])
-        self.assertEqual(response.context["related_sessions"], [])
+        self.assertEqual(response["X-Autumn-Related"], "unavailable")
+        self.assertEqual(
+            [(row["id"], row["match"]) for row in response.json()["sessions"]],
+            [(self.failure_note.pk, "direct")],
+        )
         failed = RecommendationUsage.objects.get(user=self.user, success=False)
         self.assertEqual(failed.error_category, "TimeoutError")
 

@@ -1,11 +1,11 @@
-"""One Sessions search for the web page, API v2 and MCP.
+"""One Sessions search for API v2 (which the React Sessions page uses) and MCP.
 
 Regression for a paraphrase search ("dizzy during leg curls"): two sessions
-describe it without the word, and the Sessions page's Related section showed only the five most
-similar matches, so the one ranked seventh (#5580, a long workout log where
-the relevant sentence is a small part) was out of reach on the page while the
-API listed all nine. Both now take the same ranked list from
-core.search.rank_sessions.
+describe it without the word, and a Related section showing only the five
+most similar matches left the one ranked seventh (#5580, a long workout log
+where the relevant sentence is a small part) out of reach while the API listed
+all nine. Every interface now takes the same ranked list from
+core.search.rank_sessions, and pages through it by offset.
 
 Fictional stand-in notes keep the real ids and the production similarity
 order; the fake model returns a chosen similarity to the query per note.
@@ -108,21 +108,6 @@ class SearchParityTests(SemanticSearchTestCase):
 
     # ------------------------------------------------------------ surfaces --
 
-    def _web(self, term, **params):
-        """Sessions page: (direct list ids, every related id across its pages)."""
-        response = self.client.get(reverse("sessions"), {"search": term, **params})
-        self.assertEqual(response.status_code, 200)
-        direct = [s.pk for s in response.context["paginator"].object_list] if term else []
-        related, page = [], response.context["related_page"]
-        while page is not None:
-            response = self.client.get(
-                reverse("sessions"), {"search": term, "related_page": page.number, **params}
-            )
-            related += [s.pk for s in response.context["related_sessions"]]
-            page = response.context["related_page"]
-            page = page.paginator.page(page.next_page_number()) if page.has_next() else None
-        return direct, related
-
     def _api(self, **params):
         response = self.client.get(reverse("api_v2:sessions"), params)
         self.assertEqual(response.status_code, 200, response.content)
@@ -151,38 +136,29 @@ class SearchParityTests(SemanticSearchTestCase):
     def test_keyword_only_finds_nothing_for_the_paraphrase(self):
         self.assertEqual(self._api(search=QUERY)["total"], 0)
         self.assertEqual(self._mcp(search=QUERY, related=False, limit=500)["total"], 0)
-        response = self.client.get(reverse("sessions"), {"search": QUERY})
-        self.assertEqual(response.context["result_count"], 0)
 
     def test_both_relevant_sessions_are_retrievable_everywhere(self):
-        direct, related = self._web(QUERY)
-        self.assertEqual(direct, [])
-        self.assertTrue(RELEVANT <= set(related))
         api = self._api(search=QUERY, related="true", include="note")
         self.assertTrue(RELEVANT <= set(self._ids(api)))
         self.assertNotIn("dizzy", " ".join(row["note"] for row in api["sessions"]).lower())
         self.assertTrue(RELEVANT <= set(self._ids(self._mcp(search=QUERY, related=True, limit=100))))
 
-    def test_web_api_and_mcp_list_the_same_sessions_in_the_same_order(self):
-        direct, related = self._web(QUERY)
+    def test_api_and_mcp_list_the_same_sessions_in_the_same_order(self):
         api = self._api(search=QUERY, related="true")
         mcp = self._mcp(search=QUERY, related=True, include="note", limit=100)
-        self.assertEqual(direct + related, BY_SIMILARITY)
         self.assertEqual(self._ids(api), BY_SIMILARITY)
         self.assertEqual(self._ids(mcp), BY_SIMILARITY)
         self.assertEqual(api["total"], mcp["total"])
         self.assertEqual(api["total"], len(BY_SIMILARITY))
         self.assertEqual({row["match"] for row in api["sessions"]}, {"related"})
 
-    def test_pages_line_up_across_web_and_api(self):
-        # The page's Related section shows RELATED_LIMIT at a time; #5580 is
-        # seventh, on its second page, and at the same API offset.
-        first = self.client.get(reverse("sessions"), {"search": QUERY})
-        self.assertEqual([s.pk for s in first.context["related_sessions"]], BY_SIMILARITY[:RELATED_LIMIT])
-        self.assertEqual(first.context["related_page"].paginator.count, len(BY_SIMILARITY))
-        self.assertContains(first, 'aria-label="Related pages"')
-        second = self.client.get(reverse("sessions"), {"search": QUERY, "related_page": 2})
-        page_two = [s.pk for s in second.context["related_sessions"]]
+    def test_pages_line_up_across_api_and_mcp(self):
+        # A client showing RELATED_LIMIT at a time (the Sessions page's
+        # Related section did): #5580 is seventh, on the second page.
+        first = self._api(search=QUERY, related="true", limit=RELATED_LIMIT)
+        self.assertEqual(self._ids(first), BY_SIMILARITY[:RELATED_LIMIT])
+        self.assertEqual(first["total"], len(BY_SIMILARITY))
+        page_two = BY_SIMILARITY[RELATED_LIMIT : 2 * RELATED_LIMIT]
         self.assertIn(5580, page_two)
         api = self._api(search=QUERY, related="true", offset=RELATED_LIMIT, limit=RELATED_LIMIT)
         self.assertEqual(self._ids(api), page_two)
@@ -192,16 +168,11 @@ class SearchParityTests(SemanticSearchTestCase):
 
     def test_ordinary_keyword_search_finds_both(self):
         self.assertEqual(self._ids(self._api(search=KEYWORD)), [5642, 5580])
-        direct, _ = self._web(KEYWORD)
-        self.assertEqual(direct, [5642, 5580])
 
     def test_related_keeps_keyword_matches_first_and_labelled_direct(self):
         api = self._api(search=KEYWORD, related="true")
         mcp = self._mcp(search=KEYWORD, related=True)
-        direct, related = self._web(KEYWORD)
-        self.assertEqual(direct, [5642, 5580])
-        expected = direct + [pk for pk in BY_SIMILARITY if pk not in RELEVANT]
-        self.assertEqual(direct + related, expected)
+        expected = [5642, 5580] + [pk for pk in BY_SIMILARITY if pk not in RELEVANT]
         self.assertEqual(self._ids(api), expected)
         self.assertEqual(self._ids(mcp), expected)
         self.assertEqual(
@@ -241,9 +212,6 @@ class SearchParityTests(SemanticSearchTestCase):
             SessionPassageEmbedding.objects.all().delete()
             self._sync()
         expected = [5580] + [pk for pk in BY_SIMILARITY if pk != 5580]
-        first = self.client.get(reverse("sessions"), {"search": QUERY})
-        self.assertEqual(first.context["related_sessions"][0].pk, 5580)
-        self.assertEqual(self._web(QUERY)[1], expected)
         self.assertEqual(self._ids(self._api(search=QUERY, related="true")), expected)
         self.assertEqual(self._ids(self._mcp(search=QUERY, related=True)), expected)
 

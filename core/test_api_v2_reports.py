@@ -180,12 +180,3 @@ class V2ReportsTests(TestCase):
     def test_v1_chart_data_route_is_removed(self):
         response = self.client.get("/api/chart_data/", {"chart_type": "line"})
         self.assertEqual(response.status_code, 404)
-
-    def test_web_charts_template_references_only_v2_chart_url(self):
-        web_client = Client()
-        web_client.force_login(self.user)
-        response = web_client.get(reverse("charts"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, reverse("api_v2:report-charts"))
-        self.assertNotContains(response, "/api/chart_data/")
-        self.assertNotContains(response, "api_chart_data")

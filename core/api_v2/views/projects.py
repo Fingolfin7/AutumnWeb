@@ -44,7 +44,7 @@ class ProjectsView(V2APIView):
             queryset = queryset.exclude(pk__in=excluded_ids)
         # Last: related matches are drawn from what the other filters left.
         if data.get("search"):
-            matches = queryset.filter(name__icontains=data["search"])
+            matches = search_projects(queryset, data["search"])
             if data.get("related"):
                 matches = with_extra(
                     queryset,

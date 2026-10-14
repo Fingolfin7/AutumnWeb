@@ -54,7 +54,7 @@ from core.api_v2.serializers import (
 )
 from core.commitments import mutation_affects_ledger
 from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
-from core.search import DIRECT, RELATED, SESSION_ORDER, with_extra
+from core.search import DIRECT, RELATED, SESSION_ORDER, search_projects, with_extra
 from core.services.embedding_sync import request_sync_on_commit
 from core.services.semantic_search import related_project_ids
 from core.services import (
