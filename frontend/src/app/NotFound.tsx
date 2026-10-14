@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 import { useLocation } from "react-router";
 import { AppLink, urls } from "./links";
+import { setPageTitle } from "./title";
 
 /* Django serves the app for any path it does not own, so a path the router
    does not know either is a real 404. */
 export function NotFound() {
   const { pathname } = useLocation();
   useEffect(() => {
-    document.title = "Not found · Autumn";
+    setPageTitle("Not found");
   }, []);
   return (
     <section className="slab" style={{ padding: "var(--s5)" }}>

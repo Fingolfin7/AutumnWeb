@@ -150,7 +150,10 @@
   text-align: left;
 }
 .palette-item.is-active, .palette-item:hover { background: var(--raised-2, #22262a); }
-.palette-item .muted { margin-left: auto; font-size: .85em; }
+.palette-item { justify-content: flex-start; }
+.palette-icon { color: var(--muted); width: 1rem; }
+.palette-item.is-active .palette-icon { color: var(--brand); }
+.palette-hint { margin-left: auto; font-size: .85em; color: var(--muted); }
 .palette-group { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: .6rem .7rem .2rem; }
 
 .offline-banner {

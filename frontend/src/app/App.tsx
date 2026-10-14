@@ -9,6 +9,9 @@ import { Skeleton } from "@/components/states";
 import { NotFound } from "./NotFound";
 import { ApiError } from "@/api/errors";
 import { useCrossTabSync } from "@/api/sync";
+import { setPageTitle } from "./title";
+import { LiveTitle } from "./LiveTitle";
+import { CommandPalette } from "./CommandPalette";
 
 export function makeQueryClient() {
   return new QueryClient({
@@ -42,6 +45,8 @@ function Layout() {
   return (
     <ActiveContextProvider>
       <ProgressBar />
+      <LiveTitle />
+      <CommandPalette />
       <Shell>
         <Suspense fallback={<Skeleton lines={5} />}>
           <Outlet />
@@ -53,9 +58,7 @@ function Layout() {
 
 function titled(Component: ComponentType, title: string) {
   return function TitledPage() {
-    useEffect(() => {
-      document.title = title === "Autumn" ? "Autumn" : `${title} · Autumn`;
-    }, []);
+    useEffect(() => setPageTitle(title), []);
     return <Component />;
   };
 }
