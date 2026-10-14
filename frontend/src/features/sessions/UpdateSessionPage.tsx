@@ -1,8 +1,9 @@
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { Navigate, useNavigate, useParams } from "react-router";
 import { faArrowLeft, faCheckCircle, faExclamationTriangle } from "@fortawesome/free-solid-svg-icons";
 import { AllocationEditor } from "@/components/AllocationEditor";
 import { Icon } from "@/components/Icon";
+import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { NoteEditor } from "@/components/NoteEditor";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -369,9 +370,8 @@ function mapFieldErrors(details: Record<string, unknown>): { fields: Record<stri
   return { fields, rest };
 }
 
-/* The project text box with a suggestion list. Same look as the old jQuery UI
-   autocomplete (the .ui-autocomplete menu inside #project-search-results),
-   with keyboard navigation. Typing an exact project name selects it. */
+/* The shared project picker, plus this form's errors: typing a name that
+   matches no project leaves nothing selected, and says so on blur. */
 function ProjectField({
   projects,
   loading,
@@ -387,99 +387,19 @@ function ProjectField({
   onChange: (project: Project | null, text: string) => void;
   errors?: string[];
 }) {
-  const listId = useId();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-
-  const matches = useMemo(() => {
-    const needle = text.trim().toLowerCase();
-    const found = needle ? projects.filter((p) => p.name.toLowerCase().includes(needle)) : projects;
-    return [...found].sort((a, b) => Number(b.name.toLowerCase().startsWith(needle)) - Number(a.name.toLowerCase().startsWith(needle))).slice(0, 30);
-  }, [projects, text]);
-
-  const exact = (value: string) => {
-    const needle = value.trim();
-    return projects.find((p) => p.name === needle) ?? projects.find((p) => p.name.toLowerCase() === needle.toLowerCase()) ?? null;
-  };
-
-  const choose = (project: Project) => {
-    onChange(project, project.name);
-    setOpen(false);
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      if (!open) {
-        setOpen(true);
-        return;
-      }
-      const count = matches.length;
-      if (count) setActive((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + count) % count);
-    } else if (event.key === "Enter") {
-      if (open && matches[active]) {
-        event.preventDefault();
-        choose(matches[active]!);
-      } else {
-        event.preventDefault();
-      }
-    } else if (event.key === "Escape" && open) {
-      event.preventDefault();
-      setOpen(false);
-    }
-  };
-
-  const showMenu = open && matches.length > 0;
-  const unmatched = !open && text.trim() !== "" && selectedId === null && !loading;
-
+  const [focused, setFocused] = useState(false);
+  const selected = projects.find((p) => p.id === selectedId) ?? null;
+  const unmatched = !focused && text.trim() !== "" && selectedId === null && !loading;
   return (
-    <div className="field">
+    <div className="field" onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>
       <label htmlFor="project-search">Project</label>
-      <input
-        ref={inputRef}
+      <ProjectCombobox
         id="project-search"
-        type="text"
-        role="combobox"
-        aria-expanded={showMenu}
-        aria-controls={listId}
-        aria-autocomplete="list"
-        aria-activedescendant={showMenu ? `${listId}-${active}` : undefined}
+        value={selected}
+        onChange={onChange}
         placeholder="Projects"
-        autoComplete="off"
-        value={text}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onKeyDown={onKeyDown}
-        onChange={(event) => {
-          setOpen(true);
-          setActive(0);
-          onChange(exact(event.target.value), event.target.value);
-        }}
+        invalid={Boolean(errors?.length) || unmatched}
       />
-      <div id="project-search-results">
-        {showMenu ? (
-          <ul className="ui-autocomplete ui-menu" id={listId} role="listbox" style={{ left: 0, right: 0 }}>
-            {matches.map((project, index) => (
-              <li
-                key={project.id}
-                className="ui-menu-item"
-                role="option"
-                id={`${listId}-${index}`}
-                aria-selected={index === active}
-                /* mousedown, not click: the input's blur would close the menu first. */
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  choose(project);
-                }}
-                onMouseEnter={() => setActive(index)}
-              >
-                <div className={`ui-menu-item-wrapper${index === active ? " ui-state-active" : ""}`}>{project.name}</div>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
       <FieldErrors messages={errors} />
       {unmatched && !errors?.length ? <ul className="errorlist"><li>No project with that name. Pick one from the list.</li></ul> : null}
     </div>

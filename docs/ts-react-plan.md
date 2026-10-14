@@ -153,6 +153,23 @@ API tests. "MCP" column: whether it becomes an MCP tool (§5).
 Backend services each page needs already exist in `core/services/*`; the new
 endpoints must call them rather than re-implement logic.
 
+### 4.1 Gaps found while porting (backend chunk 3)
+
+- `GET /commitments/?applies_to=<kind>:<id>` using `core.commitments.commitment_applies_to_*`,
+  so the project/subproject/context/tag pages stop carrying two TypeScript
+  copies of those rules (`projects/logic.ts`, `commitments/applies.ts`) and
+  share one panel component.
+- Projects list: search across descriptions/subproject names, date-range and
+  activity ordering; subproject `start_date`; `version` + `If-Match` on
+  projects and subprojects.
+- Commitments: `current_surplus` and consistent filter names.
+- `GET /sessions/{id}?include=note_html`; an `id` filter on the sessions list.
+- Charts: complete the `chart_type` enum, type `context` as an id, and give
+  the chart responses real schemas.
+- Bootstrap/`/me/`: default chart date range, whether an OpenAI key is set.
+- DST-ambiguous local times in start/stop/edit forms: reject or disambiguate
+  the way the Django forms did.
+
 ## 5. MCP: keeping ChatGPT/Claude stable and making it better
 
 - `build.mjs` currently turns *every* OpenAPI operation into a tool. Add a

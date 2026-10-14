@@ -39,12 +39,15 @@ export function ProjectCombobox({
   onChange,
   placeholder = "Start typing a project name...",
   autoFocus,
+  invalid,
 }: {
   id: string;
   value: Project | null;
-  onChange: (project: Project | null) => void;
+  /* Also given the typed text, for forms that validate unmatched input. */
+  onChange: (project: Project | null, text: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
+  invalid?: boolean;
 }) {
   const projects = useAllProjects();
   const [text, setText] = useState(value?.name ?? "");
@@ -65,7 +68,7 @@ export function ProjectCombobox({
   const choose = (project: Project) => {
     setText(project.name);
     setOpen(false);
-    onChange(project);
+    onChange(project, project.name);
   };
 
   const type = (next: string) => {
@@ -73,7 +76,7 @@ export function ProjectCombobox({
     setOpen(true);
     setActive(0);
     const exact = (projects.data ?? []).find((p) => p.name.toLowerCase() === next.trim().toLowerCase());
-    onChange(exact ?? null);
+    onChange(exact ?? null, next);
   };
 
   return (
@@ -89,6 +92,7 @@ export function ProjectCombobox({
         aria-activedescendant={open && matches[active] ? `${listId}-${matches[active]!.id}` : undefined}
         autoComplete="off"
         autoFocus={autoFocus}
+        aria-invalid={invalid || undefined}
         placeholder={placeholder}
         value={text}
         onMouseDown={() => setOpen(true)}
