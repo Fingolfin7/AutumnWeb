@@ -134,18 +134,20 @@ export interface StopTimerInput {
   timer: Timer;
   note?: string | null;
   allocations?: { subproject_id: number; allocation_bp: number }[];
+  /** ISO instant; defaults to now. */
+  end?: string;
 }
 
 export function useStopTimer() {
   const client = useQueryClient();
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async ({ timer, note, allocations }: StopTimerInput) =>
+    mutationFn: async ({ timer, note, allocations, end }: StopTimerInput) =>
       unwrap(
         api.POST("/api/v2/timers/{session_id}/stop/", {
           params: { path: { session_id: timer.id }, header: { "If-Match": timer.version } },
           body: {
-            end: toOffsetIso(new Date()),
+            end: end ?? toOffsetIso(new Date()),
             ...(note !== undefined ? { note } : {}),
             ...(allocations ? { subproject_allocations: allocations } : {}),
           },
