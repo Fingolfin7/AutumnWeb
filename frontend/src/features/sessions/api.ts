@@ -111,3 +111,90 @@ export function useDeleteSession() {
     onSettled: () => invalidate("sessions"),
   });
 }
+
+/* ---- Single-session reads and edits (edit / delete pages) ---------------- */
+
+import { useQuery } from "@tanstack/react-query";
+import { ApiError } from "@/api/errors";
+import type { SessionPatch } from "@/api/types";
+
+const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
+
+/* The URL param of /update_session/:id/ is a numeric id or a session uuid
+   (the uuid survives export/re-import, so it works as a stable link). */
+export type SessionParam = { kind: "id"; id: number } | { kind: "uuid"; uuid: string } | { kind: "invalid" };
+
+export function parseSessionParam(param: string | undefined): SessionParam {
+  if (param && /^\d+$/.test(param)) return { kind: "id", id: Number(param) };
+  if (param && UUID_RE.test(param)) return { kind: "uuid", uuid: param };
+  return { kind: "invalid" };
+}
+
+const uuidKey = (uuid: string) => [...keys.sessions(), "detail", "uuid", uuid.toLowerCase().replace(/-/g, "")] as const;
+
+/** One session by numeric id or uuid; a 404 ApiError when it doesn't exist. */
+export function useSession(param: string | undefined) {
+  const parsed = parseSessionParam(param);
+  return useQuery({
+    queryKey: parsed.kind === "id" ? keys.session(parsed.id) : parsed.kind === "uuid" ? uuidKey(parsed.uuid) : ["sessions", "detail", "invalid"],
+    enabled: parsed.kind !== "invalid",
+    /* The form reads this once; edits elsewhere are caught by If-Match. */
+    refetchOnWindowFocus: false,
+    queryFn: async (): Promise<SessionRow> => {
+      if (parsed.kind === "id") {
+        return unwrap(api.GET("/api/v2/sessions/{session_id}", { params: { path: { session_id: parsed.id } } }));
+      }
+      if (parsed.kind === "uuid") {
+        const data = await unwrap(
+          api.GET("/api/v2/sessions/", { params: { query: { uuid: parsed.uuid, include: "note,note_html", limit: 1 } } }),
+        );
+        const found = data.sessions[0];
+        if (!found) throw new ApiError(404, "not_found", "That session no longer exists.");
+        return found;
+      }
+      throw new ApiError(404, "not_found", "That session no longer exists.");
+    },
+  });
+}
+
+function writeSessionCache(client: ReturnType<typeof useQueryClient>, session: SessionRow) {
+  client.setQueryData(keys.session(session.id), session);
+  if (session.uuid) client.setQueryData(uuidKey(session.uuid), session);
+}
+
+/* PATCH with the version the form was opened on (If-Match): the server
+   answers 409 version_conflict, with the current session in error.details,
+   when it changed meanwhile. Pass `version` to override (save over it). */
+export function useUpdateSession() {
+  const client = useQueryClient();
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async ({ session, body, version }: { session: SessionRow; body: SessionPatch; version?: number }) =>
+      unwrap(
+        api.PATCH("/api/v2/sessions/{session_id}", {
+          params: { path: { session_id: session.id }, header: { "If-Match": version ?? session.version } },
+          body,
+        }),
+      ) as Promise<SessionRow>,
+    onSuccess: (session) => {
+      writeSessionCache(client, session);
+      invalidate("sessions");
+    },
+  });
+}
+
+/* GET /sessions/{id} does not render note_html (only the list does, with
+   include=note_html), so the confirm page asks the list for the rendered note
+   by uuid. API gap: the retrieve endpoint should accept include=note_html. */
+export function useRenderedNote(session: SessionRow | undefined) {
+  const uuid = session?.uuid;
+  const needed = !!session && !!session.note && !session.note_html && !!uuid;
+  return useQuery({
+    queryKey: [...keys.sessions(), "note_html", uuid ?? ""],
+    enabled: needed,
+    queryFn: async () => {
+      const data = await unwrap(api.GET("/api/v2/sessions/", { params: { query: { uuid: uuid!, include: "note,note_html", limit: 1 } } }));
+      return data.sessions[0]?.note_html ?? null;
+    },
+  });
+}
