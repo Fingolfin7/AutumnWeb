@@ -13,6 +13,7 @@
     "gen:api": "openapi-typescript ../openapi-v2.yaml -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-free": "5.15.4",
     "@fortawesome/free-solid-svg-icons": "5.15.4",
     "@tanstack/react-query": "5.104.2",
     "chart.js": "4.5.1",

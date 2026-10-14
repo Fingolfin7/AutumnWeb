@@ -3,6 +3,19 @@
    server-rendered pages; only what the app introduces lives here, and it uses
    the same tokens. */
 
+/* focus_desk.css draws a few glyphs with the Font Awesome webfont in CSS
+   pseudo-elements (the commitment-form chevrons, the start button's
+   hourglass). The app ships icons as inline SVG and no longer loads the CDN
+   stylesheet, so declare just the solid face here. Browsers only fetch a
+   font once a glyph actually uses it. */
+@font-face {
+  font-family: "Font Awesome 5 Free";
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url("../../node_modules/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2") format("woff2");
+}
+
 .icon {
   display: inline-block;
   height: 1em;

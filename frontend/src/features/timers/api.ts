@@ -75,6 +75,8 @@ export interface StartTimerInput {
   subproject_ids?: number[];
   note?: string | null;
   stop_after_minutes?: number;
+  notify_on_auto_stop?: boolean;
+  reminder?: { mode: "after" | "interval" | "at"; amount?: number; unit?: "minutes" | "hours"; at?: string; message?: string };
   /** Shown on the optimistic card until the server answers. */
   optimistic?: { projectName: string; subprojects: { id: number; name: string }[] };
 }
@@ -89,7 +91,9 @@ export function useStartTimer() {
       const { optimistic: _optimistic, ...body } = input;
       return unwrap(
         api.POST("/api/v2/timers/", {
-          body: { ...body, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() },
+          /* notify_on_auto_stop / reminder are newer optional fields; the
+             cast goes away once the regenerated schema has them. */
+          body: { ...body, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() } as never,
         }),
       );
     },
@@ -110,7 +114,7 @@ export function useStartTimer() {
           start: new Date().toISOString(),
           end: null,
           active: true,
-          auto_stop_at: null,
+          auto_stop_at: input.stop_after_minutes ? new Date(Date.now() + input.stop_after_minutes * 60000).toISOString() : null,
           duration_minutes: null,
           elapsed_minutes: 0,
           note: input.note ?? null,

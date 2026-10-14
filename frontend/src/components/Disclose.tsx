@@ -14,6 +14,8 @@ export function Disclose({
   className,
   children,
   defaultOpen = true,
+  slab = true,
+  headClassName,
 }: {
   id: string;
   icon: IconDefinition;
@@ -23,6 +25,9 @@ export function Disclose({
   className?: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  /** false renders a nested disclosure without the .slab surface. */
+  slab?: boolean;
+  headClassName?: string;
 }) {
   const key = `autumn:disclose:${id}`;
   const [open, setOpen] = useState(() => {
@@ -46,8 +51,8 @@ export function Disclose({
   };
 
   return (
-    <section className={`slab disclose${open ? "" : " is-closed"}${className ? " " + className : ""}`}>
-      <button className="disclose-head" type="button" aria-expanded={open} onClick={toggle}>
+    <section className={`${slab ? "slab " : ""}disclose${open ? "" : " is-closed"}${className ? " " + className : ""}`}>
+      <button className={`disclose-head${headClassName ? " " + headClassName : ""}`} type="button" aria-expanded={open} onClick={toggle}>
         <Icon icon={icon} className={`disclose-icon${iconClass ? " " + iconClass : ""}`} />
         <span className="disclose-title">{title}</span>
         {summary !== undefined ? <span className="disclose-summary">{summary}</span> : null}
