@@ -168,6 +168,21 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "Autumn API v2",
     "VERSION": "2.0.0",
+    "ENUM_NAME_OVERRIDES": {
+        "FilterUnitEnum": [
+            "days",
+            "weeks",
+            "months",
+            "years",
+            "month_to_date",
+            "quarter_to_date",
+            "year_to_date",
+        ],
+        "LunaEffortEnum": ["low", "medium", "high", "xhigh", "max"],
+        "ProjectStatusEnum": ["active", "paused", "complete", "archived"],
+        "ReportHierarchyKindEnum": ["subproject", "residual"],
+        "TimerReminderModeEnum": ["after", "at", "interval"],
+    },
     "PREPROCESSING_HOOKS": ["core.api_v2.schema.v2_endpoints_only"],
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",

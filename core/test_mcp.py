@@ -97,7 +97,7 @@ class MCPTests(TestCase):
 
     def test_discovery_and_read_only_scope(self):
         tools = self.rpc("tools/list").json()["result"]["tools"]
-        self.assertEqual(len(tools), 51)
+        self.assertEqual(len(tools), 54)
         for tool in tools:
             scopes = ["autumn:read"] + ([] if tool["annotations"]["readOnlyHint"] else ["autumn:write"])
             self.assertEqual(tool["securitySchemes"], [{"type": "oauth2", "scopes": scopes}])

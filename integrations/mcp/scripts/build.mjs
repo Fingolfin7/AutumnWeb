@@ -15,7 +15,7 @@ function schema(value) {
   if (value.nullable) return { anyOf: [result, { type: 'null' }] };
   return result;
 }
-const overrides = { me_retrieve: 'me', timers_retrieve: 'status', timers_create: 'start', timers_stop_create: 'stop', timers_restart_create: 'restart', timers_partial_update: 'update_timer', timers_destroy: 'delete_timer', sessions_create: 'track', project_subprojects_list: 'subprojects', project_subprojects_create: 'create_subproject', export_retrieve: 'export_data', import_create: 'import_data', reports_timeline_retrieve: 'get_timeline', recommendations_timers_retrieve: 'timer_suggestions', recommendations_luna_retrieve: 'luna_recommendations' };
+const overrides = { me_retrieve: 'me', timers_retrieve: 'status', timers_create: 'start', timers_stop_create: 'stop', timers_restart_create: 'restart', timers_partial_update: 'update_timer', timers_destroy: 'delete_timer', sessions_create: 'track', project_subprojects_list: 'subprojects', project_subprojects_create: 'create_subproject', export_retrieve: 'export_data', import_create: 'import_data', reports_timeline_retrieve: 'get_timeline', reports_weekly_review_retrieve: 'weekly_review', recommendations_timers_retrieve: 'timer_suggestions', recommendations_luna_retrieve: 'luna_recommendations', notifications_schedules_list: 'list_reminder_schedules', notifications_schedules_create: 'create_reminder_schedule' };
 const descriptions = {
   me: 'Get the authenticated Autumn account and API version.',
   start: 'Start a live timer now. Resolve the project ID with list_projects first. stop_after_minutes sets an optional automatic stop. Use track for past work.',
@@ -30,6 +30,9 @@ const descriptions = {
   get_timeline: 'Get timeline lanes and session segments for a local date range, optionally scoped to one context.',
   timer_suggestions: 'Get fast deterministic timer suggestions from recent work, habits, and commitments, optionally scoped to one context.',
   luna_recommendations: 'Get Luna timer recommendations. A 202 response means generation is still in progress and should be retried after the supplied delay.',
+  weekly_review: 'Summarize a local Monday-to-Sunday Autumn week: tracked time, project totals, session count, and closed commitment results. Pass any date inside the desired week.',
+  list_reminder_schedules: 'List the account\'s active planned reminder schedules, including targets, cadence, next fire time, and reminders due within seven days.',
+  create_reminder_schedule: 'Create a planned reminder schedule for one owned project, context, or tag at a profile-local date and time, optionally repeating daily or weekly.',
 };
 const operations = [];
 for (const [path, item] of Object.entries(spec.paths)) for (const [method, operation] of Object.entries(item)) {

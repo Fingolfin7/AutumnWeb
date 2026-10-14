@@ -25,4 +25,28 @@ from .timers import (
     TimersView,
     TimerStopView,
 )
+from .insights import (
+    InsightChatDetailView,
+    InsightChatsView,
+    InsightOptionsView,
+    InsightStreamView,
+)
+from .notifications import (
+    NotificationPreferencesView,
+    NotificationScheduleDetailView,
+    NotificationSchedulesView,
+    NotificationScheduleSnoozeView,
+    WeeklyReviewView,
+)
+from .push import PushStatusView, PushSubscriptionsView, PushTestView
+from .account import (
+    AccountView,
+    ApiKeyView,
+    AvatarView,
+    BackgroundDownloadView,
+    BackgroundView,
+    ChatGPTLoginView,
+    SocialAccountDetailView,
+    SocialAccountsView,
+)
 
