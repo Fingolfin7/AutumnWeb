@@ -60,7 +60,7 @@ export function useRefreshOnRunningChange(timers: Timer[] | undefined) {
   useEffect(() => {
     if (!timers) return;
     const signature = timers
-      .filter((t) => t.id > 0)
+      .filter((t) => t.id > 0 || t.pending_sync)
       .map((t) => t.id)
       .sort((a, b) => a - b)
       .join(",");

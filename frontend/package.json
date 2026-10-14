@@ -15,7 +15,9 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "5.15.4",
     "@fortawesome/free-solid-svg-icons": "5.15.4",
+    "@tanstack/query-sync-storage-persister": "5.104.2",
     "@tanstack/react-query": "5.104.2",
+    "@tanstack/react-query-persist-client": "5.104.2",
     "chart.js": "4.5.1",
     "chartjs-adapter-date-fns": "3.0.0",
     "chartjs-chart-matrix": "3.1.0",

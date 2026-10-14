@@ -7,6 +7,7 @@ import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
 import { csrfToken } from "@/lib/csrf";
 import { toOffsetIso } from "@/lib/format";
+import { cancelStart, enqueueStart, enqueueStop, isNetworkFailure, overlayTimers, type QueuedStart } from "@/lib/offlineQueue";
 import { useActiveContext } from "@/app/context";
 
 /* Running timers are the one piece of data other clients (CLI, MCP, another
@@ -46,7 +47,7 @@ export function useTimers() {
   const { contextIdsParam } = useActiveContext();
   return useQuery({
     queryKey: [...keys.timers(), contextIdsParam ?? "all"],
-    queryFn: () => fetchTimers(contextIdsParam),
+    queryFn: async () => overlayTimers(await fetchTimers(contextIdsParam), pendingTimer),
     refetchInterval: TIMER_POLL_MS,
     refetchIntervalInBackground: false,
     staleTime: 5_000,
@@ -81,28 +82,71 @@ export interface StartTimerInput {
   optimistic?: { projectName: string; subprojects: { id: number; name: string }[] };
 }
 
+/* A timer the server hasn't seen yet, drawn from the offline queue. */
+export function pendingTimer(op: QueuedStart): Timer {
+  const subs = op.display.subprojects;
+  return {
+    id: -Date.parse(op.queuedAt) || -1,
+    uuid: op.uuid,
+    version: 0,
+    project: { id: op.body.project_id, name: op.display.projectName },
+    subproject_allocations: subs.map((sub) => ({
+      subproject_id: sub.id,
+      name: sub.name,
+      allocation_bp: Math.floor(10000 / Math.max(1, subs.length)),
+    })),
+    start: op.body.start,
+    end: null,
+    active: true,
+    auto_stop_at:
+      typeof op.body.stop_after_minutes === "number"
+        ? new Date(Date.parse(op.body.start) + op.body.stop_after_minutes * 60000).toISOString()
+        : null,
+    duration_minutes: null,
+    elapsed_minutes: 0,
+    note: (op.body.note as string | null | undefined) ?? null,
+    pending_sync: true,
+  };
+}
+
+const isOffline = (error: unknown) => error instanceof ApiError && isNetworkFailure(error.status);
+
 /* Client instants and a client uuid make start safe to retry and correct
-   even when the server was asleep: the timer starts when you tapped. */
+   even when the server was asleep: the timer starts when you tapped. If the
+   server can't be reached at all, the start is queued and replays later. */
 export function useStartTimer() {
   const client = useQueryClient();
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async (input: StartTimerInput) => {
-      const { optimistic: _optimistic, ...body } = input;
-      return unwrap(
-        api.POST("/api/v2/timers/", {
-          /* notify_on_auto_stop / reminder are newer optional fields; the
-             cast goes away once the regenerated schema has them. */
-          body: { ...body, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() } as never,
-        }),
-      );
+    networkMode: "always",
+    mutationFn: async (input: StartTimerInput): Promise<Timer> => {
+      const { optimistic, ...rest } = input;
+      const body = { ...rest, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() };
+      try {
+        return await unwrap(
+          api.POST("/api/v2/timers/", {
+            /* notify_on_auto_stop / reminder are newer optional fields; the
+               cast goes away once the regenerated schema has them. */
+            body: body as never,
+          }),
+        );
+      } catch (error) {
+        if (!isOffline(error)) throw error;
+        const op = enqueueStart({
+          uuid: body.uuid,
+          body,
+          display: optimistic ?? { projectName: "Project", subprojects: [] },
+        });
+        return pendingTimer(op);
+      }
     },
     onMutate: async (input) => {
       await client.cancelQueries({ queryKey: keys.timers() });
       const previous = client.getQueriesData<Timer[]>({ queryKey: keys.timers() });
+      const placeholderId = -Date.now();
       if (input.optimistic) {
         const placeholder: Timer = {
-          id: -Date.now(),
+          id: placeholderId,
           uuid: null,
           version: 0,
           project: { id: input.project_id, name: input.optimistic.projectName },
@@ -121,7 +165,15 @@ export function useStartTimer() {
         };
         client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) => [...(list ?? []), placeholder]);
       }
-      return { previous };
+      return { previous, placeholderId };
+    },
+    onSuccess: (timer, _input, context) => {
+      /* Swap the placeholder for the real (or queued) timer, so an offline
+         start keeps its card even though the refetch below can't run. */
+      client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) => [
+        ...(list ?? []).filter((t) => t.id !== context?.placeholderId && t.id !== timer.id),
+        timer,
+      ]);
     },
     onError: (_error, _input, context) => {
       for (const [key, data] of context?.previous ?? []) client.setQueryData(key, data);
@@ -142,17 +194,36 @@ export function useStopTimer() {
   const client = useQueryClient();
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async ({ timer, note, allocations, end }: StopTimerInput) =>
-      unwrap(
-        api.POST("/api/v2/timers/{session_id}/stop/", {
-          params: { path: { session_id: timer.id }, header: { "If-Match": timer.version } },
-          body: {
-            end: end ?? toOffsetIso(new Date()),
-            ...(note !== undefined ? { note } : {}),
-            ...(allocations ? { subproject_allocations: allocations } : {}),
-          },
-        }),
-      ),
+    networkMode: "always",
+    mutationFn: async ({ timer, note, allocations, end }: StopTimerInput): Promise<Timer> => {
+      const at = end ?? toOffsetIso(new Date());
+      const queue = (target: { id: number } | { uuid: string }): Timer => {
+        enqueueStop({
+          target,
+          end: at,
+          ...(note !== undefined ? { note } : {}),
+          ...(allocations ? { subproject_allocations: allocations } : {}),
+        });
+        return { ...timer, end: at, active: false, pending_sync: true };
+      };
+      /* Started offline: stop it in the queue, right behind its start. */
+      if (timer.pending_sync && timer.uuid) return queue({ uuid: timer.uuid });
+      try {
+        return await unwrap(
+          api.POST("/api/v2/timers/{session_id}/stop/", {
+            params: { path: { session_id: timer.id }, header: { "If-Match": timer.version } },
+            body: {
+              end: at,
+              ...(note !== undefined ? { note } : {}),
+              ...(allocations ? { subproject_allocations: allocations } : {}),
+            },
+          }),
+        );
+      } catch (error) {
+        if (!isOffline(error)) throw error;
+        return queue({ id: timer.id });
+      }
+    },
     onMutate: async ({ timer }) => {
       await client.cancelQueries({ queryKey: keys.timers() });
       const previous = client.getQueriesData<Timer[]>({ queryKey: keys.timers() });
@@ -184,12 +255,18 @@ export function useDeleteTimer() {
   const client = useQueryClient();
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: async (timer: Timer) =>
-      unwrap(
+    mutationFn: async (timer: Timer) => {
+      /* Never reached the server: just forget the queued start. */
+      if (timer.pending_sync && timer.uuid) {
+        cancelStart(timer.uuid);
+        return undefined;
+      }
+      return unwrap(
         api.DELETE("/api/v2/timers/{session_id}", {
           params: { path: { session_id: timer.id }, header: { "If-Match": timer.version } },
         }),
-      ),
+      );
+    },
     onMutate: async (timer) => {
       await client.cancelQueries({ queryKey: keys.timers() });
       const previous = client.getQueriesData<Timer[]>({ queryKey: keys.timers() });

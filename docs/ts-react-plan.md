@@ -105,10 +105,10 @@ frontend/
   context, feature flags, CSRF token, static version) so first paint needs no
   extra request, and the background-image `<body>` style the shell already
   computes (Bing/APOD resolution stays server-side).
-- A catch-all URL at the very end of `AutumnWeb/urls.py` serves `spa.html` for
-  any authenticated path not matched earlier; unauthenticated → login with
-  `next`. While porting, old template views stay earlier in the URL list and
-  win; deleting a template view hands its path to the SPA (strangler cut-over).
+- Each ported page's route in `core/urls.py` keeps its URL name but points at
+  the `spa` view (unauthenticated → login with `next`). There is no catch-all:
+  an unknown path is a real server 404, so removed routes (e.g. the old debug
+  probes) stay gone. A new React-only page needs its Django route too.
 - **Dev:** `VITE_DEV_SERVER=http://localhost:5173` makes `spa.html` load from
   Vite with HMR; Django still owns cookies, CSRF and auth.
 

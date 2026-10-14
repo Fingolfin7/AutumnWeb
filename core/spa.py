@@ -22,6 +22,7 @@ from django.contrib.staticfiles.storage import staticfiles_storage
 from django.http import Http404
 from django.middleware.csrf import get_token
 from django.shortcuts import render
+from django.utils.cache import patch_cache_control
 from django.views.decorators.http import require_GET
 
 from core.models import Context
@@ -132,7 +133,7 @@ def spa(request, *args, **kwargs):
     if assets is None:
         logger.error("React bundle missing: run `npm run build` in frontend/ (no %s).", MANIFEST)
         raise Http404("The web app has not been built.")
-    return render(
+    response = render(
         request,
         "core/spa.html",
         {
@@ -140,3 +141,8 @@ def spa(request, *args, **kwargs):
             "bootstrap": bootstrap_payload(request),
         },
     )
+    # The service worker keeps this page as the offline app shell
+    # (core/static/core/pwa/service-worker.js); the browser cache must not.
+    response["X-Autumn-Shell"] = "1"
+    patch_cache_control(response, no_cache=True, private=True)
+    return response

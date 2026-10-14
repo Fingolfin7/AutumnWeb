@@ -12,6 +12,7 @@ import { ApiError, errorMessage } from "@/api/errors";
 import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
 import { elapsedSeconds, formatDurationWords, fromDateTimeLocal, toDateTimeLocal } from "@/lib/format";
+import { updateQueuedStart } from "@/lib/offlineQueue";
 import { useNow, useStopTimer, useTimers } from "./api";
 
 /* Stop a timer (stop_timer.html): adjust start/end, write the note (a draft
@@ -24,7 +25,12 @@ export default function StopTimerPage() {
   const timers = useTimers();
   const navigate = useNavigate();
   const toast = useToast();
-  const timer = timers.data?.find((t) => t.id === id);
+  const found = timers.data?.find((t) => t.id === id);
+  /* Stopping removes the timer from the list at once (optimistic), so once
+     submitted, keep the form on the timer as it was and skip the "already
+     stopped elsewhere" redirect. */
+  const [stopping, setStopping] = useState<Timer | null>(null);
+  const timer = stopping ?? found;
 
   useEffect(() => {
     if (timers.isSuccess && !timer) {
@@ -41,10 +47,10 @@ export default function StopTimerPage() {
     );
   }
   if (timers.isError || !timer) return <ErrorState error={timers.error} onRetry={() => void timers.refetch()} />;
-  return <StopForm timer={timer} />;
+  return <StopForm timer={timer} onSubmitting={() => setStopping(timer)} />;
 }
 
-function StopForm({ timer }: { timer: Timer }) {
+function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => void }) {
   const navigate = useNavigate();
   const toast = useToast();
   const invalidate = useInvalidate();
@@ -80,9 +86,13 @@ function StopForm({ timer }: { timer: Timer }) {
     if (Object.keys(nextErrors).length) return;
 
     setBusy(true);
+    onSubmitting();
     try {
       let current = timer;
-      if (start !== initialStart) {
+      if (start !== initialStart && timer.pending_sync && timer.uuid) {
+        /* Not on the server yet: correct the queued start instead. */
+        updateQueuedStart(timer.uuid, startIso!);
+      } else if (start !== initialStart) {
         /* The stop endpoint only takes the end; a corrected start is saved
            first, carrying the version forward. */
         current = (await unwrap(
@@ -103,7 +113,9 @@ function StopForm({ timer }: { timer: Timer }) {
       } catch {
         /* storage unavailable */
       }
-      if (result.celebration) {
+      if (result.pending_sync) {
+        toast.info("Stopped. Saved on this device; it syncs when Autumn is reachable.");
+      } else if (result.celebration) {
         toast.success(result.celebration.message, { celebration: result.celebration.kind });
       } else {
         toast.success("Stopped timer");

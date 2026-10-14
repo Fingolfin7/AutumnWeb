@@ -11,6 +11,9 @@ const DEV_ORIGIN = "http://localhost:5173";
 
 export default defineConfig(({ command }) => ({
   plugins: [react()],
+  /* Changes every build: persisted query data from an older build is dropped
+     rather than read with code that may expect a different shape. */
+  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   base: command === "build" ? "/static/app/" : "/",
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   build: {

@@ -31,7 +31,8 @@ export function FocusCard({
   const restart = useRestartTimer();
   const remove = useDeleteTimer();
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const pending = timer.id < 0;
+  /* In flight to the server; a queued offline timer is settled locally. */
+  const pending = timer.id < 0 && !timer.pending_sync;
 
   const elapsed = elapsedSeconds(timer.start, now);
   const start = parseInstant(timer.start);
@@ -51,7 +52,7 @@ export function FocusCard({
       aria-busy={pending || undefined}
     >
       <p className="focus-eyebrow">
-        <span className="live-dot" /> {pending ? "Starting…" : "Running"}
+        <span className="live-dot" /> {pending ? "Starting…" : timer.pending_sync ? "Running · saved offline" : "Running"}
       </p>
       <h2 className="focus-project">
         <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
@@ -111,7 +112,7 @@ export function FocusCard({
           className="btn-icon"
           type="button"
           title="Restart this timer"
-          disabled={pending || restart.isPending}
+          disabled={pending || timer.pending_sync || restart.isPending}
           onClick={() =>
             restart
               .mutateAsync(timer)

@@ -27,6 +27,7 @@ import { csrfToken } from "@/lib/csrf";
 import { requestJson } from "@/api/client";
 import { AppLink, urls } from "./links";
 import { useActiveContext } from "./context";
+import { clearPersistedQueries } from "./persist";
 
 interface Tab {
   href: string;
@@ -119,7 +120,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <SheetLink href={urls.export()} icon={faFileExport} label="Export" />
           <SheetLink href={urls.mcpConnections()} icon={faPlug} label="AI connections" />
           <SheetLink href={urls.profile()} icon={faUserCircle} label="Profile & backdrop" />
-          <form method="POST" action={urls.logout()}>
+          <form method="POST" action={urls.logout()} onSubmit={clearPersistedQueries}>
             <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} />
             <button className="sheet-item" type="submit">
               <Icon icon={faSignOutAlt} className="sheet-item-icon" /> Log out

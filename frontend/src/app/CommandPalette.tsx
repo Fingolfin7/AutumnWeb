@@ -61,7 +61,7 @@ export function CommandPalette() {
   const commands = useMemo<Command[]>(() => {
     const q = query.trim().toLowerCase();
     const out: Command[] = [];
-    for (const timer of (timers.data ?? []).filter((t) => t.id > 0)) {
+    for (const timer of (timers.data ?? []).filter((t) => t.id > 0 || t.pending_sync)) {
       if (!q || `stop ${timer.project.name}`.toLowerCase().includes(q)) {
         out.push({
           id: `stop-${timer.id}`,

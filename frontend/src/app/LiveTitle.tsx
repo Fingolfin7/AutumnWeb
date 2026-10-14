@@ -9,7 +9,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
    most recently started one is shown, plus a count. */
 export function LiveTitle() {
   const timers = useTimers();
-  const running = (timers.data ?? []).filter((t) => t.id > 0);
+  const running = (timers.data ?? []).filter((t) => t.id > 0 || t.pending_sync);
   const now = useNow(1000);
 
   const latest = running.reduce<(typeof running)[number] | null>(

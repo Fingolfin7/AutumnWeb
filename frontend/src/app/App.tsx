@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useState, type ComponentType } from "react";
 import { createBrowserRouter, Outlet, RouterProvider, useNavigation, type RouteObject } from "react-router";
 import { QueryClient, QueryClientProvider, useIsFetching, useIsMutating } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { ToastProvider } from "./toasts";
 import { ActiveContextProvider } from "./context";
 import { Shell } from "./Shell";
@@ -12,6 +13,8 @@ import { useCrossTabSync } from "@/api/sync";
 import { setPageTitle } from "./title";
 import { LiveTitle } from "./LiveTitle";
 import { CommandPalette } from "./CommandPalette";
+import { OfflineSync } from "./OfflineSync";
+import { MAX_AGE, persistOptions } from "./persist";
 
 export function makeQueryClient() {
   return new QueryClient({
@@ -20,7 +23,9 @@ export function makeQueryClient() {
         /* Revisiting a page shows the last data instantly and refreshes
            behind it; 30 s keeps tab-switching from refetching everything. */
         staleTime: 30_000,
-        gcTime: 10 * 60_000,
+        /* As long as the saved copy lives (persist.ts), or it would be
+           collected before it could be saved. */
+        gcTime: MAX_AGE,
         refetchOnWindowFocus: true,
         retry: (count, error) => {
           if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
@@ -47,6 +52,7 @@ function Layout() {
       <ProgressBar />
       <LiveTitle />
       <CommandPalette />
+      <OfflineSync />
       <Shell>
         <Suspense fallback={<Skeleton lines={5} />}>
           <Outlet />
@@ -82,11 +88,18 @@ export function buildRoutes(): RouteObject[] {
 export function App({ queryClient: provided }: { queryClient?: QueryClient }) {
   const [queryClient] = useState(() => provided ?? makeQueryClient());
   const [router] = useState(() => createBrowserRouter(buildRoutes()));
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <RouterProvider router={router} />
-      </ToastProvider>
-    </QueryClientProvider>
+  /* Tests pass their own client and skip the device cache. */
+  const [persist] = useState(() => (provided ? null : persistOptions()));
+  const tree = (
+    <ToastProvider>
+      <RouterProvider router={router} />
+    </ToastProvider>
+  );
+  return persist ? (
+    <PersistQueryClientProvider client={queryClient} persistOptions={persist}>
+      {tree}
+    </PersistQueryClientProvider>
+  ) : (
+    <QueryClientProvider client={queryClient}>{tree}</QueryClientProvider>
   );
 }

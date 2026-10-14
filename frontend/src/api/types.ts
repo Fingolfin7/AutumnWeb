@@ -8,7 +8,9 @@ type WithOptionalNoteHtml<T> = Omit<T, "note_html"> & { note_html?: string | nul
 
 export type Session = WithOptionalNoteHtml<S["SessionListItem"]>;
 export type SessionResource = WithOptionalNoteHtml<S["SessionResource"]>;
-export type Timer = SessionResource;
+/* pending_sync: started while Autumn was unreachable; lives in the offline
+   queue (lib/offlineQueue.ts) until the server has it. */
+export type Timer = SessionResource & { pending_sync?: boolean };
 export type Project = S["ProjectResource"];
 export type ProjectDetail = S["ProjectDetailResource"];
 export type ProjectSummary = S["ProjectSummary"];

@@ -2,8 +2,19 @@ import type { ReactNode } from "react";
 import { faExclamationCircle, faRedo } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
 import { errorMessage } from "@/api/errors";
+import { useOnline } from "@/lib/useOnline";
 
 export function Skeleton({ lines = 3, height = "1.1rem" }: { lines?: number; height?: string }) {
+  /* Offline, a query with nothing saved waits (paused) instead of failing:
+     say so rather than shimmer forever. It loads by itself once back. */
+  const online = useOnline();
+  if (!online) {
+    return (
+      <p className="empty" role="status">
+        You're offline, and this hasn't been saved on this device yet. It will load when you're back online.
+      </p>
+    );
+  }
   return (
     <div className="skeleton-stack" aria-busy="true" aria-label="Loading">
       {Array.from({ length: lines }, (_, index) => (
