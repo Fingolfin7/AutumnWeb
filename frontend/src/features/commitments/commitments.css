@@ -1,0 +1,23 @@
+/* Commitment form additions. focus_desk.css draws the <details> chevrons with
+   the Font Awesome webfont, which the React app does not load (icons are
+   inlined SVG), so the glyph is swapped for an <Icon> with the same look. */
+.commitment-rules > summary::after,
+.commitment-rule-dropdown > summary::after { content: none; }
+
+.rule-chevron {
+  font-size: .625rem;
+  color: var(--muted);
+  transition: transform .18s var(--ease);
+}
+.commitment-rules > summary > .rule-chevron { margin-left: auto; }
+.commitment-rules[open] > summary > .rule-chevron,
+.commitment-rule-dropdown[open] > summary > .rule-chevron { transform: rotate(180deg); }
+
+/* Scope-target search: the datalist field is a plain text input. */
+.commitment-scope-note { display: block; margin-top: .35rem; }
+
+/* A queued or required change the user should read before saving. */
+.commitment-notice { margin-top: var(--s4); }
+.commitment-notice p + p { margin-top: var(--s2); }
+.commitment-notice ul { margin: var(--s2) 0 0; padding-left: 1.1rem; }
+.commitment-notice .form-actions { margin-top: var(--s3); }
