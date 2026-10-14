@@ -44,6 +44,14 @@ class SpaViewTests(TestCase):
         self.assertEqual(data["user"]["username"], "spa-user")
         self.assertEqual([c["name"] for c in data["contexts"]], ["Work"])
         self.assertTrue(data["csrf_token"])
+        expected_start, expected_end = self.user.profile.default_filter_date_range()
+        self.assertEqual(
+            data["profile"]["default_chart_start_date"], expected_start.isoformat()
+        )
+        self.assertEqual(
+            data["profile"]["default_chart_end_date"], expected_end.isoformat()
+        )
+        self.assertFalse(data["profile"]["openai_key_configured"])
 
     def test_marked_as_the_offline_shell_and_not_browser_cached(self, _manifest):
         self.client.force_login(self.user)

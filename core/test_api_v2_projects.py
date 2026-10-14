@@ -57,6 +57,7 @@ class V2ProjectSubprojectTests(TestCase):
         self.assertEqual(created.status_code, 201)
         project_id = created.json()["id"]
         self.assertEqual(created.json()["description"], "Initial")
+        self.assertEqual(created.json()["version"], 1)
         self.assertEqual(created.json()["status"], "paused")
         self.assertEqual(created.json()["context"]["id"], self.context.id)
         self.assertEqual(
@@ -70,6 +71,8 @@ class V2ProjectSubprojectTests(TestCase):
         )
         self.assertEqual(sub_created.status_code, 201)
         subproject_id = sub_created.json()["id"]
+        self.assertEqual(sub_created.json()["version"], 1)
+        self.assertEqual(sub_created.json()["start_date"], "2026-07-16")
 
         project = Projects.objects.get(pk=project_id)
         subproject = SubProjects.objects.get(pk=subproject_id)
@@ -117,6 +120,7 @@ class V2ProjectSubprojectTests(TestCase):
         self.assertEqual(sub_patched.status_code, 200)
         self.assertEqual(sub_patched.json()["name"], "Built")
         self.assertEqual(sub_patched.json()["description"], "Updated sub")
+        self.assertEqual(sub_patched.json()["version"], 2)
 
         patched = self.client.patch(
             reverse("api_v2:project-detail", args=[project_id]),
@@ -137,6 +141,7 @@ class V2ProjectSubprojectTests(TestCase):
         self.assertIsNone(patched.json()["context"])
         self.assertEqual(patched.json()["tags"], [])
         self.assertEqual(patched.json()["start_date"], "2025-01-02")
+        self.assertEqual(patched.json()["version"], 2)
 
         sub_detail = self.client.get(
             reverse("api_v2:subproject-detail", args=[subproject_id])
@@ -370,6 +375,125 @@ class V2ProjectSubprojectTests(TestCase):
             [project["name"] for project in by_name.json()["projects"]],
             ["Alpha match", "Beta match", "Gamma match", "Zeta"],
         )
+
+    @freeze_time("2026-07-20 12:00:00")
+    def test_search_start_date_range_and_last_activity_ordering(self):
+        description_match = self._project(
+            "Description",
+            description="Contains PORTING token",
+            start_date=datetime(2026, 1, 5, tzinfo=UTC),
+        )
+        subproject_match = self._project(
+            "Child",
+            start_date=datetime(2026, 1, 10, tzinfo=UTC),
+        )
+        SubProjects.objects.create(
+            user=self.user,
+            parent_project=subproject_match,
+            name="Porting child",
+        )
+        outside = self._project(
+            "Outside",
+            start_date=datetime(2025, 12, 31, tzinfo=UTC),
+        )
+        Projects.objects.filter(
+            pk__in=[description_match.pk, subproject_match.pk, outside.pk]
+        ).update(last_updated=datetime(2025, 1, 1, tzinfo=UTC))
+        SessionMutationService.create_session(
+            user=self.user,
+            project=description_match,
+            start_time=datetime(2026, 7, 10, 9, tzinfo=UTC),
+            end_time=datetime(2026, 7, 10, 10, tzinfo=UTC),
+            is_active=False,
+        )
+        SessionMutationService.create_session(
+            user=self.user,
+            project=subproject_match,
+            start_time=datetime(2026, 7, 15, 9, tzinfo=UTC),
+            end_time=datetime(2026, 7, 15, 10, tzinfo=UTC),
+            is_active=False,
+        )
+
+        searched = self.client.get(
+            reverse("api_v2:projects"),
+            {"search": "porting", "ordering": "last_activity"},
+        )
+        self.assertEqual(searched.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in searched.json()["projects"]],
+            [subproject_match.id, description_match.id],
+        )
+
+        ranged = self.client.get(
+            reverse("api_v2:projects"),
+            {"start_date": "2026-01-01", "end_date": "2026-01-07"},
+        )
+        self.assertEqual(ranged.status_code, 200)
+        self.assertEqual(
+            [item["id"] for item in ranged.json()["projects"]],
+            [description_match.id],
+        )
+
+        invalid = self.client.get(
+            reverse("api_v2:projects"),
+            {"start_date": "2026-02-01", "end_date": "2026-01-01"},
+        )
+        self.assertEqual(invalid.status_code, 400)
+        self.assertIn("end_date", invalid.json()["error"]["details"])
+
+    def test_project_and_subproject_if_match_conflicts_are_optional(self):
+        project = self._project("Versioned")
+        subproject = SubProjects.objects.create(
+            user=self.user,
+            parent_project=project,
+            name="Versioned child",
+        )
+
+        updated = self.client.patch(
+            reverse("api_v2:project-detail", args=[project.pk]),
+            {"description": "new"},
+            format="json",
+            HTTP_IF_MATCH="1",
+        )
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["version"], 2)
+
+        stale = self.client.patch(
+            reverse("api_v2:project-detail", args=[project.pk]),
+            {"description": "stale"},
+            format="json",
+            HTTP_IF_MATCH="1",
+        )
+        self.assertEqual(stale.status_code, 409)
+        self.assertEqual(stale.json()["error"]["code"], "version_conflict")
+        self.assertEqual(
+            stale.json()["error"]["details"]["current"]["version"], 2
+        )
+
+        sub_updated = self.client.patch(
+            reverse("api_v2:subproject-detail", args=[subproject.pk]),
+            {"start_date": "2026-02-03"},
+            format="json",
+            HTTP_IF_MATCH="1",
+        )
+        self.assertEqual(sub_updated.status_code, 200)
+        self.assertEqual(sub_updated.json()["version"], 2)
+        self.assertEqual(sub_updated.json()["start_date"], "2026-02-03")
+
+        stale_delete = self.client.delete(
+            reverse("api_v2:subproject-detail", args=[subproject.pk]),
+            HTTP_IF_MATCH="1",
+        )
+        self.assertEqual(stale_delete.status_code, 409)
+        self.assertEqual(
+            stale_delete.json()["error"]["details"]["current"]["version"], 2
+        )
+
+        # If-Match remains optional for existing CLI/MCP callers.
+        deleted = self.client.delete(
+            reverse("api_v2:subproject-detail", args=[subproject.pk])
+        )
+        self.assertEqual(deleted.status_code, 204)
 
     def test_foreign_resources_are_not_found_and_unknown_tag_is_validation_error(self):
         foreign_project = Projects.objects.create(

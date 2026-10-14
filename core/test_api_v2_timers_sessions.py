@@ -240,6 +240,92 @@ class V2TimersSessionsTests(TestCase):
         self.assertEqual(response.json()["sessions"][0]["note"], "second")
         self.assertNotEqual(older.id, tied_first.id)
 
+    def test_sessions_ids_filter_and_detail_note_html_include(self):
+        first = self._create_completed(
+            end=datetime(2026, 7, 15, 10, 0, tzinfo=UTC),
+            note="**first**",
+        )
+        second = self._create_completed(
+            end=datetime(2026, 7, 15, 11, 0, tzinfo=UTC),
+            note="second",
+        )
+        third = self._create_completed(
+            end=datetime(2026, 7, 15, 12, 0, tzinfo=UTC),
+            note="third",
+        )
+
+        response = self.client.get(
+            reverse("api_v2:sessions"),
+            {"ids": f"{first.pk},{third.pk}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {item["id"] for item in response.json()["sessions"]},
+            {first.pk, third.pk},
+        )
+        self.assertNotIn(second.pk, {item["id"] for item in response.json()["sessions"]})
+
+        plain = self.client.get(
+            reverse("api_v2:session-detail", args=[first.pk])
+        )
+        rendered = self.client.get(
+            reverse("api_v2:session-detail", args=[first.pk]),
+            {"include": "note_html"},
+        )
+        self.assertNotIn("note_html", plain.json())
+        self.assertIn("<strong>first</strong>", rendered.json()["note_html"])
+
+        foreign = Sessions.objects.create(
+            user=self.other_user,
+            project=self.foreign_project,
+            start_time=datetime(2026, 7, 15, 9, tzinfo=UTC),
+            end_time=datetime(2026, 7, 15, 10, tzinfo=UTC),
+        )
+        rejected = self.client.get(
+            reverse("api_v2:sessions"), {"ids": foreign.pk}
+        )
+        self.assertEqual(rejected.status_code, 400)
+        self.assertIn("ids", rejected.json()["error"]["details"])
+
+    @freeze_time("2026-11-01 12:00:00")
+    def test_naive_start_stop_and_edit_times_are_explicitly_utc(self):
+        # These wall-clock values are nonexistent/ambiguous in Europe/Prague,
+        # but API v2's documented naive-time policy is UTC, so neither falls
+        # into a local DST gap or fold. Offset-aware timestamps remain the
+        # preferred client form.
+        started = self.client.post(
+            reverse("api_v2:timers"),
+            {
+                "project_id": self.project.pk,
+                "start": "2026-03-29T02:30:00",
+            },
+            format="json",
+        )
+        self.assertEqual(started.status_code, 201)
+        self.assertEqual(started.json()["start"], "2026-03-29T02:30:00+00:00")
+
+        stopped = self.client.post(
+            reverse("api_v2:timer-stop", args=[started.json()["id"]]),
+            {"end": "2026-03-29T03:30:00"},
+            format="json",
+            HTTP_IF_MATCH=str(started.json()["version"]),
+        )
+        self.assertEqual(stopped.status_code, 200)
+        self.assertEqual(stopped.json()["end"], "2026-03-29T03:30:00+00:00")
+
+        edited = self.client.patch(
+            reverse("api_v2:session-detail", args=[started.json()["id"]]),
+            {
+                "start": "2026-10-25T02:15:00",
+                "end": "2026-10-25T02:45:00",
+            },
+            format="json",
+            HTTP_IF_MATCH=str(stopped.json()["version"]),
+        )
+        self.assertEqual(edited.status_code, 200)
+        self.assertEqual(edited.json()["start"], "2026-10-25T02:15:00+00:00")
+        self.assertEqual(edited.json()["end"], "2026-10-25T02:45:00+00:00")
+
     @freeze_time("2026-01-20 12:00:00")
     def test_sessions_list_date_range_uses_user_timezone(self):
         self.user.profile.timezone = "America/New_York"
