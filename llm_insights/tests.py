@@ -1133,7 +1133,7 @@ class PerformLlmAnalysisStreamTests(TransactionTestCase):
             model="fake:fake-model",
         )
 
-        with patch("llm_insights.views.close_old_connections") as close_connections:
+        with patch("llm_insights.services.chats.close_old_connections") as close_connections:
             async_to_sync(save_llm_messages)(
                 chat.id,
                 [{"role": "user", "content": "hello"}],
