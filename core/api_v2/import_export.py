@@ -1,21 +1,29 @@
 """Portable import/export endpoints for API v2."""
 
+import json
+import uuid
+
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from django.http import StreamingHttpResponse
 
 from core.api_v2.exceptions import V2APIView, _envelope, related_outcome
 from core.api_v2.filters import SessionFilterSpec
 from core.export2 import build_format2_export
-from core.importer import run_import
+from core.forms import ImportJSONForm
+from core.importer import iter_import, run_import
 from core.importer2 import Format2ConflictError, Format2ValidationError
 from core.models import Context, Sessions
+from core.temp_uploads import discard_upload, store_upload
 from core.utils import build_project_json_from_sessions, json_compress, json_decompress
 
 
 class ExportQuerySerializer(serializers.Serializer):
+    project_name = serializers.CharField(required=False, allow_blank=True)
     project_ids = serializers.CharField(required=False)
     subproject_ids = serializers.CharField(required=False)
     context_ids = serializers.CharField(required=False)
@@ -43,6 +51,21 @@ class ExportQuerySerializer(serializers.Serializer):
     export_format = serializers.ChoiceField(required=False, choices=("1", "2"), default="2")
     # format-1 only: emit the Autumn-CLI-compatible variant of the heritage doc
     autumn_compatible = serializers.BooleanField(required=False, default=False)
+
+
+class ImportUploadRequestSerializer(serializers.Serializer):
+    file = serializers.FileField()
+    autumn_import = serializers.BooleanField(required=False, default=False)
+    force = serializers.BooleanField(required=False, default=False)
+    merge = serializers.BooleanField(required=False, default=True)
+    tolerance = serializers.FloatField(required=False, default=0.5)
+    verbose = serializers.BooleanField(required=False, default=False)
+    import_context = serializers.IntegerField(required=False, allow_null=True)
+    import_context_new = serializers.CharField(required=False, allow_blank=True)
+
+
+class ImportUploadResponseSerializer(serializers.Serializer):
+    upload_id = serializers.UUIDField()
 
 
 class ImportRequestSerializer(serializers.Serializer):
@@ -114,27 +137,23 @@ class ExportView(V2APIView):
         responses=Format2DocumentSerializer,
     )
     def get(self, request):
-        compress_field = serializers.BooleanField(required=False, default=False)
-        try:
-            compress = (
-                False
-                if "compress" not in request.query_params
-                else compress_field.run_validation(request.query_params.get("compress"))
-            )
-        except serializers.ValidationError as exc:
-            raise ValidationError({"compress": exc.detail}) from exc
+        query = ExportQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        options = query.validated_data
+        compress = options["compress"]
         spec = SessionFilterSpec.from_query_params(request.query_params, request.user)
         queryset = spec.apply(
             Sessions.objects.filter(user=request.user, end_time__isnull=False),
             user=request.user,
             outcome=related_outcome(request),
         )
-        if request.query_params.get("export_format") == "1":
-            autumn_compatible = serializers.BooleanField(
-                required=False, default=False
-            ).run_validation(request.query_params.get("autumn_compatible", False))
+        project_name = (options.get("project_name") or "").strip()
+        if project_name:
+            queryset = queryset.filter(project__name__icontains=project_name)
+        if options["export_format"] == "1":
             document = build_project_json_from_sessions(
-                queryset.order_by("-end_time", "id"), autumn_compatible
+                queryset.order_by("-end_time", "id"),
+                options["autumn_compatible"],
             )
         else:
             document = build_format2_export(queryset)
@@ -236,3 +255,129 @@ class ImportView(V2APIView):
         if summary.get("skipped"):
             payload["skipped"] = summary["skipped"]
         return Response(payload)
+
+
+def _stream_response(message):
+    return f"data: {json.dumps({'message': message})}\n\n"
+
+
+class ImportUploadView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="import_uploads_create",
+        request=ImportUploadRequestSerializer,
+        responses={201: ImportUploadResponseSerializer},
+    )
+    def post(self, request):
+        serializer = ImportUploadRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        # Use the API serializer's explicit defaults. An omitted HTML checkbox
+        # means false to Django forms, while the import page starts with merge
+        # enabled and API clients should get that same default when omitting it.
+        form_data = {
+            key: value
+            for key, value in data.items()
+            if key != "file" and value is not None
+        }
+        form = ImportJSONForm(
+            form_data,
+            {"file": data["file"]},
+            user=request.user,
+        )
+        if not form.is_valid():
+            raise ValidationError(
+                {
+                    field: [str(message) for message in messages]
+                    for field, messages in form.errors.items()
+                }
+            )
+        upload_id = str(uuid.uuid4())
+        path = store_upload(form.cleaned_data["file"])
+        context = form.cleaned_data.get("import_context")
+        uploads = dict(request.session.get("api_import_uploads") or {})
+        uploads[upload_id] = {
+            "file_path": path,
+            "autumn_import": form.cleaned_data.get("autumn_import", False),
+            "force": form.cleaned_data.get("force", False),
+            "merge": form.cleaned_data.get("merge", True),
+            "tolerance": form.cleaned_data.get("tolerance", 0.5),
+            "verbose": form.cleaned_data.get("verbose", False),
+            "import_context_id": context.pk if context else None,
+            "import_context_new": form.cleaned_data.get("import_context_new", ""),
+        }
+        request.session["api_import_uploads"] = uploads
+        request.session.modified = True
+        return Response({"upload_id": upload_id}, status=status.HTTP_201_CREATED)
+
+
+class ImportUploadStreamView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="import_uploads_stream_retrieve",
+        responses={
+            (200, "text/event-stream"): OpenApiResponse(
+                response=OpenApiTypes.STR,
+                description=(
+                    "Server-sent default message events. Each data payload is a JSON "
+                    "object with a message string containing an import progress, "
+                    "completion, skipped-project, or Error line from iter_import."
+                ),
+            )
+        },
+    )
+    def get(self, request, upload_id):
+        uploads = dict(request.session.get("api_import_uploads") or {})
+        data = uploads.pop(str(upload_id), None)
+        if data is None:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound("Import upload not found or already consumed.")
+        request.session["api_import_uploads"] = uploads
+        request.session.modified = True
+        path = data["file_path"]
+
+        def event_stream():
+            try:
+                context = None
+                new_name = (data.get("import_context_new") or "").strip()
+                if new_name:
+                    context, _ = Context.objects.get_or_create(
+                        user=request.user, name=new_name
+                    )
+                elif data.get("import_context_id"):
+                    context = Context.objects.filter(
+                        user=request.user, pk=data["import_context_id"]
+                    ).first()
+                with open(path, encoding="utf-8") as handle:
+                    raw = handle.read()
+                try:
+                    document = json_decompress(raw)
+                except RuntimeError:
+                    try:
+                        document = json.loads(raw)
+                    except json.JSONDecodeError:
+                        yield _stream_response("Error: Invalid JSON file")
+                        return
+                for message in iter_import(
+                    request.user,
+                    document,
+                    force=data.get("force"),
+                    merge=data.get("merge"),
+                    tolerance=data.get("tolerance"),
+                    verbose=data.get("verbose"),
+                    autumn_import=data.get("autumn_import"),
+                    import_into_context=context,
+                ):
+                    yield _stream_response(message)
+            except Exception as exc:
+                yield _stream_response(f"Error: {exc}")
+            finally:
+                discard_upload(path)
+
+        response = StreamingHttpResponse(event_stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response

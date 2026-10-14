@@ -49,6 +49,23 @@ class UTCDateTimeField(serializers.DateTimeField):
         return value.astimezone(datetime_timezone.utc).isoformat()
 
 
+class OffsetDateTimeField(serializers.DateTimeField):
+    default_error_messages = {
+        "invalid": "Enter a valid ISO-8601 timestamp with an offset."
+    }
+
+    def to_internal_value(self, value):
+        if not isinstance(value, str):
+            self.fail("invalid")
+        try:
+            instant = parse_datetime(value)
+        except (TypeError, ValueError, OverflowError):
+            instant = None
+        if instant is None or timezone.is_naive(instant):
+            self.fail("invalid")
+        return instant
+
+
 class ProjectSummarySerializer(serializers.Serializer):
     id = serializers.IntegerField()
     name = serializers.CharField()
@@ -65,6 +82,34 @@ class SubprojectAllocationWriteSerializer(serializers.Serializer):
     allocation_bp = serializers.IntegerField(min_value=1, max_value=10000)
 
 
+class CelebrationSerializer(serializers.Serializer):
+    kind = serializers.ChoiceField(choices=("progress", "completion"))
+    message = serializers.CharField()
+
+
+class TimerReminderCreateSerializer(serializers.Serializer):
+    mode = serializers.ChoiceField(choices=("after", "interval", "at"))
+    amount = serializers.FloatField(required=False)
+    unit = serializers.ChoiceField(choices=("minutes", "hours"), required=False)
+    at = OffsetDateTimeField(required=False)
+    message = serializers.CharField(required=False, allow_blank=True, max_length=240)
+
+class TimerReminderSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    session_id = serializers.IntegerField()
+    mode = serializers.ChoiceField(choices=("after", "at", "interval"))
+    next_fire_at = UTCDateTimeField()
+    interval_seconds = serializers.IntegerField(allow_null=True)
+    message = serializers.CharField(allow_blank=True)
+    last_fired_at = UTCDateTimeField(allow_null=True)
+    created_at = UTCDateTimeField()
+
+
+class TimerReminderListSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    reminders = TimerReminderSerializer(many=True)
+
+
 class SessionResourceSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     uuid = serializers.UUIDField(allow_null=True)
@@ -75,11 +120,14 @@ class SessionResourceSerializer(serializers.Serializer):
     end = UTCDateTimeField(source="end_time", allow_null=True)
     active = serializers.SerializerMethodField()
     auto_stop_at = UTCDateTimeField(allow_null=True)
+    notify_on_auto_stop = serializers.BooleanField()
     duration_minutes = serializers.SerializerMethodField()
     elapsed_minutes = serializers.SerializerMethodField()
     note = serializers.CharField(allow_null=True, required=False)
     note_html = serializers.SerializerMethodField(required=False)
     commitment_history_unaffected = serializers.BooleanField(required=False)
+    active_reminders = serializers.SerializerMethodField(required=False)
+    celebration = serializers.SerializerMethodField(required=False)
 
     @extend_schema_field(SubprojectAllocationSerializer(many=True))
     def get_subproject_allocations(self, session):
@@ -123,12 +171,27 @@ class SessionResourceSerializer(serializers.Serializer):
     def get_note_html(self, session):
         return render_markdown(session.note or "")
 
+    @extend_schema_field(TimerReminderSerializer(many=True))
+    def get_active_reminders(self, session):
+        reminders = getattr(session, "active_reminders", None)
+        if reminders is None:
+            reminders = session.reminders.filter(active=True).order_by("next_fire_at", "id")
+        return TimerReminderSerializer(reminders, many=True).data
+
+    @extend_schema_field(CelebrationSerializer(allow_null=True))
+    def get_celebration(self, session):
+        return getattr(session, "celebration", None)
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if not self.context.get("include_note", True):
             data.pop("note", None)
         if not self.context.get("include_note_html", False):
             data.pop("note_html", None)
+        if not self.context.get("include_reminders", False):
+            data.pop("active_reminders", None)
+        if not hasattr(instance, "celebration"):
+            data.pop("celebration", None)
         return data
 
 
@@ -143,6 +206,8 @@ class TimerStartRequestSerializer(serializers.Serializer):
     )
     start = UTCDateTimeField(required=False)
     uuid = serializers.UUIDField(required=False)
+    notify_on_auto_stop = serializers.BooleanField(required=False, default=False)
+    reminder = TimerReminderCreateSerializer(required=False)
 
 
 class TimerStopRequestSerializer(serializers.Serializer):
@@ -199,7 +264,7 @@ def _parse_resource_include(value):
         raise serializers.ValidationError(
             "Enter a comma-separated list without blanks or duplicates."
         )
-    unknown = sorted(set(values) - {"note", "note_html"})
+    unknown = sorted(set(values) - {"note", "note_html", "reminders"})
     if unknown:
         raise serializers.ValidationError(
             f"Unsupported include value: {', '.join(unknown)}."
@@ -614,6 +679,7 @@ class ProjectResourceSerializer(serializers.Serializer):
     last_activity = serializers.SerializerMethodField()
     total_minutes = serializers.SerializerMethodField()
     session_count = serializers.IntegerField(source="completed_session_count")
+    celebration = serializers.SerializerMethodField(required=False)
 
     @extend_schema_field(serializers.CharField())
     def get_description(self, project):
@@ -637,6 +703,16 @@ class ProjectResourceSerializer(serializers.Serializer):
     @extend_schema_field(serializers.FloatField())
     def get_total_minutes(self, project):
         return round(project.derived_total_time, 2)
+
+    @extend_schema_field(CelebrationSerializer(allow_null=True))
+    def get_celebration(self, project):
+        return getattr(project, "celebration", None)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not hasattr(instance, "celebration"):
+            data.pop("celebration", None)
+        return data
 
 
 class ProjectDetailResourceSerializer(ProjectResourceSerializer):
@@ -975,22 +1051,6 @@ class RecommendationUsageResponseSerializer(serializers.Serializer):
     days = serializers.IntegerField()
     summary = RecommendationUsageSummarySerializer(many=True)
     cache_hits = RecommendationCacheHitSerializer(many=True)
-
-
-class TimerReminderSerializer(serializers.Serializer):
-    id = serializers.IntegerField()
-    session_id = serializers.IntegerField()
-    mode = serializers.ChoiceField(choices=("after", "at", "interval"))
-    next_fire_at = UTCDateTimeField()
-    interval_seconds = serializers.IntegerField(allow_null=True)
-    message = serializers.CharField(allow_blank=True)
-    last_fired_at = UTCDateTimeField(allow_null=True)
-    created_at = UTCDateTimeField()
-
-
-class TimerReminderListSerializer(serializers.Serializer):
-    count = serializers.IntegerField()
-    reminders = TimerReminderSerializer(many=True)
 
 
 class TimelineTickSerializer(serializers.Serializer):

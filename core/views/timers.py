@@ -13,15 +13,12 @@ from django.views.generic import (
     ListView,
 )
 from django.views.decorators.http import require_GET, require_POST
-from core.celebrations import (
-    commitment_progress_for_project,
-    crossed_tracked_time_milestone,
-    format_tracked_time,
-    newly_met_commitment,
-    project_total_minutes,
-)
 from core.models import Projects, SubProjects, Sessions, TimerReminder
 from core.services import SessionMutationService, timer_suggestions
+from core.services.celebrations import (
+    capture_timer_stop_progress,
+    timer_stop_celebration,
+)
 from core.services.reminders import create_timer_reminder
 from core.views.allocations import parse_allocation_post
 from core.forms import StopTimerForm
@@ -279,12 +276,8 @@ def stop_timer(request, session_id: int):
                 # completed. The same reference instant makes the comparison
                 # a true crossing check, rather than a page-load effect.
                 celebration_reference = timezone.now()
-                before_total_minutes = project_total_minutes(
-                    request.user, timer.project_id
-                )
-                before_commitments = commitment_progress_for_project(
-                    request.user,
-                    timer.project,
+                before_progress = capture_timer_stop_progress(
+                    request.user, timer,
                     reference_instant=celebration_reference,
                 )
                 allocations = parse_allocation_post(
@@ -307,33 +300,14 @@ def stop_timer(request, session_id: int):
                             user=request.user,
                             allocations=allocations,
                         )
-                after_total_minutes = project_total_minutes(
-                    request.user, timer.project_id
-                )
-                after_commitments = commitment_progress_for_project(
-                    request.user,
-                    timer.project,
+                celebration = timer_stop_celebration(
+                    request.user, timer, before_progress,
                     reference_instant=celebration_reference,
                 )
-                newly_met = newly_met_commitment(
-                    before_commitments, after_commitments
-                )
-                crossed_milestone = crossed_tracked_time_milestone(
-                    before_total_minutes, after_total_minutes
-                )
-                if newly_met is not None:
+                if celebration is not None:
                     messages.success(
                         request,
-                        f"Stopped timer — commitment met: {newly_met.target_name}.",
-                        extra_tags="celebration celebration-progress",
-                    )
-                elif crossed_milestone is not None:
-                    messages.success(
-                        request,
-                        (
-                            f"Stopped timer — {timer.project.name} reached "
-                            f"{format_tracked_time(crossed_milestone)} tracked."
-                        ),
+                        celebration["message"],
                         extra_tags="celebration celebration-progress",
                     )
                 else:

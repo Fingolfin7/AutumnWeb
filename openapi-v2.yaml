@@ -433,6 +433,10 @@ paths:
           type: string
           minLength: 1
       - in: query
+        name: project_name
+        schema:
+          type: string
+      - in: query
         name: related
         schema:
           type: boolean
@@ -501,6 +505,169 @@ paths:
                 $ref: '#/components/schemas/ImportSummary'
           description: ''
       x-autumn-mcp: include
+  /api/v2/import/uploads/:
+    post:
+      operationId: import_uploads_create
+      tags:
+      - import
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportUploadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImportUploadRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImportUploadRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportUploadResponse'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/import/uploads/{upload_id}/stream/:
+    get:
+      operationId: import_uploads_stream_retrieve
+      parameters:
+      - in: path
+        name: upload_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - import
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            text/event-stream:
+              schema:
+                type: string
+          description: Server-sent default message events. Each data payload is a
+            JSON object with a message string containing an import progress, completion,
+            skipped-project, or Error line from iter_import.
+      x-autumn-mcp: exclude
+  /api/v2/insights/chats/:
+    get:
+      operationId: insights_chats_list
+      tags:
+      - insights
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightChatList'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/insights/chats/{chat_id}:
+    get:
+      operationId: insights_chats_retrieve
+      parameters:
+      - in: path
+        name: chat_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - insights
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightChatDetail'
+          description: ''
+      x-autumn-mcp: exclude
+    delete:
+      operationId: insights_chats_destroy
+      parameters:
+      - in: path
+        name: chat_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - insights
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Chat deleted.
+      x-autumn-mcp: exclude
+  /api/v2/insights/options/:
+    get:
+      operationId: insights_options_retrieve
+      tags:
+      - insights
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightOptions'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/insights/stream/:
+    post:
+      operationId: insights_stream_create
+      tags:
+      - insights
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsightStreamRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InsightStreamRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InsightStreamRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            text/event-stream:
+              schema:
+                type: string
+          description: Server-sent events. Emits chat (chat identifiers/URLs), delta
+            (content fragment), done (final content, rendered HTML, sources, usage
+            and model), error, plus keep-alive comment lines.
+      x-autumn-mcp: exclude
   /api/v2/me/:
     get:
       operationId: me_retrieve
@@ -518,6 +685,242 @@ paths:
                 $ref: '#/components/schemas/Me'
           description: ''
       x-autumn-mcp: include
+  /api/v2/me/account/:
+    get:
+      operationId: me_account_retrieve
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: ''
+      x-autumn-mcp: exclude
+    patch:
+      operationId: me_account_partial_update
+      tags:
+      - me
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAccountPatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAccountPatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAccountPatch'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/me/api-keys/{provider}:
+    put:
+      operationId: me_api_keys_update
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+        required: true
+      tags:
+      - me
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiKeyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ApiKeyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ApiKeyRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configured'
+          description: ''
+      x-autumn-mcp: exclude
+    delete:
+      operationId: me_api_keys_destroy
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+        required: true
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-autumn-mcp: exclude
+  /api/v2/me/avatar/:
+    put:
+      operationId: me_avatar_update
+      tags:
+      - me
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImageUpload'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImageUpload'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaStatus'
+          description: ''
+      x-autumn-mcp: exclude
+    delete:
+      operationId: me_avatar_destroy
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-autumn-mcp: exclude
+  /api/v2/me/background/:
+    put:
+      operationId: me_background_update
+      tags:
+      - me
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImageUpload'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ImageUpload'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaStatus'
+          description: ''
+      x-autumn-mcp: exclude
+    delete:
+      operationId: me_background_destroy
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-autumn-mcp: exclude
+  /api/v2/me/background/download/:
+    get:
+      operationId: me_background_download_retrieve
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: Current automatic or uploaded background file download.
+      x-autumn-mcp: exclude
+  /api/v2/me/chatgpt-login/:
+    get:
+      operationId: me_chatgpt_login_retrieve
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatGPTLogin'
+          description: ''
+      x-autumn-mcp: exclude
+    post:
+      operationId: me_chatgpt_login_create
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatGPTLogin'
+          description: ''
+      x-autumn-mcp: exclude
+    delete:
+      operationId: me_chatgpt_login_destroy
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-autumn-mcp: exclude
   /api/v2/me/preferences/:
     get:
       operationId: me_preferences_retrieve
@@ -560,6 +963,218 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PreferencesResponse'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/me/social-accounts/:
+    get:
+      operationId: me_social_accounts_retrieve
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SocialAccounts'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/me/social-accounts/{provider}:
+    delete:
+      operationId: me_social_accounts_destroy
+      parameters:
+      - in: path
+        name: provider
+        schema:
+          type: string
+        required: true
+      tags:
+      - me
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Social account disconnected.
+      x-autumn-mcp: exclude
+  /api/v2/notifications/preferences/:
+    get:
+      operationId: notifications_preferences_retrieve
+      tags:
+      - notifications
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
+      x-autumn-mcp: exclude
+    patch:
+      operationId: notifications_preferences_partial_update
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreferencePatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreferencePatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreferencePatch'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreference'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/notifications/schedules/:
+    get:
+      operationId: notifications_schedules_list
+      tags:
+      - notifications
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleList'
+          description: ''
+      x-autumn-mcp: include
+    post:
+      operationId: notifications_schedules_create
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleWrite'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ScheduleWrite'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ScheduleWrite'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+          description: ''
+      x-autumn-mcp: include
+  /api/v2/notifications/schedules/{schedule_id}:
+    patch:
+      operationId: notifications_schedules_partial_update
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSchedulePatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSchedulePatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSchedulePatch'
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
+          description: ''
+      x-autumn-mcp: exclude
+    delete:
+      operationId: notifications_schedules_destroy
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - notifications
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Schedule cancelled.
+      x-autumn-mcp: exclude
+  /api/v2/notifications/schedules/{schedule_id}/snooze/:
+    post:
+      operationId: notifications_schedules_snooze_create
+      parameters:
+      - in: path
+        name: schedule_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SnoozeRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SnoozeRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SnoozeRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Schedule'
           description: ''
       x-autumn-mcp: exclude
   /api/v2/projects/:
@@ -835,6 +1450,81 @@ paths:
                 $ref: '#/components/schemas/ProjectResource'
           description: ''
       x-autumn-mcp: include
+  /api/v2/push/status/:
+    get:
+      operationId: push_status_retrieve
+      tags:
+      - push
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushStatus'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/push/subscriptions/:
+    post:
+      operationId: push_subscriptions_create
+      tags:
+      - push
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PushSubscriptionRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushSubscriptionResponse'
+          description: ''
+      x-autumn-mcp: exclude
+    delete:
+      operationId: push_subscriptions_destroy
+      tags:
+      - push
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: No response body
+      x-autumn-mcp: exclude
+  /api/v2/push/test/:
+    post:
+      operationId: push_test_create
+      tags:
+      - push
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushTestResponse'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/recommendations/luna/:
     get:
       operationId: recommendations_luna_retrieve
@@ -1369,6 +2059,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ReportTotals'
+          description: ''
+      x-autumn-mcp: include
+  /api/v2/reports/weekly-review/:
+    get:
+      operationId: reports_weekly_review_retrieve
+      parameters:
+      - in: query
+        name: week
+        schema:
+          type: string
+          format: date
+      tags:
+      - reports
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeeklyReview'
           description: ''
       x-autumn-mcp: include
   /api/v2/sessions/:
@@ -2066,6 +2779,23 @@ paths:
       x-autumn-mcp: include
 components:
   schemas:
+    Account:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
+      required:
+      - email
+      - first_name
+      - last_name
+      - username
     AggregationTypeEnum:
       enum:
       - project
@@ -2078,6 +2808,13 @@ components:
         * `subproject` - subproject
         * `context` - context
         * `tag` - tag
+    ApiKeyRequest:
+      type: object
+      properties:
+        key:
+          type: string
+      required:
+      - key
     Background:
       type: object
       properties:
@@ -2119,6 +2856,34 @@ components:
         * `context` - context
         * `status` - status
         * `tag` - tag
+    CadenceEnum:
+      enum:
+      - once
+      - daily
+      - weekly
+      type: string
+      description: |-
+        * `once` - once
+        * `daily` - daily
+        * `weekly` - weekly
+    Celebration:
+      type: object
+      properties:
+        kind:
+          $ref: '#/components/schemas/CelebrationKindEnum'
+        message:
+          type: string
+      required:
+      - kind
+      - message
+    CelebrationKindEnum:
+      enum:
+      - progress
+      - completion
+      type: string
+      description: |-
+        * `progress` - progress
+        * `completion` - completion
     ChartPayloadRow:
       type: object
       properties:
@@ -2162,6 +2927,54 @@ components:
           type: number
           format: double
           minimum: 0
+    ChatGPTLogin:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/ChatGPTLoginStatusEnum'
+        user_code:
+          type: string
+        verification_url:
+          type: string
+          format: uri
+        interval:
+          type: integer
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        plan:
+          type: string
+          nullable: true
+        account_id:
+          type: string
+          nullable: true
+      required:
+      - status
+    ChatGPTLoginStatusEnum:
+      enum:
+      - pending
+      - connected
+      - disconnected
+      type: string
+      description: |-
+        * `pending` - pending
+        * `connected` - connected
+        * `disconnected` - disconnected
+    ChoiceEnum:
+      enum:
+      - 15m
+      - 1h
+      - tomorrow
+      type: string
+      description: |-
+        * `15m` - 15m
+        * `1h` - 1h
+        * `tomorrow` - tomorrow
     CommitmentAdjustmentRequest:
       type: object
       properties:
@@ -2629,6 +3442,13 @@ components:
       description: |-
         * `time` - time
         * `sessions` - sessions
+    Configured:
+      type: object
+      properties:
+        configured:
+          type: boolean
+      required:
+      - configured
     ConfiguredApiKeys:
       type: object
       properties:
@@ -2912,7 +3732,7 @@ components:
       required:
       - current_streak
       - recent_days
-    DefaultFilterUnitEnum:
+    FilterUnitEnum:
       enum:
       - days
       - weeks
@@ -2962,7 +3782,7 @@ components:
         name:
           type: string
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/ProjectStatusEnum'
         description:
           type: string
         context:
@@ -3027,6 +3847,14 @@ components:
       required:
       - description
       - name
+    ImageUpload:
+      type: object
+      properties:
+        image:
+          type: string
+          format: uri
+      required:
+      - image
     ImportRequest:
       type: object
       properties:
@@ -3069,47 +3897,294 @@ components:
       - projects_updated
       - sessions_imported
       - sessions_skipped
-    InsightsDefaultFilterUnitEnum:
-      enum:
-      - days
-      - weeks
-      - months
-      - years
-      - month_to_date
-      - quarter_to_date
-      - year_to_date
-      type: string
-      description: |-
-        * `days` - days
-        * `weeks` - weeks
-        * `months` - months
-        * `years` - years
-        * `month_to_date` - month_to_date
-        * `quarter_to_date` - quarter_to_date
-        * `year_to_date` - year_to_date
-    Kind0e1Enum:
-      enum:
-      - subproject
-      - residual
-      type: string
-      description: |-
-        * `subproject` - subproject
-        * `residual` - residual
+    ImportUploadRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+        autumn_import:
+          type: boolean
+          default: false
+        force:
+          type: boolean
+          default: false
+        merge:
+          type: boolean
+          default: true
+        tolerance:
+          type: number
+          format: double
+          default: 0.5
+        verbose:
+          type: boolean
+          default: false
+        import_context:
+          type: integer
+          nullable: true
+        import_context_new:
+          type: string
+      required:
+      - file
+    ImportUploadResponse:
+      type: object
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+      required:
+      - upload_id
+    InsightChatDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        model:
+          type: string
+        filters:
+          allOf:
+          - $ref: '#/components/schemas/InsightFilters'
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsightMessage'
+      required:
+      - created_at
+      - filters
+      - id
+      - messages
+      - model
+      - title
+      - updated_at
+    InsightChatGroup:
+      type: object
+      properties:
+        label:
+          type: string
+        chats:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsightChatSummary'
+      required:
+      - chats
+      - label
+    InsightChatList:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsightChatGroup'
+      required:
+      - groups
+    InsightChatSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+      required:
+      - id
+      - title
+      - updated_at
+    InsightFilters:
+      type: object
+      properties:
+        search:
+          type: string
+        related:
+          type: string
+        project_name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        note_snippet:
+          type: string
+        context:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: integer
+        include_projects:
+          type: array
+          items:
+            type: integer
+        exclude_projects:
+          type: array
+          items:
+            type: integer
+        reasoning_effort:
+          type: string
+    InsightMessage:
+      type: object
+      properties:
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        content:
+          type: string
+        html:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        metadata:
+          $ref: '#/components/schemas/InsightMessageMetadata'
+      required:
+      - content
+      - created_at
+      - html
+      - metadata
+      - role
+    InsightMessageMetadata:
+      type: object
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsightSource'
+        model:
+          type: string
+        usage:
+          $ref: '#/components/schemas/InsightUsage'
+        auth_source:
+          type: string
+        error:
+          type: boolean
+        error_message:
+          type: string
+        refusal:
+          type: boolean
+    InsightModelOption:
+      type: object
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+        reasoning_efforts:
+          type: array
+          items:
+            type: string
+      required:
+      - label
+      - reasoning_efforts
+      - value
+    InsightOptions:
+      type: object
+      properties:
+        providers:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsightProviderOption'
+        default_start_date:
+          type: string
+          format: date
+        default_end_date:
+          type: string
+          format: date
+      required:
+      - default_end_date
+      - default_start_date
+      - providers
+    InsightProviderOption:
+      type: object
+      properties:
+        provider:
+          type: string
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsightModelOption'
+      required:
+      - models
+      - provider
+    InsightSource:
+      type: object
+      properties:
+        link:
+          type: string
+          format: uri
+        title:
+          type: string
+      required:
+      - link
+      - title
+    InsightStreamRequest:
+      type: object
+      properties:
+        chat_id:
+          type: string
+          format: uuid
+        message:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        reasoning_effort:
+          type: string
+        search:
+          type: string
+        related:
+          type: boolean
+        project_name:
+          type: string
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        note_snippet:
+          type: string
+        context:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: integer
+        include_projects:
+          type: array
+          items:
+            type: integer
+        exclude_projects:
+          type: array
+          items:
+            type: integer
+      required:
+      - message
+    InsightUsage:
+      type: object
+      properties:
+        prompt:
+          type: integer
+        response:
+          type: integer
+        cached:
+          type: integer
+        total:
+          type: integer
     LunaEffortEnum:
-      enum:
-      - low
-      - medium
-      - high
-      - xhigh
-      - max
-      type: string
-      description: |-
-        * `low` - low
-        * `medium` - medium
-        * `high` - high
-        * `xhigh` - xhigh
-        * `max` - max
-    LunaRecommendationEffortEnum:
       enum:
       - low
       - medium
@@ -3186,6 +4261,14 @@ components:
       - id
       - timezone
       - username
+    MediaStatus:
+      type: object
+      properties:
+        url:
+          type: string
+          nullable: true
+      required:
+      - url
     NamedResource:
       type: object
       properties:
@@ -3196,6 +4279,57 @@ components:
       required:
       - id
       - name
+    NotificationPreference:
+      type: object
+      properties:
+        scheduled_reminders_enabled:
+          type: boolean
+        commitment_checks_enabled:
+          type: boolean
+        weekly_review_enabled:
+          type: boolean
+        commitment_check_time:
+          type: string
+          format: time
+        weekly_review_weekday:
+          type: integer
+          maximum: 6
+          minimum: 0
+        weekly_review_time:
+          type: string
+          format: time
+        next_commitment_check_at:
+          type: string
+          format: date-time
+          nullable: true
+        next_weekly_review_at:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: integer
+      required:
+      - commitment_check_time
+      - commitment_checks_enabled
+      - next_commitment_check_at
+      - next_weekly_review_at
+      - scheduled_reminders_enabled
+      - version
+      - weekly_review_enabled
+      - weekly_review_time
+      - weekly_review_weekday
+    PatchedAccountPatch:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        first_name:
+          type: string
+        last_name:
+          type: string
     PatchedCommitmentChangesRequest:
       type: object
       properties:
@@ -3283,6 +4417,25 @@ components:
         description:
           type: string
           nullable: true
+    PatchedNotificationPreferencePatch:
+      type: object
+      properties:
+        scheduled_reminders_enabled:
+          type: boolean
+        commitment_checks_enabled:
+          type: boolean
+        weekly_review_enabled:
+          type: boolean
+        commitment_check_time:
+          type: string
+          format: time
+        weekly_review_weekday:
+          type: integer
+          maximum: 6
+          minimum: 0
+        weekly_review_time:
+          type: string
+          format: time
     PatchedPreferencesRequest:
       type: object
       properties:
@@ -3294,13 +4447,13 @@ components:
           maximum: 1000
           minimum: 1
         default_filter_unit:
-          $ref: '#/components/schemas/DefaultFilterUnitEnum'
+          $ref: '#/components/schemas/FilterUnitEnum'
         insights_default_filter_value:
           type: integer
           maximum: 1000
           minimum: 1
         insights_default_filter_unit:
-          $ref: '#/components/schemas/InsightsDefaultFilterUnitEnum'
+          $ref: '#/components/schemas/FilterUnitEnum'
         default_chart_project_count:
           type: integer
           maximum: 100
@@ -3316,7 +4469,7 @@ components:
         nasa_apod_background:
           type: boolean
         luna_recommendation_effort:
-          $ref: '#/components/schemas/LunaRecommendationEffortEnum'
+          $ref: '#/components/schemas/LunaEffortEnum'
         ai_features_enabled:
           type: boolean
         active_context_id:
@@ -3332,7 +4485,7 @@ components:
         description:
           type: string
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/ProjectStatusEnum'
         context_id:
           type: integer
           minimum: 1
@@ -3345,6 +4498,37 @@ components:
         start_date:
           type: string
           format: date
+    PatchedSchedulePatch:
+      type: object
+      properties:
+        target:
+          $ref: '#/components/schemas/TargetEnum'
+        project:
+          type: integer
+          nullable: true
+        context:
+          type: integer
+          nullable: true
+        tag:
+          type: integer
+          nullable: true
+        subprojects:
+          type: array
+          items:
+            type: integer
+        local_date:
+          type: string
+          format: date
+        local_time:
+          type: string
+          format: time
+        cadence:
+          $ref: '#/components/schemas/CadenceEnum'
+        message:
+          type: string
+          maxLength: 240
+        version:
+          type: integer
     PatchedSessionPatchRequest:
       type: object
       properties:
@@ -3498,7 +4682,7 @@ components:
           type: string
         status:
           allOf:
-          - $ref: '#/components/schemas/StatusEnum'
+          - $ref: '#/components/schemas/ProjectStatusEnum'
           default: active
         context_id:
           type: integer
@@ -3519,7 +4703,7 @@ components:
         name:
           type: string
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/ProjectStatusEnum'
         description:
           type: string
           readOnly: true
@@ -3547,12 +4731,18 @@ components:
           readOnly: true
         session_count:
           type: integer
+        celebration:
+          allOf:
+          - $ref: '#/components/schemas/Celebration'
+          nullable: true
+          readOnly: true
         subprojects:
           type: array
           items:
             $ref: '#/components/schemas/SubprojectResource'
           readOnly: true
       required:
+      - celebration
       - context
       - description
       - id
@@ -3603,7 +4793,7 @@ components:
         name:
           type: string
         status:
-          $ref: '#/components/schemas/StatusEnum'
+          $ref: '#/components/schemas/ProjectStatusEnum'
         description:
           type: string
           readOnly: true
@@ -3631,7 +4821,13 @@ components:
           readOnly: true
         session_count:
           type: integer
+        celebration:
+          allOf:
+          - $ref: '#/components/schemas/Celebration'
+          nullable: true
+          readOnly: true
       required:
+      - celebration
       - context
       - description
       - id
@@ -3642,6 +4838,18 @@ components:
       - status
       - tags
       - total_minutes
+    ProjectStatusEnum:
+      enum:
+      - active
+      - paused
+      - complete
+      - archived
+      type: string
+      description: |-
+        * `active` - active
+        * `paused` - paused
+        * `complete` - complete
+        * `archived` - archived
     ProjectSummary:
       type: object
       properties:
@@ -3652,6 +4860,72 @@ components:
       required:
       - id
       - name
+    PushKeys:
+      type: object
+      properties:
+        p256dh:
+          type: string
+        auth:
+          type: string
+      required:
+      - auth
+      - p256dh
+    PushStatus:
+      type: object
+      properties:
+        available:
+          type: boolean
+        public_key:
+          type: string
+          nullable: true
+        configuration_error:
+          type: string
+          nullable: true
+        subscriptions:
+          type: integer
+        subscribed:
+          type: boolean
+      required:
+      - available
+      - configuration_error
+      - public_key
+      - subscribed
+      - subscriptions
+    PushSubscriptionRequest:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 2048
+        expirationTime:
+          type: integer
+          nullable: true
+        keys:
+          $ref: '#/components/schemas/PushKeys'
+      required:
+      - endpoint
+      - keys
+    PushSubscriptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        active:
+          type: boolean
+      required:
+      - active
+      - id
+    PushTestResponse:
+      type: object
+      properties:
+        queued:
+          type: boolean
+        event_id:
+          type: integer
+      required:
+      - event_id
+      - queued
     RecommendationCacheHit:
       type: object
       properties:
@@ -3758,7 +5032,7 @@ components:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/Kind0e1Enum'
+          $ref: '#/components/schemas/ReportHierarchyKindEnum'
         project_id:
           type: integer
         id:
@@ -3775,6 +5049,14 @@ components:
       - kind
       - name
       - total_minutes
+    ReportHierarchyKindEnum:
+      enum:
+      - subproject
+      - residual
+      type: string
+      description: |-
+        * `subproject` - subproject
+        * `residual` - residual
     ReportHierarchyProject:
       type: object
       properties:
@@ -3810,7 +5092,7 @@ components:
       type: object
       properties:
         kind:
-          $ref: '#/components/schemas/Kind0e1Enum'
+          $ref: '#/components/schemas/ReportHierarchyKindEnum'
         project_id:
           type: integer
         id:
@@ -3839,6 +5121,130 @@ components:
       required:
       - session_count
       - total_minutes
+    RoleEnum:
+      enum:
+      - system
+      - user
+      - assistant
+      type: string
+      description: |-
+        * `system` - system
+        * `user` - user
+        * `assistant` - assistant
+    Schedule:
+      type: object
+      properties:
+        id:
+          type: integer
+        target:
+          type: string
+        target_resource:
+          $ref: '#/components/schemas/ScheduleNamedResource'
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduleNamedResource'
+        message:
+          type: string
+        cadence:
+          type: string
+        timezone:
+          type: string
+        local_date:
+          type: string
+          format: date
+        local_time:
+          type: string
+          format: time
+        next_fire_at:
+          type: string
+          format: date-time
+          nullable: true
+        snoozed_until:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+        version:
+          type: integer
+      required:
+      - active
+      - cadence
+      - id
+      - local_date
+      - local_time
+      - message
+      - next_fire_at
+      - snoozed_until
+      - subprojects
+      - target
+      - target_resource
+      - timezone
+      - version
+    ScheduleList:
+      type: object
+      properties:
+        count:
+          type: integer
+        schedules:
+          type: array
+          items:
+            $ref: '#/components/schemas/Schedule'
+        upcoming:
+          type: array
+          items:
+            $ref: '#/components/schemas/Schedule'
+      required:
+      - count
+      - schedules
+      - upcoming
+    ScheduleNamedResource:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+      - id
+      - name
+    ScheduleWrite:
+      type: object
+      properties:
+        target:
+          $ref: '#/components/schemas/TargetEnum'
+        project:
+          type: integer
+          nullable: true
+        context:
+          type: integer
+          nullable: true
+        tag:
+          type: integer
+          nullable: true
+        subprojects:
+          type: array
+          items:
+            type: integer
+        local_date:
+          type: string
+          format: date
+        local_time:
+          type: string
+          format: time
+        cadence:
+          $ref: '#/components/schemas/CadenceEnum'
+        message:
+          type: string
+          maxLength: 240
+        version:
+          type: integer
+      required:
+      - cadence
+      - local_date
+      - local_time
+      - target
     SessionListItem:
       type: object
       properties:
@@ -3877,6 +5283,8 @@ components:
           nullable: true
           description: ISO-8601 instant; a timestamp without an offset is interpreted
             as UTC.
+        notify_on_auto_stop:
+          type: boolean
         duration_minutes:
           type: number
           format: double
@@ -3895,6 +5303,16 @@ components:
           readOnly: true
         commitment_history_unaffected:
           type: boolean
+        active_reminders:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimerReminder'
+          readOnly: true
+        celebration:
+          allOf:
+          - $ref: '#/components/schemas/Celebration'
+          nullable: true
+          readOnly: true
         match:
           allOf:
           - $ref: '#/components/schemas/MatchEnum'
@@ -3905,12 +5323,15 @@ components:
             * `related` - related
       required:
       - active
+      - active_reminders
       - auto_stop_at
+      - celebration
       - duration_minutes
       - elapsed_minutes
       - end
       - id
       - note_html
+      - notify_on_auto_stop
       - project
       - start
       - subproject_allocations
@@ -3969,6 +5390,8 @@ components:
           nullable: true
           description: ISO-8601 instant; a timestamp without an offset is interpreted
             as UTC.
+        notify_on_auto_stop:
+          type: boolean
         duration_minutes:
           type: number
           format: double
@@ -3987,14 +5410,27 @@ components:
           readOnly: true
         commitment_history_unaffected:
           type: boolean
+        active_reminders:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimerReminder'
+          readOnly: true
+        celebration:
+          allOf:
+          - $ref: '#/components/schemas/Celebration'
+          nullable: true
+          readOnly: true
       required:
       - active
+      - active_reminders
       - auto_stop_at
+      - celebration
       - duration_minutes
       - elapsed_minutes
       - end
       - id
       - note_html
+      - notify_on_auto_stop
       - project
       - start
       - subproject_allocations
@@ -4035,18 +5471,48 @@ components:
       - end
       - project_id
       - start
-    StatusEnum:
-      enum:
-      - active
-      - paused
-      - complete
-      - archived
-      type: string
-      description: |-
-        * `active` - active
-        * `paused` - paused
-        * `complete` - complete
-        * `archived` - archived
+    SnoozeRequest:
+      type: object
+      properties:
+        choice:
+          $ref: '#/components/schemas/ChoiceEnum'
+        version:
+          type: integer
+      required:
+      - choice
+      - version
+    SocialAccount:
+      type: object
+      properties:
+        provider:
+          type: string
+        name:
+          type: string
+        connected:
+          type: boolean
+        available:
+          type: boolean
+        identity:
+          type: string
+        login_url:
+          type: string
+          nullable: true
+      required:
+      - available
+      - connected
+      - identity
+      - login_url
+      - name
+      - provider
+    SocialAccounts:
+      type: object
+      properties:
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/SocialAccount'
+      required:
+      - accounts
     SubprojectAllocation:
       type: object
       properties:
@@ -4198,6 +5664,16 @@ components:
           type: string
           nullable: true
           maxLength: 20
+    TargetEnum:
+      enum:
+      - project
+      - context
+      - tag
+      type: string
+      description: |-
+        * `project` - project
+        * `context` - context
+        * `tag` - tag
     TimelineBlock:
       type: object
       properties:
@@ -4433,6 +5909,24 @@ components:
       - mode
       - next_fire_at
       - session_id
+    TimerReminderCreate:
+      type: object
+      properties:
+        mode:
+          $ref: '#/components/schemas/TimerReminderModeEnum'
+        amount:
+          type: number
+          format: double
+        unit:
+          $ref: '#/components/schemas/UnitEnum'
+        at:
+          type: string
+          format: date-time
+        message:
+          type: string
+          maxLength: 240
+      required:
+      - mode
     TimerReminderList:
       type: object
       properties:
@@ -4490,6 +5984,11 @@ components:
         uuid:
           type: string
           format: uuid
+        notify_on_auto_stop:
+          type: boolean
+          default: false
+        reminder:
+          $ref: '#/components/schemas/TimerReminderCreate'
       required:
       - project_id
     TimerStopRequest:
@@ -4574,6 +6073,140 @@ components:
         * `habit` - habit
         * `commitment` - commitment
         * `luna` - luna
+    UnitEnum:
+      enum:
+      - minutes
+      - hours
+      type: string
+      description: |-
+        * `minutes` - minutes
+        * `hours` - hours
+    WeeklyCommitment:
+      type: object
+      properties:
+        commitment_id:
+          type: integer
+        target_name:
+          type: string
+        period_count:
+          type: integer
+        met_period_count:
+          type: integer
+        met:
+          type: boolean
+        periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyPeriod'
+      required:
+      - commitment_id
+      - met
+      - met_period_count
+      - period_count
+      - periods
+      - target_name
+    WeeklyPeriod:
+      type: object
+      properties:
+        actual:
+          type: number
+          format: double
+        target:
+          type: number
+          format: double
+        balance:
+          type: number
+          format: double
+        banking_enabled:
+          type: boolean
+        met:
+          type: boolean
+        saved_by_bank:
+          type: boolean
+        period_start:
+          type: string
+          format: date-time
+        period_end:
+          type: string
+          format: date-time
+      required:
+      - actual
+      - balance
+      - banking_enabled
+      - met
+      - period_end
+      - period_start
+      - saved_by_bank
+      - target
+    WeeklyProject:
+      type: object
+      properties:
+        project_id:
+          type: integer
+        project_name:
+          type: string
+        total_minutes:
+          type: number
+          format: double
+        session_count:
+          type: integer
+      required:
+      - project_id
+      - project_name
+      - session_count
+      - total_minutes
+    WeeklyReview:
+      type: object
+      properties:
+        window_start:
+          type: string
+          format: date-time
+        window_end:
+          type: string
+          format: date-time
+        timezone:
+          type: string
+        week_start:
+          type: string
+          format: date
+        week_end:
+          type: string
+          format: date
+        total_minutes:
+          type: number
+          format: double
+        duration_label:
+          type: string
+        project_count:
+          type: integer
+        session_count:
+          type: integer
+        per_project:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyProject'
+        met_count:
+          type: integer
+        eligible_count:
+          type: integer
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/WeeklyCommitment'
+      required:
+      - details
+      - duration_label
+      - eligible_count
+      - met_count
+      - per_project
+      - project_count
+      - session_count
+      - timezone
+      - total_minutes
+      - week_end
+      - week_start
+      - window_end
+      - window_start
   securitySchemes:
     basicAuth:
       type: http

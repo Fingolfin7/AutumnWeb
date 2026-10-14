@@ -31,10 +31,12 @@ EXPECTED_TOOLS = sorted(
         "list_commitments",
         "list_contexts",
         "list_projects",
+        "list_reminder_schedules",
         "list_sessions",
         "list_tags",
         "luna_recommendations",
         "me",
+        "create_reminder_schedule",
         "merge_projects",
         "merge_subprojects",
         "reports_charts_list",
@@ -56,6 +58,7 @@ EXPECTED_TOOLS = sorted(
         "update_subproject",
         "update_tag",
         "update_timer",
+        "weekly_review",
     ]
 )
 
