@@ -1009,28 +1009,119 @@ export interface components {
          * @enum {string}
          */
         CelebrationKindEnum: "progress" | "completion";
-        ChartPayloadRow: {
-            /** Format: date-time */
-            x?: string;
-            /** Format: double */
-            y?: number;
-            series?: string;
+        ChartBubbleRow: {
+            name: string;
+            tag_id: number;
+            /**
+             * Format: double
+             * @description Minutes.
+             */
+            total_time: number;
+            project_count: number;
+            color: string | null;
+        };
+        ChartDailySeriesRow: {
             /** Format: date */
-            date?: string;
+            date: string;
+            series: string;
             /** Format: double */
-            hours?: number;
-            /** Format: date-time */
-            start_time?: string;
-            /** Format: date-time */
-            end_time?: string;
-            label?: string;
-            count?: number;
-            text?: string;
-            weight?: number;
-            weekday?: number;
-            hour?: number;
+            hours: number;
+        };
+        ChartDailyTotalRow: {
+            /** Format: date */
+            date: string;
             /** Format: double */
-            average_hours?: number;
+            hours: number;
+        };
+        ChartHeatmapCell: {
+            weekday: number;
+            hour: number;
+            /** Format: double */
+            average_hours: number;
+        };
+        ChartHierarchyContext: {
+            name: string;
+            children: components["schemas"]["ChartHierarchyProject"][];
+        };
+        ChartHierarchyProject: {
+            name: string;
+            project_id: number;
+            /**
+             * Format: double
+             * @description Minutes.
+             */
+            total_time: number;
+            children: components["schemas"]["ChartHierarchySubproject"][];
+        };
+        ChartHierarchyResponse: {
+            name: string;
+            children: components["schemas"]["ChartHierarchyContext"][];
+        };
+        ChartHierarchySubproject: {
+            name: string;
+            subproject_id: number;
+            /**
+             * Format: double
+             * @description Minutes.
+             */
+            total_time: number;
+        };
+        ChartHistogramRow: {
+            label: string;
+            count: number;
+        };
+        ChartIntervalRow: {
+            /** Format: date-time */
+            start_time: string;
+            /** Format: date-time */
+            end_time: string;
+        };
+        ChartRadarRow: {
+            name: string;
+            /**
+             * Format: double
+             * @description Minutes.
+             */
+            total_time: number;
+            session_count: number;
+            subproject_count: number;
+            days_since_update: number;
+            status: components["schemas"]["ProjectStatusEnum"];
+        };
+        ChartResponse: components["schemas"]["ChartTallyRow"][] | components["schemas"]["ChartStatusRow"][] | components["schemas"]["ChartBubbleRow"][] | components["schemas"]["ChartScatterRow"][] | components["schemas"]["ChartDailySeriesRow"][] | components["schemas"]["ChartDailyTotalRow"][] | components["schemas"]["ChartIntervalRow"][] | components["schemas"]["ChartHeatmapCell"][] | components["schemas"]["ChartHistogramRow"][] | components["schemas"]["ChartWordRow"][] | components["schemas"]["ChartRadarRow"][] | components["schemas"]["ChartHierarchyResponse"];
+        ChartScatterRow: {
+            /**
+             * Format: date-time
+             * @description Session end instant.
+             */
+            x: string;
+            /**
+             * Format: double
+             * @description Session duration in hours.
+             */
+            y: number;
+            series: string;
+        };
+        ChartStatusRow: {
+            status: components["schemas"]["ProjectStatusEnum"];
+            count: number;
+            /**
+             * Format: double
+             * @description Minutes.
+             */
+            total_time: number;
+        };
+        ChartTallyRow: {
+            name: string;
+            /**
+             * Format: double
+             * @description Minutes.
+             */
+            total_time: number;
+        };
+        ChartWordRow: {
+            text: string;
+            weight: number;
         };
         ChatGPTLogin: {
             status: components["schemas"]["ChatGPTLoginStatusEnum"];
@@ -1225,6 +1316,8 @@ export interface components {
             min_balance: number;
             /** Format: double */
             balance: number;
+            /** Format: double */
+            current_surplus: number;
             filters: components["schemas"]["CommitmentFilters"];
             current_period: components["schemas"]["CommitmentCurrentPeriod"];
             pending_revision: components["schemas"]["CommitmentPendingRevision"] | null;
@@ -1604,6 +1697,11 @@ export interface components {
             api_version: number;
             capabilities: string[];
             user: components["schemas"]["MeUser"];
+            /** Format: date */
+            default_chart_start_date: string;
+            /** Format: date */
+            default_chart_end_date: string;
+            openai_key_configured: boolean;
         };
         MeUser: {
             id: number;
@@ -1735,6 +1833,8 @@ export interface components {
         PatchedSubprojectPatchRequest: {
             name?: string;
             description?: string;
+            /** Format: date */
+            start_date?: string;
         };
         PatchedTagWriteRequest: {
             name?: string;
@@ -1788,6 +1888,7 @@ export interface components {
         };
         ProjectDetailResource: {
             id: number;
+            version?: number;
             name: string;
             status: components["schemas"]["ProjectStatusEnum"];
             readonly description: string;
@@ -1814,6 +1915,7 @@ export interface components {
         };
         ProjectResource: {
             id: number;
+            version?: number;
             name: string;
             status: components["schemas"]["ProjectStatusEnum"];
             readonly description: string;
@@ -2112,6 +2214,8 @@ export interface components {
         SubprojectCreateRequest: {
             name: string;
             description?: string;
+            /** Format: date */
+            start_date?: string;
         };
         SubprojectListResponse: {
             count: number;
@@ -2124,9 +2228,12 @@ export interface components {
         };
         SubprojectResource: {
             id: number;
+            version?: number;
             name: string;
             readonly description: string;
             project_id: number;
+            /** Format: date */
+            readonly start_date: string;
             /** Format: date */
             readonly last_activity: string | null;
             /** Format: double */
@@ -2412,7 +2519,12 @@ export type $defs = Record<string, never>;
 export interface operations {
     commitments_list: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Return commitments relevant to one owned resource, formatted as project:<id>, subproject:<id>, context:<id>, or tag:<id>. */
+                applies_to?: string;
+                /** @description * `streak` - streak */
+                include?: "streak";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3462,17 +3574,24 @@ export interface operations {
         parameters: {
             query?: {
                 context_ids?: string;
+                /** @description Latest project start date (inclusive). */
+                end_date?: string;
                 exclude_project_ids?: string;
                 limit?: number;
                 offset?: number;
                 /**
-                 * @description * `name` - name
+                 * @description name (default), id, or last_activity (most recently active first).
+                 *
+                 *     * `name` - name
                  *     * `id` - id
+                 *     * `last_activity` - last_activity
                  */
-                ordering?: "name" | "id";
+                ordering?: "name" | "id" | "last_activity";
                 /** @description With search, also include projects that match it by meaning (their name, subprojects, description or session notes). Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
                 search?: string;
+                /** @description Earliest project start date (inclusive). */
+                start_date?: string;
                 /**
                  * @description * `active` - active
                  *     * `paused` - paused
@@ -3547,7 +3666,10 @@ export interface operations {
     projects_destroy: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional current integer project version. */
+                "If-Match"?: number;
+            };
             path: {
                 project_id: number;
             };
@@ -3567,7 +3689,10 @@ export interface operations {
     projects_partial_update: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional current integer project version. */
+                "If-Match"?: number;
+            };
             path: {
                 project_id: number;
             };
@@ -3854,7 +3979,8 @@ export interface operations {
                 active?: string;
                 /** @description For heatmap charts, return server-aggregated weekday/hour cells instead of raw session intervals. */
                 aggregate?: boolean;
-                chart_type: "calendar" | "cumulative" | "heatmap" | "histogram" | "line" | "scatter" | "stacked_area" | "wordcloud";
+                chart_type: "bar" | "bubble" | "calendar" | "context" | "cumulative" | "heatmap" | "histogram" | "line" | "pie" | "radar" | "scatter" | "stacked_area" | "status" | "treemap" | "wordcloud";
+                /** @description Context ID. Omit for all contexts. */
                 context?: number;
                 /** @description Comma-separated context IDs. */
                 context_ids?: string;
@@ -3896,7 +4022,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ChartPayloadRow"][];
+                    "application/json": components["schemas"]["ChartResponse"];
                 };
             };
         };
@@ -4093,6 +4219,8 @@ export interface operations {
                 exclude_project_ids?: string;
                 exclude_subproject_ids?: string;
                 exclude_tag_ids?: string;
+                /** @description Comma-separated session IDs. */
+                ids?: string;
                 include?: string;
                 limit?: number;
                 note_snippet?: string;
@@ -4165,7 +4293,10 @@ export interface operations {
     };
     sessions_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                context?: string;
+                include?: string;
+            };
             header?: never;
             path: {
                 session_id: number;
@@ -4269,7 +4400,10 @@ export interface operations {
     subprojects_destroy: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional current integer subproject version. */
+                "If-Match"?: number;
+            };
             path: {
                 subproject_id: number;
             };
@@ -4289,7 +4423,10 @@ export interface operations {
     subprojects_partial_update: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Optional current integer subproject version. */
+                "If-Match"?: number;
+            };
             path: {
                 subproject_id: number;
             };

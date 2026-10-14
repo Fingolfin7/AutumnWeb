@@ -6,6 +6,23 @@ paths:
   /api/v2/commitments/:
     get:
       operationId: commitments_list
+      parameters:
+      - in: query
+        name: applies_to
+        schema:
+          type: string
+          pattern: ^(project|subproject|context|tag):[1-9][0-9]*$
+          minLength: 1
+        description: Return commitments relevant to one owned resource, formatted
+          as project:<id>, subproject:<id>, context:<id>, or tag:<id>.
+      - in: query
+        name: include
+        schema:
+          enum:
+          - streak
+          type: string
+          minLength: 1
+        description: '* `streak` - streak'
       tags:
       - commitments
       security:
@@ -1187,6 +1204,12 @@ paths:
           type: string
           minLength: 1
       - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Latest project start date (inclusive).
+      - in: query
         name: exclude_project_ids
         schema:
           type: string
@@ -1210,12 +1233,16 @@ paths:
           enum:
           - name
           - id
+          - last_activity
           type: string
           default: name
           minLength: 1
         description: |-
+          name (default), id, or last_activity (most recently active first).
+
           * `name` - name
           * `id` - id
+          * `last_activity` - last_activity
       - in: query
         name: related
         schema:
@@ -1228,6 +1255,12 @@ paths:
         schema:
           type: string
           minLength: 1
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: Earliest project start date (inclusive).
       - in: query
         name: status
         schema:
@@ -1316,6 +1349,11 @@ paths:
     patch:
       operationId: projects_partial_update
       parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer project version.
       - in: path
         name: project_id
         schema:
@@ -1349,6 +1387,11 @@ paths:
     delete:
       operationId: projects_destroy
       parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer project version.
       - in: path
         name: project_id
         schema:
@@ -1653,19 +1696,27 @@ paths:
         schema:
           type: string
           enum:
+          - bar
+          - bubble
           - calendar
+          - context
           - cumulative
           - heatmap
           - histogram
           - line
+          - pie
+          - radar
           - scatter
           - stacked_area
+          - status
+          - treemap
           - wordcloud
         required: true
       - in: query
         name: context
         schema:
           type: integer
+        description: Context ID. Omit for all contexts.
       - in: query
         name: context_ids
         schema:
@@ -1760,9 +1811,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ChartPayloadRow'
+                $ref: '#/components/schemas/ChartResponse'
           description: ''
       x-autumn-mcp: include
   /api/v2/reports/hierarchy/:
@@ -2118,6 +2167,12 @@ paths:
           type: string
           minLength: 1
       - in: query
+        name: ids
+        schema:
+          type: string
+          minLength: 1
+        description: Comma-separated session IDs.
+      - in: query
         name: include
         schema:
           type: string
@@ -2243,6 +2298,16 @@ paths:
     get:
       operationId: sessions_retrieve
       parameters:
+      - in: query
+        name: context
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: include
+        schema:
+          type: string
+          minLength: 1
       - in: path
         name: session_id
         schema:
@@ -2355,6 +2420,11 @@ paths:
     patch:
       operationId: subprojects_partial_update
       parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer subproject version.
       - in: path
         name: subproject_id
         schema:
@@ -2388,6 +2458,11 @@ paths:
     delete:
       operationId: subprojects_destroy
       parameters:
+      - in: header
+        name: If-Match
+        schema:
+          type: integer
+        description: Optional current integer subproject version.
       - in: path
         name: subproject_id
         schema:
@@ -2884,37 +2959,58 @@ components:
       description: |-
         * `progress` - progress
         * `completion` - completion
-    ChartPayloadRow:
+    ChartBubbleRow:
       type: object
       properties:
-        x:
+        name:
           type: string
-          format: date-time
-        y:
+        tag_id:
+          type: integer
+        total_time:
           type: number
           format: double
+          description: Minutes.
+        project_count:
+          type: integer
+        color:
+          type: string
+          nullable: true
+      required:
+      - color
+      - name
+      - project_count
+      - tag_id
+      - total_time
+    ChartDailySeriesRow:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
         series:
           type: string
+        hours:
+          type: number
+          format: double
+      required:
+      - date
+      - hours
+      - series
+    ChartDailyTotalRow:
+      type: object
+      properties:
         date:
           type: string
           format: date
         hours:
           type: number
           format: double
-        start_time:
-          type: string
-          format: date-time
-        end_time:
-          type: string
-          format: date-time
-        label:
-          type: string
-        count:
-          type: integer
-        text:
-          type: string
-        weight:
-          type: integer
+      required:
+      - date
+      - hours
+    ChartHeatmapCell:
+      type: object
+      properties:
         weekday:
           type: integer
           maximum: 6
@@ -2927,6 +3023,205 @@ components:
           type: number
           format: double
           minimum: 0
+      required:
+      - average_hours
+      - hour
+      - weekday
+    ChartHierarchyContext:
+      type: object
+      properties:
+        name:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChartHierarchyProject'
+      required:
+      - children
+      - name
+    ChartHierarchyProject:
+      type: object
+      properties:
+        name:
+          type: string
+        project_id:
+          type: integer
+        total_time:
+          type: number
+          format: double
+          description: Minutes.
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChartHierarchySubproject'
+      required:
+      - children
+      - name
+      - project_id
+      - total_time
+    ChartHierarchyResponse:
+      type: object
+      properties:
+        name:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChartHierarchyContext'
+      required:
+      - children
+      - name
+    ChartHierarchySubproject:
+      type: object
+      properties:
+        name:
+          type: string
+        subproject_id:
+          type: integer
+        total_time:
+          type: number
+          format: double
+          description: Minutes.
+      required:
+      - name
+      - subproject_id
+      - total_time
+    ChartHistogramRow:
+      type: object
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+      required:
+      - count
+      - label
+    ChartIntervalRow:
+      type: object
+      properties:
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+      required:
+      - end_time
+      - start_time
+    ChartRadarRow:
+      type: object
+      properties:
+        name:
+          type: string
+        total_time:
+          type: number
+          format: double
+          description: Minutes.
+        session_count:
+          type: integer
+        subproject_count:
+          type: integer
+        days_since_update:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+      required:
+      - days_since_update
+      - name
+      - session_count
+      - status
+      - subproject_count
+      - total_time
+    ChartResponse:
+      oneOf:
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartTallyRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartStatusRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartBubbleRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartScatterRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartDailySeriesRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartDailyTotalRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartIntervalRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartHeatmapCell'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartHistogramRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartWordRow'
+      - type: array
+        items:
+          $ref: '#/components/schemas/ChartRadarRow'
+      - $ref: '#/components/schemas/ChartHierarchyResponse'
+    ChartScatterRow:
+      type: object
+      properties:
+        x:
+          type: string
+          format: date-time
+          description: Session end instant.
+        y:
+          type: number
+          format: double
+          description: Session duration in hours.
+        series:
+          type: string
+      required:
+      - series
+      - x
+      - y
+    ChartStatusRow:
+      type: object
+      properties:
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+        count:
+          type: integer
+        total_time:
+          type: number
+          format: double
+          description: Minutes.
+      required:
+      - count
+      - status
+      - total_time
+    ChartTallyRow:
+      type: object
+      properties:
+        name:
+          type: string
+        total_time:
+          type: number
+          format: double
+          description: Minutes.
+      required:
+      - name
+      - total_time
+    ChartWordRow:
+      type: object
+      properties:
+        text:
+          type: string
+        weight:
+          type: integer
+      required:
+      - text
+      - weight
     ChatGPTLogin:
       type: object
       properties:
@@ -3376,6 +3671,9 @@ components:
         balance:
           type: number
           format: double
+        current_surplus:
+          type: number
+          format: double
         filters:
           $ref: '#/components/schemas/CommitmentFilters'
         current_period:
@@ -3399,6 +3697,7 @@ components:
       - banking_enabled
       - commitment_type
       - current_period
+      - current_surplus
       - filters
       - generation
       - id
@@ -4244,9 +4543,20 @@ components:
             type: string
         user:
           $ref: '#/components/schemas/MeUser'
+        default_chart_start_date:
+          type: string
+          format: date
+        default_chart_end_date:
+          type: string
+          format: date
+        openai_key_configured:
+          type: boolean
       required:
       - api_version
       - capabilities
+      - default_chart_end_date
+      - default_chart_start_date
+      - openai_key_configured
       - user
     MeUser:
       type: object
@@ -4565,6 +4875,9 @@ components:
           maxLength: 255
         description:
           type: string
+        start_date:
+          type: string
+          format: date
     PatchedTagWriteRequest:
       type: object
       properties:
@@ -4700,6 +5013,8 @@ components:
       properties:
         id:
           type: integer
+        version:
+          type: integer
         name:
           type: string
         status:
@@ -4788,6 +5103,8 @@ components:
       type: object
       properties:
         id:
+          type: integer
+        version:
           type: integer
         name:
           type: string
@@ -5539,6 +5856,9 @@ components:
           maxLength: 255
         description:
           type: string
+        start_date:
+          type: string
+          format: date
       required:
       - name
     SubprojectListResponse:
@@ -5578,6 +5898,8 @@ components:
       properties:
         id:
           type: integer
+        version:
+          type: integer
         name:
           type: string
         description:
@@ -5585,6 +5907,10 @@ components:
           readOnly: true
         project_id:
           type: integer
+        start_date:
+          type: string
+          format: date
+          readOnly: true
         last_activity:
           type: string
           format: date
@@ -5603,6 +5929,7 @@ components:
       - name
       - project_id
       - session_count
+      - start_date
       - total_minutes
     TagListResponse:
       type: object
