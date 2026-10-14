@@ -1164,6 +1164,14 @@
       },
       {
         "in": "query",
+        "name": "project_name",
+        "schema": {
+          "type": "string"
+        },
+        "argument": "project_name"
+      },
+      {
+        "in": "query",
         "name": "related",
         "schema": {
           "type": "boolean"
@@ -1266,6 +1274,9 @@
           "type": "string",
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "project_name": {
+          "type": "string"
         },
         "related": {
           "type": "boolean",
@@ -1391,6 +1402,145 @@
       "readOnlyHint": true,
       "destructiveHint": false,
       "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "list_reminder_schedules",
+    "method": "GET",
+    "path": "/api/v2/notifications/schedules/",
+    "parameters": [],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "List the account's active planned reminder schedules, including targets, cadence, next fire time, and reminders due within seven days. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "create_reminder_schedule",
+    "method": "POST",
+    "path": "/api/v2/notifications/schedules/",
+    "parameters": [],
+    "bodyKeys": [
+      "target",
+      "project",
+      "context",
+      "tag",
+      "subprojects",
+      "local_date",
+      "local_time",
+      "cadence",
+      "message",
+      "version"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "enum": [
+            "project",
+            "context",
+            "tag"
+          ],
+          "type": "string",
+          "description": "* `project` - project\n* `context` - context\n* `tag` - tag"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tag": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subprojects": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "local_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "local_time": {
+          "type": "string",
+          "format": "time"
+        },
+        "cadence": {
+          "enum": [
+            "once",
+            "daily",
+            "weekly"
+          ],
+          "type": "string",
+          "description": "* `once` - once\n* `daily` - daily\n* `weekly` - weekly"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "version": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "cadence",
+        "local_date",
+        "local_time",
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "description": "Create a planned reminder schedule for one owned project, context, or tag at a profile-local date and time, optionally repeating daily or weekly. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
       "openWorldHint": true
     }
   },
@@ -3048,6 +3198,47 @@
     }
   },
   {
+    "name": "weekly_review",
+    "method": "GET",
+    "path": "/api/v2/reports/weekly-review/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "week",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "argument": "week"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "week": {
+          "type": "string",
+          "format": "date"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Summarize a local Monday-to-Sunday Autumn week: tracked time, project totals, session count, and closed commitment results. Pass any date inside the desired week. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "list_sessions",
     "method": "GET",
     "path": "/api/v2/sessions/",
@@ -4069,7 +4260,9 @@
       "note",
       "stop_after_minutes",
       "start",
-      "uuid"
+      "uuid",
+      "notify_on_auto_stop",
+      "reminder"
     ],
     "inputSchema": {
       "type": "object",
@@ -4108,6 +4301,47 @@
         "uuid": {
           "type": "string",
           "format": "uuid"
+        },
+        "notify_on_auto_stop": {
+          "type": "boolean",
+          "default": false
+        },
+        "reminder": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "after",
+                "at",
+                "interval"
+              ],
+              "type": "string",
+              "description": "* `after` - after\n* `at` - at\n* `interval` - interval"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "unit": {
+              "enum": [
+                "minutes",
+                "hours"
+              ],
+              "type": "string",
+              "description": "* `minutes` - minutes\n* `hours` - hours"
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "message": {
+              "type": "string",
+              "maxLength": 240
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
         },
         "account": {
           "type": "string",
