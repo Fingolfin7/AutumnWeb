@@ -5,12 +5,10 @@ import {
   commitmentAppliesToProject,
   commitmentAppliesToSubproject,
   commitmentRuleLines,
-  completionMessage,
   describeFilters,
   emptyFilters,
   formatSigned,
   groupByStatus,
-  isCompletionTransition,
   readFilters,
   relatedOnly,
   serverQuery,
@@ -215,16 +213,4 @@ describe("editing", () => {
     expect(changedFields(original, { ...original, context_id: null })).toEqual({ context_id: null });
   });
 
-  it("celebrates only a live project becoming complete", () => {
-    expect(isCompletionTransition("active", "complete")).toBe(true);
-    expect(isCompletionTransition("paused", "complete")).toBe(true);
-    expect(isCompletionTransition("archived", "complete")).toBe(false);
-    expect(isCompletionTransition("complete", "complete")).toBe(false);
-  });
-
-  it("words the completion message like the old page", () => {
-    expect(completionMessage(200, 4)).toBe("Project complete — 3h 20m tracked across 4 sessions.");
-    expect(completionMessage(60, 1)).toBe("Project complete — 1h tracked across 1 session.");
-    expect(completionMessage(0, 0)).toBe("Project complete — no sessions logged yet.");
-  });
 });

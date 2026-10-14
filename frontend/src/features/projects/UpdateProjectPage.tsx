@@ -10,7 +10,7 @@ import type { ProjectDetail } from "@/api/types";
 import { failure, useCommitments, useProject, useUpdateProject } from "./api";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { splitErrors } from "./forms";
-import { changedFields, commitmentAppliesToProject, completionMessage, isCompletionTransition, sortCommitments, type ProjectValues } from "./logic";
+import { changedFields, commitmentAppliesToProject, sortCommitments, type ProjectValues } from "./logic";
 import { FormErrors, LoadState, PageHead, ProjectFields } from "./Parts";
 
 const FIELDS = ["name", "description", "status", "context_id", "tag_ids"];
@@ -58,8 +58,10 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
     update.mutate(patch, {
       onSuccess: (saved) => {
         setValues({ ...values, name: saved.name });
-        if (isCompletionTransition(original.status, saved.status)) {
-          toast.success(completionMessage(project.total_minutes, project.session_count), { celebration: "completion" });
+        /* The server words it (core/services/celebrations.py), the same as
+           the CLI and MCP see. */
+        if (saved.celebration) {
+          toast.success(saved.celebration.message, { celebration: "completion" });
         } else {
           toast.success("Project updated successfully");
         }

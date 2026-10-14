@@ -272,27 +272,6 @@ export function formatSigned(value: number, timeBased: boolean): string {
   return `${rounded >= 0 ? "+" : ""}${formatNumber(rounded)}${timeBased ? "m" : ""}`;
 }
 
-/* "Project complete — 3h 20m tracked across 4 sessions."
-   (core.celebrations.format_tracked_time) */
-export function formatTracked(minutes: number): string {
-  const total = Math.max(0, Math.round(minutes || 0));
-  const hours = Math.floor(total / 60);
-  const rest = total % 60;
-  if (hours && rest) return `${hours}h ${rest}m`;
-  if (hours) return `${hours}h`;
-  return `${rest}m`;
-}
-
-export function completionMessage(totalMinutes: number, sessionCount: number): string {
-  if (!sessionCount) return "Project complete — no sessions logged yet.";
-  return `Project complete — ${formatTracked(totalMinutes)} tracked across ${sessionCount} ${sessionCount === 1 ? "session" : "sessions"}.`;
-}
-
-/** An edit moved a live project into its completed state. */
-export function isCompletionTransition(previous: ProjectStatus, next: ProjectStatus): boolean {
-  return (previous === "active" || previous === "paused") && next === "complete";
-}
-
 /* ------------------------------------------------------------------ edits */
 
 export interface ProjectValues {
