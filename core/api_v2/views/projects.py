@@ -1,4 +1,6 @@
 from .base import *
+from core.celebrations import is_completion_transition
+from core.services.celebrations import project_completion_celebration
 class ProjectsView(V2APIView):
     permission_classes = [IsAuthenticated]
 
@@ -135,6 +137,7 @@ class ProjectDetailView(V2APIView):
     )
     def patch(self, request, project_id):
         project = _get_project(request.user, project_id)
+        previous_status = project.status
         serializer = ProjectPatchRequestSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -176,6 +179,8 @@ class ProjectDetailView(V2APIView):
         except DestructiveOperationError as exc:
             return _conflict(exc)
         project = _get_project(request.user, project.pk)
+        if is_completion_transition(previous_status, project.status):
+            project.celebration = project_completion_celebration(request.user, project)
         return Response(ProjectResourceSerializer(project).data)
 
     @extend_schema(

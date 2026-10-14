@@ -4,6 +4,12 @@ import hashlib
 from core.utils import filter_by_active_context
 from core.models import TimerReminder
 from core.api_v2.serializers import TimerReminderListSerializer
+from core.services.celebrations import (
+    capture_timer_stop_progress,
+    timer_stop_celebration,
+)
+from core.services.reminders import create_timer_reminder
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 
 class TimersView(V2APIView):
@@ -25,17 +31,35 @@ class TimersView(V2APIView):
         include = set(query.validated_data.get("include", []))
         stop_expired_timers(request.user)
         context_request = _context_request(request)
+        queryset = _session_queryset(request.user).filter(end_time__isnull=True)
+        if "reminders" in include:
+            queryset = queryset.prefetch_related(
+                Prefetch(
+                    "reminders",
+                    queryset=TimerReminder.objects.filter(active=True).order_by(
+                        "next_fire_at", "id"
+                    ),
+                    to_attr="active_reminders",
+                )
+            )
         timers = list(
             filter_by_active_context(
-                _session_queryset(request.user).filter(end_time__isnull=True),
+                queryset,
                 context_request,
             )
             .order_by("-start_time", "-id")
         )
         context_key = context_request.session.get("active_context_id", "all")
-        etag_source = f"{context_key}|" + ",".join(
-            f"{timer.pk}:{timer.version}" for timer in timers
-        )
+        timer_etags = []
+        for timer in timers:
+            value = f"{timer.pk}:{timer.version}"
+            if "reminders" in include:
+                value += ":" + ",".join(
+                    f"{reminder.pk}:{reminder.next_fire_at.isoformat()}"
+                    for reminder in timer.active_reminders
+                )
+            timer_etags.append(value)
+        etag_source = f"{context_key}|{','.join(sorted(include))}|" + ",".join(timer_etags)
         etag = f'W/"{hashlib.sha256(etag_source.encode()).hexdigest()}"'
         if request.headers.get("If-None-Match") == etag:
             response = Response(status=status.HTTP_304_NOT_MODIFIED)
@@ -48,6 +72,7 @@ class TimersView(V2APIView):
                     _serialize(
                         timer,
                         include_note_html="note_html" in include,
+                        include_reminders="reminders" in include,
                     )
                     for timer in timers
                 ],
@@ -100,7 +125,26 @@ class TimersView(V2APIView):
             fields["auto_stop_at"] = start_time + timedelta(
                 minutes=data["stop_after_minutes"]
             )
-        session = SessionMutationService.create_session(**fields)
+        fields["notify_on_auto_stop"] = data.get("notify_on_auto_stop", False)
+        try:
+            with transaction.atomic():
+                session = SessionMutationService.create_session(**fields)
+                reminder = data.get("reminder")
+                if reminder:
+                    create_timer_reminder(
+                        user=request.user,
+                        session=session,
+                        mode=reminder["mode"],
+                        amount=reminder.get("amount"),
+                        unit=reminder.get("unit"),
+                        at_local=reminder.get("at"),
+                        message=reminder.get("message", ""),
+                    )
+        except DjangoValidationError as exc:
+            details = getattr(exc, "message_dict", None) or {
+                "reminder": getattr(exc, "messages", [str(exc)])
+            }
+            raise ValidationError(details) from exc
         return Response(_serialize(session), status=status.HTTP_201_CREATED)
 
 
@@ -116,6 +160,10 @@ class TimerStopView(V2APIView):
         session = _get_session(request.user, session_id)
         if session.end_time is not None:
             return Response(_serialize(session), status=status.HTTP_200_OK)
+        celebration_reference = timezone.now()
+        before_progress = capture_timer_stop_progress(
+            request.user, session, reference_instant=celebration_reference
+        )
         # Parse (and validate the format of) If-Match here; the comparison
         # itself happens under the row lock inside the mutation service.
         expected_version = _parse_if_match(request)
@@ -155,6 +203,12 @@ class TimerStopView(V2APIView):
                     )
         except StaleVersionError as exc:
             return _version_conflict(exc.current)
+        session.celebration = timer_stop_celebration(
+            request.user,
+            session,
+            before_progress,
+            reference_instant=celebration_reference,
+        )
         return Response(_serialize(session), status=status.HTTP_200_OK)
 
 

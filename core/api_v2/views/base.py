@@ -106,12 +106,15 @@ def _get_session(user, session_id):
         raise NotFound(f"Session {session_id} not found.") from exc
 
 
-def _serialize(session, *, include_note=True, include_note_html=False):
+def _serialize(
+    session, *, include_note=True, include_note_html=False, include_reminders=False
+):
     return SessionResourceSerializer(
         session,
         context={
             "include_note": include_note,
             "include_note_html": include_note_html,
+            "include_reminders": include_reminders,
         },
     ).data
 

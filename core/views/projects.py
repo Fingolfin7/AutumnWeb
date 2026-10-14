@@ -19,11 +19,8 @@ from core.commitments import (
     get_commitment_progress,
     reconcile_commitment,
 )
-from core.celebrations import (
-    format_tracked_time,
-    is_completion_transition,
-    project_total_minutes,
-)
+from core.celebrations import is_completion_transition
+from core.services.celebrations import project_completion_celebration
 from core.models import Projects, SubProjects, Sessions, Commitment, status_choices
 from core.search import search_projects
 from core.services.semantic_search import related_project_ids
@@ -385,23 +382,10 @@ class UpdateProjectView(LoginRequiredMixin, UpdateView):
             project.save(update_fields=update_fields)
         form.save_m2m()
         if is_completion_transition(previous_project.status, project.status):
-            total_minutes = project_total_minutes(self.request.user, project.pk)
-            session_count = Sessions.objects.filter(
-                user=self.request.user,
-                project_id=project.pk,
-                end_time__isnull=False,
-            ).count()
-            if session_count:
-                session_word = "session" if session_count == 1 else "sessions"
-                completion_copy = (
-                    f"Project complete — {format_tracked_time(total_minutes)} "
-                    f"tracked across {session_count} {session_word}."
-                )
-            else:
-                completion_copy = "Project complete — no sessions logged yet."
+            celebration = project_completion_celebration(self.request.user, project)
             messages.success(
                 self.request,
-                completion_copy,
+                celebration["message"],
                 extra_tags="celebration celebration-complete",
             )
         else:
