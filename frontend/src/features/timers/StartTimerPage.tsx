@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from
 import { useNavigate, useSearchParams } from "react-router";
 import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -9,7 +10,6 @@ import { useAllProjects, useSubprojects } from "@/api/meta";
 import { errorMessage } from "@/api/errors";
 import { bootstrap } from "@/bootstrap";
 import type { Project } from "@/api/types";
-import { fromDateTimeLocal } from "@/lib/format";
 import { useStartTimer } from "./api";
 import { minutesOf, planReminders, type DurationUnit, type ReminderMode } from "./reminderPlan";
 import { PushPermission } from "./PushPermission";
@@ -59,6 +59,7 @@ export default function StartTimerPage() {
   const [message, setMessage] = useState("");
   const [notifyOnAutoStop, setNotifyOnAutoStop] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const atTime = useLocalTime(at);
 
   /* Prefill once the project list is in. */
   const [prefilled, setPrefilled] = useState(false);
@@ -88,11 +89,11 @@ export default function StartTimerPage() {
           stopAfter,
           after: { amount: numberOrNull(afterAmount), unit: afterUnit },
           interval: { amount: numberOrNull(intervalAmount), unit: intervalUnit },
-          at,
+          at: atTime.instant ?? "",
         },
         now,
       ),
-    [mode, stopAfter?.amount, stopAfter?.unit, afterAmount, afterUnit, intervalAmount, intervalUnit, at, now],
+    [mode, stopAfter?.amount, stopAfter?.unit, afterAmount, afterUnit, intervalAmount, intervalUnit, atTime.instant, now],
   );
 
   const pickProject = (next: Project | null) => {
@@ -117,9 +118,9 @@ export default function StartTimerPage() {
       }
       reminder = { mode, amount, unit: mode === "after" ? afterUnit : intervalUnit, message };
     } else if (mode === "at") {
-      const iso = fromDateTimeLocal(at);
+      const iso = atTime.instant;
       if (!iso) {
-        toast.error("Choose a date and time for the reminder.");
+        toast.error(atTime.error ?? "Choose a date and time for the reminder.");
         return;
       }
       reminder = { mode, at: iso, message };
@@ -303,9 +304,10 @@ export default function StartTimerPage() {
                   <div className="field">
                     <label htmlFor="reminder-at">Date and time</label>
                     <input type="datetime-local" id="reminder-at" step={60} value={at} onChange={(event) => setAt(event.target.value)} aria-describedby="reminder-timezone" />
+                    <LocalTimeNotice field={atTime} label="the reminder" />
                   </div>
                   <p className="rm-note" id="reminder-timezone">
-                    {at ? `${new Date(at).toLocaleString([], { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}, ${zone} (profile timezone)` : `Your profile timezone: ${zone}`}
+                    {atTime.instant ? `${new Date(atTime.instant).toLocaleString([], { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}, ${zone} (profile timezone)` : `Your profile timezone: ${zone}`}
                   </p>
                 </div>
               ) : null}

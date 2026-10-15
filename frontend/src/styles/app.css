@@ -176,3 +176,6 @@
   font-size: .85rem;
 }
 @media (min-width: 1000px) { .offline-banner { bottom: 1rem; } }
+
+/* Which occurrence of a repeated wall time (components/LocalTimeNotice). */
+.local-time-notice { display: grid; gap: var(--s2); margin-top: var(--s2); }

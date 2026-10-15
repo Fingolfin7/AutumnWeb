@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router";
 import { faArrowLeft, faStopwatch } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { NoteEditor } from "@/components/NoteEditor";
 import { AllocationEditor } from "@/components/AllocationEditor";
 import { ErrorState, Skeleton } from "@/components/states";
@@ -11,7 +12,7 @@ import { api, unwrap } from "@/api/client";
 import { ApiError, errorMessage } from "@/api/errors";
 import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
-import { elapsedSeconds, formatDurationWords, fromDateTimeLocal, toDateTimeLocal } from "@/lib/format";
+import { elapsedSeconds, formatDurationWords, toDateTimeLocal } from "@/lib/format";
 import { updateQueuedStart } from "@/lib/offlineQueue";
 import { useNow, useStopTimer, useTimers } from "./api";
 
@@ -66,6 +67,10 @@ function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => v
   const [allocations, setAllocations] = useState<{ subproject_id: number; allocation_bp: number }[] | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
+  /* Repeated (clocks went back) or skipped (forward) wall times need a choice
+     or an error; an untouched start keeps the occurrence the timer began in. */
+  const startTime = useLocalTime(start, timer.start);
+  const endTime = useLocalTime(end);
 
   /* Until End is edited, keep it showing "now". */
   useEffect(() => {
@@ -76,23 +81,27 @@ function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => v
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const startIso = fromDateTimeLocal(start);
-    const endIso = endTouched ? fromDateTimeLocal(end) : new Date().toISOString();
+    const startIso = startTime.instant;
+    const endIso = endTouched ? endTime.instant : new Date().toISOString();
     const nextErrors: Record<string, string[]> = {};
-    if (!startIso) nextErrors.start = ["Enter a valid date and time."];
-    if (!endIso) nextErrors.end = ["Enter a valid date and time."];
+    if (!startIso) nextErrors.start = [startTime.error ?? "Enter a valid date and time."];
+    if (!endIso) nextErrors.end = [endTime.error ?? "Enter a valid date and time."];
     if (startIso && endIso && new Date(endIso) < new Date(startIso)) nextErrors.end = ["End time cannot be earlier than start time."];
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
+
+    /* Choosing the other occurrence of a repeated start changes the instant
+       without changing the field's text. */
+    const startChanged = start !== initialStart || Math.floor(Date.parse(startIso!) / 1000) !== Math.floor(Date.parse(timer.start) / 1000);
 
     setBusy(true);
     onSubmitting();
     try {
       let current = timer;
-      if (start !== initialStart && timer.pending_sync && timer.uuid) {
+      if (startChanged && timer.pending_sync && timer.uuid) {
         /* Not on the server yet: correct the queued start instead. */
         updateQueuedStart(timer.uuid, startIso!);
-      } else if (start !== initialStart) {
+      } else if (startChanged) {
         /* The stop endpoint only takes the end; a corrected start is saved
            first, carrying the version forward. */
         current = (await unwrap(
@@ -177,7 +186,8 @@ function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => v
             <div className="field">
               <label htmlFor="id_start_time">Start time</label>
               <input id="id_start_time" type="datetime-local" step={1} className="half-width" value={start} onChange={(e) => setStart(e.target.value)} />
-              <Errors messages={errors.start} />
+              <Errors messages={errors.start?.filter((message) => message !== startTime.error)} />
+              <LocalTimeNotice field={startTime} label="the start" />
             </div>
             <div className="field">
               <label htmlFor="id_end_time">End time</label>
@@ -192,7 +202,8 @@ function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => v
                   setEnd(e.target.value);
                 }}
               />
-              <Errors messages={errors.end} />
+              <Errors messages={errors.end?.filter((message) => message !== endTime.error)} />
+              {endTouched ? <LocalTimeNotice field={endTime} label="the end" /> : null}
             </div>
           </div>
           <NoteEditor id="id_note" value={note} onChange={setNote} draftKey={timer.id} placeholder="Session Note..." error={errors.note} />

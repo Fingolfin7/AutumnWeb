@@ -147,6 +147,73 @@ export function fromDateTimeLocal(value: string): string | null {
   return toOffsetIso(date);
 }
 
+export interface LocalTimeCandidates {
+  /** "ok": one instant. "ambiguous": clocks went back, so the wall time
+   *  happened twice (instants are in time order). "nonexistent": clocks went
+   *  forward over it, so nothing is on the clock at that time (no instants).
+   *  An empty or unparseable value is "ok" with no instants. */
+  kind: "ok" | "ambiguous" | "nonexistent";
+  instants: string[];
+}
+
+const LOCAL_VALUE = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2})(?:\.\d+)?)?$/;
+const PROBE_MINUTES = [-60, -30, 30, 60];
+
+/* The canonical "YYYY-MM-DDTHH:MM:SS" form of a datetime-local value. */
+function normalizeLocal(value: string): string | null {
+  const match = LOCAL_VALUE.exec(value);
+  return match ? `${match[1]}T${match[2]}:${match[3] ?? "00"}` : null;
+}
+
+/** Every instant a <input type="datetime-local"> wall time can mean in the
+ *  browser's zone. `new Date(value)` silently picks the first occurrence of a
+ *  repeated time and silently shifts a skipped one, so the caller has to ask. */
+export function localTimeCandidates(value: string): LocalTimeCandidates {
+  const wall = normalizeLocal(value);
+  const date = new Date(value);
+  if (!wall || Number.isNaN(date.getTime())) return { kind: "ok", instants: [] };
+
+  /* Skipped time: the browser moved it, so the wall time doesn't round-trip. */
+  if (toDateTimeLocal(date, true) !== wall) return { kind: "nonexistent", instants: [] };
+
+  /* Repeated time: another instant 30 or 60 minutes away shows the same wall
+     time (the clock change is 30 or 60 minutes). The browser's own pick may be
+     either occurrence, so look both ways. */
+  const found = new Set([date.getTime()]);
+  for (const minutes of PROBE_MINUTES) {
+    const probe = new Date(date.getTime() + minutes * 60_000);
+    if (toDateTimeLocal(probe, true) === wall) found.add(probe.getTime());
+  }
+  const instants = [...found].sort((a, b) => a - b).map((ms) => toOffsetIso(new Date(ms)));
+  return { kind: instants.length > 1 ? "ambiguous" : "ok", instants };
+}
+
+/** "UTC+02:00" for the browser's offset at an instant. */
+export function utcOffsetLabel(value: string | Date): string {
+  const date = value instanceof Date ? value : parseInstant(value);
+  if (!date) return "";
+  const offset = -date.getTimezoneOffset();
+  const abs = Math.abs(offset);
+  return `UTC${offset >= 0 ? "+" : "-"}${pad(Math.floor(abs / 60))}:${pad(abs % 60)}`;
+}
+
+/** "first, UTC+02:00" / "second, UTC+01:00" for one occurrence of a repeated time. */
+export function occurrenceLabel(index: number, instant: string): string {
+  const ordinal = ["first", "second", "third"][index] ?? `#${index + 1}`;
+  return `${ordinal}, ${utcOffsetLabel(instant)}`;
+}
+
+/** Field error for a wall time that clocks skipped, or null if it exists. */
+export function nonexistentTimeMessage(value: string): string | null {
+  const wall = normalizeLocal(value);
+  if (!wall || localTimeCandidates(value).kind !== "nonexistent") return null;
+  const [datePart, timePart] = wall.split("T") as [string, string];
+  const [year, month, day] = datePart.split("-").map(Number) as [number, number, number];
+  const monthName = new Date(year, month - 1, day).toLocaleDateString("en-GB", { month: "short" });
+  const clock = timePart.endsWith(":00") ? timePart.slice(0, 5) : timePart;
+  return `Clocks go forward at this time, so ${clock} doesn't exist on ${day} ${monthName}.`;
+}
+
 /** ISO 8601 with the browser's own offset, e.g. 2026-10-14T09:30:00+02:00. */
 export function toOffsetIso(date: Date): string {
   const offset = -date.getTimezoneOffset();

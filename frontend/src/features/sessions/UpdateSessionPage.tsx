@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router";
 import { faArrowLeft, faCheckCircle, faExclamationTriangle } from "@fortawesome/free-solid-svg-icons";
 import { AllocationEditor } from "@/components/AllocationEditor";
 import { Icon } from "@/components/Icon";
+import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { NoteEditor } from "@/components/NoteEditor";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
@@ -12,7 +13,7 @@ import { useAllProjects, useSubprojects } from "@/api/meta";
 import { ApiError, errorMessage } from "@/api/errors";
 import type { Project, SessionPatch } from "@/api/types";
 import { sameAllocations, type AllocationItem, type AllocationWrite } from "@/lib/allocation";
-import { fromDateTimeLocal, toDateTimeLocal } from "@/lib/format";
+import { toDateTimeLocal } from "@/lib/format";
 import { parseSessionParam, useSession, useUpdateSession, type SessionRow } from "./api";
 
 /* /update_session/<id or uuid>/ (update_session.html). Three slabs' worth of
@@ -91,6 +92,10 @@ function SessionForm({ session }: { session: SessionRow }) {
   const bannerRef = useRef<HTMLDivElement>(null);
   const startId = useId();
   const endId = useId();
+  /* A wall time can mean two instants (clocks went back) or none (they went
+     forward); an untouched field keeps the occurrence it was saved with. */
+  const startTime = useLocalTime(form.start, baseline.start);
+  const endTime = useLocalTime(form.end, baseline.end);
 
   const subprojects = useSubprojects(form.projectId);
   const baselineIds = useMemo(() => initialState(baseline).subprojectIds, [baseline]);
@@ -144,13 +149,17 @@ function SessionForm({ session }: { session: SessionRow }) {
     if (form.projectId === null) errors.project = ["Choose one of your projects."];
     else if (form.projectId !== baseline.project.id) body.project_id = form.projectId;
 
-    const start = fromDateTimeLocal(form.start);
-    const end = fromDateTimeLocal(form.end);
-    if (!start) errors.start = ["Enter a start time."];
-    if (!end) errors.end = ["Enter an end time."];
+    const start = startTime.instant;
+    const end = endTime.instant;
+    /* A skipped time already says so under its field. */
+    if (!start) errors.start = [startTime.error ?? "Enter a start time."];
+    if (!end) errors.end = [endTime.error ?? "Enter an end time."];
     if (start && end && new Date(end) < new Date(start)) errors.end = ["End time cannot be earlier than start time."];
-    if (start && form.start !== initial.start) body.start = start;
-    if (end && form.end !== initial.end) body.end = end;
+    /* Picking the other occurrence of a repeated time changes the instant
+       without changing the field's text. */
+    const moved = (instant: string, was: string | null) => !was || Math.floor(Date.parse(instant) / 1000) !== Math.floor(Date.parse(was) / 1000);
+    if (start && (form.start !== initial.start || moved(start, baseline.start))) body.start = start;
+    if (end && (form.end !== initial.end || moved(end, baseline.end))) body.end = end;
 
     if (form.note !== initial.note) body.note = form.note;
 
@@ -278,7 +287,8 @@ function SessionForm({ session }: { session: SessionRow }) {
                 value={form.start}
                 onChange={(event) => setForm({ ...form, start: event.target.value })}
               />
-              <FieldErrors messages={fieldErrors.start} />
+              <FieldErrors messages={fieldErrors.start?.filter((message) => message !== startTime.error)} />
+              <LocalTimeNotice field={startTime} label="the start" />
             </div>
             <div className="field">
               <label htmlFor={endId}>Ended</label>
@@ -289,7 +299,8 @@ function SessionForm({ session }: { session: SessionRow }) {
                 value={form.end}
                 onChange={(event) => setForm({ ...form, end: event.target.value })}
               />
-              <FieldErrors messages={fieldErrors.end} />
+              <FieldErrors messages={fieldErrors.end?.filter((message) => message !== endTime.error)} />
+              <LocalTimeNotice field={endTime} label="the end" />
             </div>
           </div>
 
