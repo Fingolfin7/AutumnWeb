@@ -135,6 +135,7 @@ class Tag(models.Model):
 class Projects(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
+    version = models.IntegerField(default=1, db_default=1)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=25, choices=status_choices, default='active')
@@ -185,6 +186,7 @@ class Projects(models.Model):
 class SubProjects(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
+    version = models.IntegerField(default=1, db_default=1)
     start_date = models.DateTimeField(default=timezone.now)
     last_updated = models.DateTimeField(default=timezone.now)
     description = models.TextField(null=True, blank=True)

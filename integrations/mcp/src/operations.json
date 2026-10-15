@@ -3,11 +3,50 @@
     "name": "list_commitments",
     "method": "GET",
     "path": "/api/v2/commitments/",
-    "parameters": [],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "applies_to",
+        "schema": {
+          "type": "string",
+          "pattern": "^(project|subproject|context|tag):[1-9][0-9]*$",
+          "minLength": 1
+        },
+        "description": "Return commitments relevant to one owned resource, formatted as project:<id>, subproject:<id>, context:<id>, or tag:<id>.",
+        "argument": "applies_to"
+      },
+      {
+        "in": "query",
+        "name": "include",
+        "schema": {
+          "enum": [
+            "streak"
+          ],
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "* `streak` - streak",
+        "argument": "include"
+      }
+    ],
     "bodyKeys": [],
     "inputSchema": {
       "type": "object",
       "properties": {
+        "applies_to": {
+          "type": "string",
+          "pattern": "^(project|subproject|context|tag):[1-9][0-9]*$",
+          "minLength": 1,
+          "description": "Return commitments relevant to one owned resource, formatted as project:<id>, subproject:<id>, context:<id>, or tag:<id>."
+        },
+        "include": {
+          "enum": [
+            "streak"
+          ],
+          "type": "string",
+          "minLength": 1,
+          "description": "* `streak` - streak"
+        },
         "account": {
           "type": "string",
           "minLength": 1,
@@ -1560,6 +1599,16 @@
       },
       {
         "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": "Latest project start date (inclusive).",
+        "argument": "end_date"
+      },
+      {
+        "in": "query",
         "name": "exclude_project_ids",
         "schema": {
           "type": "string",
@@ -1594,13 +1643,14 @@
         "schema": {
           "enum": [
             "name",
-            "id"
+            "id",
+            "last_activity"
           ],
           "type": "string",
           "default": "name",
           "minLength": 1
         },
-        "description": "* `name` - name\n* `id` - id",
+        "description": "name (default), id, or last_activity (most recently active first).\n\n* `name` - name\n* `id` - id\n* `last_activity` - last_activity",
         "argument": "ordering"
       },
       {
@@ -1620,6 +1670,16 @@
           "minLength": 1
         },
         "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": "Earliest project start date (inclusive).",
+        "argument": "start_date"
       },
       {
         "in": "query",
@@ -1656,6 +1716,11 @@
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
         },
+        "end_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Latest project start date (inclusive)."
+        },
         "exclude_project_ids": {
           "type": "string",
           "minLength": 1,
@@ -1675,12 +1740,13 @@
         "ordering": {
           "enum": [
             "name",
-            "id"
+            "id",
+            "last_activity"
           ],
           "type": "string",
           "default": "name",
           "minLength": 1,
-          "description": "* `name` - name\n* `id` - id"
+          "description": "name (default), id, or last_activity (most recently active first).\n\n* `name` - name\n* `id` - id\n* `last_activity` - last_activity"
         },
         "related": {
           "type": "boolean",
@@ -1689,6 +1755,11 @@
         "search": {
           "type": "string",
           "minLength": 1
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Earliest project start date (inclusive)."
         },
         "status": {
           "enum": [
@@ -1847,6 +1918,15 @@
     "path": "/api/v2/projects/{project_id}",
     "parameters": [
       {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer project version.",
+        "argument": "expected_version"
+      },
+      {
         "in": "path",
         "name": "project_id",
         "schema": {
@@ -1867,6 +1947,10 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer project version."
+        },
         "project_id": {
           "type": "integer"
         },
@@ -1921,7 +2005,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "update project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "update project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
@@ -1934,6 +2018,15 @@
     "method": "DELETE",
     "path": "/api/v2/projects/{project_id}",
     "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer project version.",
+        "argument": "expected_version"
+      },
       {
         "in": "path",
         "name": "project_id",
@@ -1948,6 +2041,10 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer project version."
+        },
         "project_id": {
           "type": "integer"
         },
@@ -1963,7 +2060,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "delete project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "delete project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
@@ -2030,7 +2127,8 @@
     ],
     "bodyKeys": [
       "name",
-      "description"
+      "description",
+      "start_date"
     ],
     "inputSchema": {
       "type": "object",
@@ -2044,6 +2142,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
         },
         "account": {
           "type": "string",
@@ -2223,13 +2325,20 @@
         "schema": {
           "type": "string",
           "enum": [
+            "bar",
+            "bubble",
             "calendar",
+            "context",
             "cumulative",
             "heatmap",
             "histogram",
             "line",
+            "pie",
+            "radar",
             "scatter",
             "stacked_area",
+            "status",
+            "treemap",
             "wordcloud"
           ]
         },
@@ -2242,6 +2351,7 @@
         "schema": {
           "type": "integer"
         },
+        "description": "Context ID. Omit for all contexts.",
         "argument": "context"
       },
       {
@@ -2409,18 +2519,26 @@
         "chart_type": {
           "type": "string",
           "enum": [
+            "bar",
+            "bubble",
             "calendar",
+            "context",
             "cumulative",
             "heatmap",
             "histogram",
             "line",
+            "pie",
+            "radar",
             "scatter",
             "stacked_area",
+            "status",
+            "treemap",
             "wordcloud"
           ]
         },
         "context": {
-          "type": "integer"
+          "type": "integer",
+          "description": "Context ID. Omit for all contexts."
         },
         "context_ids": {
           "type": "string",
@@ -3209,6 +3327,7 @@
           "type": "string",
           "format": "date"
         },
+        "description": "First local date of the seven reviewed (the weekly review notification links its own). Defaults to the seven days ending yesterday.",
         "argument": "week"
       }
     ],
@@ -3218,7 +3337,8 @@
       "properties": {
         "week": {
           "type": "string",
-          "format": "date"
+          "format": "date",
+          "description": "First local date of the seven reviewed (the weekly review notification links its own). Defaults to the seven days ending yesterday."
         },
         "account": {
           "type": "string",
@@ -3295,6 +3415,16 @@
           "minLength": 1
         },
         "argument": "exclude_tag_ids"
+      },
+      {
+        "in": "query",
+        "name": "ids",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "Comma-separated session IDs.",
+        "argument": "ids"
       },
       {
         "in": "query",
@@ -3445,6 +3575,11 @@
           "type": "string",
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "ids": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Comma-separated session IDs."
         },
         "include": {
           "type": "string",
@@ -3627,6 +3762,24 @@
     "path": "/api/v2/sessions/{session_id}",
     "parameters": [
       {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "context"
+      },
+      {
+        "in": "query",
+        "name": "include",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "include"
+      },
+      {
         "in": "path",
         "name": "session_id",
         "schema": {
@@ -3640,6 +3793,14 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "include": {
+          "type": "string",
+          "minLength": 1
+        },
         "session_id": {
           "type": "integer"
         },
@@ -3881,6 +4042,15 @@
     "path": "/api/v2/subprojects/{subproject_id}",
     "parameters": [
       {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer subproject version.",
+        "argument": "expected_version"
+      },
+      {
         "in": "path",
         "name": "subproject_id",
         "schema": {
@@ -3892,11 +4062,16 @@
     ],
     "bodyKeys": [
       "name",
-      "description"
+      "description",
+      "start_date"
     ],
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer subproject version."
+        },
         "subproject_id": {
           "type": "integer"
         },
@@ -3906,6 +4081,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
         },
         "account": {
           "type": "string",
@@ -3919,7 +4098,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "update subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "update subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
@@ -3932,6 +4111,15 @@
     "method": "DELETE",
     "path": "/api/v2/subprojects/{subproject_id}",
     "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer subproject version.",
+        "argument": "expected_version"
+      },
       {
         "in": "path",
         "name": "subproject_id",
@@ -3946,6 +4134,10 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer subproject version."
+        },
         "subproject_id": {
           "type": "integer"
         },
@@ -3961,7 +4153,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "delete subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "delete subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,

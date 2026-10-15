@@ -50,8 +50,10 @@ const ICONS = {
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const nextId = useRef(1);
+  const [toasts, setToasts] = useState<Toast[]>(() =>
+    (bootstrap().messages ?? []).map((flash, index) => ({ id: index + 1, kind: flash.kind, message: flash.text })),
+  );
+  const nextId = useRef(toasts.length + 1);
 
   const dismiss = useCallback((id: number) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));

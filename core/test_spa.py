@@ -2,7 +2,10 @@ import json
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import TestCase, override_settings
+from django.contrib import messages
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.contrib.sessions.middleware import SessionMiddleware
+from django.test import RequestFactory, TestCase, override_settings
 
 from core import spa
 from core.models import Context
@@ -44,6 +47,14 @@ class SpaViewTests(TestCase):
         self.assertEqual(data["user"]["username"], "spa-user")
         self.assertEqual([c["name"] for c in data["contexts"]], ["Work"])
         self.assertTrue(data["csrf_token"])
+        expected_start, expected_end = self.user.profile.default_filter_date_range()
+        self.assertEqual(
+            data["profile"]["default_chart_start_date"], expected_start.isoformat()
+        )
+        self.assertEqual(
+            data["profile"]["default_chart_end_date"], expected_end.isoformat()
+        )
+        self.assertFalse(data["profile"]["openai_key_configured"])
 
     def test_marked_as_the_offline_shell_and_not_browser_cached(self, _manifest):
         self.client.force_login(self.user)
@@ -80,9 +91,26 @@ class SpaViewTests(TestCase):
 
     def test_server_rendered_pages_still_win(self, _manifest):
         self.client.force_login(self.user)
-        response = self.client.get("/export/")
+        response = self.client.get("/password-reset/")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(b'id="autumn-bootstrap"', response.content)
+
+    def test_flash_messages_ride_along(self, _manifest):
+        request = RequestFactory().get("/profile/")
+        request.user = self.user
+        SessionMiddleware(lambda r: None).process_request(request)
+        request._messages = FallbackStorage(request)
+        messages.success(request, "Connected GitHub.")
+        messages.error(request, "That account belongs to someone else.")
+        messages.info(request, "Heads up.")
+        self.assertEqual(
+            spa.bootstrap_payload(request)["messages"],
+            [
+                {"kind": "success", "text": "Connected GitHub."},
+                {"kind": "error", "text": "That account belongs to someone else."},
+                {"kind": "info", "text": "Heads up."},
+            ],
+        )
 
     def test_old_reminder_pages_open_the_matching_dialog(self, _manifest):
         self.client.force_login(self.user)

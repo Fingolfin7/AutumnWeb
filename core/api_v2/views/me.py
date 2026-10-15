@@ -68,11 +68,15 @@ class MeView(V2APIView):
 
     @extend_schema(responses=MeSerializer)
     def get(self, request):
+        profile = request.user.profile
         try:
-            profile_timezone = request.user.profile.timezone
+            profile_timezone = profile.timezone
             ZoneInfo(profile_timezone)
         except (AttributeError, KeyError, ObjectDoesNotExist, ZoneInfoNotFoundError):
             profile_timezone = settings.TIME_ZONE
+        default_chart_start_date, default_chart_end_date = (
+            profile.default_filter_date_range()
+        )
         return Response(
             {
                 "api_version": 2,
@@ -94,6 +98,9 @@ class MeView(V2APIView):
                     "email": request.user.email,
                     "timezone": profile_timezone,
                 },
+                "default_chart_start_date": default_chart_start_date.isoformat(),
+                "default_chart_end_date": default_chart_end_date.isoformat(),
+                "openai_key_configured": bool(profile.openai_api_key_enc),
             }
         )
 

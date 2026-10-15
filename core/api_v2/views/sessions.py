@@ -113,9 +113,24 @@ class SessionsView(V2APIView):
 class SessionDetailView(V2APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(operation_id="sessions_retrieve", responses=SessionResourceSerializer)
+    @extend_schema(
+        operation_id="sessions_retrieve",
+        parameters=[ResourceIncludeQuerySerializer],
+        responses=SessionResourceSerializer,
+    )
     def get(self, request, session_id):
-        return Response(_serialize(_get_session(request.user, session_id)))
+        query_data = {}
+        if "include" in request.query_params:
+            query_data["include"] = request.query_params["include"]
+        query = ResourceIncludeQuerySerializer(data=query_data)
+        query.is_valid(raise_exception=True)
+        include = set(query.validated_data.get("include", []))
+        return Response(
+            _serialize(
+                _get_session(request.user, session_id),
+                include_note_html="note_html" in include,
+            )
+        )
 
     @extend_schema(
         request=SessionPatchRequestSerializer,

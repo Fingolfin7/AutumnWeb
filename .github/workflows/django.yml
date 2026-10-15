@@ -85,6 +85,39 @@ jobs:
           python manage.py spectacular --file "$RUNNER_TEMP/openapi-v2.yaml"
           git diff --no-index -- openapi-v2.yaml "$RUNNER_TEMP/openapi-v2.yaml"
 
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify generated API types are current
+        run: |
+          npm run gen:api
+          git diff --exit-code src/api/schema.d.ts
+
+      - name: Type-check frontend
+        run: npx tsc --noEmit -p .
+
+      - name: Run frontend tests
+        run: npx vitest run
+
+      - name: Build frontend
+        run: npm run build
+
   # Manual-only: times the hot queries with/without the pre-S5 indexes on the
   # production DB engine. Informs the deferred index drops (plan S5/S12).
   index-benchmark:

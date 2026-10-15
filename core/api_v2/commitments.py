@@ -18,6 +18,7 @@ from core.api_v2.serializers import (
     CommitmentAdjustmentResponseSerializer,
     CommitmentChangesRequestSerializer,
     CommitmentCreateRequestSerializer,
+    CommitmentListQuerySerializer,
     CommitmentListResponseSerializer,
     CommitmentPeriodListResponseSerializer,
     CommitmentPeriodsQuerySerializer,
@@ -27,6 +28,10 @@ from core.api_v2.serializers import (
 from core.commitments import (
     _revision_accrual,
     calculate_commitment_streak,
+    commitment_applies_to_context,
+    commitment_applies_to_project,
+    commitment_applies_to_subproject,
+    commitment_applies_to_tag,
     get_commitment_progress,
     reconcile_commitment,
 )
@@ -256,6 +261,7 @@ def serialize_commitment(commitment, *, reconcile=True, include_streak=False):
         _prepare_for_read(commitment)
     revision = _active_revision(commitment)
     target = commitment.target_object
+    current_period = _current_period_payload(commitment, revision)
     return {
         "id": commitment.pk,
         "version": commitment.version,
@@ -276,8 +282,12 @@ def serialize_commitment(commitment, *, reconcile=True, include_streak=False):
         "max_balance": _unit_value(commitment.commitment_type, commitment.max_balance),
         "min_balance": _unit_value(commitment.commitment_type, commitment.min_balance),
         "balance": _unit_value(commitment.commitment_type, commitment.balance),
+        "current_surplus": _unit_value(
+            commitment.commitment_type,
+            current_period["accrued"] - current_period["target"],
+        ),
         "filters": _filter_payload(commitment),
-        "current_period": _current_period_payload(commitment, revision),
+        "current_period": current_period,
         "pending_revision": _pending_payload(commitment, revision),
         "ledger_start_at": _iso(commitment.ledger_start_at),
         **(
@@ -380,11 +390,37 @@ class CommitmentsView(V2APIView):
 
     @extend_schema(
         operation_id="commitments_list",
+        parameters=[CommitmentListQuerySerializer],
         responses=CommitmentListResponseSerializer,
     )
     def get(self, request):
-        include_streak = request.query_params.get("include") == "streak"
+        query = CommitmentListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        include_streak = query.validated_data.get("include") == "streak"
         commitments = list(_commitment_queryset(request.user).order_by("pk"))
+        applies_to = query.validated_data.get("applies_to")
+        if applies_to is not None:
+            kind, target_id = applies_to
+            model = TARGET_MODELS[kind]
+            target_queryset = model.objects.filter(
+                user=request.user, pk=target_id
+            )
+            if kind == "subproject":
+                target_queryset = target_queryset.select_related("parent_project")
+            target = target_queryset.first()
+            if target is None:
+                raise NotFound(f"{kind.title()} {target_id} not found.")
+            applies = {
+                "project": commitment_applies_to_project,
+                "subproject": commitment_applies_to_subproject,
+                "context": commitment_applies_to_context,
+                "tag": commitment_applies_to_tag,
+            }[kind]
+            commitments = [
+                commitment
+                for commitment in commitments
+                if applies(commitment, target)
+            ]
         return Response(
             {
                 "count": len(commitments),

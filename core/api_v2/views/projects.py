@@ -1,6 +1,48 @@
 from .base import *
+from django.db.models import F
+
 from core.celebrations import is_completion_transition
 from core.services.celebrations import project_completion_celebration
+
+
+PROJECT_IF_MATCH_PARAMETER = OpenApiParameter(
+    name="If-Match",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.HEADER,
+    required=False,
+    description="Optional current integer project version.",
+)
+SUBPROJECT_IF_MATCH_PARAMETER = OpenApiParameter(
+    name="If-Match",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.HEADER,
+    required=False,
+    description="Optional current integer subproject version.",
+)
+
+
+def _project_version_conflict(project):
+    return Response(
+        _envelope(
+            "version_conflict",
+            "The project has changed since the supplied version.",
+            {"current": ProjectResourceSerializer(project).data},
+        ),
+        status=status.HTTP_409_CONFLICT,
+    )
+
+
+def _subproject_version_conflict(subproject):
+    return Response(
+        _envelope(
+            "version_conflict",
+            "The subproject has changed since the supplied version.",
+            {"current": SubprojectResourceSerializer(subproject).data},
+        ),
+        status=status.HTTP_409_CONFLICT,
+    )
+
+
 class ProjectsView(V2APIView):
     permission_classes = [IsAuthenticated]
 
@@ -59,12 +101,26 @@ class ProjectsView(V2APIView):
                     ),
                 )
             queryset = matches
+        current_timezone = timezone.get_current_timezone()
+        if data.get("start_date") is not None:
+            start = timezone.make_aware(
+                datetime.combine(data["start_date"], time.min),
+                current_timezone,
+            )
+            queryset = queryset.filter(start_date__gte=start)
+        if data.get("end_date") is not None:
+            end = timezone.make_aware(
+                datetime.combine(data["end_date"] + timedelta(days=1), time.min),
+                current_timezone,
+            )
+            queryset = queryset.filter(start_date__lt=end)
         ordering = data["ordering"]
-        queryset = (
-            queryset.order_by(ordering, "id")
-            if ordering == "name"
-            else queryset.order_by("id")
-        )
+        if ordering == "name":
+            queryset = queryset.order_by("name", "id")
+        elif ordering == "last_activity":
+            queryset = queryset.order_by("-derived_last_updated", "id")
+        else:
+            queryset = queryset.order_by("id")
 
         total = queryset.count()
         offset = data["offset"]
@@ -133,11 +189,11 @@ class ProjectDetailView(V2APIView):
     @extend_schema(
         operation_id="projects_partial_update",
         request=ProjectPatchRequestSerializer,
+        parameters=[PROJECT_IF_MATCH_PARAMETER],
         responses={200: ProjectResourceSerializer},
     )
     def patch(self, request, project_id):
-        project = _get_project(request.user, project_id)
-        previous_status = project.status
+        expected_version = _parse_if_match(request)
         serializer = ProjectPatchRequestSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -153,6 +209,18 @@ class ProjectDetailView(V2APIView):
         )
         try:
             with transaction.atomic():
+                try:
+                    locked = Projects.objects.select_for_update().get(
+                        user=request.user, pk=project_id
+                    )
+                except Projects.DoesNotExist as exc:
+                    raise NotFound(f"Project {project_id} not found.") from exc
+                if expected_version is not None and expected_version != locked.version:
+                    return _project_version_conflict(
+                        _get_project(request.user, project_id)
+                    )
+                previous_status = locked.status
+                project = locked
                 if "name" in data:
                     project = DestructiveMutationService.rename_project(
                         user=request.user,
@@ -176,6 +244,10 @@ class ProjectDetailView(V2APIView):
                     request_sync_on_commit(request.user.pk)
                 if tags is not None:
                     project.tags.set(tags)
+                if data:
+                    Projects.objects.filter(pk=project.pk).update(
+                        version=F("version") + 1
+                    )
         except DestructiveOperationError as exc:
             return _conflict(exc)
         project = _get_project(request.user, project.pk)
@@ -186,20 +258,31 @@ class ProjectDetailView(V2APIView):
     @extend_schema(
         operation_id="projects_destroy",
         request=None,
+        parameters=[PROJECT_IF_MATCH_PARAMETER],
         responses={204: OpenApiResponse(description="Project deleted.")},
     )
     def delete(self, request, project_id):
-        project = _delete_target_or_none(
-            Projects, request.user, project_id, "Project"
-        )
-        if project is None:
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        try:
-            DestructiveMutationService.delete_project(
-                user=request.user, project_name=project.name
+        with transaction.atomic():
+            project = (
+                Projects.objects.select_for_update()
+                .filter(user=request.user, pk=project_id)
+                .first()
             )
-        except DestructiveOperationError as exc:
-            return _conflict(exc)
+            if project is None:
+                if Projects.objects.filter(pk=project_id).exists():
+                    raise NotFound(f"Project {project_id} not found.")
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            expected_version = _parse_if_match(request)
+            if expected_version is not None and expected_version != project.version:
+                return _project_version_conflict(
+                    _get_project(request.user, project_id)
+                )
+            try:
+                DestructiveMutationService.delete_project(
+                    user=request.user, project_name=project.name
+                )
+            except DestructiveOperationError as exc:
+                return _conflict(exc)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -279,6 +362,11 @@ class ProjectSubprojectsView(V2APIView):
             parent_project=project,
             name=data["name"],
             description=data.get("description", ""),
+            **(
+                {"start_date": _as_start_datetime(data["start_date"])}
+                if "start_date" in data
+                else {}
+            ),
         )
         subproject = _get_subproject(request.user, subproject.pk)
         return Response(
@@ -304,10 +392,11 @@ class SubprojectDetailView(V2APIView):
     @extend_schema(
         operation_id="subprojects_partial_update",
         request=SubprojectPatchRequestSerializer,
+        parameters=[SUBPROJECT_IF_MATCH_PARAMETER],
         responses={200: SubprojectResourceSerializer},
     )
     def patch(self, request, subproject_id):
-        subproject = _get_subproject(request.user, subproject_id)
+        expected_version = _parse_if_match(request)
         serializer = SubprojectPatchRequestSerializer(
             data=request.data, partial=True
         )
@@ -315,6 +404,21 @@ class SubprojectDetailView(V2APIView):
         data = serializer.validated_data
         try:
             with transaction.atomic():
+                try:
+                    subproject = SubProjects.objects.select_for_update().get(
+                        user=request.user, pk=subproject_id
+                    )
+                except SubProjects.DoesNotExist as exc:
+                    raise NotFound(
+                        f"Subproject {subproject_id} not found."
+                    ) from exc
+                if (
+                    expected_version is not None
+                    and expected_version != subproject.version
+                ):
+                    return _subproject_version_conflict(
+                        _get_subproject(request.user, subproject_id)
+                    )
                 if "name" in data:
                     subproject = DestructiveMutationService.rename_subproject(
                         user=request.user,
@@ -322,10 +426,15 @@ class SubprojectDetailView(V2APIView):
                         subproject_name=subproject.name,
                         new_name=data["name"],
                     )
+                updates = {}
                 if "description" in data:
-                    SubProjects.objects.filter(pk=subproject.pk).update(
-                        description=data["description"]
-                    )
+                    updates["description"] = data["description"]
+                if "start_date" in data:
+                    updates["start_date"] = _as_start_datetime(data["start_date"])
+                if data:
+                    updates["version"] = F("version") + 1
+                if updates:
+                    SubProjects.objects.filter(pk=subproject.pk).update(**updates)
         except DestructiveOperationError as exc:
             return _conflict(exc)
         return Response(
@@ -337,22 +446,37 @@ class SubprojectDetailView(V2APIView):
     @extend_schema(
         operation_id="subprojects_destroy",
         request=None,
+        parameters=[SUBPROJECT_IF_MATCH_PARAMETER],
         responses={204: OpenApiResponse(description="Subproject deleted.")},
     )
     def delete(self, request, subproject_id):
-        subproject = _delete_target_or_none(
-            SubProjects, request.user, subproject_id, "Subproject"
-        )
-        if subproject is None:
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        try:
-            DestructiveMutationService.delete_subproject(
-                user=request.user,
-                project_name=subproject.parent_project.name,
-                subproject_name=subproject.name,
+        with transaction.atomic():
+            subproject = (
+                SubProjects.objects.select_for_update()
+                .select_related("parent_project")
+                .filter(user=request.user, pk=subproject_id)
+                .first()
             )
-        except DestructiveOperationError as exc:
-            return _conflict(exc)
+            if subproject is None:
+                if SubProjects.objects.filter(pk=subproject_id).exists():
+                    raise NotFound(f"Subproject {subproject_id} not found.")
+                return Response(status=status.HTTP_204_NO_CONTENT)
+            expected_version = _parse_if_match(request)
+            if (
+                expected_version is not None
+                and expected_version != subproject.version
+            ):
+                return _subproject_version_conflict(
+                    _get_subproject(request.user, subproject_id)
+                )
+            try:
+                DestructiveMutationService.delete_subproject(
+                    user=request.user,
+                    project_name=subproject.parent_project.name,
+                    subproject_name=subproject.name,
+                )
+            except DestructiveOperationError as exc:
+                return _conflict(exc)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

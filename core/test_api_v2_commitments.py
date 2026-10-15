@@ -6,7 +6,15 @@ from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
 
-from core.models import Commitment, CommitmentPeriod, CommitmentRevision, Projects
+from core.models import (
+    Commitment,
+    CommitmentPeriod,
+    CommitmentRevision,
+    Context,
+    Projects,
+    SubProjects,
+    Tag,
+)
 from core.services import SessionMutationService
 
 
@@ -66,6 +74,7 @@ class V2CommitmentsTests(TestCase):
         )
         self.assertEqual(payload["target_value"], 60.0)
         self.assertEqual(payload["filters"]["include_project_ids"], [])
+        self.assertEqual(payload["current_surplus"], -60.0)
         self.assertIsNone(payload["pending_revision"])
 
         listed = self.client.get(reverse("api_v2:commitments"))
@@ -120,6 +129,78 @@ class V2CommitmentsTests(TestCase):
             ).status_code,
             204,
         )
+
+    @freeze_time("2026-01-01 12:00:00+00:00")
+    def test_applies_to_filters_with_shared_commitment_rules(self):
+        context = Context.objects.create(user=self.user, name="Study")
+        tag = Tag.objects.create(user=self.user, name="Deep")
+        scoped = Projects.objects.create(
+            user=self.user, name="Scoped", context=context
+        )
+        scoped.tags.add(tag)
+        child = SubProjects.objects.create(
+            user=self.user, parent_project=scoped, name="Child"
+        )
+        unrelated = Projects.objects.create(user=self.user, name="Unrelated")
+        commitments = [
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="project",
+                project=scoped,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="subproject",
+                subproject=child,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="context",
+                context=context,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="tag",
+                tag=tag,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="project",
+                project=unrelated,
+                target=10,
+            ),
+        ]
+
+        for kind, target in (
+            ("project", scoped),
+            ("subproject", child),
+            ("context", context),
+            ("tag", tag),
+        ):
+            with self.subTest(kind=kind):
+                response = self.client.get(
+                    reverse("api_v2:commitments"),
+                    {"applies_to": f"{kind}:{target.pk}"},
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    {item["id"] for item in response.json()["commitments"]},
+                    {commitment.pk for commitment in commitments[:4]},
+                )
+
+        malformed = self.client.get(
+            reverse("api_v2:commitments"), {"applies_to": "project:not-an-id"}
+        )
+        self.assertEqual(malformed.status_code, 400)
+        foreign = self.client.get(
+            reverse("api_v2:commitments"),
+            {"applies_to": f"project:{self.foreign_project.pk}"},
+        )
+        self.assertEqual(foreign.status_code, 404)
 
     @freeze_time("2026-01-01 12:00:00+00:00")
     def test_patch_pending_stale_version_and_restart_required(self):
