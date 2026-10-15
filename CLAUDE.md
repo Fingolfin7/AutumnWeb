@@ -60,6 +60,7 @@ The browser UI is a React 19 + TypeScript single-page app in `frontend/` (Vite, 
 - Adding a page means an entry in `frontend/src/app/routePatterns.ts` and a Django route to `spa` under the same path, keeping the old URL name.
 - Pages live in `frontend/src/features/<area>/`; shared shell, toasts, command palette and offline sync in `frontend/src/app/`. The Night Ledger look comes from `core/static/core/css/focus_desk.css`, loaded by `spa.html`; `frontend/src/styles/app.css` only adds what the app introduces.
 - Offline: TanStack Query's cache is persisted to localStorage, timer start/stop made offline are queued (`frontend/src/lib/offlineQueue.ts`) and replayed when the server is reachable, and the service worker (`core/static/core/pwa/service-worker.js`) keeps the app shell and built assets.
+- Polling (running timers every 15 s, the Home timeline every 5 min) pauses while the tab is hidden or after 3 minutes without input (`frontend/src/app/attention.ts` drives TanStack Query's `focusManager`), so a tab left open lets the database (Neon) suspend; the next input refetches what went stale.
 - Render builds with `bash scripts/render-build.sh` (pip install, `npm ci && npm run build`, collectstatic).
 
 ### Django Apps
