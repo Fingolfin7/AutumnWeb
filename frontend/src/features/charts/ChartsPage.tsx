@@ -14,6 +14,8 @@ import { ChartCanvas } from "./ChartCanvas";
 import { semanticSearchAvailable, useChartData } from "./api";
 import { buildChart, CHART_GROUPS, CIRCULAR_KINDS, parseKind } from "./build";
 import { buildChartQuery, describeFilters, EMPTY_FILTERS, readFilters, writeFilters, type ChartFilters } from "./filters";
+import { SimilaritySlider } from "@/features/search/SimilaritySlider";
+import { accountSimilarity, sameCutoff, similarityScale } from "@/features/search/similarity";
 
 export default function ChartsPage() {
   const [params, setParams] = useSearchParams();
@@ -186,6 +188,17 @@ export default function ChartsPage() {
               <input id="related-search" type="checkbox" checked={draft.related} onChange={(e) => setDraft({ ...draft, related: e.target.checked })} />
               <label htmlFor="related-search">Include related sessions</label>
             </div>
+          ) : null}
+          {semantic && draft.related ? (
+            <SimilaritySlider
+              value={draft.similarity ?? accountSimilarity()}
+              defaultValue={accountSimilarity()}
+              scale={similarityScale()}
+              immediate
+              onCommit={(value) =>
+                setDraft((current) => ({ ...current, similarity: sameCutoff(value, accountSimilarity()) ? null : value }))
+              }
+            />
           ) : null}
 
           <div className="field">

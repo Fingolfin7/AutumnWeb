@@ -1,5 +1,6 @@
 import { DEFAULT_KIND, parseKind } from "./build";
 import type { ChartKind } from "./payloads";
+import { accountSimilarity, fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
 
 /* URL <-> filter state for the Charts page. The URL is the source of truth so
    a chart can be bookmarked and survives a reload; the parameter names are the
@@ -10,6 +11,8 @@ export interface ChartFilters {
   end_date: string;
   search: string;
   related: boolean;
+  /** The related cutoff; null = the account's (Profile) default. */
+  similarity: number | null;
   project_name: string;
   /** "" = the header's context, "all", or a context id. */
   context: string;
@@ -24,6 +27,7 @@ export const EMPTY_FILTERS: ChartFilters = {
   end_date: "",
   search: "",
   related: false,
+  similarity: null,
   project_name: "",
   context: "",
   tags: [],
@@ -48,6 +52,7 @@ export function readFilters(params: URLSearchParams): ChartFilters {
     end_date: params.get("end_date") ?? "",
     search: (params.get("search") ?? "").trim(),
     related: TRUTHY.has((params.get("related") ?? "").toLowerCase()),
+    similarity: parseSimilarity(params.get("similarity"), similarityScale()),
     project_name: (params.get("project_name") ?? "").trim(),
     context: params.get("context") ?? "",
     tags: ids("tags"),
@@ -62,7 +67,10 @@ export function writeFilters(state: ChartFilters): URLSearchParams {
   for (const key of ["start_date", "end_date", "search", "project_name", "context"] as const) {
     if (state[key]) params.set(key, state[key]);
   }
-  if (state.related && state.search) params.set("related", "on");
+  if (state.related && state.search) {
+    params.set("related", "on");
+    if (state.similarity !== null) params.set("similarity", fixed2(state.similarity));
+  }
   for (const tag of state.tags) params.append("tags", String(tag));
   const projectKey = state.projectMode === "include" ? "include_projects" : "exclude_projects";
   for (const project of state.projects) params.append(projectKey, String(project));
@@ -76,6 +84,7 @@ export interface ChartQuery {
   aggregate?: boolean;
   search?: string;
   related?: boolean;
+  similarity?: number;
   project_name?: string;
   start_date?: string;
   end_date?: string;
@@ -100,6 +109,7 @@ export function buildChartQuery(
   if (filters.search) {
     query.search = filters.search;
     if (filters.related) query.related = true;
+    if (filters.related && filters.similarity !== null) query.similarity = filters.similarity;
   }
   if (filters.project_name) query.project_name = filters.project_name;
   const start = filters.start_date || defaults.start;
@@ -150,7 +160,11 @@ export function describeFilters(
   const names = (ids: number[], items: Named[]) => ids.map((id) => items.find((item) => item.id === id)?.name ?? `#${id}`).join(", ");
   const pills: Pill[] = [];
   if (state.search) pills.push({ label: "Search", value: state.search });
-  if (related.available && state.search && state.related) pills.push(relatedPill(related.state));
+  if (related.available && state.search && state.related) {
+    pills.push(relatedPill(related.state));
+    // The cutoff decides the related total, so it is always on show.
+    pills.push({ label: "Closeness", value: fixed2(state.similarity ?? accountSimilarity()) });
+  }
   if (state.project_name) pills.push({ label: "Project", value: state.project_name });
   if (state.start_date) pills.push({ label: "From", value: state.start_date });
   if (state.end_date) pills.push({ label: "To", value: state.end_date });

@@ -97,6 +97,14 @@ describe("prefsChanges", () => {
     const ai = { ...prefs, ai_features_enabled: true } as Prefs;
     expect(prefsChanges({ ...prefsDraft(ai), luna: "low" }, ai)).toEqual({ luna_recommendation_effort: "low" });
   });
+
+  it("stores the related cutoff, and null at the server default", () => {
+    expect(prefsDraft(prefs).similarity).toBe(0.45);
+    expect(prefsChanges({ ...prefsDraft(prefs), similarity: 0.38 }, prefs)).toEqual({ related_similarity: 0.38 });
+    const custom = { ...prefs, related_similarity: 0.38 } as Prefs;
+    expect(prefsDraft(custom).similarity).toBe(0.38);
+    expect(prefsChanges({ ...prefsDraft(custom), similarity: 0.45 }, custom)).toEqual({ related_similarity: null });
+  });
 });
 
 describe("validatePrefs", () => {

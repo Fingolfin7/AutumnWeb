@@ -48,6 +48,8 @@ import { BackgroundSection } from "./BackgroundSection";
 import { FieldErrors, SlabHead } from "./Parts";
 import { applyAvatar, applyBackground, applyDimming, applyPrefs, refreshBootstrapProfile, syncHeaderDimming } from "./shell";
 import { SocialConnectForms, SocialSection } from "./SocialSection";
+import { SimilaritySlider } from "@/features/search/SimilaritySlider";
+import { similarityScale } from "@/features/search/similarity";
 import "./profile.css";
 
 /* Profile (users/templates/users/profile.html): account, avatar, backdrop,
@@ -496,6 +498,29 @@ function ProfileEditor({
               <p className="muted">The rest are grouped as Other (max 100)</p>
               <FieldErrors lines={errors.default_chart_project_count} />
             </div>
+
+            {prefs.ai_features_enabled && prefs.configured_api_keys.openai ? (
+              <div className="profile-default-item profile-default-item--wide">
+                <SimilaritySlider
+                  title="Related search closeness"
+                  value={prefsD.similarity}
+                  defaultValue={prefs.related_similarity_default}
+                  defaultLabel="Autumn's default"
+                  scale={{
+                    ...similarityScale(),
+                    floor: prefs.related_similarity_min,
+                    ceiling: prefs.related_similarity_max,
+                  }}
+                  immediate
+                  onCommit={(similarity) => patchPrefsDraft({ similarity })}
+                />
+                <p className="muted">
+                  Where the Related slider starts on every search. Lower finds more, looser matches; higher keeps only
+                  close ones.
+                </p>
+                <FieldErrors lines={errors.related_similarity} />
+              </div>
+            ) : null}
           </div>
         </section>
 

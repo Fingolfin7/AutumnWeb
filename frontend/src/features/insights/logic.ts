@@ -1,4 +1,5 @@
 import type { paths } from "@/api/schema";
+import { accountSimilarity, fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
 import type { ChatFiltersStored, ChatGroup, ChatMessage, InsightOptions, StreamRequest, Usage } from "./types";
 
 /* ---- the session selection (the page's filters) --------------------------- */
@@ -8,6 +9,8 @@ import type { ChatFiltersStored, ChatGroup, ChatMessage, InsightOptions, StreamR
 export interface SelectionFilters {
   search: string;
   related: boolean;
+  /** The related cutoff; null = the account's (Profile) default. */
+  similarity: number | null;
   project_name: string;
   start_date: string;
   end_date: string;
@@ -22,6 +25,7 @@ export interface SelectionFilters {
 export const EMPTY_SELECTION: SelectionFilters = {
   search: "",
   related: false,
+  similarity: null,
   project_name: "",
   start_date: "",
   end_date: "",
@@ -55,6 +59,7 @@ export function readSelection(params: URLSearchParams, defaults: { start: string
   return {
     search: (params.get("search") ?? "").trim(),
     related: TRUTHY.has((params.get("related") ?? "").toLowerCase()),
+    similarity: parseSimilarity(params.get("similarity"), similarityScale()),
     project_name: (params.get("project_name") ?? "").trim(),
     start_date: params.get("start_date") || defaults.start,
     end_date: params.get("end_date") || defaults.end,
@@ -76,6 +81,7 @@ export function selectionFromChat(stored: ChatFiltersStored | undefined, default
   return {
     search: typeof f.search === "string" ? f.search : "",
     related: TRUTHY.has(String(f.related ?? "").toLowerCase()),
+    similarity: f.similarity == null ? null : parseSimilarity(String(f.similarity), similarityScale()),
     project_name: typeof f.project_name === "string" ? f.project_name : "",
     start_date: typeof f.start_date === "string" && f.start_date ? f.start_date : defaults.start,
     end_date: typeof f.end_date === "string" && f.end_date ? f.end_date : defaults.end,
@@ -100,6 +106,7 @@ export function selectionRequest(
   if (filters.search) {
     body.search = filters.search;
     if (filters.related) body.related = true;
+    if (filters.related && filters.similarity !== null) body.similarity = filters.similarity;
   }
   if (filters.project_name) body.project_name = filters.project_name;
   const start = filters.start_date || defaults.start;
@@ -158,6 +165,8 @@ export function describeSelection(
         ? { label: "Related", value: "unavailable", title: RELATED_UNAVAILABLE_TITLE }
         : { label: "Including", value: "related" },
     );
+    // The cutoff decides which sessions are included, so it is always on show.
+    pills.push({ label: "Closeness", value: fixed2(filters.similarity ?? accountSimilarity()) });
   }
   if (filters.project_name) pills.push({ label: "Project", value: filters.project_name });
   if (filters.start_date && filters.start_date !== defaults.start) pills.push({ label: "From", value: filters.start_date });

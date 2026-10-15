@@ -65,6 +65,18 @@ describe("selection <-> request", () => {
   });
 });
 
+describe("related cutoff", () => {
+  it("reads it from the URL and a chat, and sends it only for a related search", () => {
+    expect(readSelection(new URLSearchParams("search=a&related=on&similarity=0.38"), defaults).similarity).toBe(0.38);
+    expect(readSelection(new URLSearchParams("similarity=2"), defaults).similarity).toBeNull();
+    expect(selectionFromChat({ search: "a", related: "on", similarity: 0.52 }, defaults).similarity).toBe(0.52);
+    expect(selectionFromChat({ search: "a" }, defaults).similarity).toBeNull();
+    const filters = { ...EMPTY_SELECTION, search: "a", related: true, similarity: 0.38 };
+    expect(selectionRequest(filters, defaults, null).similarity).toBe(0.38);
+    expect(selectionRequest({ ...filters, related: false }, defaults, null)).not.toHaveProperty("similarity");
+  });
+});
+
 describe("selectionQuery", () => {
   it("sends the stream's filter fields so the count matches what the model is given", () => {
     const filters = { ...EMPTY_SELECTION, search: "a", related: true, project_name: "writ", tags: [1, 2], projects: [3] };
@@ -116,7 +128,7 @@ describe("describeSelection", () => {
   it("resolves ids to names and flips the related pill when meaning search is unavailable", () => {
     const f = { ...EMPTY_SELECTION, search: "x", related: true, context: "3", tags: [2], projects: [1], projectMode: "include" as const };
     const pills = describeSelection(f, lookup, defaults, { available: true, state: "included" });
-    expect(pills.map((p) => `${p.label}=${p.value}`)).toEqual(["Search=x", "Including=related", "Context=Work", "Tags=deep", "Only=Writing"]);
+    expect(pills.map((p) => `${p.label}=${p.value}`)).toEqual(["Search=x", "Including=related", "Closeness=0.45", "Context=Work", "Tags=deep", "Only=Writing"]);
     const unavailable = describeSelection(f, lookup, defaults, { available: true, state: "unavailable" });
     expect(unavailable[1]).toMatchObject({ label: "Related", value: "unavailable" });
     expect(unavailable[1]!.title).toBeTruthy();

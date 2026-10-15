@@ -51,6 +51,8 @@ export interface PrefsDraft {
   insightsUnit: FilterUnit;
   chartCount: string;
   luna: LunaEffort;
+  /** The Related slider's starting cutoff (the server default when unset). */
+  similarity: number;
 }
 
 export function accountDraft(account: Account): AccountDraft {
@@ -78,6 +80,7 @@ export function prefsDraft(prefs: Prefs): PrefsDraft {
     insightsUnit: prefs.insights_default_filter_unit as FilterUnit,
     chartCount: String(prefs.default_chart_project_count),
     luna: prefs.luna_recommendation_effort as LunaEffort,
+    similarity: prefs.related_similarity ?? prefs.related_similarity_default,
   };
 }
 
@@ -170,6 +173,12 @@ export function prefsChanges(draft: PrefsDraft, server: Prefs): PrefsPatch | nul
   if (server.ai_features_enabled && draft.luna !== server.luna_recommendation_effort) {
     patch.luna_recommendation_effort = draft.luna;
   }
+  // Stored as null at the server default, so a later change of that default applies.
+  const similarity =
+    draft.similarity.toFixed(2) === server.related_similarity_default.toFixed(2)
+      ? null
+      : Number(draft.similarity.toFixed(2));
+  if (similarity !== server.related_similarity) patch.related_similarity = similarity;
   return Object.keys(patch).length ? patch : null;
 }
 

@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Sheet } from "@/components/Sheet";
 import type { Context, Project, Tag } from "@/api/types";
+import { SimilaritySlider } from "@/features/search/SimilaritySlider";
+import { accountSimilarity, sameCutoff, similarityScale } from "@/features/search/similarity";
 import type { SelectionFilters } from "./logic";
 
 /* The narrowing controls that do not live on the page itself (the date range
@@ -58,6 +60,15 @@ export function FilterSheet({
             <input id="related-search" type="checkbox" checked={draft.related} onChange={(e) => onDraft({ ...draft, related: e.target.checked })} />
             <label htmlFor="related-search">Include related sessions</label>
           </div>
+        ) : null}
+        {semantic && draft.related ? (
+          <SimilaritySlider
+            value={draft.similarity ?? accountSimilarity()}
+            defaultValue={accountSimilarity()}
+            scale={similarityScale()}
+            immediate
+            onCommit={(value) => onDraft({ ...draft, similarity: sameCutoff(value, accountSimilarity()) ? null : value })}
+          />
         ) : null}
 
         <div className="field">
