@@ -1,7 +1,7 @@
 from django.urls import path
 
 from core.spa import spa
-from llm_insights.views import delete_chat, stream_insights
+from llm_insights.views import stream_insights
 
 urlpatterns = [
     path("", spa, name="insights"),
@@ -12,5 +12,4 @@ urlpatterns = [
         stream_insights,
         name="insights_detail_stream",
     ),
-    path("delete/<uuid:chat_id>/", delete_chat, name="delete_chat"),
 ]
