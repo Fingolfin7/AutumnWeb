@@ -189,9 +189,6 @@ frontend/test-results/
 frontend/playwright-report/
 core/static/app/
 
-# Playwright
-frontend/test-results/
-frontend/playwright-report/
 frontend/e2e/.auth/
 test-results/
 playwright-report/
