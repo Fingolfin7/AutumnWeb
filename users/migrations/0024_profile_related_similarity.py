@@ -3,6 +3,44 @@
 import django.core.validators
 from django.db import migrations, models
 
+# Production applied this field as users.0023_profile_related_similarity
+# (2026-10-13) before that migration was renumbered after
+# 0023_profile_active_context. So the column may already exist without this
+# migration being recorded: add it only where it is missing.
+
+
+def related_similarity_field():
+    field = models.FloatField(
+        blank=True,
+        help_text="How close a meaning-based match must be to count as related (0.25-0.60).",
+        null=True,
+        validators=[
+            django.core.validators.MinValueValidator(0.25),
+            django.core.validators.MaxValueValidator(0.6),
+        ],
+    )
+    field.set_attributes_from_name("related_similarity")
+    return field
+
+
+def _has_column(schema_editor, model):
+    connection = schema_editor.connection
+    with connection.cursor() as cursor:
+        columns = connection.introspection.get_table_description(cursor, model._meta.db_table)
+    return any(column.name == "related_similarity" for column in columns)
+
+
+def add_if_missing(apps, schema_editor):
+    Profile = apps.get_model("users", "Profile")
+    if not _has_column(schema_editor, Profile):
+        schema_editor.add_field(Profile, related_similarity_field())
+
+
+def remove_if_present(apps, schema_editor):
+    Profile = apps.get_model("users", "Profile")
+    if _has_column(schema_editor, Profile):
+        schema_editor.remove_field(Profile, related_similarity_field())
+
 
 class Migration(migrations.Migration):
 
@@ -11,9 +49,16 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='profile',
-            name='related_similarity',
-            field=models.FloatField(blank=True, help_text='How close a meaning-based match must be to count as related (0.25-0.60).', null=True, validators=[django.core.validators.MinValueValidator(0.25), django.core.validators.MaxValueValidator(0.6)]),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(add_if_missing, remove_if_present),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name="profile",
+                    name="related_similarity",
+                    field=related_similarity_field(),
+                ),
+            ],
         ),
     ]
