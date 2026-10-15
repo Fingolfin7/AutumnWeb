@@ -17,7 +17,7 @@ export interface Bootstrap {
   contexts: { id: number; name: string }[];
   active_context_id: number | null;
   csrf_token: string;
-  static: { leaf: string };
+  static: { leaf: string; insights_empty: string };
   push: { vapid_public_key: string };
   debug: boolean;
   /** Django flash messages from the redirect that opened the app. */
@@ -40,7 +40,7 @@ const FALLBACK: Bootstrap = {
   contexts: [],
   active_context_id: null,
   csrf_token: "",
-  static: { leaf: "" },
+  static: { leaf: "", insights_empty: "" },
   push: { vapid_public_key: "" },
   debug: false,
 };

@@ -23,6 +23,7 @@ const dates = { start_date: defaults.start, end_date: defaults.end };
 const options: InsightOptions = {
   default_start_date: defaults.start,
   default_end_date: defaults.end,
+  openai_source: null,
   providers: [
     {
       provider: "openai",

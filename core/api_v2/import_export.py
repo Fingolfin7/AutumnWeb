@@ -6,6 +6,7 @@ import uuid
 from rest_framework import serializers, status
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiResponse, extend_schema
@@ -13,6 +14,7 @@ from django.http import StreamingHttpResponse
 
 from core.api_v2.exceptions import V2APIView, _envelope, related_outcome
 from core.api_v2.filters import SessionFilterSpec
+from core.api_v2.renderers import EventStreamRenderer
 from core.export2 import build_format2_export
 from core.forms import ImportJSONForm
 from core.importer import iter_import, run_import
@@ -314,6 +316,7 @@ class ImportUploadView(V2APIView):
 
 class ImportUploadStreamView(V2APIView):
     permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer, EventStreamRenderer]
 
     @extend_schema(
         operation_id="import_uploads_stream_retrieve",

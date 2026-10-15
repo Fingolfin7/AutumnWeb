@@ -4,6 +4,7 @@ from django.shortcuts import get_object_or_404
 
 from llm_insights.models import LLMChat
 from llm_insights.services.handlers import build_api_keys, provider_models
+from core.services.semantic_search import RelatedOutcome
 
 
 FILTER_KEYS = [
@@ -50,6 +51,25 @@ def apply_default_date_filters(current_filters, user):
     current_filters["end_date"] = end_date.isoformat()
 
 
+def filter_insights_sessions(request, user, current_filters, *, outcome=None):
+    """Apply the one session-selection pipeline used by Insights streaming."""
+    queryset = (
+        Sessions.objects.filter(end_time__isnull=False, user=user)
+        .select_related("project", "project__context")
+        .prefetch_related("subprojects", "project__tags")
+    )
+    queryset = filter_by_active_context(
+        queryset, request, override_context_id=current_filters.get("context")
+    )
+    return filter_sessions_by_params(
+        request,
+        queryset,
+        params_override=current_filters,
+        user=user,
+        outcome=outcome,
+    )
+
+
 def build_post_context(request, user, chat_id=None):
     chat_obj = None
     if chat_id:
@@ -62,16 +82,9 @@ def build_post_context(request, user, chat_id=None):
     elif not chat_obj and not any(current_filters.get(key) for key in FILTER_KEYS):
         apply_default_date_filters(current_filters, user)
 
-    queryset = (
-        Sessions.objects.filter(end_time__isnull=False, user=user)
-        .select_related("project", "project__context")
-        .prefetch_related("subprojects", "project__tags")
-    )
-    queryset = filter_by_active_context(
-        queryset, request, override_context_id=current_filters.get("context")
-    )
-    queryset = filter_sessions_by_params(
-        request, queryset, params_override=current_filters, user=user
+    related_outcome = RelatedOutcome()
+    queryset = filter_insights_sessions(
+        request, user, current_filters, outcome=related_outcome
     )
 
     sessions_updated = request.session.get("sessions_updated", False)
@@ -87,4 +100,5 @@ def build_post_context(request, user, chat_id=None):
         "chat_obj": chat_obj,
         "current_filters": current_filters,
         "is_filtering": is_filtering,
+        "related_outcome": related_outcome,
     }

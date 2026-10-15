@@ -1,19 +1,24 @@
 from django.http import QueryDict
+from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_field
 from rest_framework import serializers, status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 
 from core.api_v2.exceptions import V2APIView
+from core.api_v2.renderers import EventStreamRenderer
 from core.templatetags.markdown_render import markdown as render_markdown
 from llm_insights.models import LLMChat
 from llm_insights.services.chats import group_chats_by_recency
 from llm_insights.services.handlers import (
+    openai_connection_source,
     openai_reasoning_efforts,
     provider_models,
 )
+from llm_insights.services.context import build_post_context
 from llm_insights.services.streaming import stream_insights_response
 from llm_insights.views import user_has_insights_access
 
@@ -38,6 +43,14 @@ class InsightChatGroupSerializer(serializers.Serializer):
 
 class InsightChatListSerializer(serializers.Serializer):
     groups = InsightChatGroupSerializer(many=True)
+    total = serializers.IntegerField(required=False)
+    limit = serializers.IntegerField(required=False)
+    offset = serializers.IntegerField(required=False)
+
+
+class InsightChatListQuerySerializer(serializers.Serializer):
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=100)
+    offset = serializers.IntegerField(required=False, min_value=0, default=0)
 
 
 class InsightSourceSerializer(serializers.Serializer):
@@ -70,6 +83,32 @@ class InsightMessageSerializer(serializers.Serializer):
     metadata = InsightMessageMetadataSerializer()
 
 
+@extend_schema_field(
+    {
+        "oneOf": [
+            {"type": "integer", "minimum": 1},
+            {"type": "string", "enum": ["all"]},
+        ],
+        "nullable": True,
+        "description": "A context ID, or 'all' for all contexts.",
+    }
+)
+class InsightContextField(serializers.Field):
+    def to_internal_value(self, data):
+        if data is None or str(data).strip().lower() == "all":
+            return "all"
+        try:
+            value = int(data)
+        except (TypeError, ValueError) as exc:
+            raise serializers.ValidationError("Enter a positive context ID or 'all'.") from exc
+        if value < 1:
+            raise serializers.ValidationError("Enter a positive context ID or 'all'.")
+        return value
+
+    def to_representation(self, value):
+        return value
+
+
 class InsightFiltersSerializer(serializers.Serializer):
     search = serializers.CharField(required=False, allow_blank=True)
     related = serializers.CharField(required=False, allow_blank=True)
@@ -77,7 +116,7 @@ class InsightFiltersSerializer(serializers.Serializer):
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
     note_snippet = serializers.CharField(required=False, allow_blank=True)
-    context = serializers.IntegerField(required=False)
+    context = InsightContextField(required=False, allow_null=True)
     tags = serializers.ListField(child=serializers.IntegerField(), required=False)
     include_projects = serializers.ListField(child=serializers.IntegerField(), required=False)
     exclude_projects = serializers.ListField(child=serializers.IntegerField(), required=False)
@@ -113,6 +152,10 @@ class InsightOptionsSerializer(serializers.Serializer):
     providers = InsightProviderOptionSerializer(many=True)
     default_start_date = serializers.DateField()
     default_end_date = serializers.DateField()
+    openai_source = serializers.ChoiceField(
+        choices=("server", "codex", "profile", "codex_with_api_fallback"),
+        allow_null=True,
+    )
 
 
 class InsightStreamRequestSerializer(serializers.Serializer):
@@ -127,7 +170,7 @@ class InsightStreamRequestSerializer(serializers.Serializer):
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
     note_snippet = serializers.CharField(required=False, allow_blank=True)
-    context = serializers.IntegerField(required=False)
+    context = InsightContextField(required=False, allow_null=True)
     tags = serializers.ListField(child=serializers.IntegerField(), required=False)
     include_projects = serializers.ListField(
         child=serializers.IntegerField(), required=False
@@ -137,26 +180,108 @@ class InsightStreamRequestSerializer(serializers.Serializer):
     )
 
 
+class InsightSelectionQuerySerializer(serializers.Serializer):
+    chat_id = serializers.UUIDField(required=False)
+    search = serializers.CharField(required=False, allow_blank=True)
+    related = serializers.BooleanField(required=False)
+    project_name = serializers.CharField(required=False, allow_blank=True)
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+    note_snippet = serializers.CharField(required=False, allow_blank=True)
+    context = InsightContextField(required=False, allow_null=True)
+    tags = serializers.ListField(child=serializers.IntegerField(), required=False)
+    include_projects = serializers.ListField(
+        child=serializers.IntegerField(), required=False
+    )
+    exclude_projects = serializers.ListField(
+        child=serializers.IntegerField(), required=False
+    )
+
+
+class InsightSelectionSerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    first_date = serializers.DateField(allow_null=True)
+    last_date = serializers.DateField(allow_null=True)
+    related = serializers.ChoiceField(
+        choices=("included", "unavailable"), allow_null=True
+    )
+
+
+FILTER_FIELDS = (
+    "search",
+    "related",
+    "project_name",
+    "start_date",
+    "end_date",
+    "note_snippet",
+    "context",
+    "tags",
+    "include_projects",
+    "exclude_projects",
+)
+
+
+def _as_insights_post(data):
+    post = QueryDict(mutable=True)
+    for key in (
+        "provider",
+        "model",
+        "reasoning_effort",
+        "search",
+        "project_name",
+        "start_date",
+        "end_date",
+        "note_snippet",
+        "context",
+    ):
+        if key in data:
+            value = data[key]
+            if key == "context" and value is None:
+                value = "all"
+            post[key] = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    if data.get("related"):
+        post["related"] = "on"
+    for key in ("tags", "include_projects", "exclude_projects"):
+        if key in data:
+            post.setlist(key, [str(value) for value in data[key]])
+    if any(key in data for key in FILTER_FIELDS):
+        post["filter"] = "1"
+    return post
+
+
 class InsightChatsView(V2APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(operation_id="insights_chats_list", responses=InsightChatListSerializer)
+    @extend_schema(
+        operation_id="insights_chats_list",
+        parameters=[InsightChatListQuerySerializer],
+        responses=InsightChatListSerializer,
+    )
     def get(self, request):
         _require_access(request.user)
-        chats = list(
-            LLMChat.objects.filter(user=request.user).only("id", "title", "updated_at")
+        query = InsightChatListQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        options = query.validated_data
+        queryset = LLMChat.objects.filter(user=request.user).only(
+            "id", "title", "updated_at"
         )
-        return Response(
+        payload = {}
+        if "limit" in options or "offset" in request.query_params:
+            total = queryset.count()
+            offset = options["offset"]
+            limit = options.get("limit", 100)
+            chats = list(queryset[offset : offset + limit])
+            payload.update(total=total, limit=limit, offset=offset)
+        else:
+            chats = list(queryset)
+        payload["groups"] = [
             {
-                "groups": [
-                    {
-                        "label": label,
-                        "chats": InsightChatSummarySerializer(items, many=True).data,
-                    }
-                    for label, items in group_chats_by_recency(chats)
-                ]
+                "label": label,
+                "chats": InsightChatSummarySerializer(items, many=True).data,
             }
-        )
+            for label, items in group_chats_by_recency(chats)
+        ]
+        return Response(payload)
 
 
 class InsightChatDetailView(V2APIView):
@@ -237,12 +362,49 @@ class InsightOptionsView(V2APIView):
                 "providers": options,
                 "default_start_date": start,
                 "default_end_date": end,
+                "openai_source": openai_connection_source(request.user) or None,
+            }
+        )
+
+
+class InsightSelectionView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="insights_selection_retrieve",
+        parameters=[InsightSelectionQuerySerializer],
+        responses=InsightSelectionSerializer,
+    )
+    def get(self, request):
+        _require_access(request.user)
+        serializer = InsightSelectionQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        chat_id = data.pop("chat_id", None)
+        request._request._post = _as_insights_post(data)
+        selection = build_post_context(request._request, request.user, chat_id)
+        sessions = selection["sessions"]
+        first_time = min((session.start_time for session in sessions), default=None)
+        last_time = max((session.end_time for session in sessions), default=None)
+        first = timezone.localdate(first_time) if first_time else None
+        last = timezone.localdate(last_time) if last_time else None
+        related_outcome = selection["related_outcome"]
+        related = None
+        if related_outcome.requested:
+            related = "unavailable" if related_outcome.unavailable else "included"
+        return Response(
+            {
+                "count": len(sessions),
+                "first_date": first,
+                "last_date": last,
+                "related": related,
             }
         )
 
 
 class InsightStreamView(V2APIView):
     permission_classes = [IsAuthenticated]
+    renderer_classes = [JSONRenderer, EventStreamRenderer]
 
     @extend_schema(
         operation_id="insights_stream_create",
@@ -268,43 +430,8 @@ class InsightStreamView(V2APIView):
             user=request.user, pk=chat_id
         ).exists():
             raise NotFound("Chat not found.")
-        post = QueryDict(mutable=True)
+        post = _as_insights_post(data)
         post["prompt"] = data["message"]
-        for key in (
-            "provider",
-            "model",
-            "reasoning_effort",
-            "search",
-            "project_name",
-            "start_date",
-            "end_date",
-            "note_snippet",
-            "context",
-        ):
-            if key in data:
-                value = data[key]
-                post[key] = value.isoformat() if hasattr(value, "isoformat") else str(value)
-        if data.get("related"):
-            post["related"] = "on"
-        for key in ("tags", "include_projects", "exclude_projects"):
-            if key in data:
-                post.setlist(key, [str(value) for value in data[key]])
-        if any(
-            key in data
-            for key in (
-                "search",
-                "related",
-                "project_name",
-                "start_date",
-                "end_date",
-                "note_snippet",
-                "context",
-                "tags",
-                "include_projects",
-                "exclude_projects",
-            )
-        ):
-            post["filter"] = "1"
         request._request._post = post
         return stream_insights_response(
             request._request, chat_id, user_has_insights_access

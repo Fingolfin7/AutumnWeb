@@ -29,6 +29,7 @@ from .insights import (
     InsightChatDetailView,
     InsightChatsView,
     InsightOptionsView,
+    InsightSelectionView,
     InsightStreamView,
 )
 from .notifications import (

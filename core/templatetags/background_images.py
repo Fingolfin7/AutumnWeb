@@ -2,7 +2,7 @@ import logging
 from datetime import timedelta
 from html import unescape
 from html.parser import HTMLParser
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urljoin, urlsplit
 import requests
 from django import template
 from django.utils import timezone
@@ -76,7 +76,10 @@ def bing_background():
         _cached_bing_data = {
             'title': data.get('title', '') or 'Bing Daily Image',
             'description': data.get('desc') or data.get('copyright', ''),
-            'copyright': data.get('copyright', '')
+            'copyright': data.get('copyright', ''),
+            'source_url': urljoin(
+                'https://www.bing.com/', data.get('copyrightlink', '')
+            ) if data.get('copyrightlink') else '',
         }
         # OPTIONAL: replace print with logger.debug
         # logger.debug("Bing metadata: %s", _cached_bing_data)
@@ -167,6 +170,12 @@ def bing_background_description():
     if copyright and copyright not in desc:
         return f"{desc} (© {copyright})" if desc else f"© {copyright}"
     return desc
+
+
+def bing_background_metadata():
+    """Return the metadata fetched alongside the current Bing image."""
+    bing_background()
+    return dict(_cached_bing_data)
 
 
 # NASA metadata tags
