@@ -15,20 +15,27 @@ test("searching sessions narrows the list and the filter survives a reload", asy
   await expect(page).toHaveURL(/[?&]search=grammar\b/);
   await expect(page.locator(".result-count")).not.toHaveText(String(total));
   const rows = list.getByRole("listitem");
-  await expect.poll(() => rows.count()).toBeLessThan(total);
-  expect(await rows.count()).toBeGreaterThan(0);
-  for (const text of await rows.allInnerTexts()) expect(text.toLowerCase()).toContain("grammar");
+  /* The list empties while the search runs: wait until it holds only
+     matches, at least one and fewer than before. */
+  await expect
+    .poll(async () => {
+      const texts = await rows.allInnerTexts();
+      return texts.length > 0 && texts.length < total && texts.every((text) => text.toLowerCase().includes("grammar"));
+    })
+    .toBe(true);
+  const matches = await rows.count();
 
   await page.reload();
   await expect(page).toHaveURL(/[?&]search=grammar\b/);
   await expect(page.getByRole("searchbox", { name: /Search projects/ })).toHaveValue("grammar");
-  await expect(list.getByRole("listitem")).toHaveCount(await rows.count());
+  await expect(list.getByRole("listitem")).toHaveCount(matches);
   expect(problems()).toEqual([]);
 });
 
 test("editing a session note saves it", async ({ page }, testInfo) => {
   const problems = trackErrors(page);
-  const note = `Edited by the ${testInfo.project.name} e2e run`;
+  // Each attempt writes a new note, or a retry would have nothing to save.
+  const note = `Edited by the ${testInfo.project.name} e2e run ${testInfo.retry}.${testInfo.repeatEachIndex}`;
 
   await page.goto("/sessions/?search=Piano");
   const first = page.getByRole("region", { name: "Sessions" }).getByRole("listitem").first();
