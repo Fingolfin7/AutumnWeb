@@ -160,6 +160,10 @@ class TimerStopView(V2APIView):
         session = _get_session(request.user, session_id)
         if session.end_time is not None:
             return Response(_serialize(session), status=status.HTTP_200_OK)
+        # One clock reading for the default end and the celebration's
+        # before/after snapshots: a second read could land past a second
+        # boundary, ending the session after the "after" instant and leaving
+        # it uncounted.
         celebration_reference = timezone.now()
         before_progress = capture_timer_stop_progress(
             request.user, session, reference_instant=celebration_reference
@@ -172,7 +176,7 @@ class TimerStopView(V2APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         end_time = data.get(
-            "end", timezone.now().astimezone(datetime_timezone.utc).replace(microsecond=0)
+            "end", celebration_reference.astimezone(datetime_timezone.utc).replace(microsecond=0)
         )
         _validate_not_future(end_time, "end")
         if end_time < session.start_time:
@@ -207,7 +211,8 @@ class TimerStopView(V2APIView):
             request.user,
             session,
             before_progress,
-            reference_instant=celebration_reference,
+            # An explicit end may be (slightly) later than the reference.
+            reference_instant=max(celebration_reference, session.end_time),
         )
         return Response(_serialize(session), status=status.HTTP_200_OK)
 

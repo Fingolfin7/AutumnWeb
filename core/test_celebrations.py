@@ -1,12 +1,14 @@
 """Focused contracts for milestone detection and its user-visible markup."""
 
 from datetime import timedelta
+from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.utils import timezone
 
+import core.api_v2.views.timers as timer_views
 from core.celebrations import (
     crossed_tracked_time_milestone,
     is_completion_transition,
@@ -114,6 +116,39 @@ class CelebrationApiTests(TestCase):
         )
         response = self.client.post(f"/api/v2/timers/{timer.pk}/stop/", {}, format="json")
         self.assertEqual(response.json()["celebration"]["kind"], "progress")
+        self.assertIn("commitment met: Atlas API", response.json()["celebration"]["message"])
+
+    def test_a_stop_whose_clock_reads_cross_a_second_still_counts_the_session(self):
+        # The stop view once read the clock twice: for the celebration's
+        # reference instant, then for the default end (truncated to the
+        # second). A tick between the reads ended the session after the
+        # reference, so the "after" snapshot left it out and the 100%
+        # celebration was missed.
+        Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            commitment_type="time",
+            period="weekly",
+            target=60,
+        )
+        base = timezone.now().replace(microsecond=0) - timedelta(seconds=5)
+        timer = SessionMutationService.create_session(
+            user=self.user, project=self.project, start_time=base - timedelta(hours=1), is_active=True
+        )
+        reads = iter([base + timedelta(microseconds=999_999)])
+
+        class TickingClock:
+            """The timers view's clock: just before a second, then just past it."""
+
+            def __getattr__(self, name):
+                return getattr(timezone, name)
+
+            def now(self):
+                return next(reads, base + timedelta(seconds=1, microseconds=1))
+
+        with mock.patch.object(timer_views, "timezone", TickingClock()):
+            response = self.client.post(f"/api/v2/timers/{timer.pk}/stop/", {}, format="json")
+        self.assertEqual(response.status_code, 200, response.content)
         self.assertIn("commitment met: Atlas API", response.json()["celebration"]["message"])
 
     def test_an_ordinary_stop_stays_quiet(self):
