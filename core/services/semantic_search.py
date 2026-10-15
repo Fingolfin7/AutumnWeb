@@ -66,8 +66,8 @@ FAILURE_COOLDOWN_SECONDS = 5 * 60
 # shown for the no-match query; override with SEMANTIC_SEARCH_MIN_SIMILARITY.
 DEFAULT_MIN_SIMILARITY = 0.45
 CANDIDATE_LIMIT = 50
-# The "Related" sections show this many at a time (Sessions pages through the
-# rest). Sessions search (core.search.rank_sessions) and counted related
+# The "Related" sections show this many at a time and page through the rest
+# (?related_page= on Sessions and Projects). Sessions search (core.search.rank_sessions) and counted related
 # matches (Charts/Insights "Include related", the API's related=true) pass
 # limit=None: every match above the cutoff is kept, so nothing is silently
 # truncated. The cutoff is the only relevance control.
@@ -78,8 +78,39 @@ RRF_K = 60
 SCORE_BATCH_ROWS = 4000
 
 
-def min_similarity():
+# The range a search's own cutoff (?similarity=, the Related slider) or a
+# profile default may take. Below the floor nearly everything is "related";
+# above the ceiling almost nothing is. Steps are what the slider moves by.
+SIMILARITY_FLOOR = 0.25
+SIMILARITY_CEILING = 0.60
+SIMILARITY_STEP = 0.01
+# Named stops on the slider, loosest first.
+SIMILARITY_MARKS = (("Loose", 0.30), ("Moderate", 0.45), ("Strict", 0.55))
+
+
+def server_min_similarity():
     return float(getattr(settings, "SEMANTIC_SEARCH_MIN_SIMILARITY", DEFAULT_MIN_SIMILARITY))
+
+
+def min_similarity(user=None):
+    """The cutoff a search uses unless it names its own: the account's, else the server's."""
+    profile = getattr(user, "profile", None)
+    value = getattr(profile, "related_similarity", None)
+    return float(value) if value is not None else server_min_similarity()
+
+
+def parse_similarity(value):
+    """A requested cutoff as a float on the slider's grid, or None when absent.
+
+    Raises ValueError for anything that is not a number between
+    SIMILARITY_FLOOR and SIMILARITY_CEILING.
+    """
+    if value is None or str(value).strip() == "":
+        return None
+    number = float(str(value).strip())
+    if not SIMILARITY_FLOOR <= number <= SIMILARITY_CEILING:
+        raise ValueError("similarity out of range")
+    return round(number, 2)
 
 
 def semantic_search_available(user):
@@ -738,16 +769,40 @@ class RelatedOutcome:
     """
     requested: bool = False
     included: bool = False
+    # The cutoff the search applied, once it ran.
+    cutoff: float = None
+    # Pages with the Related slider set this to also learn the score of every
+    # related match down to SIMILARITY_FLOOR (``scores``, best first), so the
+    # slider can show how many a looser or stricter cutoff would give.
+    collect_scores: bool = False
+    scores: list = field(default_factory=list)
 
     @property
     def unavailable(self):
         return self.requested and not self.included
 
+    @property
+    def best(self):
+        """The closest related match's score, if any reaches SIMILARITY_FLOOR."""
+        return self.scores[0] if self.scores else None
 
-def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT, outcome=None):
+    def counts(self):
+        """How many related matches each slider step, floor to ceiling, keeps."""
+        steps = round((SIMILARITY_CEILING - SIMILARITY_FLOOR) / SIMILARITY_STEP)
+        counts = []
+        for index in range(steps + 1):
+            cutoff = round(SIMILARITY_FLOOR + index * SIMILARITY_STEP, 2)
+            counts.append(sum(1 for score in self.scores if score >= cutoff))
+        return counts
+
+
+def related_session_ids(
+    user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT, cutoff=None, outcome=None
+):
     """Ids of sessions in ``sessions`` that mean ``term`` but keyword search missed.
 
-    ``limit=None`` returns every one above the cutoff.
+    ``limit=None`` returns every one at or above the cutoff: ``cutoff``, else
+    the account's default (``min_similarity``).
 
     ``sessions`` must already carry the caller's ownership and filters (dates,
     context, tags, project include/exclude); ``keyword_sessions`` is the same
@@ -768,25 +823,51 @@ def related_session_ids(user, sessions, keyword_sessions, term, *, limit=RELATED
     vector = _query_vector_or_none(user, term)
     if vector is None:
         return []
+    cutoff = min_similarity(user) if cutoff is None else cutoff
     if outcome is not None:
         outcome.included = True
-    scores = session_scores(user, sessions, vector, cutoff=min_similarity())
+        outcome.cutoff = cutoff
+    floor = _scoring_floor(cutoff, outcome)
+    scores = session_scores(user, sessions, vector, cutoff=floor)
     ranked = sorted(scores, key=lambda pk: (-scores[pk], pk))
 
     def keep(chunk):
         keyword = set(keyword_sessions.filter(pk__in=chunk).values_list("pk", flat=True))
         return {pk for pk in chunk if pk not in keyword}
 
-    return _select(ranked, keep, limit)
+    return _cut(ranked, scores, keep, limit=limit, cutoff=cutoff, floor=floor, outcome=outcome)
 
 
-def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED_LIMIT, outcome=None):
+def _scoring_floor(cutoff, outcome):
+    """Score down to the slider's floor only when its counts were asked for."""
+    if outcome is not None and outcome.collect_scores:
+        return min(cutoff, SIMILARITY_FLOOR)
+    return cutoff
+
+
+def _cut(ranked, scores, keep, *, limit, cutoff, floor, outcome):
+    """The ``keep``-accepted ``ranked`` ids at or above ``cutoff``, up to ``limit``.
+
+    When ``ranked`` was scored below the cutoff (for the slider), every
+    accepted score is recorded on ``outcome`` first.
+    """
+    if floor >= cutoff:
+        return _select(ranked, keep, limit)
+    related = _select(ranked, keep, None)
+    outcome.scores = [scores[pk] for pk in related]
+    kept = [pk for pk in related if scores[pk] >= cutoff]
+    return kept if limit is None else kept[:limit]
+
+
+def related_project_ids(
+    user, projects, keyword_projects, term, *, limit=RELATED_LIMIT, cutoff=None, outcome=None
+):
     """Ids of projects in ``projects`` that mean ``term`` but keyword search missed.
 
     A project scores the better of its own vector (name, subprojects,
     description) and its best-matching session, mirroring keyword search,
     which also matches projects through their session notes. ``limit=None``
-    returns every one above the cutoff.
+    returns every one at or above the cutoff (``cutoff``, else the account's).
     """
     term = _clean_term(term)
     if not term:
@@ -806,17 +887,19 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
     vector = _query_vector_or_none(user, term)
     if vector is None:
         return []
+    cutoff = min_similarity(user) if cutoff is None else cutoff
     if outcome is not None:
         outcome.included = True
+        outcome.cutoff = cutoff
 
     # Every fresh score is aggregated per project before anything is cut.
-    cutoff = min_similarity()
+    floor = _scoring_floor(cutoff, outcome)
     scores = {}
-    project_hits = dict(semantic_ranking(project_ids, project_matrix, vector, cutoff=cutoff, limit=None))
+    project_hits = dict(semantic_ranking(project_ids, project_matrix, vector, cutoff=floor, limit=None))
     for chunk in _chunks(list(project_hits), 500):
         for pk in fresh_project_ids(user, chunk, project_digests):
             scores[pk] = max(scores.get(pk, project_hits[pk]), project_hits[pk])
-    session_hits = session_scores(user, project_sessions, vector, cutoff=cutoff)
+    session_hits = session_scores(user, project_sessions, vector, cutoff=floor)
     for chunk in _chunks(list(session_hits), 500):
         for session_id, project_id in Sessions.objects.filter(pk__in=chunk, user=user).values_list(
             "pk", "project_id"
@@ -832,4 +915,4 @@ def related_project_ids(user, projects, keyword_projects, term, *, limit=RELATED
         keyword = set(keyword_projects.filter(pk__in=chunk).values_list("pk", flat=True))
         return {pk for pk in chunk if pk not in keyword}
 
-    return _select(ranked, keep, limit)
+    return _cut(ranked, scores, keep, limit=limit, cutoff=cutoff, floor=floor, outcome=outcome)

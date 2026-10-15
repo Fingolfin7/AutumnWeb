@@ -13,6 +13,12 @@ export interface Bootstrap {
     default_chart_start_date: string;
     default_chart_end_date: string;
     openai_key_configured: boolean;
+    related_similarity: number | null;
+  };
+  semantic_search: {
+    default_similarity: number;
+    min_similarity: number;
+    max_similarity: number;
   };
   contexts: { id: number; name: string }[];
   active_context_id: number | null;
@@ -36,6 +42,12 @@ const FALLBACK: Bootstrap = {
     default_chart_start_date: "",
     default_chart_end_date: "",
     openai_key_configured: false,
+    related_similarity: null,
+  },
+  semantic_search: {
+    default_similarity: 0.45,
+    min_similarity: 0.25,
+    max_similarity: 0.6,
   },
   contexts: [],
   active_context_id: null,

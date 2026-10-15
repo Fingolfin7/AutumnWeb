@@ -1,6 +1,7 @@
 """Shared search semantics for pages that browse tracked work."""
 
 import json
+import re
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -11,31 +12,63 @@ from django.db.models.expressions import RawSQL
 from core.models import SessionSubproject, Sessions, SubProjects
 
 
-def search_projects(projects, term):
-    """Find projects by name, description, child name, or session note."""
-    term = (term or "").strip()
-    if not term:
-        return projects
+# Words too common to narrow a search: "figured it out" looks for "figured"
+# and "out". A term made only of them keeps them all.
+STOPWORDS = frozenset(
+    "a an and are as at be but by for from has have i in is it its me my "
+    "of on or our so than that the their them then this to was we were "
+    "with you your".split()
+)
+_TOKENS = re.compile(r'"([^"]*)"|(\S+)')
+_EDGE_PUNCTUATION = ".,;:!?()[]{}'\u2018\u2019\u201c\u201d"
 
-    matching_subprojects = SubProjects.objects.filter(
-        parent_project_id=OuterRef("pk"),
-        user_id=OuterRef("user_id"),
-        name__icontains=term,
-    )
-    matching_notes = Sessions.objects.filter(
-        project_id=OuterRef("pk"),
-        user_id=OuterRef("user_id"),
-        note__icontains=term,
-    )
-    return projects.alias(
-        search_subproject=Exists(matching_subprojects),
-        search_note=Exists(matching_notes),
-    ).filter(
-        Q(name__icontains=term)
-        | Q(description__icontains=term)
-        | Q(search_subproject=True)
-        | Q(search_note=True)
-    )
+
+def search_words(term):
+    """The pieces of ``term`` that must each appear: its words, or quoted phrases.
+
+    Every unquoted word must appear somewhere (any order, any field);
+    "a quoted phrase" must appear as written. Common words are dropped unless
+    nothing else is left.
+    """
+    words, phrases = [], []
+    for phrase, word in _TOKENS.findall(term or ""):
+        if phrase.strip():
+            phrases.append(phrase.strip())
+            continue
+        word = word.strip(_EDGE_PUNCTUATION + '"')
+        if word:
+            words.append(word)
+    meaningful = [word for word in words if word.lower() not in STOPWORDS]
+    if meaningful or phrases:
+        words = meaningful
+    pieces = []
+    for piece in phrases + words:
+        if piece.lower() not in {seen.lower() for seen in pieces}:
+            pieces.append(piece)
+    return pieces
+
+
+def search_projects(projects, term):
+    """Projects where every word of ``term`` (``search_words``) appears in the
+    name, description, a child's name, or one of its session notes."""
+    for word in search_words(term):
+        matching_subprojects = SubProjects.objects.filter(
+            parent_project_id=OuterRef("pk"),
+            user_id=OuterRef("user_id"),
+            name__icontains=word,
+        )
+        matching_notes = Sessions.objects.filter(
+            project_id=OuterRef("pk"),
+            user_id=OuterRef("user_id"),
+            note__icontains=word,
+        )
+        projects = projects.filter(
+            Q(name__icontains=word)
+            | Q(description__icontains=word)
+            | Exists(matching_subprojects)
+            | Exists(matching_notes)
+        )
+    return projects
 
 
 #: The one order for session lists: newest first, ties by id.
@@ -91,32 +124,31 @@ class SessionSearch:
 
 
 def keyword_sessions(sessions, term):
-    """Sessions whose project, assigned subproject or own note contains ``term``."""
-    term = (term or "").strip()
-    if not term:
-        return sessions
-    matching_subprojects = SessionSubproject.objects.filter(
-        session_id=OuterRef("pk"),
-        subproject__user_id=OuterRef("user_id"),
-        subproject__name__icontains=term,
-    )
-    return sessions.alias(
-        search_subproject=Exists(matching_subprojects)
-    ).filter(
-        Q(project__name__icontains=term)
-        | Q(search_subproject=True)
-        | Q(note__icontains=term)
-    )
+    """Sessions where every word of ``term`` (``search_words``) appears in the
+    project's name, an assigned subproject's name, or the session's note."""
+    for word in search_words(term):
+        matching_subprojects = SessionSubproject.objects.filter(
+            session_id=OuterRef("pk"),
+            subproject__user_id=OuterRef("user_id"),
+            subproject__name__icontains=word,
+        )
+        sessions = sessions.filter(
+            Q(project__name__icontains=word)
+            | Exists(matching_subprojects)
+            | Q(note__icontains=word)
+        )
+    return sessions
 
 
-def rank_sessions(sessions, term, *, user=None, related=False, outcome=None):
+def rank_sessions(sessions, term, *, user=None, related=False, cutoff=None, outcome=None):
     """The SessionSearch of ``term`` within ``sessions``.
 
     With ``related`` (and the ``user`` whose OpenAI key pays for the query),
     every session that matches the term by meaning is added after the keyword
     matches; see core.services.semantic_search. ``sessions`` must already
     carry every other filter, because related matches are drawn from it.
-    ``outcome`` (a RelatedOutcome) records whether they could be added.
+    ``cutoff`` overrides the account's similarity cutoff. ``outcome`` (a
+    RelatedOutcome) records whether they could be added.
     """
     term = (term or "").strip()
     direct = keyword_sessions(sessions, term)
@@ -130,17 +162,17 @@ def rank_sessions(sessions, term, *, user=None, related=False, outcome=None):
 
             # Counted, not previewed: every match above the cutoff, no cap.
             related_ids = related_session_ids(
-                user, sessions, direct, term, limit=None, outcome=outcome
+                user, sessions, direct, term, limit=None, cutoff=cutoff, outcome=outcome
             )
     return SessionSearch(sessions=sessions, direct=direct, related_ids=related_ids)
 
 
-def search_sessions(sessions, term, *, user=None, related=False, outcome=None):
+def search_sessions(sessions, term, *, user=None, related=False, cutoff=None, outcome=None):
     """``rank_sessions`` as one unordered queryset, for totals and charts."""
     if not (term or "").strip():
         return sessions
     return rank_sessions(
-        sessions, term, user=user, related=related, outcome=outcome
+        sessions, term, user=user, related=related, cutoff=cutoff, outcome=outcome
     ).combined()
 
 

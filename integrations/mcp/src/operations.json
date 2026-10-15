@@ -1225,8 +1225,20 @@
           "type": "string",
           "minLength": 1
         },
-        "description": "Search project names, assigned subproject names and session notes.",
+        "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored.",
         "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "similarity",
+        "schema": {
+          "type": "number",
+          "format": "double",
+          "maximum": 0.6,
+          "minimum": 0.25
+        },
+        "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
+        "argument": "similarity"
       },
       {
         "in": "query",
@@ -1324,7 +1336,13 @@
         "search": {
           "type": "string",
           "minLength": 1,
-          "description": "Search project names, assigned subproject names and session notes."
+          "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored."
+        },
+        "similarity": {
+          "type": "number",
+          "maximum": 0.6,
+          "minimum": 0.25,
+          "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
         },
         "start_date": {
           "type": "string",
@@ -1673,6 +1691,18 @@
       },
       {
         "in": "query",
+        "name": "similarity",
+        "schema": {
+          "type": "number",
+          "format": "double",
+          "maximum": 0.6,
+          "minimum": 0.25
+        },
+        "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
+        "argument": "similarity"
+      },
+      {
+        "in": "query",
         "name": "start_date",
         "schema": {
           "type": "string",
@@ -1756,6 +1786,12 @@
           "type": "string",
           "minLength": 1
         },
+        "similarity": {
+          "type": "number",
+          "maximum": 0.6,
+          "minimum": 0.25,
+          "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
+        },
         "start_date": {
           "type": "string",
           "format": "date",
@@ -1787,7 +1823,7 @@
       "required": [],
       "additionalProperties": false
     },
-    "description": "List or search projects. Use search to resolve names to numeric IDs; add related=true to also find projects that match the search by meaning. Responses include count and total; advance the offset using the returned count until the total is covered. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "List or search projects. Use search to resolve names to numeric IDs; add related=true to also find projects that match the search by meaning, and similarity (0.25 loose to 0.60 strict; default: the account setting) to say how close they must be. Responses include count and total; advance the offset using the returned count until the total is covered. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": true,
       "destructiveHint": false,
@@ -2462,8 +2498,18 @@
         "schema": {
           "type": "string"
         },
-        "description": "Search project names, assigned subproject names and session notes.",
+        "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored.",
         "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "similarity",
+        "schema": {
+          "type": "number",
+          "format": "double"
+        },
+        "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
+        "argument": "similarity"
       },
       {
         "in": "query",
@@ -2589,7 +2635,11 @@
         },
         "search": {
           "type": "string",
-          "description": "Search project names, assigned subproject names and session notes."
+          "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored."
+        },
+        "similarity": {
+          "type": "number",
+          "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
         },
         "start_date": {
           "type": "string",
@@ -2721,8 +2771,18 @@
         "schema": {
           "type": "string"
         },
-        "description": "Search project names, assigned subproject names and session notes.",
+        "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored.",
         "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "similarity",
+        "schema": {
+          "type": "number",
+          "format": "double"
+        },
+        "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
+        "argument": "similarity"
       },
       {
         "in": "query",
@@ -2794,7 +2854,11 @@
         },
         "search": {
           "type": "string",
-          "description": "Search project names, assigned subproject names and session notes."
+          "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored."
+        },
+        "similarity": {
+          "type": "number",
+          "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
         },
         "start_date": {
           "type": "string",
@@ -2934,8 +2998,18 @@
         "schema": {
           "type": "string"
         },
-        "description": "Search project names, assigned subproject names and session notes.",
+        "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored.",
         "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "similarity",
+        "schema": {
+          "type": "number",
+          "format": "double"
+        },
+        "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
+        "argument": "similarity"
       },
       {
         "in": "query",
@@ -3017,7 +3091,11 @@
         },
         "search": {
           "type": "string",
-          "description": "Search project names, assigned subproject names and session notes."
+          "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored."
+        },
+        "similarity": {
+          "type": "number",
+          "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
         },
         "start_date": {
           "type": "string",
@@ -3210,8 +3288,18 @@
         "schema": {
           "type": "string"
         },
-        "description": "Search project names, assigned subproject names and session notes.",
+        "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored.",
         "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "similarity",
+        "schema": {
+          "type": "number",
+          "format": "double"
+        },
+        "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
+        "argument": "similarity"
       },
       {
         "in": "query",
@@ -3283,7 +3371,11 @@
         },
         "search": {
           "type": "string",
-          "description": "Search project names, assigned subproject names and session notes."
+          "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored."
+        },
+        "similarity": {
+          "type": "number",
+          "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
         },
         "start_date": {
           "type": "string",
@@ -3505,8 +3597,20 @@
           "type": "string",
           "minLength": 1
         },
-        "description": "Search project names, assigned subproject names and session notes.",
+        "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored.",
         "argument": "search"
+      },
+      {
+        "in": "query",
+        "name": "similarity",
+        "schema": {
+          "type": "number",
+          "format": "double",
+          "maximum": 0.6,
+          "minimum": 0.25
+        },
+        "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
+        "argument": "similarity"
       },
       {
         "in": "query",
@@ -3622,7 +3726,13 @@
         "search": {
           "type": "string",
           "minLength": 1,
-          "description": "Search project names, assigned subproject names and session notes."
+          "description": "Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as \"it\" and \"the\" are ignored."
+        },
+        "similarity": {
+          "type": "number",
+          "maximum": 0.6,
+          "minimum": 0.25,
+          "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
         },
         "start_date": {
           "type": "string",
@@ -3652,7 +3762,7 @@
       "required": [],
       "additionalProperties": false
     },
-    "description": "Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Add related=true with search to also include sessions that match it by meaning: the match field of each result says direct (the text contains the search) or related, and the default relevance ordering lists direct matches newest first, then related ones best first, as the Sessions page does; ordering=newest sorts all by date. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Search needs every word (any order); quote a phrase to match it exactly. Add related=true with search to also include sessions that match it by meaning (similarity, 0.25 loose to 0.60 strict, sets how close; default: the account setting): the match field of each result says direct (the text contains the search) or related, and the default relevance ordering lists direct matches newest first, then related ones best first, as the Sessions page does; ordering=newest sorts all by date. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": true,
       "destructiveHint": false,

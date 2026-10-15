@@ -8,6 +8,30 @@ from rest_framework import serializers
 from core.templatetags.markdown_render import markdown as render_markdown
 
 
+SEARCH_HELP = (
+    "Search project names, assigned subproject names and session notes. Every word "
+    "must appear (in any of them, in any order); put a phrase in double quotes to "
+    'match it as written. Common words such as "it" and "the" are ignored.'
+)
+SIMILARITY_HELP = (
+    "How close a meaning-based match must be to count as related, from 0.25 "
+    "(loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless "
+    "changed in Profile). Only used with search and related=true; the cutoff "
+    "applied is echoed in the X-Autumn-Related-Similarity header."
+)
+
+
+def similarity_field(**kwargs):
+    """The related-match cutoff parameter (core.services.semantic_search bounds)."""
+    return serializers.FloatField(
+        required=False,
+        min_value=0.25,
+        max_value=0.60,
+        help_text=SIMILARITY_HELP,
+        **kwargs,
+    )
+
+
 def _local_date(value):
     if value is None:
         return None
@@ -329,7 +353,7 @@ class SessionListQuerySerializer(serializers.Serializer):
     note_snippet = serializers.CharField(required=False)
     search = serializers.CharField(
         required=False,
-        help_text="Search project names, assigned subproject names and session notes.",
+        help_text=SEARCH_HELP,
     )
     related = serializers.BooleanField(
         required=False,
@@ -338,6 +362,7 @@ class SessionListQuerySerializer(serializers.Serializer):
             "Needs AI features and an OpenAI key on the account; otherwise ignored."
         ),
     )
+    similarity = similarity_field()
 
     def validate_include(self, value):
         return _parse_resource_include(value)
@@ -816,6 +841,7 @@ class ProjectListQuerySerializer(serializers.Serializer):
             "and an OpenAI key on the account; otherwise ignored."
         ),
     )
+    similarity = similarity_field()
     context_ids = serializers.CharField(required=False)
     tag_ids = serializers.CharField(required=False)
     exclude_project_ids = serializers.CharField(required=False)
@@ -1104,6 +1130,7 @@ class PreferencesRequestSerializer(serializers.Serializer):
         required=False, choices=("low", "medium", "high", "xhigh", "max")
     )
     ai_features_enabled = serializers.BooleanField(required=False)
+    related_similarity = similarity_field(allow_null=True)
     active_context_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
 
     def validate_background_dimming(self, value):
@@ -1143,6 +1170,10 @@ class PreferencesResponseSerializer(PreferencesRequestSerializer):
     nasa_apod_background = serializers.BooleanField()
     luna_recommendation_effort = serializers.CharField()
     ai_features_enabled = serializers.BooleanField()
+    related_similarity = serializers.FloatField(allow_null=True)
+    related_similarity_default = serializers.FloatField()
+    related_similarity_min = serializers.FloatField()
+    related_similarity_max = serializers.FloatField()
     active_context_id = serializers.IntegerField(allow_null=True)
     insights_access_enabled = serializers.BooleanField()
     avatar_url = serializers.CharField()

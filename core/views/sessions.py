@@ -18,12 +18,14 @@ from core.services import SessionMutationService, UNSET
 from core.views.allocations import parse_allocation_post
 from core.forms import SearchProjectForm, UpdateSessionForm
 from core.search import SESSION_ORDER, rank_sessions
-from core.services.semantic_search import RELATED_LIMIT
+from core.services.semantic_search import RELATED_LIMIT, RelatedOutcome
 from core.utils import (
     build_exclude_project_meta,
     filter_by_active_context,
     filter_sessions_by_params,
     group_sessions_by_date,
+    requested_similarity,
+    similarity_slider,
     summarise_search_filters,
 )
 
@@ -249,26 +251,35 @@ class SessionsListView(LoginRequiredMixin, ListView):
         sessions = filter_sessions_by_params(
             self.request, self._scoped_sessions(), params_override=params
         )
+        self.cutoff = requested_similarity(self.request.GET)
+        self.related_outcome = RelatedOutcome(collect_scores=True)
         self.search = rank_sessions(
             sessions,
             self.request.GET.get("search"),
             user=self.request.user,
             related=True,
+            cutoff=self.cutoff,
+            outcome=self.related_outcome,
         )
         return self.search.direct.order_by(*SESSION_ORDER)
 
     def _related_context(self):
-        """Every related match above the cutoff, a page of them at a time."""
+        """Every related match above the cutoff, a page of them at a time, and
+        the slider that sets the cutoff (whenever related matching ran, so a
+        search with none can still be loosened)."""
+        context = {"related_sessions": [], "related_page": None, "related_slider": None}
+        if self.related_outcome.included:
+            context["related_slider"] = similarity_slider(
+                self.request.user, value=self.cutoff, outcome=self.related_outcome
+            )
         related_ids = self.search.related_ids
-        if not related_ids:
-            return {"related_sessions": [], "related_page": None}
-        page = Paginator(related_ids, RELATED_LIMIT).get_page(
-            self.request.GET.get("related_page")
-        )
-        return {
-            "related_sessions": self.search.related_sessions(page.object_list),
-            "related_page": page,
-        }
+        if related_ids:
+            page = Paginator(related_ids, RELATED_LIMIT).get_page(
+                self.request.GET.get("related_page")
+            )
+            context["related_sessions"] = self.search.related_sessions(page.object_list)
+            context["related_page"] = page
+        return context
 
 
 class DeleteSessionView(LoginRequiredMixin, DeleteView):

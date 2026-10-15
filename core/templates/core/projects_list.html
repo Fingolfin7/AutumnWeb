@@ -23,6 +23,7 @@
 {% block head_includes %}
     <script>const EXCLUDE_PROJECT_META = {{ exclude_project_meta_json|safe }};</script>
     <script src="{% static 'core/js/option_pickers.js' %}?v={{ static_version.option_pickers }}" type="text/javascript" defer></script>
+    <script src="{% static 'core/js/similarity_slider.js' %}?v={{ static_version.similarity_slider }}" type="text/javascript" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -133,14 +134,37 @@
 </section>
 {% endif %}
 
-{% if related_projects %}
+{% if related_slider %}
 <section class="slab" aria-label="Related projects">
-    <header class="day-head"><span class="day-date">Related</span></header>
+    <header class="day-head">
+        <span class="day-date">Related</span>
+        {% if related_page %}<span class="day-total">{% if related_page.paginator.num_pages > 1 %}{{ related_page.start_index }}–{{ related_page.end_index }} of {% endif %}{{ related_page.paginator.count }}</span>{% endif %}
+    </header>
+    {% include 'core/partials/similarity_slider.html' with slider=related_slider slider_id='related-similarity' collapsible=True %}
+    {% if related_projects %}
     <ul class="band-list band-list--grid">
         {% for project in related_projects %}
         {% include 'core/partials/project_band.html' %}
         {% endfor %}
     </ul>
+    {% endif %}
+    {% if related_page.paginator.num_pages > 1 %}
+    <nav class="pager" aria-label="Related pages">
+        {% if related_page.has_previous %}
+        <a class="pager-btn" href="?{% param_replace related_page=related_page.previous_page_number %}" aria-label="Previous related"><i class="fas fa-angle-left"></i></a>
+        {% endif %}
+        {% for num in related_page.paginator.page_range %}
+            {% if related_page.number == num %}
+            <a class="pager-btn is-current" href="?{% param_replace related_page=num %}" aria-current="page">{{ num }}</a>
+            {% elif num > related_page.number|add:'-2' and num < related_page.number|add:'2' %}
+            <a class="pager-btn" href="?{% param_replace related_page=num %}">{{ num }}</a>
+            {% endif %}
+        {% endfor %}
+        {% if related_page.has_next %}
+        <a class="pager-btn" href="?{% param_replace related_page=related_page.next_page_number %}" aria-label="More related"><i class="fas fa-angle-right"></i></a>
+        {% endif %}
+    </nav>
+    {% endif %}
 </section>
 {% endif %}
 
