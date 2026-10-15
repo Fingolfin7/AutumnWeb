@@ -392,7 +392,10 @@ class ApiV2WebChunk2Tests(TestCase):
             "/api/v2/reports/weekly-review/", {"week": "2026-10-14"}
         )
         self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(response.json()["week_start"], "2026-10-12")
+        # The chosen date starts the window (notification links carry the
+        # user's own review weekday), rather than snapping to a Monday.
+        self.assertEqual(response.json()["week_start"], "2026-10-14")
+        self.assertEqual(response.json()["week_end"], "2026-10-20")
         for key in (
             "window_start",
             "window_end",
@@ -412,6 +415,14 @@ class ApiV2WebChunk2Tests(TestCase):
         )
         self.assertEqual(invalid.status_code, 400)
         self.assertIn("week", invalid.json()["error"]["details"])
+
+    def test_weekly_review_defaults_to_the_seven_days_ending_yesterday(self):
+        from core.services.proactive_notifications import user_timezone
+
+        today = timezone.now().astimezone(user_timezone(self.user)).date()
+        data = self.client.get("/api/v2/reports/weekly-review/").json()
+        self.assertEqual(data["week_start"], (today - timedelta(days=7)).isoformat())
+        self.assertEqual(data["week_end"], (today - timedelta(days=1)).isoformat())
 
     def test_account_and_api_keys_are_owned_and_write_only(self):
         response = self.client.patch(

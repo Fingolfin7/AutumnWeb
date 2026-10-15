@@ -80,6 +80,13 @@ class SpaViewTests(TestCase):
 
     def test_server_rendered_pages_still_win(self, _manifest):
         self.client.force_login(self.user)
-        response = self.client.get("/notifications/")
+        response = self.client.get("/export/")
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(b'id="autumn-bootstrap"', response.content)
+
+    def test_old_reminder_pages_open_the_matching_dialog(self, _manifest):
+        self.client.force_login(self.user)
+        for action in ("edit", "snooze", "cancel"):
+            response = self.client.get(f"/notifications/schedules/7/{action}/")
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response["Location"], f"/notifications/?{action}=7")

@@ -24,6 +24,12 @@
   overflow: visible;
   flex: none;
 }
+/* Fixed-width icon columns in focus_desk.css (written for <i> glyphs) lose to
+   width:auto above; restore them so labels line up. The SVG keeps its aspect
+   ratio and centres itself in the wider box. */
+.icon.sheet-item-icon { width: 1.5rem; }
+.icon.disclose-icon { width: 1.25rem; }
+.icon.profile-auth-icon { width: 1.4rem; }
 .icon--spin { animation: icon-spin 1s linear infinite; }
 @keyframes icon-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .icon--spin { animation: none; } }

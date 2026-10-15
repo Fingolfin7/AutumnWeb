@@ -21,7 +21,8 @@ from django.contrib.staticfiles import finders
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.http import Http404
 from django.middleware.csrf import get_token
-from django.shortcuts import render
+from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils.cache import patch_cache_control
 from django.views.decorators.http import require_GET
 
@@ -146,3 +147,11 @@ def spa(request, *args, **kwargs):
     response["X-Autumn-Shell"] = "1"
     patch_cache_control(response, no_cache=True, private=True)
     return response
+
+
+@require_GET
+@login_required
+def reminder_action(request, reminder_id, action):
+    """The old per-reminder pages, still the target of a scheduled reminder's
+    Snooze notification action: open that dialog on the Notifications page."""
+    return redirect(f"{reverse('notifications')}?{action}={reminder_id}")

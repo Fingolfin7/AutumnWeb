@@ -96,7 +96,7 @@ class PushSubscriptionsView(V2APIView):
     @extend_schema(
         operation_id="push_subscriptions_destroy",
         request=PushUnsubscribeSerializer,
-        responses=PushRemovedSerializer,
+        responses={200: PushRemovedSerializer},
     )
     def delete(self, request):
         serializer = PushUnsubscribeSerializer(data=request.data)

@@ -1,4 +1,10 @@
-import { decodeBase64Url, describePushError, sameApplicationServerKey } from "./push";
+import { api } from "@/api/client";
+import { decodeBase64Url, describePushError, pushStatus, sameApplicationServerKey, sendTestPush } from "./push";
+
+vi.mock("@/api/client", () => ({
+  api: { GET: vi.fn(), POST: vi.fn(), DELETE: vi.fn() },
+  unwrap: async (promise: Promise<{ data?: unknown }>) => (await promise).data,
+}));
 
 const key = new Uint8Array(65);
 key[0] = 4;
@@ -27,4 +33,16 @@ it("names browser push errors", () => {
   error.name = "AbortError";
   expect(describePushError(error, "x")).toBe("AbortError: Registration failed - push service error");
   expect(describePushError(new Error("Plain"), "x")).toBe("Plain");
+});
+
+it("reads push status from the v2 API", async () => {
+  vi.mocked(api.GET).mockResolvedValueOnce({ data: { available: true, subscribed: true }, response: new Response() } as never);
+  expect((await pushStatus()).subscribed).toBe(true);
+  expect(api.GET).toHaveBeenCalledWith("/api/v2/push/status/");
+});
+
+it("queues a test notification with a bodyless POST to the v2 API", async () => {
+  vi.mocked(api.POST).mockResolvedValueOnce({ data: { queued: true, event_id: 3 }, response: new Response() } as never);
+  expect((await sendTestPush()).queued).toBe(true);
+  expect(api.POST).toHaveBeenCalledWith("/api/v2/push/test/");
 });

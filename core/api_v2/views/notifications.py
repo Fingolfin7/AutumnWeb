@@ -133,6 +133,9 @@ def _schedule_payload(schedule):
         "message": schedule.message,
         "cadence": schedule.cadence,
         "timezone": schedule.timezone,
+        "local_date": schedule.anchor_date,
+        "local_time": schedule.anchor_time,
+        # Pre-schema names, kept so existing callers don't break.
         "anchor_date": schedule.anchor_date,
         "anchor_time": schedule.anchor_time,
         "next_fire_at": schedule.next_fire_at,
@@ -386,7 +389,13 @@ class WeeklyReviewSerializer(serializers.Serializer):
 
 
 class WeeklyReviewQuerySerializer(serializers.Serializer):
-    week = serializers.DateField(required=False)
+    week = serializers.DateField(
+        required=False,
+        help_text=(
+            "First local date of the seven reviewed (the weekly review "
+            "notification links its own). Defaults to the seven days ending yesterday."
+        ),
+    )
 
 
 class WeeklyReviewView(V2APIView):
@@ -402,16 +411,20 @@ class WeeklyReviewView(V2APIView):
         query.is_valid(raise_exception=True)
         preference = ensure_notification_preferences(request.user)
         zone = user_timezone(request.user)
+        # A review covers the seven local dates before its slot, so a chosen
+        # start date gets a slot seven days later; DST is resolved by the same
+        # helper the scheduler uses.
         selected = query.validated_data.get("week")
         if selected is None:
-            selected = timezone.now().astimezone(zone).date()
-        monday = selected - timedelta(days=selected.weekday())
-        occurrence = local_wall_to_utc(
-            datetime.combine(monday + timedelta(days=7), preference.weekly_review_time),
-            zone.key,
-            strict=False,
-        )
+            occurrence = timezone.now()
+        else:
+            occurrence = local_wall_to_utc(
+                datetime.combine(selected + timedelta(days=7), preference.weekly_review_time),
+                zone.key,
+                strict=False,
+            )
         summary = weekly_review_summary(preference, occurrence)
+        week_start = summary["window_start"].astimezone(zone).date()
         commitments = {
             item.pk: item
             for item in Commitment.objects.filter(
@@ -429,8 +442,8 @@ class WeeklyReviewView(V2APIView):
         return Response(
             {
                 **summary,
-                "week_start": monday,
-                "week_end": monday + timedelta(days=6),
+                "week_start": week_start,
+                "week_end": week_start + timedelta(days=6),
                 "duration_label": duration_label,
                 "details": details,
             }

@@ -19,13 +19,6 @@ from core.views.contexts_tags import (
 )
 from core.views.dashboard import DashboardView, timeline_fragment
 from core.views.import_export import export_view, import_stream, import_view
-from core.views.notifications import (
-    cancel_scheduled_reminder,
-    edit_scheduled_reminder,
-    notifications,
-    snooze_scheduled_reminder,
-    weekly_review,
-)
 from core.views.projects import (
     CreateProjectView,
     CreateSubProjectView,
@@ -60,7 +53,7 @@ from core.views.timers import (
 def healthz(request):
     return JsonResponse({"status": "ok"})
 
-from core.spa import spa
+from core.spa import reminder_action, spa
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
@@ -91,21 +84,24 @@ urlpatterns = [
         cancel_timer_reminder,
         name="cancel_timer_reminder",
     ),
-    path("notifications/", notifications, name="notifications"),
-    path("review/weekly/", weekly_review, name="weekly_review"),
+    path("notifications/", spa, name="notifications"),
+    path("review/weekly/", spa, name="weekly_review"),
     path(
         "notifications/schedules/<int:reminder_id>/edit/",
-        edit_scheduled_reminder,
+        reminder_action,
+        {"action": "edit"},
         name="edit_scheduled_reminder",
     ),
     path(
         "notifications/schedules/<int:reminder_id>/snooze/",
-        snooze_scheduled_reminder,
+        reminder_action,
+        {"action": "snooze"},
         name="snooze_scheduled_reminder",
     ),
     path(
         "notifications/schedules/<int:reminder_id>/cancel/",
-        cancel_scheduled_reminder,
+        reminder_action,
+        {"action": "cancel"},
         name="cancel_scheduled_reminder",
     ),
     # Was served at "create_subproject/" — a copy-paste slip. Only the URL name
