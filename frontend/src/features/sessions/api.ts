@@ -15,6 +15,8 @@ export interface SessionFilters {
   tag_ids?: string;
   project_ids?: string;
   exclude_project_ids?: string;
+  /** The Related cutoff; absent = the account's default. */
+  similarity?: number;
 }
 
 /* Session rows as the list pages need them. note_html is the server's

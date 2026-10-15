@@ -165,7 +165,7 @@ export function SimilaritySlider({
           {looser !== null && best != null ? (
             <>
               <span>
-                Nothing related at <b>{fixed2(draft)}</b>. The closest match is <b>{fixed2(best)}</b>.
+                Nothing related at <b>{fixed2(draft)}</b>. The closest match is <b>{fixed2(looser)}</b>.
               </span>
               <button type="button" className="btn btn--ghost" onClick={() => jump(looser)}>
                 Loosen to {fixed2(looser)}

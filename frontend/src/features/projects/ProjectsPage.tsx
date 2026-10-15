@@ -20,7 +20,11 @@ import type { Commitment } from "@/api/types";
 import { useTimers } from "@/features/timers/api";
 import { ProjectBand } from "./ProjectBand";
 import { useCommitments, useProjectLists } from "./api";
-import { describeFilters, emptyFilters, groupByStatus, readFilters, writeFilters, type ProjectFilters } from "./logic";
+import { describeFilters, emptyFilters, groupByStatus, readFilters, serverQuery, writeFilters, type ProjectFilters } from "./logic";
+import { semanticSearchAvailable } from "@/features/charts/api";
+import { useActiveContext } from "@/app/context";
+import { RelatedSlider } from "@/features/search/RelatedSlider";
+import { useRelatedSummary } from "@/features/search/api";
 
 export default function ProjectsPage() {
   const [params, setParams] = useSearchParams();
@@ -32,6 +36,10 @@ export default function ProjectsPage() {
   useEffect(() => setSearchText(applied.search), [applied.search]);
 
   const lists = useProjectLists(applied);
+  const { contextIdsParam } = useActiveContext();
+  const { ordering: _ordering, ...relatedQuery } = serverQuery(applied, contextIdsParam);
+  const summary = useRelatedSummary("projects", relatedQuery, !!applied.search && semanticSearchAvailable());
+  const relatedSummary = summary.data?.available ? summary.data : null;
   const allProjects = useAllProjects();
   const tags = useTags();
   const contexts = useContexts();
@@ -241,12 +249,14 @@ export default function ProjectsPage() {
         </section>
       )}
 
-      {related.length ? (
+      {related.length || relatedSummary ? (
         <section className="slab" aria-label="Related projects">
           <header className="day-head">
             <span className="day-date">Related</span>
+            <span className="day-total">{related.length}</span>
           </header>
-          <ul className="band-list band-list--grid">{related.map(band)}</ul>
+          {relatedSummary ? <RelatedSlider summary={relatedSummary} loading={lists.isFetching} /> : null}
+          {related.length ? <ul className="band-list band-list--grid">{related.map(band)}</ul> : null}
         </section>
       ) : null}
     </>

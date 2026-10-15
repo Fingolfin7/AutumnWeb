@@ -1,4 +1,5 @@
 import type { Commitment, Project, ProjectListQuery, ProjectStatus } from "@/api/types";
+import { fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
 
 /* ---------------------------------------------------------------- filters */
 
@@ -13,6 +14,8 @@ export interface ProjectFilters {
   tags: number[];
   projects: number[];
   projectMode: "include" | "exclude";
+  /** The Related slider's cutoff; null = the account's default. */
+  similarity: number | null;
 }
 
 export const emptyFilters: ProjectFilters = {
@@ -23,6 +26,7 @@ export const emptyFilters: ProjectFilters = {
   tags: [],
   projects: [],
   projectMode: "exclude",
+  similarity: null,
 };
 
 export function readFilters(params: URLSearchParams): ProjectFilters {
@@ -42,6 +46,7 @@ export function readFilters(params: URLSearchParams): ProjectFilters {
     tags: ids("tags"),
     projects: include.length ? include : exclude,
     projectMode: include.length ? "include" : "exclude",
+    similarity: parseSimilarity(params.get("similarity"), similarityScale()),
   };
 }
 
@@ -54,6 +59,7 @@ export function writeFilters(state: ProjectFilters): URLSearchParams {
   if (state.projects.length) {
     params.set(state.projectMode === "include" ? "include_projects" : "exclude_projects", state.projects.join(","));
   }
+  if (state.search && state.similarity !== null) params.set("similarity", fixed2(state.similarity));
   return params;
 }
 
@@ -71,6 +77,7 @@ export function serverQuery(filters: ProjectFilters, activeContextParam: string 
   if (context) query.context_ids = context;
   if (filters.tags.length) query.tag_ids = filters.tags.join(",");
   if (filters.projectMode === "exclude" && filters.projects.length) query.exclude_project_ids = filters.projects.join(",");
+  if (filters.search && filters.similarity !== null) query.similarity = filters.similarity;
   return query;
 }
 

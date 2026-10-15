@@ -12,6 +12,10 @@ import { formatDayDate, formatDuration } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "./SessionBand";
 import { useSessionList, type SessionFilters, type SessionRow } from "./api";
+import { semanticSearchAvailable } from "@/features/charts/api";
+import { RelatedSlider } from "@/features/search/RelatedSlider";
+import { useRelatedSummary } from "@/features/search/api";
+import { fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
 
 /* URL <-> filter state. The URL is the source of truth so a filtered view can
    be bookmarked, shared between devices and survives a reload. */
@@ -24,6 +28,8 @@ interface FilterState {
   tags: number[];
   projects: number[];
   projectMode: "include" | "exclude";
+  /** The Related slider's cutoff; null = the account's default. */
+  similarity: number | null;
 }
 
 function readFilters(params: URLSearchParams): FilterState {
@@ -44,6 +50,7 @@ function readFilters(params: URLSearchParams): FilterState {
     tags: ids("tags"),
     projects: include.length ? include : exclude,
     projectMode: include.length ? "include" : "exclude",
+    similarity: parseSimilarity(params.get("similarity"), similarityScale()),
   };
 }
 
@@ -54,6 +61,7 @@ function writeFilters(state: FilterState): URLSearchParams {
   }
   if (state.tags.length) params.set("tags", state.tags.join(","));
   if (state.projects.length) params.set(state.projectMode === "include" ? "include_projects" : "exclude_projects", state.projects.join(","));
+  if (state.search && state.similarity !== null) params.set("similarity", fixed2(state.similarity));
   return params;
 }
 
@@ -80,8 +88,12 @@ export default function SessionsPage() {
     ...(applied.projectMode === "include"
       ? { project_ids: applied.projects.join(",") }
       : { exclude_project_ids: applied.projects.join(",") }),
+    ...(applied.search && applied.similarity !== null ? { similarity: applied.similarity } : {}),
   };
   const list = useSessionList(apiFilters);
+  const relatedQuery = Object.fromEntries(Object.entries(apiFilters).filter(([, value]) => value));
+  const summary = useRelatedSummary("sessions", relatedQuery, !!applied.search && semanticSearchAvailable());
+  const relatedSummary = summary.data?.available ? summary.data : null;
 
   const all: SessionRow[] = list.data?.pages.flatMap((page) => page.sessions) ?? [];
   const direct = all.filter((s) => s.match !== "related");
@@ -257,17 +269,29 @@ export default function SessionsPage() {
         </section>
       ) : null}
 
-      {related.length ? (
+      {related.length || relatedSummary ? (
         <section className="slab session-list" aria-label="Related sessions">
           <header className="day-head">
             <span className="day-date">Related</span>
-            <span className="day-total">{related.length} loaded</span>
+            {relatedSummary ? (
+              <span className="day-total">
+                {related.length < relatedSummary.count ? `${related.length} of ${relatedSummary.count}` : relatedSummary.count}
+              </span>
+            ) : null}
           </header>
-          <ul className="band-list">
-            {related.map((session) => (
-              <SessionBand key={session.id} session={session} showDate />
-            ))}
-          </ul>
+          {relatedSummary ? (
+            <RelatedSlider summary={relatedSummary} loading={list.isFetching && !list.isFetchingNextPage} />
+          ) : null}
+          {related.length ? (
+            <ul className="band-list">
+              {related.map((session) => (
+                <SessionBand key={session.id} session={session} showDate />
+              ))}
+            </ul>
+          ) : relatedSummary?.count && list.hasNextPage ? (
+            /* One ranked list: related matches follow every direct one. */
+            <p className="muted slab-pad">They follow the direct matches. Show more below to reach them.</p>
+          ) : null}
         </section>
       ) : null}
 
