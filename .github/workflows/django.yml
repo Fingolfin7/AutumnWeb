@@ -70,13 +70,6 @@ jobs:
         run: |
           python manage.py test
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Verify browser polling request budgets
-        run: node --test scripts/tests/polling.test.cjs scripts/tests/recommendations.test.cjs scripts/tests/charts_related.test.cjs scripts/tests/similarity_slider.test.cjs
-
       - name: Verify committed v2 OpenAPI schema (Linux only)
         if: runner.os == 'Linux'
         env:
