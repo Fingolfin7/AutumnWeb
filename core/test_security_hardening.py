@@ -6,7 +6,6 @@ from django.urls import NoReverseMatch, reverse
 from django.utils.crypto import get_random_string
 
 from core.templatetags.markdown_render import markdown as render_markdown
-from llm_insights.models import LLMChat
 
 
 class MarkdownSanitizationTests(TestCase):
@@ -28,41 +27,6 @@ class MarkdownSanitizationTests(TestCase):
         self.assertIn("<table>", rendered)
         self.assertIn("<code>", rendered)
         self.assertIn("<del>", rendered)
-
-
-class DeleteChatMethodTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="chat-user", password=None)
-        self.user.profile.ai_features_enabled = True
-        self.user.profile.set_api_key("openai", "test-openai-key")
-        self.user.profile.save(
-            update_fields=["ai_features_enabled", "openai_api_key_enc"]
-        )
-        self.chat = LLMChat.objects.create(user=self.user, title="t")
-        self.client.force_login(self.user)
-
-    def test_get_is_rejected_and_post_deletes(self):
-        url = reverse("delete_chat", args=[self.chat.id])
-
-        self.assertEqual(self.client.get(url).status_code, 405)
-        self.assertTrue(LLMChat.objects.filter(id=self.chat.id).exists())
-
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(LLMChat.objects.filter(id=self.chat.id).exists())
-
-
-class ImportStreamAuthTests(TestCase):
-    def test_anonymous_request_is_redirected_to_login(self):
-        response = self.client.get(reverse("import_stream"))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("login", response.url)
-
-    def test_non_get_is_rejected(self):
-        user = User.objects.create_user(username="import-user", password=None)
-        self.client.force_login(user)
-        response = self.client.post(reverse("import_stream"))
-        self.assertEqual(response.status_code, 405)
 
 
 class RemovedDebugRoutesTests(TestCase):

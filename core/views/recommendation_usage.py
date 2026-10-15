@@ -1,34 +1,15 @@
-"""Account-only usage review and explicit cache refresh."""
+"""Account-only usage review."""
 import csv
 from datetime import timedelta
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Avg, Count, Q, Sum
-from django.http import HttpResponse, HttpResponseBadRequest
-from django.shortcuts import redirect, render
+from django.http import HttpResponse
+from django.shortcuts import render
 from django.utils import timezone
-from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.http import require_GET
 
-from core.models import RecommendationCache, RecommendationUsage
-from core.services.luna_recommendations import LUNA_EFFORTS
-
-
-@login_required
-@require_POST
-def refresh_recommendations(request):
-    # Effort belongs to this account and only affects timer recommendations.
-    effort = request.POST.get("luna_effort")
-    if effort is not None:
-        if effort not in LUNA_EFFORTS:
-            return HttpResponseBadRequest("Unsupported reasoning effort")
-        profile = request.user.profile
-        if not profile.ai_features_enabled:
-            return HttpResponse(status=403)
-        profile.luna_recommendation_effort = effort
-        profile.save(update_fields=["luna_recommendation_effort"])
-    # Keep any active lease: clicking twice must not launch duplicate calls.
-    RecommendationCache.objects.filter(user=request.user, provider="luna").update(expires_at=timezone.now())
-    return redirect("timers")
+from core.models import RecommendationUsage
 
 
 @login_required
