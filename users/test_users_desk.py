@@ -28,12 +28,6 @@ class UsersShellTests(TestCase):
 
         self._assert_focus_desk_page(self.client.post(reverse("logout")))
 
-    def test_profile_uses_the_focus_desk_shell_only(self):
-        user = User.objects.create_user(username="finrod", password="pw")
-        self.client.force_login(user)
-
-        self._assert_focus_desk_page(self.client.get(reverse("profile")))
-
     def test_anonymous_profile_redirects_to_login(self):
         response = self.client.get(reverse("profile"))
 

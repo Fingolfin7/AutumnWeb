@@ -91,7 +91,11 @@ class ApodBackgroundTests(TestCase):
         self.assertIn("still.jpg", html)
         self.assertNotIn('class="workspace-bg-video"', html)
 
-    def test_profile_links_to_the_video_and_labels_the_poster_download(self):
+    def test_preferences_link_to_the_video_and_carry_the_poster(self):
+        # The React Profile page labels "Watch video at NASA" / "Download
+        # preview" from these fields of /api/v2/me/preferences/.
+        from rest_framework.test import APIClient
+
         entry = {
             "media_type": "video", "hdurl": "https://assets.science.nasa.gov/comet.png",
             "permalink": "https://science.nasa.gov/image-article/comet/",
@@ -102,12 +106,14 @@ class ApodBackgroundTests(TestCase):
         profile.automatic_background = True
         profile.nasa_apod_background = True
         profile.save()
-        self.client.force_login(user)
+        client = APIClient()
+        client.force_authenticate(user)
         with self._feed(entry):
-            body = self.client.get(reverse("profile")).content.decode()
-        self.assertIn("Watch video at NASA", body)
-        self.assertIn("Download preview", body)
-        self.assertIn("https://science.nasa.gov/image-article/comet/", body)
+            background = client.get("/api/v2/me/preferences/").json()["background"]
+        self.assertEqual(background["mode"], "apod")
+        self.assertEqual(background["video_url"], "https://assets.science.nasa.gov/comet.mp4")
+        self.assertEqual(background["image_url"], "https://assets.science.nasa.gov/comet.png")
+        self.assertEqual(background["page_url"], "https://science.nasa.gov/image-article/comet/")
 
     def test_missing_video_poster_uses_a_recent_apod_photo(self):
         latest = Mock()

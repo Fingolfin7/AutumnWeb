@@ -70,13 +70,16 @@ class SocialAuthUITests(TestCase):
         self.assertTrue(settings.SOCIALACCOUNT_QUERY_EMAIL)
 
     def test_profile_offers_connections_for_enabled_providers(self):
+        # The React Profile page lists /api/v2/me/social-accounts/.
         self.client.force_login(self.user)
 
-        response = self.client.get(reverse("profile"))
+        accounts = self.client.get("/api/v2/me/social-accounts/").json()["accounts"]
 
-        self.assertContains(response, "Connect Google")
-        self.assertContains(response, "Connect GitHub")
-        self.assertContains(response, 'process=connect', count=2)
+        self.assertEqual({row["provider"] for row in accounts}, {"google", "github"})
+        for row in accounts:
+            self.assertTrue(row["available"])
+            self.assertFalse(row["connected"])
+            self.assertIn(reverse(f"{row['provider']}_login"), row["login_url"])
 
     def test_profile_displays_and_disconnects_connected_provider(self):
         account = SocialAccount.objects.create(
@@ -87,14 +90,15 @@ class SocialAuthUITests(TestCase):
         )
         self.client.force_login(self.user)
 
-        response = self.client.get(reverse("profile"))
-        self.assertContains(response, "Connected as social@gmail.example")
+        accounts = self.client.get("/api/v2/me/social-accounts/").json()["accounts"]
+        google = next(row for row in accounts if row["provider"] == "google")
+        self.assertTrue(google["connected"])
+        self.assertEqual(google["identity"], "social@gmail.example")
+        self.assertIsNone(google["login_url"])
 
-        response = self.client.post(
-            reverse("disconnect_social_account", args=["google"]),
-        )
+        response = self.client.delete("/api/v2/me/social-accounts/google")
 
-        self.assertRedirects(response, reverse("profile"))
+        self.assertEqual(response.status_code, 204, response.content)
         self.assertFalse(SocialAccount.objects.filter(pk=account.pk).exists())
 
     def test_last_provider_cannot_be_removed_without_a_password(self):
@@ -110,11 +114,10 @@ class SocialAuthUITests(TestCase):
         )
         self.client.force_login(social_only_user)
 
-        response = self.client.post(
-            reverse("disconnect_social_account", args=["github"]),
-        )
+        response = self.client.delete("/api/v2/me/social-accounts/github")
 
-        self.assertRedirects(response, reverse("profile"))
+        self.assertGreaterEqual(response.status_code, 400)
+        self.assertLess(response.status_code, 500)
         self.assertTrue(SocialAccount.objects.filter(pk=account.pk).exists())
 
 

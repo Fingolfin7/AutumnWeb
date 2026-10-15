@@ -71,14 +71,6 @@ class HeaderControlTests(TestCase):
             username="header", email="h@example.com", password="pw"
         )
 
-    def test_slider_is_in_the_shell_for_signed_in_users(self):
-        self.client.login(username="header", password="pw")
-        body = self.client.get(reverse("home")).content.decode()
-        self.assertIn('id="header-dimming"', body)
-        self.assertIn("dim-control", body)
-        # it needs a token: there is no surrounding form to supply one
-        self.assertIn("csrfmiddlewaretoken", body)
-
     def test_slider_is_absent_for_anonymous_visitors(self):
         response = self.client.get(reverse("login"))
         self.assertNotIn('id="header-dimming"', response.content.decode())

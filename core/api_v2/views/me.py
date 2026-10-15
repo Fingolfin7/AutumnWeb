@@ -27,6 +27,7 @@ def _background_payload(profile):
             "mode": "apod",
             "image_url": media.get("image_url") or None,
             "video_url": media.get("video_url") or None,
+            "page_url": media.get("page_url") or None,
         }
     return {"mode": "none", "image_url": None, "video_url": None}
 
