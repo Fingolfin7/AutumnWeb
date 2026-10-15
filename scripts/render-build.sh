@@ -8,6 +8,6 @@ set -euo pipefail
 pip install -r requirements.txt
 
 node --version
-(cd frontend && npm ci --no-audit --no-fund && npm run build)
+(cd frontend && npm ci --include=dev --no-audit --no-fund && npm run build)
 
 python manage.py collectstatic --noinput
