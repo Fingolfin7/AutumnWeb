@@ -1,0 +1,4 @@
+/* Week stepper under the review's date range (additive; Night Ledger tokens only). */
+.nx-week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+.nx-week-nav .btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+.nx-review-dim { opacity: .55; transition: opacity .15s var(--ease); }

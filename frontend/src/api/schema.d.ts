@@ -1844,6 +1844,9 @@ export interface components {
             p256dh: string;
             auth: string;
         };
+        PushRemoved: {
+            removed: boolean;
+        };
         PushStatus: {
             available: boolean;
             public_key: string | null;
@@ -1864,6 +1867,10 @@ export interface components {
         PushTestResponse: {
             queued: boolean;
             event_id: number;
+        };
+        PushUnsubscribe: {
+            /** Format: uri */
+            endpoint: string;
         };
         RecommendationCacheHit: {
             provider: string;
@@ -1962,6 +1969,9 @@ export interface components {
             /** Format: date-time */
             snoozed_until: string | null;
             active: boolean;
+            version: number;
+        };
+        ScheduleDelete: {
             version: number;
         };
         ScheduleList: {
@@ -3393,7 +3403,13 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleDelete"];
+                "application/x-www-form-urlencoded": components["schemas"]["ScheduleDelete"];
+                "multipart/form-data": components["schemas"]["ScheduleDelete"];
+            };
+        };
         responses: {
             /** @description Schedule cancelled. */
             204: {
@@ -3715,14 +3731,21 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushUnsubscribe"];
+                "application/x-www-form-urlencoded": components["schemas"]["PushUnsubscribe"];
+                "multipart/form-data": components["schemas"]["PushUnsubscribe"];
+            };
+        };
         responses: {
-            /** @description No response body */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["PushRemoved"];
+                };
             };
         };
     };

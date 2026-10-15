@@ -1134,6 +1134,18 @@ paths:
         required: true
       tags:
       - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScheduleDelete'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ScheduleDelete'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ScheduleDelete'
+        required: true
       security:
       - basicAuth: []
       - cookieAuth: []
@@ -1500,13 +1512,29 @@ paths:
       operationId: push_subscriptions_destroy
       tags:
       - push
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushUnsubscribe'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PushUnsubscribe'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PushUnsubscribe'
+        required: true
       security:
       - basicAuth: []
       - cookieAuth: []
       - tokenAuth: []
       responses:
-        '204':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushRemoved'
+          description: ''
       x-autumn-mcp: exclude
   /api/v2/push/test/:
     post:
@@ -4868,6 +4896,13 @@ components:
       required:
       - auth
       - p256dh
+    PushRemoved:
+      type: object
+      properties:
+        removed:
+          type: boolean
+      required:
+      - removed
     PushStatus:
       type: object
       properties:
@@ -4924,6 +4959,15 @@ components:
       required:
       - event_id
       - queued
+    PushUnsubscribe:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 2048
+      required:
+      - endpoint
     RecommendationCacheHit:
       type: object
       properties:
@@ -5179,6 +5223,13 @@ components:
       - target
       - target_resource
       - timezone
+      - version
+    ScheduleDelete:
+      type: object
+      properties:
+        version:
+          type: integer
+      required:
       - version
     ScheduleList:
       type: object

@@ -1,29 +1,17 @@
-import { requestJson } from "@/api/client";
+import { api, unwrap } from "@/api/client";
+import type { components } from "@/api/schema";
 
 /* Web Push for this browser (formerly window.AutumnPush in pwa.js). The
    server holds the subscriptions; the VAPID private key never leaves it. */
 
-export interface PushStatus {
-  available: boolean;
-  public_key: string;
-  configuration_error: string | null;
-  subscriptions: number;
-  subscribed: boolean;
-}
-
-const URLS = {
-  status: "/push/status/",
-  subscribe: "/push/subscribe/",
-  unsubscribe: "/push/unsubscribe/",
-  test: "/push/test/",
-};
+export type PushStatus = components["schemas"]["PushStatus"];
 
 export function pushSupported(): boolean {
   return "Notification" in window && "serviceWorker" in navigator && "PushManager" in window;
 }
 
 export function pushStatus(): Promise<PushStatus> {
-  return requestJson<PushStatus>("GET", URLS.status);
+  return unwrap(api.GET("/api/v2/push/status/"));
 }
 
 export function decodeBase64Url(value: string): Uint8Array<ArrayBuffer> {
@@ -86,7 +74,9 @@ export async function enablePush(): Promise<void> {
   }
   const registration = await navigator.serviceWorker.ready;
   const subscription = await ensureSubscription(registration, decodeBase64Url(status.public_key));
-  await requestJson("POST", URLS.subscribe, subscription.toJSON());
+  await unwrap(
+    api.POST("/api/v2/push/subscriptions/", { body: subscription.toJSON() as components["schemas"]["PushSubscriptionRequest"] }),
+  );
 }
 
 export async function disablePush(): Promise<void> {
@@ -94,18 +84,24 @@ export async function disablePush(): Promise<void> {
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.getSubscription();
   if (!subscription) return;
-  await requestJson("POST", URLS.unsubscribe, { endpoint: subscription.endpoint });
+  await removeSubscription(subscription.endpoint);
   await subscription.unsubscribe();
 }
 
+/* DELETE names the device in its body. */
+function removeSubscription(endpoint: string) {
+  return unwrap(api.DELETE("/api/v2/push/subscriptions/", { body: { endpoint } }));
+}
+
+/** Queues a test notification; the dispatcher delivers it, so nothing is sent from the request. */
 export function sendTestPush(): Promise<{ queued?: boolean; sent?: number }> {
-  return requestJson("POST", URLS.test, {});
+  return unwrap(api.POST("/api/v2/push/test/"));
 }
 
 export type PermissionState = "loading" | "unavailable" | "denied" | "granted" | "default";
 
 /** Where this browser stands, for the permission strip. */
-export async function permissionState(): Promise<{ state: PermissionState; detail?: string }> {
+export async function permissionState(): Promise<{ state: PermissionState; detail?: string; devices?: number }> {
   if (!pushSupported()) return { state: "unavailable", detail: "This browser does not support background notifications." };
   const [status, local] = await Promise.all([
     pushStatus(),
@@ -116,7 +112,7 @@ export async function permissionState(): Promise<{ state: PermissionState; detai
   }
   const permission = Notification.permission;
   if (permission === "denied") return { state: "denied" };
-  if (permission === "granted" && local) return { state: "granted" };
+  if (permission === "granted" && local) return { state: "granted", devices: status.subscriptions };
   return { state: "default" };
 }
 

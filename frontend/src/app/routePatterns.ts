@@ -49,10 +49,11 @@ export const pages: PageEntry[] = [
   { path: "/update_commitment/:commitmentId/", title: "Commitment", load: () => import("@/features/commitments/UpdateCommitmentPage") },
   { path: "/delete_commitment/:commitmentId/", title: "Delete commitment", load: () => import("@/features/commitments/DeleteCommitmentPage") },
 
-  /* Being ported: reachable by in-app navigation; their Django routes still
-     serve the old pages on a full load until the switch (see core/urls.py). */
   { path: "/notifications/", title: "Notifications", load: () => import("@/features/notifications/NotificationsPage") },
   { path: "/review/weekly/", title: "Weekly review", load: () => import("@/features/review/WeeklyReviewPage") },
+
+  /* Being ported: reachable by in-app navigation; their Django routes still
+     serve the old pages on a full load until the switch (see core/urls.py). */
   { path: "/import/", title: "Import", load: () => import("@/features/import-export/ImportPage") },
   { path: "/export/", title: "Export", load: () => import("@/features/import-export/ExportPage") },
   { path: "/profile/", title: "Profile", load: () => import("@/features/profile/ProfilePage") },
