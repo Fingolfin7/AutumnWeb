@@ -5,6 +5,11 @@ from core.templatetags.background_images import (
     bing_background_metadata,
     nasa_apod_media,
 )
+from core.services.semantic_search import (
+    SIMILARITY_CEILING,
+    SIMILARITY_FLOOR,
+    server_min_similarity,
+)
 from core.utils import ACTIVE_CONTEXT_SESSION_KEY
 from llm_insights.services.handlers import openai_connection_source
 
@@ -73,6 +78,10 @@ def _preferences_payload(user):
         "nasa_apod_background": profile.nasa_apod_background,
         "luna_recommendation_effort": profile.luna_recommendation_effort,
         "ai_features_enabled": profile.ai_features_enabled,
+        "related_similarity": profile.related_similarity,
+        "related_similarity_default": server_min_similarity(),
+        "related_similarity_min": SIMILARITY_FLOOR,
+        "related_similarity_max": SIMILARITY_CEILING,
         "active_context_id": profile.active_context_id,
         "insights_access_enabled": profile.insights_access_enabled,
         "avatar_url": profile.image_url,

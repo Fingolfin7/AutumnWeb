@@ -53,6 +53,7 @@ def v2_exception_handler(exc, context):
 
 
 RELATED_HEADER = "X-Autumn-Related"
+SIMILARITY_HEADER = "X-Autumn-Related-Similarity"
 
 
 def related_outcome(request):
@@ -84,4 +85,7 @@ class V2APIView(APIView):
         outcome = getattr(request, "_related_outcome", None)
         if outcome is not None and outcome.requested and response.status_code < 400:
             response[RELATED_HEADER] = "unavailable" if outcome.unavailable else "included"
+            # The similarity cutoff the related matches were held to.
+            if outcome.cutoff is not None:
+                response[SIMILARITY_HEADER] = f"{outcome.cutoff:.2f}"
         return response

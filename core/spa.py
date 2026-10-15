@@ -108,6 +108,12 @@ def bootstrap_payload(request):
 
     Kept deliberately small: everything else is fetched through /api/v2/.
     """
+    from core.services.semantic_search import (
+        SIMILARITY_CEILING,
+        SIMILARITY_FLOOR,
+        server_min_similarity,
+    )
+
     user = request.user
     profile = user.profile
     default_chart_start_date, default_chart_end_date = (
@@ -129,6 +135,12 @@ def bootstrap_payload(request):
             "default_chart_start_date": default_chart_start_date.isoformat(),
             "default_chart_end_date": default_chart_end_date.isoformat(),
             "openai_key_configured": bool(profile.openai_api_key_enc),
+            "related_similarity": profile.related_similarity,
+        },
+        "semantic_search": {
+            "default_similarity": server_min_similarity(),
+            "min_similarity": SIMILARITY_FLOOR,
+            "max_similarity": SIMILARITY_CEILING,
         },
         "contexts": contexts,
         "active_context_id": active_context.id if active_context else None,

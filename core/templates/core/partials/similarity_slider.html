@@ -1,0 +1,58 @@
+{% comment %}
+  The Related slider: how close a meaning-based match must be to count as
+  related. Context comes from core.utils.similarity_slider. Without a
+  field_name, letting go of it re-runs the page's search with ?similarity=
+  (dropped again at the account's default); with one, it only sets that form
+  field (omit_default: leave it out of the form at the account's default).
+  collapsible folds it into its one-line readout (Sessions, Projects), left
+  open when nothing is related or the cutoff is not the default.
+  similarity_slider.js does the rest; without JS the range still moves, and
+  in a form the field submits the value the page was rendered with.
+{% endcomment %}
+{% with sid=slider_id|default:'similarity' %}
+<div class="similarity{% if collapsible %} similarity--collapsible{% endif %}" data-similarity
+     data-default="{{ slider.default|stringformat:'.2f' }}"
+     {% if slider.counts_json %}data-counts="{{ slider.counts_json }}"{% endif %}
+     {% if slider.field_name %}data-field{% if omit_default %} data-omit-default{% endif %}{% endif %}>
+{% if collapsible %}<details class="similarity-disclosure"{% if slider.open %} open{% endif %}>{% endif %}
+    <{% if collapsible %}summary{% else %}div{% endif %} class="similarity-head">
+        <span class="similarity-title" id="{{ sid }}-title">Match closeness</span>
+        <output class="similarity-readout" for="{{ sid }}" aria-live="polite">
+            <b data-similarity-value>{{ slider.value|stringformat:'.2f' }}</b>{% if slider.counts_json %} · <span data-similarity-count>{{ slider.count }}</span> related{% endif %}
+        </output>
+        {% if collapsible %}<i class="fas fa-chevron-down similarity-chevron" aria-hidden="true"></i>{% endif %}
+    </{% if collapsible %}summary{% else %}div{% endif %}>
+    <div class="similarity-slider">
+        {% for mark in slider.marks %}
+        <span class="similarity-mark" style="--at: {{ mark.position|stringformat:'s' }}" data-value="{{ mark.value|stringformat:'.2f' }}" aria-hidden="true"></span>
+        {% endfor %}
+        {% if slider.default_position is not None %}
+        <span class="similarity-default" style="--at: {{ slider.default_position|stringformat:'s' }}" title="{{ slider.default_label }}, {{ slider.default|stringformat:'.2f' }}" aria-hidden="true"></span>
+        {% endif %}
+        <input type="range" class="similarity-range" id="{{ sid }}"
+               min="{{ slider.floor|stringformat:'.2f' }}" max="{{ slider.ceiling|stringformat:'.2f' }}"
+               step="{{ slider.step|stringformat:'.2f' }}" value="{{ slider.value|stringformat:'.2f' }}"
+               aria-labelledby="{{ sid }}-title" aria-describedby="{{ sid }}-help">
+    </div>
+    {% if slider.field_name %}
+    <input type="hidden" name="{{ slider.field_name }}" value="{{ slider.value|stringformat:'.2f' }}" data-similarity-field>
+    {% endif %}
+    <div class="similarity-labels" aria-hidden="true">
+        {% for mark in slider.marks %}
+        <button type="button" tabindex="-1" style="--at: {{ mark.position|stringformat:'s' }}" data-similarity-set="{{ mark.value|stringformat:'.2f' }}">{{ mark.label }}</button>
+        {% endfor %}
+    </div>
+    <p class="sr-only" id="{{ sid }}-help">Lower is looser: more sessions count as related. Higher is stricter.</p>
+    {% if slider.counts_json %}
+    <p class="similarity-hint" data-similarity-hint {% if slider.count %}hidden{% endif %}>
+        {% if slider.loosen_to %}
+        <span>Nothing related at <b>{{ slider.value|stringformat:'.2f' }}</b>. The closest match is <b>{{ slider.best|stringformat:'.2f' }}</b>.</span>
+        <button type="button" class="btn btn--ghost" data-similarity-set="{{ slider.loosen_to|stringformat:'.2f' }}">Loosen to {{ slider.loosen_to|stringformat:'.2f' }}</button>
+        {% else %}
+        <span>Nothing related, even at the loosest setting.</span>
+        {% endif %}
+    </p>
+    {% endif %}
+{% if collapsible %}</details>{% endif %}
+</div>
+{% endwith %}

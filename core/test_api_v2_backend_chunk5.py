@@ -155,6 +155,51 @@ class ProfileApiGapTests(TestCase):
         )
         self.assertIsNone(response.json()["openai_source"])
 
+    def test_related_similarity_preferences_and_bootstrap_contract(self):
+        response = self.client.get("/api/v2/me/preferences/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            {
+                "value": response.json()["related_similarity"],
+                "default": response.json()["related_similarity_default"],
+                "min": response.json()["related_similarity_min"],
+                "max": response.json()["related_similarity_max"],
+            },
+            {"value": None, "default": 0.45, "min": 0.25, "max": 0.60},
+        )
+
+        changed = self.client.patch(
+            "/api/v2/me/preferences/", {"related_similarity": 0.38}, format="json"
+        )
+        self.assertEqual(changed.status_code, 200, changed.content)
+        self.user.profile.refresh_from_db()
+        self.assertEqual(self.user.profile.related_similarity, 0.38)
+
+        invalid = self.client.patch(
+            "/api/v2/me/preferences/", {"related_similarity": 0.61}, format="json"
+        )
+        self.assertEqual(invalid.status_code, 400)
+
+        request = RequestFactory().get("/")
+        request.user = self.user
+        request.session = {}
+        payload = bootstrap_payload(request)
+        self.assertEqual(payload["profile"]["related_similarity"], 0.38)
+        self.assertEqual(
+            payload["semantic_search"],
+            {
+                "default_similarity": 0.45,
+                "min_similarity": 0.25,
+                "max_similarity": 0.60,
+            },
+        )
+
+        reset = self.client.patch(
+            "/api/v2/me/preferences/", {"related_similarity": None}, format="json"
+        )
+        self.assertEqual(reset.status_code, 200, reset.content)
+        self.assertIsNone(reset.json()["related_similarity"])
+
     def test_social_accounts_report_password_safety(self):
         response = self.client.get("/api/v2/me/social-accounts/")
         self.assertTrue(response.json()["has_usable_password"])
@@ -260,6 +305,53 @@ class InsightsApiGapTests(TestCase):
             )
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.json()["related"], "unavailable")
+
+    def test_selection_and_stream_validate_and_forward_similarity(self):
+        def search_with_outcome(queryset, _term, *, cutoff=None, outcome=None, **_kwargs):
+            outcome.requested = True
+            outcome.included = True
+            outcome.cutoff = cutoff
+            return queryset
+
+        with mock.patch("core.utils.search_sessions", side_effect=search_with_outcome):
+            selection = self.client.get(
+                "/api/v2/insights/selection/",
+                {
+                    "search": "alpha",
+                    "related": "true",
+                    "similarity": "0.38",
+                    "context": "all",
+                },
+            )
+        self.assertEqual(selection.status_code, 200, selection.content)
+        self.assertEqual(selection["X-Autumn-Related-Similarity"], "0.38")
+
+        stream = StreamingHttpResponse(iter([b"event: done\ndata: {}\n\n"]))
+        with mock.patch(
+            "core.api_v2.views.insights.stream_insights_response",
+            return_value=stream,
+        ) as streamer:
+            response = self.client.post(
+                "/api/v2/insights/stream/",
+                {"message": "Summarise", "similarity": 0.38},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(streamer.call_args.args[0].POST["similarity"], "0.38")
+
+        for method in ("get", "post"):
+            with self.subTest(method=method):
+                if method == "get":
+                    invalid = self.client.get(
+                        "/api/v2/insights/selection/", {"similarity": "0.61"}
+                    )
+                else:
+                    invalid = self.client.post(
+                        "/api/v2/insights/stream/",
+                        {"message": "Summarise", "similarity": 0.61},
+                        format="json",
+                    )
+                self.assertEqual(invalid.status_code, 400)
 
     def test_stream_accepts_all_or_null_context(self):
         stream = StreamingHttpResponse(iter([b"event: done\ndata: {}\n\n"]))

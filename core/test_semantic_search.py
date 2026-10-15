@@ -156,11 +156,14 @@ class RelatedSessionsTests(SemanticSearchTestCase):
         self.assertContains(response, 'aria-label="Related sessions"')
         self.assertContains(response, "Repaired OAuth token refresh")
 
-    def test_unrelated_query_shows_no_related_section(self):
+    def test_unrelated_query_shows_only_the_slider(self):
         self._sync()
         response = self._search("nonexistent lighthouse project")
         self.assertEqual(response.context["related_sessions"], [])
-        self.assertNotContains(response, "Related sessions")
+        # The section stays, open, so the cutoff can still be loosened.
+        self.assertEqual(response.context["related_slider"]["count"], 0)
+        self.assertTrue(response.context["related_slider"]["open"])
+        self.assertContains(response, "Nothing related")
 
     def test_related_pages_on_its_own_and_list_is_unchanged(self):
         for day in range(10):

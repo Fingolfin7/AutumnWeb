@@ -13,6 +13,8 @@ from core.utils import (
     build_exclude_project_meta,
     filter_by_active_context,
     filter_sessions_by_params,
+    requested_similarity,
+    similarity_slider,
     summarise_search_filters,
 )
 from llm_insights.llm_handlers import get_llm_handler
@@ -146,6 +148,13 @@ def build_insights_page_data(request, user, chat_id=None):
             related_unavailable=related.unavailable,
         ),
         "semantic_search_available": semantic,
+        "related_slider": similarity_slider(
+            user,
+            value=requested_similarity(current_filters),
+            field_name="similarity",
+        )
+        if semantic
+        else None,
     }
 
 
@@ -213,6 +222,7 @@ def build_template_context(request, data, chat_id=None):
         "exclude_project_meta_json": data["exclude_project_meta_json"],
         "active_filters": data["active_filters"],
         "semantic_search_available": data["semantic_search_available"],
+        "related_slider": data["related_slider"],
     }
 
 

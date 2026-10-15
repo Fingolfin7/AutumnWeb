@@ -114,7 +114,7 @@ function invalidateChartData() {
     relatedStateByUrl.clear();
 }
 
-function get_project_data(type, start_date = "", end_date = "", search_term = "", context_id = "", tag_ids = [], exclude_ids = [], include_ids = [], project_name = "", include_related = false) {
+function get_project_data(type, start_date = "", end_date = "", search_term = "", context_id = "", tag_ids = [], exclude_ids = [], include_ids = [], project_name = "", include_related = false, similarity = "") {
     // Every chart type is served by the v2 charts endpoint; the server picks
     // the payload shape from chart_type (legacy tally/hierarchy shapes for
     // pie/bar/context/status/bubble/treemap/radar).
@@ -127,6 +127,7 @@ function get_project_data(type, start_date = "", end_date = "", search_term = ""
     if (type === 'heatmap') qs.set('aggregate', 'true');
     if (search_term) qs.set('search', search_term);
     if (search_term && include_related) qs.set('related', 'true');
+    if (search_term && include_related && similarity) qs.set('similarity', similarity);
     if (project_name) qs.set('project_name', project_name);
     if (start_date) qs.set('start_date', start_date);
     if (end_date) qs.set('end_date', end_date);
@@ -289,6 +290,8 @@ function render() {
     let search_term = ($('#content-search').val() || '').trim();
     // "Include related sessions" only renders when semantic search is available.
     const include_related = $('#related-search').is(':checked');
+    // Its cutoff, as applied with the other filters (absent: the account's).
+    const similarity = new URLSearchParams(window.location.search).get('similarity') || '';
     let project_name = ($('#project-search').val() || '').trim();
 
     let context_id = String($('#context-filter').val() || '').trim();
@@ -311,7 +314,7 @@ function render() {
     const exclude_ids = checkedProjectIds('exclude_projects');
     const include_ids = checkedProjectIds('include_projects');
 
-    get_project_data(type, start_date, end_date, search_term, context_id, tag_ids, exclude_ids, include_ids, project_name, include_related)
+    get_project_data(type, start_date, end_date, search_term, context_id, tag_ids, exclude_ids, include_ids, project_name, include_related, similarity)
         .then(data => {
             if (generation !== renderGeneration) return;
             // Only the current generation's response, cached or fresh.
