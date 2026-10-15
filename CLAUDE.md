@@ -35,6 +35,7 @@ python manage.py migrate
 pip install -r requirements-dev.txt
 python manage.py test
 (cd frontend && npx tsc --noEmit && npx vitest run)  # Frontend checks
+PG_BIN=<pgsql/bin> PGDATA=<data dir> PYTHON=<venv python> scripts/test_postgres.sh [labels]  # Same tests on a local PostgreSQL (started and stopped for the run)
 
 # Run specific test file
 python manage.py test core.tests.test_parse_date_or_datetime_iso
@@ -197,5 +198,10 @@ that the operating system displayed it.
 Tests are in `core/test_*.py`, `core/tests.py`, `users/`, and `llm_insights/`.
 Install `requirements-dev.txt` for test-only dependencies. CI runs on Windows
 with SQLite and Python 3.10, and Ubuntu with PostgreSQL and Python 3.13.
+Some failures only show on PostgreSQL (production runs it too):
+`scripts/test_postgres.sh` runs the suite against a local server from plain
+PostgreSQL binaries (e.g. EnterpriseDB's Windows "binaries" zip, unpacked
+anywhere; no install or service), starting it on 127.0.0.1 for the run and
+stopping it after. It refuses to run if `.env` points Django elsewhere.
 Frontend tests are Vitest (`npm test` in `frontend/`); CI also checks that
 `src/api/schema.d.ts` matches `openapi-v2.yaml`, type-checks and builds the app.
