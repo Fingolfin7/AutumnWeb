@@ -1619,6 +1619,11 @@ export interface components {
         InsightFilters: {
             search?: string;
             related?: string;
+            /**
+             * Format: double
+             * @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.
+             */
+            similarity?: number;
             project_name?: string;
             /** Format: date */
             start_date?: string;
@@ -1688,6 +1693,11 @@ export interface components {
             reasoning_effort?: string;
             search?: string;
             related?: boolean;
+            /**
+             * Format: double
+             * @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.
+             */
+            similarity?: number;
             project_name?: string;
             /** Format: date */
             start_date?: string;
@@ -1840,6 +1850,11 @@ export interface components {
             nasa_apod_background?: boolean;
             luna_recommendation_effort?: components["schemas"]["LunaEffortEnum"];
             ai_features_enabled?: boolean;
+            /**
+             * Format: double
+             * @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.
+             */
+            related_similarity?: number | null;
             active_context_id?: number | null;
         };
         PatchedProjectPatchRequest: {
@@ -1922,7 +1937,15 @@ export interface components {
             nasa_apod_background: boolean;
             luna_recommendation_effort: string;
             ai_features_enabled: boolean;
+            /** Format: double */
+            related_similarity: number | null;
             active_context_id: number | null;
+            /** Format: double */
+            related_similarity_default: number;
+            /** Format: double */
+            related_similarity_min: number;
+            /** Format: double */
+            related_similarity_max: number;
             insights_access_enabled: boolean;
             avatar_url: string;
             background: components["schemas"]["Background"];
@@ -2925,8 +2948,10 @@ export interface operations {
                 project_name?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
-                /** @description Search project names, assigned subproject names and session notes. */
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 start_date?: string;
                 subproject_ids?: string;
                 tag_ids?: string;
@@ -3116,6 +3141,8 @@ export interface operations {
                 project_name?: string;
                 related?: boolean;
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 start_date?: string;
                 tags?: number[];
             };
@@ -3716,6 +3743,8 @@ export interface operations {
                 /** @description With search, also include projects that match it by meaning (their name, subprojects, description or session notes). Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 /** @description Earliest project start date (inclusive). */
                 start_date?: string;
                 /**
@@ -4134,8 +4163,10 @@ export interface operations {
                 project_name?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
-                /** @description Search project names, assigned subproject names and session notes. */
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 /** @description Inclusive local date in YYYY-MM-DD format. */
                 start_date?: string;
                 /** @description Comma-separated subproject IDs. */
@@ -4181,8 +4212,10 @@ export interface operations {
                 project_ids?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
-                /** @description Search project names, assigned subproject names and session notes. */
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 /** @description Inclusive local date in YYYY-MM-DD format. */
                 start_date?: string;
                 /** @description Comma-separated subproject IDs. */
@@ -4228,8 +4261,10 @@ export interface operations {
                 project_ids?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
-                /** @description Search project names, assigned subproject names and session notes. */
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 /** @description Inclusive local date in YYYY-MM-DD format. */
                 start_date?: string;
                 /** @description Comma-separated subproject IDs. */
@@ -4297,8 +4332,10 @@ export interface operations {
                 project_ids?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
-                /** @description Search project names, assigned subproject names and session notes. */
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 /** @description Inclusive local date in YYYY-MM-DD format. */
                 start_date?: string;
                 /** @description Comma-separated subproject IDs. */
@@ -4369,8 +4406,10 @@ export interface operations {
                 project_ids?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
-                /** @description Search project names, assigned subproject names and session notes. */
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
                 search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
                 start_date?: string;
                 subproject_ids?: string;
                 tag_ids?: string;

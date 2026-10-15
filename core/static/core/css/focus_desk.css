@@ -3519,3 +3519,122 @@ img.brand-mark {
   .band-list--grid > .band { background: var(--slab); }
   .band-list--grid > .band + .band { border-top: 0; }
 }
+
+/* ============================================================================
+   RELATED SLIDER — how close a meaning-based match must be
+   ----------------------------------------------------------------------------
+   core/partials/similarity_slider.html + similarity_slider.js. The native
+   range keeps pointer, touch and keyboard handling; only its thumb is drawn
+   by it. The track, the fill and the markers sit underneath on the wrapper,
+   so the markers show above the track yet under the thumb, which one input
+   element cannot layer by itself. The fill runs note-gold (loose) through the
+   brand orange to project-rust (strict): the autumn of the backdrop slider.
+   ==========================================================================*/
+.similarity {
+  --fill: 57; --thumb: 18px;
+  display: grid; gap: .4rem;
+  padding: var(--s3) var(--s4) var(--s4);
+}
+.similarity.is-loading { opacity: .6; pointer-events: none; }
+.similarity-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; }
+.similarity-title {
+  font-size: var(--fs-label); font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted);
+}
+.similarity-readout {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); color: var(--ink-2);
+}
+.similarity-readout b { color: var(--brand); font-weight: 600; }
+
+.similarity-slider { position: relative; height: 24px; }
+/* Where a value sits: the thumb's centre travels inside half a thumb of each end. */
+.similarity-slider::before,
+.similarity-slider::after,
+.similarity-mark,
+.similarity-default { position: absolute; top: 50%; pointer-events: none; }
+.similarity-slider::before {
+  content: ""; left: 0; right: 0; height: 8px; margin-top: -4px;
+  border-radius: var(--r-pill); background: var(--raised-2);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+}
+.similarity-slider::after {
+  content: ""; left: 0; right: 0; height: 8px; margin-top: -4px;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--note), var(--brand) 55%, var(--project-deep));
+  clip-path: inset(0 calc(100% - (var(--thumb) / 2 + (100% - var(--thumb)) * var(--fill) / 100)) 0 0 round var(--r-pill));
+}
+.similarity-mark {
+  z-index: 1; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%;
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--at) / 100);
+  background: rgba(228, 232, 229, .35);
+}
+.similarity-mark.is-passed { background: rgba(16, 18, 20, .5); }
+.similarity-default {
+  z-index: 1; width: 2px; height: 16px; margin: -8px 0 0 -1px; border-radius: 1px;
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--at) / 100);
+  background: var(--ink-2);
+}
+
+.similarity-range {
+  -webkit-appearance: none; appearance: none;
+  position: absolute; inset: 0; z-index: 2;
+  width: 100%; height: 100%; margin: 0;
+  background: transparent; cursor: pointer;
+}
+.similarity-range::-webkit-slider-runnable-track { height: 100%; background: transparent; border: 0; }
+.similarity-range::-moz-range-track { height: 100%; background: transparent; border: 0; }
+.similarity-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: var(--thumb); height: var(--thumb); margin-top: 3px; border: 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--brand-hover), var(--brand) 55%, var(--brand-deep));
+  box-shadow: 0 0 0 3px var(--slab-solid), 0 2px 8px rgba(0, 0, 0, .5);
+  transition: transform .12s ease;
+}
+.similarity-range::-moz-range-thumb {
+  width: var(--thumb); height: var(--thumb); border: 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--brand-hover), var(--brand) 55%, var(--brand-deep));
+  box-shadow: 0 0 0 3px var(--slab-solid), 0 2px 8px rgba(0, 0, 0, .5);
+}
+.similarity-range:active::-webkit-slider-thumb { transform: scale(1.12); }
+.similarity-range:focus { outline: 0; }
+.similarity-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--slab-solid), var(--focus-ring); }
+.similarity-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--slab-solid), var(--focus-ring); }
+
+.similarity-labels { position: relative; height: 1.1rem; }
+.similarity-labels button {
+  position: absolute; top: 0; transform: translateX(-50%);
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--at) / 100);
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-label); color: var(--muted); white-space: nowrap;
+}
+.similarity-labels button:hover { color: var(--ink-2); }
+.similarity-labels button.is-current { color: var(--brand); }
+
+.similarity-hint {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .75rem;
+  margin: .35rem 0 0; padding: .55rem .75rem;
+  border-radius: var(--r-xs); border-left: 2px solid var(--brand-deep);
+  background: rgba(209, 139, 76, .07);
+  font-size: var(--fs-sm); color: var(--ink-2);
+}
+.similarity-hint[hidden] { display: none; }
+.similarity-hint .btn { margin-left: auto; }
+/* Inside a filter sheet the sheet already pads its fields. */
+.sheet .similarity { padding: 0; }
+/* Profile: the default cutoff spans the defaults grid; the item pads it. */
+.profile-default-item--wide { grid-column: 1 / -1; }
+.profile-default-item .similarity { padding: 0; }
+.profile-default-item .similarity-title { color: var(--ink); font-size: var(--fs-sm); letter-spacing: normal; text-transform: none; font-weight: 400; }
+/* Collapsible (Sessions, Projects): the readout row is the summary. */
+.similarity--collapsible { padding-top: 0; padding-bottom: 0; }
+.similarity-disclosure > summary {
+  list-style: none; cursor: pointer;
+  padding: var(--s3) 0;
+}
+.similarity-disclosure > summary::-webkit-details-marker { display: none; }
+.similarity-disclosure > summary:focus-visible { outline: 0; box-shadow: var(--focus-ring); border-radius: var(--r-xs); }
+.similarity--collapsible .similarity-readout { margin-left: auto; }
+.similarity-chevron { font-size: .7rem; color: var(--muted); transition: transform .15s ease; }
+.similarity-disclosure[open] .similarity-chevron { transform: rotate(180deg); }
+.similarity-disclosure[open] { display: grid; gap: .4rem; padding-bottom: var(--s4); }

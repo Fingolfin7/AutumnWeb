@@ -182,7 +182,7 @@ class RelatedSessionsTests(SemanticSearchTestCase):
         )
         self.assertEqual(payload["sessions"][1]["note"], "Repaired OAuth token refresh")
 
-    def test_unrelated_query_shows_no_related_section(self):
+    def test_unrelated_query_lists_nothing_related(self):
         self._sync()
         payload = self._search("nonexistent lighthouse project").json()
         self.assertEqual(payload["sessions"], [])

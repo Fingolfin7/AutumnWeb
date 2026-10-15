@@ -9,6 +9,7 @@ from core.services.semantic_search import RelatedOutcome
 
 FILTER_KEYS = [
     "search",
+    "similarity",
     "project_name",
     "start_date",
     "end_date",
@@ -25,6 +26,7 @@ def extract_filter_params(request):
     for key in (
         "search",
         "related",
+        "similarity",
         "project_name",
         "start_date",
         "end_date",
@@ -83,6 +85,7 @@ def build_post_context(request, user, chat_id=None):
         apply_default_date_filters(current_filters, user)
 
     related_outcome = RelatedOutcome()
+    request._related_outcome = related_outcome
     queryset = filter_insights_sessions(
         request, user, current_filters, outcome=related_outcome
     )

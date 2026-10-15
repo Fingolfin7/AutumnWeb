@@ -97,6 +97,7 @@ class ProjectsView(V2APIView):
                         matches,
                         data["search"],
                         limit=None,
+                        cutoff=data.get("similarity"),
                         outcome=related_outcome(request),
                     ),
                 )

@@ -10,6 +10,7 @@ from rest_framework.response import Response
 
 from core.api_v2.exceptions import V2APIView
 from core.api_v2.renderers import EventStreamRenderer
+from core.api_v2.serializers import similarity_field
 from core.templatetags.markdown_render import markdown as render_markdown
 from llm_insights.models import LLMChat
 from llm_insights.services.chats import group_chats_by_recency
@@ -112,6 +113,7 @@ class InsightContextField(serializers.Field):
 class InsightFiltersSerializer(serializers.Serializer):
     search = serializers.CharField(required=False, allow_blank=True)
     related = serializers.CharField(required=False, allow_blank=True)
+    similarity = similarity_field()
     project_name = serializers.CharField(required=False, allow_blank=True)
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
@@ -166,6 +168,7 @@ class InsightStreamRequestSerializer(serializers.Serializer):
     reasoning_effort = serializers.CharField(required=False, allow_blank=True)
     search = serializers.CharField(required=False, allow_blank=True)
     related = serializers.BooleanField(required=False)
+    similarity = similarity_field()
     project_name = serializers.CharField(required=False, allow_blank=True)
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
@@ -184,6 +187,7 @@ class InsightSelectionQuerySerializer(serializers.Serializer):
     chat_id = serializers.UUIDField(required=False)
     search = serializers.CharField(required=False, allow_blank=True)
     related = serializers.BooleanField(required=False)
+    similarity = similarity_field()
     project_name = serializers.CharField(required=False, allow_blank=True)
     start_date = serializers.DateField(required=False)
     end_date = serializers.DateField(required=False)
@@ -210,6 +214,7 @@ class InsightSelectionSerializer(serializers.Serializer):
 FILTER_FIELDS = (
     "search",
     "related",
+    "similarity",
     "project_name",
     "start_date",
     "end_date",
@@ -228,6 +233,7 @@ def _as_insights_post(data):
         "model",
         "reasoning_effort",
         "search",
+        "similarity",
         "project_name",
         "start_date",
         "end_date",
@@ -389,6 +395,7 @@ class InsightSelectionView(V2APIView):
         first = timezone.localdate(first_time) if first_time else None
         last = timezone.localdate(last_time) if last_time else None
         related_outcome = selection["related_outcome"]
+        request._related_outcome = related_outcome
         related = None
         if related_outcome.requested:
             related = "unavailable" if related_outcome.unavailable else "included"
@@ -433,6 +440,8 @@ class InsightStreamView(V2APIView):
         post = _as_insights_post(data)
         post["prompt"] = data["message"]
         request._request._post = post
-        return stream_insights_response(
+        response = stream_insights_response(
             request._request, chat_id, user_has_insights_access
         )
+        request._related_outcome = getattr(request._request, "_related_outcome", None)
+        return response

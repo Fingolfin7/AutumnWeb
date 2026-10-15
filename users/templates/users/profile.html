@@ -231,6 +231,15 @@
                 <p class="muted">The rest are grouped as Other (max 100)</p>
                 {{ profile_form.default_chart_project_count.errors }}
             </div>
+
+            {% if related_slider %}
+            <div class="profile-default-item profile-default-item--wide">
+                {% include 'core/partials/similarity_slider.html' with slider=related_slider slider_id='profile-related-similarity' %}
+                <p class="muted">Where the Related slider starts on every search. Lower finds more, looser matches; higher keeps only close ones.</p>
+                {{ profile_form.related_similarity.errors }}
+                <script src="{% static 'core/js/similarity_slider.js' %}?v={{ static_version.similarity_slider }}" defer></script>
+            </div>
+            {% endif %}
         </div>
     </section>
 

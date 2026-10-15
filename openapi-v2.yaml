@@ -465,6 +465,19 @@ paths:
           type: string
           minLength: 1
         description: Search project names, assigned subproject names and session notes.
+          Every word must appear (in any of them, in any order); put a phrase in double
+          quotes to match it as written. Common words such as "it" and "the" are ignored.
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
       - in: query
         name: start_date
         schema:
@@ -727,6 +740,17 @@ paths:
         name: search
         schema:
           type: string
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
       - in: query
         name: start_date
         schema:
@@ -1396,6 +1420,17 @@ paths:
           type: string
           minLength: 1
       - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
+      - in: query
         name: start_date
         schema:
           type: string
@@ -1935,6 +1970,17 @@ paths:
         schema:
           type: string
         description: Search project names, assigned subproject names and session notes.
+          Every word must appear (in any of them, in any order); put a phrase in double
+          quotes to match it as written. Common words such as "it" and "the" are ignored.
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
       - in: query
         name: start_date
         schema:
@@ -2025,6 +2071,17 @@ paths:
         schema:
           type: string
         description: Search project names, assigned subproject names and session notes.
+          Every word must appear (in any of them, in any order); put a phrase in double
+          quotes to match it as written. Common words such as "it" and "the" are ignored.
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
       - in: query
         name: start_date
         schema:
@@ -2120,6 +2177,17 @@ paths:
         schema:
           type: string
         description: Search project names, assigned subproject names and session notes.
+          Every word must appear (in any of them, in any order); put a phrase in double
+          quotes to match it as written. Common words such as "it" and "the" are ignored.
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
       - in: query
         name: start_date
         schema:
@@ -2237,6 +2305,17 @@ paths:
         schema:
           type: string
         description: Search project names, assigned subproject names and session notes.
+          Every word must appear (in any of them, in any order); put a phrase in double
+          quotes to match it as written. Common words such as "it" and "the" are ignored.
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
       - in: query
         name: start_date
         schema:
@@ -2384,6 +2463,19 @@ paths:
           type: string
           minLength: 1
         description: Search project names, assigned subproject names and session notes.
+          Every word must appear (in any of them, in any order); put a phrase in double
+          quotes to match it as written. Common words such as "it" and "the" are ignored.
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+        description: How close a meaning-based match must be to count as related,
+          from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45
+          unless changed in Profile). Only used with search and related=true; the
+          cutoff applied is echoed in the X-Autumn-Related-Similarity header.
       - in: query
         name: start_date
         schema:
@@ -4498,6 +4590,15 @@ components:
           type: string
         related:
           type: string
+        similarity:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+          description: How close a meaning-based match must be to count as related,
+            from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting
+            (0.45 unless changed in Profile). Only used with search and related=true;
+            the cutoff applied is echoed in the X-Autumn-Related-Similarity header.
         project_name:
           type: string
         start_date:
@@ -4672,6 +4773,15 @@ components:
           type: string
         related:
           type: boolean
+        similarity:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+          description: How close a meaning-based match must be to count as related,
+            from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting
+            (0.45 unless changed in Profile). Only used with search and related=true;
+            the cutoff applied is echoed in the X-Autumn-Related-Similarity header.
         project_name:
           type: string
         start_date:
@@ -5034,6 +5144,16 @@ components:
           $ref: '#/components/schemas/LunaEffortEnum'
         ai_features_enabled:
           type: boolean
+        related_similarity:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+          nullable: true
+          description: How close a meaning-based match must be to count as related,
+            from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting
+            (0.45 unless changed in Profile). Only used with search and related=true;
+            the cutoff applied is echoed in the X-Autumn-Related-Similarity header.
         active_context_id:
           type: integer
           minimum: 1
@@ -5203,9 +5323,22 @@ components:
           type: string
         ai_features_enabled:
           type: boolean
+        related_similarity:
+          type: number
+          format: double
+          nullable: true
         active_context_id:
           type: integer
           nullable: true
+        related_similarity_default:
+          type: number
+          format: double
+        related_similarity_min:
+          type: number
+          format: double
+        related_similarity_max:
+          type: number
+          format: double
         insights_access_enabled:
           type: boolean
         avatar_url:
@@ -5242,6 +5375,10 @@ components:
       - luna_recommendation_effort
       - nasa_apod_background
       - openai_source
+      - related_similarity
+      - related_similarity_default
+      - related_similarity_max
+      - related_similarity_min
       - timezone
     ProjectCreateRequest:
       type: object
