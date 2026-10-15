@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { CHART_STALE, fetchChart, parseRelatedHeader, useChartData } from "./api";
+import { CHART_STALE, fetchChart, parseRelatedHeader, semanticSearchAvailable, useChartData } from "./api";
 import { buildChartQuery, EMPTY_FILTERS, type ChartQuery } from "./filters";
 
 /* Ported from scripts/tests/charts_related.test.cjs: the "Including related"
@@ -106,4 +106,11 @@ it("a response that outlived a Refresh does not overwrite the newer state", asyn
   await act(async () => pending[2]!.reply("included"));
   await act(async () => pending[1]!.reply("unavailable"));
   expect(hook.result.current.data?.related).toBe("included");
+});
+
+it("related search needs AI features and a stored OpenAI key", () => {
+  const profile = { ai_features_enabled: true, openai_key_configured: true };
+  expect(semanticSearchAvailable(profile)).toBe(true);
+  expect(semanticSearchAvailable({ ...profile, openai_key_configured: false })).toBe(false);
+  expect(semanticSearchAvailable({ ...profile, ai_features_enabled: false })).toBe(false);
 });

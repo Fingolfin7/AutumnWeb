@@ -1,10 +1,35 @@
-import { bootstrap } from "@/bootstrap";
+import { api, unwrap } from "@/api/client";
+import type { components } from "@/api/schema";
+import { bootstrap, type Bootstrap } from "@/bootstrap";
 import type { Prefs } from "./model";
 
 /* The app shell (header avatar, page backdrop, header dimming slider) is
    rendered from the bootstrap blob at page load. When the profile changes
    them, bring the live page and the cached bootstrap along so no reload is
    needed. */
+
+/* The Charts page opens on profile.default_chart_start/end_date and Charts and
+   Insights offer related search when profile.openai_key_configured (all from
+   the bootstrap blob). After the profile changes a default filter or an API
+   key, take the server's current values from GET /api/v2/me/. */
+export function applyMe(profile: Bootstrap["profile"], me: components["schemas"]["Me"]) {
+  profile.default_chart_start_date = me.default_chart_start_date;
+  profile.default_chart_end_date = me.default_chart_end_date;
+  profile.openai_key_configured = me.openai_key_configured;
+}
+
+/* The rest of the profile the app reads from the bootstrap, straight from a
+   fresh preferences response. */
+export function applyPrefs(fresh: Pick<Prefs, "timezone" | "default_chart_project_count" | "ai_features_enabled">) {
+  const profile = bootstrap().profile;
+  profile.timezone = fresh.timezone;
+  profile.default_chart_project_count = fresh.default_chart_project_count;
+  profile.ai_features_enabled = fresh.ai_features_enabled;
+}
+
+export async function refreshBootstrapProfile(): Promise<void> {
+  applyMe(bootstrap().profile, await unwrap(api.GET("/api/v2/me/")));
+}
 
 export function applyAvatar(url: string) {
   bootstrap().profile.avatar_url = url;

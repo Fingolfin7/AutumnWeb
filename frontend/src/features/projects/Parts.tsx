@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { faExclamationCircle } from "@fortawesome/free-solid-svg-icons";
+import { faExclamationCircle, faExclamationTriangle } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Skeleton, ErrorState } from "@/components/states";
@@ -39,6 +39,44 @@ export function FormErrors({ errors }: { errors: SplitErrors }) {
     <div className="msg msg--error" role="alert" style={{ marginBottom: "var(--s4)" }}>
       <Icon icon={faExclamationCircle} className="msg-icon" />
       <span>{errors.general.join(" ")}</span>
+    </div>
+  );
+}
+
+/* The 409 version_conflict notice, worded like the session edit page's: the
+   record was changed (another tab, the CLI, an assistant) after this page
+   opened it. `outcome` says what did not happen; the buttons are for edit
+   pages ("Save mine anyway" only when the server named the current version). */
+export function ConflictBanner({
+  noun,
+  outcome,
+  onLoadLatest,
+  onSaveAnyway,
+  busy,
+}: {
+  noun: string;
+  outcome?: string;
+  onLoadLatest?: () => void;
+  onSaveAnyway?: () => void;
+  busy?: boolean;
+}) {
+  return (
+    <div className="msg msg--warning" role="alert" style={{ marginBottom: "var(--s4)" }}>
+      <Icon icon={faExclamationTriangle} className="msg-icon" />
+      <span>
+        This {noun} was changed somewhere else (another tab, the CLI or an assistant) after you opened it.
+        {outcome ? ` ${outcome}` : ""}
+      </span>
+      {onLoadLatest ? (
+        <button type="button" className="toast-action" onClick={onLoadLatest}>
+          Load latest
+        </button>
+      ) : null}
+      {onSaveAnyway ? (
+        <button type="button" className="toast-action" disabled={busy} onClick={onSaveAnyway}>
+          Save mine anyway
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -135,6 +135,9 @@ def bootstrap_payload(request):
         "csrf_token": get_token(request),
         "static": {
             "leaf": staticfiles_storage.url("core/images/new_autumn_leaf_transparent_slanted.png"),
+            "insights_empty": staticfiles_storage.url(
+                "core/images/reddit_such_empty_transparent.png"
+            ),
         },
         "push": {"vapid_public_key": getattr(settings, "PUSH_VAPID_PUBLIC_KEY", "") or ""},
         "debug": settings.DEBUG,

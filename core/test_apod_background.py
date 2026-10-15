@@ -112,7 +112,7 @@ class ApodBackgroundTests(TestCase):
         self.assertEqual(background["mode"], "apod")
         self.assertEqual(background["video_url"], "https://assets.science.nasa.gov/comet.mp4")
         self.assertEqual(background["image_url"], "https://assets.science.nasa.gov/comet.png")
-        self.assertEqual(background["page_url"], "https://science.nasa.gov/image-article/comet/")
+        self.assertEqual(background["source_url"], "https://science.nasa.gov/image-article/comet/")
 
     def test_missing_video_poster_uses_a_recent_apod_photo(self):
         latest = Mock()

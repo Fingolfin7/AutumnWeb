@@ -46,7 +46,7 @@ import {
 import { AiSection } from "./AiSection";
 import { BackgroundSection } from "./BackgroundSection";
 import { FieldErrors, SlabHead } from "./Parts";
-import { applyAvatar, applyBackground, applyDimming, syncHeaderDimming } from "./shell";
+import { applyAvatar, applyBackground, applyDimming, applyPrefs, refreshBootstrapProfile, syncHeaderDimming } from "./shell";
 import { SocialConnectForms, SocialSection } from "./SocialSection";
 import "./profile.css";
 
@@ -255,8 +255,10 @@ function ProfileEditor({
         applyBackground(fresh.background);
         applyDimming(fresh.background_dimming);
         syncHeaderDimming(fresh.background_dimming);
+        applyPrefs(fresh);
         if (prefsOk) setPrefsD(prefsDraft(fresh));
         if (avatarFile === null) applyAvatar(fresh.avatar_url);
+        await refreshBootstrapProfile();
       } catch {
         /* the next page load will catch up */
       }

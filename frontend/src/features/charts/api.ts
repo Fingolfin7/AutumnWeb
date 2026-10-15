@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, unwrap } from "@/api/client";
+import { api } from "@/api/client";
 import { ApiError, toApiError } from "@/api/errors";
 import { keys } from "@/api/keys";
-import type { Preferences } from "@/api/types";
+import { bootstrap, type Bootstrap } from "@/bootstrap";
 import type { ChartQuery, RelatedState } from "./filters";
 
 export interface ChartResult {
@@ -44,17 +44,10 @@ export function useChartData(query: ChartQuery, enabled: boolean) {
   });
 }
 
-/* Profile defaults the page needs: the default date range, and whether
-   meaning-based ("related") search can work at all. */
-export function usePreferences() {
-  return useQuery({
-    queryKey: keys.preferences(),
-    queryFn: (): Promise<Preferences> => unwrap(api.GET("/api/v2/me/preferences/")),
-    staleTime: 5 * 60_000,
-  });
-}
-
-/* Same rule as core.services.semantic_search.semantic_search_available. */
-export function semanticSearchAvailable(preferences: Preferences | undefined): boolean {
-  return !!preferences && preferences.ai_features_enabled && preferences.configured_api_keys.openai;
+/* Whether meaning-based ("related") search can work at all: AI features on
+   and an OpenAI key stored. Same rule as
+   core.services.semantic_search.semantic_search_available, read from the
+   bootstrap profile (kept current by the Profile page after it saves). */
+export function semanticSearchAvailable(profile: Pick<Bootstrap["profile"], "ai_features_enabled" | "openai_key_configured"> = bootstrap().profile): boolean {
+  return profile.ai_features_enabled && profile.openai_key_configured;
 }

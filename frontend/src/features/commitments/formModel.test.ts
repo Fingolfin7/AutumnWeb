@@ -14,7 +14,8 @@ import {
   type FormState,
 } from "./formModel";
 import { buildScopeMeta, isRuleOptionInScope, resolveTarget, targetOptions } from "./scope";
-import { commitmentAppliesToProject, commitmentsFor, ruleLines, type AppliesData } from "./applies";
+import { ruleLines, sortCommitments } from "./applies";
+import { progressOf } from "./display";
 
 const project = (id: number, name: string, contextId: number | null, tagIds: number[]): Project =>
   ({
@@ -70,6 +71,7 @@ const commitment = (over: Partial<Commitment> = {}): Commitment =>
     max_balance: 360,
     min_balance: -240,
     balance: 0,
+    current_surplus: 0,
     filters: filters(),
     pending_revision: null,
     ...over,
@@ -288,30 +290,18 @@ describe("edit policy", () => {
 });
 
 describe("related commitments", () => {
-  const data: AppliesData = { projects, subprojectParents: new Map([[20, 1], [21, 3]]) };
-
-  it("matches by scope kind", () => {
-    const byContext = commitment({ aggregation_type: "context", target: { kind: "context", id: 10, name: "ctx10" } });
-    expect(commitmentAppliesToProject(byContext, projects[0]!, data)).toBe(true);
-    expect(commitmentAppliesToProject(byContext, projects[2]!, data)).toBe(false);
-    const byTag = commitment({ aggregation_type: "tag", target: { kind: "tag", id: 100, name: "deep" } });
-    expect(commitmentAppliesToProject(byTag, projects[2]!, data)).toBe(true);
-    expect(commitmentAppliesToProject(byTag, projects[1]!, data)).toBe(false);
+  it("lists active commitments first, then by scope, keeping the server order within a scope", () => {
+    const paused = commitment({ id: 1, active: false, aggregation_type: "project" });
+    const tag = commitment({ id: 2, aggregation_type: "tag", target: { kind: "tag", id: 100, name: "deep" } });
+    const projectB = commitment({ id: 4, aggregation_type: "project" });
+    const projectA = commitment({ id: 3, aggregation_type: "project" });
+    expect(sortCommitments([paused, tag, projectB, projectA]).map((c) => c.id)).toEqual([4, 3, 2, 1]);
   });
 
-  it("applies include and exclude rules", () => {
-    const base = { aggregation_type: "tag" as const, target: { kind: "tag", id: 100, name: "deep" } };
-    expect(commitmentAppliesToProject(commitment({ ...base, filters: filters({ exclude_project_ids: [1] }) }), projects[0]!, data)).toBe(false);
-    expect(commitmentAppliesToProject(commitment({ ...base, filters: filters({ include_project_ids: [3] }) }), projects[0]!, data)).toBe(false);
-    expect(commitmentAppliesToProject(commitment({ ...base, filters: filters({ include_subproject_ids: [21] }) }), projects[2]!, data)).toBe(true);
-    expect(commitmentAppliesToProject(commitment({ ...base, filters: filters({ include_subproject_ids: [21] }) }), projects[0]!, data)).toBe(false);
-  });
-
-  it("lists a context's commitments active first", () => {
-    const paused = commitment({ id: 1, active: false, aggregation_type: "project", target: { kind: "project", id: 1, name: "Alpha" } });
-    const live = commitment({ id: 2, aggregation_type: "tag", target: { kind: "tag", id: 100, name: "deep" } });
-    const other = commitment({ id: 3, aggregation_type: "project", target: { kind: "project", id: 3, name: "Gamma" } });
-    expect(commitmentsFor("context", 10, [paused, live, other], data).map((c) => c.id)).toEqual([2, 1]);
+  it("takes the unbanked surplus from the server instead of deriving it", () => {
+    const period = { start: "2026-10-12T00:00:00Z", end: "2026-10-19T00:00:00Z", accrued: 100, target: 180, met: false, percentage: 55.6, status: "behind" };
+    expect(progressOf(commitment({ current_period: period, current_surplus: -80 })).surplus).toBe(-80);
+    expect(progressOf(commitment({ current_period: period, current_surplus: -12.5 })).surplus).toBe(-12.5);
   });
 
   it("writes rule lines the way the server does", () => {

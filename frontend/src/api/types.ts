@@ -1,4 +1,4 @@
-import type { components } from "./schema";
+import type { components, operations } from "./schema";
 
 type S = components["schemas"];
 
@@ -19,6 +19,8 @@ export type SubprojectAllocation = S["SubprojectAllocation"];
 export type Context = S["ContextResource"];
 export type Tag = S["TagResource"];
 export type Commitment = S["CommitmentResource"];
+/** Query parameters of GET /api/v2/projects/. */
+export type ProjectListQuery = NonNullable<operations["projects_list"]["parameters"]["query"]>;
 export type ProjectStatus = S["ProjectStatusEnum"];
 export type CommitmentFilters = S["CommitmentFilters"];
 export type NamedResource = S["NamedResource"];

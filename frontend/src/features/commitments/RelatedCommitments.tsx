@@ -7,28 +7,24 @@ import { AppLink, urls } from "@/app/links";
 import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import type { Commitment } from "@/api/types";
 import { tagStyle } from "@/features/contexts-tags/ui";
-import { useAllSubprojects, useCommitments } from "./api";
-import { commitmentsFor, needsSubprojects, subprojectParentMap, ruleLines, type EntityKind } from "./applies";
+import { useAllSubprojects, useCommitmentsAppliedTo } from "./api";
+import { needsSubprojects, ruleLines, type EntityKind } from "./applies";
 import { floatText, progressOf, signed, unitSuffix } from "./display";
 import { aggregationLabel } from "./scope";
 import { periodLabel } from "./formModel";
 
-/* The "Commitments" slab on the context, tag, project and subproject edit
-   pages (partials/commitments_panel.html): every commitment that reaches this
+/* The "Commitments" slab on the context and tag edit pages
+   (partials/commitments_panel.html): every commitment that reaches this
    item, its progress, the rules it composes and a way to edit or add one. */
 export function RelatedCommitments({ kind, id }: { kind: EntityKind; id: number }) {
-  const commitments = useCommitments();
+  const applied = useCommitmentsAppliedTo(kind, id);
   const projects = useAllProjects();
   const tags = useTags();
   const contexts = useContexts();
-  const wantSubprojects = !!commitments.data && needsSubprojects(commitments.data);
-  const subs = useAllSubprojects(wantSubprojects || kind === "subproject");
-
-  const items = useMemo(() => {
-    if (!commitments.data || !projects.data) return [];
-    const subproject = kind === "subproject" ? subs.subprojects.find((s) => s.id === id) : undefined;
-    return commitmentsFor(kind, id, commitments.data, { projects: projects.data, subprojectParents: subprojectParentMap(subs.subprojects) }, subproject);
-  }, [commitments.data, projects.data, subs.subprojects, kind, id]);
+  const items = useMemo(() => applied.data ?? [], [applied.data]);
+  /* Subprojects are only fetched to name the ones a rule mentions. */
+  const wantSubprojects = needsSubprojects(items);
+  const subs = useAllSubprojects(wantSubprojects);
 
   const names = useMemo(
     () => ({
@@ -40,15 +36,15 @@ export function RelatedCommitments({ kind, id }: { kind: EntityKind; id: number 
     [tags.data, projects.data, subs.subprojects, contexts.data],
   );
 
-  const error = commitments.error ?? projects.error;
-  const loading = commitments.isPending || projects.isPending || (wantSubprojects && subs.isPending);
+  const error = applied.error ?? projects.error;
+  const loading = applied.isPending || projects.isPending || (wantSubprojects && subs.isPending);
   const addHref =
     kind === "project" ? urls.createCommitment(id) : `${urls.createCommitment()}?aggregation_type=${kind}&target_id=${id}`;
 
   return (
     <Disclose id={`${kind}-commitments`} icon={faBullseye} iconClass="text-cyan" title="Commitments" summary={loading ? "…" : items.length}>
       {error ? (
-        <ErrorState error={error} onRetry={() => void commitments.refetch()} />
+        <ErrorState error={error} onRetry={() => void applied.refetch()} />
       ) : loading ? (
         <Skeleton lines={3} />
       ) : items.length ? (

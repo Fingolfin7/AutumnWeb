@@ -37,7 +37,7 @@ export function progressOf(c: Commitment) {
     target: period.target,
     percentage: period.percentage ?? 0,
     status: period.status ?? "behind",
-    surplus: Math.round((period.accrued - period.target) * 100) / 100,
+    surplus: c.current_surplus,
   };
 }
 

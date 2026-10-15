@@ -1,10 +1,21 @@
 from .base import *
 
-from core.templatetags.background_images import bing_background, nasa_apod_media
+from core.templatetags.background_images import (
+    bing_background,
+    bing_background_metadata,
+    nasa_apod_media,
+)
 from core.utils import ACTIVE_CONTEXT_SESSION_KEY
+from llm_insights.services.handlers import openai_connection_source
 
 
 def _background_payload(profile):
+    empty_metadata = {
+        "title": None,
+        "description": None,
+        "copyright": None,
+        "source_url": None,
+    }
     if profile.background_image and not profile.automatic_background:
         try:
             image_url = profile.background_image.url
@@ -14,12 +25,19 @@ def _background_payload(profile):
             "mode": "upload",
             "image_url": image_url,
             "video_url": None,
+            **empty_metadata,
         }
     if profile.automatic_background and profile.bing_background:
+        image_url = bing_background() or None
+        metadata = bing_background_metadata() if image_url else {}
         return {
             "mode": "bing",
-            "image_url": bing_background() or None,
+            "image_url": image_url,
             "video_url": None,
+            "title": metadata.get("title") or None,
+            "description": metadata.get("description") or None,
+            "copyright": metadata.get("copyright") or None,
+            "source_url": metadata.get("source_url") or None,
         }
     if profile.automatic_background and profile.nasa_apod_background:
         media = nasa_apod_media()
@@ -27,9 +45,17 @@ def _background_payload(profile):
             "mode": "apod",
             "image_url": media.get("image_url") or None,
             "video_url": media.get("video_url") or None,
-            "page_url": media.get("page_url") or None,
+            "title": media.get("title") or None,
+            "description": media.get("explanation") or None,
+            "copyright": media.get("copyright") or None,
+            "source_url": media.get("page_url") or None,
         }
-    return {"mode": "none", "image_url": None, "video_url": None}
+    return {
+        "mode": "none",
+        "image_url": None,
+        "video_url": None,
+        **empty_metadata,
+    }
 
 
 def _preferences_payload(user):
@@ -57,6 +83,7 @@ def _preferences_payload(user):
             "openai_chatgpt": bool(profile.openai_chatgpt_token_enc),
             "claude": bool(profile.claude_api_key_enc),
         },
+        "openai_source": openai_connection_source(user) or None,
         "contexts": [
             {"id": context.pk, "name": context.name, "color": None}
             for context in Context.objects.filter(user=user).order_by("name", "id")

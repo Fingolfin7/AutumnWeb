@@ -142,7 +142,11 @@ export function useSession(param: string | undefined) {
     refetchOnWindowFocus: false,
     queryFn: async (): Promise<SessionRow> => {
       if (parsed.kind === "id") {
-        return unwrap(api.GET("/api/v2/sessions/{session_id}", { params: { path: { session_id: parsed.id } } }));
+        return unwrap(
+          api.GET("/api/v2/sessions/{session_id}", {
+            params: { path: { session_id: parsed.id }, query: { include: "note_html" } },
+          }),
+        );
       }
       if (parsed.kind === "uuid") {
         const data = await unwrap(
@@ -183,18 +187,3 @@ export function useUpdateSession() {
   });
 }
 
-/* GET /sessions/{id} does not render note_html (only the list does, with
-   include=note_html), so the confirm page asks the list for the rendered note
-   by uuid. API gap: the retrieve endpoint should accept include=note_html. */
-export function useRenderedNote(session: SessionRow | undefined) {
-  const uuid = session?.uuid;
-  const needed = !!session && !!session.note && !session.note_html && !!uuid;
-  return useQuery({
-    queryKey: [...keys.sessions(), "note_html", uuid ?? ""],
-    enabled: needed,
-    queryFn: async () => {
-      const data = await unwrap(api.GET("/api/v2/sessions/", { params: { query: { uuid: uuid!, include: "note,note_html", limit: 1 } } }));
-      return data.sessions[0]?.note_html ?? null;
-    },
-  });
-}

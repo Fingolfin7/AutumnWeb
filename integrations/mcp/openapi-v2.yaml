@@ -555,6 +555,13 @@ paths:
     get:
       operationId: import_uploads_stream_retrieve
       parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - event-stream
+          - json
       - in: path
         name: upload_id
         schema:
@@ -580,6 +587,19 @@ paths:
   /api/v2/insights/chats/:
     get:
       operationId: insights_chats_list
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+      - in: query
+        name: offset
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
       tags:
       - insights
       security:
@@ -654,9 +674,95 @@ paths:
                 $ref: '#/components/schemas/InsightOptions'
           description: ''
       x-autumn-mcp: exclude
+  /api/v2/insights/selection/:
+    get:
+      operationId: insights_selection_retrieve
+      parameters:
+      - in: query
+        name: chat_id
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: context
+        schema:
+          oneOf:
+          - type: integer
+            minimum: 1
+          - type: string
+            enum:
+            - all
+          nullable: true
+        description: A context ID, or 'all' for all contexts.
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: exclude_projects
+        schema:
+          type: array
+          items:
+            type: integer
+      - in: query
+        name: include_projects
+        schema:
+          type: array
+          items:
+            type: integer
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+      - in: query
+        name: project_name
+        schema:
+          type: string
+      - in: query
+        name: related
+        schema:
+          type: boolean
+      - in: query
+        name: search
+        schema:
+          type: string
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: tags
+        schema:
+          type: array
+          items:
+            type: integer
+      tags:
+      - insights
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightSelection'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/insights/stream/:
     post:
       operationId: insights_stream_create
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - event-stream
+          - json
       tags:
       - insights
       requestBody:
@@ -796,8 +902,12 @@ paths:
       - cookieAuth: []
       - tokenAuth: []
       responses:
-        '204':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configured'
+          description: ''
       x-autumn-mcp: exclude
   /api/v2/me/avatar/:
     put:
@@ -834,8 +944,12 @@ paths:
       - cookieAuth: []
       - tokenAuth: []
       responses:
-        '204':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaStatus'
+          description: ''
       x-autumn-mcp: exclude
   /api/v2/me/background/:
     put:
@@ -872,8 +986,12 @@ paths:
       - cookieAuth: []
       - tokenAuth: []
       responses:
-        '204':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaStatus'
+          description: ''
       x-autumn-mcp: exclude
   /api/v2/me/background/download/:
     get:
@@ -909,6 +1027,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChatGPTLogin'
           description: ''
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatGPTLogin'
+          description: ''
       x-autumn-mcp: exclude
     post:
       operationId: me_chatgpt_login_create
@@ -935,8 +1059,12 @@ paths:
       - cookieAuth: []
       - tokenAuth: []
       responses:
-        '204':
-          description: No response body
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatGPTLogin'
+          description: ''
       x-autumn-mcp: exclude
   /api/v2/me/preferences/:
     get:
@@ -2931,9 +3059,25 @@ components:
         video_url:
           type: string
           nullable: true
+        title:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        copyright:
+          type: string
+          nullable: true
+        source_url:
+          type: string
+          nullable: true
       required:
+      - copyright
+      - description
       - image_url
       - mode
+      - source_url
+      - title
       - video_url
     BackgroundModeEnum:
       enum:
@@ -4324,6 +4468,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InsightChatGroup'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
       required:
       - groups
     InsightChatSummary:
@@ -4359,7 +4509,14 @@ components:
         note_snippet:
           type: string
         context:
-          type: integer
+          oneOf:
+          - type: integer
+            minimum: 1
+          - type: string
+            enum:
+            - all
+          nullable: true
+          description: A context ID, or 'all' for all contexts.
         tags:
           type: array
           items:
@@ -4441,9 +4598,15 @@ components:
         default_end_date:
           type: string
           format: date
+        openai_source:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/OpenaiSourceEnum'
+          - $ref: '#/components/schemas/NullEnum'
       required:
       - default_end_date
       - default_start_date
+      - openai_source
       - providers
     InsightProviderOption:
       type: object
@@ -4457,6 +4620,29 @@ components:
       required:
       - models
       - provider
+    InsightSelection:
+      type: object
+      properties:
+        count:
+          type: integer
+        first_date:
+          type: string
+          format: date
+          nullable: true
+        last_date:
+          type: string
+          format: date
+          nullable: true
+        related:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/RelatedEnum'
+          - $ref: '#/components/schemas/NullEnum'
+      required:
+      - count
+      - first_date
+      - last_date
+      - related
     InsightSource:
       type: object
       properties:
@@ -4497,7 +4683,14 @@ components:
         note_snippet:
           type: string
         context:
-          type: integer
+          oneOf:
+          - type: integer
+            minimum: 1
+          - type: string
+            enum:
+            - all
+          nullable: true
+          description: A context ID, or 'all' for all contexts.
         tags:
           type: array
           items:
@@ -4668,6 +4861,21 @@ components:
       - weekly_review_enabled
       - weekly_review_time
       - weekly_review_weekday
+    NullEnum:
+      enum:
+      - null
+    OpenaiSourceEnum:
+      enum:
+      - server
+      - codex
+      - profile
+      - codex_with_api_fallback
+      type: string
+      description: |-
+        * `server` - server
+        * `codex` - codex
+        * `profile` - profile
+        * `codex_with_api_fallback` - codex_with_api_fallback
     PatchedAccountPatch:
       type: object
       properties:
@@ -5006,6 +5214,11 @@ components:
           $ref: '#/components/schemas/Background'
         configured_api_keys:
           $ref: '#/components/schemas/ConfiguredApiKeys'
+        openai_source:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/OpenaiSourceEnum'
+          - $ref: '#/components/schemas/NullEnum'
         contexts:
           type: array
           items:
@@ -5028,6 +5241,7 @@ components:
       - insights_default_filter_value
       - luna_recommendation_effort
       - nasa_apod_background
+      - openai_source
       - timezone
     ProjectCreateRequest:
       type: object
@@ -5394,6 +5608,14 @@ components:
       - output_total
       - provider
       - reasoning_total
+    RelatedEnum:
+      enum:
+      - included
+      - unavailable
+      type: string
+      description: |-
+        * `included` - included
+        * `unavailable` - unavailable
     ReportHierarchy:
       type: object
       properties:
@@ -5887,8 +6109,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SocialAccount'
+        has_usable_password:
+          type: boolean
       required:
       - accounts
+      - has_usable_password
     SubprojectAllocation:
       type: object
       properties:

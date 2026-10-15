@@ -16,8 +16,15 @@ python -m venv .venv
 # macOS/Linux:
 source .venv/bin/activate
 
-# Development server
+# Development server (Django renders the page shell; the UI is the React app in frontend/)
 python manage.py runserver
+
+# Web UI (frontend/, Node 22)
+cd frontend && npm ci
+npm run dev        # Vite on :5173; run Django with VITE_DEV_SERVER=http://localhost:5173 for hot reload
+npm run build      # Writes core/static/app/ (gitignored); Django serves it when VITE_DEV_SERVER is unset
+npm run gen:api    # Regenerate src/api/schema.d.ts after changing openapi-v2.yaml
+npm run typecheck && npm test
 
 # Database migrations
 python manage.py makemigrations
@@ -42,6 +49,16 @@ python scripts/semantic_search_eval.py [--keyword-only]  # Keyword vs hybrid sea
 ```
 
 ## Architecture
+
+### Web UI (frontend/)
+
+The browser UI is a React 19 + TypeScript single-page app in `frontend/` (Vite, react-router, TanStack Query, openapi-fetch). It talks only to `/api/v2/`; its client types are generated from `openapi-v2.yaml` (`npm run gen:api`), so API changes go through the schema first.
+
+- Django still owns every URL: each page route in `core/urls.py` (and `profile/`, `insights/`) points at `core.spa.spa`, which renders `core/templates/core/spa.html` with the Vite bundle from `core/static/app/manifest.json` and a JSON bootstrap blob (`bootstrap_payload`: user, profile defaults, contexts, CSRF token, flash messages). Unknown paths are real 404s, and auth pages (login, register, password reset, OAuth) stay server-rendered.
+- Adding a page means an entry in `frontend/src/app/routePatterns.ts` and a Django route to `spa` under the same path, keeping the old URL name.
+- Pages live in `frontend/src/features/<area>/`; shared shell, toasts, command palette and offline sync in `frontend/src/app/`. The Night Ledger look comes from `core/static/core/css/focus_desk.css`, loaded by `spa.html`; `frontend/src/styles/app.css` only adds what the app introduces.
+- Offline: TanStack Query's cache is persisted to localStorage, timer start/stop made offline are queued (`frontend/src/lib/offlineQueue.ts`) and replayed when the server is reachable, and the service worker (`core/static/core/pwa/service-worker.js`) keeps the app shell and built assets.
+- Render builds with `bash scripts/render-build.sh` (pip install, `npm ci && npm run build`, collectstatic).
 
 ### Django Apps
 
@@ -113,6 +130,7 @@ Optional:
 DATABASE_URL=postgres://...  # Falls back to SQLite
 NASA_API_KEY=<key>
 SERVE_MEDIA=TRUE  # For PaaS deployments
+VITE_DEV_SERVER=http://localhost:5173  # Dev only: load the UI from Vite instead of the built bundle
 ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *
 ALLOW_REGISTRATION=FALSE  # Registration is closed unless explicitly enabled
 GOOGLE_OAUTH_CLIENT_ID=<google-web-client-id>
@@ -177,3 +195,5 @@ Tests are in `core/test_*.py`, `core/tests.py`, `users/`, and `llm_insights/`.
 Install `requirements-dev.txt` for test-only dependencies. CI runs on Windows
 with SQLite and Python 3.10, and Ubuntu with PostgreSQL and Python 3.13.
 Browser polling behavior tests use Node 22+ built-ins, with no npm dependencies.
+Frontend tests are Vitest (`npm test` in `frontend/`); CI also checks that
+`src/api/schema.d.ts` matches `openapi-v2.yaml`, type-checks and builds the app.

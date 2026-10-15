@@ -4,6 +4,7 @@ import { api, unwrap } from "@/api/client";
 import { keys } from "@/api/keys";
 import { useInvalidate } from "@/api/sync";
 import { useAllProjects } from "@/api/meta";
+import { sortCommitments, type EntityKind } from "./applies";
 import type { Commitment, CommitmentChanges, CommitmentCreate, Subproject } from "@/api/types";
 
 const STALE = 30_000;
@@ -14,6 +15,19 @@ export function useCommitments() {
   return useQuery({
     queryKey: keys.commitments(),
     queryFn: async (): Promise<Commitment[]> => (await unwrap(api.GET("/api/v2/commitments/"))).commitments,
+    staleTime: STALE,
+  });
+}
+
+/* The commitments that apply to one context, tag, project or subproject (the
+   server decides: GET /commitments/?applies_to=kind:id), in display order. */
+export function useCommitmentsAppliedTo(kind: EntityKind, id: number) {
+  return useQuery({
+    queryKey: [...keys.commitments(), "applies", kind, id] as const,
+    enabled: id > 0,
+    queryFn: async (): Promise<Commitment[]> =>
+      (await unwrap(api.GET("/api/v2/commitments/", { params: { query: { applies_to: `${kind}:${id}` } } }))).commitments,
+    select: sortCommitments,
     staleTime: STALE,
   });
 }

@@ -1,4 +1,4 @@
-import { buildChartQuery, defaultDateRange, describeFilters, EMPTY_FILTERS, readFilters, relatedPill, todayIn, writeFilters } from "./filters";
+import { buildChartQuery, describeFilters, EMPTY_FILTERS, readFilters, relatedPill, writeFilters } from "./filters";
 
 const params = (query: string) => new URLSearchParams(query);
 
@@ -43,32 +43,6 @@ describe("URL <-> filters", () => {
 
   it("only writes related alongside a search", () => {
     expect(writeFilters({ ...EMPTY_FILTERS, related: true }).has("related")).toBe(false);
-  });
-});
-
-describe("default date range", () => {
-  const today = new Date(2026, 9, 14);
-  it("looks back N units", () => {
-    expect(defaultDateRange(1, "months", today)).toEqual({ start: "2026-09-14", end: "2026-10-14" });
-    expect(defaultDateRange(2, "weeks", today)).toEqual({ start: "2026-09-30", end: "2026-10-14" });
-    expect(defaultDateRange(10, "days", today).start).toBe("2026-10-04");
-    expect(defaultDateRange(1, "years", today).start).toBe("2025-10-14");
-  });
-  it("clamps month ends like relativedelta", () => {
-    expect(defaultDateRange(1, "months", new Date(2026, 2, 31)).start).toBe("2026-02-28");
-  });
-  it("supports to-date ranges", () => {
-    expect(defaultDateRange(1, "month_to_date", today).start).toBe("2026-10-01");
-    expect(defaultDateRange(1, "quarter_to_date", today).start).toBe("2026-10-01");
-    expect(defaultDateRange(1, "year_to_date", today).start).toBe("2026-01-01");
-  });
-  it("treats an unknown unit as months and a zero count as one", () => {
-    expect(defaultDateRange(0, "fortnights", today).start).toBe("2026-09-14");
-  });
-  it("reads today in the user's timezone", () => {
-    const instant = new Date("2026-10-14T23:30:00Z");
-    expect(todayIn("Pacific/Auckland", instant).getDate()).toBe(15);
-    expect(todayIn("America/Los_Angeles", instant).getDate()).toBe(14);
   });
 });
 

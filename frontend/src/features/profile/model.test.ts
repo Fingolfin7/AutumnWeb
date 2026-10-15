@@ -30,9 +30,10 @@ const prefs = {
   active_context_id: null,
   insights_access_enabled: false,
   avatar_url: "/media/default.jpg",
-  background: { mode: "none", image_url: null, video_url: null },
+  background: { mode: "none", image_url: null, video_url: null, title: null, description: null, copyright: null, source_url: null },
   configured_api_keys: { gemini: false, openai: false, openai_chatgpt: false, claude: false },
   contexts: [],
+  openai_source: null,
 } as Prefs;
 
 describe("accountChanges", () => {

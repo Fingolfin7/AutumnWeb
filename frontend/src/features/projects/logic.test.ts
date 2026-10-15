@@ -1,19 +1,15 @@
 import type { Commitment, Project } from "@/api/types";
 import {
-  applyClientFilters,
   changedFields,
-  commitmentAppliesToProject,
-  commitmentAppliesToSubproject,
   commitmentRuleLines,
   describeFilters,
   emptyFilters,
   formatSigned,
   groupByStatus,
+  onlyIncluded,
   readFilters,
   relatedOnly,
   serverQuery,
-  sortByActivity,
-  sortCommitments,
   writeFilters,
   type NameLookup,
 } from "./logic";
@@ -76,14 +72,24 @@ describe("filters <-> URL", () => {
     expect(state.projectMode).toBe("exclude");
   });
 
-  it("sends only what the API can filter, with the header context as the default", () => {
+  it("sends what the API can filter and order, with the header context as the default", () => {
     const filters = { ...emptyFilters, search: "a", tags: [2], projects: [9], projectMode: "include" as const };
-    expect(serverQuery(filters, "3")).toEqual({ search: "a", context_ids: "3", tag_ids: "2" });
+    expect(serverQuery(filters, "3")).toEqual({ ordering: "last_activity", search: "a", context_ids: "3", tag_ids: "2" });
     expect(serverQuery({ ...filters, context: "all" }, "3").context_ids).toBeUndefined();
     expect(serverQuery({ ...filters, context: "8", projectMode: "exclude" }, "3")).toMatchObject({
       context_ids: "8",
       exclude_project_ids: "9",
     });
+  });
+
+  it("passes the date range to the API, either end alone", () => {
+    expect(serverQuery({ ...emptyFilters, start_date: "2026-10-05", end_date: "2026-10-10" }, undefined)).toEqual({
+      ordering: "last_activity",
+      start_date: "2026-10-05",
+      end_date: "2026-10-10",
+    });
+    expect(serverQuery({ ...emptyFilters, end_date: "2026-10-10" }, undefined).end_date).toBe("2026-10-10");
+    expect(serverQuery(emptyFilters, undefined).start_date).toBeUndefined();
   });
 
   it("describes the applied filters as pills with names", () => {
@@ -107,24 +113,9 @@ describe("list shaping", () => {
     project({ id: 3, start_date: "2026-10-20" }),
   ];
 
-  it("narrows by creation date range (end inclusive, only with a start)", () => {
-    expect(applyClientFilters(list, { ...emptyFilters, start_date: "2026-10-05" }).map((p) => p.id)).toEqual([2, 3]);
-    expect(applyClientFilters(list, { ...emptyFilters, start_date: "2026-10-05", end_date: "2026-10-10" }).map((p) => p.id)).toEqual([2]);
-    expect(applyClientFilters(list, { ...emptyFilters, end_date: "2026-10-05" })).toHaveLength(3);
-  });
-
   it("keeps only the included projects", () => {
-    expect(applyClientFilters(list, { ...emptyFilters, projects: [3], projectMode: "include" }).map((p) => p.id)).toEqual([3]);
-    expect(applyClientFilters(list, { ...emptyFilters, projects: [3], projectMode: "exclude" })).toHaveLength(3);
-  });
-
-  it("sorts by latest activity, falling back to the start date", () => {
-    const sorted = sortByActivity([
-      project({ id: 1, last_activity: "2026-10-12" }),
-      project({ id: 2, last_activity: null, start_date: "2026-10-14" }),
-      project({ id: 3, last_activity: "2026-10-12", name: "A" }),
-    ]);
-    expect(sorted.map((p) => p.id)).toEqual([2, 3, 1]);
+    expect(onlyIncluded(list, { ...emptyFilters, projects: [3], projectMode: "include" }).map((p) => p.id)).toEqual([3]);
+    expect(onlyIncluded(list, { ...emptyFilters, projects: [3], projectMode: "exclude" })).toHaveLength(3);
   });
 
   it("groups by status in display order and drops empty groups", () => {
@@ -139,49 +130,7 @@ describe("list shaping", () => {
   });
 });
 
-describe("commitments for a project", () => {
-  const scope = { id: 1, contextId: 5, tagIds: [10], subprojectIds: [20, 21] };
-
-  it("matches by target scope", () => {
-    expect(commitmentAppliesToProject(commitment({ id: 1 }), scope)).toBe(true);
-    expect(commitmentAppliesToProject(commitment({ id: 1, target: { kind: "project", id: 2, name: "x" } }), scope)).toBe(false);
-    expect(
-      commitmentAppliesToProject(commitment({ id: 1, aggregation_type: "context", target: { kind: "context", id: 5, name: "c" } }), scope),
-    ).toBe(true);
-    expect(
-      commitmentAppliesToProject(commitment({ id: 1, aggregation_type: "tag", target: { kind: "tag", id: 11, name: "t" } }), scope),
-    ).toBe(false);
-    expect(
-      commitmentAppliesToProject(commitment({ id: 1, aggregation_type: "subproject", target: { kind: "subproject", id: 21, name: "s" } }), scope),
-    ).toBe(true);
-  });
-
-  it("honours include and exclude rules", () => {
-    const tagScoped = commitment({ id: 1, aggregation_type: "context", target: { kind: "context", id: 5, name: "c" } });
-    expect(commitmentAppliesToProject({ ...tagScoped, filters: { ...noFilters, exclude_tag_ids: [10] } }, scope)).toBe(false);
-    expect(commitmentAppliesToProject({ ...tagScoped, filters: { ...noFilters, include_tag_ids: [99] } }, scope)).toBe(false);
-    expect(commitmentAppliesToProject({ ...tagScoped, filters: { ...noFilters, exclude_project_ids: [1] } }, scope)).toBe(false);
-    expect(commitmentAppliesToProject({ ...tagScoped, filters: { ...noFilters, include_subproject_ids: [21] } }, scope)).toBe(true);
-    expect(commitmentAppliesToProject({ ...tagScoped, filters: { ...noFilters, include_subproject_ids: [77] } }, scope)).toBe(false);
-  });
-
-  it("matches a subproject only for its own or its project's scope", () => {
-    expect(commitmentAppliesToSubproject(commitment({ id: 1 }), scope, 20)).toBe(true);
-    const own = commitment({ id: 2, aggregation_type: "subproject", target: { kind: "subproject", id: 20, name: "s" } });
-    expect(commitmentAppliesToSubproject(own, scope, 20)).toBe(true);
-    expect(commitmentAppliesToSubproject(own, scope, 21)).toBe(false);
-    expect(commitmentAppliesToSubproject({ ...commitment({ id: 3 }), filters: { ...noFilters, exclude_subproject_ids: [20] } }, scope, 20)).toBe(false);
-  });
-
-  it("orders active first, then scope, then id", () => {
-    const sorted = sortCommitments([
-      commitment({ id: 3, active: false }),
-      commitment({ id: 2, aggregation_type: "tag" }),
-      commitment({ id: 1, aggregation_type: "project" }),
-    ]);
-    expect(sorted.map((c) => c.id)).toEqual([1, 2, 3]);
-  });
-
+describe("commitment display", () => {
   it("writes rule lines in the old order with a fallback for unknown names", () => {
     const names: NameLookup = {
       tags: new Map([[1, "deep-work"]]),

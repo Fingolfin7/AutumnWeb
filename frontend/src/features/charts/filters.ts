@@ -1,5 +1,3 @@
-import { startOfMonth, startOfQuarter, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
-import { dayKey, parseDay } from "./data";
 import { DEFAULT_KIND, parseKind } from "./build";
 import type { ChartKind } from "./payloads";
 
@@ -69,34 +67,6 @@ export function writeFilters(state: ChartFilters): URLSearchParams {
   const projectKey = state.projectMode === "include" ? "include_projects" : "exclude_projects";
   for (const project of state.projects) params.append(projectKey, String(project));
   return params;
-}
-
-/* ---- default date range ------------------------------------------------- */
-
-/* The profile's default filter (users.models Profile._filter_date_range):
-   "last N days/weeks/months/years" or "month/quarter/year to date". */
-export function defaultDateRange(value: number, unit: string, today: Date): { start: string; end: string } {
-  const end = dayKey(today);
-  switch (unit) {
-    case "month_to_date":
-      return { start: dayKey(startOfMonth(today)), end };
-    case "quarter_to_date":
-      return { start: dayKey(startOfQuarter(today)), end };
-    case "year_to_date":
-      return { start: dayKey(startOfYear(today)), end };
-  }
-  const n = Math.max(1, value);
-  const back = { days: subDays, weeks: subWeeks, months: subMonths, years: subYears }[unit] ?? subMonths;
-  return { start: dayKey(back(today, n)), end };
-}
-
-/* Today's calendar date in the user's timezone, as a local-midnight Date. */
-export function todayIn(timeZone: string, now = new Date()): Date {
-  try {
-    return parseDay(new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now));
-  } catch {
-    return parseDay(dayKey(now));
-  }
 }
 
 /* ---- API query ---------------------------------------------------------- */

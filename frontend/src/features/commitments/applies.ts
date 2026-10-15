@@ -1,14 +1,4 @@
-import type { Commitment, Project, Subproject } from "@/api/types";
-
-/* Which commitments a context/tag/project/subproject page lists. Mirrors
-   core.commitments.commitment_applies_to_* so the panel shows the same set
-   the Django page did, but over data the client already has. */
-
-export interface AppliesData {
-  projects: Project[];
-  /** subproject id -> parent project id; only needed when a rule or target names subprojects. */
-  subprojectParents: Map<number, number>;
-}
+import type { Commitment } from "@/api/types";
 
 export function needsSubprojects(commitments: Commitment[]): boolean {
   return commitments.some(
@@ -19,89 +9,14 @@ export function needsSubprojects(commitments: Commitment[]): boolean {
   );
 }
 
-export function subprojectParentMap(subprojects: Subproject[]): Map<number, number> {
-  return new Map(subprojects.map((sub) => [sub.id, sub.project_id]));
-}
-
-export function commitmentAppliesToProject(c: Commitment, project: Project, data: AppliesData): boolean {
-  const projectTagIds = project.tags.map((tag) => tag.id);
-  switch (c.aggregation_type) {
-    case "context":
-      if (c.target.id !== project.context?.id) return false;
-      break;
-    case "tag":
-      if (!projectTagIds.includes(c.target.id)) return false;
-      break;
-    case "project":
-      if (c.target.id !== project.id) return false;
-      break;
-    case "subproject":
-      return data.subprojectParents.get(c.target.id) === project.id;
-    default:
-      return false;
-  }
-  const f = c.filters;
-  if (f.include_tag_ids.length && !f.include_tag_ids.some((id) => projectTagIds.includes(id))) return false;
-  if (f.exclude_tag_ids.length && f.exclude_tag_ids.some((id) => projectTagIds.includes(id))) return false;
-  if (f.include_project_ids.length && !f.include_project_ids.includes(project.id)) return false;
-  if (f.exclude_project_ids.includes(project.id)) return false;
-  if (f.include_subproject_ids.length && !f.include_subproject_ids.some((id) => data.subprojectParents.get(id) === project.id)) {
-    return false;
-  }
-  return true;
-}
-
-export function commitmentAppliesToSubproject(c: Commitment, subproject: Subproject, data: AppliesData): boolean {
-  const project = data.projects.find((p) => p.id === subproject.project_id);
-  if (!project) return false;
-  const projectTagIds = project.tags.map((tag) => tag.id);
-  switch (c.aggregation_type) {
-    case "context":
-      if (c.target.id !== project.context?.id) return false;
-      break;
-    case "tag":
-      if (!projectTagIds.includes(c.target.id)) return false;
-      break;
-    case "project":
-      if (c.target.id !== project.id) return false;
-      break;
-    case "subproject":
-      if (c.target.id !== subproject.id) return false;
-      break;
-    default:
-      return false;
-  }
-  const f = c.filters;
-  if (f.include_tag_ids.length && !f.include_tag_ids.some((id) => projectTagIds.includes(id))) return false;
-  if (f.exclude_tag_ids.length && f.exclude_tag_ids.some((id) => projectTagIds.includes(id))) return false;
-  if (f.include_project_ids.length && !f.include_project_ids.includes(project.id)) return false;
-  if (f.exclude_project_ids.includes(project.id)) return false;
-  if (f.include_subproject_ids.length && !f.include_subproject_ids.includes(subproject.id)) return false;
-  if (f.exclude_subproject_ids.includes(subproject.id)) return false;
-  return true;
-}
-
 export type EntityKind = "context" | "tag" | "project" | "subproject";
 
-export function commitmentsFor(
-  kind: EntityKind,
-  id: number,
-  commitments: Commitment[],
-  data: AppliesData,
-  subproject?: Subproject,
-): Commitment[] {
-  const matches = commitments.filter((c) => {
-    if (kind === "subproject") return subproject ? commitmentAppliesToSubproject(c, subproject, data) : false;
-    const candidates =
-      kind === "context"
-        ? data.projects.filter((p) => p.context?.id === id)
-        : kind === "tag"
-          ? data.projects.filter((p) => p.tags.some((t) => t.id === id))
-          : data.projects.filter((p) => p.id === id);
-    return candidates.some((project) => commitmentAppliesToProject(c, project, data));
-  });
-  /* Active first, then by scope kind; the server list order (id) breaks ties. */
-  return matches
+/* Which commitments reach an item is the server's call
+   (GET /commitments/?applies_to=kind:id, the same rules the old pages used);
+   this only orders them for display: active first, then by scope kind, with
+   the server's (id) order breaking ties. */
+export function sortCommitments(commitments: Commitment[]): Commitment[] {
+  return commitments
     .map((c, index) => ({ c, index }))
     .sort(
       (a, b) =>

@@ -98,7 +98,7 @@ export function CommitmentsPanel({
             const timeBased = commitment.commitment_type === "time";
             const rules = commitmentRuleLines(commitment, names);
             const balance = commitment.balance;
-            const surplus = period.accrued - period.target;
+            const surplus = commitment.current_surplus;
             return (
               <article className="band commit" key={commitment.id}>
                 <header className="commit-head">

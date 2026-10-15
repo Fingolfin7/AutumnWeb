@@ -1068,11 +1068,10 @@ class BackgroundSerializer(serializers.Serializer):
     mode = serializers.ChoiceField(choices=("upload", "bing", "apod", "none"))
     image_url = serializers.CharField(allow_null=True)
     video_url = serializers.CharField(allow_null=True)
-    page_url = serializers.CharField(
-        allow_null=True,
-        required=False,
-        help_text="For the NASA APOD mode: the NASA page of the picture or video.",
-    )
+    title = serializers.CharField(allow_null=True)
+    description = serializers.CharField(allow_null=True)
+    copyright = serializers.CharField(allow_null=True)
+    source_url = serializers.CharField(allow_null=True)
 
 
 class ConfiguredApiKeysSerializer(serializers.Serializer):
@@ -1157,6 +1156,10 @@ class PreferencesResponseSerializer(PreferencesRequestSerializer):
     avatar_url = serializers.CharField()
     background = BackgroundSerializer()
     configured_api_keys = ConfiguredApiKeysSerializer()
+    openai_source = serializers.ChoiceField(
+        choices=("server", "codex", "profile", "codex_with_api_fallback"),
+        allow_null=True,
+    )
     contexts = PreferenceContextSerializer(many=True)
 
 
