@@ -3,14 +3,24 @@ from django.urls import path
 from core.api_v2.views import (
     ContextDetailView,
     ContextsView,
+    DashboardAPIView,
     MeView,
+    PreferencesView,
     ProjectDetailView,
     ProjectMergeView,
+    ProjectRelatedSummaryView,
     ProjectsView,
     ProjectSubprojectsView,
+    LunaRecommendationsRefreshView,
+    LunaRecommendationsView,
+    RecommendationUsageView,
     SessionDetailView,
+    SessionRelatedSummaryView,
     SessionsView,
     TimerDetailView,
+    TimerReminderDetailView,
+    TimerRemindersView,
+    TimerRecommendationsView,
     TimerRestartView,
     TimersView,
     TimerStopView,
@@ -18,6 +28,28 @@ from core.api_v2.views import (
     SubprojectMergeView,
     TagDetailView,
     TagsView,
+    TimelineAPIView,
+    InsightChatDetailView,
+    InsightChatsView,
+    InsightOptionsView,
+    InsightSelectionView,
+    InsightStreamView,
+    NotificationPreferencesView,
+    NotificationScheduleDetailView,
+    NotificationSchedulesView,
+    NotificationScheduleSnoozeView,
+    PushStatusView,
+    PushSubscriptionsView,
+    PushTestView,
+    WeeklyReviewView,
+    AccountView,
+    ApiKeyView,
+    AvatarView,
+    BackgroundDownloadView,
+    BackgroundView,
+    ChatGPTLoginView,
+    SocialAccountDetailView,
+    SocialAccountsView,
 )
 from core.api_v2.commitments import (
     CommitmentAdjustmentsView,
@@ -32,15 +64,122 @@ from core.api_v2.reports import (
     ReportTalliesView,
     ReportTotalsView,
 )
-from core.api_v2.import_export import ExportView, ImportView
+from core.api_v2.import_export import (
+    ExportView,
+    ImportUploadStreamView,
+    ImportUploadView,
+    ImportView,
+)
 
 
 app_name = "api_v2"
 
 urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
+    path("me/preferences/", PreferencesView.as_view(), name="me-preferences"),
+    path("me/account/", AccountView.as_view(), name="me-account"),
+    path("me/avatar/", AvatarView.as_view(), name="me-avatar"),
+    path("me/background/", BackgroundView.as_view(), name="me-background"),
+    path(
+        "me/background/download/",
+        BackgroundDownloadView.as_view(),
+        name="me-background-download",
+    ),
+    path(
+        "me/api-keys/<str:provider>",
+        ApiKeyView.as_view(),
+        name="me-api-key",
+    ),
+    path(
+        "me/chatgpt-login/",
+        ChatGPTLoginView.as_view(),
+        name="me-chatgpt-login",
+    ),
+    path(
+        "me/social-accounts/",
+        SocialAccountsView.as_view(),
+        name="me-social-accounts",
+    ),
+    path(
+        "me/social-accounts/<str:provider>",
+        SocialAccountDetailView.as_view(),
+        name="me-social-account-detail",
+    ),
+    path("insights/chats/", InsightChatsView.as_view(), name="insights-chats"),
+    path(
+        "insights/chats/<uuid:chat_id>",
+        InsightChatDetailView.as_view(),
+        name="insights-chat-detail",
+    ),
+    path("insights/options/", InsightOptionsView.as_view(), name="insights-options"),
+    path(
+        "insights/selection/",
+        InsightSelectionView.as_view(),
+        name="insights-selection",
+    ),
+    path("insights/stream/", InsightStreamView.as_view(), name="insights-stream"),
+    path(
+        "notifications/preferences/",
+        NotificationPreferencesView.as_view(),
+        name="notification-preferences",
+    ),
+    path(
+        "notifications/schedules/",
+        NotificationSchedulesView.as_view(),
+        name="notification-schedules",
+    ),
+    path(
+        "notifications/schedules/<int:schedule_id>",
+        NotificationScheduleDetailView.as_view(),
+        name="notification-schedule-detail",
+    ),
+    path(
+        "notifications/schedules/<int:schedule_id>/snooze/",
+        NotificationScheduleSnoozeView.as_view(),
+        name="notification-schedule-snooze",
+    ),
+    path("push/status/", PushStatusView.as_view(), name="push-status"),
+    path(
+        "push/subscriptions/",
+        PushSubscriptionsView.as_view(),
+        name="push-subscriptions",
+    ),
+    path("push/test/", PushTestView.as_view(), name="push-test"),
+    path("dashboard/", DashboardAPIView.as_view(), name="dashboard"),
+    path("reports/timeline/", TimelineAPIView.as_view(), name="report-timeline"),
+    path(
+        "reports/weekly-review/",
+        WeeklyReviewView.as_view(),
+        name="report-weekly-review",
+    ),
+    path(
+        "recommendations/timers/",
+        TimerRecommendationsView.as_view(),
+        name="timer-recommendations",
+    ),
+    path(
+        "recommendations/luna/",
+        LunaRecommendationsView.as_view(),
+        name="luna-recommendations",
+    ),
+    path(
+        "recommendations/luna/refresh/",
+        LunaRecommendationsRefreshView.as_view(),
+        name="luna-recommendations-refresh",
+    ),
+    path(
+        "recommendations/usage/",
+        RecommendationUsageView.as_view(),
+        name="recommendation-usage",
+    ),
     path("export/", ExportView.as_view(), name="export"),
     path("import/", ImportView.as_view(), name="import"),
+    path("import/uploads/", ImportUploadView.as_view(), name="import-upload"),
+    path(
+        "import/uploads/<uuid:upload_id>/stream/",
+        ImportUploadStreamView.as_view(),
+        name="import-upload-stream",
+    ),
     path("commitments/", CommitmentsView.as_view(), name="commitments"),
     path(
         "commitments/<int:commitment_id>",
@@ -81,6 +220,16 @@ urlpatterns = [
     path("timers/", TimersView.as_view(), name="timers"),
     path("timers/<int:session_id>", TimerDetailView.as_view(), name="timer-detail"),
     path(
+        "timers/<int:session_id>/reminders/",
+        TimerRemindersView.as_view(),
+        name="timer-reminders",
+    ),
+    path(
+        "timers/<int:session_id>/reminders/<int:reminder_id>",
+        TimerReminderDetailView.as_view(),
+        name="timer-reminder-detail",
+    ),
+    path(
         "timers/<int:session_id>/stop/",
         TimerStopView.as_view(),
         name="timer-stop",
@@ -92,11 +241,21 @@ urlpatterns = [
     ),
     path("sessions/", SessionsView.as_view(), name="sessions"),
     path(
+        "sessions/related-summary/",
+        SessionRelatedSummaryView.as_view(),
+        name="sessions-related-summary",
+    ),
+    path(
         "sessions/<int:session_id>",
         SessionDetailView.as_view(),
         name="session-detail",
     ),
     path("projects/", ProjectsView.as_view(), name="projects"),
+    path(
+        "projects/related-summary/",
+        ProjectRelatedSummaryView.as_view(),
+        name="projects-related-summary",
+    ),
     path("projects/merge/", ProjectMergeView.as_view(), name="project-merge"),
     path(
         "projects/<int:project_id>",

@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from django.contrib.auth.models import User
 from django.http import StreamingHttpResponse
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase
-from django.urls import reverse
 from asgiref.sync import async_to_sync
 from unittest.mock import patch
 
@@ -14,15 +13,17 @@ from llm_insights.gemini_handler import GeminiHandler
 from llm_insights.llm_handlers import get_llm_handler
 from llm_insights.models import LLMChat, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
-from llm_insights.views import (
-    InsightsView,
+from llm_insights.services import handlers as insight_handlers
+from llm_insights.services.analysis import perform_llm_analysis_stream
+from llm_insights.services.chats import (
     clean_generated_chat_title,
-    configure_sse_response,
     fallback_chat_title,
     generate_and_save_chat_title,
-    perform_llm_analysis_stream,
     save_llm_messages,
     save_partial_stream_messages,
+)
+from llm_insights.services.streaming import (
+    configure_sse_response,
     stream_keepalive,
     stream_queue_events,
 )
@@ -30,8 +31,11 @@ from users.codex_auth import serialize_token_bundle
 
 
 class InsightsViewProviderModelsTests(TestCase):
+    """Model and reasoning-effort choices (llm_insights.services.handlers)."""
+
+    OPENAI_REASONING_EFFORTS = insight_handlers.OPENAI_REASONING_EFFORTS
+
     def setUp(self):
-        self.view = InsightsView()
         self.user = User.objects.create_user(
             username="llm-user", password="test-pass-123"
         )
@@ -46,21 +50,21 @@ class InsightsViewProviderModelsTests(TestCase):
             self.assertTrue(model_label)
 
     def test_gemini_models_require_a_profile_api_key(self):
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assertNotIn("gemini", provider_models)
 
         self.user.profile.set_api_key("gemini", "test-gemini-key")
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
         self.assert_has_model_choices(provider_models, "gemini")
 
     def test_openai_models_are_available_when_key_present(self):
         self.user.profile.set_api_key("openai", "test-openai-key")
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
         self.assertEqual(
@@ -75,7 +79,7 @@ class InsightsViewProviderModelsTests(TestCase):
 
     def test_openai_models_are_available_when_server_key_present(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-server-key"}):
-            provider_models = self.view._provider_models(self.user)
+            provider_models = insight_handlers.provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
 
@@ -92,7 +96,7 @@ class InsightsViewProviderModelsTests(TestCase):
         )
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
         self.assertIn(("gpt-6-sol", "GPT-6 Sol"), provider_models["openai"])
@@ -100,14 +104,14 @@ class InsightsViewProviderModelsTests(TestCase):
 
     def test_openai_reasoning_effort_defaults_to_high(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "unexpected"),
+            insight_handlers.validate_reasoning_effort("openai", "unexpected"),
             "high",
         )
 
     def test_xhigh_reasoning_effort_is_available(self):
-        self.assertIn("xhigh", self.view.OPENAI_REASONING_EFFORTS)
+        self.assertIn("xhigh", self.OPENAI_REASONING_EFFORTS)
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "xhigh", "gpt-5.5"),
+            insight_handlers.validate_reasoning_effort("openai", "xhigh", "gpt-5.5"),
             "xhigh",
         )
 
@@ -118,16 +122,16 @@ class InsightsViewProviderModelsTests(TestCase):
                          ("gpt-5.6-terra", "gpt-6-sol"),
                          ("gpt-5.6", "gpt-6-sol")]:
             with self.subTest(model=old):
-                self.assertEqual(self.view._validate_selection(models, "openai", old), ("openai", new))
+                self.assertEqual(insight_handlers.validate_selection(models, "openai", old), ("openai", new))
 
     def test_all_gpt_6_choices_preserve_xhigh_and_max(self):
         for model in ("gpt-6-luna", "gpt-6-sol", "gpt-6-astra"):
             for effort in ("xhigh", "max"):
-                self.assertEqual(self.view._validate_reasoning_effort("openai", effort, model), effort)
+                self.assertEqual(insight_handlers.validate_reasoning_effort("openai", effort, model), effort)
 
     def test_legacy_extra_high_reasoning_effort_is_normalized(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort(
+            insight_handlers.validate_reasoning_effort(
                 "openai", "extra-high", "gpt-6-sol"
             ),
             "xhigh",
@@ -135,11 +139,11 @@ class InsightsViewProviderModelsTests(TestCase):
 
     def test_max_reasoning_effort_is_available_for_gpt_6(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "max", "gpt-6-sol"),
+            insight_handlers.validate_reasoning_effort("openai", "max", "gpt-6-sol"),
             "max",
         )
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "max", "gpt-5.5"),
+            insight_handlers.validate_reasoning_effort("openai", "max", "gpt-5.5"),
             "high",
         )
 
@@ -147,49 +151,44 @@ class InsightsViewProviderModelsTests(TestCase):
         self.user.profile.set_api_key("openai", "test-openai-key")
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assertEqual(
-            self.view._validate_selection(provider_models, None, None),
+            insight_handlers.validate_selection(provider_models, None, None),
             ("openai", "gpt-6-luna"),
         )
 
     def test_reasoning_effort_is_ignored_for_non_openai_providers(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort("gemini", "high"),
+            insight_handlers.validate_reasoning_effort("gemini", "high"),
             "",
         )
 
-    def test_insights_page_redirects_when_ai_features_disabled(self):
-        self.user.profile.ai_features_enabled = False
-        self.user.profile.save()
-        client = Client()
-        client.force_login(self.user)
+class InsightsAccessAndUsageApiTests(TestCase):
+    """The Insights page (React) reads chats and token usage from /api/v2/insights/."""
 
-        response = client.get(reverse("insights"))
-
-        self.assertRedirects(response, reverse("home"))
-
-    def test_insights_page_redirects_when_no_profile_credentials_exist(self):
-        self.user.profile.ai_features_enabled = True
-        self.user.profile.save()
-        client = Client()
-        client.force_login(self.user)
-
-        response = client.get(reverse("insights"))
-
-        self.assertRedirects(response, reverse("home"))
-
-        home_response = client.get(reverse("home"))
-        self.assertNotContains(home_response, f'href="{reverse("insights")}"')
-
-
-class TokenUsageHeaderTests(TestCase):
-    def test_header_reports_cached_tokens_alongside_in_and_out(self):
-        user = User.objects.create_user(username="usage-user", password="test-pass-123")
-        user.profile.set_api_key("gemini", "test-gemini-key")
-        user.profile.ai_features_enabled = True
+    def _user(self, name, *, ai=True, key=True):
+        user = User.objects.create_user(username=name, email=f"{name}@example.com", password="test-pass-123")
+        user.profile.ai_features_enabled = ai
+        if key:
+            user.profile.set_api_key("gemini", "test-gemini-key")
         user.profile.save()
+        return user
+
+    def test_access_is_refused_when_ai_features_are_disabled(self):
+        client = Client()
+        client.force_login(self._user("noai", ai=False))
+        for path in ("/api/v2/insights/chats/", "/api/v2/insights/options/"):
+            with self.subTest(path=path):
+                self.assertEqual(client.get(path).status_code, 403)
+
+    def test_access_is_refused_without_provider_credentials(self):
+        client = Client()
+        client.force_login(self._user("nokey", key=False))
+        self.assertEqual(client.get("/api/v2/insights/chats/").status_code, 403)
+
+    def test_chat_detail_carries_the_per_message_usage_the_header_sums(self):
+        user = self._user("usage-user")
         chat = LLMChat.objects.create(
             user=user, title="Usage test", model="gemini:gemini-3.1-flash-lite"
         )
@@ -203,37 +202,20 @@ class TokenUsageHeaderTests(TestCase):
         client = Client()
         client.force_login(user)
 
-        response = client.get(
-            reverse("insights_detail", kwargs={"chat_id": chat.id})
-        )
+        payload = client.get(f"/api/v2/insights/chats/{chat.id}").json()
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "In: 15756")
-        self.assertContains(response, "Cached: 3054")
-        self.assertContains(response, 'data-cached="3054"')
+        usages = [message["metadata"]["usage"] for message in payload["messages"]]
+        self.assertEqual([usage["cached"] for usage in usages], [0, 3054])
+        self.assertEqual(sum(usage["prompt"] for usage in usages), 15756)
 
-    def test_header_omits_cached_when_nothing_was_cached(self):
-        user = User.objects.create_user(username="nocache-user", password="test-pass-123")
-        user.profile.set_api_key("gemini", "test-gemini-key")
-        user.profile.ai_features_enabled = True
-        user.profile.save()
-        chat = LLMChat.objects.create(
-            user=user, title="No cache", model="gemini:gemini-3.1-flash-lite"
-        )
-        LLMMessage.objects.create(
-            chat=chat,
-            role="assistant",
-            content="answer",
-            metadata={"usage": {"prompt": 100, "response": 10, "cached": 0}},
-        )
+    def test_another_users_chat_is_not_found(self):
+        owner = self._user("owner")
+        chat = LLMChat.objects.create(user=owner, title="Private", model="gemini:gemini-3.1-flash-lite")
         client = Client()
-        client.force_login(user)
-
-        response = client.get(
-            reverse("insights_detail", kwargs={"chat_id": chat.id})
-        )
-
-        self.assertNotContains(response, "Cached:")
+        client.force_login(self._user("intruder"))
+        self.assertEqual(client.get(f"/api/v2/insights/chats/{chat.id}").status_code, 404)
+        self.assertEqual(client.delete(f"/api/v2/insights/chats/{chat.id}").status_code, 404)
+        self.assertTrue(LLMChat.objects.filter(pk=chat.pk).exists())
 
 
 class GetLlmHandlerTests(SimpleTestCase):
@@ -1133,7 +1115,7 @@ class PerformLlmAnalysisStreamTests(TransactionTestCase):
             model="fake:fake-model",
         )
 
-        with patch("llm_insights.views.close_old_connections") as close_connections:
+        with patch("llm_insights.services.chats.close_old_connections") as close_connections:
             async_to_sync(save_llm_messages)(
                 chat.id,
                 [{"role": "user", "content": "hello"}],

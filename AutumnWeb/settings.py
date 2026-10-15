@@ -162,13 +162,33 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
         "rest_framework.authentication.TokenAuthentication",
     ],
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_SCHEMA_CLASS": "core.api_v2.openapi.AutoSchema",
 }
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Autumn API v2",
     "VERSION": "2.0.0",
+    "ENUM_NAME_OVERRIDES": {
+        "FilterUnitEnum": [
+            "days",
+            "weeks",
+            "months",
+            "years",
+            "month_to_date",
+            "quarter_to_date",
+            "year_to_date",
+        ],
+        "LunaEffortEnum": ["low", "medium", "high", "xhigh", "max"],
+        "ProjectStatusEnum": ["active", "paused", "complete", "archived"],
+        "ReportHierarchyKindEnum": ["subproject", "residual"],
+        "TimerReminderModeEnum": ["after", "at", "interval"],
+    },
     "PREPROCESSING_HOOKS": ["core.api_v2.schema.v2_endpoints_only"],
+    "POSTPROCESSING_HOOKS": [
+        "drf_spectacular.hooks.postprocess_schema_enums",
+        "core.api_v2.schema.mark_mcp_operations",
+        "core.api_v2.schema.relax_conditional_fields",
+    ],
 }
 
 
@@ -443,6 +463,10 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
+
+# Development only: load the React app from Vite's dev server (hot reload)
+# instead of the built bundle in core/static/app/. Example: http://localhost:5173
+VITE_DEV_SERVER = env("VITE_DEV_SERVER", default="")
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static" if not DEBUG else "staticfiles")

@@ -1,8 +1,15 @@
 const CACHE_PREFIX = "autumn-pwa";
-/* Bumped to v3 in chunk 13: the precache list below changed, and installed
-   clients hold the old list under the old key until the name changes. */
-const PRECACHE = `${CACHE_PREFIX}-precache-v3`;
-const RUNTIME = `${CACHE_PREFIX}-runtime-v3`;
+/* Bumped to v4 for the React app: the shell and app-asset caches below are
+   new, and installed clients hold the old list until the name changes. */
+const PRECACHE = `${CACHE_PREFIX}-precache-v4`;
+const RUNTIME = `${CACHE_PREFIX}-runtime-v4`;
+/* The last React page HTML (spa.html) this user loaded, served for any
+   navigation while offline; the app routes itself from the URL. */
+const SHELL = `${CACHE_PREFIX}-shell-v4`;
+const SHELL_KEY = "/__autumn-shell__";
+/* Every file of the current React build, so lazy pages open offline too. */
+const APP_ASSETS = `${CACHE_PREFIX}-app-v4`;
+const APP_MANIFEST = "/static/app/manifest.json";
 const OFFLINE_URL = "/static/core/pwa/offline.html";
 
 /* cache.addAll is all-or-nothing: one 404 rejects the install and the worker
@@ -35,7 +42,7 @@ self.addEventListener("activate", function (event) {
                 cacheNames
                     .filter(function (cacheName) {
                         return cacheName.startsWith(CACHE_PREFIX)
-                            && ![PRECACHE, RUNTIME].includes(cacheName);
+                            && ![PRECACHE, RUNTIME, SHELL, APP_ASSETS].includes(cacheName);
                     })
                     .map(function (cacheName) {
                         return caches.delete(cacheName);
@@ -257,9 +264,21 @@ self.addEventListener("fetch", function (event) {
     }
 
     if (event.request.mode === "navigate") {
+        event.respondWith(navigate(event.request));
+        return;
+    }
+
+    /* Hashed build files never change under a name: cache-first. */
+    if (requestUrl.pathname.startsWith("/static/app/assets/")) {
         event.respondWith(
-            fetch(event.request).catch(function () {
-                return caches.match(OFFLINE_URL);
+            caches.match(event.request).then(function (cached) {
+                return cached || fetch(event.request).then(function (response) {
+                    if (response && response.status === 200 && response.type === "basic") {
+                        var copy = response.clone();
+                        caches.open(APP_ASSETS).then(function (cache) { cache.put(event.request, copy); });
+                    }
+                    return response;
+                });
             })
         );
         return;
@@ -290,4 +309,69 @@ self.addEventListener("fetch", function (event) {
             })
         );
     }
+});
+
+/* Network first. A React page (marked by core/spa.py's X-Autumn-Shell
+   header) is remembered as the offline shell; leaving for the login page
+   (signed out, session expired) forgets it, so a signed-out device never
+   opens someone's cached app. With no network, the shell stands in for any
+   page, and the static offline page for the rest. */
+function navigate(request) {
+    return fetch(request).then(function (response) {
+        var path = new URL(response.url || request.url).pathname;
+        if (response.ok && response.headers.get("X-Autumn-Shell") === "1") {
+            var copy = response.clone();
+            caches.open(SHELL).then(function (cache) { cache.put(SHELL_KEY, copy); });
+        } else if (path.startsWith("/login") || path.startsWith("/logout") || path.startsWith("/accounts/")) {
+            caches.delete(SHELL);
+        }
+        return response;
+    }).catch(function () {
+        return caches.open(SHELL).then(function (cache) {
+            return cache.match(SHELL_KEY);
+        }).then(function (shell) {
+            return shell || caches.match(OFFLINE_URL);
+        });
+    });
+}
+
+/* The app asks for this after each load: cache the whole current build so
+   pages not yet visited open offline, and drop files of older builds. */
+function warmAppAssets() {
+    return fetch(APP_MANIFEST, { cache: "no-store", credentials: "same-origin" })
+        .then(function (response) {
+            if (!response.ok) throw new Error("manifest " + response.status);
+            return response.json();
+        })
+        .then(function (manifest) {
+            var wanted = new Set();
+            Object.keys(manifest).forEach(function (key) {
+                var chunk = manifest[key] || {};
+                [chunk.file].concat(chunk.css || [], chunk.assets || []).forEach(function (file) {
+                    if (file) wanted.add(new URL("/static/app/" + file, self.location.origin).href);
+                });
+            });
+            return caches.open(APP_ASSETS).then(function (cache) {
+                return cache.keys().then(function (requests) {
+                    var have = new Set(requests.map(function (r) { return r.url; }));
+                    var stale = requests.filter(function (r) { return !wanted.has(r.url); });
+                    var missing = Array.from(wanted).filter(function (url) { return !have.has(url); });
+                    return Promise.all(stale.map(function (r) { return cache.delete(r); })).then(function () {
+                        /* One by one: a single failure shouldn't drop the rest. */
+                        return missing.reduce(function (chain, url) {
+                            return chain.then(function () {
+                                return cache.add(url).catch(function () {});
+                            });
+                        }, Promise.resolve());
+                    });
+                });
+            });
+        })
+        .catch(function () {});
+}
+
+self.addEventListener("message", function (event) {
+    var data = event.data || {};
+    if (data.type === "warm-app") event.waitUntil(warmAppAssets());
+    if (data.type === "forget-shell") event.waitUntil(caches.delete(SHELL));
 });

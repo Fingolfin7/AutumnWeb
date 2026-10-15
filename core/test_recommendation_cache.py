@@ -115,12 +115,12 @@ class PersistentAdviceTests(TestCase):
         self.get()
         self.get(user=self.other)
         self.client.force_login(self.user)
-        url = reverse("refresh_recommendations")
+        url = "/api/v2/recommendations/luna/refresh/"
         self.assertEqual(self.client.get(url).status_code, 405)
         strict = Client(enforce_csrf_checks=True)
         strict.force_login(self.user)
-        self.assertEqual(strict.post(url).status_code, 403)
-        self.assertEqual(self.client.post(url).status_code, 302)
+        self.assertEqual(strict.post(url, "{}", content_type="application/json").status_code, 403)
+        self.assertEqual(self.client.post(url, "{}", content_type="application/json").status_code, 200)
         self.assertLessEqual(RecommendationCache.objects.get(user=self.user).expires_at, timezone.now())
         self.assertGreater(RecommendationCache.objects.get(user=self.other).expires_at, timezone.now())
 

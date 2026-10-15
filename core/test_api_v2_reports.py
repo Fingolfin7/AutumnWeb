@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta, timezone as datetime_timezone
 
 from django.contrib.auth.models import User
-from django.test import Client, TestCase
+from django.test import TestCase
 from django.urls import reverse
+from drf_spectacular.generators import SchemaGenerator
 from rest_framework.test import APIClient
 
 from core.models import Context, Projects, Sessions, SessionSubproject, SubProjects, Tag
@@ -169,6 +170,52 @@ class V2ReportsTests(TestCase):
                 self.assertTrue(response.json())
                 self.assertEqual(set(response.json()[0]), keys)
 
+    def test_chart_schema_has_all_types_typed_context_and_family_components(self):
+        schema = SchemaGenerator().get_schema(request=None, public=True)
+        operation = schema["paths"]["/api/v2/reports/charts/"]["get"]
+        parameters = {item["name"]: item for item in operation["parameters"]}
+        self.assertEqual(
+            set(parameters["chart_type"]["schema"]["enum"]),
+            {
+                "pie",
+                "bar",
+                "scatter",
+                "line",
+                "calendar",
+                "heatmap",
+                "stacked_area",
+                "cumulative",
+                "treemap",
+                "status",
+                "context",
+                "histogram",
+                "radar",
+                "bubble",
+                "wordcloud",
+            },
+        )
+        self.assertEqual(parameters["context"]["schema"]["type"], "integer")
+        response_schema = operation["responses"]["200"]["content"][
+            "application/json"
+        ]["schema"]
+        self.assertEqual(response_schema["$ref"], "#/components/schemas/ChartResponse")
+        components = schema["components"]["schemas"]
+        for name in (
+            "ChartTallyRow",
+            "ChartStatusRow",
+            "ChartBubbleRow",
+            "ChartScatterRow",
+            "ChartDailySeriesRow",
+            "ChartDailyTotalRow",
+            "ChartIntervalRow",
+            "ChartHeatmapCell",
+            "ChartHistogramRow",
+            "ChartWordRow",
+            "ChartRadarRow",
+            "ChartHierarchyResponse",
+        ):
+            self.assertIn(name, components)
+
     def test_chart_date_filter_uses_yyyy_mm_dd(self):
         response = self.client.get(
             reverse("api_v2:report-charts"),
@@ -180,12 +227,3 @@ class V2ReportsTests(TestCase):
     def test_v1_chart_data_route_is_removed(self):
         response = self.client.get("/api/chart_data/", {"chart_type": "line"})
         self.assertEqual(response.status_code, 404)
-
-    def test_web_charts_template_references_only_v2_chart_url(self):
-        web_client = Client()
-        web_client.force_login(self.user)
-        response = web_client.get(reverse("charts"))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, reverse("api_v2:report-charts"))
-        self.assertNotContains(response, "/api/chart_data/")
-        self.assertNotContains(response, "api_chart_data")

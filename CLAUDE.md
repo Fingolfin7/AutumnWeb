@@ -16,8 +16,16 @@ python -m venv .venv
 # macOS/Linux:
 source .venv/bin/activate
 
-# Development server
+# Development server (Django renders the page shell; the UI is the React app in frontend/)
 python manage.py runserver
+
+# Web UI (frontend/, Node 22)
+cd frontend && npm ci
+npm run dev        # Vite on :5173; run Django with VITE_DEV_SERVER=http://localhost:5173 for hot reload
+npm run build      # Writes core/static/app/ (gitignored); Django serves it when VITE_DEV_SERVER is unset
+npm run gen:api    # Regenerate src/api/schema.d.ts after changing openapi-v2.yaml
+npm run typecheck && npm test
+npm run e2e         # Playwright suite (Chromium; first `npx playwright install chromium`): builds the app, serves it from Django on a throwaway SQLite db seeded by seed_demo; needs Python, set PYTHON to the venv interpreter
 
 # Database migrations
 python manage.py makemigrations
@@ -26,7 +34,7 @@ python manage.py migrate
 # Run all tests
 pip install -r requirements-dev.txt
 python manage.py test
-node --test scripts/tests/polling.test.cjs scripts/tests/recommendations.test.cjs scripts/tests/charts_related.test.cjs scripts/tests/similarity_slider.test.cjs
+(cd frontend && npx tsc --noEmit && npx vitest run)  # Frontend checks
 
 # Run specific test file
 python manage.py test core.tests.test_parse_date_or_datetime_iso
@@ -36,12 +44,24 @@ python manage.py audit --username=<user>  # Recalculate totals (omit --username 
 python manage.py export <username> --output_file=<path>
 python manage.py import <username> --input_file=<path>
 python manage.py clear --username=<user>  # Delete all project data (omit --username for all users)
+python manage.py seed_demo [--username=demo --password=demo-pass-123] [--reset [--force]]  # Fictional demo account (used by e2e); --reset needs DEBUG or --force
 python manage.py clear_temp_uploads --older-than-hours=24 [--dry-run]  # Sweep abandoned import uploads from MEDIA_ROOT/temp
 python manage.py embed_sessions [--username=<user>] [--dry-run] [--limit=N]  # Embed new/changed sessions and projects for semantic search (backfill/repair; web processes do it after edits)
 python scripts/semantic_search_eval.py [--keyword-only]  # Keyword vs hybrid search on fictional records; needs OPENAI_API_KEY
 ```
 
 ## Architecture
+
+### Web UI (frontend/)
+
+The browser UI is a React 19 + TypeScript single-page app in `frontend/` (Vite, react-router, TanStack Query, openapi-fetch). It talks only to `/api/v2/`; its client types are generated from `openapi-v2.yaml` (`npm run gen:api`), so API changes go through the schema first.
+
+- Django still owns every URL: each page route in `core/urls.py` (and `profile/`, `insights/`) points at `core.spa.spa`, which renders `core/templates/core/spa.html` with the Vite bundle from `core/static/app/manifest.json` and a JSON bootstrap blob (`bootstrap_payload`: user, profile defaults, contexts, CSRF token, flash messages). Unknown paths are real 404s, and auth pages (login, register, password reset, OAuth) stay server-rendered.
+- Adding a page means an entry in `frontend/src/app/routePatterns.ts` and a Django route to `spa` under the same path, keeping the old URL name.
+- Pages live in `frontend/src/features/<area>/`; shared shell, toasts, command palette and offline sync in `frontend/src/app/`. The Night Ledger look comes from `core/static/core/css/focus_desk.css`, loaded by `spa.html`; `frontend/src/styles/app.css` only adds what the app introduces.
+- Offline: TanStack Query's cache is persisted to localStorage, timer start/stop made offline are queued (`frontend/src/lib/offlineQueue.ts`) and replayed when the server is reachable, and the service worker (`core/static/core/pwa/service-worker.js`) keeps the app shell and built assets.
+- Polling (running timers every 15 s, the Home timeline every 5 min) pauses while the tab is hidden or after 3 minutes without input (`frontend/src/app/attention.ts` drives TanStack Query's `focusManager`), so a tab left open lets the database (Neon) suspend; the next input refetches what went stale.
+- Render builds with `bash scripts/render-build.sh` (pip install, `npm ci && npm run build`, collectstatic).
 
 ### Django Apps
 
@@ -90,11 +110,11 @@ Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate
 
 ### Key Files
 
-- `core/views/` - UI views package, one module per area (`timers`, `sessions`, `projects`, `contexts_tags`, `commitments`, `import_export`, `charts`, `dashboard`); import views from their owning module rather than relying on package-level re-exports
+- `core/views/` - the few Django views that remain: `switch_context` (the context form on server-rendered pages) and the `recommendation_usage` page. Every other page is the React app (`core/spa.py`) and every action goes through `core/api_v2/`
 - `core/api_v2/` - versioned REST API package (`views`, `serializers`, `reports`, `commitments`, `contexts_tags`, `filters`, `import_export`); `openapi-v2.yaml` is the checked-in schema artifact
 - `core/importer.py` - Shared `iter_import` generator and `run_import` wrapper used by web and API imports
-- `core/temp_uploads.py` - Staging of web-import uploads under `MEDIA_ROOT/temp` between the import POST and the stream GET, plus their cleanup
-- `core/services/semantic_search.py` - meaning-based search: OpenAI `text-embedding-3-small` (512 dims) vectors in `SessionEmbedding`/`ProjectEmbedding`, written with each user's own OpenAI key while `ai_features_enabled`, by `core/services/embedding_sync.py` (a daemon thread in each web process re-embeds an account ~10 s after edits, requested via `core/signals.py` and `request_sync_on_commit` on `update()` paths that bypass signals; related searches also recheck an account every 10 min) and by `embed_sessions` for backfills; a search embeds just the query and falls back to keyword results on any failure. A vector is stale when its stored text digest no longer matches the record's current text (project/subproject names plus the note or description). Notes longer than one ~240-character passage also get per-passage vectors (`SessionPassageEmbedding`, replaced together under one digest of the session's text), and a session scores the better of its whole vector and its best passage. Sessions search is one ranked list shared by the Sessions page and API v2/MCP (`core.search.rank_sessions`: direct keyword matches newest first, then every related match above the cutoff best first; the API's default `ordering=relevance` returns that order with a per-row `match`, and the page shows related matches in their own paged "Related" section). Projects shows every related project in its own paged "Related" section (`?related_page=`), as Sessions does; Charts and Insights count related sessions only with the "Include related sessions" toggle (`related=on`); API v2 sessions/reports/projects take `search` + `related=true` and answer with an `X-Autumn-Related: included|unavailable` header (Charts' JS flips its "Including related" pill from it; Insights does the same server-side). A failed query embedding starts a 5-minute per-account cooldown (`FAILURE_COOLDOWN_SECONDS`). `core.search.search_sessions(..., user=, related=)` applies it and must run after every other filter, since related matches are drawn from what the filters left. The similarity cutoff is per search (`?similarity=` on pages and API v2, 0.25-0.60, echoed in `X-Autumn-Related-Similarity`), else the account's `Profile.related_similarity`, else `SEMANTIC_SEARCH_MIN_SIMILARITY`; the Related slider (`core/partials/similarity_slider.html`, `similarity_slider.js`, context from `core.utils.similarity_slider`) sets it, and on Sessions/Projects shows live counts from `RelatedOutcome(collect_scores=True)`, which scores down to the 0.25 floor. Keyword search (`core.search.search_words`) needs every word, in any order and field, drops common words, and keeps "quoted phrases" whole
+- `core/temp_uploads.py` - Staging of import uploads under `MEDIA_ROOT/temp` between `POST /api/v2/import/uploads/` and its stream GET, plus their cleanup
+- `core/services/semantic_search.py` - meaning-based search: OpenAI `text-embedding-3-small` (512 dims) vectors in `SessionEmbedding`/`ProjectEmbedding`, written with each user's own OpenAI key while `ai_features_enabled`, by `core/services/embedding_sync.py` (a daemon thread in each web process re-embeds an account ~10 s after edits, requested via `core/signals.py` and `request_sync_on_commit` on `update()` paths that bypass signals; related searches also recheck an account every 10 min) and by `embed_sessions` for backfills; a search embeds just the query and falls back to keyword results on any failure. A vector is stale when its stored text digest no longer matches the record's current text (project/subproject names plus the note or description). Notes longer than one ~240-character passage also get per-passage vectors (`SessionPassageEmbedding`, replaced together under one digest of the session's text), and a session scores the better of its whole vector and its best passage. Sessions search is one ranked list shared by the Sessions page (React, via API v2) and MCP (`core.search.rank_sessions`: direct keyword matches newest first, then every related match above the cutoff best first; the API's default `ordering=relevance` returns that order with a per-row `match`, and the page lists related matches in their own "Related" section). Projects lists every related project after the keyword matches (API v2 `related=true`); Charts and Insights count related sessions only with the "Include related sessions" toggle (`related=on`); API v2 sessions/reports/projects take `search` + `related=true` and answer with an `X-Autumn-Related: included|unavailable` header (the React Charts and Insights pages flip their "Including related" pill from it). A failed query embedding starts a 5-minute per-account cooldown (`FAILURE_COOLDOWN_SECONDS`). `core.search.search_sessions(..., user=, related=)` applies it and must run after every other filter, since related matches are drawn from what the filters left. The similarity cutoff is per search (`?similarity=` on pages and API v2, 0.25-0.60, echoed in `X-Autumn-Related-Similarity`), else the account's `Profile.related_similarity`, else `SEMANTIC_SEARCH_MIN_SIMILARITY`; the Related slider (`frontend/src/features/search/SimilaritySlider.tsx`) sets it; `RelatedOutcome(collect_scores=True)` scores down to the 0.25 floor so the slider can show live counts (`GET /api/v2/sessions/related-summary/` and `/projects/related-summary/`, web-only, not MCP tools). Keyword search (`core.search.search_words`) needs every word, in any order and field, drops common words, and keeps "quoted phrases" whole
 - `core/urls.py` - URL routing, including `/healthz/`
 - `core/utils.py` (~20KB) - Helper functions, date parsing, data formatting
 - `users/models.py` - Profile model with encrypted API key get/set methods
@@ -113,6 +133,7 @@ Optional:
 DATABASE_URL=postgres://...  # Falls back to SQLite
 NASA_API_KEY=<key>
 SERVE_MEDIA=TRUE  # For PaaS deployments
+VITE_DEV_SERVER=http://localhost:5173  # Dev only: load the UI from Vite instead of the built bundle
 ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *
 ALLOW_REGISTRATION=FALSE  # Registration is closed unless explicitly enabled
 GOOGLE_OAUTH_CLIENT_ID=<google-web-client-id>
@@ -176,4 +197,5 @@ that the operating system displayed it.
 Tests are in `core/test_*.py`, `core/tests.py`, `users/`, and `llm_insights/`.
 Install `requirements-dev.txt` for test-only dependencies. CI runs on Windows
 with SQLite and Python 3.10, and Ubuntu with PostgreSQL and Python 3.13.
-Browser polling behavior tests use Node 22+ built-ins, with no npm dependencies.
+Frontend tests are Vitest (`npm test` in `frontend/`); CI also checks that
+`src/api/schema.d.ts` matches `openapi-v2.yaml`, type-checks and builds the app.

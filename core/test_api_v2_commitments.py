@@ -6,7 +6,15 @@ from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
 
-from core.models import Commitment, CommitmentPeriod, CommitmentRevision, Projects
+from core.models import (
+    Commitment,
+    CommitmentPeriod,
+    CommitmentRevision,
+    Context,
+    Projects,
+    SubProjects,
+    Tag,
+)
 from core.services import SessionMutationService
 
 
@@ -66,6 +74,7 @@ class V2CommitmentsTests(TestCase):
         )
         self.assertEqual(payload["target_value"], 60.0)
         self.assertEqual(payload["filters"]["include_project_ids"], [])
+        self.assertEqual(payload["current_surplus"], -60.0)
         self.assertIsNone(payload["pending_revision"])
 
         listed = self.client.get(reverse("api_v2:commitments"))
@@ -120,6 +129,78 @@ class V2CommitmentsTests(TestCase):
             ).status_code,
             204,
         )
+
+    @freeze_time("2026-01-01 12:00:00+00:00")
+    def test_applies_to_filters_with_shared_commitment_rules(self):
+        context = Context.objects.create(user=self.user, name="Study")
+        tag = Tag.objects.create(user=self.user, name="Deep")
+        scoped = Projects.objects.create(
+            user=self.user, name="Scoped", context=context
+        )
+        scoped.tags.add(tag)
+        child = SubProjects.objects.create(
+            user=self.user, parent_project=scoped, name="Child"
+        )
+        unrelated = Projects.objects.create(user=self.user, name="Unrelated")
+        commitments = [
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="project",
+                project=scoped,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="subproject",
+                subproject=child,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="context",
+                context=context,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="tag",
+                tag=tag,
+                target=10,
+            ),
+            Commitment.objects.create(
+                user=self.user,
+                aggregation_type="project",
+                project=unrelated,
+                target=10,
+            ),
+        ]
+
+        for kind, target in (
+            ("project", scoped),
+            ("subproject", child),
+            ("context", context),
+            ("tag", tag),
+        ):
+            with self.subTest(kind=kind):
+                response = self.client.get(
+                    reverse("api_v2:commitments"),
+                    {"applies_to": f"{kind}:{target.pk}"},
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    {item["id"] for item in response.json()["commitments"]},
+                    {commitment.pk for commitment in commitments[:4]},
+                )
+
+        malformed = self.client.get(
+            reverse("api_v2:commitments"), {"applies_to": "project:not-an-id"}
+        )
+        self.assertEqual(malformed.status_code, 400)
+        foreign = self.client.get(
+            reverse("api_v2:commitments"),
+            {"applies_to": f"project:{self.foreign_project.pk}"},
+        )
+        self.assertEqual(foreign.status_code, 404)
 
     @freeze_time("2026-01-01 12:00:00+00:00")
     def test_patch_pending_stale_version_and_restart_required(self):
@@ -413,3 +494,118 @@ class V2CommitmentsTests(TestCase):
         response = self.client.get(reverse("api_v2:me"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("commitments", response.json()["capabilities"])
+
+
+class V2CommitmentRestartScopeTests(TestCase):
+    """Restarting can move a commitment to a new scope (the edit form's restart)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="v2-restart-scope", email="v2-restart-scope@example.com"
+        )
+        self.project = Projects.objects.create(user=self.user, name="Focus")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_restart_with_a_new_scope_keeps_the_balance(self):
+        from core.models import Context
+
+        new_context = Context.objects.create(user=self.user, name="Exercise")
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            aggregation_type="project",
+            commitment_type="time",
+            period="weekly",
+            target=300,
+            balance=-60,
+            start_date="2026-01-01",
+            active=False,
+        )
+
+        response = self.client.post(
+            reverse("api_v2:commitment-restart", args=[commitment.pk]),
+            {
+                "keep_balance": True,
+                "changes": {"aggregation_type": "context", "context_id": new_context.pk},
+            },
+            format="json",
+            HTTP_IF_MATCH=str(commitment.version),
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        commitment.refresh_from_db()
+        self.assertEqual(commitment.generation, 2)
+        self.assertEqual(commitment.aggregation_type, "context")
+        self.assertEqual(commitment.context, new_context)
+        self.assertIsNone(commitment.project)
+        self.assertEqual(commitment.balance, -60)
+        self.assertEqual(
+            response.json()["target"],
+            {"kind": "context", "id": new_context.pk, "name": "Exercise"},
+        )
+
+    def test_a_scope_that_belongs_to_someone_else_is_not_found(self):
+        from core.models import Context
+
+        other = User.objects.create_user(username="v2-other-scope", email="o@example.com")
+        foreign = Context.objects.create(user=other, name="Theirs")
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            aggregation_type="project",
+            commitment_type="time",
+            period="weekly",
+            target=300,
+            start_date="2026-01-01",
+        )
+        response = self.client.post(
+            reverse("api_v2:commitment-restart", args=[commitment.pk]),
+            {"keep_balance": True, "changes": {"aggregation_type": "context", "context_id": foreign.pk}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+        commitment.refresh_from_db()
+        self.assertEqual(commitment.generation, 1)
+
+
+class V2CommitmentNotificationOptInTests(TestCase):
+    """The per-commitment opt-in to the evening commitment check notification."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="v2-optin", email="v2-optin@example.com")
+        self.project = Projects.objects.create(user=self.user, name="Focus")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.payload = {
+            "aggregation_type": "project",
+            "project_id": self.project.pk,
+            "commitment_type": "time",
+            "period": "weekly",
+            "target_value": 120,
+        }
+
+    def test_it_defaults_to_off_and_can_be_set_on_create(self):
+        off = self.client.post(reverse("api_v2:commitments"), self.payload, format="json")
+        self.assertEqual(off.status_code, 201, off.content)
+        self.assertIs(off.json()["notifications_enabled"], False)
+        Commitment.objects.all().delete()
+        on = self.client.post(
+            reverse("api_v2:commitments"), {**self.payload, "notifications_enabled": True}, format="json"
+        )
+        self.assertEqual(on.status_code, 201, on.content)
+        self.assertIs(on.json()["notifications_enabled"], True)
+        self.assertTrue(Commitment.objects.get().notifications_enabled)
+
+    def test_it_changes_immediately_without_a_restart_or_pending_revision(self):
+        created = self.client.post(reverse("api_v2:commitments"), self.payload, format="json").json()
+        url = reverse("api_v2:commitment-detail", args=[created["id"]])
+        response = self.client.patch(
+            url, {"notifications_enabled": True}, format="json", HTTP_IF_MATCH=str(created["version"])
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertIs(response.json()["notifications_enabled"], True)
+        self.assertIsNone(response.json()["pending_revision"])
+        self.assertTrue(Commitment.objects.get(pk=created["id"]).notifications_enabled)
+        listed = self.client.get(reverse("api_v2:commitments")).json()["commitments"][0]
+        self.assertIs(listed["notifications_enabled"], True)

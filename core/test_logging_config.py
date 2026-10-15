@@ -67,8 +67,7 @@ class GunicornAccessLogFilterTests(SimpleTestCase):
     def test_successful_health_and_polling_requests_are_suppressed(self):
         for path in (
             "/healthz/",
-            "/timeline/fragment/",
-            "/timers/active-fragment/",
+            "/api/v2/timers/",
         ):
             with self.subTest(path=path):
                 self.assertFalse(should_log_access("GET", path, "200 OK"))

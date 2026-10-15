@@ -5,13 +5,14 @@ from uuid import UUID
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
-from core.models import Context, Projects, SubProjects, Tag
+from core.models import Context, Projects, Sessions, SubProjects, Tag
 from core.search import rank_sessions, search_sessions
 from core.services.semantic_search import parse_similarity
 
 
 @dataclass(frozen=True)
 class SessionFilterSpec:
+    ids: frozenset[int] | None = None
     project_ids: frozenset[int] | None = None
     subproject_ids: frozenset[int] | None = None
     context_ids: frozenset[int] | None = None
@@ -41,6 +42,29 @@ class SessionFilterSpec:
             "exclude_tag_ids": Tag,
         }
         values = {}
+
+        raw_session_ids = qp.get("ids")
+        if raw_session_ids in (None, ""):
+            values["ids"] = None
+        else:
+            try:
+                parts = raw_session_ids.split(",")
+                if any(not part.strip() for part in parts):
+                    raise ValueError
+                session_ids = frozenset(int(part.strip()) for part in parts)
+                if any(value <= 0 for value in session_ids):
+                    raise ValueError
+            except (AttributeError, TypeError, ValueError):
+                errors["ids"] = ["Enter comma-separated positive integer IDs."]
+            else:
+                owned_session_ids = frozenset(
+                    Sessions.objects.filter(
+                        user=user, id__in=session_ids
+                    ).values_list("id", flat=True)
+                )
+                if owned_session_ids != session_ids:
+                    errors["ids"] = ["One or more IDs do not belong to this user."]
+                values["ids"] = session_ids
 
         parsed_id_fields = {}
         fields_by_model = {}
@@ -155,19 +179,21 @@ class SessionFilterSpec:
             )
         return queryset
 
-    def rank(self, queryset, *, user=None, outcome=None):
+    def rank(self, queryset, *, user=None, outcome=None, related=None):
         """The core.search.SessionSearch of these filters and ``search``."""
         return rank_sessions(
             self._filter(queryset),
             self.search,
             user=user,
-            related=self.related,
+            related=self.related if related is None else related,
             cutoff=self.similarity,
             outcome=outcome,
         )
 
     def _filter(self, queryset):
         """Every filter but ``search``."""
+        if self.ids is not None:
+            queryset = queryset.filter(pk__in=self.ids)
         if self.project_ids is not None:
             queryset = queryset.filter(project_id__in=self.project_ids)
         if self.subproject_ids is not None:

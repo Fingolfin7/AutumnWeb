@@ -127,42 +127,6 @@ class CutoffTests(SemanticSearchTestCase):
         self.assertEqual(outcome.scores, [])
 
 
-class SessionsPageSliderTests(SemanticSearchTestCase):
-    def setUp(self):
-        super().setUp()
-        self.mixed = self._session(self.identity, "Login for the invoice, watered plants")
-        self._sync()
-
-    def test_similarity_param_sets_the_cutoff(self):
-        self.assertEqual(self._related("sign-in failure"), [self.oauth.pk])
-        self.assertEqual(
-            self._related("sign-in failure", similarity="0.40"), [self.oauth.pk, self.mixed.pk]
-        )
-
-    def test_invalid_similarity_falls_back_to_the_default(self):
-        self.assertEqual(self._related("sign-in failure", similarity="9"), [self.oauth.pk])
-
-    def test_slider_is_folded_at_the_default_and_open_off_it(self):
-        slider = self._search("sign-in failure").context["related_slider"]
-        self.assertEqual((slider["value"], slider["count"], slider["open"]), (0.45, 1, False))
-        slider = self._search("sign-in failure", similarity="0.40").context["related_slider"]
-        self.assertEqual((slider["value"], slider["count"], slider["open"]), (0.40, 2, True))
-
-    def test_nothing_related_suggests_a_looser_cutoff(self):
-        # "charged" is a billing word no note contains; it scores the mixed
-        # note ~0.41 and the others ~0.
-        response = self._search("charged", similarity="0.50")
-        slider = response.context["related_slider"]
-        self.assertEqual(slider["count"], 0)
-        self.assertEqual(slider["loosen_to"], 0.40)
-        self.assertContains(response, "Loosen to 0.40")
-
-    def test_no_slider_without_semantic_search(self):
-        self.user.profile.ai_features_enabled = False
-        self.user.profile.save()
-        self.assertIsNone(self._search("sign-in failure").context["related_slider"])
-
-
 class ApiSimilarityTests(SemanticSearchTestCase):
     def setUp(self):
         super().setUp()
@@ -197,14 +161,15 @@ class ApiSimilarityTests(SemanticSearchTestCase):
 
 
 class ChartsAndProfileTests(SemanticSearchTestCase):
-    def test_charts_show_the_cutoff_in_use(self):
-        response = self.client.get(
-            reverse("charts"), {"search": "sign-in", "related": "on", "similarity": "0.38"}
-        )
-        self.assertIn({"label": "Closeness", "value": "0.38"}, response.context["active_filters"])
-        self.assertEqual(response.context["related_slider"]["value"], 0.38)
-        default = self.client.get(reverse("charts"), {"search": "sign-in", "related": "on"})
-        self.assertIn({"label": "Closeness", "value": "0.45"}, default.context["active_filters"])
+    def test_charts_report_the_cutoff_in_use(self):
+        self._sync()
+        url = reverse("api_v2:report-charts")
+        params = {"chart_type": "pie", "search": "sign-in", "related": "true"}
+        loose = self.client.get(url, {**params, "similarity": "0.38"})
+        self.assertEqual(loose["X-Autumn-Related-Similarity"], "0.38")
+        default = self.client.get(url, params)
+        self.assertEqual(default["X-Autumn-Related-Similarity"], "0.45")
+        self.assertEqual(self.client.get(url, {**params, "similarity": "0.9"}).status_code, 400)
 
     def _form(self, data):
         form = ProfileUpdateForm(data=data, instance=self.user.profile)
@@ -227,6 +192,50 @@ class ChartsAndProfileTests(SemanticSearchTestCase):
         self.assertIn("related_similarity", form.errors)
 
 
+class SessionsSimilarityTests(SemanticSearchTestCase):
+    """?similarity= on /api/v2/sessions/ (the Sessions page's Related slider)."""
+
+    def setUp(self):
+        super().setUp()
+        self.mixed = self._session(self.identity, "Login for the invoice, watered plants")
+        self._sync()
+
+    def test_similarity_param_sets_the_cutoff(self):
+        self.assertEqual(self._related("sign-in failure"), [self.oauth.pk])
+        self.assertEqual(
+            self._related("sign-in failure", similarity="0.40"), [self.oauth.pk, self.mixed.pk]
+        )
+
+    def test_the_account_default_applies_without_a_param_and_is_echoed(self):
+        response = self._search("sign-in failure")
+        self.assertEqual(response["X-Autumn-Related-Similarity"], "0.45")
+        self.user.profile.related_similarity = 0.40
+        self.user.profile.save()
+        response = self._search("sign-in failure")
+        self.assertEqual(response["X-Autumn-Related-Similarity"], "0.40")
+        self.assertIn(self.mixed.pk, [row["id"] for row in response.json()["sessions"]])
+
+    def test_an_invalid_similarity_is_a_validation_error(self):
+        response = self.client.get(
+            reverse("api_v2:sessions"),
+            {"search": "sign-in failure", "related": "true", "similarity": "9"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("similarity", response.json()["error"]["details"])
+
+    def test_nothing_related_still_echoes_the_cutoff(self):
+        response = self._search("nonexistent lighthouse project", similarity="0.50")
+        self.assertEqual(response.json()["sessions"], [])
+        self.assertEqual(response["X-Autumn-Related-Similarity"], "0.50")
+
+    def test_no_related_matches_or_cutoff_without_semantic_search(self):
+        self.user.profile.ai_features_enabled = False
+        self.user.profile.save()
+        response = self._search("sign-in failure")
+        self.assertEqual(response["X-Autumn-Related"], "unavailable")
+        self.assertEqual([row["match"] for row in response.json()["sessions"]], ["direct"])
+
+
 class ProjectsRelatedPagingTests(SemanticSearchTestCase):
     def setUp(self):
         super().setUp()
@@ -237,24 +246,30 @@ class ProjectsRelatedPagingTests(SemanticSearchTestCase):
         self._sync()
 
     def _page(self, **params):
-        return self.client.get(reverse("projects"), {"search": "sign-in failure", **params})
-
-    def test_every_related_project_is_paged(self):
-        first = self._page()
-        page = first.context["related_page"]
-        # Identity matches by keyword (its "sign-in failure" note), so it is
-        # a direct match, not a related one.
-        self.assertEqual(page.paginator.count, 6)
-        self.assertEqual(len(first.context["related_projects"]), 5)
-        self.assertContains(first, 'aria-label="Related pages"')
-        second = self._page(related_page=2)
-        self.assertEqual(len(second.context["related_projects"]), 1)
-        shown = {p.pk for p in first.context["related_projects"] + second.context["related_projects"]}
-        self.assertEqual(shown, {p.pk for p in self.auth_projects})
-
-    def test_the_slider_count_matches_the_pages(self):
-        response = self._page()
-        self.assertEqual(
-            response.context["related_slider"]["count"],
-            response.context["related_page"].paginator.count,
+        response = self.client.get(
+            reverse("api_v2:projects"),
+            {"search": "sign-in failure", "related": "true", **params},
         )
+        self.assertEqual(response.status_code, 200, response.content)
+        return response
+
+    def test_every_related_project_is_reachable_by_paging(self):
+        # Identity matches by keyword (its "sign-in failure" note), so it is a
+        # direct match, not a related one: 7 in all, 6 of them related.
+        first = self._page(limit=5)
+        self.assertEqual(first.json()["total"], 7)
+        self.assertEqual(first.json()["count"], 5)
+        second = self._page(limit=5, offset=5)
+        self.assertEqual(second.json()["count"], 2)
+        shown = {row["id"] for row in first.json()["projects"] + second.json()["projects"]}
+        self.assertEqual(shown, {p.pk for p in self.auth_projects} | {self.identity.pk})
+
+    def test_the_related_count_is_the_total_beyond_the_keyword_matches(self):
+        keyword = self._project_ids("sign-in failure", related=False)
+        self.assertEqual(keyword, [self.identity.pk])
+        self.assertEqual(len(self._related_projects("sign-in failure")), 6)
+        self.assertEqual(self._page()["X-Autumn-Related"], "included")
+
+    def test_the_cutoff_applies_to_projects(self):
+        loose = self._page(similarity="0.25")
+        self.assertEqual(loose["X-Autumn-Related-Similarity"], "0.25")

@@ -156,20 +156,34 @@ def _day_ticks(start_day, days):
     ]
 
 
-def build_timeline(user, range_key=DEFAULT_RANGE, end_day=None):
+def build_timeline(
+    user,
+    range_key=DEFAULT_RANGE,
+    end_day=None,
+    *,
+    start_day=None,
+    context=None,
+):
     """Lanes, gaps and a now-marker for ``user`` over the selected range.
 
     Returns a dict shaped for direct template consumption. ``lanes`` is empty
     when the window has no activity; callers should render an empty state
     rather than an empty chart.
     """
-    if range_key not in RANGE_DAYS:
-        range_key = DEFAULT_RANGE
-    days = RANGE_DAYS[range_key]
+    if start_day is None:
+        if range_key not in RANGE_DAYS:
+            range_key = DEFAULT_RANGE
+        days = RANGE_DAYS[range_key]
+    else:
+        end_day = end_day or start_day
+        if start_day > end_day:
+            raise ValueError("start_day must be on or before end_day")
+        days = (end_day - start_day).days + 1
+        range_key = "custom"
     multi_day = days > 1
 
     end_day = end_day or timezone.localdate()
-    start_day = end_day - timedelta(days=days - 1)
+    start_day = start_day or end_day - timedelta(days=days - 1)
     now = timezone.now()
     now_local = timezone.localtime(now)
     today_in_range = start_day <= timezone.localdate() <= end_day
@@ -185,6 +199,8 @@ def build_timeline(user, range_key=DEFAULT_RANGE, end_day=None):
         .prefetch_related("subprojects")
         .order_by("start_time")
     )
+    if context is not None:
+        sessions = sessions.filter(project__context=context)
 
     entries = []
     spans = []

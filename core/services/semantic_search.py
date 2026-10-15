@@ -18,6 +18,7 @@ updates). Stale vectors are re-embedded by the next sync and are never used.
 from dataclasses import dataclass, field
 import hashlib
 import logging
+import math
 import re
 
 from django.conf import settings
@@ -111,6 +112,13 @@ def parse_similarity(value):
     if not SIMILARITY_FLOOR <= number <= SIMILARITY_CEILING:
         raise ValueError("similarity out of range")
     return round(number, 2)
+
+
+def loosen_similarity(best, cutoff):
+    """The slider step that includes ``best``, only when ``cutoff`` excludes it."""
+    if best is None or best >= cutoff:
+        return None
+    return max(SIMILARITY_FLOOR, math.floor(best * 100 + 1e-9) / 100)
 
 
 def semantic_search_available(user):
@@ -835,7 +843,7 @@ def related_session_ids(
         keyword = set(keyword_sessions.filter(pk__in=chunk).values_list("pk", flat=True))
         return {pk for pk in chunk if pk not in keyword}
 
-    return _cut(ranked, scores, keep, limit=limit, cutoff=cutoff, floor=floor, outcome=outcome)
+    return _cut(ranked, scores, keep, limit=limit, cutoff=cutoff, outcome=outcome)
 
 
 def _scoring_floor(cutoff, outcome):
@@ -845,18 +853,18 @@ def _scoring_floor(cutoff, outcome):
     return cutoff
 
 
-def _cut(ranked, scores, keep, *, limit, cutoff, floor, outcome):
+def _cut(ranked, scores, keep, *, limit, cutoff, outcome):
     """The ``keep``-accepted ``ranked`` ids at or above ``cutoff``, up to ``limit``.
 
-    When ``ranked`` was scored below the cutoff (for the slider), every
-    accepted score is recorded on ``outcome`` first.
+    When the slider asked to collect scores, every accepted score is recorded
+    on ``outcome`` before applying its current cutoff.
     """
-    if floor >= cutoff:
-        return _select(ranked, keep, limit)
-    related = _select(ranked, keep, None)
-    outcome.scores = [scores[pk] for pk in related]
-    kept = [pk for pk in related if scores[pk] >= cutoff]
-    return kept if limit is None else kept[:limit]
+    if outcome is not None and outcome.collect_scores:
+        related = _select(ranked, keep, None)
+        outcome.scores = [scores[pk] for pk in related]
+        kept = [pk for pk in related if scores[pk] >= cutoff]
+        return kept if limit is None else kept[:limit]
+    return _select(ranked, keep, limit)
 
 
 def related_project_ids(
@@ -915,4 +923,4 @@ def related_project_ids(
         keyword = set(keyword_projects.filter(pk__in=chunk).values_list("pk", flat=True))
         return {pk for pk in chunk if pk not in keyword}
 
-    return _cut(ranked, scores, keep, limit=limit, cutoff=cutoff, floor=floor, outcome=outcome)
+    return _cut(ranked, scores, keep, limit=limit, cutoff=cutoff, outcome=outcome)

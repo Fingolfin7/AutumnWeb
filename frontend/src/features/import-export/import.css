@@ -1,0 +1,30 @@
+/* focus_desk.css hides the stream panels until the old script showed them;
+   here they are only rendered once an import has started. */
+.import-page .stream-output,
+.import-page .stream-progress,
+.import-page .stream-log {
+  display: block;
+}
+.import-page .stream-progress .progress {
+  transition: width 0.3s var(--ease);
+}
+.import-page .stream-progress.is-indeterminate .progress {
+  width: 100%;
+  opacity: 0.45;
+  animation: import-pulse 1.2s ease-in-out infinite;
+}
+@keyframes import-pulse {
+  50% {
+    opacity: 0.9;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .import-page .stream-progress.is-indeterminate .progress {
+    animation: none;
+  }
+}
+.io-field-error {
+  margin: var(--s1) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--project);
+}

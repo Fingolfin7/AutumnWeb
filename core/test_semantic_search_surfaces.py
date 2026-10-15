@@ -30,6 +30,20 @@ def _session_count(document):
     return sum(len(project["sessions"]) for project in document["projects"])
 
 
+def insights_session_ids(testcase, **extra):
+    """The sessions an Insights chat is built from (POST /api/v2/insights/stream/)."""
+    from django.test import RequestFactory
+
+    from llm_insights.services.context import build_post_context
+
+    request = RequestFactory().post(
+        "/api/v2/insights/stream/", {"search": "sign-in failure", "filter": "1", **extra}
+    )
+    request.user = testcase.user
+    request.session = testcase.client.session
+    return [s.pk for s in build_post_context(request, testcase.user)["sessions"]]
+
+
 class ProjectsRelatedTests(SemanticSearchTestCase):
     def setUp(self):
         super().setUp()
@@ -41,28 +55,20 @@ class ProjectsRelatedTests(SemanticSearchTestCase):
         self._session(self.platform, "Rotated OAuth signing keys", days_ago=3)
         self._sync()
 
-    def _projects(self, term, **params):
-        return self.client.get(reverse("projects"), {"search": term, **params})
-
     def _related(self, term, **params):
-        return {project.pk for project in self._projects(term, **params).context["related_projects"]}
+        return self._related_projects(term, **params)
 
     def test_related_projects_come_from_descriptions_and_session_notes(self):
-        response = self._projects("sign-in failure")
         # The keyword list is unchanged: only Identity has a note with the words.
-        self.assertEqual([p.pk for p in response.context["projects"]], [self.identity.pk])
-        self.assertEqual(
-            {p.pk for p in response.context["related_projects"]}, {self.accounts.pk, self.platform.pk}
-        )
-        self.assertContains(response, 'aria-label="Related projects"')
+        self.assertEqual(self._project_ids("sign-in failure", related=False), [self.identity.pk])
+        self.assertEqual(self._related("sign-in failure"), {self.accounts.pk, self.platform.pk})
 
-    def test_related_projects_obey_the_page_filters(self):
-        self.assertEqual(self._related("sign-in failure", context=str(self.home.pk)), set())
+    def test_related_projects_obey_the_list_filters(self):
+        self.assertEqual(self._related("sign-in failure", context_ids=str(self.home.pk)), set())
+        self.assertEqual(self._related("sign-in failure", context_ids=str(self.work.pk)),
+                         {self.accounts.pk, self.platform.pk})
         self.assertEqual(
-            self._related("sign-in failure", exclude_projects=str(self.accounts.pk)), {self.platform.pk}
-        )
-        self.assertEqual(
-            self._related("sign-in failure", include_projects=str(self.accounts.pk)), {self.accounts.pk}
+            self._related("sign-in failure", exclude_project_ids=str(self.accounts.pk)), {self.platform.pk}
         )
 
     def test_other_accounts_projects_never_appear(self):
@@ -107,20 +113,31 @@ class IncludeRelatedTests(SemanticSearchTestCase):
         )
         self.assertEqual(self._pie(related="true", context=str(self.home.pk)), {})
 
-    def test_charts_page_shows_the_toggle_only_when_available(self):
-        response = self.client.get(reverse("charts"), {"search": "sign-in failure", "related": "on"})
-        self.assertContains(response, 'id="related-search"')
-        self.assertContains(response, "Including")
+    def test_charts_report_whether_related_was_available(self):
+        # The Charts page flips its "Including related" pill from this header.
+        params = {"chart_type": "pie", "search": "sign-in failure", "related": "true"}
+        url = reverse("api_v2:report-charts")
+        self.assertEqual(self.client.get(url, params)["X-Autumn-Related"], "included")
 
         self.user.profile.ai_features_enabled = False
         self.user.profile.save()
-        response = self.client.get(reverse("charts"), {"search": "sign-in failure", "related": "on"})
-        self.assertNotContains(response, 'id="related-search"')
-        self.assertNotContains(response, "Including")
+        self.assertEqual(self.client.get(url, params)["X-Autumn-Related"], "unavailable")
 
     def test_blank_search_does_not_claim_related(self):
-        response = self.client.get(reverse("charts"), {"search": "   ", "related": "on"})
-        self.assertNotContains(response, 'id="related-pill"')
+        for url, params in (
+            (reverse("api_v2:report-charts"), {"chart_type": "pie"}),
+            (reverse("api_v2:report-totals"), {}),
+            (reverse("api_v2:sessions"), {}),
+        ):
+            response = self.client.get(url, {"search": "   ", "related": "true", **params})
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn("X-Autumn-Related", response)
+
+    def test_insights_session_set_includes_related_only_with_the_toggle(self):
+        self.assertEqual(insights_session_ids(self), [self.failure_note.pk])
+        self.assertEqual(
+            insights_session_ids(self, related="on"), [self.failure_note.pk, self.oauth.pk]
+        )
 
     def test_charts_ignore_related_when_ai_is_off(self):
         self.user.profile.ai_features_enabled = False
@@ -128,21 +145,6 @@ class IncludeRelatedTests(SemanticSearchTestCase):
         FakeOpenAI.instances = []
         self.assertEqual(self._pie(related="true"), {"Identity": 30.0})
         self.assertEqual(FakeOpenAI.instances, [])
-
-    def test_insights_session_set_includes_related_only_with_the_toggle(self):
-        url = reverse("insights")
-        base = {"search": "sign-in failure", "filter": "true"}
-        self.assertEqual(self.client.get(url, base).context["session_count"], 1)
-        response = self.client.get(url, {**base, "related": "on"})
-        self.assertEqual(response.context["session_count"], 2)
-        self.assertContains(response, 'id="related-search"')
-
-    def test_sessions_page_list_stays_keyword_only(self):
-        response = self._search("sign-in failure", related="on")
-        self.assertEqual([s.pk for s in response.context["object_list"]], [self.failure_note.pk])
-        self.assertEqual([s.pk for s in response.context["related_sessions"]], [self.oauth.pk])
-        self.assertNotContains(response, "Including")
-
 
 class ApiRelatedTests(SemanticSearchTestCase):
     def setUp(self):
@@ -211,8 +213,9 @@ class ApiRelatedTests(SemanticSearchTestCase):
     def test_projects_list_related(self):
         url = reverse("api_v2:projects")
         names = lambda **params: {row["name"] for row in self.client.get(url, params).json()["projects"]}
-        self.assertEqual(names(search="sign-in"), set())
-        # Identity through its sessions, Accounts through its description.
+        # Keyword: Identity has a session note with the words.
+        self.assertEqual(names(search="sign-in"), {"Identity"})
+        # Accounts is added through its description.
         self.assertEqual(names(search="sign-in", related="true"), {"Identity", "Accounts"})
         self.assertEqual(
             names(search="sign-in", related="true", exclude_project_ids=str(self.accounts.pk)),
@@ -244,11 +247,15 @@ class ReviewRegressionTests(SemanticSearchTestCase):
             with self.assertLogs("core.services.semantic_search", "WARNING"):
                 response = self._search("sign-in failure")
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.context["related_sessions"], [])
+            self.assertEqual(response["X-Autumn-Related"], "unavailable")
+            self.assertEqual([row["match"] for row in response.json()["sessions"]], ["direct"])
             cache.delete(semantic_search._cooldown_key(self.user))
             with self.assertLogs("core.services.semantic_search", "WARNING"):
-                response = self.client.get(reverse("projects"), {"search": "sign-in failure"})
+                response = self.client.get(
+                    reverse("api_v2:projects"), {"search": "sign-in failure", "related": "true"}
+                )
             self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["X-Autumn-Related"], "unavailable")
 
     def test_keyword_matches_do_not_use_up_the_related_preview(self):
         # 55 keyword matches outrank the paraphrase; it must still be found.
@@ -369,20 +376,14 @@ class FailureHandlingTests(SemanticSearchTestCase):
         self.assertEqual(response["X-Autumn-Related"], "unavailable")
         self.assertEqual(response.json()["session_count"], 1)
 
-    def test_insights_pill_says_when_related_is_unavailable(self):
-        url = reverse("insights")
-        params = {"search": "sign-in failure", "related": "on", "filter": "true"}
-        response = self.client.get(url, params)
-        self.assertContains(response, 'id="related-pill"')
-        self.assertContains(response, "Including <b>related</b>")
-
+class InsightsFailureTests(SemanticSearchTestCase):
+    def test_a_failing_provider_leaves_the_insights_session_set_keyword_only(self):
+        self._sync()
         cache.clear()
         FakeOpenAI.fail = True
         with self.assertLogs("core.services.semantic_search", "WARNING"):
-            response = self.client.get(url, params)
-        self.assertEqual(response.context["session_count"], 1)
-        self.assertContains(response, "Related <b>unavailable</b>")
-        self.assertContains(response, "only keyword matches are counted")
+            ids = insights_session_ids(self, related="on")
+        self.assertEqual(ids, [self.failure_note.pk])
 
 
 class LargeRelatedSetTests(SemanticSearchTestCase):

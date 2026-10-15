@@ -6,67 +6,19 @@ dashboard_desk.js paints a second later, and the start card's quick-start
 chips must not offer to start a timer that is already running.
 """
 
-from datetime import datetime, timedelta, timezone as datetime_timezone
-from unittest.mock import patch
+from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase
-from django.urls import reverse
 from django.utils import timezone
-from freezegun import freeze_time
 
 from core.models import Context, Projects, Sessions, SubProjects
-from core.templatetags.time_formats import hero_duration
-from core.views.dashboard import (
+from core.services.dashboard import (
     QUICK_START_LIMIT,
     build_quick_starts,
     get_recent_dashboard_sessions,
     select_recent_dashboard_sessions,
 )
-
-
-class HeroDurationTests(TestCase):
-    """`hero_duration` and `heroParts()` in dashboard_desk.js are one format.
-
-    If they drift, the hero timer visibly jumps on its first tick.
-    """
-
-    def test_sub_hour_durations_read_minutes_and_seconds(self):
-        self.assertEqual(
-            hero_duration(timedelta(minutes=43, seconds=18)),
-            [{"value": 43, "unit": "minutes"}, {"value": 18, "unit": "seconds"}],
-        )
-
-    def test_hours_push_seconds_off_the_end(self):
-        self.assertEqual(
-            hero_duration(timedelta(hours=2, minutes=5, seconds=40)),
-            [{"value": 2, "unit": "hours"}, {"value": 5, "unit": "minutes"}],
-        )
-
-    def test_days_push_minutes_off_the_end(self):
-        self.assertEqual(
-            hero_duration(timedelta(days=1, hours=3, minutes=9)),
-            [{"value": 1, "unit": "day"}, {"value": 3, "unit": "hours"}],
-        )
-
-    def test_units_are_singular_at_one(self):
-        self.assertEqual(
-            hero_duration(timedelta(minutes=1, seconds=1)),
-            [{"value": 1, "unit": "minute"}, {"value": 1, "unit": "second"}],
-        )
-
-    def test_plain_numbers_are_read_as_minutes(self):
-        """Sessions.duration is a float count of minutes, not a timedelta."""
-        self.assertEqual(
-            hero_duration(90.0),
-            [{"value": 1, "unit": "hour"}, {"value": 30, "unit": "minutes"}],
-        )
-
-    def test_a_fresh_timer_reads_zero_rather_than_blank(self):
-        self.assertEqual(
-            hero_duration(0),
-            [{"value": 0, "unit": "minutes"}, {"value": 0, "unit": "seconds"}],
-        )
 
 
 class DashboardTestCase(TestCase):
@@ -276,135 +228,3 @@ class QuickStartTests(DashboardTestCase):
         self.assertEqual(len(build_quick_starts(recent, [])), QUICK_START_LIMIT)
 
 
-class DashboardRendersFocusDeskTests(DashboardTestCase):
-    def test_summary_windows_follow_the_users_local_day(self):
-        self.user.profile.timezone = "Pacific/Kiritimati"
-        self.user.profile.save(update_fields=["timezone"])
-        # Monday 00:30 in Kiritimati, while the UTC date is still Sunday.
-        now = datetime(2026, 1, 4, 10, 30, tzinfo=datetime_timezone.utc)
-        Sessions.objects.create(
-            user=self.user,
-            project=self.atlas,
-            start_time=now - timedelta(minutes=40),
-            end_time=now - timedelta(minutes=10),
-        )
-        Sessions.objects.create(
-            user=self.user,
-            project=self.autumn,
-            start_time=now - timedelta(hours=2),
-            end_time=now - timedelta(hours=1),
-        )
-
-        with patch("core.views.dashboard.timezone.now", return_value=now):
-            response = self.client.get(reverse("home"))
-
-        self.assertEqual(response.context["today_total"], 30.0)
-        self.assertEqual(response.context["week_total"], 30.0)
-
-    def test_dashboard_uses_the_focus_desk_shell_only(self):
-        """No page may load both stylesheets — that is the whole migration."""
-        response = self.client.get(reverse("home"))
-
-        self.assertTemplateUsed(response, "core/base.html")
-        self.assertContains(response, "core/css/focus_desk.css")
-        self.assertNotContains(response, "core/css/style.css")
-
-    @freeze_time("2026-09-20 12:00:00+02:00")
-    def test_dashboard_supplies_the_day_timeline(self):
-        self._session(self.atlas, 10, subs=["auth"])
-
-        response = self.client.get(reverse("home"))
-
-        self.assertIn("timeline", response.context)
-        self.assertEqual(
-            [lane["project"].name for lane in response.context["timeline"]["lanes"]],
-            ["Atlas API"],
-        )
-        self.assertContains(response, "fd-tl-lane")
-
-    def test_an_untracked_day_renders_the_axis_and_an_empty_state(self):
-        response = self.client.get(reverse("home"))
-
-        self.assertEqual(response.context["timeline"]["lanes"], [])
-        self.assertContains(response, "fd-tl-empty")
-        self.assertNotContains(response, "fd-tl-lane")
-
-    def test_running_timers_render_as_focus_cards(self):
-        self._timer(self.atlas, subs=["auth"])
-
-        response = self.client.get(reverse("home"))
-
-        self.assertContains(response, "focus-card")
-        self.assertContains(response, "Atlas API")
-        # start card is always present alongside the running ones
-        self.assertContains(response, "focus-card--start")
-
-    def test_quick_start_chips_post_the_project_and_subprojects(self):
-        self._session(self.atlas, 10, subs=["auth"])
-
-        response = self.client.get(reverse("home"))
-
-        self.assertEqual(
-            [s.project.name for s in response.context["quick_starts"]], ["Atlas API"]
-        )
-        self.assertContains(response, 'name="project" value="Atlas API"')
-        self.assertContains(response, 'name="subprojects" value="auth"')
-
-
-class TimelineFragmentTests(DashboardTestCase):
-    """The fragment endpoint serves both the range tabs and the live poll."""
-
-    def test_fragment_requires_login(self):
-        self.client.logout()
-        response = self.client.get(reverse("timeline_fragment"))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("login", response.url)
-
-    @freeze_time("2026-09-20 12:00:00+02:00")
-    def test_fragment_renders_the_timeline_alone(self):
-        self._session(self.atlas, 10, subs=["auth"])
-
-        response = self.client.get(reverse("timeline_fragment"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Cache-Control"], "no-store")
-        self.assertContains(response, "data-timeline")
-        self.assertContains(response, "Atlas API")
-        # a fragment, not a page
-        self.assertNotContains(response, "<html")
-        self.assertNotContains(response, "desk-head")
-
-    def test_the_range_parameter_selects_the_window(self):
-        response = self.client.get(reverse("timeline_fragment"), {"range": "wk"})
-
-        self.assertContains(response, 'data-timeline-range="wk"')
-        self.assertContains(response, 'data-tlrange="wk"')
-
-    def test_a_junk_range_falls_back_rather_than_failing(self):
-        response = self.client.get(reverse("timeline_fragment"), {"range": "nonsense"})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'data-timeline-range="today"')
-
-    def test_the_fragment_carries_the_window_the_client_ticks_against(self):
-        """dashboard_desk.js grows live blocks locally; without absolute
-        window bounds it would have to poll instead."""
-        response = self.client.get(reverse("timeline_fragment"))
-
-        self.assertContains(response, "data-timeline-window")
-
-    def test_a_running_timer_is_marked_for_client_side_ticking(self):
-        self._timer(self.atlas, subs=["auth"])
-
-        response = self.client.get(reverse("timeline_fragment"))
-
-        self.assertContains(response, "data-live-block")
-        self.assertContains(response, "data-start-iso")
-        self.assertContains(response, "data-live-dur")
-
-    def test_the_dashboard_and_the_fragment_render_the_same_partial(self):
-        self._session(self.atlas, 10)
-
-        page = self.client.get(reverse("home"))
-
-        self.assertTemplateUsed(page, "core/partials/day_timeline.html")

@@ -3,8 +3,7 @@
 QUIET_SUCCESS_PATHS = frozenset(
     {
         "/healthz/",
-        "/timeline/fragment/",
-        "/timers/active-fragment/",
+        "/api/v2/timers/",
     }
 )
 

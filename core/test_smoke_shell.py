@@ -1,7 +1,9 @@
-"""Every ported page must render on the new shell and only the new shell.
+"""Server-rendered pages sit on the new shell and only the new shell, and the
+static files and service worker they rely on exist.
 
 A blunt sweep: it will not catch a bad layout, but it catches a page that
-500s, that quietly still pulls style.css, or that was missed entirely.
+500s, that quietly still pulls style.css, or that was missed entirely. The
+React pages are covered by core/test_spa.py and the frontend tests.
 """
 
 from datetime import timedelta
@@ -51,49 +53,11 @@ class PortedPagesSmokeTests(TestCase):
         self.client.login(username="smoke", password="pw")
 
     def ported_urls(self):
-        return [
-            reverse("home"),
-            reverse("sessions"),
-            reverse("update_session", args=[self.session.id]),
-            reverse("delete_session", args=[self.session.id]),
-            reverse("projects"),
-            reverse("create_project"),
-            reverse("update_project", args=[self.project.id]),
-            reverse("delete_project", args=[self.project.id]),
-            reverse("merge_projects"),
-            reverse("create_subproject", args=[self.project.id]),
-            reverse("update_subproject", args=[self.sub.id]),
-            reverse("delete_subproject", args=[self.sub.id]),
-            reverse("merge_subprojects", args=[self.project.id]),
-            reverse("timers"),
-            reverse("start_timer"),
-            reverse("stop_timer", args=[self.timer.id]),
-            reverse("remove_timer", args=[self.timer.id]),
-            reverse("delete_commitment", args=[self.commitment.id]),
-            reverse("contexts"),
-            reverse("update_context", args=[self.context.id]),
-            reverse("delete_context", args=[self.context.id]),
-            reverse("tags"),
-            reverse("update_tag", args=[self.tag.id]),
-            reverse("delete_tag", args=[self.tag.id]),
-            reverse("charts"),
-            reverse("insights"),
-            reverse("import"),
-            reverse("export"),
-            reverse("profile"),
-        ]
+        # Everything else is the React app (core/test_spa.py): what is still
+        # rendered by Django on the Night Ledger shell.
+        return [reverse("recommendation_usage")]
 
-    def test_fragments_render_without_a_shell(self):
-        """Fragments are swapped into a live page, so they must NOT carry one."""
-        for url in (reverse("timeline_fragment"), reverse("active_timers_fragment")):
-            with self.subTest(url=url):
-                response = self.client.get(url)
-                self.assertEqual(response.status_code, 200)
-                body = response.content.decode()
-                self.assertNotIn("<html", body)
-                self.assertNotIn("focus_desk.css", body)
-
-    def test_every_ported_page_renders_on_the_new_shell_only(self):
+    def test_every_server_rendered_page_renders_on_the_new_shell_only(self):
         for url in self.ported_urls():
             with self.subTest(url=url):
                 response = self.client.get(url)

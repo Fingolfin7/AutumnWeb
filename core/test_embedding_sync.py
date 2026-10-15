@@ -339,7 +339,7 @@ class TriggerTests(SemanticSearchTestCase):
 class SearchRecheckTests(SemanticSearchTestCase):
     def test_a_related_search_asks_for_a_recheck(self):
         with mock.patch("core.services.semantic_search.request_sync") as request_sync:
-            self.client.get(reverse("sessions"), {"search": "login"})
+            self.client.get(reverse("api_v2:sessions"), {"search": "login", "related": "true"})
         request_sync.assert_called_with(self.user.pk, recheck=True)
 
     def test_accounts_without_ai_do_not(self):
@@ -347,5 +347,22 @@ class SearchRecheckTests(SemanticSearchTestCase):
         self.user.profile.save()
         cache.clear()
         with mock.patch("core.services.semantic_search.request_sync") as request_sync:
-            self.client.get(reverse("sessions"), {"search": "login"})
+            self.client.get(reverse("api_v2:sessions"), {"search": "login", "related": "true"})
         request_sync.assert_not_called()
+
+    def test_every_api_surface_that_searches_related_asks_for_a_recheck(self):
+        surfaces = (
+            ("api_v2:projects", {}),
+            ("api_v2:report-totals", {}),
+            ("api_v2:report-charts", {"chart_type": "pie"}),
+            ("api_v2:export", {}),
+        )
+        for name, extra in surfaces:
+            with self.subTest(name=name):
+                cache.clear()
+                with mock.patch("core.services.semantic_search.request_sync") as request_sync:
+                    response = self.client.get(
+                        reverse(name), {"search": "login", "related": "true", **extra}
+                    )
+                self.assertEqual(response.status_code, 200, response.content)
+                request_sync.assert_called_with(self.user.pk, recheck=True)

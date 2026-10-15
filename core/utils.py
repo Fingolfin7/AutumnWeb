@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from collections import defaultdict
 from django.db.models import QuerySet
-from django.db.models import Min, Max, Sum, Count
+from django.db.models import Min, Max, Count
 from datetime import datetime, timedelta
 from django.http import HttpRequest
 from dateutil.relativedelta import relativedelta
@@ -90,25 +90,6 @@ def stop_expired_timers(user=None, now=None):
     return stopped
 
 
-def build_exclude_project_meta(user) -> dict:
-    """Build a mapping of project_id -> {context_id, tag_ids} for the
-    exclude-projects dropdown so JS can show/hide options based on the
-    active context and tag selections.
-    """
-    projects = (
-        Projects.objects.filter(user=user)
-        .select_related("context")
-        .prefetch_related("tags")
-    )
-    meta = {}
-    for p in projects:
-        meta[str(p.id)] = {
-            "ctx": p.context_id,
-            "tags": [t.id for t in p.tags.all()],
-        }
-    return meta
-
-
 def parse_date_or_datetime(date_str):
     """ "
     Parse a date or datetime string into a datetime object. Supports the following formats:
@@ -139,42 +120,6 @@ def parse_date_or_datetime(date_str):
 
 
 
-def filter_by_projects(
-    data: QuerySet[Projects | SubProjects | Sessions],
-    name: str = None,
-    names: list[str] = None,
-) -> QuerySet:
-    """
-    filter a queryset of data and return a list of items that match the given project name or names
-    :param data: a queryset of data
-    :param name: if you need to filter for 1 name
-    :param names: if you need to filter for multiple names
-    :return: list of items that match the given name or names
-    """
-    if not data.exists():
-        return data
-
-    item = (
-        data.first()
-    )  # get the first item in the queryset to determine the type of data
-    if name:
-        if isinstance(item, Projects):
-            return data.filter(name__icontains=name)
-        elif isinstance(item, SubProjects):
-            return data.filter(parent_project__name__icontains=name)
-        elif isinstance(item, Sessions):
-            return data.filter(project__name__icontains=name)
-    elif names:
-        if isinstance(item, Projects):
-            return data.filter(name__in=names)
-        elif isinstance(item, SubProjects):
-            return data.filter(parent_project__name__in=names)
-        elif isinstance(item, Sessions):
-            return data.filter(project__name__in=names)
-    else:
-        return data
-
-
 def get_active_context(
     request: HttpRequest, override_context_id: str | None = None
 ) -> tuple[Context | None, str]:
@@ -193,8 +138,16 @@ def get_active_context(
     context_id = override_context_id
 
     if context_id is None:
-        # Fall back to session
-        context_id = request.session.get(ACTIVE_CONTEXT_SESSION_KEY)
+        # The session is the immediate browser override. A fresh browser
+        # session falls back to the durable profile preference, so the header
+        # switch survives logging in on another device. API requests never
+        # inherit it: the CLI, MCP and web app state their scope explicitly.
+        if ACTIVE_CONTEXT_SESSION_KEY in request.session:
+            context_id = request.session.get(ACTIVE_CONTEXT_SESSION_KEY)
+        elif not getattr(request, "path", "").startswith("/api/"):
+            context_id = getattr(
+                getattr(request.user, "profile", None), "active_context_id", None
+            )
 
     if not context_id or str(context_id).lower() == "all":
         return None, "all"
@@ -252,6 +205,17 @@ def filter_by_active_context(
         return data.filter(project__context=context)
 
     return data
+
+
+def requested_similarity(params):
+    """A page's ?similarity= cutoff, or None when absent or invalid (then the
+    account's default applies)."""
+    from core.services.semantic_search import parse_similarity
+
+    try:
+        return parse_similarity(params.get("similarity"))
+    except (TypeError, ValueError):
+        return None
 
 
 def filter_sessions_by_params(
@@ -321,148 +285,9 @@ def filter_sessions_by_params(
     return sessions
 
 
-def requested_similarity(params):
-    """A page's ?similarity= cutoff, or None when absent or invalid (then the
-    account's default applies)."""
-    from core.services.semantic_search import parse_similarity
-
-    try:
-        return parse_similarity(params.get("similarity"))
-    except (TypeError, ValueError):
-        return None
-
-
-def similarity_slider(
-    user, *, value=None, outcome=None, field_name=None, default=None, default_label="Your default"
-):
-    """Context for core/partials/similarity_slider.html, the Related slider.
-
-    ``value`` is the cutoff in use (default: the account's). With an
-    ``outcome`` that collected scores, the slider shows how many related
-    matches each position keeps, and suggests a looser cutoff when nothing
-    passes. ``field_name`` makes it a form field (Charts/Insights filter
-    sheets, Profile) instead of re-running the page's search when moved.
-    ``default`` (the account's cutoff unless given) is the marked tick.
-    """
-    import math
-
-    from core.services import semantic_search as semantic
-
-    floor, ceiling = semantic.SIMILARITY_FLOOR, semantic.SIMILARITY_CEILING
-
-    def position(cutoff):
-        return round((cutoff - floor) / (ceiling - floor) * 100, 2)
-
-    default = round(semantic.min_similarity(user) if default is None else default, 2)
-    account_default = round(semantic.min_similarity(user), 2)
-    value = account_default if value is None else value
-    slider = {
-        "value": value,
-        "default": default,
-        "default_position": position(default) if floor <= default <= ceiling else None,
-        "default_label": default_label,
-        "floor": floor,
-        "ceiling": ceiling,
-        "step": semantic.SIMILARITY_STEP,
-        "marks": [
-            {"label": label, "value": cutoff, "position": position(cutoff)}
-            for label, cutoff in semantic.SIMILARITY_MARKS
-        ],
-        "field_name": field_name,
-    }
-    if outcome is not None and outcome.included and outcome.collect_scores:
-        slider["counts_json"] = json.dumps(outcome.counts())
-        slider["count"] = sum(1 for score in outcome.scores if score >= value)
-        best = outcome.best
-        slider["best"] = best
-        if best is not None and best < value:
-            slider["loosen_to"] = max(floor, math.floor(best * 100 + 1e-9) / 100)
-        # Folded away (collapsible) unless there is something to do with it.
-        slider["open"] = slider["count"] == 0 or value != account_default
-    return slider
-
-
-#: Free-text search params, in the order their pills should read.
-_TEXT_FILTER_LABELS = (
-    ("search", "Search"),
-    ("project_name", "Project"),
-    ("start_date", "From"),
-    ("end_date", "To"),
-    ("note_snippet", "Note"),
-)
-
-
-def summarise_search_filters(
-    request, user, *, related=False, related_unavailable=False
-) -> list[dict]:
-    """Label/value pairs for the filters currently narrowing a list page.
-
-    The Focus Desk nav model puts filters behind a sheet, so the page itself
-    has to say what is being hidden — otherwise a filtered list that comes
-    back empty looks broken rather than narrow. Ids are resolved to names,
-    scoped to ``user``: a pill reading "Context 3" tells nobody anything, and
-    another user's id must resolve to nothing at all. ``related`` is for the
-    pages whose filter sheet has the "Include related" toggle;
-    ``related_unavailable`` turns its pill into "Related unavailable" when the
-    counted set is keyword-only after all.
-    """
-
-    def names_for(model, ids):
-        wanted = _numeric_ids(ids)
-        if not wanted:
-            return ""
-        return ", ".join(
-            model.objects.filter(id__in=wanted, user=user)
-            .order_by("name")
-            .values_list("name", flat=True)
-        )
-
-    params = request.GET
-    summary = [
-        {"label": label, "value": params[key]}
-        for key, label in _TEXT_FILTER_LABELS
-        if params.get(key)
-    ]
-
-    if related and (params.get("search") or "").strip() and is_truthy(params.get("related")):
-        summary.append(
-            related_pill(unavailable=related_unavailable)
-        )
-        from core.services.semantic_search import min_similarity
-
-        # The cutoff decides the related total, so it is always on show.
-        cutoff = requested_similarity(params)
-        if cutoff is None:
-            cutoff = min_similarity(user)
-        summary.append({"label": "Closeness", "value": f"{cutoff:.2f}"})
-
-    for label, names in (
-        ("Context", names_for(Context, [params.get("context") or ""])),
-        ("Tags", names_for(Tag, params.getlist("tags"))),
-        ("Only", names_for(Projects, params.getlist("include_projects"))),
-        ("Excluding", names_for(Projects, params.getlist("exclude_projects"))),
-    ):
-        if names:
-            summary.append({"label": label, "value": names})
-
-    return summary
-
-
 RELATED_UNAVAILABLE_TITLE = (
     "Meaning-based matches couldn't be added right now, so only keyword matches are counted."
 )
-
-
-def related_pill(*, unavailable=False) -> dict:
-    """The "Include related" filter pill; Charts' JS flips it to the second form."""
-    if unavailable:
-        return {
-            "label": "Related",
-            "value": "unavailable",
-            "id": "related-pill",
-            "title": RELATED_UNAVAILABLE_TITLE,
-        }
-    return {"label": "Including", "value": "related", "id": "related-pill"}
 
 
 def _param_list(params, key) -> list:

@@ -3,11 +3,50 @@
     "name": "list_commitments",
     "method": "GET",
     "path": "/api/v2/commitments/",
-    "parameters": [],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "applies_to",
+        "schema": {
+          "type": "string",
+          "pattern": "^(project|subproject|context|tag):[1-9][0-9]*$",
+          "minLength": 1
+        },
+        "description": "Return commitments relevant to one owned resource, formatted as project:<id>, subproject:<id>, context:<id>, or tag:<id>.",
+        "argument": "applies_to"
+      },
+      {
+        "in": "query",
+        "name": "include",
+        "schema": {
+          "enum": [
+            "streak"
+          ],
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "* `streak` - streak",
+        "argument": "include"
+      }
+    ],
     "bodyKeys": [],
     "inputSchema": {
       "type": "object",
       "properties": {
+        "applies_to": {
+          "type": "string",
+          "pattern": "^(project|subproject|context|tag):[1-9][0-9]*$",
+          "minLength": 1,
+          "description": "Return commitments relevant to one owned resource, formatted as project:<id>, subproject:<id>, context:<id>, or tag:<id>."
+        },
+        "include": {
+          "enum": [
+            "streak"
+          ],
+          "type": "string",
+          "minLength": 1,
+          "description": "* `streak` - streak"
+        },
         "account": {
           "type": "string",
           "minLength": 1,
@@ -46,6 +85,7 @@
       "max_balance",
       "min_balance",
       "active",
+      "notifications_enabled",
       "include_project_ids",
       "exclude_project_ids",
       "include_subproject_ids",
@@ -127,6 +167,10 @@
         },
         "active": {
           "type": "boolean"
+        },
+        "notifications_enabled": {
+          "type": "boolean",
+          "description": "Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on)."
         },
         "include_project_ids": {
           "type": "array",
@@ -286,6 +330,7 @@
       "max_balance",
       "min_balance",
       "active",
+      "notifications_enabled",
       "include_project_ids",
       "exclude_project_ids",
       "include_subproject_ids",
@@ -374,6 +419,10 @@
         },
         "active": {
           "type": "boolean"
+        },
+        "notifications_enabled": {
+          "type": "boolean",
+          "description": "Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on)."
         },
         "include_project_ids": {
           "type": "array",
@@ -760,6 +809,10 @@
             "active": {
               "type": "boolean"
             },
+            "notifications_enabled": {
+              "type": "boolean",
+              "description": "Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on)."
+            },
             "include_project_ids": {
               "type": "array",
               "items": {
@@ -1013,6 +1066,47 @@
     }
   },
   {
+    "name": "get_dashboard",
+    "method": "GET",
+    "path": "/api/v2/dashboard/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Context ID or 'all'; defaults to all contexts.",
+        "argument": "context"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "type": "string",
+          "description": "Context ID or 'all'; defaults to all contexts."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Get the Autumn home dashboard in one read: activity streak, active timers, quick starts, recent sessions with rendered notes, commitments, and today timeline. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "export_data",
     "method": "GET",
     "path": "/api/v2/export/",
@@ -1120,6 +1214,14 @@
           "minLength": 1
         },
         "argument": "project_ids"
+      },
+      {
+        "in": "query",
+        "name": "project_name",
+        "schema": {
+          "type": "string"
+        },
+        "argument": "project_name"
       },
       {
         "in": "query",
@@ -1237,6 +1339,9 @@
           "type": "string",
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "project_name": {
+          "type": "string"
         },
         "related": {
           "type": "boolean",
@@ -1372,6 +1477,145 @@
     }
   },
   {
+    "name": "list_reminder_schedules",
+    "method": "GET",
+    "path": "/api/v2/notifications/schedules/",
+    "parameters": [],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "List the account's active planned reminder schedules, including targets, cadence, next fire time, and reminders due within seven days. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "create_reminder_schedule",
+    "method": "POST",
+    "path": "/api/v2/notifications/schedules/",
+    "parameters": [],
+    "bodyKeys": [
+      "target",
+      "project",
+      "context",
+      "tag",
+      "subprojects",
+      "local_date",
+      "local_time",
+      "cadence",
+      "message",
+      "version"
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "enum": [
+            "project",
+            "context",
+            "tag"
+          ],
+          "type": "string",
+          "description": "* `project` - project\n* `context` - context\n* `tag` - tag"
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "context": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tag": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "subprojects": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "local_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "local_time": {
+          "type": "string",
+          "format": "time"
+        },
+        "cadence": {
+          "enum": [
+            "once",
+            "daily",
+            "weekly"
+          ],
+          "type": "string",
+          "description": "* `once` - once\n* `daily` - daily\n* `weekly` - weekly"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "version": {
+          "type": "integer"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [
+        "cadence",
+        "local_date",
+        "local_time",
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "description": "Create a planned reminder schedule for one owned project, context, or tag at a profile-local date and time, optionally repeating daily or weekly. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "list_projects",
     "method": "GET",
     "path": "/api/v2/projects/",
@@ -1384,6 +1628,16 @@
           "minLength": 1
         },
         "argument": "context_ids"
+      },
+      {
+        "in": "query",
+        "name": "end_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": "Latest project start date (inclusive).",
+        "argument": "end_date"
       },
       {
         "in": "query",
@@ -1421,13 +1675,14 @@
         "schema": {
           "enum": [
             "name",
-            "id"
+            "id",
+            "last_activity"
           ],
           "type": "string",
           "default": "name",
           "minLength": 1
         },
-        "description": "* `name` - name\n* `id` - id",
+        "description": "name (default), id, or last_activity (most recently active first).\n\n* `name` - name\n* `id` - id\n* `last_activity` - last_activity",
         "argument": "ordering"
       },
       {
@@ -1459,6 +1714,16 @@
         },
         "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header.",
         "argument": "similarity"
+      },
+      {
+        "in": "query",
+        "name": "start_date",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": "Earliest project start date (inclusive).",
+        "argument": "start_date"
       },
       {
         "in": "query",
@@ -1495,6 +1760,11 @@
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
         },
+        "end_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Latest project start date (inclusive)."
+        },
         "exclude_project_ids": {
           "type": "string",
           "minLength": 1,
@@ -1514,12 +1784,13 @@
         "ordering": {
           "enum": [
             "name",
-            "id"
+            "id",
+            "last_activity"
           ],
           "type": "string",
           "default": "name",
           "minLength": 1,
-          "description": "* `name` - name\n* `id` - id"
+          "description": "name (default), id, or last_activity (most recently active first).\n\n* `name` - name\n* `id` - id\n* `last_activity` - last_activity"
         },
         "related": {
           "type": "boolean",
@@ -1534,6 +1805,11 @@
           "maximum": 0.6,
           "minimum": 0.25,
           "description": "How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header."
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Earliest project start date (inclusive)."
         },
         "status": {
           "enum": [
@@ -1692,6 +1968,15 @@
     "path": "/api/v2/projects/{project_id}",
     "parameters": [
       {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer project version.",
+        "argument": "expected_version"
+      },
+      {
         "in": "path",
         "name": "project_id",
         "schema": {
@@ -1712,6 +1997,10 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer project version."
+        },
         "project_id": {
           "type": "integer"
         },
@@ -1766,7 +2055,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "update project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "update project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
@@ -1779,6 +2068,15 @@
     "method": "DELETE",
     "path": "/api/v2/projects/{project_id}",
     "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer project version.",
+        "argument": "expected_version"
+      },
       {
         "in": "path",
         "name": "project_id",
@@ -1793,6 +2091,10 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer project version."
+        },
         "project_id": {
           "type": "integer"
         },
@@ -1808,7 +2110,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "delete project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "delete project in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
@@ -1875,7 +2177,8 @@
     ],
     "bodyKeys": [
       "name",
-      "description"
+      "description",
+      "start_date"
     ],
     "inputSchema": {
       "type": "object",
@@ -1889,6 +2192,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
         },
         "account": {
           "type": "string",
@@ -1958,6 +2265,88 @@
     }
   },
   {
+    "name": "luna_recommendations",
+    "method": "GET",
+    "path": "/api/v2/recommendations/luna/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Context ID or 'all'; defaults to all contexts.",
+        "argument": "context"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "type": "string",
+          "description": "Context ID or 'all'; defaults to all contexts."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Get Luna timer recommendations. A 202 response means generation is still in progress and should be retried after the supplied delay. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "timer_suggestions",
+    "method": "GET",
+    "path": "/api/v2/recommendations/timers/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Context ID or 'all'; defaults to all contexts.",
+        "argument": "context"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "type": "string",
+          "description": "Context ID or 'all'; defaults to all contexts."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Get fast deterministic timer suggestions from recent work, habits, and commitments, optionally scoped to one context. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "reports_charts_list",
     "method": "GET",
     "path": "/api/v2/reports/charts/",
@@ -1986,13 +2375,20 @@
         "schema": {
           "type": "string",
           "enum": [
+            "bar",
+            "bubble",
             "calendar",
+            "context",
             "cumulative",
             "heatmap",
             "histogram",
             "line",
+            "pie",
+            "radar",
             "scatter",
             "stacked_area",
+            "status",
+            "treemap",
             "wordcloud"
           ]
         },
@@ -2005,6 +2401,7 @@
         "schema": {
           "type": "integer"
         },
+        "description": "Context ID. Omit for all contexts.",
         "argument": "context"
       },
       {
@@ -2182,18 +2579,26 @@
         "chart_type": {
           "type": "string",
           "enum": [
+            "bar",
+            "bubble",
             "calendar",
+            "context",
             "cumulative",
             "heatmap",
             "histogram",
             "line",
+            "pie",
+            "radar",
             "scatter",
             "stacked_area",
+            "status",
+            "treemap",
             "wordcloud"
           ]
         },
         "context": {
-          "type": "integer"
+          "type": "integer",
+          "description": "Context ID. Omit for all contexts."
         },
         "context_ids": {
           "type": "string",
@@ -2739,6 +3144,73 @@
     }
   },
   {
+    "name": "get_timeline",
+    "method": "GET",
+    "path": "/api/v2/reports/timeline/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "context"
+      },
+      {
+        "in": "query",
+        "name": "end",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "argument": "end"
+      },
+      {
+        "in": "query",
+        "name": "start",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "argument": "start"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "end": {
+          "type": "string",
+          "format": "date"
+        },
+        "start": {
+          "type": "string",
+          "format": "date"
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Get timeline lanes and session segments for a local date range, optionally scoped to one context. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "reports_totals_retrieve",
     "method": "GET",
     "path": "/api/v2/reports/totals/",
@@ -2950,6 +3422,49 @@
     }
   },
   {
+    "name": "weekly_review",
+    "method": "GET",
+    "path": "/api/v2/reports/weekly-review/",
+    "parameters": [
+      {
+        "in": "query",
+        "name": "week",
+        "schema": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": "First local date of the seven reviewed (the weekly review notification links its own). Defaults to the seven days ending yesterday.",
+        "argument": "week"
+      }
+    ],
+    "bodyKeys": [],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "week": {
+          "type": "string",
+          "format": "date",
+          "description": "First local date of the seven reviewed (the weekly review notification links its own). Defaults to the seven days ending yesterday."
+        },
+        "account": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Authorized Autumn account name from list_accounts. Omit to use your selected default. Set explicitly when comparing accounts."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "description": "Summarize a local Monday-to-Sunday Autumn week: tracked time, project totals, session count, and closed commitment results. Pass any date inside the desired week. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
     "name": "list_sessions",
     "method": "GET",
     "path": "/api/v2/sessions/",
@@ -3009,15 +3524,21 @@
       },
       {
         "in": "query",
-        "name": "include",
+        "name": "ids",
         "schema": {
-          "enum": [
-            "note"
-          ],
           "type": "string",
           "minLength": 1
         },
-        "description": "* `note` - note",
+        "description": "Comma-separated session IDs.",
+        "argument": "ids"
+      },
+      {
+        "in": "query",
+        "name": "include",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
         "argument": "include"
       },
       {
@@ -3173,13 +3694,14 @@
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
         },
-        "include": {
-          "enum": [
-            "note"
-          ],
+        "ids": {
           "type": "string",
           "minLength": 1,
-          "description": "* `note` - note"
+          "description": "Comma-separated session IDs."
+        },
+        "include": {
+          "type": "string",
+          "minLength": 1
         },
         "limit": {
           "type": "integer",
@@ -3364,6 +3886,24 @@
     "path": "/api/v2/sessions/{session_id}",
     "parameters": [
       {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "context"
+      },
+      {
+        "in": "query",
+        "name": "include",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "include"
+      },
+      {
         "in": "path",
         "name": "session_id",
         "schema": {
@@ -3377,6 +3917,14 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "include": {
+          "type": "string",
+          "minLength": 1
+        },
         "session_id": {
           "type": "integer"
         },
@@ -3618,6 +4166,15 @@
     "path": "/api/v2/subprojects/{subproject_id}",
     "parameters": [
       {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer subproject version.",
+        "argument": "expected_version"
+      },
+      {
         "in": "path",
         "name": "subproject_id",
         "schema": {
@@ -3629,11 +4186,16 @@
     ],
     "bodyKeys": [
       "name",
-      "description"
+      "description",
+      "start_date"
     ],
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer subproject version."
+        },
         "subproject_id": {
           "type": "integer"
         },
@@ -3643,6 +4205,10 @@
         },
         "description": {
           "type": "string"
+        },
+        "start_date": {
+          "type": "string",
+          "format": "date"
         },
         "account": {
           "type": "string",
@@ -3656,7 +4222,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "update subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "update subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
@@ -3669,6 +4235,15 @@
     "method": "DELETE",
     "path": "/api/v2/subprojects/{subproject_id}",
     "parameters": [
+      {
+        "in": "header",
+        "name": "If-Match",
+        "schema": {
+          "type": "integer"
+        },
+        "description": "Optional current integer subproject version.",
+        "argument": "expected_version"
+      },
       {
         "in": "path",
         "name": "subproject_id",
@@ -3683,6 +4258,10 @@
     "inputSchema": {
       "type": "object",
       "properties": {
+        "expected_version": {
+          "type": "integer",
+          "description": "Optional current integer subproject version."
+        },
         "subproject_id": {
           "type": "integer"
         },
@@ -3698,7 +4277,7 @@
       ],
       "additionalProperties": false
     },
-    "description": "delete subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "delete subproject in Autumn API v2. Use numeric IDs from list tools. Durations are in minutes. Dates use ISO 8601; timestamps should include a timezone offset. Supply expected_version from the current resource to prevent overwriting concurrent edits. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": false,
       "destructiveHint": true,
@@ -3936,11 +4515,38 @@
     "name": "status",
     "method": "GET",
     "path": "/api/v2/timers/",
-    "parameters": [],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "context",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "context"
+      },
+      {
+        "in": "query",
+        "name": "include",
+        "schema": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argument": "include"
+      }
+    ],
     "bodyKeys": [],
     "inputSchema": {
       "type": "object",
       "properties": {
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "include": {
+          "type": "string",
+          "minLength": 1
+        },
         "account": {
           "type": "string",
           "minLength": 1,
@@ -3970,7 +4576,9 @@
       "note",
       "stop_after_minutes",
       "start",
-      "uuid"
+      "uuid",
+      "notify_on_auto_stop",
+      "reminder"
     ],
     "inputSchema": {
       "type": "object",
@@ -4009,6 +4617,47 @@
         "uuid": {
           "type": "string",
           "format": "uuid"
+        },
+        "notify_on_auto_stop": {
+          "type": "boolean",
+          "default": false
+        },
+        "reminder": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "enum": [
+                "after",
+                "at",
+                "interval"
+              ],
+              "type": "string",
+              "description": "* `after` - after\n* `at` - at\n* `interval` - interval"
+            },
+            "amount": {
+              "type": "number"
+            },
+            "unit": {
+              "enum": [
+                "minutes",
+                "hours"
+              ],
+              "type": "string",
+              "description": "* `minutes` - minutes\n* `hours` - hours"
+            },
+            "at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "message": {
+              "type": "string",
+              "maxLength": 240
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
         },
         "account": {
           "type": "string",

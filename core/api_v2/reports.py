@@ -4,7 +4,11 @@ from dataclasses import replace
 
 from django.db.models import Count, DurationField, ExpressionWrapper, F, Sum
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import (
+    OpenApiParameter,
+    PolymorphicProxySerializer,
+    extend_schema,
+)
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -15,7 +19,18 @@ from core.api_v2.filters import SessionFilterSpec
 from core.api_v2.serializers import (
     SEARCH_HELP,
     SIMILARITY_HELP,
-    ChartPayloadRowSerializer,
+    ChartBubbleRowSerializer,
+    ChartDailySeriesRowSerializer,
+    ChartDailyTotalRowSerializer,
+    ChartHeatmapCellSerializer,
+    ChartHierarchyResponseSerializer,
+    ChartHistogramRowSerializer,
+    ChartIntervalRowSerializer,
+    ChartRadarRowSerializer,
+    ChartScatterRowSerializer,
+    ChartStatusRowSerializer,
+    ChartTallyRowSerializer,
+    ChartWordRowSerializer,
     ReportHierarchySerializer,
     ReportTalliesSerializer,
     ReportTotalsSerializer,
@@ -33,6 +48,27 @@ from core.utils import filter_by_active_context, filter_sessions_by_params
 # already consumes.
 LEGACY_TALLY_CHARTS = {"pie", "bar", "context", "status", "bubble"}
 LEGACY_TREE_CHARTS = {"treemap", "radar"}
+ALL_CHART_TYPES = SUPPORTED_CHARTS | LEGACY_TALLY_CHARTS | LEGACY_TREE_CHARTS
+
+CHART_RESPONSE_SCHEMA = PolymorphicProxySerializer(
+    component_name="ChartResponse",
+    serializers=[
+        ChartTallyRowSerializer(many=True),
+        ChartStatusRowSerializer(many=True),
+        ChartBubbleRowSerializer(many=True),
+        ChartScatterRowSerializer(many=True),
+        ChartDailySeriesRowSerializer(many=True),
+        ChartDailyTotalRowSerializer(many=True),
+        ChartIntervalRowSerializer(many=True),
+        ChartHeatmapCellSerializer(many=True),
+        ChartHistogramRowSerializer(many=True),
+        ChartWordRowSerializer(many=True),
+        ChartRadarRowSerializer(many=True),
+        ChartHierarchyResponseSerializer,
+    ],
+    resource_type_field_name=None,
+    many=False,
+)
 
 
 TALLY_KINDS = ("project", "subproject", "context", "status", "tag")
@@ -283,17 +319,23 @@ class ReportChartsView(V2APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
+        operation_id="reports_charts_list",
         parameters=[
             *FILTER_PARAMETERS,
             OpenApiParameter(
                 name="chart_type",
                 type=OpenApiTypes.STR,
-                enum=sorted(SUPPORTED_CHARTS),
+                enum=sorted(ALL_CHART_TYPES),
                 location=OpenApiParameter.QUERY,
                 required=True,
             ),
             OpenApiParameter("project_name", OpenApiTypes.STR, OpenApiParameter.QUERY),
-            OpenApiParameter("context", OpenApiTypes.INT, OpenApiParameter.QUERY),
+            OpenApiParameter(
+                "context",
+                OpenApiTypes.INT,
+                OpenApiParameter.QUERY,
+                description="Context ID. Omit for all contexts.",
+            ),
             OpenApiParameter("tags", OpenApiTypes.INT, OpenApiParameter.QUERY, many=True),
             OpenApiParameter(
                 "include_projects",
@@ -317,11 +359,11 @@ class ReportChartsView(V2APIView):
                 ),
             ),
         ],
-        responses=ChartPayloadRowSerializer(many=True),
+        responses=CHART_RESPONSE_SCHEMA,
     )
     def get(self, request):
         chart_type = (request.query_params.get("chart_type") or "").strip().lower()
-        if chart_type not in SUPPORTED_CHARTS | LEGACY_TALLY_CHARTS | LEGACY_TREE_CHARTS:
+        if chart_type not in ALL_CHART_TYPES:
             raise ValidationError({"chart_type": ["Unsupported chart_type."]})
 
         sessions = Sessions.objects.filter(

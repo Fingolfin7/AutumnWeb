@@ -7,7 +7,6 @@ from io import BytesIO
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
-from django.urls import reverse
 from PIL import Image
 
 from users import codex_auth
@@ -119,31 +118,6 @@ class ProfileSaveTests(TestCase):
             content_type="image/png",
         )
 
-    def test_update_profile_saves_image_account_background_and_api_key_together(self):
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "username": "updated-user",
-                "email": "updated@example.com",
-                "image": self._profile_image(),
-                "automatic_background": "on",
-                "background_choice": "bing",
-                "openai_api_key": "profile-openai-key",
-            },
-        )
-
-        self.assertRedirects(response, reverse("profile"))
-        self.user.refresh_from_db()
-        profile = self.user.profile
-        profile.refresh_from_db()
-        self.assertEqual(self.user.username, "updated-user")
-        self.assertEqual(self.user.email, "updated@example.com")
-        self.assertTrue(profile.image.name.startswith("profile_pics/"))
-        self.assertTrue(profile.automatic_background)
-        self.assertTrue(profile.bing_background)
-        self.assertFalse(profile.nasa_apod_background)
-        self.assertEqual(profile.get_api_key("openai"), "profile-openai-key")
-
     def test_typesafe_api_key_is_encrypted_and_can_be_cleared(self):
         profile = self.user.profile
         profile.set_api_key("typesafe", "typesafe-production-key")
@@ -157,45 +131,6 @@ class ProfileSaveTests(TestCase):
         profile.save(update_fields=["typesafe_api_key_enc"])
         profile.refresh_from_db()
         self.assertIsNone(profile.get_api_key("typesafe"))
-
-    def test_retired_typesafe_key_is_not_exposed_or_changed_by_profile_form(self):
-        profile = self.user.profile
-        profile.set_api_key("typesafe", "legacy-key")
-        profile.save(update_fields=["typesafe_api_key_enc"])
-        response = self.client.get(reverse("profile"))
-        self.assertNotContains(response, "TypeSafe / Jev")
-        self.assertNotContains(response, "legacy-key")
-        self.assertNotIn("typesafe_api_key", response.context["profile_form"].fields)
-        response = self.client.post(reverse("profile"), data={
-            "username": self.user.username, "email": self.user.email,
-            "typesafe_api_key": "ignored", "clear_typesafe_api_key": "on",
-        })
-        self.assertRedirects(response, reverse("profile"))
-        profile.refresh_from_db()
-        self.assertEqual(profile.get_api_key("typesafe"), "legacy-key")
-
-    def test_removing_background_image_clears_field_and_deletes_file_after_commit(self):
-        profile = self.user.profile
-        profile.background_image = self._profile_image()
-        profile.save(update_fields=["background_image"])
-        old_image_name = profile.background_image.name
-        storage = profile.background_image.storage
-        self.assertTrue(storage.exists(old_image_name))
-
-        with self.captureOnCommitCallbacks(execute=True):
-            response = self.client.post(
-                reverse("profile"),
-                data={
-                    "username": self.user.username,
-                    "email": self.user.email,
-                    "remove_background_image": "on",
-                },
-            )
-
-        self.assertRedirects(response, reverse("profile"))
-        profile.refresh_from_db()
-        self.assertFalse(profile.background_image)
-        self.assertFalse(storage.exists(old_image_name))
 
     def test_profile_default_date_range_supports_each_requested_unit(self):
         profile = self.user.profile
@@ -219,24 +154,101 @@ class ProfileSaveTests(TestCase):
                     (expected_start, reference_date),
                 )
 
-    def test_update_profile_saves_filter_and_chart_defaults(self):
+    def test_image_url_uses_active_storage_for_default_image(self):
+        profile = self.user.profile
+        profile.image = None
+
+        self.assertEqual(profile.image_url, "/media/default.jpg")
+
+
+    # ---- the React Profile page's endpoints ---------------------------------
+    # (these replace the tests of the old server-rendered profile form)
+
+    def _api(self):
+        from rest_framework.test import APIClient
+
+        client = APIClient()
+        client.force_authenticate(self.user)
+        return client
+
+    def test_account_avatar_background_and_api_key_save_through_their_endpoints(self):
+        api = self._api()
+        account = api.patch(
+            "/api/v2/me/account/",
+            {"username": "updated-user", "email": "updated@example.com"},
+            format="json",
+        )
+        self.assertEqual(account.status_code, 200, account.content)
+        avatar = api.put("/api/v2/me/avatar/", {"image": self._profile_image()}, format="multipart")
+        self.assertEqual(avatar.status_code, 200, avatar.content)
+        prefs = api.patch(
+            "/api/v2/me/preferences/",
+            {"automatic_background": True, "bing_background": True},
+            format="json",
+        )
+        self.assertEqual(prefs.status_code, 200, prefs.content)
+        key = api.put("/api/v2/me/api-keys/openai", {"key": "profile-openai-key"}, format="json")
+        self.assertEqual(key.status_code, 200, key.content)
+
+        self.user.refresh_from_db()
+        profile = self.user.profile
+        profile.refresh_from_db()
+        self.assertEqual(self.user.username, "updated-user")
+        self.assertEqual(self.user.email, "updated@example.com")
+        self.assertTrue(profile.image.name.startswith("profile_pics/"))
+        self.assertTrue(profile.automatic_background)
+        self.assertTrue(profile.bing_background)
+        self.assertFalse(profile.nasa_apod_background)
+        self.assertEqual(profile.get_api_key("openai"), "profile-openai-key")
+
+    def test_the_retired_typesafe_key_is_not_exposed_or_changed(self):
+        profile = self.user.profile
+        profile.set_api_key("typesafe", "legacy-key")
+        profile.save(update_fields=["typesafe_api_key_enc"])
+        api = self._api()
+
+        preferences = api.get("/api/v2/me/preferences/")
+        self.assertNotIn("typesafe", preferences.json()["configured_api_keys"])
+        self.assertNotIn("legacy-key", preferences.content.decode())
+        for method in (api.put, api.delete):
+            response = method("/api/v2/me/api-keys/typesafe", {"key": "ignored"}, format="json")
+            self.assertEqual(response.status_code, 404)
+        profile.refresh_from_db()
+        self.assertEqual(profile.get_api_key("typesafe"), "legacy-key")
+
+    def test_removing_the_background_image_clears_the_field_and_deletes_the_file_after_commit(self):
+        profile = self.user.profile
+        profile.background_image = self._profile_image()
+        profile.save(update_fields=["background_image"])
+        old_image_name = profile.background_image.name
+        storage = profile.background_image.storage
+        self.assertTrue(storage.exists(old_image_name))
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self._api().delete("/api/v2/me/background/")
+
+        self.assertEqual(response.status_code, 200, response.content)
+        profile.refresh_from_db()
+        self.assertFalse(profile.background_image)
+        self.assertFalse(storage.exists(old_image_name))
+
+    def test_filter_and_chart_defaults_are_saved(self):
         profile = self.user.profile
         profile.default_filter_value = 6
         profile.insights_default_filter_value = 3
         profile.save()
 
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "username": self.user.username,
-                "email": self.user.email,
+        response = self._api().patch(
+            "/api/v2/me/preferences/",
+            {
                 "default_filter_unit": "quarter_to_date",
                 "insights_default_filter_unit": "year_to_date",
-                "default_chart_project_count": "12",
+                "default_chart_project_count": 12,
             },
+            format="json",
         )
 
-        self.assertRedirects(response, reverse("profile"))
+        self.assertEqual(response.status_code, 200, response.content)
         profile.refresh_from_db()
         self.assertEqual(profile.default_filter_value, 6)
         self.assertEqual(profile.default_filter_unit, "quarter_to_date")
@@ -245,29 +257,24 @@ class ProfileSaveTests(TestCase):
         self.assertEqual(profile.default_chart_project_count, 12)
 
     def test_charts_use_profile_defaults_until_dates_are_explicit(self):
+        # The profile side: saved defaults decide the range. The Charts page
+        # takes it from /api/v2/me/ (and the SPA bootstrap) and lets explicit
+        # dates in its URL override it, which is client behaviour.
         profile = self.user.profile
         profile.default_filter_value = 2
         profile.default_filter_unit = "quarter_to_date"
         profile.default_chart_project_count = 11
         profile.save()
 
-        response = self.client.get(reverse("charts"))
-
         expected_start, expected_end = profile.default_filter_date_range()
-        search_initial = response.context["search_form"].initial
-        self.assertEqual(search_initial["start_date"], expected_start)
-        self.assertEqual(search_initial["end_date"], expected_end)
-        self.assertContains(response, "window.AUTUM_CHART_PROJECT_COUNT = 11;")
+        me = self._api().get("/api/v2/me/").json()
+        self.assertEqual(me["default_chart_start_date"], expected_start.isoformat())
+        self.assertEqual(me["default_chart_end_date"], expected_end.isoformat())
+        preferences = self._api().get("/api/v2/me/preferences/").json()
+        self.assertEqual(preferences["default_chart_project_count"], 11)
+        self.assertEqual(preferences["default_filter_unit"], "quarter_to_date")
 
-        response = self.client.get(
-            reverse("charts"),
-            {"start_date": "2026-01-02", "end_date": "2026-02-03"},
-        )
-        search_initial = response.context["search_form"].initial
-        self.assertEqual(search_initial["start_date"], "2026-01-02")
-        self.assertEqual(search_initial["end_date"], "2026-02-03")
-
-    def test_new_insights_chat_uses_its_separate_profile_date_range(self):
+    def test_the_insights_default_range_is_separate_from_the_app_range(self):
         profile = self.user.profile
         profile.default_filter_value = 2
         profile.default_filter_unit = "weeks"
@@ -275,51 +282,39 @@ class ProfileSaveTests(TestCase):
         profile.insights_default_filter_unit = "year_to_date"
         profile.save()
 
-        response = self.client.get(reverse("insights"))
-
         expected_start, expected_end = profile.insights_default_filter_date_range()
         app_start, _ = profile.default_filter_date_range()
-        search_initial = response.context["search_form"].initial
-        self.assertEqual(search_initial["start_date"], expected_start.isoformat())
-        self.assertEqual(search_initial["end_date"], expected_end.isoformat())
-        self.assertNotEqual(search_initial["start_date"], app_start.isoformat())
+        options = self._api().get("/api/v2/insights/options/").json()
+        self.assertEqual(options["default_start_date"], expected_start.isoformat())
+        self.assertEqual(options["default_end_date"], expected_end.isoformat())
+        self.assertNotEqual(options["default_start_date"], app_start.isoformat())
 
-    def test_image_url_uses_active_storage_for_default_image(self):
-        profile = self.user.profile
-        profile.image = None
-
-        self.assertEqual(profile.image_url, "/media/default.jpg")
-
-    def test_profile_hides_and_ignores_ai_settings_when_disabled(self):
+    def test_ai_settings_are_refused_and_account_fields_still_save_when_ai_is_disabled(self):
         profile = self.user.profile
         profile.ai_features_enabled = False
         profile.set_api_key("openai", None)
         profile.save(update_fields=["ai_features_enabled", "openai_api_key_enc"])
+        api = self._api()
 
-        response = self.client.get(reverse("profile"))
-
-        self.assertNotContains(response, "LLM Connections")
-        self.assertNotContains(response, "Gemini API Key")
-        self.assertNotContains(response, "Use Codex Login")
-
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "username": "updated-user",
-                "email": "updated@example.com",
-                "openai_api_key": "should-not-save",
-            },
+        self.assertEqual(
+            api.put("/api/v2/me/api-keys/openai", {"key": "should-not-save"}, format="json").status_code,
+            403,
         )
+        account = api.patch(
+            "/api/v2/me/account/",
+            {"username": "updated-user", "email": "updated@example.com"},
+            format="json",
+        )
+        self.assertEqual(account.status_code, 200, account.content)
 
-        self.assertRedirects(response, reverse("profile"))
         self.user.refresh_from_db()
         profile.refresh_from_db()
         self.assertEqual(self.user.username, "updated-user")
         self.assertEqual(self.user.email, "updated@example.com")
         self.assertIsNone(profile.get_api_key("openai"))
 
-    @patch("users.views.start_device_code_login")
-    def test_codex_action_does_not_run_general_profile_save(self, start_login):
+    @patch("core.api_v2.views.account.start_device_code_login")
+    def test_chatgpt_login_does_not_touch_the_account_and_is_blocked_without_ai(self, start_login):
         start_login.return_value = codex_auth.CodexDeviceCode(
             verification_url="https://auth.openai.com/codex/device",
             user_code="CODE-123",
@@ -327,38 +322,17 @@ class ProfileSaveTests(TestCase):
             interval=5,
             expires_at="2099-01-01T00:00:00+00:00",
         )
-
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "start_openai_chatgpt_login": "1",
-                "username": "should-not-save",
-                "email": "should-not-save@example.com",
-            },
-        )
-
-        self.assertRedirects(response, reverse("profile"))
+        api = self._api()
+        started = api.post("/api/v2/me/chatgpt-login/", {}, format="json")
+        self.assertEqual(started.status_code, 201, started.content)
         self.user.refresh_from_db()
         self.assertEqual(self.user.username, "profile-user")
         self.assertEqual(self.user.email, "profile@example.com")
 
-    @patch("users.views.start_device_code_login")
-    def test_codex_action_is_blocked_when_ai_features_disabled(self, start_login):
+        start_login.reset_mock()
         profile = self.user.profile
         profile.ai_features_enabled = False
         profile.save()
-
-        response = self.client.post(
-            reverse("profile"),
-            data={
-                "start_openai_chatgpt_login": "1",
-                "username": "should-not-save",
-                "email": "should-not-save@example.com",
-            },
-        )
-
-        self.assertRedirects(response, reverse("profile"))
+        blocked = api.post("/api/v2/me/chatgpt-login/", {}, format="json")
+        self.assertEqual(blocked.status_code, 403)
         start_login.assert_not_called()
-        self.user.refresh_from_db()
-        self.assertEqual(self.user.username, "profile-user")
-        self.assertEqual(self.user.email, "profile@example.com")

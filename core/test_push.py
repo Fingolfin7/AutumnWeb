@@ -7,7 +7,6 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import Client, TestCase, override_settings
-from django.urls import reverse
 from django.utils import timezone
 
 from core.models import NotificationDelivery, NotificationEvent, PushSubscription
@@ -105,7 +104,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         client.force_login(self.user)
         with mock.patch("core.services.push.webpush") as provider:
             response = client.post(
-                reverse("push_test"), data="{}", content_type="application/json"
+                "/api/v2/push/test/", data="{}", content_type="application/json"
             )
 
         self.assertEqual(response.status_code, 202)
@@ -118,7 +117,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         client = Client()
         client.force_login(self.user)
         response = client.post(
-            reverse("push_test"),
+            "/api/v2/push/test/",
             data={"endpoint": "https://attacker.example/send"},
             content_type="application/json",
         )
@@ -129,30 +128,30 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         client = Client(enforce_csrf_checks=True)
         client.force_login(self.user)
         response = client.post(
-            reverse("push_test"), data="{}", content_type="application/json"
+            "/api/v2/push/test/", data="{}", content_type="application/json"
         )
         self.assertEqual(response.status_code, 403)
 
     def test_subscribe_status_and_unsubscribe_are_authenticated(self):
         client = Client()
         self.assertIn(
-            client.get(reverse("push_status")).status_code,
-            {302, 403},
+            client.get("/api/v2/push/status/").status_code,
+            {401, 403},
         )
         client.force_login(self.user)
         response = client.post(
-            reverse("push_subscribe"),
+            "/api/v2/push/subscriptions/",
             data=self.payload(),
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 201)
-        status = client.get(reverse("push_status"))
+        status = client.get("/api/v2/push/status/")
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["subscriptions"], 1)
         self.assertNotIn(VAPID_PRIVATE, status.content.decode())
 
-        response = client.post(
-            reverse("push_unsubscribe"),
+        response = client.delete(
+            "/api/v2/push/subscriptions/",
             data={"endpoint": self.payload()["endpoint"]},
             content_type="application/json",
         )
@@ -168,7 +167,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         client.force_login(self.user)
 
         configuration = vapid_configuration()
-        response = client.get(reverse("push_status"))
+        response = client.get("/api/v2/push/status/")
 
         self.assertTrue(configuration["configured"])
         self.assertEqual(configuration["public_key"], VAPID_PUBLIC)
@@ -189,7 +188,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
             with self.subTest(value=value), override_settings(
                 PUSH_VAPID_PUBLIC_KEY=value
             ):
-                key = client.get(reverse("push_status")).json()["public_key"]
+                key = client.get("/api/v2/push/status/").json()["public_key"]
                 self.assertRegex(key, r"^[A-Za-z0-9_-]+$")
                 self.assertEqual(
                     base64.urlsafe_b64decode(key + "=" * (-len(key) % 4)), raw
@@ -203,7 +202,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
             with self.subTest(subject=subject), override_settings(
                 PUSH_VAPID_SUBJECT=subject
             ):
-                body = client.get(reverse("push_status")).json()
+                body = client.get("/api/v2/push/status/").json()
                 self.assertFalse(body["available"])
                 self.assertIsNone(body["public_key"])
                 self.assertIn("PUSH_VAPID_SUBJECT", body["configuration_error"])
@@ -214,7 +213,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         client.force_login(self.user)
 
         configuration = vapid_configuration()
-        response = client.get(reverse("push_status"))
+        response = client.get("/api/v2/push/status/")
 
         self.assertFalse(configuration["configured"])
         self.assertIn("PUSH_VAPID_PRIVATE_KEY", str(configuration["error"]))
@@ -226,7 +225,7 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         client = Client()
         client.force_login(self.user)
 
-        response = client.get(reverse("push_status"))
+        response = client.get("/api/v2/push/status/")
 
         self.assertFalse(response.json()["available"])
         self.assertIsNone(response.json()["public_key"])

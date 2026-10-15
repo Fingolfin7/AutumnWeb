@@ -1,4 +1,8 @@
-"""Search on browse pages should mean the same thing as their visible field."""
+"""Search means the same thing on every surface that browses tracked work.
+
+These ran against the old Projects, Sessions and Charts pages; the React pages
+read the same rules through /api/v2/projects/, /api/v2/sessions/ and
+/api/v2/reports/charts/ (core.search is shared)."""
 
 from datetime import timedelta
 
@@ -59,12 +63,12 @@ class ContentSearchTests(TestCase):
         )
         for term, expected in cases:
             with self.subTest(term=term):
-                response = self.client.get(reverse("projects"), {"search": term})
-                self.assertEqual(
-                    {project.pk for project in response.context["object_list"]},
-                    expected,
-                )
-                self.assertEqual(len(response.context["object_list"]), len(expected))
+                response = self.client.get(reverse("api_v2:projects"), {"search": term})
+                self.assertEqual(response.status_code, 200, response.content)
+                ids = [row["id"] for row in response.json()["projects"]]
+                self.assertEqual(set(ids), expected)
+                self.assertEqual(len(ids), len(expected))  # each project once
+                self.assertEqual(response.json()["total"], len(expected))
 
     def test_sessions_match_only_assigned_subprojects_or_own_notes(self):
         cases = (
@@ -77,37 +81,18 @@ class ContentSearchTests(TestCase):
         )
         for term, expected in cases:
             with self.subTest(term=term):
-                response = self.client.get(reverse("sessions"), {"search": term})
-                self.assertEqual(
-                    {session.pk for session in response.context["object_list"]},
-                    expected,
-                )
-                self.assertEqual(response.context["result_count"], len(expected))
+                response = self.client.get(reverse("api_v2:sessions"), {"search": term})
+                self.assertEqual(response.status_code, 200, response.content)
+                self.assertEqual({row["id"] for row in response.json()["sessions"]}, expected)
+                self.assertEqual(response.json()["total"], len(expected))
 
     def test_search_combines_with_existing_note_filter(self):
         response = self.client.get(
-            reverse("sessions"), {"search": "invoices", "note_snippet": "reviewed"}
+            reverse("api_v2:sessions"), {"search": "invoices", "note_snippet": "reviewed"}
         )
         self.assertEqual(
-            [session.pk for session in response.context["object_list"]],
-            [self.beta_session.pk],
+            [row["id"] for row in response.json()["sessions"]], [self.beta_session.pk]
         )
-
-    def test_visible_browse_fields_describe_scope(self):
-        for page in ("projects", "sessions", "charts"):
-            with self.subTest(page=page):
-                response = self.client.get(reverse(page), {"search": "payments"})
-                self.assertContains(response, 'name="search"')
-                scope = (
-                    "Search project names and descriptions, subprojects, and session notes"
-                    if page == "projects"
-                    else "Search projects, subprojects, and session notes"
-                )
-                self.assertContains(response, scope)
-                self.assertIn(
-                    {"label": "Search", "value": "payments"},
-                    response.context["active_filters"],
-                )
 
     def test_chart_search_uses_matching_sessions(self):
         response = self.client.get(
@@ -129,10 +114,6 @@ class ContentSearchTests(TestCase):
         )
 
     def test_charts_keep_explicit_project_breakdown_filter(self):
-        response = self.client.get(reverse("charts"))
-        self.assertContains(response, 'name="project_name"')
-        self.assertContains(response, "Project name (show subproject breakdown)")
-
         response = self.client.get(
             reverse("api_v2:report-charts"),
             {"chart_type": "pie", "project_name": "Atlas"},

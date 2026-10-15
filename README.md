@@ -198,7 +198,7 @@ when checking when a device was reached.
 ### Tech Stack
 
 * **Backend**: Django, Django REST Framework, SQLite
-* **Frontend**: HTML/CSS/JS (jQuery), Chart.js, wordcloud2.js
+* **Frontend**: React + TypeScript (Vite) in `frontend/`, Chart.js; Django serves the shell and the `/api/v2/` API
 * **LLM**: Gemini, OpenAI/Codex login, OpenAI API key, and Claude integration paths
 * **Import/Export**: JSON-based, compatible with Autumn CLI
 * **No analytics or tracking**

@@ -1,0 +1,184 @@
+/* Additions for the React app. The Night Ledger design system itself is
+   core/static/core/css/focus_desk.css, loaded by spa.html exactly as on the
+   server-rendered pages; only what the app introduces lives here, and it uses
+   the same tokens. */
+
+/* focus_desk.css draws a few glyphs with the Font Awesome webfont in CSS
+   pseudo-elements (the commitment-form chevrons, the start button's
+   hourglass). The app ships icons as inline SVG and no longer loads the CDN
+   stylesheet, so declare just the solid face here. Browsers only fetch a
+   font once a glyph actually uses it. */
+@font-face {
+  font-family: "Font Awesome 5 Free";
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url("../../node_modules/@fortawesome/fontawesome-free/webfonts/fa-solid-900.woff2") format("woff2");
+}
+
+.icon {
+  display: inline-block;
+  height: 1em;
+  width: auto;
+  vertical-align: -0.125em;
+  overflow: visible;
+  flex: none;
+}
+/* Fixed-width icon columns in focus_desk.css (written for <i> glyphs) lose to
+   width:auto above; restore them so labels line up. The SVG keeps its aspect
+   ratio and centres itself in the wider box. */
+.icon.sheet-item-icon { width: 1.5rem; }
+.icon.disclose-icon { width: 1.25rem; }
+.icon.profile-auth-icon { width: 1.4rem; }
+.icon--spin { animation: icon-spin 1s linear infinite; }
+@keyframes icon-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .icon--spin { animation: none; } }
+
+/* Toasts replace Django messages. Same .msg look, pinned above the content
+   so they never push the page around when they arrive or leave. */
+.toast-region {
+  position: fixed;
+  z-index: 80;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + var(--s3, .75rem));
+  transform: translateX(-50%);
+  width: min(32rem, calc(100vw - 1.5rem));
+  display: grid;
+  gap: var(--s2, .5rem);
+  pointer-events: none;
+}
+.toast-region .msg {
+  pointer-events: auto;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+  animation: toast-in .18s var(--ease, ease-out);
+}
+.toast-region .msg > span { flex: 1; }
+.toast-action {
+  background: none;
+  border: 0;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 0 .25rem;
+}
+.toast-close {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 .25rem;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .toast-region .msg { animation: none; } }
+
+/* Loading placeholders instead of the old full-page loading overlay. */
+.skeleton {
+  border-radius: var(--r-sm, 6px);
+  background: linear-gradient(90deg, var(--raised, #1a1d20) 25%, var(--raised-2, #22262a) 37%, var(--raised, #1a1d20) 63%);
+  background-size: 400% 100%;
+  animation: skeleton 1.4s ease infinite;
+  min-height: 1rem;
+}
+.skeleton-stack { display: grid; gap: var(--s3, .75rem); padding: var(--s4, 1rem); }
+@keyframes skeleton { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* Thin progress bar at the very top while route data or a mutation is in
+   flight; replaces page_loading.js. */
+.route-progress {
+  position: fixed;
+  z-index: 90;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--brand, #c98245);
+  transform-origin: left;
+  animation: route-progress 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes route-progress {
+  0% { transform: scaleX(0); opacity: 1; }
+  70% { transform: scaleX(.85); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* Dialogs (confirmations, edit sheets) reuse the sheet look. */
+.dialog-panel {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(34rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  z-index: 70;
+  background: var(--slab-solid);
+  border: 1px solid var(--hairline, #2a2e33);
+  border-radius: var(--r-lg, 14px);
+  box-shadow: var(--e3);
+  padding: var(--s5, 1.25rem);
+}
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 69;
+  background: rgba(0, 0, 0, .55);
+}
+.dialog-title { font-size: var(--fs-lg, 1.125rem); font-weight: 650; margin: 0 0 var(--s3, .75rem); }
+.dialog-actions { display: flex; gap: var(--s2, .5rem); justify-content: flex-end; margin-top: var(--s4, 1rem); flex-wrap: wrap; }
+
+/* Command palette (Ctrl/Cmd-K). */
+.palette-input {
+  width: 100%;
+  font: inherit;
+  font-size: 1.05rem;
+  padding: .75rem .9rem;
+  border-radius: var(--r-sm, 6px);
+  border: 1px solid var(--hairline, #2a2e33);
+  background: var(--raised, #1a1d20);
+  color: var(--ink, #e8e6e3);
+}
+.palette-list { list-style: none; margin: var(--s3, .75rem) 0 0; padding: 0; max-height: 50vh; overflow: auto; }
+.palette-item {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  width: 100%;
+  padding: .6rem .7rem;
+  border-radius: var(--r-sm, 6px);
+  cursor: pointer;
+  color: var(--ink, #e8e6e3);
+  background: none;
+  border: 0;
+  font: inherit;
+  text-align: left;
+}
+.palette-item.is-active, .palette-item:hover { background: var(--raised-2, #22262a); }
+.palette-item { justify-content: flex-start; }
+.palette-icon { color: var(--muted); width: 1rem; }
+.palette-item.is-active .palette-icon { color: var(--brand); }
+.palette-hint { margin-left: auto; font-size: .85em; color: var(--muted); }
+.palette-group { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: .6rem .7rem .2rem; }
+
+.offline-banner {
+  position: fixed;
+  z-index: 85;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.5rem);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: .4rem .8rem;
+  border-radius: 999px;
+  background: var(--raised-2, #22262a);
+  border: 1px solid var(--hairline, #2a2e33);
+  color: var(--muted);
+  font-size: .85rem;
+}
+@media (min-width: 1000px) { .offline-banner { bottom: 1rem; } }
+
+/* Which occurrence of a repeated wall time (components/LocalTimeNotice). */
+.local-time-notice { display: grid; gap: var(--s2); margin-top: var(--s2); }
+
+/* Related slider in a filter sheet: room between its stop labels and the next field. */
+.sheet .similarity { padding-bottom: var(--s2); }
