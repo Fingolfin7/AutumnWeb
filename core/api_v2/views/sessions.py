@@ -110,6 +110,27 @@ class SessionsView(V2APIView):
         return Response(_serialize(session), status=status.HTTP_201_CREATED)
 
 
+class SessionRelatedSummaryView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="sessions_related_summary_retrieve",
+        parameters=[SessionRelatedSummaryQuerySerializer],
+        responses=RelatedSummarySerializer,
+    )
+    def get(self, request):
+        spec = SessionFilterSpec.from_query_params(request.query_params, request.user)
+        outcome = related_outcome(request)
+        outcome.collect_scores = True
+        spec.rank(
+            _session_queryset(request.user).filter(end_time__isnull=False),
+            user=request.user,
+            outcome=outcome,
+            related=True,
+        )
+        return Response(_related_summary(request.user, outcome, spec.similarity))
+
+
 class SessionDetailView(V2APIView):
     permission_classes = [IsAuthenticated]
 

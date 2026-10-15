@@ -1668,6 +1668,86 @@ paths:
                 $ref: '#/components/schemas/ProjectResource'
           description: ''
       x-autumn-mcp: include
+  /api/v2/projects/related-summary/:
+    get:
+      operationId: projects_related_summary_retrieve
+      parameters:
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+        description: Latest project start date (inclusive).
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: related
+        schema:
+          type: boolean
+        description: Accepted for project-list query parity; this summary always describes
+          related-only matches.
+      - in: query
+        name: search
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+        description: Cutoff whose related-only count is returned in count. Defaults
+          to the account setting.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+        description: Earliest project start date (inclusive).
+      - in: query
+        name: status
+        schema:
+          enum:
+          - active
+          - paused
+          - complete
+          - archived
+          type: string
+          minLength: 1
+        description: |-
+          * `active` - active
+          * `paused` - paused
+          * `complete` - complete
+          * `archived` - archived
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      tags:
+      - projects
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedSummary'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/push/status/:
     get:
       operationId: push_status_retrieve
@@ -2644,6 +2724,112 @@ paths:
         '204':
           description: Session deleted.
       x-autumn-mcp: include
+  /api/v2/sessions/related-summary/:
+    get:
+      operationId: sessions_related_summary_retrieve
+      parameters:
+      - in: query
+        name: active
+        schema:
+          type: boolean
+      - in: query
+        name: context_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: end_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: exclude_project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: exclude_tag_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: ids
+        schema:
+          type: string
+          minLength: 1
+        description: Comma-separated session IDs.
+      - in: query
+        name: note_snippet
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: project_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: related
+        schema:
+          type: boolean
+        description: Accepted for session-list query parity; this summary always describes
+          related-only matches.
+      - in: query
+        name: search
+        schema:
+          type: string
+          minLength: 1
+        description: Search project names, assigned subproject names and session notes.
+          Every word must appear (in any of them, in any order); put a phrase in double
+          quotes to match it as written. Common words such as "it" and "the" are ignored.
+      - in: query
+        name: similarity
+        schema:
+          type: number
+          format: double
+          maximum: 0.6
+          minimum: 0.25
+        description: Cutoff whose related-only count is returned in count. Defaults
+          to the account setting.
+      - in: query
+        name: start_date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: subproject_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: tag_ids
+        schema:
+          type: string
+          minLength: 1
+      - in: query
+        name: uuid
+        schema:
+          type: string
+          format: uuid
+      tags:
+      - sessions
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RelatedSummary'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/subprojects/{subproject_id}:
     get:
       operationId: subprojects_retrieve
@@ -5753,6 +5939,67 @@ components:
       description: |-
         * `included` - included
         * `unavailable` - unavailable
+    RelatedSummary:
+      type: object
+      properties:
+        available:
+          type: boolean
+        similarity:
+          type: number
+          format: double
+        default:
+          type: number
+          format: double
+        floor:
+          type: number
+          format: double
+        ceiling:
+          type: number
+          format: double
+        step:
+          type: number
+          format: double
+        marks:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelatedSummaryMark'
+        counts:
+          type: array
+          items:
+            type: integer
+        count:
+          type: integer
+        best:
+          type: number
+          format: double
+          nullable: true
+        loosen_to:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - available
+      - best
+      - ceiling
+      - count
+      - counts
+      - default
+      - floor
+      - loosen_to
+      - marks
+      - similarity
+      - step
+    RelatedSummaryMark:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: number
+          format: double
+      required:
+      - label
+      - value
     ReportHierarchy:
       type: object
       properties:

@@ -352,8 +352,6 @@ def similarity_slider(
     sheets, Profile) instead of re-running the page's search when moved.
     ``default`` (the account's cutoff unless given) is the marked tick.
     """
-    import math
-
     from core.services import semantic_search as semantic
 
     floor, ceiling = semantic.SIMILARITY_FLOOR, semantic.SIMILARITY_CEILING
@@ -383,8 +381,9 @@ def similarity_slider(
         slider["count"] = sum(1 for score in outcome.scores if score >= value)
         best = outcome.best
         slider["best"] = best
-        if best is not None and best < value:
-            slider["loosen_to"] = max(floor, math.floor(best * 100 + 1e-9) / 100)
+        loosen_to = semantic.loosen_similarity(best, value)
+        if loosen_to is not None:
+            slider["loosen_to"] = loosen_to
         # Folded away (collapsible) unless there is something to do with it.
         slider["open"] = slider["count"] == 0 or value != account_default
     return slider

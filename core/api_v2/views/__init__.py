@@ -5,6 +5,7 @@ from .me import MeView, PreferencesView
 from .projects import (
     ProjectDetailView,
     ProjectMergeView,
+    ProjectRelatedSummaryView,
     ProjectsView,
     ProjectSubprojectsView,
     SubprojectDetailView,
@@ -16,7 +17,7 @@ from .recommendations import (
     RecommendationUsageView,
     TimerRecommendationsView,
 )
-from .sessions import SessionDetailView, SessionsView
+from .sessions import SessionDetailView, SessionRelatedSummaryView, SessionsView
 from .timers import (
     TimerDetailView,
     TimerReminderDetailView,

@@ -27,14 +27,17 @@ from core.api_v2.serializers import (
     ProjectDetailResourceSerializer,
     ProjectListQuerySerializer,
     ProjectListResponseSerializer,
+    ProjectRelatedSummaryQuerySerializer,
     ProjectMergeRequestSerializer,
     ProjectPatchRequestSerializer,
     ProjectResourceSerializer,
     PreferencesRequestSerializer,
     PreferencesResponseSerializer,
     ResourceIncludeQuerySerializer,
+    RelatedSummarySerializer,
     SessionListQuerySerializer,
     SessionListResponseSerializer,
+    SessionRelatedSummaryQuerySerializer,
     SessionPatchRequestSerializer,
     SessionResourceSerializer,
     SessionTrackRequestSerializer,
@@ -56,7 +59,15 @@ from core.commitments import mutation_affects_ledger
 from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
 from core.search import DIRECT, RELATED, SESSION_ORDER, search_projects, with_extra
 from core.services.embedding_sync import request_sync_on_commit
-from core.services.semantic_search import related_project_ids
+from core.services.semantic_search import (
+    SIMILARITY_CEILING,
+    SIMILARITY_FLOOR,
+    SIMILARITY_MARKS,
+    SIMILARITY_STEP,
+    loosen_similarity,
+    min_similarity,
+    related_project_ids,
+)
 from core.services import (
     DestructiveMutationService,
     DestructiveOperationError,
@@ -385,6 +396,30 @@ def _delete_target_or_none(model, user, object_id, label):
     if model.objects.filter(pk=object_id).exists():
         raise NotFound(f"{label} {object_id} not found.")
     return None
+
+
+def _related_summary(user, outcome, requested_similarity):
+    default = round(min_similarity(user), 2)
+    similarity = default if requested_similarity is None else requested_similarity
+    available = outcome.included
+    scores = outcome.scores if available else []
+    best = outcome.best if available else None
+    return {
+        "available": available,
+        "similarity": similarity,
+        "default": default,
+        "floor": SIMILARITY_FLOOR,
+        "ceiling": SIMILARITY_CEILING,
+        "step": SIMILARITY_STEP,
+        "marks": [
+            {"label": label, "value": value}
+            for label, value in SIMILARITY_MARKS
+        ],
+        "counts": outcome.counts() if available else [],
+        "count": sum(1 for score in scores if score >= similarity),
+        "best": best,
+        "loosen_to": loosen_similarity(best, similarity) if available else None,
+    }
 
 
 
