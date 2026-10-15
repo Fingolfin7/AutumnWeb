@@ -4,12 +4,14 @@ import {
   describeSelection,
   EMPTY_SELECTION,
   formatUsage,
-  limitGroups,
+  mergeChatPages,
+  nextChatOffset,
+  openaiConnectionNote,
   pickEffort,
-  previewQuery,
   readSelection,
   resolveSelection,
   selectionFromChat,
+  selectionQuery,
   selectionRequest,
   splitChatModel,
   sumUsage,
@@ -63,36 +65,42 @@ describe("selection <-> request", () => {
   });
 });
 
-describe("previewQuery", () => {
-  const projects = [
-    { id: 1, name: "Writing" },
-    { id: 2, name: "Rewriting notes" },
-    { id: 3, name: "Cooking" },
-  ];
-
-  it("maps filters onto the sessions list parameters", () => {
-    const result = previewQuery({ ...EMPTY_SELECTION, ...dates, search: "a", related: true, tags: [1, 2], projects: [3] }, projects, 5);
-    expect(result).toEqual({
-      none: false,
-      query: { search: "a", related: true, start_date: defaults.start, end_date: defaults.end, context_ids: "5", tag_ids: "1,2", exclude_project_ids: "3" },
+describe("selectionQuery", () => {
+  it("sends the stream's filter fields so the count matches what the model is given", () => {
+    const filters = { ...EMPTY_SELECTION, search: "a", related: true, project_name: "writ", tags: [1, 2], projects: [3] };
+    expect(selectionQuery(filters, defaults, 5)).toEqual({
+      search: "a",
+      related: true,
+      project_name: "writ",
+      start_date: defaults.start,
+      end_date: defaults.end,
+      context: 5,
+      tags: [1, 2],
+      exclude_projects: [3],
     });
   });
 
-  it("turns a project-name match into project ids (case-insensitive contains)", () => {
-    expect(previewQuery({ ...EMPTY_SELECTION, project_name: "WRIT" }, projects, null)).toEqual({ none: false, query: { project_ids: "1,2" } });
+  it("passes all contexts, and the chosen context over the header's", () => {
+    expect(selectionQuery({ ...EMPTY_SELECTION, context: "all" }, defaults, 5).context).toBe("all");
+    expect(selectionQuery({ ...EMPTY_SELECTION, context: "8" }, defaults, 5).context).toBe(8);
+    expect(selectionQuery(EMPTY_SELECTION, defaults, null)).not.toHaveProperty("context");
+  });
+});
+
+describe("all contexts", () => {
+  it("reads and restores the all choice", () => {
+    expect(readSelection(new URLSearchParams("context=all"), defaults).context).toBe("all");
+    expect(selectionFromChat({ context: "all" }, defaults).context).toBe("all");
+    expect(selectionFromChat({ context: null }, defaults).context).toBe("all");
+    expect(readSelection(new URLSearchParams("context=junk"), defaults).context).toBe("");
   });
 
-  it("intersects the name match with an include list, and is empty when nothing can match", () => {
-    expect(previewQuery({ ...EMPTY_SELECTION, project_name: "writ", projects: [2, 3], projectMode: "include" }, projects, null)).toEqual({
-      none: false,
-      query: { project_ids: "2" },
-    });
-    expect(previewQuery({ ...EMPTY_SELECTION, project_name: "zzz" }, projects, null)).toEqual({ none: true });
-    expect(previewQuery({ ...EMPTY_SELECTION, project_name: "cook", projects: [1], projectMode: "include" }, projects, null)).toEqual({ none: true });
-  });
-
-  it("uses the chosen context over the header's", () => {
-    expect(previewQuery({ ...EMPTY_SELECTION, context: "8" }, projects, 5)).toEqual({ none: false, query: { context_ids: "8" } });
+  it("is sent to the stream and shown as a pill", () => {
+    expect(selectionRequest({ ...EMPTY_SELECTION, context: "all" }, defaults, 6).context).toBe("all");
+    const lookup = { projects: [], tags: [], contexts: [{ id: 3, name: "Work" }] };
+    expect(describeSelection({ ...EMPTY_SELECTION, context: "all" }, lookup, defaults, { available: false, state: null })).toEqual([
+      { label: "Context", value: "All contexts" },
+    ]);
   });
 });
 
@@ -144,15 +152,28 @@ describe("chat list", () => {
     chats: Array.from({ length: n }, (_, i) => ({ id: `${label}-${i}`, title: `${label} ${i}`, updated_at: "2026-10-14T10:00:00Z" })),
   });
 
-  it("shows the newest chats first up to the limit, across groups", () => {
-    const groups = [group("Today", 3), group("Yesterday", 4), group("Older", 5)];
-    const view = limitGroups(groups, 5);
-    expect(view.groups.map((g) => [g.label, g.chats.length])).toEqual([
-      ["Today", 3],
-      ["Yesterday", 2],
+  it("merges server pages back into one set of groups", () => {
+    const first = { groups: [group("Today", 2), group("Older", 1)], total: 5, limit: 3, offset: 0 };
+    const second = { groups: [{ label: "Older", chats: [{ id: "x", title: "x", updated_at: "2026-01-01T00:00:00Z" }] }, group("Ancient", 1)], total: 5, limit: 3, offset: 3 };
+    const merged = mergeChatPages([first, second]);
+    expect(merged.map((g) => [g.label, g.chats.length])).toEqual([
+      ["Today", 2],
+      ["Older", 2],
+      ["Ancient", 1],
     ]);
-    expect(view).toMatchObject({ total: 12, shown: 5 });
-    expect(limitGroups(groups, 20)).toMatchObject({ total: 12, shown: 12 });
+  });
+
+  it("shows a chat once when pages overlap", () => {
+    const page = { groups: [group("Today", 2)] };
+    expect(mergeChatPages([page, page]).flatMap((g) => g.chats)).toHaveLength(2);
+  });
+
+  it("asks for the next page until the total is loaded", () => {
+    const first = { groups: [group("Today", 3)], total: 5, offset: 0 };
+    expect(nextChatOffset([first])).toBe(3);
+    expect(nextChatOffset([first, { groups: [group("Older", 2)], total: 5, offset: 3 }])).toBeUndefined();
+    expect(nextChatOffset([{ groups: [], total: 0, offset: 0 }])).toBeUndefined();
+    expect(nextChatOffset([])).toBeUndefined();
   });
 
   it("stamps today and yesterday with a time, older chats with a date", () => {
@@ -208,5 +229,19 @@ describe("transcript", () => {
     expect(total).toEqual({ prompt: 2000, response: 400, cached: 200 });
     expect(formatUsage(total)).toBe(`In: ${(2000).toLocaleString()} · Out: 400 · Cached: 200`);
     expect(formatUsage({ prompt: 0, response: 0, cached: 0 })).toBe("In: 0 · Out: 0");
+  });
+});
+
+describe("OpenAI connection note", () => {
+  it("names the source of the key", () => {
+    expect(openaiConnectionNote("server", true)).toMatchObject({ text: expect.stringContaining("server key"), profileLink: true });
+    expect(openaiConnectionNote("codex_with_api_fallback", true)?.text).toBe("OpenAI via Codex login, API key fallback.");
+    expect(openaiConnectionNote("codex", true)?.text).toBe("OpenAI via Codex login.");
+    expect(openaiConnectionNote("profile", true)?.text).toBe("OpenAI via your profile API key.");
+  });
+
+  it("asks for a key only when OpenAI is not available", () => {
+    expect(openaiConnectionNote(null, false)).toMatchObject({ text: expect.stringContaining("needs a key"), profileLink: true });
+    expect(openaiConnectionNote(null, true)).toBeNull();
   });
 });

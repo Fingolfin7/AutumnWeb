@@ -15,7 +15,16 @@ import { useToast } from "@/app/toasts";
 import { keys } from "@/api/keys";
 import { errorMessage } from "@/api/errors";
 import { disconnectChatGPT, meKeys, startChatGPTLogin, useChatGPTLogin, useOnCodexConnected } from "./api";
-import { KEY_PROVIDERS, LUNA_EFFORTS, type KeyDraft, type KeyProvider, type LunaEffort, type Prefs } from "./model";
+import {
+  KEY_PROVIDERS,
+  LUNA_EFFORTS,
+  openaiKeyBadge,
+  openaiKeyNote,
+  type KeyDraft,
+  type KeyProvider,
+  type LunaEffort,
+  type Prefs,
+} from "./model";
 import { FieldErrors, SlabHead } from "./Parts";
 
 const KEY_LABELS: Record<KeyProvider, string> = {
@@ -86,6 +95,8 @@ export function AiSection({
   const status = login.data?.status;
   const connected = status === "connected" || (status === undefined && configured.openai_chatgpt);
   const pending = status === "pending" ? login.data : null;
+  const openaiBadge = openaiKeyBadge(configured, prefs.openai_source);
+  const openaiNote = openaiKeyNote(configured, prefs.openai_source, connected);
 
   return (
     <section className="slab slab-pad">
@@ -177,8 +188,10 @@ export function AiSection({
               <div className="u-between u-gap-3">
                 <label htmlFor={`${provider}_api_key`}>{KEY_LABELS[provider]}</label>
                 <span>
-                  {stored ? (
-                    <span className="text-green">{provider === "openai" ? "Fallback stored" : "Stored"}</span>
+                  {provider === "openai" ? (
+                    <span className={`text-${openaiBadge.tone}`}>{openaiBadge.label}</span>
+                  ) : stored ? (
+                    <span className="text-green">Stored</span>
                   ) : (
                     <span className="text-red">None</span>
                   )}
@@ -195,9 +208,20 @@ export function AiSection({
               />
               {provider === "openai" ? (
                 <small className="muted">
-                  {connected
-                    ? "Used after Codex if the Codex bucket is unavailable."
-                    : "Paste an OpenAI API key to enable OpenAI models."}
+                  {openaiNote === "after-codex" ? (
+                    "Used after Codex if the Codex bucket is unavailable."
+                  ) : openaiNote === "server-needs-profile" ? (
+                    <>
+                      The server <code>OPENAI_API_KEY</code> is available, but Insights requires a profile key or Codex
+                      login.
+                    </>
+                  ) : openaiNote === "server-available" ? (
+                    <>
+                      Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key to override it.
+                    </>
+                  ) : (
+                    "Paste an OpenAI API key to enable OpenAI models."
+                  )}
                 </small>
               ) : null}
               <div className="check-row">

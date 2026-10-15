@@ -7,6 +7,8 @@ export type Prefs = S["PreferencesResponse"];
 export type PrefsPatch = S["PatchedPreferencesRequest"];
 export type FilterUnit = S["FilterUnitEnum"];
 export type LunaEffort = S["LunaEffortEnum"];
+export type Background = S["Background"];
+export type OpenaiSource = Prefs["openai_source"];
 export type BackgroundChoice = "bing" | "nasa" | "";
 
 export const FILTER_UNITS: { value: FilterUnit; label: string }[] = [
@@ -237,4 +239,47 @@ export function detailsOf(error: unknown): {
   }
   if (!Object.keys(fields).length) general = e?.message ?? "Something went wrong.";
   return { fields, general };
+}
+
+/* The picture's credit line, as the old page printed it: the description with
+   "(© owner)" appended unless the description already names the owner. */
+export function backgroundCredit(background: Pick<Background, "description" | "copyright">): string {
+  const description = (background.description ?? "").trim();
+  const copyright = (background.copyright ?? "").trim();
+  if (!copyright || description.includes(copyright)) return description;
+  return description ? `${description} (© ${copyright})` : `© ${copyright}`;
+}
+
+/* Label of the link to the picture's page; videos (NASA) get "Watch video". */
+export function backgroundLinkLabel(background: Pick<Background, "mode" | "video_url">): string {
+  if (background.mode === "apod") return background.video_url ? "Watch video at NASA" : "View APOD at NASA";
+  return "View at Bing";
+}
+
+/* What the OpenAI key slab says about where OpenAI models get their key, from
+   the server's openai_source (users/profile.html's have_keys branches).
+   `codexConnected` is the live login state, which can be fresher than the
+   preferences. */
+export function openaiKeyBadge(
+  configured: Prefs["configured_api_keys"],
+  source: OpenaiSource,
+): { label: string; tone: "green" | "red" } {
+  if (configured.openai) return { label: "Fallback stored", tone: "green" };
+  if (source === "server") return { label: "Server key", tone: "green" };
+  return { label: "None", tone: "red" };
+}
+
+export type OpenaiNote = "after-codex" | "server-needs-profile" | "server-available" | "paste";
+
+export function openaiKeyNote(
+  configured: Prefs["configured_api_keys"],
+  source: OpenaiSource,
+  codexConnected: boolean,
+): OpenaiNote {
+  if (codexConnected) return "after-codex";
+  if (source === "server") {
+    const profileCredentials = configured.gemini || configured.openai || configured.openai_chatgpt || configured.claude;
+    return profileCredentials ? "server-available" : "server-needs-profile";
+  }
+  return "paste";
 }

@@ -6,5 +6,5 @@ export const insightKeys = {
   options: () => ["insights", "options"] as const,
   chats: () => ["insights", "chats"] as const,
   chat: (id: string) => ["insights", "chat", id] as const,
-  preview: (params: object) => ["insights", "preview", params] as const,
+  selection: (params: object) => ["insights", "selection", params] as const,
 };

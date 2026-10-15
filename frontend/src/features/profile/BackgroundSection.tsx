@@ -1,11 +1,11 @@
 import { useEffect, useMemo } from "react";
-import { faDownload } from "@fortawesome/free-solid-svg-icons";
+import { faDownload, faExternalLinkAlt, faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
 import { downloadBackground } from "./api";
 import { applyDimming } from "./shell";
-import { DIM_MAX, type BackgroundChoice, type Prefs, type PrefsDraft } from "./model";
+import { backgroundCredit, backgroundLinkLabel, DIM_MAX, type BackgroundChoice, type Prefs, type PrefsDraft } from "./model";
 import { FieldErrors, SlabHead } from "./Parts";
 
 /* Workspace backdrop: automatic Bing / NASA picture, or an uploaded image,
@@ -31,6 +31,7 @@ export function BackgroundSection({
 }) {
   const toast = useToast();
   const mode = prefs.background.mode;
+  const credit = backgroundCredit(prefs.background);
   const uploaded = mode === "upload" ? prefs.background.image_url : null;
 
   const download = async () => {
@@ -115,7 +116,20 @@ export function BackgroundSection({
         <div className="background-context profile-background-context">
           {mode === "bing" || mode === "apod" ? (
             <>
-              <h3 className="disclose-title">{mode === "bing" ? "Bing daily wallpaper" : "NASA picture of the day"}</h3>
+              <h3 className="disclose-title">
+                {prefs.background.title ?? (mode === "bing" ? "Bing daily wallpaper" : "NASA picture of the day")}
+              </h3>
+              {credit ? <p className="focus-lede">{credit}</p> : null}
+              {prefs.background.source_url ? (
+                <a
+                  className="btn btn--ghost u-mt-4"
+                  href={prefs.background.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Icon icon={prefs.background.video_url ? faPlay : faExternalLinkAlt} /> {backgroundLinkLabel(prefs.background)}
+                </a>
+              ) : null}
               {prefs.background.image_url ? (
                 <>
                   <img
@@ -130,13 +144,13 @@ export function BackgroundSection({
                       onClick={download}
                       aria-label="Download current background"
                     >
-                      <Icon icon={faDownload} /> Download background
+                      <Icon icon={faDownload} /> {prefs.background.video_url ? "Download preview" : "Download background"}
                     </button>
                   </div>
                 </>
-              ) : (
+              ) : !credit && !prefs.background.source_url ? (
                 <p className="focus-lede">No image is available right now, so the page shows no backdrop.</p>
-              )}
+              ) : null}
             </>
           ) : (
             <p className="empty">

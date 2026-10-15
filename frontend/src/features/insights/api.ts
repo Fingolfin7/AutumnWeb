@@ -1,9 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { ApiError, errorMessage, toApiError } from "@/api/errors";
 import { useToast } from "@/app/toasts";
-import { parseRelatedHeader } from "@/features/charts/api";
 import { insightKeys } from "./keys";
+import { CHAT_PAGE_SIZE, mergeChatPages, nextChatOffset, type SelectionQuery } from "./logic";
 import type { ChatDetail, ChatGroup, InsightOptions } from "./types";
 
 /* A 403 here means the account has no AI provider key (or AI is switched off):
@@ -20,13 +20,20 @@ export function useInsightOptions(enabled: boolean) {
   });
 }
 
+/* The chat list, one server page at a time (newest first). The pages are
+   merged back into the Today / Yesterday / Previous 7 days / Older groups. */
 export function useInsightChats(enabled: boolean) {
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: insightKeys.chats(),
     enabled,
     retry: noRetryOn4xx,
-    queryFn: async (): Promise<ChatGroup[]> => (await unwrap(api.GET("/api/v2/insights/chats/"))).groups,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      unwrap(api.GET("/api/v2/insights/chats/", { params: { query: { limit: CHAT_PAGE_SIZE, offset: pageParam } } })),
+    getNextPageParam: (_last, pages) => nextChatOffset(pages),
+    select: (data): ChatGroup[] => mergeChatPages(data.pages),
   });
+  return query;
 }
 
 export function useInsightChat(chatId: string | undefined) {
@@ -55,41 +62,14 @@ export function useDeleteChat() {
   });
 }
 
-export interface SelectionPreview {
-  count: number;
-  /** Start of the earliest and end of the latest selected session. */
-  earliest: string | null;
-  latest: string | null;
-  related: "included" | "unavailable" | null;
-}
-
-const EMPTY_PREVIEW: SelectionPreview = { count: 0, earliest: null, latest: null, related: null };
-
-/* How many sessions the filters select, and over what span: the header line
-   the old page computed server-side. Two one-row reads of the sessions list
-   (newest, then the last one). */
-async function fetchPreview(query: Record<string, string | boolean>): Promise<SelectionPreview> {
-  const params = { ...query, active: false, ordering: "newest" as const, limit: 1 };
-  const first = await api.GET("/api/v2/sessions/", { params: { query: params } });
-  if (!first.response.ok) throw toApiError(first.response.status, first.error);
-  const total = first.data?.total ?? 0;
-  const related = parseRelatedHeader(first.response.headers.get("X-Autumn-Related"));
-  if (!total) return { ...EMPTY_PREVIEW, related };
-  const latest = first.data?.sessions[0]?.end ?? null;
-  let earliest = first.data?.sessions[0]?.start ?? null;
-  if (total > 1) {
-    const last = await api.GET("/api/v2/sessions/", { params: { query: { ...params, offset: total - 1 } } });
-    if (last.response.ok) earliest = last.data?.sessions[0]?.start ?? earliest;
-  }
-  return { count: total, earliest, latest, related };
-}
-
-export function useSelectionPreview(query: Record<string, string | boolean> | null, enabled: boolean) {
+/* How many sessions the filters select, over what dates, and whether related
+   matches were included: the header line the old page computed server-side. */
+export function useInsightSelection(query: SelectionQuery, enabled: boolean) {
   return useQuery({
-    queryKey: insightKeys.preview(query ?? { none: true }),
+    queryKey: insightKeys.selection(query),
     enabled,
     staleTime: 60_000,
     retry: noRetryOn4xx,
-    queryFn: (): Promise<SelectionPreview> => (query ? fetchPreview(query) : Promise.resolve(EMPTY_PREVIEW)),
+    queryFn: () => unwrap(api.GET("/api/v2/insights/selection/", { params: { query } })),
   });
 }

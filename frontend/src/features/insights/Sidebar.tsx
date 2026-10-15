@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { faChevronDown, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Skeleton, ErrorState } from "@/components/states";
 import { AppLink } from "@/app/links";
 import { chatPath } from "./paths";
-import { CHAT_PAGE_SIZE, chatStamp, limitGroups } from "./logic";
+import { chatStamp } from "./logic";
 import type { ChatGroup } from "./types";
 
 /* The past chats, grouped by recency, with delete on hover/focus. */
@@ -16,6 +15,9 @@ export function Sidebar({
   activeId,
   collapsed,
   onDelete,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: {
   groups: ChatGroup[] | undefined;
   loading: boolean;
@@ -24,11 +26,11 @@ export function Sidebar({
   activeId: string | undefined;
   collapsed: boolean;
   onDelete: (chat: { id: string; title: string }) => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 }) {
-  const [limit, setLimit] = useState(CHAT_PAGE_SIZE);
-  /* Newest chats first; older ones load on request. */
-  const view = limitGroups(groups ?? [], limit);
-  const hasOlder = view.total > view.shown;
+  /* Newest chats first; the server sends older ones a page at a time. */
   const now = new Date();
 
   return (
@@ -41,8 +43,8 @@ export function Sidebar({
           <Skeleton lines={4} />
         ) : error ? (
           <ErrorState error={error} onRetry={onRetry} />
-        ) : view.groups.length ? (
-          view.groups.map((group) => (
+        ) : groups?.length ? (
+          groups.map((group) => (
             <div key={group.label} role="group" aria-label={group.label}>
               <p className="group-label">{group.label}</p>
               {group.chats.map((chat) => {
@@ -66,8 +68,8 @@ export function Sidebar({
         ) : (
           <p className="empty chat-list-empty">No chats yet. Filter some sessions and ask a question.</p>
         )}
-        {hasOlder ? (
-          <button type="button" className="btn btn--quiet btn--block load-older-chats" onClick={() => setLimit(limit + CHAT_PAGE_SIZE)}>
+        {hasMore ? (
+          <button type="button" className="btn btn--quiet btn--block load-older-chats" disabled={loadingMore} onClick={onLoadMore}>
             <Icon icon={faChevronDown} /> Load older chats
           </button>
         ) : null}

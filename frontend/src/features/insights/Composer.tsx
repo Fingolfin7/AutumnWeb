@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, type FormEvent, type KeyboardEvent 
 import { faPaperPlane, faStop } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
-import { effortLabel, effortsFor, pickEffort, providerLabel, type ModelSelection } from "./logic";
+import { effortLabel, effortsFor, openaiConnectionNote, pickEffort, providerLabel, type ModelSelection } from "./logic";
 import type { InsightOptions } from "./types";
 
 /* Model pickers, the question box and Send. */
@@ -28,7 +28,7 @@ export function Composer({
   const textarea = useRef<HTMLTextAreaElement>(null);
   const provider = options.providers.find((p) => p.provider === selection.provider);
   const efforts = effortsFor(options, selection.provider, selection.model);
-  const hasOpenai = options.providers.some((p) => p.provider === "openai");
+  const note = openaiConnectionNote(options.openai_source, options.providers.some((p) => p.provider === "openai"));
 
   /* Auto-grow up to ~7 lines. */
   useLayoutEffect(() => {
@@ -107,13 +107,18 @@ export function Composer({
           </span>
         ) : null}
 
-        {!hasOpenai ? (
-          <span className="composer-note muted" title="OpenAI models need an API key or Codex login.">
-            OpenAI needs a key or Codex login &mdash; add one in{" "}
-            <AppLink href={urls.profile()} className="plain-link">
-              Profile
-            </AppLink>
-            .
+        {note ? (
+          <span className="composer-note muted" title={note.title}>
+            {note.text}
+            {note.profileLink ? (
+              <>
+                {" "}
+                <AppLink href={urls.profile()} className="plain-link">
+                  Profile
+                </AppLink>
+                .
+              </>
+            ) : null}
           </span>
         ) : null}
       </div>

@@ -1,3 +1,4 @@
+import type { paths } from "@/api/schema";
 import type { ChatFiltersStored, ChatGroup, ChatMessage, InsightOptions, StreamRequest, Usage } from "./types";
 
 /* ---- the session selection (the page's filters) --------------------------- */
@@ -11,7 +12,7 @@ export interface SelectionFilters {
   start_date: string;
   end_date: string;
   note_snippet: string;
-  /** "" = the header's active context, otherwise a context id. */
+  /** "" = the header's active context, "all" = every context, otherwise a context id. */
   context: string;
   tags: number[];
   projects: number[];
@@ -30,6 +31,12 @@ export const EMPTY_SELECTION: SelectionFilters = {
   projects: [],
   projectMode: "exclude",
 };
+
+/* "all", a context id, or "" for anything else. */
+function contextValue(raw: string | null | undefined): string {
+  const value = (raw ?? "").trim().toLowerCase();
+  return value === "all" || /^\d+$/.test(value) ? value : "";
+}
 
 const TRUTHY = new Set(["1", "true", "on", "yes"]);
 
@@ -52,7 +59,7 @@ export function readSelection(params: URLSearchParams, defaults: { start: string
     start_date: params.get("start_date") || defaults.start,
     end_date: params.get("end_date") || defaults.end,
     note_snippet: (params.get("note_snippet") ?? "").trim(),
-    context: params.get("context") ?? "",
+    context: contextValue(params.get("context")),
     tags: ids(params.getAll("tags")),
     projects: include.length ? include : exclude,
     projectMode: include.length ? "include" : "exclude",
@@ -64,7 +71,8 @@ export function selectionFromChat(stored: ChatFiltersStored | undefined, default
   const f = (stored ?? {}) as Record<string, unknown>;
   const include = ids(f.include_projects);
   const exclude = ids(f.exclude_projects);
-  const context = f.context === undefined || f.context === null ? "" : String(f.context);
+  /* A stored null means the chat was grounded in every context. */
+  const context = f.context === null ? "all" : f.context === undefined ? "" : String(f.context);
   return {
     search: typeof f.search === "string" ? f.search : "",
     related: TRUTHY.has(String(f.related ?? "").toLowerCase()),
@@ -72,7 +80,7 @@ export function selectionFromChat(stored: ChatFiltersStored | undefined, default
     start_date: typeof f.start_date === "string" && f.start_date ? f.start_date : defaults.start,
     end_date: typeof f.end_date === "string" && f.end_date ? f.end_date : defaults.end,
     note_snippet: typeof f.note_snippet === "string" ? f.note_snippet : "",
-    context: /^\d+$/.test(context) ? context : "",
+    context: contextValue(context),
     tags: ids(f.tags),
     projects: include.length ? include : exclude,
     projectMode: include.length ? "include" : "exclude",
@@ -99,7 +107,7 @@ export function selectionRequest(
   if (start) body.start_date = start;
   if (end) body.end_date = end;
   if (filters.note_snippet) body.note_snippet = filters.note_snippet;
-  const context = filters.context ? Number(filters.context) : activeContextId;
+  const context = filters.context === "all" ? "all" : filters.context ? Number(filters.context) : activeContextId;
   if (context) body.context = context;
   if (filters.tags.length) body.tags = filters.tags;
   if (filters.projects.length) {
@@ -111,36 +119,17 @@ export function selectionRequest(
 
 type Named = { id: number; name: string };
 
-/* Query for GET /api/v2/sessions/ that counts the same sessions the stream
-   will hand the model. That endpoint has no project-name filter, so the name
-   (a case-insensitive "contains" on the server) is resolved to project ids
-   here. `none` means the filters cannot match anything at all. */
-export function previewQuery(
+/* Query for GET /api/v2/insights/selection/: the same filter fields the
+   stream takes, so the count is of exactly the sessions the model will be
+   handed (the server resolves the project name and the active context). */
+export type SelectionQuery = NonNullable<paths["/api/v2/insights/selection/"]["get"]["parameters"]["query"]>;
+
+export function selectionQuery(
   filters: SelectionFilters,
-  projects: Named[],
+  defaults: { start: string; end: string },
   activeContextId: number | null,
-): { none: true } | { none: false; query: Record<string, string | boolean> } {
-  let positive: number[] | null = filters.projectMode === "include" && filters.projects.length ? filters.projects : null;
-  if (filters.project_name) {
-    const needle = filters.project_name.toLowerCase();
-    const named = projects.filter((p) => p.name.toLowerCase().includes(needle)).map((p) => p.id);
-    positive = positive ? positive.filter((id) => named.includes(id)) : named;
-  }
-  if (positive && positive.length === 0) return { none: true };
-  const query: Record<string, string | boolean> = {};
-  if (filters.search) {
-    query.search = filters.search;
-    if (filters.related) query.related = true;
-  }
-  if (filters.start_date) query.start_date = filters.start_date;
-  if (filters.end_date) query.end_date = filters.end_date;
-  if (filters.note_snippet) query.note_snippet = filters.note_snippet;
-  const context = filters.context || (activeContextId === null ? "" : String(activeContextId));
-  if (context) query.context_ids = context;
-  if (filters.tags.length) query.tag_ids = filters.tags.join(",");
-  if (positive) query.project_ids = positive.join(",");
-  if (filters.projectMode === "exclude" && filters.projects.length) query.exclude_project_ids = filters.projects.join(",");
-  return { none: false, query };
+): SelectionQuery {
+  return selectionRequest(filters, defaults, activeContextId);
 }
 
 export interface Pill {
@@ -174,7 +163,9 @@ export function describeSelection(
   if (filters.start_date && filters.start_date !== defaults.start) pills.push({ label: "From", value: filters.start_date });
   if (filters.end_date && filters.end_date !== defaults.end) pills.push({ label: "To", value: filters.end_date });
   if (filters.note_snippet) pills.push({ label: "Note", value: filters.note_snippet });
-  if (filters.context) pills.push({ label: "Context", value: names([Number(filters.context)], lookup.contexts) });
+  if (filters.context) {
+    pills.push({ label: "Context", value: filters.context === "all" ? "All contexts" : names([Number(filters.context)], lookup.contexts) });
+  }
   if (filters.tags.length) pills.push({ label: "Tags", value: names(filters.tags, lookup.tags) });
   if (filters.projects.length) {
     pills.push({ label: filters.projectMode === "include" ? "Only" : "Excluding", value: names(filters.projects, lookup.projects) });
@@ -237,19 +228,32 @@ export function providerLabel(provider: string): string {
 
 export const CHAT_PAGE_SIZE = 20;
 
-/* The sidebar shows the newest `limit` chats and loads more on request, as
-   the old page's ?chat_limit= did. Groups arrive newest first. */
-export function limitGroups(groups: ChatGroup[], limit: number): { groups: ChatGroup[]; total: number; shown: number } {
-  const total = groups.reduce((sum, g) => sum + g.chats.length, 0);
-  let left = limit;
-  const out: ChatGroup[] = [];
-  for (const group of groups) {
-    if (left <= 0) break;
-    const chats = group.chats.slice(0, left);
-    left -= chats.length;
-    out.push({ label: group.label, chats });
+/* The server returns each page of chats already grouped (Today, Yesterday,
+   Previous 7 days, Older). Groups that continue onto the next page share a
+   label, so merge them back into one list; a chat that moved between pages
+   while loading (a new one pushed the rest down) is shown once. */
+export function mergeChatPages(pages: { groups: ChatGroup[] }[]): ChatGroup[] {
+  const seen = new Set<string>();
+  const merged: ChatGroup[] = [];
+  for (const page of pages) {
+    for (const group of page.groups) {
+      const chats = group.chats.filter((chat) => !seen.has(chat.id));
+      chats.forEach((chat) => seen.add(chat.id));
+      if (!chats.length) continue;
+      const last = merged[merged.length - 1];
+      if (last && last.label === group.label) last.chats.push(...chats);
+      else merged.push({ label: group.label, chats });
+    }
   }
-  return { groups: out, total, shown: Math.min(limit, total) };
+  return merged;
+}
+
+/* Offset of the next page, or undefined once everything is loaded. */
+export function nextChatOffset(pages: { total?: number; offset?: number; groups: ChatGroup[] }[]): number | undefined {
+  const last = pages[pages.length - 1];
+  if (!last) return undefined;
+  const loaded = (last.offset ?? 0) + last.groups.reduce((sum, group) => sum + group.chats.length, 0);
+  return last.total !== undefined && loaded < last.total ? loaded : undefined;
 }
 
 /* Compact hover stamp (time_formats.chat_hover_stamp): a time for today and
@@ -322,3 +326,43 @@ export function formatUsage(total: UsageTotals): string {
 
 export const USAGE_TITLE =
   "Approximate cumulative token usage for this conversation. In = input/prompt tokens sent to the model, Out = tokens generated by the model (includes reasoning tokens). Cached = the share of In served from the provider's prompt cache, billed at a fraction of the normal rate.";
+
+/* ---- OpenAI connection note ----------------------------------------------- */
+
+export interface ConnectionNote {
+  /** Text before the Profile link (the link is shown when `profileLink`). */
+  text: string;
+  title: string;
+  profileLink: boolean;
+}
+
+/* The composer's note about where OpenAI models get their key
+   (insights.html's openai_connection_source branches). */
+export function openaiConnectionNote(source: InsightOptions["openai_source"], hasOpenaiProvider: boolean): ConnectionNote | null {
+  switch (source) {
+    case "server":
+      return {
+        text: "OpenAI via server key — add your own in",
+        title: "OpenAI models are available through the server OPENAI_API_KEY. Add a personal key in Profile to use your own API account.",
+        profileLink: true,
+      };
+    case "codex_with_api_fallback":
+      return {
+        text: "OpenAI via Codex login, API key fallback.",
+        title: "OpenAI models use your Codex login first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.",
+        profileLink: false,
+      };
+    case "codex":
+      return { text: "OpenAI via Codex login.", title: "OpenAI models are available through your Codex login.", profileLink: false };
+    case "profile":
+      return { text: "OpenAI via your profile API key.", title: "OpenAI models are using your profile API key.", profileLink: false };
+    default:
+      return hasOpenaiProvider
+        ? null
+        : {
+            text: "OpenAI needs a key or Codex login — add one in",
+            title: "OpenAI models need an API key or Codex login.",
+            profileLink: true,
+          };
+  }
+}

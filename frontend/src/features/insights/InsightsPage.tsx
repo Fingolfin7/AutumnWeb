@@ -13,7 +13,7 @@ import { ApiError } from "@/api/errors";
 import { bootstrap } from "@/bootstrap";
 import { formatDayDate } from "@/lib/format";
 import { semanticSearchAvailable } from "@/features/charts/api";
-import { useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useSelectionPreview } from "./api";
+import { useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useInsightSelection } from "./api";
 import { Composer } from "./Composer";
 import { FilterSheet } from "./FilterSheet";
 import { Sidebar } from "./Sidebar";
@@ -26,10 +26,10 @@ import {
   describeSelection,
   EMPTY_SELECTION,
   formatUsage,
-  previewQuery,
   readSelection,
   resolveSelection,
   selectionFromChat,
+  selectionQuery,
   selectionRequest,
   splitChatModel,
   sumUsage,
@@ -183,8 +183,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
   const ownRun = useRef<number | null>(null);
 
-  const query = previewQuery(selection, projects.data ?? [], contextId);
-  const preview = useSelectionPreview(query.none ? null : query.query, !selection.project_name || !!projects.data);
+  const preview = useInsightSelection(selectionQuery(selection, defaults, contextId), true);
   const count = preview.data?.count;
 
   const turns = useMemo(() => visibleTurns(chat?.messages ?? [], model?.model ?? ""), [chat, model?.model]);
@@ -363,6 +362,9 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
         <Sidebar
           groups={chats.data}
           loading={chats.isPending}
+          hasMore={chats.hasNextPage}
+          loadingMore={chats.isFetchingNextPage}
+          onLoadMore={() => void chats.fetchNextPage()}
           error={chats.isError ? chats.error : null}
           onRetry={() => void chats.refetch()}
           activeId={chatId}
@@ -379,9 +381,9 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
               <>
                 <div className="chat-header-meta">
                   <h3>{count ? `${count} ${sessionLabel}` : "Conversation"}</h3>
-                  {count && preview.data?.earliest && preview.data.latest ? (
+                  {count && preview.data?.first_date && preview.data.last_date ? (
                     <span className="chat-header-range muted">
-                      <span className="text-cyan">{formatDayDate(preview.data.earliest)}</span> &ndash; <span className="text-cyan">{formatDayDate(preview.data.latest)}</span>
+                      <span className="text-cyan">{formatDayDate(preview.data.first_date)}</span> &ndash; <span className="text-cyan">{formatDayDate(preview.data.last_date)}</span>
                     </span>
                   ) : null}
                   <span id="token-usage" className="chat-header-tokens muted" title={USAGE_TITLE}>
@@ -417,7 +419,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             <Skeleton lines={4} />
           ) : showEmpty ? (
             <div className="empty-state-container">
-              {bootstrap().static.leaf ? <img src={bootstrap().static.leaf} alt="" /> : null}
+              {bootstrap().static.insights_empty ? <img src={bootstrap().static.insights_empty} alt="" /> : null}
               <p className="empty">
                 No sessions match these filters, so there is nothing to ask about yet. Widen the range in <b>Filters</b>, or{" "}
                 <AppLink href={urls.sessions()}>check what you have tracked</AppLink>.

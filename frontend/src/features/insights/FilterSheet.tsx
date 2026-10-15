@@ -34,7 +34,7 @@ export function FilterSheet({
   /* The project picker narrows itself to the context and tags chosen beside
      it; a ticked project always stays visible. */
   const projectOptions = useMemo(() => {
-    const scope = draft.context ? Number(draft.context) : activeContextId;
+    const scope = draft.context === "all" ? null : draft.context ? Number(draft.context) : activeContextId;
     return projects
       .filter((project) => {
         if (draft.projects.includes(project.id)) return true;
@@ -82,6 +82,7 @@ export function FilterSheet({
           <label htmlFor="context-filter">Context</label>
           <select id="context-filter" value={draft.context} onChange={(e) => onDraft({ ...draft, context: e.target.value })}>
             <option value="">Active context (header)</option>
+            <option value="all">All contexts</option>
             {contexts.map((ctx) => (
               <option key={ctx.id} value={ctx.id}>
                 {ctx.name}

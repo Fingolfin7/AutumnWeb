@@ -1,10 +1,14 @@
 import {
   accountChanges,
   accountDraft,
+  backgroundCredit,
+  backgroundLinkLabel,
   clampDimming,
   detailsOf,
   hasCustomAvatar,
   keyActions,
+  openaiKeyBadge,
+  openaiKeyNote,
   prefsChanges,
   prefsDraft,
   validatePrefs,
@@ -141,5 +145,41 @@ describe("misc", () => {
       "Enter a valid email address.",
     ]);
     expect(detailsOf(new Error("boom")).general).toBe("boom");
+  });
+});
+
+describe("backgroundCredit", () => {
+  it("appends the copyright unless the description has it", () => {
+    expect(backgroundCredit({ description: "A lake", copyright: "Ann" })).toBe("A lake (© Ann)");
+    expect(backgroundCredit({ description: "A lake by Ann", copyright: "Ann" })).toBe("A lake by Ann");
+    expect(backgroundCredit({ description: null, copyright: "Ann" })).toBe("© Ann");
+    expect(backgroundCredit({ description: null, copyright: null })).toBe("");
+  });
+});
+
+describe("backgroundLinkLabel", () => {
+  it("names the source", () => {
+    expect(backgroundLinkLabel({ mode: "bing", video_url: null })).toBe("View at Bing");
+    expect(backgroundLinkLabel({ mode: "apod", video_url: null })).toBe("View APOD at NASA");
+    expect(backgroundLinkLabel({ mode: "apod", video_url: "https://v.example.test/x" })).toBe("Watch video at NASA");
+  });
+});
+
+describe("OpenAI key connection note", () => {
+  const none = { gemini: false, openai: false, openai_chatgpt: false, claude: false };
+  it("badges a stored key, then the server key", () => {
+    expect(openaiKeyBadge({ ...none, openai: true }, "codex_with_api_fallback")).toEqual({
+      label: "Fallback stored",
+      tone: "green",
+    });
+    expect(openaiKeyBadge(none, "server")).toEqual({ label: "Server key", tone: "green" });
+    expect(openaiKeyBadge(none, null)).toEqual({ label: "None", tone: "red" });
+  });
+
+  it("explains the server key by what the profile holds", () => {
+    expect(openaiKeyNote(none, "server", false)).toBe("server-needs-profile");
+    expect(openaiKeyNote({ ...none, claude: true }, "server", false)).toBe("server-available");
+    expect(openaiKeyNote(none, null, false)).toBe("paste");
+    expect(openaiKeyNote(none, "codex", true)).toBe("after-codex");
   });
 });
