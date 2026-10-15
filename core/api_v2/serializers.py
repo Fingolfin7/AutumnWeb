@@ -387,6 +387,13 @@ class CommitmentChangesRequestSerializer(serializers.Serializer):
     max_balance = serializers.IntegerField(required=False)
     min_balance = serializers.IntegerField(required=False)
     active = serializers.BooleanField(required=False)
+    notifications_enabled = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "Include this commitment in the evening commitment check "
+            "notification (needs the account's commitment checks switched on)."
+        ),
+    )
     include_project_ids = serializers.ListField(
         child=serializers.IntegerField(min_value=1), required=False
     )
@@ -535,6 +542,7 @@ class CommitmentResourceSerializer(serializers.Serializer):
     min_balance = serializers.FloatField()
     balance = serializers.FloatField()
     current_surplus = serializers.FloatField()
+    notifications_enabled = serializers.BooleanField(required=False)
     filters = CommitmentFiltersSerializer()
     current_period = CommitmentCurrentPeriodSerializer()
     pending_revision = CommitmentPendingRevisionSerializer(allow_null=True)

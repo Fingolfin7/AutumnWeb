@@ -567,3 +567,45 @@ class V2CommitmentRestartScopeTests(TestCase):
         self.assertEqual(response.status_code, 404)
         commitment.refresh_from_db()
         self.assertEqual(commitment.generation, 1)
+
+
+class V2CommitmentNotificationOptInTests(TestCase):
+    """The per-commitment opt-in to the evening commitment check notification."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="v2-optin", email="v2-optin@example.com")
+        self.project = Projects.objects.create(user=self.user, name="Focus")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+        self.payload = {
+            "aggregation_type": "project",
+            "project_id": self.project.pk,
+            "commitment_type": "time",
+            "period": "weekly",
+            "target_value": 120,
+        }
+
+    def test_it_defaults_to_off_and_can_be_set_on_create(self):
+        off = self.client.post(reverse("api_v2:commitments"), self.payload, format="json")
+        self.assertEqual(off.status_code, 201, off.content)
+        self.assertIs(off.json()["notifications_enabled"], False)
+        Commitment.objects.all().delete()
+        on = self.client.post(
+            reverse("api_v2:commitments"), {**self.payload, "notifications_enabled": True}, format="json"
+        )
+        self.assertEqual(on.status_code, 201, on.content)
+        self.assertIs(on.json()["notifications_enabled"], True)
+        self.assertTrue(Commitment.objects.get().notifications_enabled)
+
+    def test_it_changes_immediately_without_a_restart_or_pending_revision(self):
+        created = self.client.post(reverse("api_v2:commitments"), self.payload, format="json").json()
+        url = reverse("api_v2:commitment-detail", args=[created["id"]])
+        response = self.client.patch(
+            url, {"notifications_enabled": True}, format="json", HTTP_IF_MATCH=str(created["version"])
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertIs(response.json()["notifications_enabled"], True)
+        self.assertIsNone(response.json()["pending_revision"])
+        self.assertTrue(Commitment.objects.get(pk=created["id"]).notifications_enabled)
+        listed = self.client.get(reverse("api_v2:commitments")).json()["commitments"][0]
+        self.assertIs(listed["notifications_enabled"], True)

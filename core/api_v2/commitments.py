@@ -279,6 +279,7 @@ def serialize_commitment(commitment, *, reconcile=True, include_streak=False):
         "generation": commitment.generation,
         "target_value": _unit_value(commitment.commitment_type, commitment.target),
         "banking_enabled": commitment.banking_enabled,
+        "notifications_enabled": commitment.notifications_enabled,
         "max_balance": _unit_value(commitment.commitment_type, commitment.max_balance),
         "min_balance": _unit_value(commitment.commitment_type, commitment.min_balance),
         "balance": _unit_value(commitment.commitment_type, commitment.balance),
@@ -355,6 +356,7 @@ def _definition_from_api(user, data, *, current_aggregation=None):
         "max_balance": "max_balance",
         "min_balance": "min_balance",
         "active": "active",
+        "notifications_enabled": "notifications_enabled",
     }
     for api_field, service_field in scalar_mapping.items():
         if api_field in data:

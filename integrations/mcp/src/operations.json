@@ -85,6 +85,7 @@
       "max_balance",
       "min_balance",
       "active",
+      "notifications_enabled",
       "include_project_ids",
       "exclude_project_ids",
       "include_subproject_ids",
@@ -166,6 +167,10 @@
         },
         "active": {
           "type": "boolean"
+        },
+        "notifications_enabled": {
+          "type": "boolean",
+          "description": "Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on)."
         },
         "include_project_ids": {
           "type": "array",
@@ -325,6 +330,7 @@
       "max_balance",
       "min_balance",
       "active",
+      "notifications_enabled",
       "include_project_ids",
       "exclude_project_ids",
       "include_subproject_ids",
@@ -413,6 +419,10 @@
         },
         "active": {
           "type": "boolean"
+        },
+        "notifications_enabled": {
+          "type": "boolean",
+          "description": "Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on)."
         },
         "include_project_ids": {
           "type": "array",
@@ -798,6 +808,10 @@
             },
             "active": {
               "type": "boolean"
+            },
+            "notifications_enabled": {
+              "type": "boolean",
+              "description": "Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on)."
             },
             "include_project_ids": {
               "type": "array",

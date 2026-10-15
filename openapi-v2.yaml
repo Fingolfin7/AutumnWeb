@@ -3371,6 +3371,10 @@ components:
           type: integer
         active:
           type: boolean
+        notifications_enabled:
+          type: boolean
+          description: Include this commitment in the evening commitment check notification
+            (needs the account's commitment checks switched on).
         include_project_ids:
           type: array
           items:
@@ -3449,6 +3453,10 @@ components:
           type: integer
         active:
           type: boolean
+        notifications_enabled:
+          type: boolean
+          description: Include this commitment in the evening commitment check notification
+            (needs the account's commitment checks switched on).
         include_project_ids:
           type: array
           items:
@@ -3704,6 +3712,8 @@ components:
         current_surplus:
           type: number
           format: double
+        notifications_enabled:
+          type: boolean
         filters:
           $ref: '#/components/schemas/CommitmentFilters'
         current_period:
@@ -4708,6 +4718,10 @@ components:
           type: integer
         active:
           type: boolean
+        notifications_enabled:
+          type: boolean
+          description: Include this commitment in the evening commitment check notification
+            (needs the account's commitment checks switched on).
         include_project_ids:
           type: array
           items:

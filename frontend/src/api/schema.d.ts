@@ -1183,6 +1183,8 @@ export interface components {
             max_balance?: number;
             min_balance?: number;
             active?: boolean;
+            /** @description Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on). */
+            notifications_enabled?: boolean;
             include_project_ids?: number[];
             exclude_project_ids?: number[];
             include_subproject_ids?: number[];
@@ -1208,6 +1210,8 @@ export interface components {
             max_balance?: number;
             min_balance?: number;
             active?: boolean;
+            /** @description Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on). */
+            notifications_enabled?: boolean;
             include_project_ids?: number[];
             exclude_project_ids?: number[];
             include_subproject_ids?: number[];
@@ -1318,6 +1322,7 @@ export interface components {
             balance: number;
             /** Format: double */
             current_surplus: number;
+            notifications_enabled?: boolean;
             filters: components["schemas"]["CommitmentFilters"];
             current_period: components["schemas"]["CommitmentCurrentPeriod"];
             pending_revision: components["schemas"]["CommitmentPendingRevision"] | null;
@@ -1753,6 +1758,8 @@ export interface components {
             max_balance?: number;
             min_balance?: number;
             active?: boolean;
+            /** @description Include this commitment in the evening commitment check notification (needs the account's commitment checks switched on). */
+            notifications_enabled?: boolean;
             include_project_ids?: number[];
             exclude_project_ids?: number[];
             include_subproject_ids?: number[];
