@@ -276,81 +276,6 @@ class QuickStartTests(DashboardTestCase):
         self.assertEqual(len(build_quick_starts(recent, [])), QUICK_START_LIMIT)
 
 
-class DashboardRendersFocusDeskTests(DashboardTestCase):
-    def test_summary_windows_follow_the_users_local_day(self):
-        self.user.profile.timezone = "Pacific/Kiritimati"
-        self.user.profile.save(update_fields=["timezone"])
-        # Monday 00:30 in Kiritimati, while the UTC date is still Sunday.
-        now = datetime(2026, 1, 4, 10, 30, tzinfo=datetime_timezone.utc)
-        Sessions.objects.create(
-            user=self.user,
-            project=self.atlas,
-            start_time=now - timedelta(minutes=40),
-            end_time=now - timedelta(minutes=10),
-        )
-        Sessions.objects.create(
-            user=self.user,
-            project=self.autumn,
-            start_time=now - timedelta(hours=2),
-            end_time=now - timedelta(hours=1),
-        )
-
-        with patch("core.services.dashboard.timezone.now", return_value=now):
-            response = self.client.get(reverse("home"))
-
-        self.assertEqual(response.context["today_total"], 30.0)
-        self.assertEqual(response.context["week_total"], 30.0)
-
-    def test_dashboard_uses_the_focus_desk_shell_only(self):
-        """No page may load both stylesheets — that is the whole migration."""
-        response = self.client.get(reverse("home"))
-
-        self.assertTemplateUsed(response, "core/base.html")
-        self.assertContains(response, "core/css/focus_desk.css")
-        self.assertNotContains(response, "core/css/style.css")
-
-    @freeze_time("2026-09-20 12:00:00+02:00")
-    def test_dashboard_supplies_the_day_timeline(self):
-        self._session(self.atlas, 10, subs=["auth"])
-
-        response = self.client.get(reverse("home"))
-
-        self.assertIn("timeline", response.context)
-        self.assertEqual(
-            [lane["project"].name for lane in response.context["timeline"]["lanes"]],
-            ["Atlas API"],
-        )
-        self.assertContains(response, "fd-tl-lane")
-
-    def test_an_untracked_day_renders_the_axis_and_an_empty_state(self):
-        response = self.client.get(reverse("home"))
-
-        self.assertEqual(response.context["timeline"]["lanes"], [])
-        self.assertContains(response, "fd-tl-empty")
-        self.assertNotContains(response, "fd-tl-lane")
-
-    def test_running_timers_render_as_focus_cards(self):
-        self._timer(self.atlas, subs=["auth"])
-
-        response = self.client.get(reverse("home"))
-
-        self.assertContains(response, "focus-card")
-        self.assertContains(response, "Atlas API")
-        # start card is always present alongside the running ones
-        self.assertContains(response, "focus-card--start")
-
-    def test_quick_start_chips_post_the_project_and_subprojects(self):
-        self._session(self.atlas, 10, subs=["auth"])
-
-        response = self.client.get(reverse("home"))
-
-        self.assertEqual(
-            [s.project.name for s in response.context["quick_starts"]], ["Atlas API"]
-        )
-        self.assertContains(response, 'name="project" value="Atlas API"')
-        self.assertContains(response, 'name="subprojects" value="auth"')
-
-
 class TimelineFragmentTests(DashboardTestCase):
     """The fragment endpoint serves both the range tabs and the live poll."""
 
@@ -402,9 +327,3 @@ class TimelineFragmentTests(DashboardTestCase):
         self.assertContains(response, "data-start-iso")
         self.assertContains(response, "data-live-dur")
 
-    def test_the_dashboard_and_the_fragment_render_the_same_partial(self):
-        self._session(self.atlas, 10)
-
-        page = self.client.get(reverse("home"))
-
-        self.assertTemplateUsed(page, "core/partials/day_timeline.html")

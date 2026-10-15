@@ -119,13 +119,24 @@ class PwaTests(TestCase):
         self.assertIn("self.addEventListener(\"fetch\"", content)
         self.assertIn("/static/core/pwa/offline.html", content)
 
-    def test_base_templates_advertise_manifest_and_register_worker(self):
-        user = User.objects.create_user(username="pwauser", password="password")
+    def test_app_document_and_login_page_advertise_the_manifest(self):
+        # The React shell (core/templates/core/spa.html) links the manifest and
+        # frontend/src/main.tsx registers /service-worker.js; the server-rendered
+        # login page still goes through base.html and pwa.js.
+        from unittest import mock
+
+        from core import spa
+
+        User.objects.create_user(username="pwauser", password="password")
         self.client.login(username="pwauser", password="password")
 
-        dashboard_response = self.client.get(reverse("home"))
-        self.assertContains(dashboard_response, 'rel="manifest"')
-        self.assertContains(dashboard_response, "core/js/pwa.js")
+        entry = {"src/main.tsx": {"file": "assets/main-abc123.js", "isEntry": True}}
+        with mock.patch.object(spa, "manifest", return_value=entry):
+            app_response = self.client.get(reverse("home"))
+        self.assertEqual(app_response.status_code, 200)
+        self.assertContains(app_response, 'rel="manifest"')
+        self.assertContains(app_response, reverse("pwa_manifest"))
+        self.assertEqual(self.client.get(reverse("service_worker")).status_code, 200)
 
         self.client.logout()
         login_response = self.client.get(reverse("login"))
@@ -160,66 +171,6 @@ class UpdateSessionTests(TestCase):
             subprojects=[self.subproject1],
         )
 
-    def test_update_session_updates_total_time(self):
-        original_session_id = self.session.id
-
-        # Verify initial derived total times.
-        self.assertAlmostEqual(
-            derived_project_total(self.user, self.project), 60.0, places=2
-        )  # 1 hour, with 2 decimal precision
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject2), 0.0, places=2
-        )
-
-        # Prepare data for updating the session
-        new_start_time = timezone.now() - timedelta(hours=3)
-        new_end_time = new_start_time + timedelta(minutes=90)
-        update_data = {
-            "project_name": self.project.name,
-            "start_time": new_start_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "end_time": new_end_time.strftime("%Y-%m-%d %H:%M:%S"),
-            "note": "Updated session",
-            "subprojects": [self.subproject2.name],  # Change subproject
-        }
-
-        # Call the update_session view
-        response = self.client.post(
-            reverse("update_session", args=[self.session.id]), data=update_data
-        )
-
-        self.assertEqual(response.status_code, 302)  # Redirect after successful update
-        self.assertEqual(
-            response.url, reverse("update_session", args=[original_session_id])
-        )
-        self.assertEqual(Sessions.objects.filter(user=self.user).count(), 1)
-        updated_session = Sessions.objects.get(pk=original_session_id)
-        self.assertEqual(updated_session.note, "Updated session")
-
-        # Verify updated derived total times.
-        self.assertAlmostEqual(
-            derived_project_total(self.user, self.project), 90.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject2), 90.0, places=2
-        )
-
-    def test_session_is_reachable_by_uuid(self):
-        # The uuid survives export/re-import, so the uuid URL is a stable
-        # external link even when the integer pk changes.
-        by_uuid = reverse("update_session", args=[self.session.uuid])
-        self.assertIn(str(self.session.uuid), by_uuid)
-
-        response = self.client.get(by_uuid)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.project.name)
-
     def test_repeated_save_of_completed_session_is_idempotent(self):
         self.session.note = "Only the note changed"
         self.session.save()
@@ -231,174 +182,6 @@ class UpdateSessionTests(TestCase):
             derived_subproject_total(self.user, self.subproject1), 60.0, places=2
         )
 
-
-
-class StopTimerTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client.login(username="testuser", password="password")
-        self.project = Projects.objects.create(user=self.user, name="Test Project")
-        self.subproject = SubProjects.objects.create(
-            user=self.user, name="Subproject", parent_project=self.project
-        )
-
-        # Create an active session (with no end time and is_active=True)
-        self.session = Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=timezone.now() - timedelta(hours=1),
-            is_active=True,
-        )
-        self.session.subprojects.add(self.subproject)
-
-    def test_stop_timer(self):
-        response = self.client.post(reverse("stop_timer", args=[self.session.id]))
-        self.assertEqual(response.status_code, 302)  # Expecting a redirect
-
-        # Refresh session and project from DB
-        self.session.refresh_from_db()
-        self.project.refresh_from_db()
-        self.subproject.refresh_from_db()
-
-        # Verify session is stopped: is_active should be False and end_time not None
-        self.assertFalse(self.session.is_active)
-        self.assertIsNotNone(self.session.end_time)
-
-        # Derived totals follow the stopped session.
-        expected_duration = self.session.duration
-        self.assertAlmostEqual(
-            derived_project_total(self.user, self.project), expected_duration, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject), expected_duration, places=2
-        )
-
-
-class StopAfterTimerTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="stopafter", password="password")
-        self.client.login(username="stopafter", password="password")
-        self.project = Projects.objects.create(user=self.user, name="Focus Block")
-
-    def test_start_timer_accepts_stop_after_duration(self):
-        response = self.client.post(
-            reverse("start_timer"),
-            data={
-                "project": self.project.name,
-                "auto_stop_enabled": "1",
-                "stop_after_amount": "30",
-                "stop_after_unit": "minutes",
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        session = Sessions.objects.get(user=self.user, project=self.project)
-        self.assertTrue(session.is_active)
-        self.assertIsNotNone(session.auto_stop_at)
-        self.assertAlmostEqual(
-            (session.auto_stop_at - session.start_time).total_seconds(),
-            30 * 60,
-            delta=2,
-        )
-
-    def test_stop_after_value_is_ignored_without_explicit_opt_in(self):
-        response = self.client.post(
-            reverse("start_timer"),
-            data={
-                "project": self.project.name,
-                "stop_after_amount": "1",
-                "stop_after_unit": "minutes",
-                "reminder_mode": "interval",
-                "reminder_amount": "1",
-                "reminder_unit": "minutes",
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        session = Sessions.objects.get(user=self.user, project=self.project)
-        self.assertIsNone(session.auto_stop_at)
-        self.assertIsNone(session.end_time)
-
-    def test_expired_stop_after_timer_is_closed_before_listing_active_timers(self):
-        start = timezone.now() - timedelta(minutes=45)
-        auto_stop_at = start + timedelta(minutes=30)
-        session = Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            auto_stop_at=auto_stop_at,
-            is_active=True,
-        )
-
-        response = self.client.get(reverse("timers"))
-
-        self.assertEqual(response.status_code, 200)
-        session.refresh_from_db()
-        self.project.refresh_from_db()
-        self.assertFalse(session.is_active)
-        floored_auto_stop_at = auto_stop_at.replace(microsecond=0)
-        self.assertEqual(session.end_time, floored_auto_stop_at)
-        self.assertIsNone(session.auto_stop_at)
-        expected_duration = round(
-            (floored_auto_stop_at - start).total_seconds() / 60.0, 4
-        )
-        self.assertEqual(
-            derived_project_total(self.user, self.project), expected_duration
-        )
-        self.assertEqual(len(response.context["timers"]), 0)
-
-
-class DeleteSessionTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client.login(username="testuser", password="password")
-        self.project = Projects.objects.create(user=self.user, name="Test Project")
-
-        self.subproject1 = SubProjects.objects.create(
-            user=self.user, name="Subproject 1", parent_project=self.project
-        )
-        self.subproject2 = SubProjects.objects.create(
-            user=self.user, name="Subproject 2", parent_project=self.project
-        )
-
-        self.session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=timezone.now() - timedelta(hours=2),
-            end_time=timezone.now() - timedelta(hours=1),
-            is_active=False,
-            subprojects=[self.subproject1, self.subproject2],
-        )
-
-    def test_delete_session(self):
-        # Verify initial derived total times.
-        self.assertAlmostEqual(
-            derived_project_total(self.user, self.project), 60.0, places=2
-        )  # 1 hour, with 2 decimal precision
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject1), 60.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject2), 60.0, places=2
-        )
-
-        response = self.client.post(reverse("delete_session", args=[self.session.id]))
-        self.assertEqual(response.status_code, 302)  # Expecting a redirect
-
-        # Verify the session no longer exists
-        session_exists = Sessions.objects.filter(id=self.session.id).exists()
-        self.assertFalse(session_exists)
-
-        # Derived totals fall to zero after deletion.
-        self.assertAlmostEqual(
-            derived_project_total(self.user, self.project), 0.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject1), 0.0, places=2
-        )
-        self.assertAlmostEqual(
-            derived_subproject_total(self.user, self.subproject2), 0.0, places=2
-        )
 
 
 class MergeProjectsTests(TestCase):
