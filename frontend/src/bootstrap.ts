@@ -20,6 +20,8 @@ export interface Bootstrap {
   static: { leaf: string };
   push: { vapid_public_key: string };
   debug: boolean;
+  /** Django flash messages from the redirect that opened the app. */
+  messages?: { kind: "success" | "info" | "warning" | "error"; text: string }[];
 }
 
 const FALLBACK: Bootstrap = {

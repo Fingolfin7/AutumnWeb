@@ -1,0 +1,31 @@
+/* The old page revealed these with jQuery; here they are rendered only when
+   they apply, so they start visible. */
+.profile-page .profile-background-options {
+  display: block;
+}
+.profile-page .profile-field-error {
+  margin: var(--s1) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--project);
+}
+.profile-page .profile-background-thumb {
+  width: 7rem;
+  height: 4.5rem;
+  border-radius: var(--r-sm);
+  object-fit: cover;
+}
+.profile-page .profile-avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--s2);
+}
+.profile-page .profile-codex-code {
+  margin-top: var(--s2);
+}
+.profile-page .profile-luna {
+  margin-top: var(--s3);
+}
+.profile-page .profile-luna select {
+  max-width: 16rem;
+}

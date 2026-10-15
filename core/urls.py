@@ -18,7 +18,7 @@ from core.views.contexts_tags import (
     switch_context,
 )
 from core.views.dashboard import DashboardView, timeline_fragment
-from core.views.import_export import export_view, import_stream, import_view
+from core.views.import_export import import_stream
 from core.views.projects import (
     CreateProjectView,
     CreateSubProjectView,
@@ -118,8 +118,8 @@ urlpatterns = [
     path("update_session/<uuid:session_uuid>/", spa, name="update_session"),
     path("delete_session/<int:session_id>/", spa, name="delete_session"),
     path("charts/", spa, name="charts"),
-    path("export/", export_view, name="export"),
-    path("import/", import_view, name="import"),
+    path("export/", spa, name="export"),
+    path("import/", spa, name="import"),
     path("import/stream/", import_stream, name="import_stream"),
     path("merge_projects/", spa, name="merge_projects"),
     path("merge_subprojects/<int:project_id>/", spa, name="merge_subprojects"),

@@ -1,0 +1,20 @@
+/* Insights: small additions on top of focus_desk.css (the chat classes live
+   there). */
+
+/* The answer is plain text until the server's rendered markdown replaces it. */
+.assistant-message.streaming .message-content { white-space: pre-wrap; }
+
+/* Delete is a real button here (it was an anchor): drop the button chrome. */
+.delete-chat-btn { background: none; border: 0; cursor: pointer; line-height: 1; }
+
+/* No hover on touch screens, so the delete control would never appear. */
+@media (hover: none) {
+  .delete-chat-btn { opacity: .7; }
+}
+
+.empty-state-container .icon { width: 3rem; height: 3rem; }
+
+/* Phones: three selects do not fit one line; wrap rather than clip Effort. */
+@media (max-width: 700px) {
+  .composer-toolbar { flex-wrap: wrap; gap: var(--s2) var(--s3); }
+}

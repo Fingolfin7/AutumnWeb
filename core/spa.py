@@ -16,6 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.staticfiles import finders
 from django.contrib.staticfiles.storage import staticfiles_storage
@@ -95,6 +96,13 @@ def asset_tags():
     }
 
 
+MESSAGE_KINDS = {
+    messages.SUCCESS: "success",
+    messages.WARNING: "warning",
+    messages.ERROR: "error",
+}
+
+
 def bootstrap_payload(request):
     """Data the app needs before its first render.
 
@@ -130,6 +138,12 @@ def bootstrap_payload(request):
         },
         "push": {"vapid_public_key": getattr(settings, "PUSH_VAPID_PUBLIC_KEY", "") or ""},
         "debug": settings.DEBUG,
+        # Flash messages from a redirect into the app (e.g. back from an
+        # OAuth connect); the app shows them as toasts. Reading consumes them.
+        "messages": [
+            {"kind": MESSAGE_KINDS.get(message.level, "info"), "text": str(message)}
+            for message in messages.get_messages(request)
+        ],
     }
 
 
