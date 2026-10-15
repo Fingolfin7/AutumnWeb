@@ -102,6 +102,9 @@ def bootstrap_payload(request):
     """
     user = request.user
     profile = user.profile
+    default_chart_start_date, default_chart_end_date = (
+        profile.default_filter_date_range()
+    )
     active_context, _mode = get_active_context(request)
     contexts = list(
         Context.objects.filter(user=user).order_by("name").values("id", "name")
@@ -115,6 +118,9 @@ def bootstrap_payload(request):
             "insights_access_enabled": profile.insights_access_enabled,
             "ai_features_enabled": profile.ai_features_enabled,
             "default_chart_project_count": profile.default_chart_project_count,
+            "default_chart_start_date": default_chart_start_date.isoformat(),
+            "default_chart_end_date": default_chart_end_date.isoformat(),
+            "openai_key_configured": bool(profile.openai_api_key_enc),
         },
         "contexts": contexts,
         "active_context_id": active_context.id if active_context else None,

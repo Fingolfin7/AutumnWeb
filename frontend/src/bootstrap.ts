@@ -10,6 +10,9 @@ export interface Bootstrap {
     insights_access_enabled: boolean;
     ai_features_enabled: boolean;
     default_chart_project_count: number;
+    default_chart_start_date: string;
+    default_chart_end_date: string;
+    openai_key_configured: boolean;
   };
   contexts: { id: number; name: string }[];
   active_context_id: number | null;
@@ -28,6 +31,9 @@ const FALLBACK: Bootstrap = {
     insights_access_enabled: false,
     ai_features_enabled: false,
     default_chart_project_count: 7,
+    default_chart_start_date: "",
+    default_chart_end_date: "",
+    openai_key_configured: false,
   },
   contexts: [],
   active_context_id: null,

@@ -312,6 +312,10 @@ class SessionListQuerySerializer(serializers.Serializer):
     limit = serializers.IntegerField(required=False, default=100, min_value=1, max_value=500)
     offset = serializers.IntegerField(required=False, default=0, min_value=0)
     include = serializers.CharField(required=False, allow_blank=False)
+    ids = serializers.CharField(
+        required=False,
+        help_text="Comma-separated session IDs.",
+    )
     project_ids = serializers.CharField(required=False)
     subproject_ids = serializers.CharField(required=False)
     context_ids = serializers.CharField(required=False)
@@ -464,6 +468,22 @@ class CommitmentPeriodsQuerySerializer(serializers.Serializer):
     offset = serializers.IntegerField(required=False, default=0, min_value=0)
 
 
+class CommitmentListQuerySerializer(serializers.Serializer):
+    include = serializers.ChoiceField(required=False, choices=("streak",))
+    applies_to = serializers.RegexField(
+        required=False,
+        regex=r"^(project|subproject|context|tag):[1-9][0-9]*$",
+        help_text=(
+            "Return commitments relevant to one owned resource, formatted as "
+            "project:<id>, subproject:<id>, context:<id>, or tag:<id>."
+        ),
+    )
+
+    def validate_applies_to(self, value):
+        kind, raw_id = value.split(":", 1)
+        return kind, int(raw_id)
+
+
 class CommitmentTargetSerializer(serializers.Serializer):
     kind = serializers.CharField()
     id = serializers.IntegerField()
@@ -514,6 +534,7 @@ class CommitmentResourceSerializer(serializers.Serializer):
     max_balance = serializers.FloatField()
     min_balance = serializers.FloatField()
     balance = serializers.FloatField()
+    current_surplus = serializers.FloatField()
     filters = CommitmentFiltersSerializer()
     current_period = CommitmentCurrentPeriodSerializer()
     pending_revision = CommitmentPendingRevisionSerializer(allow_null=True)
@@ -653,9 +674,13 @@ class TagListResponseSerializer(serializers.Serializer):
 
 class SubprojectResourceSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    # Always present in API responses. Keep it optional in the generated type
+    # so existing callers that construct Subproject fixtures remain compatible.
+    version = serializers.IntegerField(required=False)
     name = serializers.CharField()
     description = serializers.SerializerMethodField()
     project_id = serializers.IntegerField(source="parent_project_id")
+    start_date = serializers.SerializerMethodField()
     last_activity = serializers.SerializerMethodField()
     total_minutes = serializers.SerializerMethodField()
     session_count = serializers.IntegerField(source="completed_session_count")
@@ -663,6 +688,10 @@ class SubprojectResourceSerializer(serializers.Serializer):
     @extend_schema_field(serializers.CharField())
     def get_description(self, subproject):
         return subproject.description or ""
+
+    @extend_schema_field(serializers.DateField())
+    def get_start_date(self, subproject):
+        return _local_date(subproject.start_date)
 
     @extend_schema_field(serializers.DateField(allow_null=True))
     def get_last_activity(self, subproject):
@@ -675,6 +704,9 @@ class SubprojectResourceSerializer(serializers.Serializer):
 
 class ProjectResourceSerializer(serializers.Serializer):
     id = serializers.IntegerField()
+    # Always present in API responses. Keep it optional in the generated type
+    # so adding optimistic concurrency remains backward compatible for callers.
+    version = serializers.IntegerField(required=False)
     name = serializers.CharField()
     status = serializers.ChoiceField(
         choices=("active", "paused", "complete", "archived")
@@ -787,13 +819,37 @@ class ProjectListQuerySerializer(serializers.Serializer):
     context_ids = serializers.CharField(required=False)
     tag_ids = serializers.CharField(required=False)
     exclude_project_ids = serializers.CharField(required=False)
+    start_date = serializers.DateField(
+        required=False,
+        help_text="Earliest project start date (inclusive).",
+    )
+    end_date = serializers.DateField(
+        required=False,
+        help_text="Latest project start date (inclusive).",
+    )
     limit = serializers.IntegerField(
         required=False, default=100, min_value=1, max_value=500
     )
     offset = serializers.IntegerField(required=False, default=0, min_value=0)
     ordering = serializers.ChoiceField(
-        required=False, default="name", choices=("name", "id")
+        required=False,
+        default="name",
+        choices=("name", "id", "last_activity"),
+        help_text=(
+            "name (default), id, or last_activity (most recently active first)."
+        ),
     )
+
+    def validate(self, attrs):
+        if (
+            attrs.get("start_date") is not None
+            and attrs.get("end_date") is not None
+            and attrs["end_date"] < attrs["start_date"]
+        ):
+            raise serializers.ValidationError(
+                {"end_date": ["End date must be on or after start date."]}
+            )
+        return attrs
 
 
 class ProjectListResponseSerializer(serializers.Serializer):
@@ -805,11 +861,13 @@ class ProjectListResponseSerializer(serializers.Serializer):
 class SubprojectCreateRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255, allow_blank=False)
     description = serializers.CharField(required=False, allow_blank=True)
+    start_date = serializers.DateField(required=False)
 
 
 class SubprojectPatchRequestSerializer(serializers.Serializer):
     name = serializers.CharField(required=False, max_length=255, allow_blank=False)
     description = serializers.CharField(required=False, allow_blank=True)
+    start_date = serializers.DateField(required=False)
 
 
 class SubprojectMergeRequestSerializer(serializers.Serializer):
@@ -835,6 +893,9 @@ class MeSerializer(serializers.Serializer):
     api_version = serializers.IntegerField()
     capabilities = serializers.ListField(child=serializers.CharField())
     user = MeUserSerializer()
+    default_chart_start_date = serializers.DateField()
+    default_chart_end_date = serializers.DateField()
+    openai_key_configured = serializers.BooleanField()
 
 
 class ReportTotalsSerializer(serializers.Serializer):
@@ -894,6 +955,99 @@ class ChartPayloadRowSerializer(serializers.Serializer):
     weekday = serializers.IntegerField(required=False, min_value=0, max_value=6)
     hour = serializers.IntegerField(required=False, min_value=0, max_value=23)
     average_hours = serializers.FloatField(required=False, min_value=0)
+
+
+class ChartTallyRowSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    total_time = serializers.FloatField(help_text="Minutes.")
+
+
+class ChartStatusRowSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=("active", "paused", "complete", "archived")
+    )
+    count = serializers.IntegerField()
+    total_time = serializers.FloatField(help_text="Minutes.")
+
+
+class ChartBubbleRowSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    tag_id = serializers.IntegerField()
+    total_time = serializers.FloatField(help_text="Minutes.")
+    project_count = serializers.IntegerField()
+    color = serializers.CharField(allow_null=True)
+
+
+class ChartScatterRowSerializer(serializers.Serializer):
+    x = serializers.DateTimeField(help_text="Session end instant.")
+    y = serializers.FloatField(help_text="Session duration in hours.")
+    series = serializers.CharField()
+
+
+class ChartDailySeriesRowSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    series = serializers.CharField()
+    hours = serializers.FloatField()
+
+
+class ChartDailyTotalRowSerializer(serializers.Serializer):
+    date = serializers.DateField()
+    hours = serializers.FloatField()
+
+
+class ChartIntervalRowSerializer(serializers.Serializer):
+    start_time = serializers.DateTimeField()
+    end_time = serializers.DateTimeField()
+
+
+class ChartHeatmapCellSerializer(serializers.Serializer):
+    weekday = serializers.IntegerField(min_value=0, max_value=6)
+    hour = serializers.IntegerField(min_value=0, max_value=23)
+    average_hours = serializers.FloatField(min_value=0)
+
+
+class ChartHistogramRowSerializer(serializers.Serializer):
+    label = serializers.CharField()
+    count = serializers.IntegerField()
+
+
+class ChartWordRowSerializer(serializers.Serializer):
+    text = serializers.CharField()
+    weight = serializers.IntegerField()
+
+
+class ChartRadarRowSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    total_time = serializers.FloatField(help_text="Minutes.")
+    session_count = serializers.IntegerField()
+    subproject_count = serializers.IntegerField()
+    days_since_update = serializers.IntegerField()
+    status = serializers.ChoiceField(
+        choices=("active", "paused", "complete", "archived")
+    )
+
+
+class ChartHierarchySubprojectSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    subproject_id = serializers.IntegerField()
+    total_time = serializers.FloatField(help_text="Minutes.")
+
+
+class ChartHierarchyProjectSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    project_id = serializers.IntegerField()
+    total_time = serializers.FloatField(help_text="Minutes.")
+    children = ChartHierarchySubprojectSerializer(many=True)
+
+
+class ChartHierarchyContextSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    children = ChartHierarchyProjectSerializer(many=True)
+
+
+class ChartHierarchyResponseSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    children = ChartHierarchyContextSerializer(many=True)
 
 
 class PreferenceContextSerializer(serializers.Serializer):

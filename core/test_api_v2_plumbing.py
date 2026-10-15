@@ -37,6 +37,7 @@ class V2EndpointTests(TestCase):
         self.user.profile.save(update_fields=["timezone"])
         self.client = APIClient()
 
+    @freeze_time("2026-10-14 12:00:00")
     def test_me_shape_with_session_authentication(self):
         self.client.force_login(self.user)
 
@@ -65,8 +66,16 @@ class V2EndpointTests(TestCase):
                     "email": self.user.email,
                     "timezone": "America/New_York",
                 },
+                "default_chart_start_date": "2026-09-14",
+                "default_chart_end_date": "2026-10-14",
+                "openai_key_configured": False,
             },
         )
+
+        self.user.profile.set_api_key("openai", "configured-for-test")
+        self.user.profile.save(update_fields=["openai_api_key_enc"])
+        configured = self.client.get(reverse("api_v2:me"))
+        self.assertTrue(configured.json()["openai_key_configured"])
 
     def test_me_accepts_token_authentication(self):
         token = Token.objects.create(user=self.user)
