@@ -10,6 +10,7 @@ import type { Account, AccountPatch, KeyProvider, Prefs, PrefsPatch } from "./mo
 type S = components["schemas"];
 export type ChatGPTLogin = S["ChatGPTLogin"];
 export type SocialAccount = S["SocialAccount"];
+export type SocialAccounts = S["SocialAccounts"];
 export type MediaStatus = S["MediaStatus"];
 
 export const meKeys = {
@@ -40,7 +41,7 @@ export function useProfilePreferences() {
 export function useSocialAccounts() {
   return useQuery({
     queryKey: meKeys.social(),
-    queryFn: async (): Promise<SocialAccount[]> => (await unwrap(api.GET("/api/v2/me/social-accounts/"))).accounts,
+    queryFn: (): Promise<SocialAccounts> => unwrap(api.GET("/api/v2/me/social-accounts/")),
     staleTime: 0,
   });
 }
@@ -72,10 +73,10 @@ function imageForm(file: File): FormData {
 }
 
 export const uploadAvatar = (file: File) => requestJson<MediaStatus>("PUT", "/api/v2/me/avatar/", imageForm(file));
-export const removeAvatar = () => requestJson<MediaStatus>("DELETE", "/api/v2/me/avatar/");
+export const removeAvatar = (): Promise<MediaStatus> => unwrap(api.DELETE("/api/v2/me/avatar/"));
 export const uploadBackground = (file: File) =>
   requestJson<MediaStatus>("PUT", "/api/v2/me/background/", imageForm(file));
-export const removeBackground = () => requestJson<MediaStatus>("DELETE", "/api/v2/me/background/");
+export const removeBackground = (): Promise<MediaStatus> => unwrap(api.DELETE("/api/v2/me/background/"));
 
 export const putApiKey = (provider: KeyProvider, key: string) =>
   unwrap(
@@ -85,13 +86,14 @@ export const putApiKey = (provider: KeyProvider, key: string) =>
     }),
   );
 export const deleteApiKey = (provider: KeyProvider) =>
-  requestJson<{ configured: boolean }>("DELETE", `/api/v2/me/api-keys/${provider}`);
+  unwrap(api.DELETE("/api/v2/me/api-keys/{provider}", { params: { path: { provider } } }));
 
 export const startChatGPTLogin = (): Promise<ChatGPTLogin> => unwrap(api.POST("/api/v2/me/chatgpt-login/"));
-export const disconnectChatGPT = () => requestJson<ChatGPTLogin>("DELETE", "/api/v2/me/chatgpt-login/");
+export const disconnectChatGPT = (): Promise<ChatGPTLogin> => unwrap(api.DELETE("/api/v2/me/chatgpt-login/"));
 
-export const disconnectSocial = (provider: string) =>
-  requestJson<void>("DELETE", `/api/v2/me/social-accounts/${provider}`);
+export const disconnectSocial = async (provider: string): Promise<void> => {
+  await unwrap(api.DELETE("/api/v2/me/social-accounts/{provider}", { params: { path: { provider } } }));
+};
 
 /* The download endpoint answers with the file, or with a JSON error when
    there is nothing to download, so fetch it rather than navigate to it. */

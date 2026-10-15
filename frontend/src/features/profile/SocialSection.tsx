@@ -1,18 +1,28 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { faCheckCircle, faExclamationCircle, faLink, faUnlink } from "@fortawesome/free-solid-svg-icons";
+import {
+  faCheckCircle,
+  faExclamationCircle,
+  faExclamationTriangle,
+  faLink,
+  faUnlink,
+} from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
 import { csrfToken } from "@/lib/csrf";
-import { disconnectSocial, meKeys, type SocialAccount } from "./api";
+import { disconnectSocial, meKeys, type SocialAccount, type SocialAccounts } from "./api";
 import { brandIcons } from "./brands";
 import { SlabHead } from "./Parts";
 
 /* Connected Google / GitHub logins. Changes apply immediately, as before.
    Connecting is a real form POST to the provider's login URL with
    process=connect (allauth refuses GET), which leaves the app for the
-   provider's consent screen. */
-export function SocialSection({ accounts }: { accounts: SocialAccount[] }) {
+   provider's consent screen. Without an Autumn password the last connected
+   provider is the only way in, so the server refuses to disconnect it and
+   the button says why instead of failing. */
+export function SocialSection({ social }: { social: SocialAccounts }) {
+  const { accounts, has_usable_password: hasPassword } = social;
+  const lastLogin = !hasPassword && accounts.filter((account) => account.connected).length === 1;
   const toast = useToast();
   const qc = useQueryClient();
   const disconnect = useMutation({
@@ -29,6 +39,15 @@ export function SocialSection({ accounts }: { accounts: SocialAccount[] }) {
   return (
     <section className="slab slab-pad">
       <SlabHead title="Connected accounts" aside={<span className="muted">Changes apply immediately</span>} />
+      {!hasPassword ? (
+        <div className="msg msg--warning u-mt-4">
+          <Icon icon={faExclamationTriangle} className="msg-icon" />
+          <div>
+            This account has no Autumn password, so a connected provider is the only way to log in. Autumn will refuse
+            to disconnect the last one.
+          </div>
+        </div>
+      ) : null}
       <ul className="profile-auth-list">
         {accounts.map((account) => {
           const brand = brandIcons[account.provider];
@@ -62,7 +81,8 @@ export function SocialSection({ accounts }: { accounts: SocialAccount[] }) {
                   <button
                     type="button"
                     className="btn btn--ghost"
-                    disabled={disconnect.isPending}
+                    disabled={disconnect.isPending || lastLogin}
+                    title={lastLogin ? "This is your only way to log in" : undefined}
                     onClick={() => disconnect.mutate(account.provider)}
                   >
                     <Icon icon={faUnlink} /> Disconnect {account.name}

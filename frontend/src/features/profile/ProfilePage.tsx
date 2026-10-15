@@ -80,7 +80,7 @@ export default function ProfilePage() {
           }}
         />
       ) : editable ? (
-        <ProfileEditor account={account.data} prefs={prefs.data} social={social.data ?? []} />
+        <ProfileEditor account={account.data} prefs={prefs.data} social={social.data ?? { accounts: [], has_usable_password: true }} />
       ) : (
         <section className="slab slab-pad">
           <Skeleton lines={6} />
@@ -420,7 +420,7 @@ function ProfileEditor({
           </div>
         </section>
 
-        <SocialSection accounts={social} />
+        <SocialSection social={social} />
 
         <BackgroundSection
           prefs={prefs}
@@ -535,7 +535,7 @@ function ProfileEditor({
           </div>
         </div>
       </section>
-      <SocialConnectForms accounts={social} />
+      <SocialConnectForms accounts={social.accounts} />
     </>
   );
 }
