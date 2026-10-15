@@ -17,6 +17,11 @@ export function splitErrors(error: unknown, known: string[], conflictField?: str
     result.general.push(error instanceof Error ? error.message : "Something went wrong.");
     return result;
   }
+  /* Its details are the current record, not field errors. */
+  if (conflictCurrent(error)) {
+    result.general.push(error.message);
+    return result;
+  }
   const details = error.details;
   if (details && typeof details === "object") {
     for (const [field, value] of Object.entries(details as Record<string, unknown>)) {
@@ -32,4 +37,14 @@ export function splitErrors(error: unknown, known: string[], conflictField?: str
     result.general.push(error.message);
   }
   return result;
+}
+
+/* A 409 version_conflict (If-Match no longer matches) carries the record as it
+   is now in error.details.current. Null for any other failure. */
+export function conflictCurrent<T extends { version?: number }>(error: unknown): T | null {
+  if (!(error instanceof ApiError) || error.status !== 409 || error.code !== "version_conflict") return null;
+  const details = error.details;
+  if (!details || typeof details !== "object" || !("current" in details)) return null;
+  const current = details.current;
+  return current && typeof current === "object" ? (current as T) : null;
 }

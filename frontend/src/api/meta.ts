@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { keys } from "./keys";
-import type { Context, Project, Subproject, Tag } from "./types";
+import type { Context, Project, ProjectListQuery, Subproject, Tag } from "./types";
 
 /* Lookup data for pickers and filters: every project, tag and context the
    user has. Small, changes rarely, shared by many pages, so it is cached for
@@ -9,11 +9,12 @@ import type { Context, Project, Subproject, Tag } from "./types";
 const META_STALE = 5 * 60_000;
 const PAGE = 200;
 
-export async function fetchAllProjects(query: Record<string, string | number | boolean> = {}): Promise<Project[]> {
+/* Pages through GET /api/v2/projects/. By name unless `ordering` says otherwise. */
+export async function fetchAllProjects(query: Omit<ProjectListQuery, "limit" | "offset"> = {}): Promise<Project[]> {
   const all: Project[] = [];
   for (let offset = 0; ; offset += PAGE) {
     const data = await unwrap(
-      api.GET("/api/v2/projects/", { params: { query: { ...query, limit: PAGE, offset, ordering: "name" } } }),
+      api.GET("/api/v2/projects/", { params: { query: { ordering: "name", ...query, limit: PAGE, offset } } }),
     );
     all.push(...data.projects);
     if (data.projects.length < PAGE || all.length >= data.total) break;

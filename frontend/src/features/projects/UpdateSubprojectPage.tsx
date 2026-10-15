@@ -6,11 +6,11 @@ import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { formatDate, formatDurationWords } from "@/lib/format";
 import type { Subproject } from "@/api/types";
-import { failure, useCommitments, useFirstSessionDate, useProject, useSubproject, useUpdateSubproject } from "./api";
+import { useCommitmentsAppliedTo } from "@/features/commitments/api";
+import { failure, useFirstSessionDate, useProject, useSubproject, useUpdateSubproject } from "./api";
 import { CommitmentsPanel } from "./CommitmentsPanel";
-import { splitErrors } from "./forms";
-import { commitmentAppliesToSubproject, sortCommitments } from "./logic";
-import { FieldError, FormErrors, LoadState, PageHead } from "./Parts";
+import { conflictCurrent, splitErrors } from "./forms";
+import { ConflictBanner, FieldError, FormErrors, LoadState, PageHead } from "./Parts";
 
 const FIELDS = ["name", "description"];
 
@@ -32,42 +32,61 @@ function SubprojectView({ subproject, projectName }: { subproject: Subproject; p
   const toast = useToast();
   const update = useUpdateSubproject(subproject.id);
   const { data: project } = useProject(subproject.project_id);
-  const commitments = useCommitments();
+  const related = useCommitmentsAppliedTo("subproject", subproject.id).data ?? [];
   const first = useFirstSessionDate(subproject.id, subproject.session_count);
+  /* The subproject as the form was opened (or last saved/reloaded): the edit
+     is diffed against it and the PATCH carries its version (If-Match). */
+  const [baseline, setBaseline] = useState(subproject);
   const [name, setName] = useState(subproject.name);
   const [description, setDescription] = useState(subproject.description);
-  const errors = splitErrors(update.error, FIELDS, "name");
+  const [conflict, setConflict] = useState<Subproject | null>(null);
+  const errors = splitErrors(conflict ? null : update.error, FIELDS, "name");
+  const changedElsewhere = subproject.version !== baseline.version;
 
-  const related = useMemo(() => {
-    if (!project) return [];
-    const scope = {
-      id: project.id,
-      contextId: project.context?.id ?? null,
-      tagIds: project.tags.map((tag) => tag.id),
-      subprojectIds: project.subprojects.map((sub) => sub.id),
-    };
-    return sortCommitments((commitments.data ?? []).filter((c) => commitmentAppliesToSubproject(c, scope, subproject.id)));
-  }, [commitments.data, project, subproject.id]);
+  const reset = (from: Subproject) => {
+    setBaseline(from);
+    setName(from.name);
+    setDescription(from.description);
+    setConflict(null);
+    update.reset();
+  };
+
   const known = useMemo(() => new Map((project?.subprojects ?? []).map((sub) => [sub.id, sub.name] as const)), [project]);
+
+  const save = (patch: { name?: string; description?: string }, version: number | undefined) => {
+    update.mutate(
+      { patch, version },
+      {
+        onSuccess: (saved) => {
+          setBaseline(saved);
+          setConflict(null);
+          setName(saved.name);
+          toast.success("Subproject updated successfully");
+        },
+        onError: (error) => {
+          const current = conflictCurrent<Subproject>(error);
+          if (current) setConflict(current);
+          else if (splitErrors(error, FIELDS, "name").general.length) toast.error(failure("save the subproject", error));
+        },
+      },
+    );
+  };
+
+  const changes = () => {
+    const patch: { name?: string; description?: string } = {};
+    if (name.trim() !== baseline.name) patch.name = name.trim();
+    if (description !== baseline.description) patch.description = description;
+    return patch;
+  };
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    const patch: { name?: string; description?: string } = {};
-    if (name.trim() !== subproject.name) patch.name = name.trim();
-    if (description !== subproject.description) patch.description = description;
+    const patch = changes();
     if (!Object.keys(patch).length) {
       toast.info("Nothing to save.");
       return;
     }
-    update.mutate(patch, {
-      onSuccess: (saved) => {
-        setName(saved.name);
-        toast.success("Subproject updated successfully");
-      },
-      onError: (error) => {
-        if (splitErrors(error, FIELDS, "name").general.length) toast.error(failure("save the subproject", error));
-      },
-    });
+    save(patch, baseline.version);
   };
 
   const average = subproject.session_count > 0 ? subproject.total_minutes / subproject.session_count : 0;
@@ -83,6 +102,16 @@ function SubprojectView({ subproject, projectName }: { subproject: Subproject; p
         title={subproject.name}
         titleClass="text-blue"
       />
+
+      {conflict || changedElsewhere ? (
+        <ConflictBanner
+          noun="subproject"
+          outcome={conflict ? "Your changes were not saved." : undefined}
+          onLoadLatest={() => reset(conflict ?? subproject)}
+          onSaveAnyway={conflict ? () => save(changes(), conflict.version) : undefined}
+          busy={update.isPending}
+        />
+      ) : null}
 
       <div className="split">
         <form className="fields" onSubmit={onSubmit}>

@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import { keys } from "@/api/keys";
@@ -6,13 +6,8 @@ import { fetchAllProjects } from "@/api/meta";
 import { useInvalidate } from "@/api/sync";
 import type { Commitment, Project, ProjectDetail, ProjectStatus, Subproject } from "@/api/types";
 import { useActiveContext } from "@/app/context";
-import {
-  applyClientFilters,
-  relatedOnly,
-  serverQuery,
-  sortByActivity,
-  type ProjectFilters,
-} from "./logic";
+import { conflictCurrent } from "./forms";
+import { onlyIncluded, relatedOnly, serverQuery, type ProjectFilters } from "./logic";
 
 /* ------------------------------------------------------------------ lists */
 
@@ -23,20 +18,21 @@ export interface ProjectLists {
   related: Project[];
 }
 
-/* The Projects page. The API's list has no date range, include-only or
-   activity ordering, so those are applied to the fetched set here. With a
-   search, a second request with related=true supplies the related matches. */
+/* The Projects page. The API does the searching, date range and activity
+   ordering; only "only these projects" is applied to the fetched set here.
+   With a search, a second request with related=true supplies the related
+   matches. */
 export function useProjectLists(filters: ProjectFilters) {
   const { contextIdsParam } = useActiveContext();
   const query = serverQuery(filters, contextIdsParam);
   return useQuery({
-    queryKey: keys.projects({ list: { query, client: [filters.start_date, filters.end_date, filters.projectMode === "include" ? filters.projects : []] } }),
+    queryKey: keys.projects({ list: { query, only: filters.projectMode === "include" ? filters.projects : [] } }),
     queryFn: async (): Promise<ProjectLists> => {
       const direct = await fetchAllProjects(query);
       const related = query.search ? relatedOnly(await fetchAllProjects({ ...query, related: true }), direct) : [];
       return {
-        direct: sortByActivity(applyClientFilters(direct, filters)),
-        related: applyClientFilters(related, filters),
+        direct: onlyIncluded(direct, filters),
+        related: onlyIncluded(related, filters),
       };
     },
   });
@@ -61,9 +57,11 @@ export function useProject(id: number, enabled = true) {
   });
 }
 
+const subprojectKey = (id: number) => ["projects", "subproject", id] as const;
+
 export function useSubproject(id: number, enabled = true) {
   return useQuery({
-    queryKey: ["projects", "subproject", id] as const,
+    queryKey: subprojectKey(id),
     enabled,
     queryFn: (): Promise<Subproject> => unwrap(api.GET("/api/v2/subprojects/{subproject_id}", { params: { path: { subproject_id: id } } })),
   });
@@ -133,20 +131,46 @@ export function useCreateProject() {
   });
 }
 
+/* Edits and deletes carry the version the page was opened on (If-Match): the
+   server answers 409 version_conflict, with the current record in
+   error.details, when the project changed meanwhile (see conflictCurrent). */
 export function useUpdateProject(id: number) {
   const { invalidate } = useMutationEffects();
+  const client = useQueryClient();
   return useMutation({
-    mutationFn: (patch: Partial<ProjectInput>) =>
-      unwrap(api.PATCH("/api/v2/projects/{project_id}", { params: { path: { project_id: id } }, body: patch })),
-    onSuccess: () => invalidate("projects", "commitments"),
+    mutationFn: ({ patch, version }: { patch: Partial<ProjectInput>; version?: number }) =>
+      unwrap(
+        api.PATCH("/api/v2/projects/{project_id}", {
+          params: { path: { project_id: id }, header: { "If-Match": version } },
+          body: patch,
+        }),
+      ),
+    onSuccess: (saved) => {
+      /* Keep the open page's copy at the saved version so it doesn't read as
+         "changed elsewhere" before the refetch lands. */
+      client.setQueryData<ProjectDetail>(keys.project(id), (old) => (old ? { ...old, ...saved } : old));
+      invalidate("projects", "commitments");
+    },
+    /* A conflict means the cached copy is out of date: fetch the new one. */
+    onError: (error) => {
+      if (conflictCurrent(error)) invalidate("projects");
+    },
   });
 }
 
 export function useDeleteProject() {
   const { invalidate } = useMutationEffects();
   return useMutation({
-    mutationFn: (id: number) => unwrap(api.DELETE("/api/v2/projects/{project_id}", { params: { path: { project_id: id } } })),
+    mutationFn: ({ id, version }: { id: number; version?: number }) =>
+      unwrap(
+        api.DELETE("/api/v2/projects/{project_id}", {
+          params: { path: { project_id: id }, header: { "If-Match": version } },
+        }),
+      ),
     onSuccess: () => invalidate("projects", "commitments"),
+    onError: (error) => {
+      if (conflictCurrent(error)) invalidate("projects");
+    },
   });
 }
 
@@ -168,20 +192,41 @@ export function useCreateSubproject(projectId: number) {
   });
 }
 
+/* Same If-Match contract as projects. */
 export function useUpdateSubproject(id: number) {
   const { invalidate } = useMutationEffects();
+  const client = useQueryClient();
   return useMutation({
-    mutationFn: (patch: { name?: string; description?: string }) =>
-      unwrap(api.PATCH("/api/v2/subprojects/{subproject_id}", { params: { path: { subproject_id: id } }, body: patch })),
-    onSuccess: () => invalidate("projects", "commitments"),
+    mutationFn: ({ patch, version }: { patch: { name?: string; description?: string }; version?: number }) =>
+      unwrap(
+        api.PATCH("/api/v2/subprojects/{subproject_id}", {
+          params: { path: { subproject_id: id }, header: { "If-Match": version } },
+          body: patch,
+        }),
+      ),
+    onSuccess: (saved) => {
+      client.setQueryData<Subproject>(subprojectKey(id), (old) => (old ? { ...old, ...saved } : old));
+      invalidate("projects", "commitments");
+    },
+    onError: (error) => {
+      if (conflictCurrent(error)) invalidate("projects");
+    },
   });
 }
 
 export function useDeleteSubproject() {
   const { invalidate } = useMutationEffects();
   return useMutation({
-    mutationFn: (id: number) => unwrap(api.DELETE("/api/v2/subprojects/{subproject_id}", { params: { path: { subproject_id: id } } })),
+    mutationFn: ({ id, version }: { id: number; version?: number }) =>
+      unwrap(
+        api.DELETE("/api/v2/subprojects/{subproject_id}", {
+          params: { path: { subproject_id: id }, header: { "If-Match": version } },
+        }),
+      ),
     onSuccess: () => invalidate("projects", "commitments"),
+    onError: (error) => {
+      if (conflictCurrent(error)) invalidate("projects");
+    },
   });
 }
 

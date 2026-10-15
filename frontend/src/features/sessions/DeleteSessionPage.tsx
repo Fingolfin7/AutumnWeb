@@ -6,7 +6,7 @@ import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { ApiError } from "@/api/errors";
 import { formatDuration, formatTime } from "@/lib/format";
-import { parseSessionParam, useDeleteSession, useRenderedNote, useSession, type SessionRow } from "./api";
+import { parseSessionParam, useDeleteSession, useSession, type SessionRow } from "./api";
 
 /* /delete_session/<id>/ (delete_session.html): a confirm page showing the
    session about to disappear in the same shape the lists show it. Back is the
@@ -18,7 +18,6 @@ export default function DeleteSessionPage() {
   const query = useSession(sessionId);
   const navigate = useNavigate();
   const remove = useDeleteSession();
-  const rendered = useRenderedNote(query.data);
 
   if (parseSessionParam(sessionId).kind === "invalid") return <Gone />;
   if (query.isPending) return <Skeleton lines={5} height="2rem" />;
@@ -49,7 +48,7 @@ export default function DeleteSessionPage() {
       >
         <section className="slab session-list">
           <ul className="band-list">
-            <SessionSummary session={session} html={rendered.data ?? session.note_html} />
+            <SessionSummary session={session} html={session.note_html} />
           </ul>
         </section>
 

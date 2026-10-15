@@ -6,12 +6,13 @@ import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { formatDate, formatDurationWords } from "@/lib/format";
-import type { ProjectDetail } from "@/api/types";
-import { failure, useCommitments, useProject, useUpdateProject } from "./api";
+import type { Project, ProjectDetail } from "@/api/types";
+import { useCommitmentsAppliedTo } from "@/features/commitments/api";
+import { failure, useProject, useUpdateProject } from "./api";
 import { CommitmentsPanel } from "./CommitmentsPanel";
-import { splitErrors } from "./forms";
-import { changedFields, commitmentAppliesToProject, sortCommitments, type ProjectValues } from "./logic";
-import { FormErrors, LoadState, PageHead, ProjectFields } from "./Parts";
+import { conflictCurrent, splitErrors } from "./forms";
+import { changedFields, type ProjectValues } from "./logic";
+import { ConflictBanner, FormErrors, LoadState, PageHead, ProjectFields } from "./Parts";
 
 const FIELDS = ["name", "description", "status", "context_id", "tag_ids"];
 
@@ -32,44 +33,59 @@ export default function UpdateProjectPage() {
 function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const toast = useToast();
   const update = useUpdateProject(project.id);
-  const commitments = useCommitments();
+  const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
+  /* The project as the form was opened (or last saved/reloaded): the edit is
+     diffed against it and the PATCH carries its version (If-Match). */
+  const [baseline, setBaseline] = useState(project);
   const [values, setValues] = useState<ProjectValues>(() => toValues(project));
-  const errors = splitErrors(update.error, FIELDS, "name");
+  const [conflict, setConflict] = useState<Project | null>(null);
+  const errors = splitErrors(conflict ? null : update.error, FIELDS, "name");
+  const changedElsewhere = project.version !== baseline.version;
 
-  const related = useMemo(() => {
-    const scope = {
-      id: project.id,
-      contextId: project.context?.id ?? null,
-      tagIds: project.tags.map((tag) => tag.id),
-      subprojectIds: project.subprojects.map((sub) => sub.id),
-    };
-    return sortCommitments((commitments.data ?? []).filter((commitment) => commitmentAppliesToProject(commitment, scope)));
-  }, [commitments.data, project]);
+  const reset = (from: ProjectDetail) => {
+    setBaseline(from);
+    setValues(toValues(from));
+    setConflict(null);
+    update.reset();
+  };
+
   const knownSubprojects = useMemo(() => new Map(project.subprojects.map((sub) => [sub.id, sub.name] as const)), [project.subprojects]);
+
+  const save = (patch: Partial<ProjectValues>, version: number | undefined) => {
+    update.mutate(
+      { patch, version },
+      {
+        onSuccess: (saved) => {
+          setBaseline((current) => ({ ...current, ...saved }));
+          setConflict(null);
+          setValues((current) => ({ ...current, name: saved.name }));
+          /* The server words it (core/services/celebrations.py), the same as
+             the CLI and MCP see. */
+          if (saved.celebration) {
+            toast.success(saved.celebration.message, { celebration: "completion" });
+          } else {
+            toast.success("Project updated successfully");
+          }
+        },
+        onError: (error) => {
+          const current = conflictCurrent<Project>(error);
+          if (current) setConflict(current);
+          else if (splitErrors(error, FIELDS, "name").general.length) toast.error(failure("save the project", error));
+        },
+      },
+    );
+  };
+
+  const changes = () => changedFields(toValues(baseline), { ...values, name: values.name.trim() });
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    const original = toValues(project);
-    const patch = changedFields(original, { ...values, name: values.name.trim() });
+    const patch = changes();
     if (!Object.keys(patch).length) {
       toast.info("Nothing to save.");
       return;
     }
-    update.mutate(patch, {
-      onSuccess: (saved) => {
-        setValues({ ...values, name: saved.name });
-        /* The server words it (core/services/celebrations.py), the same as
-           the CLI and MCP see. */
-        if (saved.celebration) {
-          toast.success(saved.celebration.message, { celebration: "completion" });
-        } else {
-          toast.success("Project updated successfully");
-        }
-      },
-      onError: (error) => {
-        if (splitErrors(error, FIELDS, "name").general.length) toast.error(failure("save the project", error));
-      },
-    });
+    save(patch, baseline.version);
   };
 
   const average = project.session_count > 0 ? project.total_minutes / project.session_count : 0;
@@ -77,6 +93,16 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   return (
     <>
       <PageHead title={project.name} titleClass="text-red" />
+
+      {conflict || changedElsewhere ? (
+        <ConflictBanner
+          noun="project"
+          outcome={conflict ? "Your changes were not saved." : undefined}
+          onLoadLatest={() => reset(conflict ? { ...project, ...conflict } : project)}
+          onSaveAnyway={conflict ? () => save(changes(), conflict.version) : undefined}
+          busy={update.isPending}
+        />
+      ) : null}
 
       <div className="split">
         <form className="fields" onSubmit={onSubmit}>

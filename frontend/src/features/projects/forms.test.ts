@@ -1,5 +1,5 @@
 import { ApiError } from "@/api/errors";
-import { splitErrors } from "./forms";
+import { conflictCurrent, splitErrors } from "./forms";
 
 it("puts DRF field errors under their field and the rest above the form", () => {
   const error = new ApiError(400, "validation_error", "Invalid", { name: ["Required."], source_ids: ["Pick two."] });
@@ -20,4 +20,19 @@ it("keeps other conflicts general", () => {
 
 it("is empty without an error", () => {
   expect(splitErrors(null, ["name"])).toEqual({ fields: {}, general: [] });
+});
+
+it("reads the current record out of a version conflict, and nothing else", () => {
+  const current = { id: 4, version: 7, name: "Alpha" };
+  const conflict = new ApiError(409, "version_conflict", "The project has changed since the supplied version.", { current });
+  expect(conflictCurrent<{ version?: number }>(conflict)?.version).toBe(7);
+  expect(conflictCurrent(new ApiError(409, "conflict", "Project name already exists", { current }))).toBeNull();
+  expect(conflictCurrent(new ApiError(400, "version_conflict", "x", { current }))).toBeNull();
+  expect(conflictCurrent(new ApiError(409, "version_conflict", "x"))).toBeNull();
+  expect(conflictCurrent(new Error("boom"))).toBeNull();
+});
+
+it("shows a version conflict as one general message instead of dumping its details", () => {
+  const conflict = new ApiError(409, "version_conflict", "The project has changed since the supplied version.", { current: { id: 4 } });
+  expect(splitErrors(conflict, ["name"], "name")).toEqual({ fields: {}, general: ["The project has changed since the supplied version."] });
 });

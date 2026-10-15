@@ -1,4 +1,4 @@
-import type { Commitment, Project, ProjectStatus } from "@/api/types";
+import type { Commitment, Project, ProjectListQuery, ProjectStatus } from "@/api/types";
 
 /* ---------------------------------------------------------------- filters */
 
@@ -57,10 +57,16 @@ export function writeFilters(state: ProjectFilters): URLSearchParams {
   return params;
 }
 
-/** Filters the API applies itself; the rest are applied by applyClientFilters. */
-export function serverQuery(filters: ProjectFilters, activeContextParam: string | undefined) {
-  const query: Record<string, string | boolean> = {};
+/* Everything the API can filter or order itself: search (names, descriptions,
+   subproject names), the start-date range (inclusive both ends, either end
+   alone), context, tags, excluded projects, and the Projects page's
+   most-recently-active-first order. Only "only these projects" is left for
+   onlyIncluded. */
+export function serverQuery(filters: ProjectFilters, activeContextParam: string | undefined): Omit<ProjectListQuery, "limit" | "offset"> {
+  const query: Omit<ProjectListQuery, "limit" | "offset"> = { ordering: "last_activity" };
   if (filters.search) query.search = filters.search;
+  if (filters.start_date) query.start_date = filters.start_date;
+  if (filters.end_date) query.end_date = filters.end_date;
   const context = filters.context === "all" ? undefined : filters.context || activeContextParam;
   if (context) query.context_ids = context;
   if (filters.tags.length) query.tag_ids = filters.tags.join(",");
@@ -68,31 +74,12 @@ export function serverQuery(filters: ProjectFilters, activeContextParam: string 
   return query;
 }
 
-/* The API has no "created between" or "only these projects" filters, so they
-   narrow the fetched list here. Same semantics as the old view: the end date
-   only counts together with a start date, and is inclusive. */
-export function applyClientFilters(projects: Project[], filters: ProjectFilters): Project[] {
-  let result = projects;
-  if (filters.projectMode === "include" && filters.projects.length) {
-    const wanted = new Set(filters.projects);
-    result = result.filter((project) => wanted.has(project.id));
-  }
-  if (filters.start_date) {
-    const start = filters.start_date;
-    const end = filters.end_date;
-    result = result.filter((project) => project.start_date >= start && (!end || project.start_date <= end));
-  }
-  return result;
-}
-
-/** Most recently active first, like the old list (`-derived_last_updated`). */
-export function sortByActivity(projects: Project[]): Project[] {
-  return [...projects].sort((a, b) => {
-    const left = a.last_activity ?? a.start_date;
-    const right = b.last_activity ?? b.start_date;
-    if (left !== right) return left < right ? 1 : -1;
-    return a.name.localeCompare(b.name);
-  });
+/* The API has no "only these projects" filter (it only excludes), so include
+   mode narrows the fetched list here. */
+export function onlyIncluded(projects: Project[], filters: ProjectFilters): Project[] {
+  if (filters.projectMode !== "include" || !filters.projects.length) return projects;
+  const wanted = new Set(filters.projects);
+  return projects.filter((project) => wanted.has(project.id));
 }
 
 export const STATUS_ORDER: { status: ProjectStatus; label: string }[] = [
@@ -145,83 +132,6 @@ export function describeFilters(state: ProjectFilters, lookup: FilterNames) {
 }
 
 /* ------------------------------------------------------------ commitments */
-
-export interface ProjectScope {
-  id: number;
-  contextId: number | null;
-  tagIds: number[];
-  /** Ids of the project's own subprojects. */
-  subprojectIds: number[];
-}
-
-const has = (ids: number[], id: number) => ids.includes(id);
-
-/* Whether a commitment is relevant to a project: the client twin of
-   core.commitments.commitment_applies_to_project, working from the ids the
-   API exposes on each commitment. */
-export function commitmentAppliesToProject(commitment: Commitment, project: ProjectScope): boolean {
-  const { target, filters } = commitment;
-  switch (commitment.aggregation_type) {
-    case "context":
-      if (target.id !== project.contextId) return false;
-      break;
-    case "tag":
-      if (!has(project.tagIds, target.id)) return false;
-      break;
-    case "project":
-      if (target.id !== project.id) return false;
-      break;
-    case "subproject":
-      return has(project.subprojectIds, target.id);
-    default:
-      return false;
-  }
-  if (filters.include_tag_ids.length && !filters.include_tag_ids.some((id) => has(project.tagIds, id))) return false;
-  if (filters.exclude_tag_ids.some((id) => has(project.tagIds, id))) return false;
-  if (filters.include_project_ids.length && !has(filters.include_project_ids, project.id)) return false;
-  if (has(filters.exclude_project_ids, project.id)) return false;
-  if (filters.include_subproject_ids.length && !filters.include_subproject_ids.some((id) => has(project.subprojectIds, id))) {
-    return false;
-  }
-  return true;
-}
-
-/* Twin of commitment_applies_to_subproject. */
-export function commitmentAppliesToSubproject(commitment: Commitment, project: ProjectScope, subprojectId: number): boolean {
-  const { target, filters } = commitment;
-  switch (commitment.aggregation_type) {
-    case "context":
-      if (target.id !== project.contextId) return false;
-      break;
-    case "tag":
-      if (!has(project.tagIds, target.id)) return false;
-      break;
-    case "project":
-      if (target.id !== project.id) return false;
-      break;
-    case "subproject":
-      if (target.id !== subprojectId) return false;
-      break;
-    default:
-      return false;
-  }
-  if (filters.include_tag_ids.length && !filters.include_tag_ids.some((id) => has(project.tagIds, id))) return false;
-  if (filters.exclude_tag_ids.some((id) => has(project.tagIds, id))) return false;
-  if (filters.include_project_ids.length && !has(filters.include_project_ids, project.id)) return false;
-  if (has(filters.exclude_project_ids, project.id)) return false;
-  if (filters.include_subproject_ids.length && !has(filters.include_subproject_ids, subprojectId)) return false;
-  if (has(filters.exclude_subproject_ids, subprojectId)) return false;
-  return true;
-}
-
-/** Active first, then by scope, then oldest first (the panel's order). */
-export function sortCommitments(commitments: Commitment[]): Commitment[] {
-  return [...commitments].sort((a, b) => {
-    if (a.active !== b.active) return a.active ? -1 : 1;
-    if (a.aggregation_type !== b.aggregation_type) return a.aggregation_type < b.aggregation_type ? -1 : 1;
-    return a.id - b.id;
-  });
-}
 
 export interface NameLookup {
   tags: Map<number, string>;

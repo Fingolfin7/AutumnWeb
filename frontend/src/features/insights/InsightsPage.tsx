@@ -12,7 +12,7 @@ import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import { ApiError } from "@/api/errors";
 import { bootstrap } from "@/bootstrap";
 import { formatDayDate } from "@/lib/format";
-import { semanticSearchAvailable, usePreferences } from "@/features/charts/api";
+import { semanticSearchAvailable } from "@/features/charts/api";
 import { useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useSelectionPreview } from "./api";
 import { Composer } from "./Composer";
 import { FilterSheet } from "./FilterSheet";
@@ -153,8 +153,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const projects = useAllProjects();
   const tags = useTags();
   const contexts = useContexts();
-  const preferences = usePreferences();
-  const semantic = semanticSearchAvailable(preferences.data);
+  const semantic = semanticSearchAvailable();
   const chats = useInsightChats(true);
   const deleteChat = useDeleteChat();
   const run = useRun();

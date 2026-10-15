@@ -11,9 +11,9 @@ import { useActiveContext } from "@/app/context";
 import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import { bootstrap } from "@/bootstrap";
 import { ChartCanvas } from "./ChartCanvas";
-import { semanticSearchAvailable, useChartData, usePreferences } from "./api";
+import { semanticSearchAvailable, useChartData } from "./api";
 import { buildChart, CHART_GROUPS, CIRCULAR_KINDS, parseKind } from "./build";
-import { buildChartQuery, defaultDateRange, describeFilters, EMPTY_FILTERS, readFilters, todayIn, writeFilters, type ChartFilters } from "./filters";
+import { buildChartQuery, describeFilters, EMPTY_FILTERS, readFilters, writeFilters, type ChartFilters } from "./filters";
 
 export default function ChartsPage() {
   const [params, setParams] = useSearchParams();
@@ -23,16 +23,13 @@ export default function ChartsPage() {
   const projects = useAllProjects();
   const tags = useTags();
   const contexts = useContexts();
-  const preferences = usePreferences();
   const [sheetOpen, setSheetOpen] = useState(false);
 
-  /* The range opens on the profile's default filter, so the fields read as
-     "this is the window" rather than as an empty form. */
-  const defaults = useMemo(() => {
-    const prefs = preferences.data;
-    if (!prefs) return { start: "", end: "" };
-    return defaultDateRange(prefs.default_filter_value, prefs.default_filter_unit, todayIn(bootstrap().profile.timezone));
-  }, [preferences.data]);
+  /* The range opens on the profile's default filter (computed by the server,
+     in the profile's timezone), so the fields read as "this is the window"
+     rather than as an empty form. */
+  const { default_chart_start_date: defaultStart, default_chart_end_date: defaultEnd } = bootstrap().profile;
+  const defaults = useMemo(() => ({ start: defaultStart, end: defaultEnd }), [defaultStart, defaultEnd]);
 
   const effective: ChartFilters = useMemo(
     () => ({ ...applied, start_date: applied.start_date || defaults.start, end_date: applied.end_date || defaults.end }),
@@ -45,9 +42,9 @@ export default function ChartsPage() {
   const filtersKey = writeFilters({ ...effective, chart_type: EMPTY_FILTERS.chart_type }).toString();
   useEffect(() => setDraft((current) => ({ ...effective, chart_type: current.chart_type })), [filtersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const semantic = semanticSearchAvailable(preferences.data);
+  const semantic = semanticSearchAvailable();
   const query = useMemo(() => buildChartQuery(applied, defaults, contextId), [applied, defaults, contextId]);
-  const chart = useChartData(query, !preferences.isPending);
+  const chart = useChartData(query, true);
   const kind = applied.chart_type;
 
   const built = useMemo(
@@ -91,7 +88,7 @@ export default function ChartsPage() {
       .map((project) => ({ id: project.id, label: project.name }));
   }, [projects.data, draft.context, draft.tags, draft.projects, contextId]);
 
-  const loading = preferences.isPending || chart.isPending || chart.isFetching;
+  const loading = chart.isPending || chart.isFetching;
   const empty = !loading && !chart.isError && !built;
 
   return (
