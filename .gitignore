@@ -149,6 +149,7 @@ cython_debug/
 /.idea
 /.vs
 /static
+/staticfiles
 .sqlite3
 *.sqlite3
 /media/profile_pics/
