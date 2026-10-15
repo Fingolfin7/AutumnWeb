@@ -3,6 +3,7 @@ from django.http import Http404
 from rest_framework.exceptions import (
     MethodNotAllowed,
     NotAuthenticated,
+    NotAcceptable,
     NotFound,
     PermissionDenied,
     Throttled,
@@ -29,6 +30,7 @@ def v2_exception_handler(exc, context):
         ((DjangoPermissionDenied, PermissionDenied), "permission_denied", 403),
         ((Http404, NotFound), "not_found", 404),
         (MethodNotAllowed, "method_not_allowed", 405),
+        (NotAcceptable, "not_acceptable", 406),
         (Throttled, "throttled", 429),
     )
     for exception_type, code, status_code in mappings:
@@ -68,6 +70,13 @@ class V2APIView(APIView):
         return v2_exception_handler
 
     def finalize_response(self, request, response, *args, **kwargs):
+        # Content negotiation can itself raise (most visibly on SSE views). If
+        # the exception handler turns that into a DRF Response, older DRF
+        # versions expect these attributes to exist before finalizing it.
+        if isinstance(response, Response) and not hasattr(request, "accepted_renderer"):
+            renderer, media_type = self.perform_content_negotiation(request, force=True)
+            request.accepted_renderer = renderer
+            request.accepted_media_type = media_type
         response = super().finalize_response(request, response, *args, **kwargs)
         # With search + related=true: "included", or "unavailable" when the
         # result is keyword-only (no key, AI off, nothing embedded yet, or

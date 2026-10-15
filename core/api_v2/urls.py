@@ -30,6 +30,7 @@ from core.api_v2.views import (
     InsightChatDetailView,
     InsightChatsView,
     InsightOptionsView,
+    InsightSelectionView,
     InsightStreamView,
     NotificationPreferencesView,
     NotificationScheduleDetailView,
@@ -109,6 +110,11 @@ urlpatterns = [
         name="insights-chat-detail",
     ),
     path("insights/options/", InsightOptionsView.as_view(), name="insights-options"),
+    path(
+        "insights/selection/",
+        InsightSelectionView.as_view(),
+        name="insights-selection",
+    ),
     path("insights/stream/", InsightStreamView.as_view(), name="insights-stream"),
     path(
         "notifications/preferences/",

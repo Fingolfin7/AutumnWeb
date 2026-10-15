@@ -79,6 +79,7 @@ MCP_EXCLUDED_OPERATION_IDS = {
     "insights_chats_list",
     "insights_chats_retrieve",
     "insights_options_retrieve",
+    "insights_selection_retrieve",
     "insights_stream_create",
     "me_preferences_partial_update",
     "me_preferences_retrieve",

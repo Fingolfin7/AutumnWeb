@@ -87,6 +87,7 @@ class SocialAccountSerializer(serializers.Serializer):
 
 class SocialAccountsSerializer(serializers.Serializer):
     accounts = SocialAccountSerializer(many=True)
+    has_usable_password = serializers.BooleanField()
 
 
 def _form_errors(form):
@@ -158,7 +159,7 @@ class AvatarView(V2APIView):
     @extend_schema(
         operation_id="me_avatar_destroy",
         request=None,
-        responses=MediaStatusSerializer,
+        responses={200: MediaStatusSerializer},
     )
     def delete(self, request):
         profile = request.user.profile
@@ -202,7 +203,7 @@ class BackgroundView(V2APIView):
     @extend_schema(
         operation_id="me_background_destroy",
         request=None,
-        responses=MediaStatusSerializer,
+        responses={200: MediaStatusSerializer},
     )
     def delete(self, request):
         profile = request.user.profile
@@ -255,7 +256,7 @@ class ApiKeyView(V2APIView):
     @extend_schema(
         operation_id="me_api_keys_destroy",
         request=None,
-        responses=ConfiguredSerializer,
+        responses={200: ConfiguredSerializer},
     )
     def delete(self, request, provider):
         provider = self._provider(provider)
@@ -293,7 +294,10 @@ class ChatGPTLoginView(V2APIView):
             status=status.HTTP_201_CREATED,
         )
 
-    @extend_schema(operation_id="me_chatgpt_login_retrieve", responses=ChatGPTLoginSerializer)
+    @extend_schema(
+        operation_id="me_chatgpt_login_retrieve",
+        responses={200: ChatGPTLoginSerializer, 202: ChatGPTLoginSerializer},
+    )
     def get(self, request):
         self._allowed(request)
         device_code = request.session.get(self.SESSION_KEY)
@@ -322,7 +326,7 @@ class ChatGPTLoginView(V2APIView):
     @extend_schema(
         operation_id="me_chatgpt_login_destroy",
         request=None,
-        responses=ChatGPTLoginSerializer,
+        responses={200: ChatGPTLoginSerializer},
     )
     def delete(self, request):
         profile = request.user.profile
@@ -370,7 +374,12 @@ class SocialAccountsView(V2APIView):
                     ),
                 }
             )
-        return Response({"accounts": accounts})
+        return Response(
+            {
+                "accounts": accounts,
+                "has_usable_password": request.user.has_usable_password(),
+            }
+        )
 
 
 class SocialAccountDetailView(V2APIView):
