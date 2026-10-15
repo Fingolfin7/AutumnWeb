@@ -4,7 +4,6 @@ from datetime import timedelta
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.test import TestCase
-from django.urls import reverse
 from django.utils import timezone
 from core.models import Context, Projects, Sessions
 from core.services.timer_recommendation_context import build_recommendation_candidates, build_recommendation_context, recommendation_cache_key

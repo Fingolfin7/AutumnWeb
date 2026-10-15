@@ -7,7 +7,6 @@ from django.contrib.auth.models import User
 from django.contrib.sessions.backends.db import SessionStore
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
-from django.urls import reverse
 from django.utils import timezone
 
 from core.templatetags import background_images as apod

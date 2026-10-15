@@ -9,10 +9,8 @@ the browser — Python tests would stay green — so the contract is asserted he
 
 from django.contrib.auth.models import User
 from django.test import TestCase
-from django.urls import reverse
-
-from core.models import Context, Projects, Sessions, Tag
 from django.utils import timezone
+
 from datetime import timedelta
 
 from core.templatetags.time_formats import chat_hover_stamp

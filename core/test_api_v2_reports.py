@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone as datetime_timezone
 
 from django.contrib.auth.models import User
-from django.test import Client, TestCase
+from django.test import TestCase
 from django.urls import reverse
 from drf_spectacular.generators import SchemaGenerator
 from rest_framework.test import APIClient

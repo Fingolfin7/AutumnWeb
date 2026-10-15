@@ -3,10 +3,8 @@ from types import SimpleNamespace
 from unittest import mock
 
 from django.test import SimpleTestCase, TestCase
-from django.urls import reverse
 from django.utils import timezone
 from datetime import timedelta
-from django.core.cache import cache
 from core.models import Projects, RecommendationCache, Sessions, SubProjects
 
 from core.services.luna_recommendations import LUNA_EFFORTS, rank_luna_candidates

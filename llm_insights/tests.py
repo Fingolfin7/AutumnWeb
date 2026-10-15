@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from django.contrib.auth.models import User
 from django.http import StreamingHttpResponse
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase
-from django.urls import reverse
 from asgiref.sync import async_to_sync
 from unittest.mock import patch
 

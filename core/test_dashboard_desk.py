@@ -6,8 +6,7 @@ dashboard_desk.js paints a second later, and the start card's quick-start
 chips must not offer to start a timer that is already running.
 """
 
-from datetime import datetime, timedelta, timezone as datetime_timezone
-from unittest.mock import patch
+from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase

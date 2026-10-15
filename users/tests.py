@@ -7,7 +7,6 @@ from io import BytesIO
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase, override_settings
-from django.urls import reverse
 from PIL import Image
 
 from users import codex_auth
