@@ -51,7 +51,7 @@ class TimerRecommendationContextTests(TestCase):
             project=self.active,
             start_time=timezone.now() - timedelta(minutes=4),
         )
-        request = self.client.get(reverse("luna_timer_recommendations")).wsgi_request
+        request = self.client.get("/api/v2/recommendations/luna/").wsgi_request
         candidates = build_recommendation_candidates(self.user, request)
         context = build_recommendation_context(self.user, request, candidates)
 
@@ -85,7 +85,7 @@ class TimerRecommendationContextTests(TestCase):
         session = self.client.session
         session["active_context_id"] = str(self.context.id)
         session.save()
-        request = self.client.get(reverse("luna_timer_recommendations")).wsgi_request
+        request = self.client.get("/api/v2/recommendations/luna/").wsgi_request
         candidates = build_recommendation_candidates(self.user, request)
         context = build_recommendation_context(self.user, request, candidates)
         self.assertNotIn(other_project.id, {candidate["project_id"] for candidate in candidates})
@@ -95,7 +95,7 @@ class TimerRecommendationContextTests(TestCase):
         )
 
     def test_cache_bucket_ignores_exact_clock_but_changes_with_note(self):
-        request = self.client.get(reverse("luna_timer_recommendations")).wsgi_request
+        request = self.client.get("/api/v2/recommendations/luna/").wsgi_request
         candidates = build_recommendation_candidates(self.user, request)
         context = build_recommendation_context(self.user, request, candidates)
         first = recommendation_cache_key(self.user, request, candidates, context)

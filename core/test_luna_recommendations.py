@@ -88,25 +88,29 @@ class LunaServiceTests(SimpleTestCase):
             call.assert_called_once_with("token", [], {}, oauth=True, effort="xhigh")
 
 
-class LunaViewTests(TestCase):
+LUNA = "/api/v2/recommendations/luna/"
+LUNA_REFRESH = "/api/v2/recommendations/luna/refresh/"
+
+
+class LunaApiTests(TestCase):
+    """Luna recommendations through /api/v2/recommendations/luna/ (and /refresh/).
+
+    The React Timers and Home pages read these; the old Timers page tests of the
+    same behaviour were retired with its template.
+    """
+
     setUp = context_tests.TimerRecommendationContextTests.setUp
+
     def _enable_key(self):
         return mock.patch("users.codex_auth.get_profile_access_token", return_value="oauth-test-token")
 
-    def test_timer_page_is_luna_only_with_saved_effort_and_collapsed_fallbacks(self):
-        self.user.profile.luna_recommendation_effort = "high"
-        self.user.profile.save(update_fields=["luna_recommendation_effort"])
-        response = self.client.get(reverse("timers"))
-        self.assertContains(response, 'data-luna-url="')
-        self.assertContains(response, 'value="high" selected')
-        self.assertContains(response, 'class="select" id="luna-effort"')
-        self.assertContains(response, 'class="sr-only" for="luna-effort"')
-        for effort in LUNA_EFFORTS:
-            self.assertContains(response, f'<option value="{effort}"')
-        self.assertContains(response, "luna_timer_recommendations.js")
-        self.assertNotContains(response, "jev")
-        self.assertNotContains(response, "recommendation-comparison")
-        self.assertEqual(self.client.get("/timers/jev-recommendations/").status_code, 404)
+    def _luna(self):
+        return self.client.get(LUNA)
+
+    def _refresh(self, body=None, client=None):
+        return (client or self.client).post(
+            LUNA_REFRESH, json.dumps(body or {}), content_type="application/json"
+        )
 
     def test_all_efforts_save_and_generate_with_the_selected_effort(self):
         field = self.user.profile._meta.get_field("luna_recommendation_effort")
@@ -114,70 +118,70 @@ class LunaViewTests(TestCase):
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
             for effort in LUNA_EFFORTS:
                 with self.subTest(effort=effort):
-                    response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": effort})
-                    self.assertEqual(response.status_code, 302)
+                    response = self._refresh({"luna_effort": effort})
+                    self.assertEqual(response.status_code, 200, response.content)
+                    self.assertEqual(response.json()["luna_recommendation_effort"], effort)
                     self.user.profile.refresh_from_db()
                     self.assertEqual(self.user.profile.luna_recommendation_effort, effort)
                     self.user.profile.full_clean()
-                    self.assertContains(self.client.get(reverse("timers")), f'value="{effort}" selected')
-                    self.client.get(reverse("luna_timer_recommendations"))
+                    self._luna()
                     self.assertEqual(ranker.call_args.kwargs["effort"], effort)
 
     def test_saved_effort_invalidates_cache_and_is_used_for_generation(self):
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
-            self.client.get(reverse("luna_timer_recommendations"))
+            self._luna()
             self.assertEqual(ranker.call_args.kwargs["effort"], "xhigh")
-            response = self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"})
-            self.assertRedirects(response, reverse("timers"))
+            response = self._refresh({"luna_effort": "high"})
+            self.assertEqual(response.status_code, 200)
             self.user.profile.refresh_from_db()
             self.assertEqual(self.user.profile.luna_recommendation_effort, "high")
-            self.client.get(reverse("luna_timer_recommendations"))
-            self.client.get(reverse("luna_timer_recommendations"))
+            self._luna()
+            self._luna()
             self.assertEqual(ranker.call_count, 2)
             self.assertEqual(ranker.call_args.kwargs["effort"], "high")
 
     def test_effort_change_does_not_expose_old_inflight_result(self):
-        from core.models import RecommendationCache
-        from django.utils import timezone
-        from datetime import timedelta
         RecommendationCache.objects.create(user=self.user, provider="luna", scope="all:all",
             fingerprint="old-effort", result=None, lease_until=timezone.now() + timedelta(minutes=1))
-        self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"})
+        self._refresh({"luna_effort": "high"})
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
-            self.assertEqual(self.client.get(reverse("luna_timer_recommendations")).status_code, 202)
+            self.assertEqual(self._luna().status_code, 202)
             ranker.assert_not_called()
             RecommendationCache.objects.update(result={"recommendations": [{"candidate_id": "no_activity", "score": 4, "reason": "OLD_EFFORT_REPLY", "next_step": ""}]}, lease_until=timezone.now())
-            response = self.client.get(reverse("luna_timer_recommendations"))
-            self.assertNotContains(response, "OLD_EFFORT_REPLY")
+            response = self._luna()
+            self.assertNotIn("OLD_EFFORT_REPLY", response.content.decode())
             self.assertEqual(ranker.call_args.kwargs["effort"], "high")
 
     def test_effort_update_is_authenticated_validated_and_csrf_protected(self):
         from django.test import Client
-        self.assertEqual(self.client.get(reverse("refresh_recommendations")).status_code, 405)
-        self.assertEqual(self.client.post(reverse("refresh_recommendations"), {"luna_effort": "bogus"}).status_code, 400)
+        self.assertEqual(self.client.get(LUNA_REFRESH).status_code, 405)
+        self.assertEqual(self._refresh({"luna_effort": "bogus"}).status_code, 400)
         self.user.profile.refresh_from_db()
         self.assertEqual(self.user.profile.luna_recommendation_effort, "xhigh")
         csrf_client = Client(enforce_csrf_checks=True)
         csrf_client.force_login(self.user)
-        self.assertEqual(csrf_client.post(reverse("refresh_recommendations"), {"luna_effort": "high"}).status_code, 403)
+        self.assertEqual(self._refresh({"luna_effort": "high"}, client=csrf_client).status_code, 403)
         self.user.profile.ai_features_enabled = False
         self.user.profile.save(update_fields=["ai_features_enabled"])
-        self.assertEqual(self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"}).status_code, 403)
+        self.assertEqual(self._refresh({"luna_effort": "high"}).status_code, 403)
         self.client.logout()
-        self.assertEqual(self.client.post(reverse("refresh_recommendations"), {"luna_effort": "high"}).status_code, 302)
+        self.assertIn(self._refresh({"luna_effort": "high"}).status_code, (401, 403))
 
-    def test_luna_has_independent_cache_and_escaped_explanations(self):
+    def test_luna_has_independent_cache_and_returns_the_explanation_as_plain_text(self):
         with self._enable_key() as key, mock.patch(
             "core.services.luna_recommendations.rank_luna_candidates",
             return_value={"recommendations": [{"candidate_id": "no_activity", "score": 3.75,
                                                "reason": "<script>bad</script>", "next_step": "Leave time open."}]},
         ) as ranker:
             for _ in range(2):
-                response = self.client.get(reverse("luna_timer_recommendations"))
-                self.assertContains(response, "Luna Recommends")
-                self.assertContains(response, "Luna score 3.75")
-                self.assertContains(response, "&lt;script&gt;")
-                self.assertNotContains(response, "<form")
+                response = self._luna()
+                self.assertEqual(response.status_code, 200)
+                [suggestion] = response.json()["suggestions"]
+                self.assertEqual(suggestion["kind"], "luna")
+                self.assertEqual(suggestion["recommendation_score"], 3.75)
+                # Data, not markup: the React page renders it as text.
+                self.assertIn("<script>bad</script>", suggestion["recommendation_detail"] + suggestion["detail"])
+                self.assertEqual(response["Cache-Control"], "no-store")
             ranker.assert_called_once()
             self.assertEqual(key.call_count, 2)
 
@@ -185,39 +189,38 @@ class LunaViewTests(TestCase):
         with mock.patch.object(type(self.user.profile), "get_api_key", return_value=None), mock.patch(
             "core.services.luna_recommendations.rank_luna_candidates"
         ) as ranker:
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
             ranker.assert_not_called()
-            self.assertContains(response, "connect ChatGPT in Profile")
+            self.assertEqual(response.json()["suggestions"], [])
+            self.assertIn("connect ChatGPT in Profile", response.json()["advice_status"])
         with self._enable_key(), mock.patch(
             "core.services.luna_recommendations.rank_luna_candidates", side_effect=RuntimeError("secret")
         ):
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
             self.assertEqual(response.status_code, 200)
-            self.assertNotContains(response, "secret")
+            self.assertNotIn("secret", response.content.decode())
+            self.assertEqual(response.json()["suggestions"], [])
 
     def test_luna_requires_authentication(self):
         self.client.logout()
-        self.assertEqual(self.client.get(reverse("luna_timer_recommendations")).status_code, 302)
+        self.assertIn(self._luna().status_code, (401, 403))
 
     def test_inflight_returns_retryable_response(self):
         from core.services.recommendation_cache import RecommendationPending
         with self._enable_key(), mock.patch("core.services.recommendation_cache.get_or_generate", side_effect=RecommendationPending):
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response["Retry-After"], "5")
 
     def test_project_description_edit_invalidates_persistent_result(self):
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
-            self.client.get(reverse("luna_timer_recommendations"))
+            self._luna()
             self.active.description = "A materially different project goal"
             self.active.save(update_fields=["description"])
-            self.client.get(reverse("luna_timer_recommendations"))
+            self._luna()
             self.assertEqual(ranker.call_count, 2)
 
     def test_habit_label_clock_change_does_not_regenerate_advice(self):
-        from datetime import timedelta
-        from django.utils import timezone
-        from core.models import Sessions
         now = timezone.now().replace(hour=9, minute=1, second=0, microsecond=0)
         Sessions.objects.create(user=self.user, project=self.active,
                                 start_time=now - timedelta(days=7),
@@ -225,11 +228,10 @@ class LunaViewTests(TestCase):
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", return_value={"recommendations": []}) as ranker:
             for instant in (now, now + timedelta(minutes=5)):
                 with mock.patch("django.utils.timezone.now", return_value=instant):
-                    self.client.get(reverse("luna_timer_recommendations"))
+                    self._luna()
             self.assertEqual(ranker.call_count, 1)
 
-
-    def test_nothing_option_is_scored_and_has_no_timer_action_even_without_projects(self):
+    def test_nothing_option_is_scored_and_has_no_project_even_without_projects(self):
         Projects.objects.filter(user=self.user).update(status="complete")
 
         def ranker(**kwargs):
@@ -239,12 +241,13 @@ class LunaViewTests(TestCase):
         with self._enable_key(), mock.patch(
             "core.services.luna_recommendations.rank_luna_candidates", side_effect=ranker
         ):
-            response = self.client.get(reverse("luna_timer_recommendations"))
-        self.assertContains(response, "Start nothing for now")
-        self.assertContains(response, 'aria-label="Luna score 3.75"')
-        self.assertNotContains(response, '<form')
+            response = self._luna()
+        [suggestion] = response.json()["suggestions"]
+        self.assertIn("Start nothing for now", suggestion["label"])
+        self.assertEqual(suggestion["recommendation_score"], 3.75)
+        self.assertIsNone(suggestion["project"])
+        self.assertTrue(suggestion["no_activity"])
         self.assertFalse(Sessions.objects.filter(user=self.user).exists())
-
 
     def test_candidates_are_active_only_deduplicated_and_exclude_running_projects(self):
         available = Projects.objects.create(
@@ -283,18 +286,21 @@ class LunaViewTests(TestCase):
         with self._enable_key(), mock.patch(
             "core.services.luna_recommendations.rank_luna_candidates", side_effect=ranker
         ):
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
 
         self.assertEqual(response.status_code, 200)
         candidates = self.ranker_payload["candidates"]
-        self.assertContains(response, 'class="suggest-score"')
-        self.assertContains(response, 'aria-label="Luna score 3.50"')
+        scores = [row["recommendation_score"] for row in response.json()["suggestions"]]
+        self.assertTrue(scores)
+        self.assertEqual(set(scores), {3.5})
         with self._enable_key(), mock.patch(
             "core.services.luna_recommendations.rank_luna_candidates"
         ) as cached_ranker:
-            cached_response = self.client.get(reverse("luna_timer_recommendations"))
+            cached_response = self._luna()
         cached_ranker.assert_not_called()
-        self.assertContains(cached_response, 'aria-label="Luna score 3.50"')
+        self.assertEqual(
+            [row["recommendation_score"] for row in cached_response.json()["suggestions"]], scores
+        )
         self.assertTrue(candidates)
         self.assertIn(available.id, {candidate["project_id"] for candidate in candidates})
         self.assertNotIn(self.active.id, {candidate["project_id"] for candidate in candidates})
@@ -306,7 +312,6 @@ class LunaViewTests(TestCase):
         self.assertIn("recent_completed_sessions", payload_text)
         self.assertIn("running_timers", payload_text)
 
-
     def test_pending_retry_skips_rich_context_until_lease_expires(self):
         lease = RecommendationCache.objects.create(
             user=self.user,
@@ -317,7 +322,7 @@ class LunaViewTests(TestCase):
         with self._enable_key(), mock.patch(
             "core.services.timer_suggestions.build_recommendation_candidates"
         ) as candidates:
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
         self.assertEqual(response.status_code, 202)
         candidates.assert_not_called()
 
@@ -327,9 +332,8 @@ class LunaViewTests(TestCase):
             "core.services.luna_recommendations.rank_luna_candidates",
             return_value={"recommendations": []},
         ) as ranker:
-            self.client.get(reverse("luna_timer_recommendations"))
+            self._luna()
         ranker.assert_called_once()
-
 
     def test_duplicate_timer_combo_aggregates_all_local_signals(self):
         deterministic = {
@@ -380,7 +384,7 @@ class LunaViewTests(TestCase):
                 ],
             },
         ) as ranker:
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
 
         self.assertEqual(response.status_code, 200)
         candidate = ranker.call_args.kwargs["candidates"][0]
@@ -398,8 +402,7 @@ class LunaViewTests(TestCase):
         )
         self.assertEqual(candidate["reason"], "30 min remaining with 6 days remaining")
 
-
-    def test_ranked_result_renders_top_three_and_keeps_deterministic_reason(self):
+    def test_ranked_result_lists_the_top_three_and_keeps_deterministic_reason(self):
         other = Projects.objects.create(
             user=self.user, name="Another active", context=self.context, status="active"
         )
@@ -421,26 +424,16 @@ class LunaViewTests(TestCase):
                 ],
             },
         ) as ranker:
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Luna Recommends")
-        self.assertContains(response, "Active project")
-        self.assertContains(response, "Another active")
-        ranker.assert_called_once()
-
-
-    def test_timer_page_keeps_luna_mount_and_collapsed_groups(self):
-        Sessions.objects.create(
-            user=self.user,
-            project=self.active,
-            start_time=timezone.now() - timedelta(hours=2),
-            end_time=timezone.now() - timedelta(hours=1),
+        rows = response.json()["suggestions"]
+        self.assertLessEqual(len(rows), 3)
+        self.assertEqual(
+            [row["project"]["name"] for row in rows[:2]], ["Active project", "Another active"]
         )
-        response = self.client.get(reverse("timers"))
-        self.assertContains(response, 'data-luna-url="')
-        self.assertContains(response, 'class="suggest-group disclose is-closed"')
-
+        self.assertEqual([row["recommendation_score"] for row in rows[:2]], [4.0, 3.0])
+        ranker.assert_called_once()
 
     def test_subproject_deleted_during_ranking_does_not_become_base_timer(self):
         sub = SubProjects.objects.create(user=self.user, parent_project=self.active, name="Original combo")
@@ -457,6 +450,7 @@ class LunaViewTests(TestCase):
             return {"recommendations": [{"candidate_id": candidate["id"], "score": 4.0}]}
 
         with self._enable_key(), mock.patch("core.services.luna_recommendations.rank_luna_candidates", side_effect=ranker):
-            response = self.client.get(reverse("luna_timer_recommendations"))
+            response = self._luna()
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, '<form')
+        # The suggestion must not silently degrade to the bare project.
+        self.assertEqual(response.json()["suggestions"], [])

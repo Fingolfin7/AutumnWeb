@@ -413,3 +413,76 @@ class V2CommitmentsTests(TestCase):
         response = self.client.get(reverse("api_v2:me"))
         self.assertEqual(response.status_code, 200)
         self.assertIn("commitments", response.json()["capabilities"])
+
+
+class V2CommitmentRestartScopeTests(TestCase):
+    """Restarting can move a commitment to a new scope (the edit form's restart)."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="v2-restart-scope", email="v2-restart-scope@example.com"
+        )
+        self.project = Projects.objects.create(user=self.user, name="Focus")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def test_restart_with_a_new_scope_keeps_the_balance(self):
+        from core.models import Context
+
+        new_context = Context.objects.create(user=self.user, name="Exercise")
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            aggregation_type="project",
+            commitment_type="time",
+            period="weekly",
+            target=300,
+            balance=-60,
+            start_date="2026-01-01",
+            active=False,
+        )
+
+        response = self.client.post(
+            reverse("api_v2:commitment-restart", args=[commitment.pk]),
+            {
+                "keep_balance": True,
+                "changes": {"aggregation_type": "context", "context_id": new_context.pk},
+            },
+            format="json",
+            HTTP_IF_MATCH=str(commitment.version),
+        )
+
+        self.assertEqual(response.status_code, 200, response.content)
+        commitment.refresh_from_db()
+        self.assertEqual(commitment.generation, 2)
+        self.assertEqual(commitment.aggregation_type, "context")
+        self.assertEqual(commitment.context, new_context)
+        self.assertIsNone(commitment.project)
+        self.assertEqual(commitment.balance, -60)
+        self.assertEqual(
+            response.json()["target"],
+            {"kind": "context", "id": new_context.pk, "name": "Exercise"},
+        )
+
+    def test_a_scope_that_belongs_to_someone_else_is_not_found(self):
+        from core.models import Context
+
+        other = User.objects.create_user(username="v2-other-scope", email="o@example.com")
+        foreign = Context.objects.create(user=other, name="Theirs")
+        commitment = Commitment.objects.create(
+            user=self.user,
+            project=self.project,
+            aggregation_type="project",
+            commitment_type="time",
+            period="weekly",
+            target=300,
+            start_date="2026-01-01",
+        )
+        response = self.client.post(
+            reverse("api_v2:commitment-restart", args=[commitment.pk]),
+            {"keep_balance": True, "changes": {"aggregation_type": "context", "context_id": foreign.pk}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+        commitment.refresh_from_db()
+        self.assertEqual(commitment.generation, 1)

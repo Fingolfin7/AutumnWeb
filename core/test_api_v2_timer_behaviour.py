@@ -437,3 +437,30 @@ class SessionEditTests(TimerBehaviourTestCase):
         self.assertAlmostEqual(derived_project_total(self.user, self.project), 0.0, places=2)
         for sub in (self.first, self.second):
             self.assertAlmostEqual(derived_subproject_total(self.user, sub), 0.0, places=2)
+
+
+class SessionListTests(TimerBehaviourTestCase):
+    def _make(self, count, note=None, minutes_apart=60):
+        now = timezone.now().replace(microsecond=0)
+        for index in range(count):
+            end = now - timedelta(minutes=index * minutes_apart)
+            Sessions.objects.create(
+                user=self.user,
+                project=self.project,
+                start_time=end - timedelta(minutes=30),
+                end_time=end,
+                note=note,
+            )
+
+    def test_total_is_the_whole_result_set_not_the_page(self):
+        self._make(9)
+        payload = self.client.get("/api/v2/sessions/", {"limit": 7}).json()
+        self.assertEqual(payload["total"], 9)
+        self.assertEqual(payload["count"], 7)
+        self.assertEqual(len(payload["sessions"]), 7)
+
+    def test_total_reflects_the_filter(self):
+        self._make(1, note="stripe webhook backfill")
+        self._make(2, note="dark mode pass", minutes_apart=90)
+        payload = self.client.get("/api/v2/sessions/", {"note_snippet": "stripe"}).json()
+        self.assertEqual(payload["total"], 1)
