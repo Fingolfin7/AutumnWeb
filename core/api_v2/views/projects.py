@@ -43,6 +43,96 @@ def _subproject_version_conflict(subproject):
     )
 
 
+def _filtered_projects(request, serializer_class):
+    """Apply every project-list filter except search, paging, and ordering."""
+    serializer = serializer_class(data=request.query_params)
+    serializer.is_valid(raise_exception=True)
+    data = serializer.validated_data
+
+    context_ids = _parse_owned_filter_ids(
+        request.query_params.get("context_ids"),
+        field_name="context_ids",
+        model=Context,
+        user=request.user,
+    )
+    tag_ids = _parse_owned_filter_ids(
+        request.query_params.get("tag_ids"),
+        field_name="tag_ids",
+        model=Tag,
+        user=request.user,
+    )
+    excluded_ids = _parse_owned_filter_ids(
+        request.query_params.get("exclude_project_ids"),
+        field_name="exclude_project_ids",
+        model=Projects,
+        user=request.user,
+    )
+
+    queryset = _project_queryset(request.user)
+    if "status" in data:
+        queryset = queryset.filter(status=data["status"])
+    if context_ids is not None:
+        queryset = queryset.filter(context_id__in=context_ids)
+    if tag_ids is not None:
+        queryset = queryset.filter(tags__id__in=tag_ids).distinct()
+    if excluded_ids is not None:
+        queryset = queryset.exclude(pk__in=excluded_ids)
+
+    current_timezone = timezone.get_current_timezone()
+    if data.get("start_date") is not None:
+        start = timezone.make_aware(
+            datetime.combine(data["start_date"], time.min),
+            current_timezone,
+        )
+        queryset = queryset.filter(start_date__gte=start)
+    if data.get("end_date") is not None:
+        end = timezone.make_aware(
+            datetime.combine(data["end_date"] + timedelta(days=1), time.min),
+            current_timezone,
+        )
+        queryset = queryset.filter(start_date__lt=end)
+    return data, queryset
+
+
+def _project_keyword_matches(queryset, term):
+    """The Projects API list's direct text matches."""
+    return queryset.filter(
+        Q(name__icontains=term)
+        | Q(description__icontains=term)
+        | Q(subprojects__name__icontains=term)
+    ).distinct()
+
+
+class ProjectRelatedSummaryView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="projects_related_summary_retrieve",
+        parameters=[ProjectRelatedSummaryQuerySerializer],
+        responses=RelatedSummarySerializer,
+    )
+    def get(self, request):
+        data, queryset = _filtered_projects(
+            request, ProjectRelatedSummaryQuerySerializer
+        )
+        outcome = related_outcome(request)
+        outcome.collect_scores = True
+        term = (data.get("search") or "").strip()
+        if term:
+            related_project_ids(
+                request.user,
+                queryset,
+                _project_keyword_matches(queryset, term),
+                term,
+                limit=None,
+                cutoff=data.get("similarity"),
+                outcome=outcome,
+            )
+        return Response(
+            _related_summary(request.user, outcome, data.get("similarity"))
+        )
+
+
 class ProjectsView(V2APIView):
     permission_classes = [IsAuthenticated]
 
@@ -52,45 +142,10 @@ class ProjectsView(V2APIView):
         responses=ProjectListResponseSerializer,
     )
     def get(self, request):
-        serializer = ProjectListQuerySerializer(data=request.query_params)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        context_ids = _parse_owned_filter_ids(
-            request.query_params.get("context_ids"),
-            field_name="context_ids",
-            model=Context,
-            user=request.user,
-        )
-        tag_ids = _parse_owned_filter_ids(
-            request.query_params.get("tag_ids"),
-            field_name="tag_ids",
-            model=Tag,
-            user=request.user,
-        )
-        excluded_ids = _parse_owned_filter_ids(
-            request.query_params.get("exclude_project_ids"),
-            field_name="exclude_project_ids",
-            model=Projects,
-            user=request.user,
-        )
-
-        queryset = _project_queryset(request.user)
-        if "status" in data:
-            queryset = queryset.filter(status=data["status"])
-        if context_ids is not None:
-            queryset = queryset.filter(context_id__in=context_ids)
-        if tag_ids is not None:
-            queryset = queryset.filter(tags__id__in=tag_ids).distinct()
-        if excluded_ids is not None:
-            queryset = queryset.exclude(pk__in=excluded_ids)
+        data, queryset = _filtered_projects(request, ProjectListQuerySerializer)
         # Last: related matches are drawn from what the other filters left.
         if data.get("search"):
-            matches = queryset.filter(
-                Q(name__icontains=data["search"])
-                | Q(description__icontains=data["search"])
-                | Q(subprojects__name__icontains=data["search"])
-            ).distinct()
+            matches = _project_keyword_matches(queryset, data["search"])
             if data.get("related"):
                 matches = with_extra(
                     queryset,
@@ -106,19 +161,6 @@ class ProjectsView(V2APIView):
                     ),
                 )
             queryset = matches
-        current_timezone = timezone.get_current_timezone()
-        if data.get("start_date") is not None:
-            start = timezone.make_aware(
-                datetime.combine(data["start_date"], time.min),
-                current_timezone,
-            )
-            queryset = queryset.filter(start_date__gte=start)
-        if data.get("end_date") is not None:
-            end = timezone.make_aware(
-                datetime.combine(data["end_date"] + timedelta(days=1), time.min),
-                current_timezone,
-            )
-            queryset = queryset.filter(start_date__lt=end)
         ordering = data["ordering"]
         if ordering == "name":
             queryset = queryset.order_by("name", "id")

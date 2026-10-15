@@ -564,6 +564,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/projects/related-summary/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["projects_related_summary_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/push/status/": {
         parameters: {
             query?: never;
@@ -802,6 +818,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["sessions_partial_update"];
+        trace?: never;
+    };
+    "/api/v2/sessions/related-summary/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["sessions_related_summary_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v2/subprojects/{subproject_id}": {
@@ -2079,6 +2111,31 @@ export interface components {
          * @enum {string}
          */
         RelatedEnum: "included" | "unavailable";
+        RelatedSummary: {
+            available: boolean;
+            /** Format: double */
+            similarity: number;
+            /** Format: double */
+            default: number;
+            /** Format: double */
+            floor: number;
+            /** Format: double */
+            ceiling: number;
+            /** Format: double */
+            step: number;
+            marks: components["schemas"]["RelatedSummaryMark"][];
+            counts: number[];
+            count: number;
+            /** Format: double */
+            best: number | null;
+            /** Format: double */
+            loosen_to: number | null;
+        };
+        RelatedSummaryMark: {
+            label: string;
+            /** Format: double */
+            value: number;
+        };
         ReportHierarchy: {
             projects: components["schemas"]["ReportHierarchyProject"][];
         };
@@ -3937,6 +3994,45 @@ export interface operations {
             };
         };
     };
+    projects_related_summary_retrieve: {
+        parameters: {
+            query?: {
+                context_ids?: string;
+                /** @description Latest project start date (inclusive). */
+                end_date?: string;
+                exclude_project_ids?: string;
+                /** @description Accepted for project-list query parity; this summary always describes related-only matches. */
+                related?: boolean;
+                search?: string;
+                /** @description Cutoff whose related-only count is returned in count. Defaults to the account setting. */
+                similarity?: number;
+                /** @description Earliest project start date (inclusive). */
+                start_date?: string;
+                /**
+                 * @description * `active` - active
+                 *     * `paused` - paused
+                 *     * `complete` - complete
+                 *     * `archived` - archived
+                 */
+                status?: "active" | "paused" | "complete" | "archived";
+                tag_ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedSummary"];
+                };
+            };
+        };
+    };
     push_status_retrieve: {
         parameters: {
             query?: never;
@@ -4538,6 +4634,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResource"];
+                };
+            };
+        };
+    };
+    sessions_related_summary_retrieve: {
+        parameters: {
+            query?: {
+                active?: boolean;
+                context_ids?: string;
+                end_date?: string;
+                exclude_project_ids?: string;
+                exclude_subproject_ids?: string;
+                exclude_tag_ids?: string;
+                /** @description Comma-separated session IDs. */
+                ids?: string;
+                note_snippet?: string;
+                project_ids?: string;
+                /** @description Accepted for session-list query parity; this summary always describes related-only matches. */
+                related?: boolean;
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
+                search?: string;
+                /** @description Cutoff whose related-only count is returned in count. Defaults to the account setting. */
+                similarity?: number;
+                start_date?: string;
+                subproject_ids?: string;
+                tag_ids?: string;
+                uuid?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatedSummary"];
                 };
             };
         };

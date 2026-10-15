@@ -92,10 +92,12 @@ MCP_EXCLUDED_OPERATION_IDS = {
     "push_subscriptions_create",
     "push_subscriptions_destroy",
     "push_test_create",
+    "projects_related_summary_retrieve",
     "recommendations_luna_refresh_create",
     "recommendations_usage_create",
     "timers_reminders_destroy",
     "timers_reminders_retrieve",
+    "sessions_related_summary_retrieve",
 }
 
 

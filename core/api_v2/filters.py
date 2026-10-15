@@ -179,13 +179,13 @@ class SessionFilterSpec:
             )
         return queryset
 
-    def rank(self, queryset, *, user=None, outcome=None):
+    def rank(self, queryset, *, user=None, outcome=None, related=None):
         """The core.search.SessionSearch of these filters and ``search``."""
         return rank_sessions(
             self._filter(queryset),
             self.search,
             user=user,
-            related=self.related,
+            related=self.related if related is None else related,
             cutoff=self.similarity,
             outcome=outcome,
         )

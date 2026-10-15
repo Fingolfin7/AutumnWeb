@@ -23,11 +23,11 @@ SIMILARITY_HELP = (
 
 def similarity_field(**kwargs):
     """The related-match cutoff parameter (core.services.semantic_search bounds)."""
+    kwargs.setdefault("help_text", SIMILARITY_HELP)
     return serializers.FloatField(
         required=False,
         min_value=0.25,
         max_value=0.60,
-        help_text=SIMILARITY_HELP,
         **kwargs,
     )
 
@@ -328,6 +328,25 @@ class SessionListResponseSerializer(serializers.Serializer):
     sessions = SessionListItemSerializer(many=True)
 
 
+class RelatedSummaryMarkSerializer(serializers.Serializer):
+    label = serializers.CharField()
+    value = serializers.FloatField()
+
+
+class RelatedSummarySerializer(serializers.Serializer):
+    available = serializers.BooleanField()
+    similarity = serializers.FloatField()
+    default = serializers.FloatField()
+    floor = serializers.FloatField()
+    ceiling = serializers.FloatField()
+    step = serializers.FloatField()
+    marks = RelatedSummaryMarkSerializer(many=True)
+    counts = serializers.ListField(child=serializers.IntegerField())
+    count = serializers.IntegerField()
+    best = serializers.FloatField(allow_null=True)
+    loosen_to = serializers.FloatField(allow_null=True)
+
+
 class CommitmentHistoryWarningSerializer(serializers.Serializer):
     commitment_history_unaffected = serializers.BooleanField()
 
@@ -377,6 +396,29 @@ class SessionListQuerySerializer(serializers.Serializer):
         ),
     )
     uuid = serializers.UUIDField(required=False)
+
+
+class SessionRelatedSummaryQuerySerializer(SessionListQuerySerializer):
+    """Session list filters without result paging or representation controls."""
+
+    related = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "Accepted for session-list query parity; this summary always describes "
+            "related-only matches."
+        ),
+    )
+    similarity = similarity_field(
+        help_text=(
+            "Cutoff whose related-only count is returned in count. Defaults to the "
+            "account setting."
+        )
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("limit", "offset", "include", "ordering"):
+            self.fields.pop(field_name)
 
 
 COMMITMENT_AGGREGATION_CHOICES = ("project", "subproject", "context", "tag")
@@ -876,6 +918,29 @@ class ProjectListQuerySerializer(serializers.Serializer):
                 {"end_date": ["End date must be on or after start date."]}
             )
         return attrs
+
+
+class ProjectRelatedSummaryQuerySerializer(ProjectListQuerySerializer):
+    """Project list filters without result paging or ordering controls."""
+
+    related = serializers.BooleanField(
+        required=False,
+        help_text=(
+            "Accepted for project-list query parity; this summary always describes "
+            "related-only matches."
+        ),
+    )
+    similarity = similarity_field(
+        help_text=(
+            "Cutoff whose related-only count is returned in count. Defaults to the "
+            "account setting."
+        )
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name in ("limit", "offset", "ordering"):
+            self.fields.pop(field_name)
 
 
 class ProjectListResponseSerializer(serializers.Serializer):
