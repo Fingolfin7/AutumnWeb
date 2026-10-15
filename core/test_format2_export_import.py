@@ -347,11 +347,6 @@ class Format2ExportImportTests(TestCase):
         compressed = self.client.get(reverse("api_v2:export"), {"compress": "true"})
         self.assertEqual(json_decompress(compressed.json()), self.document)
 
-        web_default = self.client.post(reverse("export"), {})
-        self.assertEqual(web_default.json()["format"], 2)
-        web_legacy = self.client.post(reverse("export"), {"legacy_format": "on"})
-        self.assertNotIn("format", web_legacy.json())
-
     def test_missing_uuid_gets_a_fresh_identity(self):
         without_uuid = copy.deepcopy(self.document)
         without_uuid["projects"][0]["sessions"][0]["uuid"] = None

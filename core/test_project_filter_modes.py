@@ -7,8 +7,7 @@ old meaning (old bookmarks and CLI calls must not change behaviour). The other
 half of these pin the order the two lists compose in: include narrows the
 field first, then exclude subtracts. The Projects page applies "include" in the
 browser (frontend/src/features/projects/logic.test.ts); the API side of that
-page is exclude_project_ids. The export form still posts the old
-``include_projects`` / ``exclude_projects`` names.
+page is exclude_project_ids. Export takes the sessions fields too.
 """
 
 from datetime import timedelta
@@ -124,22 +123,22 @@ class ProjectsListModeTests(ProjectFilterModeTestCase):
 
 
 class ExportModeTests(ProjectFilterModeTestCase):
-    def _exported_names(self, payload):
-        response = self.client.post(reverse("export"), payload)
-        self.assertEqual(response.status_code, 200)
-        return {project["name"] for project in response.json()["projects"]}
+    """The Export page (React) filters with the same fields as /api/v2/sessions/."""
+
+    def _exported_names(self, params):
+        document = self._api("api_v2:export", params)
+        return {project["name"] for project in document["projects"]}
 
     def test_include_keeps_only_the_named_projects(self):
         self.assertEqual(
-            self._exported_names({"include_projects": [str(self.atlas.id)]}),
-            {"Atlas API"},
+            self._exported_names({"project_ids": str(self.atlas.id)}), {"Atlas API"}
         )
 
     def test_include_narrows_first_then_exclude_subtracts(self):
         names = self._exported_names(
             {
-                "include_projects": [str(self.atlas.id), str(self.autumn.id)],
-                "exclude_projects": [str(self.autumn.id)],
+                "project_ids": f"{self.atlas.id},{self.autumn.id}",
+                "exclude_project_ids": str(self.autumn.id),
             }
         )
         self.assertEqual(names, {"Atlas API"})

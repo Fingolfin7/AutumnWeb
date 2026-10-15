@@ -160,36 +160,31 @@ class InsightsViewProviderModelsTests(TestCase):
             "",
         )
 
-    def test_insights_page_redirects_when_ai_features_disabled(self):
-        self.user.profile.ai_features_enabled = False
-        self.user.profile.save()
-        client = Client()
-        client.force_login(self.user)
+class InsightsAccessAndUsageApiTests(TestCase):
+    """The Insights page (React) reads chats and token usage from /api/v2/insights/."""
 
-        response = client.get(reverse("insights"))
-
-        self.assertRedirects(response, reverse("home"))
-
-    def test_insights_page_redirects_when_no_profile_credentials_exist(self):
-        self.user.profile.ai_features_enabled = True
-        self.user.profile.save()
-        client = Client()
-        client.force_login(self.user)
-
-        response = client.get(reverse("insights"))
-
-        self.assertRedirects(response, reverse("home"))
-
-        home_response = client.get(reverse("home"))
-        self.assertNotContains(home_response, f'href="{reverse("insights")}"')
-
-
-class TokenUsageHeaderTests(TestCase):
-    def test_header_reports_cached_tokens_alongside_in_and_out(self):
-        user = User.objects.create_user(username="usage-user", password="test-pass-123")
-        user.profile.set_api_key("gemini", "test-gemini-key")
-        user.profile.ai_features_enabled = True
+    def _user(self, name, *, ai=True, key=True):
+        user = User.objects.create_user(username=name, email=f"{name}@example.com", password="test-pass-123")
+        user.profile.ai_features_enabled = ai
+        if key:
+            user.profile.set_api_key("gemini", "test-gemini-key")
         user.profile.save()
+        return user
+
+    def test_access_is_refused_when_ai_features_are_disabled(self):
+        client = Client()
+        client.force_login(self._user("noai", ai=False))
+        for path in ("/api/v2/insights/chats/", "/api/v2/insights/options/"):
+            with self.subTest(path=path):
+                self.assertEqual(client.get(path).status_code, 403)
+
+    def test_access_is_refused_without_provider_credentials(self):
+        client = Client()
+        client.force_login(self._user("nokey", key=False))
+        self.assertEqual(client.get("/api/v2/insights/chats/").status_code, 403)
+
+    def test_chat_detail_carries_the_per_message_usage_the_header_sums(self):
+        user = self._user("usage-user")
         chat = LLMChat.objects.create(
             user=user, title="Usage test", model="gemini:gemini-3.1-flash-lite"
         )
@@ -203,37 +198,20 @@ class TokenUsageHeaderTests(TestCase):
         client = Client()
         client.force_login(user)
 
-        response = client.get(
-            reverse("insights_detail", kwargs={"chat_id": chat.id})
-        )
+        payload = client.get(f"/api/v2/insights/chats/{chat.id}").json()
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "In: 15756")
-        self.assertContains(response, "Cached: 3054")
-        self.assertContains(response, 'data-cached="3054"')
+        usages = [message["metadata"]["usage"] for message in payload["messages"]]
+        self.assertEqual([usage["cached"] for usage in usages], [0, 3054])
+        self.assertEqual(sum(usage["prompt"] for usage in usages), 15756)
 
-    def test_header_omits_cached_when_nothing_was_cached(self):
-        user = User.objects.create_user(username="nocache-user", password="test-pass-123")
-        user.profile.set_api_key("gemini", "test-gemini-key")
-        user.profile.ai_features_enabled = True
-        user.profile.save()
-        chat = LLMChat.objects.create(
-            user=user, title="No cache", model="gemini:gemini-3.1-flash-lite"
-        )
-        LLMMessage.objects.create(
-            chat=chat,
-            role="assistant",
-            content="answer",
-            metadata={"usage": {"prompt": 100, "response": 10, "cached": 0}},
-        )
+    def test_another_users_chat_is_not_found(self):
+        owner = self._user("owner")
+        chat = LLMChat.objects.create(user=owner, title="Private", model="gemini:gemini-3.1-flash-lite")
         client = Client()
-        client.force_login(user)
-
-        response = client.get(
-            reverse("insights_detail", kwargs={"chat_id": chat.id})
-        )
-
-        self.assertNotContains(response, "Cached:")
+        client.force_login(self._user("intruder"))
+        self.assertEqual(client.get(f"/api/v2/insights/chats/{chat.id}").status_code, 404)
+        self.assertEqual(client.delete(f"/api/v2/insights/chats/{chat.id}").status_code, 404)
+        self.assertTrue(LLMChat.objects.filter(pk=chat.pk).exists())
 
 
 class GetLlmHandlerTests(SimpleTestCase):
