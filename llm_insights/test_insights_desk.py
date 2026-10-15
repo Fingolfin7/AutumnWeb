@@ -13,36 +13,12 @@ from django.utils import timezone
 
 from datetime import timedelta
 
-from core.templatetags.time_formats import chat_hover_stamp
 from llm_insights.models import LLMChat
-from llm_insights.views import group_chats_by_recency
-
-
-class ChatHoverStampFilterTests(TestCase):
-    """core.templatetags.time_formats.chat_hover_stamp backs the sidebar's
-    hover-reveal timestamp: time for today/yesterday, a short date once the
-    group header stops implying which day, the year once it's not this one."""
-
-    def test_today_shows_a_time_with_no_leading_zero(self):
-        stamp = chat_hover_stamp(timezone.localtime())
-        self.assertRegex(stamp, r"^\d{1,2}:\d{2} [AP]M$")
-        self.assertFalse(stamp.startswith("0"))
-
-    def test_yesterday_shows_a_time_not_a_date(self):
-        stamp = chat_hover_stamp(timezone.localtime() - timedelta(days=1))
-        self.assertRegex(stamp, r"^\d{1,2}:\d{2} [AP]M$")
-
-    def test_within_the_week_shows_a_short_date(self):
-        stamp = chat_hover_stamp(timezone.localtime() - timedelta(days=3))
-        self.assertRegex(stamp, r"^\d{1,2} [A-Za-z]{3}$")
-
-    def test_older_than_this_year_includes_the_year(self):
-        stamp = chat_hover_stamp(timezone.localtime() - timedelta(days=400))
-        self.assertRegex(stamp, r"^\d{1,2} [A-Za-z]{3} \d{4}$")
+from llm_insights.services.chats import group_chats_by_recency
 
 
 class ChatSidebarGroupingTests(TestCase):
-    """llm_insights.views.group_chats_by_recency buckets the sidebar into
+    """llm_insights.services.chats.group_chats_by_recency buckets the sidebar into
     Today / Yesterday / Previous 7 days / Older, the same grouping ChatGPT and
     Claude use for their own chat history."""
 

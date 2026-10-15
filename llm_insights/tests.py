@@ -13,15 +13,17 @@ from llm_insights.gemini_handler import GeminiHandler
 from llm_insights.llm_handlers import get_llm_handler
 from llm_insights.models import LLMChat, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
-from llm_insights.views import (
-    InsightsView,
+from llm_insights.services import handlers as insight_handlers
+from llm_insights.services.analysis import perform_llm_analysis_stream
+from llm_insights.services.chats import (
     clean_generated_chat_title,
-    configure_sse_response,
     fallback_chat_title,
     generate_and_save_chat_title,
-    perform_llm_analysis_stream,
     save_llm_messages,
     save_partial_stream_messages,
+)
+from llm_insights.services.streaming import (
+    configure_sse_response,
     stream_keepalive,
     stream_queue_events,
 )
@@ -29,8 +31,11 @@ from users.codex_auth import serialize_token_bundle
 
 
 class InsightsViewProviderModelsTests(TestCase):
+    """Model and reasoning-effort choices (llm_insights.services.handlers)."""
+
+    OPENAI_REASONING_EFFORTS = insight_handlers.OPENAI_REASONING_EFFORTS
+
     def setUp(self):
-        self.view = InsightsView()
         self.user = User.objects.create_user(
             username="llm-user", password="test-pass-123"
         )
@@ -45,21 +50,21 @@ class InsightsViewProviderModelsTests(TestCase):
             self.assertTrue(model_label)
 
     def test_gemini_models_require_a_profile_api_key(self):
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assertNotIn("gemini", provider_models)
 
         self.user.profile.set_api_key("gemini", "test-gemini-key")
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
         self.assert_has_model_choices(provider_models, "gemini")
 
     def test_openai_models_are_available_when_key_present(self):
         self.user.profile.set_api_key("openai", "test-openai-key")
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
         self.assertEqual(
@@ -74,7 +79,7 @@ class InsightsViewProviderModelsTests(TestCase):
 
     def test_openai_models_are_available_when_server_key_present(self):
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-server-key"}):
-            provider_models = self.view._provider_models(self.user)
+            provider_models = insight_handlers.provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
 
@@ -91,7 +96,7 @@ class InsightsViewProviderModelsTests(TestCase):
         )
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assert_has_model_choices(provider_models, "openai")
         self.assertIn(("gpt-6-sol", "GPT-6 Sol"), provider_models["openai"])
@@ -99,14 +104,14 @@ class InsightsViewProviderModelsTests(TestCase):
 
     def test_openai_reasoning_effort_defaults_to_high(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "unexpected"),
+            insight_handlers.validate_reasoning_effort("openai", "unexpected"),
             "high",
         )
 
     def test_xhigh_reasoning_effort_is_available(self):
-        self.assertIn("xhigh", self.view.OPENAI_REASONING_EFFORTS)
+        self.assertIn("xhigh", self.OPENAI_REASONING_EFFORTS)
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "xhigh", "gpt-5.5"),
+            insight_handlers.validate_reasoning_effort("openai", "xhigh", "gpt-5.5"),
             "xhigh",
         )
 
@@ -117,16 +122,16 @@ class InsightsViewProviderModelsTests(TestCase):
                          ("gpt-5.6-terra", "gpt-6-sol"),
                          ("gpt-5.6", "gpt-6-sol")]:
             with self.subTest(model=old):
-                self.assertEqual(self.view._validate_selection(models, "openai", old), ("openai", new))
+                self.assertEqual(insight_handlers.validate_selection(models, "openai", old), ("openai", new))
 
     def test_all_gpt_6_choices_preserve_xhigh_and_max(self):
         for model in ("gpt-6-luna", "gpt-6-sol", "gpt-6-astra"):
             for effort in ("xhigh", "max"):
-                self.assertEqual(self.view._validate_reasoning_effort("openai", effort, model), effort)
+                self.assertEqual(insight_handlers.validate_reasoning_effort("openai", effort, model), effort)
 
     def test_legacy_extra_high_reasoning_effort_is_normalized(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort(
+            insight_handlers.validate_reasoning_effort(
                 "openai", "extra-high", "gpt-6-sol"
             ),
             "xhigh",
@@ -134,11 +139,11 @@ class InsightsViewProviderModelsTests(TestCase):
 
     def test_max_reasoning_effort_is_available_for_gpt_6(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "max", "gpt-6-sol"),
+            insight_handlers.validate_reasoning_effort("openai", "max", "gpt-6-sol"),
             "max",
         )
         self.assertEqual(
-            self.view._validate_reasoning_effort("openai", "max", "gpt-5.5"),
+            insight_handlers.validate_reasoning_effort("openai", "max", "gpt-5.5"),
             "high",
         )
 
@@ -146,16 +151,16 @@ class InsightsViewProviderModelsTests(TestCase):
         self.user.profile.set_api_key("openai", "test-openai-key")
         self.user.profile.save()
 
-        provider_models = self.view._provider_models(self.user)
+        provider_models = insight_handlers.provider_models(self.user)
 
         self.assertEqual(
-            self.view._validate_selection(provider_models, None, None),
+            insight_handlers.validate_selection(provider_models, None, None),
             ("openai", "gpt-6-luna"),
         )
 
     def test_reasoning_effort_is_ignored_for_non_openai_providers(self):
         self.assertEqual(
-            self.view._validate_reasoning_effort("gemini", "high"),
+            insight_handlers.validate_reasoning_effort("gemini", "high"),
             "",
         )
 

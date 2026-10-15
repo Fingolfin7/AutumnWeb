@@ -10,62 +10,15 @@ from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase
-from django.urls import reverse
 from django.utils import timezone
-from freezegun import freeze_time
 
 from core.models import Context, Projects, Sessions, SubProjects
-from core.templatetags.time_formats import hero_duration
 from core.services.dashboard import (
     QUICK_START_LIMIT,
     build_quick_starts,
     get_recent_dashboard_sessions,
     select_recent_dashboard_sessions,
 )
-
-
-class HeroDurationTests(TestCase):
-    """`hero_duration` and `heroParts()` in dashboard_desk.js are one format.
-
-    If they drift, the hero timer visibly jumps on its first tick.
-    """
-
-    def test_sub_hour_durations_read_minutes_and_seconds(self):
-        self.assertEqual(
-            hero_duration(timedelta(minutes=43, seconds=18)),
-            [{"value": 43, "unit": "minutes"}, {"value": 18, "unit": "seconds"}],
-        )
-
-    def test_hours_push_seconds_off_the_end(self):
-        self.assertEqual(
-            hero_duration(timedelta(hours=2, minutes=5, seconds=40)),
-            [{"value": 2, "unit": "hours"}, {"value": 5, "unit": "minutes"}],
-        )
-
-    def test_days_push_minutes_off_the_end(self):
-        self.assertEqual(
-            hero_duration(timedelta(days=1, hours=3, minutes=9)),
-            [{"value": 1, "unit": "day"}, {"value": 3, "unit": "hours"}],
-        )
-
-    def test_units_are_singular_at_one(self):
-        self.assertEqual(
-            hero_duration(timedelta(minutes=1, seconds=1)),
-            [{"value": 1, "unit": "minute"}, {"value": 1, "unit": "second"}],
-        )
-
-    def test_plain_numbers_are_read_as_minutes(self):
-        """Sessions.duration is a float count of minutes, not a timedelta."""
-        self.assertEqual(
-            hero_duration(90.0),
-            [{"value": 1, "unit": "hour"}, {"value": 30, "unit": "minutes"}],
-        )
-
-    def test_a_fresh_timer_reads_zero_rather_than_blank(self):
-        self.assertEqual(
-            hero_duration(0),
-            [{"value": 0, "unit": "minutes"}, {"value": 0, "unit": "seconds"}],
-        )
 
 
 class DashboardTestCase(TestCase):
@@ -274,55 +227,4 @@ class QuickStartTests(DashboardTestCase):
         ]
         self.assertEqual(len(build_quick_starts(recent, [])), QUICK_START_LIMIT)
 
-
-class TimelineFragmentTests(DashboardTestCase):
-    """The fragment endpoint serves both the range tabs and the live poll."""
-
-    def test_fragment_requires_login(self):
-        self.client.logout()
-        response = self.client.get(reverse("timeline_fragment"))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("login", response.url)
-
-    @freeze_time("2026-09-20 12:00:00+02:00")
-    def test_fragment_renders_the_timeline_alone(self):
-        self._session(self.atlas, 10, subs=["auth"])
-
-        response = self.client.get(reverse("timeline_fragment"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Cache-Control"], "no-store")
-        self.assertContains(response, "data-timeline")
-        self.assertContains(response, "Atlas API")
-        # a fragment, not a page
-        self.assertNotContains(response, "<html")
-        self.assertNotContains(response, "desk-head")
-
-    def test_the_range_parameter_selects_the_window(self):
-        response = self.client.get(reverse("timeline_fragment"), {"range": "wk"})
-
-        self.assertContains(response, 'data-timeline-range="wk"')
-        self.assertContains(response, 'data-tlrange="wk"')
-
-    def test_a_junk_range_falls_back_rather_than_failing(self):
-        response = self.client.get(reverse("timeline_fragment"), {"range": "nonsense"})
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'data-timeline-range="today"')
-
-    def test_the_fragment_carries_the_window_the_client_ticks_against(self):
-        """dashboard_desk.js grows live blocks locally; without absolute
-        window bounds it would have to poll instead."""
-        response = self.client.get(reverse("timeline_fragment"))
-
-        self.assertContains(response, "data-timeline-window")
-
-    def test_a_running_timer_is_marked_for_client_side_ticking(self):
-        self._timer(self.atlas, subs=["auth"])
-
-        response = self.client.get(reverse("timeline_fragment"))
-
-        self.assertContains(response, "data-live-block")
-        self.assertContains(response, "data-start-iso")
-        self.assertContains(response, "data-live-dur")
 

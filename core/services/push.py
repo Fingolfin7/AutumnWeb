@@ -1,6 +1,6 @@
 """Web Push subscription storage and durable outbox delivery.
 
-The request handlers in :mod:`core.views.push` only write subscriptions and
+The push request handlers (core.api_v2.views.push) only write subscriptions and
 notification events.  A dispatcher calls :func:`flush_outbox` after those
 transactions commit; no provider request is made while a web request holds a
 database transaction.

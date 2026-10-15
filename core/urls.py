@@ -1,53 +1,8 @@
 # urls.py
-from django.urls import path, re_path
+from django.urls import path
 from django.http import JsonResponse
-from core.views.charts import ChartsView
-from core.views.recommendation_usage import recommendation_usage, refresh_recommendations
-from core.views.commitments import (
-    CreateCommitmentView,
-    DeleteCommitmentView,
-    UpdateCommitmentView,
-)
-from core.views.contexts_tags import (
-    DeleteContextView,
-    DeleteTagView,
-    UpdateContextView,
-    UpdateTagView,
-    manage_contexts,
-    manage_tags,
-    switch_context,
-)
-from core.views.dashboard import DashboardView, timeline_fragment
-from core.views.import_export import import_stream
-from core.views.projects import (
-    CreateProjectView,
-    CreateSubProjectView,
-    DeleteProjectView,
-    DeleteSubProjectView,
-    ProjectsListView,
-    UpdateProjectView,
-    UpdateSubProjectView,
-    merge_projects,
-    merge_subprojects,
-)
-from core.views.push import (
-    cancel_timer_reminder,
-    push_status,
-    push_subscribe,
-    push_test,
-    push_unsubscribe,
-)
-from core.views.sessions import DeleteSessionView, SessionsListView, update_session
-from core.views.timers import (
-    TimerListView,
-    active_timers_fragment,
-    luna_timer_recommendations,
-    remove_timer,
-    restart_timer,
-    start_timer,
-    stop_timer,
-    update_timer_note,
-)
+from core.views.recommendation_usage import recommendation_usage
+from core.views.contexts_tags import switch_context
 
 
 def healthz(request):
@@ -59,31 +14,12 @@ urlpatterns = [
     path("healthz/", healthz, name="healthz"),
     # pages
     path("", spa, name="home"),
-    path("timeline/fragment/", timeline_fragment, name="timeline_fragment"),
     path("projects/", spa, name="projects"),
     path("timers/", spa, name="timers"),
-    path(
-        "timers/active-fragment/",
-        active_timers_fragment,
-        name="active_timers_fragment",
-    ),
     path("start_timer/", spa, name="start_timer"),
-    path("timers/luna-recommendations/", luna_timer_recommendations, name="luna_timer_recommendations"),
     path("timers/recommendation-usage/", recommendation_usage, name="recommendation_usage"),
-    path("timers/refresh-recommendations/", refresh_recommendations, name="refresh_recommendations"),
     path("stop_timer/<int:session_id>/", spa, name="stop_timer"),
-    path("timers/<int:session_id>/note/", update_timer_note, name="update_timer_note"),
-    path("restart_timer/<int:session_id>/", restart_timer, name="restart_timer"),
     path("remove_timer/<int:session_id>/", spa, name="remove_timer"),
-    path("push/status/", push_status, name="push_status"),
-    path("push/subscribe/", push_subscribe, name="push_subscribe"),
-    path("push/unsubscribe/", push_unsubscribe, name="push_unsubscribe"),
-    path("push/test/", push_test, name="push_test"),
-    path(
-        "timers/<int:session_id>/reminders/<int:reminder_id>/cancel/",
-        cancel_timer_reminder,
-        name="cancel_timer_reminder",
-    ),
     path("notifications/", spa, name="notifications"),
     path("review/weekly/", spa, name="weekly_review"),
     path(
@@ -120,7 +56,6 @@ urlpatterns = [
     path("charts/", spa, name="charts"),
     path("export/", spa, name="export"),
     path("import/", spa, name="import"),
-    path("import/stream/", import_stream, name="import_stream"),
     path("merge_projects/", spa, name="merge_projects"),
     path("merge_subprojects/<int:project_id>/", spa, name="merge_subprojects"),
     path("contexts/", spa, name="contexts"),

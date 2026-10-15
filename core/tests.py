@@ -1,4 +1,4 @@
-from django.test import TestCase, Client, override_settings
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from core.models import Projects, SubProjects, Sessions, Commitment, Tag
@@ -13,7 +13,6 @@ import os
 import shutil
 import tempfile
 import time
-from unittest.mock import patch
 from freezegun import freeze_time
 from core.models import Context
 from rest_framework.authtoken.models import Token
@@ -750,132 +749,6 @@ class ReconciliationTests(TestCase):
 # =============================================================================
 # Dashboard Feature Tests
 # =============================================================================
-
-
-class ActiveTimersFragmentTests(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create_user(
-            username="fragmentuser",
-            email="fragment@example.com",
-            password="testpass123",
-        )
-        self.other_user = User.objects.create_user(
-            username="otherfragmentuser",
-            email="other-fragment@example.com",
-            password="testpass123",
-        )
-        self.context = Context.objects.create(user=self.user, name="General")
-        self.project = Projects.objects.create(
-            user=self.user,
-            name="Fragment Project",
-            context=self.context,
-        )
-        self.other_project = Projects.objects.create(
-            user=self.other_user,
-            name="Other Fragment Project",
-        )
-        self.client.login(username="fragmentuser", password="testpass123")
-
-    def create_active_session(self, project=None, start_time=None):
-        return Sessions.objects.create(
-            user=self.user,
-            project=project or self.project,
-            start_time=start_time or timezone.now() - timedelta(minutes=10),
-            is_active=True,
-        )
-
-    def test_fragment_requires_login(self):
-        self.client.logout()
-
-        response = self.client.get(reverse("active_timers_fragment"))
-
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("login", response.url)
-
-    def test_fragment_rejects_unknown_surface(self):
-        response = self.client.get(
-            reverse("active_timers_fragment"),
-            {"surface": "not-real"},
-        )
-
-        self.assertEqual(response.status_code, 400)
-
-    @patch("core.services.timer_suggestions.build_timer_suggestions")
-    def test_timers_fragment_renders_active_timer_only(self, build_timer_suggestions):
-        active = self.create_active_session()
-        Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=timezone.now() - timedelta(hours=2),
-            end_time=timezone.now() - timedelta(hours=1),
-            is_active=False,
-            note="completed-session-marker",
-        )
-        Sessions.objects.create(
-            user=self.other_user,
-            project=self.other_project,
-            start_time=timezone.now() - timedelta(minutes=5),
-            is_active=True,
-        )
-
-        response = self.client.get(
-            reverse("active_timers_fragment"),
-            {"surface": "timers"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Cache-Control"], "no-store")
-        self.assertContains(response, 'data-timer-surface="timers"')
-        self.assertContains(response, f'id="timer-{active.id}"')
-        self.assertContains(response, "Fragment Project")
-        self.assertNotContains(response, "completed-session-marker")
-        self.assertNotContains(response, "Other Fragment Project")
-        build_timer_suggestions.assert_not_called()
-
-    def test_dashboard_fragment_exists_when_empty_and_appears_with_timer(self):
-        # The Focus Desk deck no longer hides itself when nothing is running:
-        # the "start something" card sits beside these cards and is always on
-        # screen, so an idle fragment is simply an empty container.
-        empty_response = self.client.get(
-            reverse("active_timers_fragment"),
-            {"surface": "dashboard"},
-        )
-        self.assertContains(empty_response, 'id="active-timers"')
-        self.assertNotContains(empty_response, "data-timer-id")
-
-        self.create_active_session()
-        active_response = self.client.get(
-            reverse("active_timers_fragment"),
-            {"surface": "dashboard"},
-        )
-
-        self.assertContains(active_response, 'data-timer-surface="dashboard"')
-        self.assertContains(active_response, "Fragment Project")
-        self.assertContains(active_response, "data-timer-id")
-
-    def test_dashboard_fragment_limits_to_five_timers(self):
-        now = timezone.now()
-        for index in range(6):
-            project = Projects.objects.create(
-                user=self.user,
-                name=f"Timer Project {index}",
-                context=self.context,
-            )
-            self.create_active_session(
-                project=project,
-                start_time=now - timedelta(minutes=index),
-            )
-
-        response = self.client.get(
-            reverse("active_timers_fragment"),
-            {"surface": "dashboard"},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Timer Project 0")
-        self.assertContains(response, "Timer Project 4")
-        self.assertNotContains(response, "Timer Project 5")
 
 
 class DailyStreakTests(TestCase):
