@@ -25,6 +25,7 @@ npm run dev        # Vite on :5173; run Django with VITE_DEV_SERVER=http://local
 npm run build      # Writes core/static/app/ (gitignored); Django serves it when VITE_DEV_SERVER is unset
 npm run gen:api    # Regenerate src/api/schema.d.ts after changing openapi-v2.yaml
 npm run typecheck && npm test
+npm run e2e         # Playwright suite (Chromium; first `npx playwright install chromium`): builds the app, serves it from Django on a throwaway SQLite db seeded by seed_demo; needs Python, set PYTHON to the venv interpreter
 
 # Database migrations
 python manage.py makemigrations
@@ -43,6 +44,7 @@ python manage.py audit --username=<user>  # Recalculate totals (omit --username 
 python manage.py export <username> --output_file=<path>
 python manage.py import <username> --input_file=<path>
 python manage.py clear --username=<user>  # Delete all project data (omit --username for all users)
+python manage.py seed_demo [--username=demo --password=demo-pass-123] [--reset [--force]]  # Fictional demo account (used by e2e); --reset needs DEBUG or --force
 python manage.py clear_temp_uploads --older-than-hours=24 [--dry-run]  # Sweep abandoned import uploads from MEDIA_ROOT/temp
 python manage.py embed_sessions [--username=<user>] [--dry-run] [--limit=N]  # Embed new/changed sessions and projects for semantic search (backfill/repair; web processes do it after edits)
 python scripts/semantic_search_eval.py [--keyword-only]  # Keyword vs hybrid search on fictional records; needs OPENAI_API_KEY
