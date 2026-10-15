@@ -244,6 +244,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/insights/selection/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["insights_selection_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/insights/stream/": {
         parameters: {
             query?: never;
@@ -974,6 +990,10 @@ export interface components {
             mode: components["schemas"]["BackgroundModeEnum"];
             image_url: string | null;
             video_url: string | null;
+            title: string | null;
+            description: string | null;
+            copyright: string | null;
+            source_url: string | null;
         };
         /**
          * @description * `upload` - upload
@@ -1580,6 +1600,9 @@ export interface components {
         };
         InsightChatList: {
             groups: components["schemas"]["InsightChatGroup"][];
+            total?: number;
+            limit?: number;
+            offset?: number;
         };
         InsightChatSummary: {
             /** Format: uuid */
@@ -1597,7 +1620,8 @@ export interface components {
             /** Format: date */
             end_date?: string;
             note_snippet?: string;
-            context?: number;
+            /** @description A context ID, or 'all' for all contexts. */
+            context?: (number | "all") | null;
             tags?: number[];
             include_projects?: number[];
             exclude_projects?: number[];
@@ -1631,10 +1655,19 @@ export interface components {
             default_start_date: string;
             /** Format: date */
             default_end_date: string;
+            openai_source: (components["schemas"]["OpenaiSourceEnum"] | components["schemas"]["NullEnum"]) | null;
         };
         InsightProviderOption: {
             provider: string;
             models: components["schemas"]["InsightModelOption"][];
+        };
+        InsightSelection: {
+            count: number;
+            /** Format: date */
+            first_date: string | null;
+            /** Format: date */
+            last_date: string | null;
+            related: (components["schemas"]["RelatedEnum"] | components["schemas"]["NullEnum"]) | null;
         };
         InsightSource: {
             /** Format: uri */
@@ -1656,7 +1689,8 @@ export interface components {
             /** Format: date */
             end_date?: string;
             note_snippet?: string;
-            context?: number;
+            /** @description A context ID, or 'all' for all contexts. */
+            context?: (number | "all") | null;
             tags?: number[];
             include_projects?: number[];
             exclude_projects?: number[];
@@ -1730,6 +1764,16 @@ export interface components {
             next_weekly_review_at: string | null;
             version: number;
         };
+        /** @enum {unknown} */
+        NullEnum: null;
+        /**
+         * @description * `server` - server
+         *     * `codex` - codex
+         *     * `profile` - profile
+         *     * `codex_with_api_fallback` - codex_with_api_fallback
+         * @enum {string}
+         */
+        OpenaiSourceEnum: "server" | "codex" | "profile" | "codex_with_api_fallback";
         PatchedAccountPatch: {
             username?: string;
             /** Format: email */
@@ -1876,6 +1920,7 @@ export interface components {
             avatar_url: string;
             background: components["schemas"]["Background"];
             configured_api_keys: components["schemas"]["ConfiguredApiKeys"];
+            openai_source: (components["schemas"]["OpenaiSourceEnum"] | components["schemas"]["NullEnum"]) | null;
             contexts: components["schemas"]["PreferenceContext"][];
         };
         ProjectCreateRequest: {
@@ -2005,6 +2050,12 @@ export interface components {
             /** Format: double */
             average_ms: number | null;
         };
+        /**
+         * @description * `included` - included
+         *     * `unavailable` - unavailable
+         * @enum {string}
+         */
+        RelatedEnum: "included" | "unavailable";
         ReportHierarchy: {
             projects: components["schemas"]["ReportHierarchyProject"][];
         };
@@ -2211,6 +2262,7 @@ export interface components {
         };
         SocialAccounts: {
             accounts: components["schemas"]["SocialAccount"][];
+            has_usable_password: boolean;
         };
         SubprojectAllocation: {
             subproject_id: number;
@@ -2940,7 +2992,9 @@ export interface operations {
     };
     import_uploads_stream_retrieve: {
         parameters: {
-            query?: never;
+            query?: {
+                format?: "event-stream" | "json";
+            };
             header?: never;
             path: {
                 upload_id: string;
@@ -2962,7 +3016,10 @@ export interface operations {
     };
     insights_chats_list: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3039,9 +3096,43 @@ export interface operations {
             };
         };
     };
+    insights_selection_retrieve: {
+        parameters: {
+            query?: {
+                chat_id?: string;
+                /** @description A context ID, or 'all' for all contexts. */
+                context?: (number | "all") | null;
+                end_date?: string;
+                exclude_projects?: number[];
+                include_projects?: number[];
+                note_snippet?: string;
+                project_name?: string;
+                related?: boolean;
+                search?: string;
+                start_date?: string;
+                tags?: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightSelection"];
+                };
+            };
+        };
+    };
     insights_stream_create: {
         parameters: {
-            query?: never;
+            query?: {
+                format?: "event-stream" | "json";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3166,12 +3257,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["Configured"];
+                };
             };
         };
     };
@@ -3208,12 +3300,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["MediaStatus"];
+                };
             };
         };
     };
@@ -3250,12 +3343,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["MediaStatus"];
+                };
             };
         };
     };
@@ -3296,6 +3390,14 @@ export interface operations {
                     "application/json": components["schemas"]["ChatGPTLogin"];
                 };
             };
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatGPTLogin"];
+                };
+            };
         };
     };
     me_chatgpt_login_create: {
@@ -3326,12 +3428,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description No response body */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["ChatGPTLogin"];
+                };
             };
         };
     };
