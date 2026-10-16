@@ -17,6 +17,10 @@ class ClaudeHandler(BaseLLMHandler):
     # arbitrary cap. Non-streaming calls can't use the ceiling: the SDK refuses
     # requests it estimates will outrun its HTTP timeout.
     MAX_OUTPUT_TOKENS = {
+        "claude-fable-5-1": 128000,
+        "claude-opus-5-5": 128000,
+        "claude-sonnet-5-5": 128000,
+        "claude-haiku-5-5": 128000,
         "claude-fable-5": 128000,
         "claude-opus-5": 128000,
         "claude-sonnet-5": 128000,
@@ -25,7 +29,7 @@ class ClaudeHandler(BaseLLMHandler):
     DEFAULT_MAX_OUTPUT_TOKENS = 64000
     NON_STREAMING_MAX_OUTPUT_TOKENS = 16000
 
-    def __init__(self, model="claude-sonnet-5", api_key: str | None = None):
+    def __init__(self, model="claude-sonnet-5-5", api_key: str | None = None):
         self.model = model
         self.api_key = api_key
         self.client = (

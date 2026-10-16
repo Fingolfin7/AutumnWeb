@@ -60,7 +60,7 @@ class InsightsViewProviderModelsTests(TestCase):
             provider_models["openai"],
             [
                 ("gpt-6-luna", "GPT-6 Luna"),
-                ("gpt-6-sol", "GPT-6 Sol"),
+                ("gpt-6.1-sol", "GPT-6.1 Sol"),
                 ("gpt-6-astra", "GPT-6 Astra"),
                 ("gpt-5.5", "GPT-5.5"),
             ],
@@ -77,6 +77,58 @@ class InsightsViewProviderModelsTests(TestCase):
             insight_handlers.validate_selection(provider_models, None, None),
             ("openai", "gpt-6-luna"),
         )
+
+    def test_options_expose_current_models_and_sol_max_effort(self):
+        self.user.profile.ai_features_enabled = True
+        for provider in ("openai", "claude"):
+            self.user.profile.set_api_key(provider, "test-key")
+        self.user.profile.save()
+        self.client.force_login(self.user)
+
+        response = self.client.get("/api/v2/insights/options/")
+
+        self.assertEqual(response.status_code, 200)
+        providers = {p["provider"]: p["models"] for p in response.json()["providers"]}
+        sol = next(m for m in providers["openai"] if m["value"] == "gpt-6.1-sol")
+        self.assertEqual(sol["reasoning_efforts"], ["low", "medium", "high", "xhigh", "max"])
+        self.assertEqual(
+            [(m["value"], m["label"]) for m in providers["claude"]],
+            [
+                ("claude-haiku-5-5", "Claude Haiku 5.5"),
+                ("claude-sonnet-5-5", "Claude Sonnet 5.5"),
+                ("claude-opus-5-5", "Claude Opus 5.5"),
+                ("claude-fable-5-1", "Claude Fable 5.1"),
+            ],
+        )
+
+    def test_saved_models_follow_replacements(self):
+        for provider in ("openai", "claude"):
+            self.user.profile.set_api_key(provider, "test-key")
+        self.user.profile.save()
+        models = insight_handlers.provider_models(self.user)
+        for provider, old, new in (
+            ("openai", "gpt-6-sol", "gpt-6.1-sol"),
+            ("openai", "gpt-5.6-sol", "gpt-6.1-sol"),
+            ("openai", "gpt-5.6", "gpt-6.1-sol"),
+            ("openai", "gpt-5.6-terra", "gpt-6.1-sol"),
+            ("claude", "claude-haiku-4-5", "claude-haiku-5-5"),
+            ("claude", "claude-sonnet-5", "claude-sonnet-5-5"),
+            ("claude", "claude-opus-5", "claude-opus-5-5"),
+            ("claude", "claude-fable-5", "claude-fable-5-1"),
+        ):
+            with self.subTest(model=old):
+                self.assertEqual(insight_handlers.validate_selection(models, provider, old), (provider, new))
+        self.assertEqual(insight_handlers.validate_reasoning_effort("openai", "max", "gpt-6.1-sol"), "max")
+        self.assertEqual(insight_handlers.validate_reasoning_effort("openai", "max", "gpt-5.5"), "high")
+
+
+class ClaudeOutputLimitTests(SimpleTestCase):
+    def test_current_models_use_their_streaming_ceiling_and_bounded_nonstreaming_limit(self):
+        for model in ("claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1"):
+            with self.subTest(model=model):
+                handler = ClaudeHandler(model=model, api_key="test-key")
+                self.assertEqual(handler._max_tokens(streaming=True), 128000)
+                self.assertEqual(handler._max_tokens(streaming=False), 16000)
 
 
 class InsightsAccessAndUsageApiTests(TestCase):

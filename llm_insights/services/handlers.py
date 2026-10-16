@@ -17,7 +17,7 @@ def provider_models(user):
     ):
         models["openai"] = [
             ("gpt-6-luna", "GPT-6 Luna"),
-            ("gpt-6-sol", "GPT-6 Sol"),
+            ("gpt-6.1-sol", "GPT-6.1 Sol"),
             ("gpt-6-astra", "GPT-6 Astra"),
             ("gpt-5.5", "GPT-5.5"),
         ]
@@ -28,10 +28,10 @@ def provider_models(user):
         ]
     if profile and profile.claude_api_key_enc:
         models["claude"] = [
-            ("claude-haiku-4-5", "Claude Haiku 4.5"),
-            ("claude-sonnet-5", "Claude Sonnet 5"),
-            ("claude-opus-5", "Claude Opus 5"),
-            ("claude-fable-5", "Claude Fable 5"),
+            ("claude-haiku-5-5", "Claude Haiku 5.5"),
+            ("claude-sonnet-5-5", "Claude Sonnet 5.5"),
+            ("claude-opus-5-5", "Claude Opus 5.5"),
+            ("claude-fable-5-1", "Claude Fable 5.1"),
         ]
     return models
 
@@ -65,9 +65,17 @@ def validate_selection(models, provider, model):
     if provider == "openai":
         model = {
             "gpt-5.6-luna": "gpt-6-luna",
-            "gpt-5.6-sol": "gpt-6-sol",
-            "gpt-5.6": "gpt-6-sol",
-            "gpt-5.6-terra": "gpt-6-sol",
+            "gpt-5.6-sol": "gpt-6.1-sol",
+            "gpt-5.6": "gpt-6.1-sol",
+            "gpt-5.6-terra": "gpt-6.1-sol",
+            "gpt-6-sol": "gpt-6.1-sol",
+        }.get(model, model)
+    elif provider == "claude":
+        model = {
+            "claude-haiku-4-5": "claude-haiku-5-5",
+            "claude-sonnet-5": "claude-sonnet-5-5",
+            "claude-opus-5": "claude-opus-5-5",
+            "claude-fable-5": "claude-fable-5-1",
         }.get(model, model)
     if not provider or provider not in models:
         provider = next(iter(models.keys()))
@@ -79,7 +87,7 @@ def validate_selection(models, provider, model):
 
 
 def openai_reasoning_efforts(model):
-    if model and not model.startswith(("gpt-5.6", "gpt-6-")):
+    if model and not model.startswith(("gpt-5.6", "gpt-6-", "gpt-6.1-")):
         return OPENAI_REASONING_EFFORTS[:-1]
     return OPENAI_REASONING_EFFORTS
 

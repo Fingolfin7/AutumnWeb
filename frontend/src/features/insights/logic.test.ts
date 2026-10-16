@@ -151,6 +151,27 @@ describe("model selection", () => {
     expect(pickEffort([], "high")).toBe("");
   });
 
+  it.each([
+    ["openai", "gpt-6-sol", "gpt-6.1-sol"],
+    ["openai", "gpt-5.6-sol", "gpt-6.1-sol"],
+    ["claude", "claude-haiku-4-5", "claude-haiku-5-5"],
+    ["claude", "claude-sonnet-5", "claude-sonnet-5-5"],
+    ["claude", "claude-opus-5", "claude-opus-5-5"],
+    ["claude", "claude-fable-5", "claude-fable-5-1"],
+  ])("keeps a saved %s %s selection on its replacement", (provider, oldModel, newModel) => {
+    const efforts = provider === "openai" ? ["low", "high", "max"] : [];
+    const upgradedOptions = {
+      ...options,
+      providers: [{ provider, models: [
+        { value: "first-model", label: "Fallback", reasoning_efforts: [] },
+        { value: newModel, label: newModel, reasoning_efforts: efforts },
+      ] }],
+    };
+    expect(resolveSelection(upgradedOptions, { provider, model: oldModel, effort: "max" })).toEqual({
+      provider, model: newModel, effort: provider === "openai" ? "max" : "",
+    });
+  });
+
   it("splits a chat's stored provider:model", () => {
     expect(splitChatModel("openai:gpt-a")).toEqual({ provider: "openai", model: "gpt-a" });
     expect(splitChatModel("gpt-a")).toEqual({ provider: null, model: "gpt-a" });

@@ -203,7 +203,24 @@ export function pickEffort(efforts: string[], wanted: string | null | undefined)
   return efforts.includes("high") ? "high" : efforts[0]!;
 }
 
-/* The server's validate_selection: an unknown provider or model falls back to
+const MODEL_REPLACEMENTS: Record<string, Record<string, string>> = {
+  openai: {
+    "gpt-5.6-luna": "gpt-6-luna",
+    "gpt-5.6-sol": "gpt-6.1-sol",
+    "gpt-5.6": "gpt-6.1-sol",
+    "gpt-5.6-terra": "gpt-6.1-sol",
+    "gpt-6-sol": "gpt-6.1-sol",
+  },
+  claude: {
+    "claude-haiku-4-5": "claude-haiku-5-5",
+    "claude-sonnet-5": "claude-sonnet-5-5",
+    "claude-opus-5": "claude-opus-5-5",
+    "claude-fable-5": "claude-fable-5-1",
+  },
+};
+
+/* The server's validate_selection: saved models follow their replacement;
+   an unknown provider or model falls back to
    the first one the user actually has configured. */
 export function resolveSelection(
   options: InsightOptions,
@@ -211,7 +228,8 @@ export function resolveSelection(
 ): ModelSelection | null {
   const provider = options.providers.find((p) => p.provider === wanted.provider) ?? options.providers[0];
   if (!provider || !provider.models.length) return null;
-  const model = provider.models.find((m) => m.value === wanted.model) ?? provider.models[0]!;
+  const modelValue = wanted.model ? MODEL_REPLACEMENTS[provider.provider]?.[wanted.model] ?? wanted.model : wanted.model;
+  const model = provider.models.find((m) => m.value === modelValue) ?? provider.models[0]!;
   return { provider: provider.provider, model: model.value, effort: pickEffort(model.reasoning_efforts, wanted.effort) };
 }
 
