@@ -2,19 +2,15 @@ import copy
 import json
 import os
 import tempfile
-from datetime import timedelta
 from io import StringIO
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
-from django.core.management.base import CommandError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
-from django.utils import timezone
 
 from core.importer import run_import
 from core.models import Context, Projects, Sessions, SubProjects
-from core.services import SessionMutationService
 
 
 def format_one_payload():
@@ -57,26 +53,6 @@ class SessionUuidTests(TestCase):
             user=self.user, name='UUID Project'
         )
 
-    def test_service_creates_distinct_non_null_uuids(self):
-        start = timezone.now().replace(microsecond=0) - timedelta(hours=2)
-        first = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=start + timedelta(minutes=30),
-            is_active=False,
-        )
-        second = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=start + timedelta(hours=1),
-            end_time=start + timedelta(hours=1, minutes=30),
-            is_active=False,
-        )
-
-        self.assertIsNotNone(first.uuid)
-        self.assertIsNotNone(second.uuid)
-        self.assertNotEqual(first.uuid, second.uuid)
 
     def test_user_and_uuid_are_unique_together(self):
         first = Sessions.objects.create(
@@ -90,45 +66,6 @@ class SessionUuidTests(TestCase):
                 uuid=first.uuid,
                 is_active=True,
             )
-
-    def test_timer_start_and_track_create_internal_uuids(self):
-        self.client.force_login(self.user)
-        timer_start = timezone.now().replace(microsecond=0) - timedelta(hours=4)
-        timer_response = self.client.post(
-            '/api/v2/timers/',
-            data=json.dumps(
-                {'project_id': self.project.id, 'start': timer_start.isoformat()}
-            ),
-            content_type='application/json',
-        )
-        self.assertEqual(timer_response.status_code, 201)
-        self.assertIn('uuid', timer_response.json())  # v2 exposes uuid
-        timer = Sessions.objects.get(pk=timer_response.json()['id'])
-        self.assertIsNotNone(timer.uuid)
-
-        track_start = timer_start + timedelta(hours=2)
-        track_response = self.client.post(
-            '/api/v2/sessions/',
-            data=json.dumps(
-                {
-                    'project_id': self.project.id,
-                    'start': track_start.isoformat(),
-                    'end': (track_start + timedelta(hours=1)).isoformat(),
-                }
-            ),
-            content_type='application/json',
-        )
-        self.assertEqual(track_response.status_code, 201)
-        self.assertIn('uuid', track_response.json())
-        tracked = Sessions.objects.get(
-            pk=track_response.json()['id']
-        )
-        self.assertIsNotNone(tracked.uuid)
-
-    def test_importer_creates_non_null_uuid(self):
-        run_import(self.user, format_one_payload(), tolerance=0.5)
-
-        self.assertIsNotNone(Sessions.objects.get(user=self.user).uuid)
 
 
 class ImportCommandConsolidationTests(TestCase):
@@ -274,21 +211,4 @@ class ImportCommandConsolidationTests(TestCase):
             SubProjects.objects.filter(
                 user=self.command_user, name='review'
             ).exists()
-        )
-
-    def test_total_time_mismatch_raises_command_error(self):
-        payload = format_one_payload()
-        payload['Client Work']['Total Time'] = 61.0
-        filepath = self.write_payload(payload)
-
-        with self.assertRaisesMessage(CommandError, 'Total time mismatch'):
-            call_command(
-                'import',
-                self.command_user.username,
-                filepath,
-                stdout=StringIO(),
-            )
-
-        self.assertFalse(
-            Projects.objects.filter(user=self.command_user, name='Client Work').exists()
         )

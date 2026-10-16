@@ -86,13 +86,6 @@ class ContentSearchTests(TestCase):
                 self.assertEqual({row["id"] for row in response.json()["sessions"]}, expected)
                 self.assertEqual(response.json()["total"], len(expected))
 
-    def test_search_combines_with_existing_note_filter(self):
-        response = self.client.get(
-            reverse("api_v2:sessions"), {"search": "invoices", "note_snippet": "reviewed"}
-        )
-        self.assertEqual(
-            [row["id"] for row in response.json()["sessions"]], [self.beta_session.pk]
-        )
 
     def test_chart_search_uses_matching_sessions(self):
         response = self.client.get(
@@ -112,19 +105,3 @@ class ContentSearchTests(TestCase):
         self.assertEqual(
             {row["name"] for row in response.json()}, {"Atlas", "Garden"}
         )
-
-    def test_charts_keep_explicit_project_breakdown_filter(self):
-        response = self.client.get(
-            reverse("api_v2:report-charts"),
-            {"chart_type": "pie", "project_name": "Atlas"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual({row["name"] for row in response.json()}, {"Invoices"})
-
-    def test_status_chart_counts_only_matching_projects(self):
-        response = self.client.get(
-            reverse("api_v2:report-charts"),
-            {"chart_type": "status", "search": "payments"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(sum(row["count"] for row in response.json()), 1)

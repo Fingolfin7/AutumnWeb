@@ -26,7 +26,6 @@ export type CommitmentFilters = S["CommitmentFilters"];
 export type NamedResource = S["NamedResource"];
 export type SessionPatch = S["PatchedSessionPatchRequest"];
 export type SubprojectAllocationWrite = S["SubprojectAllocationWrite"];
-export type Preferences = S["PreferencesResponse"];
 export type CommitmentCreate = S["CommitmentCreateRequest"];
 export type CommitmentChanges = S["PatchedCommitmentChangesRequest"];
 export type CommitmentPeriod = S["CommitmentPeriod"];

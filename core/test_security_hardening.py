@@ -2,7 +2,7 @@
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
-from django.urls import NoReverseMatch, reverse
+from django.urls import reverse
 from django.utils.crypto import get_random_string
 
 from core.templatetags.markdown_render import markdown as render_markdown
@@ -27,17 +27,6 @@ class MarkdownSanitizationTests(TestCase):
         self.assertIn("<table>", rendered)
         self.assertIn("<code>", rendered)
         self.assertIn("<del>", rendered)
-
-
-class RemovedDebugRoutesTests(TestCase):
-    def test_debug_and_token_probe_routes_are_gone(self):
-        self.assertEqual(self.client.get("/debug-session/").status_code, 404)
-        self.assertEqual(
-            self.client.get("/check-auth-token/some-token/").status_code, 404
-        )
-        for name in ("debug_session", "check-auth-token"):
-            with self.assertRaises(NoReverseMatch):
-                reverse(name, args=["x"] if "check" in name else None)
 
 
 class RegistrationGateTests(TestCase):

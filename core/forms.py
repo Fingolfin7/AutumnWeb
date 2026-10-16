@@ -30,21 +30,6 @@ class ImportJSONForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'New context name'}),
     )
 
-    class Meta:
-        fields = [
-            'file',
-            'autumn_import',
-            'force',
-            'merge',
-            'tolerance',
-            'verbose',
-            'import_context',
-            'import_context_new',
-        ]
-        widgets = {
-            'file': forms.FileInput(attrs={'accept': '.json'}),
-        }
-
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
@@ -117,17 +102,6 @@ class NotificationPreferenceForm(forms.ModelForm):
         return obj
 
 
-class SubprojectCheckboxSelect(forms.CheckboxSelectMultiple):
-    """Checkboxes that carry their parent project id for client-side filtering."""
-
-    def create_option(self, name, value, *args, **kwargs):
-        option = super().create_option(name, value, *args, **kwargs)
-        instance = getattr(value, "instance", None)
-        if instance is not None:
-            option["attrs"]["data-parent"] = str(instance.parent_project_id)
-        return option
-
-
 class ScheduledReminderForm(forms.Form):
     """Owned schedule fields; local date/time are profile-local.
 
@@ -167,10 +141,6 @@ class ScheduledReminderForm(forms.Form):
         queryset=SubProjects.objects.none(),
         required=False,
         label="Subprojects (optional)",
-        widget=SubprojectCheckboxSelect(attrs={
-            "class": "nx-subproject-options",
-            "data-schedule-subprojects": "",
-        }),
     )
     local_date = forms.DateField(
         label="Date", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
@@ -189,7 +159,6 @@ class ScheduledReminderForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
-        self.instance = kwargs.pop("instance", None)
         super().__init__(*args, **kwargs)
         if self.user is not None:
             self.fields["project"].queryset = Projects.objects.filter(user=self.user).exclude(
@@ -213,25 +182,6 @@ class ScheduledReminderForm(forms.Form):
             self.fields["subprojects"].label_from_instance = (
                 lambda obj: f"{obj.name} ({obj.parent_project.name})"
             )
-        if self.instance is not None and not self.is_bound:
-            self.initial.update({
-                "target": (
-                    "context" if self.instance.context_id
-                    else "tag" if self.instance.tag_id
-                    else "project"
-                ),
-                "project": self.instance.project_id,
-                "context": self.instance.context_id,
-                "tag": self.instance.tag_id,
-                "subprojects": list(
-                    self.instance.subprojects.values_list("pk", flat=True)
-                ),
-                "local_date": self.instance.anchor_date,
-                "local_time": self.instance.anchor_time,
-                "cadence": self.instance.cadence,
-                "message": self.instance.message,
-                "version": self.instance.version,
-            })
 
     def clean(self):
         cleaned = super().clean()

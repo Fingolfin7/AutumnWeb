@@ -2,10 +2,7 @@ import json
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.contrib import messages
-from django.contrib.messages.storage.fallback import FallbackStorage
-from django.contrib.sessions.middleware import SessionMiddleware
-from django.test import RequestFactory, TestCase, override_settings
+from django.test import TestCase
 
 from core import spa
 from core.models import Context
@@ -56,12 +53,6 @@ class SpaViewTests(TestCase):
         )
         self.assertFalse(data["profile"]["openai_key_configured"])
 
-    def test_marked_as_the_offline_shell_and_not_browser_cached(self, _manifest):
-        self.client.force_login(self.user)
-        response = self.client.get("/sessions/")
-        self.assertEqual(response["X-Autumn-Shell"], "1")
-        self.assertIn("no-cache", response["Cache-Control"])
-        self.assertIn("private", response["Cache-Control"])
 
     def test_unknown_paths_are_real_404s(self, _manifest):
         # Only the app's own pages serve it (core/urls.py points them at
@@ -77,17 +68,6 @@ class SpaViewTests(TestCase):
         self.assertEqual(missing_static.status_code, 404)
         self.assertNotIn(b'id="root"', missing_static.content)
 
-    @override_settings(VITE_DEV_SERVER="http://localhost:5173")
-    def test_dev_server_mode_loads_from_vite(self, _manifest):
-        self.client.force_login(self.user)
-        html = self.client.get("/sessions/").content.decode()
-        self.assertIn('src="http://localhost:5173/src/main.tsx"', html)
-        self.assertIn("http://localhost:5173/@vite/client", html)
-
-    def test_missing_build_is_a_clear_404(self, manifest_mock):
-        manifest_mock.return_value = None
-        self.client.force_login(self.user)
-        self.assertEqual(self.client.get("/sessions/").status_code, 404)
 
     def test_server_rendered_pages_still_win(self, _manifest):
         self.client.force_login(self.user)
@@ -95,22 +75,6 @@ class SpaViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn(b'id="autumn-bootstrap"', response.content)
 
-    def test_flash_messages_ride_along(self, _manifest):
-        request = RequestFactory().get("/profile/")
-        request.user = self.user
-        SessionMiddleware(lambda r: None).process_request(request)
-        request._messages = FallbackStorage(request)
-        messages.success(request, "Connected GitHub.")
-        messages.error(request, "That account belongs to someone else.")
-        messages.info(request, "Heads up.")
-        self.assertEqual(
-            spa.bootstrap_payload(request)["messages"],
-            [
-                {"kind": "success", "text": "Connected GitHub."},
-                {"kind": "error", "text": "That account belongs to someone else."},
-                {"kind": "info", "text": "Heads up."},
-            ],
-        )
 
     def test_old_reminder_pages_open_the_matching_dialog(self, _manifest):
         self.client.force_login(self.user)

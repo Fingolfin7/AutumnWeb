@@ -1,4 +1,4 @@
-import { emptyForm, formFromSchedule, keepSubprojects, sameForm, toggleId, toPayload, validateForm, type Schedule } from "./scheduleForm";
+import { emptyForm, formFromSchedule, keepSubprojects, toggleId, toPayload, validateForm, type Schedule } from "./scheduleForm";
 
 const slot = { date: "2026-10-15", time: "09:00" };
 
@@ -63,10 +63,4 @@ it("drops subprojects that are not in the chosen project", () => {
 it("toggles subproject ids", () => {
   expect(toggleId([1, 2], 2)).toEqual([1]);
   expect(toggleId([1], 2)).toEqual([1, 2]);
-});
-
-it("notices an unchanged form regardless of subproject order", () => {
-  const a = { ...emptyForm(slot), subprojects: [1, 2] };
-  expect(sameForm(a, { ...a, subprojects: [2, 1] })).toBe(true);
-  expect(sameForm(a, { ...a, message: "x" })).toBe(false);
 });

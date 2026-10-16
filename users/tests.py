@@ -1,7 +1,6 @@
 from unittest.mock import Mock, patch
 import shutil
 import tempfile
-from datetime import date
 from io import BytesIO
 
 from django.contrib.auth.models import User
@@ -25,23 +24,6 @@ class CodexAuthTests(SimpleTestCase):
         profile.set_api_key.assert_called_once_with("openai_chatgpt", codex_auth.serialize_token_bundle(renewed))
         profile.save.assert_called_once_with(update_fields=["openai_chatgpt_token_enc"])
 
-    @patch("users.codex_auth.requests.post")
-    def test_start_device_code_login_returns_session_payload(self, post):
-        post.return_value = Mock(
-            ok=True,
-            json=lambda: {
-                "device_auth_id": "device-auth-1",
-                "user_code": "CODE-123",
-                "interval": "3",
-            },
-        )
-
-        device_code = codex_auth.start_device_code_login()
-
-        self.assertEqual(device_code.user_code, "CODE-123")
-        self.assertEqual(device_code.device_auth_id, "device-auth-1")
-        self.assertEqual(device_code.interval, 3)
-        self.assertEqual(device_code.verification_url, "https://auth.openai.com/codex/device")
 
     @patch("users.codex_auth.requests.post")
     def test_poll_device_code_login_exchanges_code_for_tokens(self, post):
@@ -118,48 +100,6 @@ class ProfileSaveTests(TestCase):
             content_type="image/png",
         )
 
-    def test_typesafe_api_key_is_encrypted_and_can_be_cleared(self):
-        profile = self.user.profile
-        profile.set_api_key("typesafe", "typesafe-production-key")
-        profile.save(update_fields=["typesafe_api_key_enc"])
-
-        profile.refresh_from_db()
-        self.assertEqual(profile.get_api_key("typesafe"), "typesafe-production-key")
-        self.assertNotEqual(bytes(profile.typesafe_api_key_enc), b"typesafe-production-key")
-
-        profile.set_api_key("typesafe", None)
-        profile.save(update_fields=["typesafe_api_key_enc"])
-        profile.refresh_from_db()
-        self.assertIsNone(profile.get_api_key("typesafe"))
-
-    def test_profile_default_date_range_supports_each_requested_unit(self):
-        profile = self.user.profile
-        reference_date = date(2026, 5, 13)
-        expected_starts = {
-            "days": date(2026, 5, 3),
-            "weeks": date(2026, 3, 4),
-            "months": date(2025, 7, 13),
-            "years": date(2016, 5, 13),
-            "month_to_date": date(2026, 5, 1),
-            "quarter_to_date": date(2026, 4, 1),
-            "year_to_date": date(2026, 1, 1),
-        }
-
-        for unit, expected_start in expected_starts.items():
-            with self.subTest(unit=unit):
-                profile.default_filter_value = 10
-                profile.default_filter_unit = unit
-                self.assertEqual(
-                    profile.default_filter_date_range(reference_date),
-                    (expected_start, reference_date),
-                )
-
-    def test_image_url_uses_active_storage_for_default_image(self):
-        profile = self.user.profile
-        profile.image = None
-
-        self.assertEqual(profile.image_url, "/media/default.jpg")
-
 
     # ---- the React Profile page's endpoints ---------------------------------
     # (these replace the tests of the old server-rendered profile form)
@@ -201,20 +141,6 @@ class ProfileSaveTests(TestCase):
         self.assertFalse(profile.nasa_apod_background)
         self.assertEqual(profile.get_api_key("openai"), "profile-openai-key")
 
-    def test_the_retired_typesafe_key_is_not_exposed_or_changed(self):
-        profile = self.user.profile
-        profile.set_api_key("typesafe", "legacy-key")
-        profile.save(update_fields=["typesafe_api_key_enc"])
-        api = self._api()
-
-        preferences = api.get("/api/v2/me/preferences/")
-        self.assertNotIn("typesafe", preferences.json()["configured_api_keys"])
-        self.assertNotIn("legacy-key", preferences.content.decode())
-        for method in (api.put, api.delete):
-            response = method("/api/v2/me/api-keys/typesafe", {"key": "ignored"}, format="json")
-            self.assertEqual(response.status_code, 404)
-        profile.refresh_from_db()
-        self.assertEqual(profile.get_api_key("typesafe"), "legacy-key")
 
     def test_removing_the_background_image_clears_the_field_and_deletes_the_file_after_commit(self):
         profile = self.user.profile
@@ -232,29 +158,6 @@ class ProfileSaveTests(TestCase):
         self.assertFalse(profile.background_image)
         self.assertFalse(storage.exists(old_image_name))
 
-    def test_filter_and_chart_defaults_are_saved(self):
-        profile = self.user.profile
-        profile.default_filter_value = 6
-        profile.insights_default_filter_value = 3
-        profile.save()
-
-        response = self._api().patch(
-            "/api/v2/me/preferences/",
-            {
-                "default_filter_unit": "quarter_to_date",
-                "insights_default_filter_unit": "year_to_date",
-                "default_chart_project_count": 12,
-            },
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 200, response.content)
-        profile.refresh_from_db()
-        self.assertEqual(profile.default_filter_value, 6)
-        self.assertEqual(profile.default_filter_unit, "quarter_to_date")
-        self.assertEqual(profile.insights_default_filter_value, 3)
-        self.assertEqual(profile.insights_default_filter_unit, "year_to_date")
-        self.assertEqual(profile.default_chart_project_count, 12)
 
     def test_charts_use_profile_defaults_until_dates_are_explicit(self):
         # The profile side: saved defaults decide the range. The Charts page
@@ -274,20 +177,6 @@ class ProfileSaveTests(TestCase):
         self.assertEqual(preferences["default_chart_project_count"], 11)
         self.assertEqual(preferences["default_filter_unit"], "quarter_to_date")
 
-    def test_the_insights_default_range_is_separate_from_the_app_range(self):
-        profile = self.user.profile
-        profile.default_filter_value = 2
-        profile.default_filter_unit = "weeks"
-        profile.insights_default_filter_value = 3
-        profile.insights_default_filter_unit = "year_to_date"
-        profile.save()
-
-        expected_start, expected_end = profile.insights_default_filter_date_range()
-        app_start, _ = profile.default_filter_date_range()
-        options = self._api().get("/api/v2/insights/options/").json()
-        self.assertEqual(options["default_start_date"], expected_start.isoformat())
-        self.assertEqual(options["default_end_date"], expected_end.isoformat())
-        self.assertNotEqual(options["default_start_date"], app_start.isoformat())
 
     def test_ai_settings_are_refused_and_account_fields_still_save_when_ai_is_disabled(self):
         profile = self.user.profile

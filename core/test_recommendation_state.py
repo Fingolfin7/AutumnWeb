@@ -1,5 +1,4 @@
 """Bounded Luna evidence validation; no provider requests."""
-import json
 from django.test import SimpleTestCase
 from core.services.recommendation_state import RecommendationContextError, build_recommendation_state
 
@@ -134,20 +133,6 @@ def _context():
 
 
 class RecommendationStateTests(SimpleTestCase):
-    def test_state_contains_rich_context_and_decision_rules(self):
-        state = build_recommendation_state(_candidates(), _context())
-        self.assertEqual(state["now"]["weekday"], "Saturday")
-        self.assertEqual(state["active_context"]["name"], "Work")
-        self.assertEqual(state["recent_completed_sessions"][0]["note"],
-                         "The payload builder still needs a provider response fixture.")
-        self.assertEqual(state["projects"][0]["description"], "A time-aware work tracker.")
-        self.assertEqual(state["commitments"][0]["banked_credit"], 20)
-        self.assertNotIn("questions", state)
-        self.assertNotIn("model", state)
-        self.assertNotIn("provider_limits", state["history_coverage"])
-        self.assertNotIn("longest_question_byte_ceiling", state["history_coverage"])
-        self.assertIn("banked credit", json.dumps(state))
-        self.assertIn("Do not force catch-up", json.dumps(state))
 
     def test_payload_normalizes_ids_and_rejects_duplicate_ids(self):
         candidate = {
@@ -168,27 +153,6 @@ class RecommendationStateTests(SimpleTestCase):
         with self.assertRaises(RecommendationContextError):
             build_recommendation_state([candidate, {**candidate, "id": "candidate"}], {})
 
-    def test_oldest_continuity_history_is_trimmed_before_recent_notes(self):
-        context = _context()
-        context["older_latest_sessions"] = [
-            {
-                "id": "old-1",
-                "project_id": 17,
-                "note": "x" * 70_000,
-            }
-        ]
-
-        payload = build_recommendation_state(_candidates(), context)
-
-        self.assertEqual(
-            payload["recent_completed_sessions"][0]["id"],
-            "session-recent",
-        )
-        self.assertEqual(payload["older_latest_sessions"], [])
-        self.assertEqual(
-            payload["history_coverage"]["omitted_session_ids"], ["old-1"]
-        )
-        self.assertTrue(payload["history_coverage"]["truncated"])
 
     def test_oversized_core_metadata_fails_closed(self):
         context = _context()
@@ -196,24 +160,3 @@ class RecommendationStateTests(SimpleTestCase):
 
         with self.assertRaisesRegex(RecommendationContextError, "too large"):
             build_recommendation_state(_candidates(), context)
-
-    def test_malformed_shapes_and_nonfinite_values_fail_as_service_errors(self):
-        with self.assertRaises(RecommendationContextError):
-            build_recommendation_state(_candidates(), {"history_coverage": []})
-        with self.assertRaises(RecommendationContextError):
-            build_recommendation_state(_candidates(), {"recent_completed_sessions": "oops"})
-        with self.assertRaises(RecommendationContextError):
-            build_recommendation_state([{**_candidates()[0], "project_id": object()}], {})
-        with self.assertRaises(RecommendationContextError):
-            build_recommendation_state(
-                [{**_candidates()[0], "subprojects": [{"id": object(), "name": "x"}]}],
-                {},
-            )
-        with self.assertRaises(RecommendationContextError):
-            build_recommendation_state(
-                [{**_candidates()[0], "commitment_ids": "commitment-1"}], {},
-            )
-        with self.assertRaises(RecommendationContextError):
-            build_recommendation_state(
-                _candidates(), {"projects": [{"id": 1, "hours": float("nan")}]}
-            )

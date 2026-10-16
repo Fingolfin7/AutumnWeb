@@ -88,8 +88,7 @@ python -m venv venv
 source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
 python manage.py migrate
-# Set FINROD_PASSWORD in your shell before running the seed command.
-python manage.py shell -c "exec(open('scripts/seed_finrod.py', 'r', encoding='utf-8').read())"
+python manage.py seed_demo  # optional: fictional demo account (demo / demo-pass-123)
 python manage.py runserver
 ```
 
@@ -207,24 +206,22 @@ when checking when a device was reached.
 
 ### API Docs
 
-See [`docs/api.md`](docs/api.md) for the legacy `/api/*` endpoints used by the
-CLI wrapper and integrations. The versioned REST API lives under `/api/v2/`
-and its checked-in OpenAPI document is [`openapi-v2.yaml`](openapi-v2.yaml).
+The REST API lives under `/api/v2/` and its checked-in OpenAPI document is
+[`openapi-v2.yaml`](openapi-v2.yaml).
 `GET /healthz/` is an unauthenticated root health check for waking or probing a
 sleeping deployment. Browser push subscription and delivery are web routes,
 not part of the versioned API; their operational logging is described above.
 
 ### Autumn MCP
 
-**Launched October 3 on Sites; consolidated October 6, 2026:** ChatGPT and
-Claude share one MCP endpoint in Autumn: `https://autumn-lg0b.onrender.com/mcp`.
+ChatGPT and Claude share one MCP endpoint in Autumn: `https://autumn-lg0b.onrender.com/mcp`.
 Users sign into Autumn, choose one or more accounts they have signed into,
 select read-only or read/write access, and can revoke connections from Profile.
 There are no preset account credentials. All API tools select accounts per call
 and preserve account ownership checks. The local CLI remains available.
 
-See [MCP client setup](docs/mcp-clients.md), the [Sites launch note](docs/sites-mcp-launch.md),
-and the [shared tool contract](integrations/mcp/README.md).
+See [MCP client setup](docs/mcp-clients.md) and the
+[shared tool contract](integrations/mcp/README.md).
 
 ---
 

@@ -70,9 +70,5 @@ export function bootstrap(): Bootstrap {
   return cached;
 }
 
-/* Tests replace the bootstrap without a DOM blob. */
-export function setBootstrapForTests(value: Bootstrap | null) {
-  cached = value;
-}
-
+/* Tests build on the fallback without a DOM blob. */
 export { FALLBACK as EMPTY_BOOTSTRAP };

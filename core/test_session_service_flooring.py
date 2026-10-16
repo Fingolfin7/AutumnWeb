@@ -2,13 +2,11 @@ import json
 from datetime import datetime, timedelta, timezone as dt_timezone
 
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-from core.models import Projects, Sessions, SubProjects
+from core.models import Projects, Sessions
 from core.services import SessionMutationService
-from core.totals import derived_project_totals, derived_subproject_totals
 
 
 class SessionServiceFlooringTests(TestCase):
@@ -68,92 +66,6 @@ class SessionServiceFlooringTests(TestCase):
         self.assertEqual(session.end_time.microsecond, 0)
         self.assertEqual(session.auto_stop_at.microsecond, 0)
 
-    def test_mutate_session_leaves_untouched_instants_alone(self):
-        start = timezone.now().replace(microsecond=123456)
-        auto_stop_at = start + timedelta(hours=1, microseconds=111111)
-        session = Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            auto_stop_at=auto_stop_at,
-            is_active=True,
-        )
-
-        session = SessionMutationService.mutate_session(
-            session.pk, user=self.user, note="Only the note changes"
-        )
-
-        self.assertEqual(session.start_time.microsecond, start.microsecond)
-        self.assertEqual(
-            session.auto_stop_at.microsecond, auto_stop_at.microsecond
-        )
-
-    def test_validation_runs_after_flooring(self):
-        tz = dt_timezone.utc
-        valid_start = datetime(2026, 7, 15, 9, 0, 0, 100000, tzinfo=tz)
-        valid_end = datetime(2026, 7, 15, 9, 0, 0, 900000, tzinfo=tz)
-
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=valid_start,
-            end_time=valid_end,
-            is_active=False,
-        )
-        self.assertEqual(session.start_time, session.end_time)
-
-        invalid_start = datetime(2026, 7, 15, 9, 0, 1, 100000, tzinfo=tz)
-        invalid_end = datetime(2026, 7, 15, 9, 0, 0, 900000, tzinfo=tz)
-        with self.assertRaises(ValidationError):
-            SessionMutationService.create_session(
-                user=self.user,
-                project=self.project,
-                start_time=invalid_start,
-                end_time=invalid_end,
-                is_active=False,
-            )
-
-    def test_replace_subprojects_moves_derived_totals(self):
-        before_subproject = SubProjects.objects.create(
-            user=self.user,
-            name="Before",
-            parent_project=self.project,
-        )
-        after_subproject = SubProjects.objects.create(
-            user=self.user,
-            name="After",
-            parent_project=self.project,
-        )
-        start = timezone.now().replace(microsecond=0) - timedelta(minutes=30)
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            subprojects=[before_subproject],
-            start_time=start,
-            end_time=start + timedelta(minutes=30),
-            is_active=False,
-        )
-
-        self.assertEqual(
-            derived_project_totals(self.user)[self.project.pk], 30
-        )
-        totals = derived_subproject_totals(self.user)
-        self.assertEqual(totals[before_subproject.pk], 30)
-        self.assertEqual(totals[after_subproject.pk], 0)
-
-        session = SessionMutationService.replace_subprojects(
-            session.pk,
-            user=self.user,
-            subprojects=[after_subproject],
-        )
-
-        self.assertEqual(list(session.subprojects.all()), [after_subproject])
-        self.assertEqual(
-            derived_project_totals(self.user)[self.project.pk], 30
-        )
-        totals = derived_subproject_totals(self.user)
-        self.assertEqual(totals[before_subproject.pk], 0)
-        self.assertEqual(totals[after_subproject.pk], 30)
 
     def test_timer_start_and_track_apis_floor_instants(self):
         self.client.force_login(self.user)

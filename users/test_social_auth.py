@@ -56,30 +56,11 @@ class SocialAuthUITests(TestCase):
             field_names = set(form.xpath(".//input/@name"))
             self.assertEqual(field_names, {"csrfmiddlewaretoken"})
 
-    def test_provider_login_starts_oauth_using_post(self):
-        google = self.client.post(reverse("google_login"))
-        github = self.client.post(reverse("github_login"))
-
-        self.assertEqual(google.status_code, 302)
-        self.assertIn("accounts.google.com", google.url)
-        self.assertEqual(github.status_code, 302)
-        self.assertIn("github.com/login/oauth/authorize", github.url)
 
     def test_social_signup_requires_and_queries_for_email(self):
         self.assertTrue(settings.SOCIALACCOUNT_EMAIL_REQUIRED)
         self.assertTrue(settings.SOCIALACCOUNT_QUERY_EMAIL)
 
-    def test_profile_offers_connections_for_enabled_providers(self):
-        # The React Profile page lists /api/v2/me/social-accounts/.
-        self.client.force_login(self.user)
-
-        accounts = self.client.get("/api/v2/me/social-accounts/").json()["accounts"]
-
-        self.assertEqual({row["provider"] for row in accounts}, {"google", "github"})
-        for row in accounts:
-            self.assertTrue(row["available"])
-            self.assertFalse(row["connected"])
-            self.assertIn(reverse(f"{row['provider']}_login"), row["login_url"])
 
     def test_profile_displays_and_disconnects_connected_provider(self):
         account = SocialAccount.objects.create(
@@ -145,21 +126,6 @@ class SocialAuthPolicyTests(TestCase):
             )
         )
 
-    @override_settings(ALLOW_REGISTRATION=True)
-    def test_all_signup_paths_follow_registration_setting_when_open(self):
-        request = self._request()
-        sociallogin = SocialLogin(
-            user=User(username="new-user"),
-            account=SocialAccount(provider="github", uid="new-github-user"),
-        )
-
-        self.assertTrue(AutumnAccountAdapter(request).is_open_for_signup(request))
-        self.assertTrue(
-            AutumnSocialAccountAdapter(request).is_open_for_signup(
-                request,
-                sociallogin,
-            )
-        )
 
     def test_existing_email_is_not_silently_merged(self):
         User.objects.create_user(

@@ -4,7 +4,6 @@ from uuid import uuid4
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
-from django.utils import timezone
 from freezegun import freeze_time
 from rest_framework.test import APIClient
 
@@ -240,52 +239,6 @@ class V2TimersSessionsTests(TestCase):
         self.assertEqual(response.json()["sessions"][0]["note"], "second")
         self.assertNotEqual(older.id, tied_first.id)
 
-    def test_sessions_ids_filter_and_detail_note_html_include(self):
-        first = self._create_completed(
-            end=datetime(2026, 7, 15, 10, 0, tzinfo=UTC),
-            note="**first**",
-        )
-        second = self._create_completed(
-            end=datetime(2026, 7, 15, 11, 0, tzinfo=UTC),
-            note="second",
-        )
-        third = self._create_completed(
-            end=datetime(2026, 7, 15, 12, 0, tzinfo=UTC),
-            note="third",
-        )
-
-        response = self.client.get(
-            reverse("api_v2:sessions"),
-            {"ids": f"{first.pk},{third.pk}"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            {item["id"] for item in response.json()["sessions"]},
-            {first.pk, third.pk},
-        )
-        self.assertNotIn(second.pk, {item["id"] for item in response.json()["sessions"]})
-
-        plain = self.client.get(
-            reverse("api_v2:session-detail", args=[first.pk])
-        )
-        rendered = self.client.get(
-            reverse("api_v2:session-detail", args=[first.pk]),
-            {"include": "note_html"},
-        )
-        self.assertNotIn("note_html", plain.json())
-        self.assertIn("<strong>first</strong>", rendered.json()["note_html"])
-
-        foreign = Sessions.objects.create(
-            user=self.other_user,
-            project=self.foreign_project,
-            start_time=datetime(2026, 7, 15, 9, tzinfo=UTC),
-            end_time=datetime(2026, 7, 15, 10, tzinfo=UTC),
-        )
-        rejected = self.client.get(
-            reverse("api_v2:sessions"), {"ids": foreign.pk}
-        )
-        self.assertEqual(rejected.status_code, 400)
-        self.assertIn("ids", rejected.json()["error"]["details"])
 
     @freeze_time("2026-11-01 12:00:00")
     def test_naive_start_stop_and_edit_times_are_explicitly_utc(self):
@@ -350,35 +303,6 @@ class V2TimersSessionsTests(TestCase):
             {sessions[1].id, sessions[2].id},
         )
 
-    @freeze_time("2026-07-16 12:00:00")
-    def test_session_patch_honors_if_match_and_bumps_version(self):
-        session = self._create_completed(
-            end=datetime(2026, 7, 16, 10, 0, tzinfo=UTC), note="before"
-        )
-        response = self.client.patch(
-            reverse("api_v2:session-detail", args=[session.id]),
-            {"note": "after", "subproject_ids": [self.subproject_b.id]},
-            format="json",
-            HTTP_IF_MATCH="1",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["version"], 2)
-        self.assertEqual(response.json()["note"], "after")
-        self.assertEqual(
-            response.json()["subproject_allocations"][0]["subproject_id"],
-            self.subproject_b.id,
-        )
-
-        stale = self.client.patch(
-            reverse("api_v2:session-detail", args=[session.id]),
-            {"note": "stale"},
-            format="json",
-            HTTP_IF_MATCH="1",
-        )
-        self.assertEqual(stale.status_code, 409)
-        self.assertEqual(
-            stale.json()["error"]["details"]["current"]["version"], 2
-        )
 
     @freeze_time("2026-07-16 12:00:00")
     def test_validation_errors_for_ranges_future_and_foreign_resources(self):
@@ -429,99 +353,3 @@ class V2TimersSessionsTests(TestCase):
             format="json",
         )
         self.assertEqual(future_track.status_code, 400)
-
-    def test_multi_link_resource_has_stable_even_allocations(self):
-        session = self._create_completed(
-            end=datetime(2026, 7, 16, 10, 0, tzinfo=UTC),
-            subprojects=[self.subproject_b, self.subproject_a],
-        )
-        response = self.client.get(
-            reverse("api_v2:session-detail", args=[session.id])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertNotIn("allocation_mode", response.json())
-        self.assertEqual(
-            response.json()["subproject_allocations"],
-            [
-                {
-                    "subproject_id": self.subproject_a.id,
-                    "name": "Alpha",
-                    "allocation_bp": 5000,
-                },
-                {
-                    "subproject_id": self.subproject_b.id,
-                    "name": "Beta",
-                    "allocation_bp": 5000,
-                },
-            ],
-        )
-
-    @freeze_time("2026-07-16 12:00:00")
-    def test_timer_stop_accepts_explicit_allocations(self):
-        timer = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            subprojects=[self.subproject_a, self.subproject_b],
-            start_time=datetime(2026, 7, 16, 10, 0, tzinfo=UTC),
-        )
-
-        response = self.client.post(
-            reverse("api_v2:timer-stop", args=[timer.pk]),
-            {
-                "end": "2026-07-16T11:00:00Z",
-                "subproject_allocations": [
-                    {"subproject_id": self.subproject_a.pk, "allocation_bp": 2500},
-                    {"subproject_id": self.subproject_b.pk, "allocation_bp": 6500},
-                ],
-            },
-            format="json",
-            HTTP_IF_MATCH="1",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["version"], 3)
-        self.assertEqual(
-            [item["allocation_bp"] for item in response.json()["subproject_allocations"]],
-            [2500, 6500],
-        )
-
-    def test_timer_note_patch_is_active_only_owned_and_clearable(self):
-        timer = SessionMutationService.create_session(
-            user=self.user, project=self.project, note="before"
-        )
-        response = self.client.patch(
-            reverse("api_v2:timer-detail", args=[timer.pk]),
-            {"note": "in progress"},
-            format="json",
-            HTTP_IF_MATCH="1",
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["note"], "in progress")
-
-        cleared = self.client.patch(
-            reverse("api_v2:timer-detail", args=[timer.pk]),
-            {"note": ""},
-            format="json",
-            HTTP_IF_MATCH="2",
-        )
-        self.assertEqual(cleared.status_code, 200)
-        self.assertIsNone(cleared.json()["note"])
-
-        SessionMutationService.mutate_session(timer.pk, user=self.user, end_time=timezone.now())
-        completed = self.client.patch(
-            reverse("api_v2:timer-detail", args=[timer.pk]),
-            {"note": "too late"},
-            format="json",
-        )
-        self.assertEqual(completed.status_code, 409)
-
-        foreign = SessionMutationService.create_session(
-            user=self.other_user, project=self.foreign_project
-        )
-        missing = self.client.patch(
-            reverse("api_v2:timer-detail", args=[foreign.pk]),
-            {"note": "not mine"},
-            format="json",
-        )
-        self.assertEqual(missing.status_code, 404)

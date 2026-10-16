@@ -1,14 +1,11 @@
 /* ============================================================================
    AUTUMN — "FOCUS DESK" DESIGN SYSTEM                          focus_desk.css
    ============================================================================
-   The single stylesheet for every page that extends base_fd.html.
+   The single stylesheet for the React app (spa.html) and the server-rendered
+   pages (base.html).
    Do not fork it, do not add a second stylesheet, do not use inline styles —
    if a page needs a component that isn't here, APPEND it here in this style.
 
-   During the migration this file coexists with the legacy style.css, but no
-   page ever loads both: legacy pages extend base.html, ported pages extend
-   base_fd.html. That is what lets the two systems share class names
-   (.btn, .stat, .text-red, …) without colliding. See UI_REDESIGN.md.
    ============================================================================
 
    THESIS
@@ -53,18 +50,6 @@
    — never put an 8-control filter row on the page; put a search field plus a
    "Filters" launcher that opens `.sheet`.
 
-   DESK CLASSES (added on top of the v1 index below)
-     .desk  .desk-main  .desk-side  .desk-head
-
-   TIMELINE     .fd-tl-slab .fd-tl-head .fd-tl-total
-                .fd-tl .fd-tl-axis .fd-tl-lab .fd-tl-lab--minor
-                .fd-tl-plot .fd-tl-lane .fd-tl-head-cell .fd-tl-name
-                .fd-tl-fig .fd-tl-track .fd-tl-block .fd-tl-block.is-live
-                .fd-tl-b-lab .fd-tl-b-dur
-                .fd-tl-tip .fd-tl-tip--flip .fd-tl-tip-note .fd-tl-tip-link
-                .fd-tl-nowlayer .fd-tl-now .fd-tl-now-flag .fd-tl-gap
-                .fd-tl-empty
-
    TYPE SCALE  (root 16px; body runs 17px — large type is part of the thesis)
    ----------
      --fs-hero    clamp(3.25rem, 15vw, 4.75rem)  mono, 600, tabular  live timer
@@ -77,91 +62,6 @@
      --fs-label   0.6875rem uppercase 0.12em tracking, muted — eyebrow labels
    Mono (--font-mono) is confined to numerals: durations, clock times, counts,
    percentages. Never mono for prose.
-
-   CLASS INDEX (grouped by component)
-   ----------------------------------
-   Shell        .app  .app-header  .brand .brand-mark .brand-word
-                .header-right .avatar .header-clock
-                .screen  .screen-pad  .page-eyebrow .page-title
-                .messages .msg .msg--error .msg--info .msg--success
-   Nav          .tabbar .tabbar-inner .tab .tab.is-active .tab-icon .tab-label
-                .tab--overflow .tab--overflow.is-inline   (phone-hidden tabs)
-                .sheet .sheet.is-open .sheet-scrim .sheet-panel .sheet-grab
-                .sheet-title .sheet-list .sheet-item .sheet-item-icon
-   Surfaces     .slab  .slab--focus  .slab-pad  .slab-foot  .empty
-                .band  .band-list  .band--tap
-                (RULE: containers are slabs, rows are bands. Never nest a slab
-                 in a slab. Bands have no border, no shadow, no radius — they
-                 are separated by hairlines.)
-   Disclosure   .disclose .disclose.is-closed .disclose-head .disclose-icon
-                .disclose-title .disclose-summary .disclose-chevron
-                .disclose-body
-   Focus card   .focus-deck .focus-track .focus-cards .focus-card
-                .focus-card--start
-                .focus-eyebrow .live-dot .focus-project
-                .focus-subs .focus-lede .focus-quick
-                .focus-time .focus-time .num .focus-time .unit
-                .focus-autostop .focus-autostop-bar .focus-autostop-fill
-                .focus-actions .focus-secondary .focus-stop
-                .focus-dots .focus-dot .focus-dot.is-active
-                .quick-chip
-                (.focus-cards is `display: contents` — it is the polled
-                 fragment's wrapper, not a box.)
-   Stats        .stat-strip .stat .stat-label .stat-value
-   Commitments  .commit .commit-head .commit-target .commit-kind .commit-period
-                .commit-figures .commit-actual .commit-goal .commit-pct
-                .meter .meter-fill  (+ .complete .approaching .on-track
-                                       .warning .behind)
-                .bank-row .bank-cell .bank-label .bank-value
-                .streak-row .streak-flame .streak-count
-                .period-strip .period-cell (+ .met .banked .missed .current)
-   Activity     .activity .range-tabs .range-tab .range-tab.is-active
-                .cal .cal-head .cal-head span .cal-grid .cal-cell
-                .cal-cell.is-active .cal-cell.is-inactive
-   Sessions     .day-group .day-head .day-date .day-total
-                .swipe .swipe-track .swipe-face .swipe-actions .swipe-hint
-                .session .session-top .session-project .session-dur
-                .session-mid .session-time .session-arrow
-                .sub-chip .session-note .session-note.is-open .note-more
-                .badge-dst
-   Projects     .project .project-top .project-name .project-status-dot
-                .project-meta .context-chip .tag-chip .project-total
-                .project-dates .project-subs .project-commit
-                .project-start  (the big per-card primary start button)
-                .group-head .group-title .group-count
-   Filters      .searchbar .searchbar input .filter-launcher .filter-count
-                .field .field-label .input .select .check-row
-                .picker .picker-search .picker-search-input .picker-options
-                .option-chip .option-label .picker-empty .picker-count
-                .picker-head-controls .picker-mode .picker-mode-btn
-   Buttons      .btn .btn--primary .btn--stop .btn--ghost .btn--quiet
-                .btn--block .btn--lg .btn-icon .btn-icon--danger
-   Pager        .pager .pager-btn .pager-btn.is-current
-   Utilities    .text-red .text-blue .text-green .text-cyan .text-yellow
-                .text-orange .muted .mono .tnum
-                .u-row .u-between .u-wrap .u-gap-2 .u-gap-3 .u-mt-4 .sr-only
-   Insights      .chat-layout (--chat-h) .chat-sidebar .chat-sidebar.collapsed
-                 .new-chat-btn .chat-list .chat-list-empty .group-label
-                 .chat-item-container .chat-item .chat-title .reveal-stamp
-                 .delete-chat-btn
-                 .chat-main .chat-header .chat-header-meta .chat-header-range
-                 .chat-header-tokens .chat-header-actions .chat-action-btn
-                 .chat-form .conversation-container .conversation-container.selecting
-                 .user-message .assistant-message (+ .streaming .stream-error)
-                 .message-content .assistant-sources .copy-btn .msg-selected
-                 .composer .composer-toolbar .composer-field .composer-note
-                 .composer-input-row .empty-state-container
-                 (These names are a JS contract — insights_stream.js builds
-                  several of them at runtime. Grep before renaming.)
-   Data transfer .stream-output .stream-progress .stream-log .log-entry
-   Users         .auth-card
-                 .profile-page .profile-account-grid .profile-avatar-panel
-                 .profile-avatar-large .profile-background-options
-                 .profile-choice-pill .profile-background-tuning
-                 .profile-background-context .profile-background-upload
-                 .profile-current-background .profile-defaults-grid
-                 .profile-default-item .profile-default-control
-                 .profile-codex-panel .profile-keys-grid .profile-key-item
    ============================================================================ */
 
 /* ---------------------------------------------------------------- TOKENS -- */
@@ -363,10 +263,6 @@ body.bg-active .app { position: relative; z-index: 2; }
 .brand-mark { color: var(--brand); font-size: 1.15rem; }
 .brand-word { font-weight: 650; letter-spacing: .01em; font-size: var(--fs-md); }
 .header-right { display: flex; align-items: center; gap: var(--s3); }
-.header-clock {
-  font-family: var(--font-mono); font-size: var(--fs-xs);
-  color: var(--muted); letter-spacing: .02em;
-}
 /* Active-context switcher in the header. Styled as a chip rather than a form
    control because that is what it reads as — a statement of what you are
    currently looking at, which happens to be changeable. It borrows the
@@ -561,11 +457,6 @@ body.bg-active .dim-control { display: flex; }
   margin-bottom: var(--s4);
   overflow: hidden;
 }
-.slab--focus {
-  background: var(--slab-focus);
-  border-radius: var(--r-xl);
-  box-shadow: var(--edge), var(--e2), var(--glow-live);
-}
 .slab-pad { padding: var(--s4); }
 
 .band-list > .band + .band { border-top: 1px solid var(--hairline); }
@@ -671,7 +562,6 @@ body.bg-active .dim-control { display: flex; }
 }
 .focus-autostop-fill { height: 100%; background: var(--time-deep); border-radius: var(--r-pill); }
 .focus-actions { margin-top: var(--s5); display: flex; gap: var(--s2); align-items: center; }
-.focus-secondary { display: flex; gap: var(--s2); }
 /* Stop is the one primary action on a running card; it takes the leftovers. */
 .focus-stop { flex: 1 1 auto; }
 
@@ -703,7 +593,6 @@ body.bg-active .dim-control { display: flex; }
    arrive wrapped in the fragment's own container. `display: contents` lets
    that wrapper carry the polling data-attributes without becoming a box —
    the cards stay direct children of .focus-track and keep their layout. */
-.focus-cards { display: contents; }
 
 .focus-lede { margin-top: var(--s2); font-size: var(--fs-sm); color: var(--muted); }
 .focus-quick { margin-top: var(--s4); gap: .4rem; }
@@ -926,10 +815,6 @@ body.bg-active .dim-control { display: flex; }
   padding: .05rem .3rem; border-radius: var(--r-xs); background: var(--sunken);
 }
 .session-note pre { overflow-x: auto; }
-.note-more {
-  font-size: var(--fs-xs); color: var(--muted); margin-top: .2rem;
-  text-decoration: underline; text-underline-offset: 2px;
-}
 .badge-dst {
   font-size: .625rem; letter-spacing: .08em; text-transform: uppercase;
   padding: .1rem .4rem; border-radius: var(--r-xs);
@@ -937,12 +822,6 @@ body.bg-active .dim-control { display: flex; }
 }
 
 /* -------------------------------------------------------------- PROJECTS -- */
-.group-head {
-  display: flex; align-items: center; gap: .5rem; width: 100%;
-  padding: var(--s4) var(--s2) var(--s2);
-}
-.group-title { font-size: var(--fs-lg); font-weight: 650; }
-.group-count { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--muted); }
 
 .project { display: flex; align-items: flex-start; gap: var(--s4); padding: var(--s4); }
 .project-top { display: flex; align-items: center; gap: .5rem; }
@@ -950,7 +829,6 @@ body.bg-active .dim-control { display: flex; }
   font-size: var(--fs-lg); font-weight: 650; color: var(--project);
   overflow-wrap: anywhere;
 }
-.project-status-dot { width: .45rem; height: .45rem; border-radius: var(--r-pill); background: var(--duration); }
 .project-meta { margin-top: .4rem; display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
 .context-chip {
   padding: .12rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs);
@@ -1079,17 +957,6 @@ body.bg-active .dim-control { display: flex; }
 .btn-icon:hover { color: var(--ink); background: var(--raised-2); }
 .btn-icon--danger:hover { color: var(--project); background: rgba(190,103,95,.16); }
 
-/* ---------------------------------------------------------------- PAGER --- */
-.pager { display: flex; justify-content: center; gap: .35rem; flex-wrap: wrap; padding: var(--s4) 0 0; }
-.pager-btn {
-  min-width: 2.5rem; height: 2.5rem; padding: 0 .6rem;
-  border-radius: var(--r-pill); display: grid; place-items: center;
-  font-family: var(--font-mono); font-size: var(--fs-sm);
-  color: var(--muted); background: var(--raised);
-}
-.pager-btn:hover { color: var(--ink); background: var(--raised-2); }
-.pager-btn.is-current { background: var(--brand-deep); color: var(--ink-invert); font-weight: 700; }
-
 /* ------------------------------------------------------------- UTILITIES -- */
 .text-red    { color: var(--project); }
 .text-blue   { color: var(--sub); }
@@ -1131,7 +998,6 @@ body.bg-active .dim-control { display: flex; }
     padding: .6rem .55rem;
   }
   .tab-label { font-size: var(--fs-xs); }
-  .tab--overflow.is-inline { display: flex; }   /* Insights/Charts inline */
 }
 
 /* A commitment's eight-period history and the activity range are the two
@@ -1315,7 +1181,6 @@ body.bg-active .dim-control { display: flex; }
 .nx-columns { display: grid; gap: var(--s5); margin: var(--s5) 0; }
 .nx-title { margin: 0; font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
 .nx-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s4); margin-bottom: var(--s4); }
-.nx-prose { max-width: 48rem; margin: var(--s4) 0 0; color: var(--muted); line-height: 1.55; }
 .nx-rail { display: grid; gap: 0; overflow: hidden; border: 1px solid var(--hairline); border-radius: var(--r-sm); background: var(--sunken); }
 .nx-lane { display: grid; grid-template-columns: minmax(8.5rem, 12rem) minmax(0, 1fr); min-height: 5.5rem; }
 .nx-lane + .nx-lane { border-top: 1px solid var(--hairline); }
@@ -1379,9 +1244,6 @@ body.bg-active .dim-control { display: flex; }
 .nx-status { flex: 0 0 auto; padding: .2rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs); }
 .nx-status--met { color: var(--duration); background: color-mix(in srgb, var(--duration) 13%, transparent); }
 .nx-status--open { color: var(--note); background: color-mix(in srgb, var(--note) 13%, transparent); }
-.nx-rail--past .nx-event--past { flex-basis: 15rem; border-left-color: var(--muted); background: color-mix(in srgb, var(--muted) 7%, transparent); }
-.nx-rail--past .nx-event--past strong { font-size: var(--fs-sm); }
-.nx-confirm { max-width: 42rem; }
 .nx-snooze-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s3); margin: var(--s5) 0; padding: 0; border: 0; }
 .nx-snooze-options label { display: flex; align-items: flex-start; gap: .65rem; min-height: 4rem; padding: .8rem; border: 1px solid var(--hairline-2); border-radius: var(--r-sm); cursor: pointer; }
 .nx-snooze-options label:has(input:checked) { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 10%, transparent); }
@@ -2282,10 +2144,6 @@ img.brand-mark {
 .ui-menu-item-wrapper:hover, .ui-menu-item a:hover {
   background: var(--raised-2); color: var(--ink);
 }
-.ui-helper-hidden-accessible {
-  position: absolute; width: 1px; height: 1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
-}
 
 /* ============================================================================
    NOTE EDITOR
@@ -2538,10 +2396,6 @@ img.brand-mark {
    (This replaces the chunk-4 compatibility block that restyled the panel's
    old class names while it was shared with un-ported pages.)                */
 .commit-rules { margin-top: var(--s4); }
-.commit-rules-title {
-  font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
-  color: var(--muted); font-weight: 600; margin-bottom: .35rem;
-}
 .commit-rule-line { font-size: var(--fs-sm); color: var(--ink-2); }
 .commit-foot { margin-top: var(--s4); }
 .badge-paused {

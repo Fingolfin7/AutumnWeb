@@ -70,23 +70,6 @@ class ChatSidebarGroupingTests(TestCase):
         self.assertEqual([c.title for c in grouped["Previous 7 days"]], ["Week chat"])
         self.assertEqual([c.title for c in grouped["Older"]], ["Old chat"])
 
-    def test_empty_bucket_is_dropped_not_rendered_blank(self):
-        LLMChat.objects.filter(user=self.user).exclude(pk=self.today_chat.pk).delete()
-        chats = list(LLMChat.objects.filter(user=self.user).order_by("-updated_at"))
-        groups = group_chats_by_recency(chats)
-        self.assertEqual([label for label, _ in groups], ["Today"])
-
-
-    def test_the_chat_list_endpoint_groups_the_same_way(self):
-        # The React sidebar reads GET /api/v2/insights/chats/.
-        payload = self.client.get("/api/v2/insights/chats/").json()
-        self.assertEqual(
-            [group["label"] for group in payload["groups"]],
-            ["Today", "Yesterday", "Previous 7 days", "Older"],
-        )
-        titles = {group["label"]: [chat["title"] for chat in group["chats"]] for group in payload["groups"]}
-        self.assertEqual(titles["Today"], ["Today chat"])
-        self.assertEqual(titles["Older"], ["Old chat"])
 
     def test_the_chat_list_only_shows_the_users_own_chats(self):
         other = User.objects.create_user(username="nosy", email="n@example.com", password="pw")

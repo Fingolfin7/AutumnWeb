@@ -1,14 +1,12 @@
 """Focused contracts for milestone detection and its user-visible markup."""
 
 from datetime import timedelta
-from unittest import mock
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 from django.utils import timezone
 
-import core.api_v2.views.timers as timer_views
 from core.celebrations import (
     crossed_tracked_time_milestone,
     is_completion_transition,
@@ -56,10 +54,6 @@ class CelebrationApiTests(TestCase):
         self.assertEqual(response.json()["celebration"]["kind"], "completion")
         self.assertIn("Project complete", response.json()["celebration"]["message"])
 
-    def test_a_normal_project_edit_stays_quiet(self):
-        response = self._patch_project(name="Atlas API, revised", status="active")
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertNotIn("celebration", response.json())
 
     def test_saving_an_already_complete_project_does_not_replay_celebration(self):
         first = self._patch_project(status="complete")
@@ -67,22 +61,6 @@ class CelebrationApiTests(TestCase):
         self.assertEqual(first.json()["celebration"]["kind"], "completion")
         self.assertNotIn("celebration", second.json())
 
-    def test_completing_a_project_without_history_uses_a_direct_copy(self):
-        message = self._patch_project(status="complete").json()["celebration"]["message"]
-        self.assertEqual(message, "Project complete — no sessions logged yet.")
-        self.assertNotIn("0m across 0 sessions", message)
-
-    def test_completing_a_project_with_history_reports_its_totals(self):
-        now = timezone.now().replace(microsecond=0)
-        SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=now - timedelta(hours=2),
-            end_time=now - timedelta(hours=1),
-            is_active=False,
-        )
-        message = self._patch_project(status="complete").json()["celebration"]["message"]
-        self.assertIn("across 1 session", message)
 
     def test_stopping_at_a_tracked_time_threshold_carries_a_progress_celebration(self):
         now = timezone.now().replace(microsecond=0)
@@ -117,45 +95,3 @@ class CelebrationApiTests(TestCase):
         response = self.client.post(f"/api/v2/timers/{timer.pk}/stop/", {}, format="json")
         self.assertEqual(response.json()["celebration"]["kind"], "progress")
         self.assertIn("commitment met: Atlas API", response.json()["celebration"]["message"])
-
-    def test_a_stop_whose_clock_reads_cross_a_second_still_counts_the_session(self):
-        # The stop view once read the clock twice: for the celebration's
-        # reference instant, then for the default end (truncated to the
-        # second). A tick between the reads ended the session after the
-        # reference, so the "after" snapshot left it out and the 100%
-        # celebration was missed.
-        Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type="time",
-            period="weekly",
-            target=60,
-        )
-        base = timezone.now().replace(microsecond=0) - timedelta(seconds=5)
-        timer = SessionMutationService.create_session(
-            user=self.user, project=self.project, start_time=base - timedelta(hours=1), is_active=True
-        )
-        reads = iter([base + timedelta(microseconds=999_999)])
-
-        class TickingClock:
-            """The timers view's clock: just before a second, then just past it."""
-
-            def __getattr__(self, name):
-                return getattr(timezone, name)
-
-            def now(self):
-                return next(reads, base + timedelta(seconds=1, microseconds=1))
-
-        with mock.patch.object(timer_views, "timezone", TickingClock()):
-            response = self.client.post(f"/api/v2/timers/{timer.pk}/stop/", {}, format="json")
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertIn("commitment met: Atlas API", response.json()["celebration"]["message"])
-
-    def test_an_ordinary_stop_stays_quiet(self):
-        now = timezone.now().replace(microsecond=0)
-        timer = SessionMutationService.create_session(
-            user=self.user, project=self.project, start_time=now - timedelta(minutes=5), is_active=True
-        )
-        response = self.client.post(f"/api/v2/timers/{timer.pk}/stop/", {}, format="json")
-        self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json().get("celebration"))

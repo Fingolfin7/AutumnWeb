@@ -17,7 +17,6 @@ from django.db.models import (
     F,
     Func,
     IntegerField,
-    Max,
     OuterRef,
     Subquery,
     Sum,
@@ -137,90 +136,6 @@ def _with_residual_numerator(sessions):
             )
         )
     )
-
-
-def _latest_first(rows, secondary_key):
-    rows.sort(key=secondary_key)
-    rows.sort(
-        key=lambda row: row["latest_end_time"]
-        or row.get("end_time")
-        or row.get("date"),
-        reverse=True,
-    )
-    return rows
-
-
-def subproject_tally(sessions_qs, *, group_by_id=False):
-    """Return weighted subproject totals, including the residual bucket.
-
-    ``group_by_id`` preserves the older ``totals`` endpoint's ID-based bucket
-    ordering.  The default groups by name exactly like ``tally_by_subprojects``.
-    """
-
-    sessions = _reanchor(sessions_qs)
-    link_sessions = _with_link_numerator(sessions)
-    if group_by_id:
-        link_rows = list(
-            link_sessions.annotate(
-                subproject_id=F("subproject_links__subproject_id"),
-                name=F("subproject_links__subproject__name"),
-            )
-            .values("subproject_id", "name")
-            .annotate(
-                total_numerator=Cast(
-                    Sum("_weighted_numerator"), BigIntegerField()
-                ),
-                latest_end_time=Max("end_time"),
-            )
-        )
-        row_key = lambda row: row["subproject_id"]
-        secondary_key = lambda row: (
-            row["subproject_id"] is not None,
-            row["subproject_id"] or 0,
-        )
-    else:
-        link_rows = list(
-            link_sessions.annotate(
-                name=F("subproject_links__subproject__name")
-            )
-            .values("name")
-            .annotate(
-                total_numerator=Cast(
-                    Sum("_weighted_numerator"), BigIntegerField()
-                ),
-                latest_end_time=Max("end_time"),
-            )
-        )
-        row_key = lambda row: row["name"]
-        secondary_key = lambda row: row["name"]
-
-    rows_by_key = {row_key(row): row for row in link_rows}
-    residual = _with_residual_numerator(sessions).aggregate(
-        total_numerator=Cast(Sum("_weighted_numerator"), BigIntegerField()),
-        latest_end_time=Max("end_time"),
-    )
-    if residual["total_numerator"]:
-        residual_key = None if group_by_id else NO_SUBPROJECT
-        if residual_key in rows_by_key:
-            row = rows_by_key[residual_key]
-            row["total_numerator"] += residual["total_numerator"]
-            row["latest_end_time"] = max(
-                row["latest_end_time"], residual["latest_end_time"]
-            )
-        else:
-            row = {
-                "name": NO_SUBPROJECT,
-                "total_numerator": residual["total_numerator"],
-                "latest_end_time": residual["latest_end_time"],
-            }
-            if group_by_id:
-                row["subproject_id"] = None
-            rows_by_key[residual_key] = row
-
-    rows = list(rows_by_key.values())
-    for row in rows:
-        row["total"] = duration_from_numerator(row["total_numerator"])
-    return _latest_first(rows, secondary_key)
 
 
 def subproject_session_points(sessions_qs):

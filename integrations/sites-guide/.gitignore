@@ -1,6 +1,0 @@
-dist/
-*.tar.gz
-node_modules/
-.sites-runtime/
-.env
-.env.*

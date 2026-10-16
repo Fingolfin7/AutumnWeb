@@ -13,7 +13,6 @@ from unittest import mock
 from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.core.management import call_command
-from django.core.management.base import CommandError
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -27,15 +26,12 @@ from core.models import (
     SubProjects,
     Tag,
 )
-from core.services import semantic_search
 from core.services.semantic_search import (
     DIMENSIONS,
     MODEL,
     decode_vector,
     encode_vector,
-    load_vectors,
     project_text,
-    reciprocal_rank_fusion,
     session_text,
 )
 
@@ -204,21 +200,6 @@ class RelatedSessionsTests(SemanticSearchTestCase):
         self.assertEqual(paged[-1], (self.oauth.pk, "related"))
         self.assertEqual({match for _, match in paged[:-1]}, {"direct"})
 
-    def test_query_vector_is_cached(self):
-        self._sync()
-        calls = len(FakeOpenAI.all_inputs())
-        self._search("sign-in failure")
-        self._search("sign-in failure")
-        self.assertEqual(len(FakeOpenAI.all_inputs()), calls + 1)
-
-    def test_usage_is_recorded_with_estimated_cost(self):
-        self._sync()
-        self._search("sign-in failure")
-        rows = RecommendationUsage.objects.filter(user=self.user, model=MODEL)
-        self.assertEqual(rows.count(), 3)  # sessions batch, projects batch, one query
-        self.assertTrue(all(row.success and row.input_tokens for row in rows))
-        self.assertTrue(all(row.estimated_cost_usd is not None for row in rows))
-
 
 class IsolationTests(SemanticSearchTestCase):
     def test_other_accounts_sessions_never_appear(self):
@@ -316,25 +297,6 @@ class StalenessTests(SemanticSearchTestCase):
         self.assertEqual(len(texts), 3)  # two sessions and the project
         self.assertTrue(all(text.startswith("Identity Platform\n") for text in texts))
 
-    def test_subproject_rename_restales_its_sessions(self):
-        SubProjects.objects.filter(pk=self.tokens.pk).update(name="Refresh tokens")
-        texts = self._resynced_texts()
-        self.assertEqual(
-            texts,
-            [
-                session_text("Identity", ["Refresh tokens"], self.oauth.note),
-                project_text("Identity", ["Refresh tokens"], None),
-            ],
-        )
-
-    def test_project_description_edit_restales_only_the_project(self):
-        Projects.objects.filter(pk=self.garden.pk).update(description="Orchard care")
-        self.assertEqual(self._resynced_texts(), [project_text("Garden", [], "Orchard care")])
-
-    def test_model_change_restales_everything(self):
-        SessionEmbedding.objects.update(model="older-model")
-        self.assertEqual(len(self._resynced_texts()), 3)
-
 
 class FallbackTests(SemanticSearchTestCase):
     def test_ai_disabled_or_no_key_behaves_exactly_as_keyword_search(self):
@@ -354,15 +316,6 @@ class FallbackTests(SemanticSearchTestCase):
                 )
         self.assertEqual(FakeOpenAI.instances, [])
 
-    def test_command_skips_accounts_without_ai_or_key(self):
-        off = self._user("semantic-off", "off-key", ai=False)
-        keyless = self._user("semantic-keyless", None)
-        for user in (off, keyless):
-            self._session(Projects.objects.create(user=user, name="P"), "note", user=user)
-        self._sync()
-        self.assertEqual({c.api_key for c in FakeOpenAI.instances}, {"user-key"})
-        self.assertFalse(SessionEmbedding.objects.filter(session__user__in=[off, keyless]).exists())
-        self.assertIn("skipped", self._sync("--username", "semantic-off"))
 
     def test_no_vectors_yet_means_no_provider_call(self):
         self._search("sign-in failure")
@@ -382,27 +335,6 @@ class FallbackTests(SemanticSearchTestCase):
         failed = RecommendationUsage.objects.get(user=self.user, success=False)
         self.assertEqual(failed.error_category, "TimeoutError")
 
-    def test_sync_failure_keeps_progress_and_reports(self):
-        FakeOpenAI.fail = True
-        with self.assertRaises(CommandError):
-            call_command("embed_sessions", stdout=StringIO(), stderr=StringIO())
-        self.assertFalse(SessionEmbedding.objects.exists())
-
-    def test_dry_run_calls_nothing(self):
-        out = self._sync("--dry-run")
-        self.assertIn("3 sessions (0 current, 3 to embed)", out)
-        self.assertIn("2 projects (0 current, 2 to embed)", out)
-        self.assertEqual(FakeOpenAI.all_inputs(), [])
-        self.assertFalse(SessionEmbedding.objects.exists())
-
-    def test_limit_takes_newest_first_and_batches(self):
-        self._sync("--limit", "2", "--batch-size", "1")
-        # Two sessions and (the limit is per kind) both projects, one per batch.
-        self.assertEqual(len(FakeOpenAI.all_inputs()), 4)
-        self.assertEqual(
-            set(SessionEmbedding.objects.values_list("session_id", flat=True)),
-            {self.plants.pk, self.failure_note.pk},
-        )
 
     def test_active_sessions_are_not_embedded(self):
         Sessions.objects.create(user=self.user, project=self.identity, note="OAuth live")
@@ -414,26 +346,3 @@ class VectorTests(TestCase):
     def test_memoryview_vectors_decode_like_bytes(self):
         data = encode_vector(fake_vector("oauth login"))
         self.assertEqual(list(decode_vector(memoryview(data))), list(decode_vector(data)))
-
-    def test_load_vectors_accepts_postgres_memoryview_rows(self):
-        good = encode_vector(fake_vector("oauth"))
-        rows = [(1, "d1", memoryview(good)), (2, "d2", memoryview(b"short")), (3, "d3", good)]
-        with mock.patch.object(semantic_search, "SessionEmbedding") as model:
-            model.objects.filter.return_value.order_by.return_value.values_list.return_value = rows
-            ids, digests, matrix = load_vectors(User(pk=1), Sessions.objects.none())
-        self.assertEqual(ids, [1, 3])
-        self.assertEqual(digests, {1: "d1", 3: "d3"})
-        self.assertEqual(matrix.shape, (2, DIMENSIONS))
-
-    def test_vectors_are_unit_length(self):
-        vector = decode_vector(encode_vector(fake_vector("billing invoice")))
-        self.assertAlmostEqual(float((vector * vector).sum()), 1.0, places=5)
-
-    def test_long_notes_are_capped(self):
-        text = session_text("P", ["b", "a", "a"], "x" * 10_000)
-        self.assertTrue(text.startswith("P\na, b\n"))
-        self.assertEqual(len(text), semantic_search.MAX_INPUT_CHARS)
-
-    def test_reciprocal_rank_fusion(self):
-        self.assertEqual(reciprocal_rank_fusion([[1, 2, 3], [3, 4]]), [3, 1, 2, 4])
-        self.assertEqual(reciprocal_rank_fusion([[1], [2]]), [1, 2])

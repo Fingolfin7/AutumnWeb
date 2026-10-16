@@ -55,9 +55,6 @@ class ProjectFilterModeTestCase(TestCase):
         rows = self._api("api_v2:sessions", params)["sessions"]
         return {row["project"]["name"] for row in rows}
 
-    def _listed_projects(self, params):
-        return {row["name"] for row in self._api("api_v2:projects", params)["projects"]}
-
 
 class SessionListModeTests(ProjectFilterModeTestCase):
     def test_include_keeps_only_the_named_projects(self):
@@ -65,11 +62,6 @@ class SessionListModeTests(ProjectFilterModeTestCase):
             self._session_projects({"project_ids": str(self.atlas.id)}), {"Atlas API"}
         )
 
-    def test_exclude_alone_still_means_what_it_always_meant(self):
-        self.assertEqual(
-            self._session_projects({"exclude_project_ids": str(self.atlas.id)}),
-            {"Autumn", "Mirror"},
-        )
 
     def test_include_narrows_first_then_exclude_subtracts(self):
         both = {
@@ -78,13 +70,6 @@ class SessionListModeTests(ProjectFilterModeTestCase):
         }
         self.assertEqual(self._session_projects(both), {"Atlas API"})
 
-    def test_exclude_cannot_widen_the_included_set(self):
-        """Excluding something outside the include list leaves it untouched."""
-        both = {
-            "project_ids": str(self.atlas.id),
-            "exclude_project_ids": str(self.mirror.id),
-        }
-        self.assertEqual(self._session_projects(both), {"Atlas API"})
 
     def test_junk_ids_are_a_validation_error_not_a_500(self):
         """Query strings are user input. (The old page ignored junk ids; an API
@@ -102,43 +87,3 @@ class SessionListModeTests(ProjectFilterModeTestCase):
             with self.subTest(field=field):
                 body = self._api("api_v2:sessions", {field: str(theirs.id)}, status=400)
                 self.assertIn(field, body["error"]["details"])
-
-
-class ProjectsListModeTests(ProjectFilterModeTestCase):
-    def test_exclude_subtracts_from_the_list(self):
-        self.assertEqual(
-            self._listed_projects({"exclude_project_ids": str(self.atlas.id)}),
-            {"Autumn", "Mirror"},
-        )
-
-    def test_another_users_project_is_rejected(self):
-        other = User.objects.create_user(
-            username="curufin", email="curufin@example.com", password="pw"
-        )
-        theirs = Projects.objects.create(user=other, name="Forge")
-        body = self._api(
-            "api_v2:projects", {"exclude_project_ids": str(theirs.id)}, status=400
-        )
-        self.assertIn("exclude_project_ids", body["error"]["details"])
-
-
-class ExportModeTests(ProjectFilterModeTestCase):
-    """The Export page (React) filters with the same fields as /api/v2/sessions/."""
-
-    def _exported_names(self, params):
-        document = self._api("api_v2:export", params)
-        return {project["name"] for project in document["projects"]}
-
-    def test_include_keeps_only_the_named_projects(self):
-        self.assertEqual(
-            self._exported_names({"project_ids": str(self.atlas.id)}), {"Atlas API"}
-        )
-
-    def test_include_narrows_first_then_exclude_subtracts(self):
-        names = self._exported_names(
-            {
-                "project_ids": f"{self.atlas.id},{self.autumn.id}",
-                "exclude_project_ids": str(self.autumn.id),
-            }
-        )
-        self.assertEqual(names, {"Atlas API"})

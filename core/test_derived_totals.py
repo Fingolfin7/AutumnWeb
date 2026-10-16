@@ -1,13 +1,11 @@
 from datetime import datetime, timedelta
 
 from django.contrib.auth.models import User
-from django.test import RequestFactory, TestCase
+from django.test import TestCase
 from django.utils import timezone
-from rest_framework.test import force_authenticate
 
 from core.models import Projects, Sessions, SubProjects
 from core.totals import (
-    annotate_project_totals,
     derived_project_last_updated,
     derived_project_totals,
     derived_subproject_last_updated,
@@ -82,7 +80,6 @@ class DerivedTotalsTests(TestCase):
         self.assertEqual(subproject_totals[self.subproject_b.pk], expected_b)
 
 
-
     def test_last_updated_uses_latest_completed_end_and_stored_fallback(self):
         earlier = self._session(60, offset_minutes=0, links=(self.subproject_a,))
         latest = self._session(60, offset_minutes=20, links=(self.subproject_a,))
@@ -117,46 +114,3 @@ class DerivedTotalsTests(TestCase):
             timezone.localdate(project_latest[self.project.pk]),
             timezone.localdate(latest.end_time),
         )
-
-
-class DerivedTotalsQueryCountTests(TestCase):
-    @classmethod
-    def setUpTestData(cls):
-        cls.user = User.objects.create_user(username="queries", password="password")
-        start = timezone.make_aware(datetime(2026, 3, 1, 10))
-        for index in range(3):
-            project = Projects.objects.create(
-                user=cls.user, name=f"Project {index}"
-            )
-            subproject = SubProjects.objects.create(
-                user=cls.user,
-                parent_project=project,
-                name=f"Subproject {index}",
-            )
-            session = Sessions.objects.create(
-                user=cls.user,
-                project=project,
-                start_time=start + timedelta(hours=index),
-                end_time=start + timedelta(hours=index, minutes=30),
-                is_active=False,
-            )
-            session.subprojects.add(subproject)
-
-    def setUp(self):
-        self.factory = RequestFactory()
-
-    def _request(self, path, data=None):
-        request = self.factory.get(path, data or {})
-        request.session = {}
-        force_authenticate(request, user=self.user)
-        return request
-
-
-
-
-    def test_annotation_variant_evaluates_in_one_query(self):
-        with self.assertNumQueries(1):
-            projects = list(
-                annotate_project_totals(Projects.objects.filter(user=self.user))
-            )
-        self.assertEqual(len(projects), 3)

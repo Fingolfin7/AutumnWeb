@@ -166,12 +166,8 @@ recovered_json_data/
 # Pre-migration database backups
 db.sqlite3.bak-*
 
-# Local characterization data contains a clone of the personal database.
-characterization/clone*.sqlite3
-characterization/meta.json
-characterization/goldens/
-characterization/.clone-*.tmp
-characterization/.meta-*.tmp
+# Retired characterization harness; local copies may hold a clone of the personal database.
+/characterization/
 
 # SQLite sidecar files (WAL mode)
 *-wal

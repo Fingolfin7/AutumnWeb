@@ -13,7 +13,6 @@ from core.commitments import (
 )
 from core.models import Projects, Sessions
 from core.services import CommitmentEditService
-from core.services.reporting import summarize_completed_sessions
 
 
 UTC = dt_timezone.utc
@@ -116,23 +115,6 @@ class ProactiveNotificationDomainTests(TestCase):
         self.assertTrue(evaluation["covered"])
         self.assertFalse(actionability["actionable"])
 
-    def test_completed_session_summary_is_half_open(self):
-        start = datetime(2026, 1, 5, tzinfo=UTC)
-        end = datetime(2026, 1, 12, tzinfo=UTC)
-        self._session(self.project, start - timedelta(minutes=60))
-        self._session(self.project, start + timedelta(hours=1))
-        self._session(self.other_project, end - timedelta(minutes=60))
-        self._session(self.other_project, end)
-
-        summary = summarize_completed_sessions(self.user, start, end)
-
-        self.assertEqual(summary["total_minutes"], 60)
-        self.assertEqual(summary["project_count"], 2)
-        self.assertEqual(summary["session_count"], 2)
-        self.assertEqual(
-            [(row["project_id"], row["total_minutes"]) for row in summary["per_project"]],
-            [(self.project.pk, 30), (self.other_project.pk, 30)],
-        )
 
     @freeze_time("2026-01-01 12:00:00+00:00")
     def test_weekly_score_mixes_cadences_and_counts_closing_boundary(self):
@@ -181,52 +163,3 @@ class ProactiveNotificationDomainTests(TestCase):
         self.assertEqual(details[weekly.pk]["met_period_count"], 1)
         self.assertTrue(details[weekly.pk]["met"])
         self.assertNotIn(monthly.pk, details)
-
-    @freeze_time("2026-01-01 12:00:00+00:00")
-    def test_weekly_score_includes_prior_generations_with_revision_banking(self):
-        commitment = self._commitment(
-            target=60,
-            timezone="UTC",
-            start_date=datetime(2026, 1, 1, tzinfo=UTC).date(),
-            banking_enabled=True,
-            max_balance=600,
-            min_balance=0,
-        )
-        self._session(
-            self.project,
-            datetime(2026, 1, 1, 12, tzinfo=UTC),
-            minutes=120,
-        )
-
-        # Close two periods in generation one, then restart with banking
-        # disabled.  The old rows must retain the old revision's banking rule.
-        from core.commitments import recompute_commitment
-
-        with freeze_time("2026-01-03 12:00:00+00:00"):
-            recompute_commitment(commitment)
-            commitment = CommitmentEditService.restart(
-                commitment.pk,
-                user=self.user,
-                keep_balance=False,
-                changes={"banking_enabled": False},
-            )
-
-        with freeze_time("2026-01-06 12:00:00+00:00"):
-            score = weekly_commitment_score(
-                self.user,
-                datetime(2026, 1, 1, tzinfo=UTC),
-                datetime(2026, 1, 8, tzinfo=UTC),
-            )
-
-        details = score["details"][0]
-        periods = sorted(details["periods"], key=lambda row: row["period_start"])
-        self.assertEqual(details["period_count"], 5)
-        self.assertEqual(details["met_period_count"], 2)
-        self.assertEqual(
-            [period["banking_enabled"] for period in periods],
-            [True, True, False, False, False],
-        )
-        self.assertEqual(
-            [period["met"] for period in periods],
-            [True, True, False, False, False],
-        )

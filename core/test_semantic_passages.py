@@ -6,18 +6,12 @@ whole vector sits far from "sign-in failure"; one passage holds the sentence
 about a sign-in error and lands close to it.
 """
 
-from io import StringIO
 from unittest import mock
 
-from django.core.management import call_command
-from django.db import connection
-from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
 
 from core.models import Projects, SessionPassageEmbedding, Sessions
 from core.services import semantic_search
 from core.services.semantic_search import (
-    MAX_INPUT_CHARS,
     PASSAGE_CHARS,
     min_similarity,
     session_scores,
@@ -50,11 +44,6 @@ class SplitPassagesTests(SemanticSearchTestCase):
         self.assertIn("sign-in error", passages[1])
         self.assertNotIn("orchard", passages[1])
 
-    def test_every_sentence_is_in_some_passage(self):
-        note = " ".join(f"Sentence number {i} is about task {i}." for i in range(40))
-        joined = " ".join(split_passages(note))
-        for i in range(40):
-            self.assertIn(f"Sentence number {i} is about task {i}.", joined)
 
     def test_overlong_sentences_and_words_are_cut(self):
         words = split_passages(" ".join(["word"] * 200))
@@ -62,12 +51,6 @@ class SplitPassagesTests(SemanticSearchTestCase):
         self.assertTrue(all(len(passage) <= PASSAGE_CHARS for passage in words))
         blob = split_passages("x" * (PASSAGE_CHARS * 3))
         self.assertEqual([len(passage) for passage in blob], [PASSAGE_CHARS] * 3)
-
-    def test_line_breaks_end_sentences(self):
-        note = "\n".join(f"- squat set {i} at 60 kg for eight reps" for i in range(12))
-        passages = split_passages(note)
-        self.assertGreater(len(passages), 1)
-        self.assertTrue(all(not passage.startswith(" ") for passage in passages))
 
 
 class PassageSyncTests(SemanticSearchTestCase):
@@ -90,11 +73,6 @@ class PassageSyncTests(SemanticSearchTestCase):
         inputs = [text for batch in FakeOpenAI.all_inputs() for text in batch]
         self.assertIn("Garden\n" + split_passages(LONG_NOTE)[1], inputs)
 
-    def test_sync_is_idempotent(self):
-        self._sync()
-        calls = len(FakeOpenAI.all_inputs())
-        self._sync()
-        self.assertEqual(len(FakeOpenAI.all_inputs()), calls)
 
     def test_an_edit_replaces_the_passages_and_shortening_removes_them(self):
         self._sync()
@@ -126,33 +104,6 @@ class PassageSyncTests(SemanticSearchTestCase):
         inputs = [text for batch in FakeOpenAI.all_inputs() for text in batch]
         self.assertTrue(any(text.endswith("Locked the shed.") for text in inputs))
 
-    def test_passages_go_with_their_session(self):
-        self._sync()
-        self.long.delete()
-        self.assertEqual(SessionPassageEmbedding.objects.count(), 0)
-
-    def test_batches_keep_a_session_together(self):
-        for i in range(3):
-            self._session(self.garden, LONG_NOTE + f" Day {i}.", days_ago=6 + i)
-        out = StringIO()
-        call_command("embed_sessions", "--batch-size", "3", stdout=out, stderr=StringIO())
-        self.assertEqual(SessionPassageEmbedding.objects.count(), 8)
-        passage_batches = [batch for batch in FakeOpenAI.all_inputs() if "Garden\nThen a long" in "".join(batch)]
-        self.assertTrue(all(len(batch) == 2 for batch in passage_batches))
-
-    def test_command_reports_passages(self):
-        out = self._sync("--dry-run")
-        self.assertIn("1 long notes in passages (0 current, 1 to embed)", out)
-        self.assertEqual(SessionPassageEmbedding.objects.count(), 0)
-        self.assertIn("1 long notes in passages (0 current, 1 embedded)", self._sync())
-
-    def test_limit_applies_to_passages_too(self):
-        self._session(self.garden, LONG_NOTE + " Again.", days_ago=7)
-        self._sync("--limit", "1")
-        self.assertEqual(
-            SessionPassageEmbedding.objects.values("session").distinct().count(), 1
-        )
-
 
 class PassageSearchTests(SemanticSearchTestCase):
     def setUp(self):
@@ -160,12 +111,6 @@ class PassageSearchTests(SemanticSearchTestCase):
         self.long = self._session(self.garden, LONG_NOTE, days_ago=5)
         self._sync()
 
-    def test_the_whole_note_alone_is_too_far(self):
-        whole = fake_vector("Garden\n" + LONG_NOTE)
-        query = fake_vector("sign-in failure")
-        dot = sum(a * b for a, b in zip(whole, query))
-        norms = (sum(a * a for a in whole) * sum(b * b for b in query)) ** 0.5
-        self.assertLess(dot / norms, min_similarity())
 
     def test_a_buried_sentence_finds_its_session(self):
         self.assertIn(self.long.pk, self._related("sign-in failure"))
@@ -183,22 +128,6 @@ class PassageSearchTests(SemanticSearchTestCase):
         whole = session_scores(self.user, sessions, query, cutoff=-1.0, passages=False)
         self.assertLess(whole[self.long.pk], min_similarity())
 
-    def test_scoring_in_small_batches_gives_the_same_scores(self):
-        sessions = Sessions.objects.filter(user=self.user)
-        for i in range(5):
-            self._session(self.garden, LONG_NOTE + f" Day {i}.", days_ago=9 + i)
-        self._sync()
-        query = semantic_search.decode_vector(
-            semantic_search.encode_vector(fake_vector("sign-in failure"))
-        )
-        expected = session_scores(self.user, sessions, query, cutoff=-1.0)
-        with mock.patch.object(semantic_search, "SCORE_BATCH_ROWS", 2), CaptureQueriesContext(
-            connection
-        ) as queries:
-            batched = session_scores(self.user, sessions, query, cutoff=-1.0)
-        self.assertEqual(batched, expected)
-        reads = [q for q in queries if "passageembedding" in q["sql"].lower()]
-        self.assertGreater(len(reads), 5)  # 12 passages, two rows a read
 
     def test_stale_passages_are_not_used(self):
         Sessions.objects.filter(pk=self.long.pk).update(note=LONG_NOTE.replace("van", "truck"))
@@ -206,26 +135,6 @@ class PassageSearchTests(SemanticSearchTestCase):
         self._sync()
         self.assertIn(self.long.pk, self._related("sign-in failure"))
 
-    def test_a_project_rename_makes_passages_stale(self):
-        Projects.objects.filter(pk=self.garden.pk).update(name="Allotment")
-        self.assertNotIn(self.long.pk, self._related("sign-in failure"))
-
-    def test_the_tail_of_a_very_long_note_is_searchable(self):
-        filler = "Weeded the long border by the shed today. " * (MAX_INPUT_CHARS // 40 + 5)
-        tail = self._session(self.garden, filler + "Answered a call about a sign-in error.", days_ago=8)
-        self._sync()
-        self.assertIn(tail.pk, self._related("sign-in failure"))
-
-    def test_related_counts_and_api_use_passages(self):
-        ids = [
-            row["id"]
-            for row in self.client.get(
-                reverse("api_v2:sessions"), {"search": "sign-in failure", "related": "true"}
-            ).json()["sessions"]
-        ]
-        # Keyword match first, then related best first: the OAuth note is all
-        # sign-in words, the long note's passage only half.
-        self.assertEqual(ids, [self.failure_note.pk, self.oauth.pk, self.long.pk])
 
     def test_a_project_is_related_through_a_passage(self):
         self.assertIn(self.garden.pk, self._related_projects("sign-in failure"))

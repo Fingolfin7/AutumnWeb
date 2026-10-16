@@ -38,14 +38,6 @@ export function formatDuration(minutes: number | null | undefined): string {
   return `${pad(m)}m ${pad(seconds)}s`;
 }
 
-/** Compact "2h 05m" / "45m" for chips and totals where seconds are noise. */
-export function formatDurationShort(minutes: number | null | undefined): string {
-  const { days, hours, minutes: m } = splitMinutes(minutes ?? 0);
-  if (days > 0) return `${days}d ${pad(hours)}h`;
-  if (hours > 0) return `${hours}h ${pad(m)}m`;
-  return `${m}m`;
-}
-
 /** "3 hours 10 minutes": at most two non-zero units (`min_formatter_two`). */
 export function formatDurationWords(minutes: number | null | undefined): string {
   const { days, hours, minutes: m, seconds } = splitMinutes(minutes ?? 0);
@@ -81,7 +73,7 @@ export function parseInstant(value: string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** 24-hour local clock time, "14:05:09" (`time_formatter` + local_times.js). */
+/** 24-hour local clock time, "14:05:09". */
 export function formatTime(value: string | Date | null | undefined, withSeconds = true): string {
   const date = value instanceof Date ? value : parseInstant(value);
   if (!date) return "";
@@ -137,14 +129,6 @@ export function toDateTimeLocal(value: string | Date | null | undefined, withSec
   if (!date) return "";
   const base = `${localDateKey(date)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   return withSeconds ? `${base}:${pad(date.getSeconds())}` : base;
-}
-
-/** <input type="datetime-local"> value → ISO instant with the local offset. */
-export function fromDateTimeLocal(value: string): string | null {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return toOffsetIso(date);
 }
 
 export interface LocalTimeCandidates {

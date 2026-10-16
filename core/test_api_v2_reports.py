@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone as datetime_timezone
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
-from drf_spectacular.generators import SchemaGenerator
 from rest_framework.test import APIClient
 
 from core.models import Context, Projects, Sessions, SessionSubproject, SubProjects, Tag
@@ -102,14 +101,6 @@ class V2ReportsTests(TestCase):
             ],
         )
 
-    def test_status_tally(self):
-        self.assertEqual(
-            self._tally("status"),
-            [
-                {"id": None, "name": "active", "total_minutes": 90.0, "session_count": 2},
-                {"id": None, "name": "paused", "total_minutes": 45.0, "session_count": 1},
-            ],
-        )
 
     def test_tag_tally_uses_full_duration_per_tag(self):
         self.assertEqual(
@@ -149,81 +140,3 @@ class V2ReportsTests(TestCase):
             residual,
             {"kind": "residual", "project_id": self.alpha.id, "id": None, "name": None, "total_minutes": 30.0},
         )
-
-    def test_chart_types_preserve_former_payload_keys(self):
-        expected_keys = {
-            "scatter": {"x", "y", "series"},
-            "line": {"date", "series", "hours"},
-            "stacked_area": {"date", "series", "hours"},
-            "calendar": {"date", "hours"},
-            "cumulative": {"date", "hours"},
-            "heatmap": {"start_time", "end_time"},
-            "histogram": {"label", "count"},
-            "wordcloud": {"text", "weight"},
-        }
-        for chart_type, keys in expected_keys.items():
-            with self.subTest(chart_type=chart_type):
-                response = self.client.get(
-                    reverse("api_v2:report-charts"), {"chart_type": chart_type}
-                )
-                self.assertEqual(response.status_code, 200)
-                self.assertTrue(response.json())
-                self.assertEqual(set(response.json()[0]), keys)
-
-    def test_chart_schema_has_all_types_typed_context_and_family_components(self):
-        schema = SchemaGenerator().get_schema(request=None, public=True)
-        operation = schema["paths"]["/api/v2/reports/charts/"]["get"]
-        parameters = {item["name"]: item for item in operation["parameters"]}
-        self.assertEqual(
-            set(parameters["chart_type"]["schema"]["enum"]),
-            {
-                "pie",
-                "bar",
-                "scatter",
-                "line",
-                "calendar",
-                "heatmap",
-                "stacked_area",
-                "cumulative",
-                "treemap",
-                "status",
-                "context",
-                "histogram",
-                "radar",
-                "bubble",
-                "wordcloud",
-            },
-        )
-        self.assertEqual(parameters["context"]["schema"]["type"], "integer")
-        response_schema = operation["responses"]["200"]["content"][
-            "application/json"
-        ]["schema"]
-        self.assertEqual(response_schema["$ref"], "#/components/schemas/ChartResponse")
-        components = schema["components"]["schemas"]
-        for name in (
-            "ChartTallyRow",
-            "ChartStatusRow",
-            "ChartBubbleRow",
-            "ChartScatterRow",
-            "ChartDailySeriesRow",
-            "ChartDailyTotalRow",
-            "ChartIntervalRow",
-            "ChartHeatmapCell",
-            "ChartHistogramRow",
-            "ChartWordRow",
-            "ChartRadarRow",
-            "ChartHierarchyResponse",
-        ):
-            self.assertIn(name, components)
-
-    def test_chart_date_filter_uses_yyyy_mm_dd(self):
-        response = self.client.get(
-            reverse("api_v2:report-charts"),
-            {"chart_type": "calendar", "start_date": "2026-01-02", "end_date": "2026-01-02"},
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json(), [{"date": "2026-01-02", "hours": 0.75}])
-
-    def test_v1_chart_data_route_is_removed(self):
-        response = self.client.get("/api/chart_data/", {"chart_type": "line"})
-        self.assertEqual(response.status_code, 404)

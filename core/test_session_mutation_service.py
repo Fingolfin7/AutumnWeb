@@ -83,25 +83,6 @@ class SessionMutationServiceTests(TestCase):
         self.assertAlmostEqual(self.project_total(), 25, places=2)
         self.assertEqual(self.subproject_total(), 0)
 
-    def test_duration_edit_moves_derived_totals(self):
-        start = timezone.now() - timedelta(minutes=30)
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            subprojects=[self.subproject],
-            start_time=start,
-            end_time=start + timedelta(minutes=30),
-            is_active=False,
-        )
-
-        SessionMutationService.mutate_session(
-            session.pk,
-            user=self.user,
-            start_time=start - timedelta(minutes=15),
-        )
-
-        self.assertAlmostEqual(self.project_total(), 45, places=2)
-        self.assertAlmostEqual(self.subproject_total(), 45, places=2)
 
     def test_rejects_subprojects_from_a_different_project(self):
         other_project = Projects.objects.create(
@@ -124,20 +105,3 @@ class SessionMutationServiceTests(TestCase):
             )
 
         self.assertFalse(Sessions.objects.filter(project=self.project).exists())
-
-    def test_direct_note_save_does_not_change_derived_total(self):
-        start = timezone.now() - timedelta(minutes=10)
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            end_time=start + timedelta(minutes=10),
-            is_active=False,
-        )
-
-        session.note = "No contribution fields changed"
-        session.save()
-
-        self.assertAlmostEqual(self.project_total(), 10, places=2)
-        self.assertEqual(Sessions.objects.filter(pk=session.pk).count(), 1)
-

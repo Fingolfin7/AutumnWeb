@@ -3,8 +3,8 @@ import {
   formatDayDate,
   formatDuration,
   formatDurationWords,
-  fromDateTimeLocal,
   heroParts,
+  localTimeCandidates,
   parseDateish,
   toDateTimeLocal,
 } from "./format";
@@ -55,6 +55,6 @@ it("treats bare dates as local calendar days", () => {
 });
 
 it("round-trips datetime-local values through offset ISO", () => {
-  const iso = fromDateTimeLocal("2026-10-14T09:30:05")!;
+  const iso = localTimeCandidates("2026-10-14T09:30:05").instants[0]!;
   expect(toDateTimeLocal(iso)).toBe("2026-10-14T09:30:05");
 });

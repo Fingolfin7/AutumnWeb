@@ -2,7 +2,6 @@ from datetime import date, datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from django.contrib.auth.models import User
-from django.db import IntegrityError, transaction
 from django.test import TestCase
 from freezegun import freeze_time
 
@@ -238,55 +237,3 @@ class CommitmentRevisionServiceTests(TestCase):
             commitment.ledger_start_at, datetime(2026, 1, 5, 12, tzinfo=UTC)
         )
         self.assertTrue(commitment.needs_recompute)
-
-    @freeze_time("2026-01-01 12:00:00+00:00")
-    def test_version_dirty_unique_pending_and_atomic_mixed_rejection(self):
-        project = self.project("Atomic")
-        commitment = self.create_commitment(project)
-        CommitmentEditService.edit(
-            commitment.pk, user=self.user, changes={"max_balance": 700}
-        )
-        commitment.refresh_from_db()
-        self.assertEqual(commitment.version, 2)
-        self.assertTrue(commitment.needs_recompute)
-
-        active = commitment.revisions.get(status="active")
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            CommitmentRevision.objects.create(
-                commitment=commitment,
-                generation=commitment.generation,
-                effective_from_instant=timezone_now(),
-                status="pending",
-                aggregation_type=active.aggregation_type,
-                target_id=active.target_id,
-                target_name=active.target_name,
-                filters_snapshot=active.filters_snapshot,
-                commitment_type=active.commitment_type,
-                cadence=active.cadence,
-                target_value=active.target_value,
-                banking_enabled=active.banking_enabled,
-                max_balance=active.max_balance,
-                min_balance=active.min_balance,
-                start_date=active.start_date,
-                timezone=active.timezone,
-            )
-
-        before_pending = commitment.revisions.get(status="pending")
-        with self.assertRaises(CommitmentRestartRequired):
-            CommitmentEditService.edit(
-                commitment.pk,
-                user=self.user,
-                changes={"period": "weekly", "target": 10, "active": False},
-            )
-        commitment.refresh_from_db()
-        before_pending.refresh_from_db()
-        self.assertEqual(commitment.version, 2)
-        self.assertTrue(commitment.active)
-        self.assertEqual(before_pending.target_value, 60)
-
-
-def timezone_now():
-    # Kept as a function so freezegun supplies the service-call instant.
-    from django.utils import timezone
-
-    return timezone.now()

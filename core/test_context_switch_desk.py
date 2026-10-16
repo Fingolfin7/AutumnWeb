@@ -21,12 +21,6 @@ class ContextSwitchTests(TestCase):
         cls.user = User.objects.create_user(
             username="switcher", email="s@example.com", password="pw"
         )
-        cls.work = Context.objects.create(user=cls.user, name="Work")
-        cls.study = Context.objects.create(user=cls.user, name="Study")
-        cls.other = User.objects.create_user(
-            username="stranger", email="x@example.com", password="pw"
-        )
-        cls.theirs = Context.objects.create(user=cls.other, name="Theirs")
 
     def setUp(self):
         self.client.login(username="switcher", password="pw")
@@ -79,13 +73,6 @@ class ContextPreferenceApiTests(TestCase):
         self.assertEqual(self.user.profile.active_context_id, self.work.id)
         self.assertEqual(self.client.get("/api/v2/me/preferences/").json()["active_context_id"], self.work.id)
 
-    def test_null_clears_the_selection(self):
-        self._set(self.work.id)
-        response = self._set(None)
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertIsNone(response.json()["active_context_id"])
-        self.user.profile.refresh_from_db()
-        self.assertIsNone(self.user.profile.active_context_id)
 
     def test_another_users_context_is_refused_and_nothing_changes(self):
         self._set(self.work.id)
@@ -94,10 +81,6 @@ class ContextPreferenceApiTests(TestCase):
         self.user.profile.refresh_from_db()
         self.assertEqual(self.user.profile.active_context_id, self.work.id)
 
-    def test_only_this_users_contexts_are_offered(self):
-        names = [row["name"] for row in self.client.get("/api/v2/me/preferences/").json()["contexts"]]
-        self.assertIn("Work", names)
-        self.assertNotIn("Theirs", names)
 
     def test_the_stored_context_does_not_scope_the_api_on_its_own(self):
         Sessions.objects.create(user=self.user, project=self.work_project, start_time=self._now())

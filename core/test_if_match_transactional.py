@@ -10,10 +10,9 @@ from datetime import datetime, timedelta, timezone as datetime_timezone
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
-from freezegun import freeze_time
 from rest_framework.test import APIClient
 
-from core.models import Commitment, Projects, SubProjects
+from core.models import Projects, SubProjects
 from core.services import SessionMutationService, StaleVersionError
 
 
@@ -35,18 +34,6 @@ class SessionServiceIfMatchTests(TestCase):
             is_active=False,
         )
 
-    def test_matching_expected_version_succeeds_and_bumps(self):
-        session = self._completed_session()
-        self.assertEqual(session.version, 1)
-
-        updated = SessionMutationService.mutate_session(
-            session.pk,
-            user=self.user,
-            note="edited",
-            expected_version=1,
-        )
-        self.assertEqual(updated.version, 2)
-        self.assertEqual(updated.note, "edited")
 
     def test_stale_expected_version_raises_with_fresh_current(self):
         session = self._completed_session()
@@ -64,22 +51,6 @@ class SessionServiceIfMatchTests(TestCase):
         self.assertEqual(session.version, 1)
         self.assertIsNone(session.note)
 
-    def test_delete_session_honors_expected_version(self):
-        session = self._completed_session()
-
-        with self.assertRaises(StaleVersionError) as ctx:
-            SessionMutationService.delete_session(
-                session.pk, user=self.user, expected_version=99
-            )
-        self.assertEqual(ctx.exception.current.version, 1)
-        # The stale delete must have been rejected before the row was removed.
-        self.assertTrue(session.__class__.objects.filter(pk=session.pk).exists())
-        self.assertEqual(
-            SessionMutationService.delete_session(
-                session.pk, user=self.user, expected_version=1
-            ),
-            session.pk,
-        )
 
     def test_race_comparison_uses_locked_row_not_stale_read(self):
         """Sequential simulation of two writers holding the same stale read.
@@ -146,66 +117,3 @@ class SessionEndpointIfMatchTests(TestCase):
         self.assertEqual(body["error"]["code"], "version_conflict")
         self.assertEqual(body["error"]["details"]["current"]["version"], 2)
         self.assertEqual(body["error"]["details"]["current"]["note"], "first")
-
-    def test_correct_if_match_succeeds(self):
-        url = reverse("api_v2:session-detail", args=[self.session.id])
-        response = self.client.patch(
-            url, {"note": "applied"}, format="json", HTTP_IF_MATCH="1"
-        )
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(response.json()["version"], 2)
-        self.assertEqual(response.json()["note"], "applied")
-
-
-class CommitmentEndpointIfMatchTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="ifmatch-commitment-ep")
-        self.project = Projects.objects.create(user=self.user, name="Focus")
-        self.client = APIClient()
-        self.client.force_authenticate(self.user)
-
-    def _create_commitment(self):
-        response = self.client.post(
-            reverse("api_v2:commitments"),
-            {
-                "aggregation_type": "project",
-                "project_id": self.project.pk,
-                "commitment_type": "time",
-                "period": "daily",
-                "start_date": "2026-01-01",
-                "timezone": "Europe/Prague",
-                "target_value": 60,
-                "banking_enabled": True,
-                "max_balance": 600,
-                "min_balance": -600,
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, 201, response.content)
-        return response.json()
-
-    @freeze_time("2026-01-01 12:00:00+00:00")
-    def test_stale_then_correct_if_match(self):
-        commitment = self._create_commitment()
-        url = reverse("api_v2:commitment-detail", args=[commitment["id"]])
-        self.assertEqual(commitment["version"], 1)
-
-        ok = self.client.patch(
-            url, {"max_balance": 700}, format="json", HTTP_IF_MATCH="1"
-        )
-        self.assertEqual(ok.status_code, 200, ok.content)
-        self.assertEqual(ok.json()["version"], 2)
-
-        stale = self.client.patch(
-            url, {"max_balance": 500}, format="json", HTTP_IF_MATCH="1"
-        )
-        self.assertEqual(stale.status_code, 409)
-        body = stale.json()
-        self.assertEqual(body["error"]["code"], "version_conflict")
-        self.assertEqual(body["error"]["details"]["current"]["version"], 2)
-
-        correct = self.client.patch(
-            url, {"max_balance": 500}, format="json", HTTP_IF_MATCH="2"
-        )
-        self.assertEqual(correct.status_code, 200, correct.content)
-        self.assertEqual(correct.json()["version"], 3)

@@ -1,9 +1,9 @@
 """Offline evaluation: keyword-only vs hybrid Sessions search.
 
-Uses a FICTIONAL corpus modelled on the 18 queries in
-docs/jev-search-experiment.md, loaded into a throwaway test database (the dev
-database is never read or written). Only that corpus and the queries are sent
-to OpenAI: about 45 short texts, a few thousand tokens, well under $0.001.
+Uses a FICTIONAL corpus of 18 search queries, loaded into a throwaway test
+database (the dev database is never read or written). Only that corpus and the
+queries are sent to OpenAI: about 45 short texts, a few thousand tokens, well
+under $0.001.
 
     # PowerShell
     $env:OPENAI_API_KEY = "sk-..."; .\\.venv\\Scripts\\python.exe scripts\\semantic_search_eval.py

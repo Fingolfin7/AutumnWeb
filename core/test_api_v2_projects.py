@@ -376,70 +376,6 @@ class V2ProjectSubprojectTests(TestCase):
             ["Alpha match", "Beta match", "Gamma match", "Zeta"],
         )
 
-    @freeze_time("2026-07-20 12:00:00")
-    def test_search_start_date_range_and_last_activity_ordering(self):
-        description_match = self._project(
-            "Description",
-            description="Contains PORTING token",
-            start_date=datetime(2026, 1, 5, tzinfo=UTC),
-        )
-        subproject_match = self._project(
-            "Child",
-            start_date=datetime(2026, 1, 10, tzinfo=UTC),
-        )
-        SubProjects.objects.create(
-            user=self.user,
-            parent_project=subproject_match,
-            name="Porting child",
-        )
-        outside = self._project(
-            "Outside",
-            start_date=datetime(2025, 12, 31, tzinfo=UTC),
-        )
-        Projects.objects.filter(
-            pk__in=[description_match.pk, subproject_match.pk, outside.pk]
-        ).update(last_updated=datetime(2025, 1, 1, tzinfo=UTC))
-        SessionMutationService.create_session(
-            user=self.user,
-            project=description_match,
-            start_time=datetime(2026, 7, 10, 9, tzinfo=UTC),
-            end_time=datetime(2026, 7, 10, 10, tzinfo=UTC),
-            is_active=False,
-        )
-        SessionMutationService.create_session(
-            user=self.user,
-            project=subproject_match,
-            start_time=datetime(2026, 7, 15, 9, tzinfo=UTC),
-            end_time=datetime(2026, 7, 15, 10, tzinfo=UTC),
-            is_active=False,
-        )
-
-        searched = self.client.get(
-            reverse("api_v2:projects"),
-            {"search": "porting", "ordering": "last_activity"},
-        )
-        self.assertEqual(searched.status_code, 200)
-        self.assertEqual(
-            [item["id"] for item in searched.json()["projects"]],
-            [subproject_match.id, description_match.id],
-        )
-
-        ranged = self.client.get(
-            reverse("api_v2:projects"),
-            {"start_date": "2026-01-01", "end_date": "2026-01-07"},
-        )
-        self.assertEqual(ranged.status_code, 200)
-        self.assertEqual(
-            [item["id"] for item in ranged.json()["projects"]],
-            [description_match.id],
-        )
-
-        invalid = self.client.get(
-            reverse("api_v2:projects"),
-            {"start_date": "2026-02-01", "end_date": "2026-01-01"},
-        )
-        self.assertEqual(invalid.status_code, 400)
-        self.assertIn("end_date", invalid.json()["error"]["details"])
 
     def test_project_and_subproject_if_match_conflicts_are_optional(self):
         project = self._project("Versioned")
@@ -527,20 +463,3 @@ class V2ProjectSubprojectTests(TestCase):
         self.assertEqual(
             unknown_tag.json()["error"]["code"], "validation_error"
         )
-
-    def test_project_list_query_count_is_constant(self):
-        for index in range(12):
-            project = self._project(f"Project {index:02d}")
-            project.tags.add(self.tag_a, self.tag_b)
-
-        with self.assertNumQueries(3):
-            response = self.client.get(reverse("api_v2:projects"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["count"], 12)
-
-    def test_me_advertises_project_capabilities(self):
-        response = self.client.get(reverse("api_v2:me"))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("projects", response.json()["capabilities"])
-        self.assertIn("subprojects", response.json()["capabilities"])

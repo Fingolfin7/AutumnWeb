@@ -45,14 +45,6 @@ class _RoundedSessionMinutes(Func):
             [*end_params, *start_params],
         )
 
-    def as_mysql(self, compiler, connection, **extra_context):
-        end_sql, end_params = compiler.compile(self.source_expressions[0])
-        start_sql, start_params = compiler.compile(self.source_expressions[1])
-        return (
-            f"ROUND(TIMESTAMPDIFF(MICROSECOND, {start_sql}, {end_sql}) / 60000000.0, 4)",
-            [*start_params, *end_params],
-        )
-
 
 def rounded_session_minutes(end_field="end_time", start_field="start_time"):
     """Return the canonical per-session minutes expression."""

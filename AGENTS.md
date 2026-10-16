@@ -38,10 +38,9 @@ python manage.py test
 PG_BIN=<pgsql/bin> PGDATA=<data dir> PYTHON=<venv python> scripts/test_postgres.sh [labels]  # Same tests on a local PostgreSQL (started and stopped for the run)
 
 # Run specific test file
-python manage.py test core.tests.test_parse_date_or_datetime_iso
+python manage.py test core.test_timeline
 
 # Custom management commands
-python manage.py audit --username=<user>  # Recalculate totals (omit --username for all)
 python manage.py export <username> --output_file=<path>
 python manage.py import <username> --input_file=<path>
 python manage.py clear --username=<user>  # Delete all project data (omit --username for all users)
@@ -84,19 +83,9 @@ User → Context → Projects → SubProjects → Sessions
 
 ### API Structure (core/api_v2/)
 
-Two API styles coexist:
+The only API is `/api/v2/` (the legacy `/api/` surface is gone); `POST /api/v2/import/` shares its import logic with the streaming web import flow.
 
-1. **Compact endpoints** (CLI-optimized): `/api/timer/start/`, `/api/timer/stop/`, `/api/track/`, `/api/totals/`, `/api/commitments/`, etc.
-   - Default `compact=true` uses abbreviated keys (`p`, `subs`, `dur`, `elapsed`)
-   - Pass `?compact=false` for expanded responses
-
-2. **Project/context/tag management**: `/api/project/update/`, `/api/contexts/`, `/api/contexts/<id>/`, `/api/tags/`, and `/api/tags/<id>/`; `/api/create_project/` also accepts context and tags.
-
-3. **Import**: `POST /api/import/` accepts export JSON (or compressed JSON) and shares its import logic with the streaming web import flow.
-
-4. **Legacy endpoints**: `/api/create_project/`, `/api/start_session/`, etc.
-
-All API endpoints require authentication (session or token) except `GET /healthz/`, an unauthenticated root health check used to probe or wake sleeping deployments. Durations are in **minutes** (float). The versioned `/api/v2/` surface is documented in `openapi-v2.yaml`; the legacy `/api/` surface is documented in `docs/api.md`.
+All API endpoints require authentication (session or token) except `GET /healthz/`, an unauthenticated root health check used to probe or wake sleeping deployments. Durations are in **minutes** (float). It is documented in `openapi-v2.yaml`.
 
 ### LLM Handler Pattern (llm_insights/)
 
@@ -117,9 +106,9 @@ Rotating `SECRET_KEY` will invalidate existing encrypted keys unless you migrate
 - `core/temp_uploads.py` - Staging of import uploads under `MEDIA_ROOT/temp` between `POST /api/v2/import/uploads/` and its stream GET, plus their cleanup
 - `core/services/semantic_search.py` - meaning-based search: OpenAI `text-embedding-3-small` (512 dims) vectors in `SessionEmbedding`/`ProjectEmbedding`, written with each user's own OpenAI key while `ai_features_enabled`, by `core/services/embedding_sync.py` (a daemon thread in each web process re-embeds an account ~10 s after edits, requested via `core/signals.py` and `request_sync_on_commit` on `update()` paths that bypass signals; related searches also recheck an account every 10 min) and by `embed_sessions` for backfills; a search embeds just the query and falls back to keyword results on any failure. A vector is stale when its stored text digest no longer matches the record's current text (project/subproject names plus the note or description). Notes longer than one ~240-character passage also get per-passage vectors (`SessionPassageEmbedding`, replaced together under one digest of the session's text), and a session scores the better of its whole vector and its best passage. Sessions search is one ranked list shared by the Sessions page (React, via API v2) and MCP (`core.search.rank_sessions`: direct keyword matches newest first, then every related match above the cutoff best first; the API's default `ordering=relevance` returns that order with a per-row `match`, and the page lists related matches in their own "Related" section). Projects lists every related project after the keyword matches (API v2 `related=true`); Charts and Insights count related sessions only with the "Include related sessions" toggle (`related=on`); API v2 sessions/reports/projects take `search` + `related=true` and answer with an `X-Autumn-Related: included|unavailable` header (the React Charts and Insights pages flip their "Including related" pill from it). A failed query embedding starts a 5-minute per-account cooldown (`FAILURE_COOLDOWN_SECONDS`). `core.search.search_sessions(..., user=, related=)` applies it and must run after every other filter, since related matches are drawn from what the filters left. The similarity cutoff is per search (`?similarity=` on pages and API v2, 0.25-0.60, echoed in `X-Autumn-Related-Similarity`), else the account's `Profile.related_similarity`, else `SEMANTIC_SEARCH_MIN_SIMILARITY`; the Related slider (`frontend/src/features/search/SimilaritySlider.tsx`) sets it; `RelatedOutcome(collect_scores=True)` scores down to the 0.25 floor so the slider can show live counts (`GET /api/v2/sessions/related-summary/` and `/projects/related-summary/`, web-only, not MCP tools). Keyword search (`core.search.search_words`) needs every word, in any order and field, drops common words, and keeps "quoted phrases" whole
 - `core/urls.py` - URL routing, including `/healthz/`
+- `core/mcp.py`, `core/mcp_oauth.py` - the remote MCP server at `/mcp` and its OAuth consent
 - `core/utils.py` (~20KB) - Helper functions, date parsing, data formatting
 - `users/models.py` - Profile model with encrypted API key get/set methods
-- `autumn_mcp.py` - MCP server for Claude Code integration
 
 ## Environment Variables
 
@@ -132,7 +121,6 @@ DEBUG=TRUE/FALSE
 Optional:
 ```
 DATABASE_URL=postgres://...  # Falls back to SQLite
-NASA_API_KEY=<key>
 SERVE_MEDIA=TRUE  # For PaaS deployments
 VITE_DEV_SERVER=http://localhost:5173  # Dev only: load the UI from Vite instead of the built bundle
 ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *

@@ -1,4 +1,4 @@
-"""Tests for the Focus Desk account pages (UI_REDESIGN.md chunk 11)."""
+"""The server-rendered account pages render on the app shell."""
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
@@ -10,7 +10,6 @@ class UsersShellTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "core/base.html")
         self.assertContains(response, "core/css/focus_desk.css")
-        self.assertNotContains(response, "core/css/style.css")
 
     @override_settings(ALLOW_REGISTRATION=True)
     def test_public_account_pages_use_the_focus_desk_shell_only(self):

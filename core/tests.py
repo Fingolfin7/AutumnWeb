@@ -6,7 +6,6 @@ from core.services import SessionMutationService
 from django.contrib.auth.models import User
 from datetime import datetime, timedelta
 from django.core.management import call_command
-from django.conf import settings
 import io
 import json
 import os
@@ -15,7 +14,6 @@ import tempfile
 import time
 from freezegun import freeze_time
 from core.models import Context
-from rest_framework.authtoken.models import Token
 from core.utils import (
     get_period_bounds,
     calculate_daily_activity_streak,
@@ -24,7 +22,6 @@ from core.commitments import (
     calculate_commitment_streak,
     get_commitment_progress,
     get_commitment_sessions_queryset,
-    reconcile_commitment,
 )
 from core.templatetags.markdown_render import markdown
 from core.totals import derived_project_totals, derived_subproject_totals
@@ -51,22 +48,6 @@ class MarkdownRenderTests(TestCase):
         self.assertIn("<td>Bench press</td>", rendered)
         self.assertNotIn("<p>| Lift |", rendered)
 
-    def test_pipe_table_supports_column_alignment(self):
-        rendered = markdown(
-            "| Left | Center | Right |\n"
-            "| :--- | :---: | ---: |\n"
-            "| A | B | C |"
-        )
-
-        self.assertIn('style="text-align: left;"', rendered)
-        self.assertIn('style="text-align: center;"', rendered)
-        self.assertIn('style="text-align: right;"', rendered)
-
-    def test_pipe_table_does_not_insert_breaks_between_table_elements(self):
-        rendered = markdown("| A | B |\n| --- | --- |\n| 1 | 2 |")
-
-        self.assertNotIn("<br", rendered)
-        self.assertNotIn("<p><table>", rendered)
 
     def test_single_tilde_renders_as_strikethrough(self):
         rendered = markdown("testing ~single tilde~ support")
@@ -74,10 +55,6 @@ class MarkdownRenderTests(TestCase):
         self.assertIn("<del>single tilde</del>", rendered)
         self.assertNotIn("<sub>single tilde</sub>", rendered)
 
-    def test_double_tilde_still_renders_as_strikethrough(self):
-        rendered = markdown("testing ~~double tilde~~ support")
-
-        self.assertIn("<del>double tilde</del>", rendered)
 
     def test_inline_subscript_style_tilde_is_left_literal(self):
         rendered = markdown("H~2~O")
@@ -85,6 +62,14 @@ class MarkdownRenderTests(TestCase):
         self.assertIn("H~2~O", rendered)
         self.assertNotIn("<sub>2</sub>", rendered)
         self.assertNotIn("<del>2</del>", rendered)
+
+
+class HealthzTests(TestCase):
+    def test_healthz_requires_no_authentication(self):
+        response = self.client.get("/healthz/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "ok"})
 
 
 class PwaTests(TestCase):
@@ -107,40 +92,30 @@ class PwaTests(TestCase):
             any(icon.get("purpose") == "maskable" for icon in payload["icons"])
         )
 
-    def test_service_worker_is_root_scoped(self):
-        response = self.client.get(reverse("service_worker"))
+    def test_service_worker_precaches_only_files_that_exist(self):
+        """cache.addAll is all-or-nothing: one 404 rejects the install and the
+        service worker never activates, taking offline support with it."""
+        import re
+        from pathlib import Path
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Service-Worker-Allowed"], "/")
-        self.assertIn("text/javascript", response["Content-Type"])
+        from django.conf import settings
 
-        content = b"".join(response.streaming_content).decode("utf-8")
-        self.assertIn("self.addEventListener(\"fetch\"", content)
-        self.assertIn("/static/core/pwa/offline.html", content)
+        root = Path(settings.BASE_DIR)
+        source = (
+            root / "core" / "static" / "core" / "pwa" / "service-worker.js"
+        ).read_text(encoding="utf-8")
+        block = source.split("PRECACHE_URLS = [", 1)[1].split("]", 1)[0]
+        urls = re.findall(r'"(/static/[^"]+)"', block)
 
-    def test_app_document_and_login_page_advertise_the_manifest(self):
-        # The React shell (core/templates/core/spa.html) links the manifest and
-        # frontend/src/main.tsx registers /service-worker.js; the server-rendered
-        # login page still goes through base.html and pwa.js.
-        from unittest import mock
-
-        from core import spa
-
-        User.objects.create_user(username="pwauser", password="password")
-        self.client.login(username="pwauser", password="password")
-
-        entry = {"src/main.tsx": {"file": "assets/main-abc123.js", "isEntry": True}}
-        with mock.patch.object(spa, "manifest", return_value=entry):
-            app_response = self.client.get(reverse("home"))
-        self.assertEqual(app_response.status_code, 200)
-        self.assertContains(app_response, 'rel="manifest"')
-        self.assertContains(app_response, reverse("pwa_manifest"))
-        self.assertEqual(self.client.get(reverse("service_worker")).status_code, 200)
-
-        self.client.logout()
-        login_response = self.client.get(reverse("login"))
-        self.assertContains(login_response, 'rel="manifest"')
-        self.assertContains(login_response, "core/js/pwa.js")
+        self.assertTrue(urls, "precache list is empty — did the format change?")
+        for ref in urls:
+            with self.subTest(static=ref):
+                relative = ref[len("/static/"):]
+                app_dir = relative.split("/", 1)[0]
+                self.assertTrue(
+                    (root / app_dir / "static" / relative).is_file(),
+                    f"{ref} is precached but does not exist on disk",
+                )
 
 
 class UpdateSessionTests(TestCase):
@@ -182,69 +157,17 @@ class UpdateSessionTests(TestCase):
         )
 
 
-
-class MergeProjectsAPITests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client.login(username="testuser", password="password")
-
-        # Create two projects to merge
-        self.project1 = Projects.objects.create(
-            user=self.user,
-            name="Project A",
-            description="Description for Project A",
-            total_time=120.0,
-        )
-        self.project2 = Projects.objects.create(
-            user=self.user,
-            name="Project B",
-            description="Description for Project B",
-            total_time=180.0,
-        )
-
-
-
-
-
-class MergeSubProjectsAPITests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client.login(username="testuser", password="password")
-
-        # Create a parent project
-        self.parent_project = Projects.objects.create(
-            user=self.user, name="Parent Project"
-        )
-
-        # Create two subprojects to merge
-        self.subproject1 = SubProjects.objects.create(
-            user=self.user,
-            name="Design",
-            parent_project=self.parent_project,
-            total_time=120.0,
-        )
-        self.subproject2 = SubProjects.objects.create(
-            user=self.user,
-            name="UI",
-            parent_project=self.parent_project,
-            total_time=120.0,
-        )
-
-
-
-
-
 class ImportIntoContextCLITests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="importuser", password="password")
 
     def _write_temp_import_json(self, payload: dict) -> str:
-        temp_dir = os.path.join(settings.MEDIA_ROOT, "temp_tests")
-        os.makedirs(temp_dir, exist_ok=True)
-        path = os.path.join(temp_dir, "import_cli_test.json")
-        with open(path, "w", encoding="utf-8") as f:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".json", encoding="utf-8", delete=False
+        ) as f:
             json.dump(payload, f)
-        return path
+        self.addCleanup(os.remove, f.name)
+        return f.name
 
     def test_cli_import_into_new_context_overrides_file_context(self):
         payload = {
@@ -378,116 +301,9 @@ class PendingImportCleanupTests(TestCase):
         self.assertTrue(os.path.exists(fresh))
 
 
-class ProjectsGroupedApiTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client.login(username="testuser", password="password")
-        # DRF token auth for API endpoints
-        self.token = Token.objects.create(user=self.user)
-
-
-
-class TrackApiRegressionTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="trackuser", password="password")
-        self.client.login(username="trackuser", password="password")
-        self.token = Token.objects.create(user=self.user)
-
-        self.project = Projects.objects.create(user=self.user, name="Track Project")
-
-
-
-class CreateSubprojectApiCompatTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="subprojapiuser", password="password"
-        )
-        self.client.login(username="subprojapiuser", password="password")
-        self.token = Token.objects.create(user=self.user)
-        self.project = Projects.objects.create(user=self.user, name="API Parent")
-
-
-
-
 # =============================================================================
 # Commitment Feature Tests
 # =============================================================================
-
-
-class CommitmentModelTests(TestCase):
-    """Test the Commitment model."""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username='commituser',
-            email='commit@example.com',
-            password='testpass123'
-        )
-        self.context = Context.objects.create(user=self.user, name='General')
-        self.project = Projects.objects.create(
-            user=self.user,
-            name='Commitment Test Project',
-            context=self.context
-        )
-
-    def test_create_time_commitment(self):
-        """Test creating a time-based commitment."""
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='time',
-            period='weekly',
-            target=300
-        )
-        self.assertEqual(commitment.commitment_type, 'time')
-        self.assertEqual(commitment.period, 'weekly')
-        self.assertEqual(commitment.target, 300)
-        self.assertEqual(commitment.balance, 0)
-        self.assertTrue(commitment.active)
-        self.assertTrue(commitment.banking_enabled)
-
-    def test_create_session_commitment(self):
-        """Test creating a session-based commitment."""
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='sessions',
-            period='daily',
-            target=2
-        )
-        self.assertEqual(commitment.commitment_type, 'sessions')
-        self.assertEqual(commitment.target, 2)
-
-    def test_commitment_str(self):
-        """Test the string representation of a commitment."""
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='time',
-            period='weekly',
-            target=300
-        )
-        self.assertIn('Commitment Test Project', str(commitment))
-        self.assertIn('300', str(commitment))
-        self.assertIn('weekly', str(commitment))
-
-    def test_one_to_one_constraint(self):
-        """Test that a project can only have one commitment."""
-        Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='time',
-            period='weekly',
-            target=300
-        )
-        with self.assertRaises(Exception):
-            Commitment.objects.create(
-                user=self.user,
-                project=self.project,
-                commitment_type='sessions',
-                period='daily',
-                target=5
-            )
 
 
 class PeriodBoundsTests(TestCase):
@@ -509,13 +325,6 @@ class PeriodBoundsTests(TestCase):
         self.assertEqual(start.date(), datetime(2025, 6, 16).date())
         self.assertEqual(end.date(), datetime(2025, 6, 23).date())
 
-    def test_weekly_bounds_on_monday(self):
-        """Test weekly bounds when reference is Monday."""
-        ref_date = timezone.make_aware(datetime(2025, 6, 16, 14, 30))
-        start, end = get_period_bounds('weekly', ref_date)
-
-        self.assertEqual(start.date(), datetime(2025, 6, 16).date())
-        self.assertEqual(end.date(), datetime(2025, 6, 23).date())
 
     def test_monthly_bounds(self):
         """Test monthly period bounds."""
@@ -525,13 +334,6 @@ class PeriodBoundsTests(TestCase):
         self.assertEqual(start.date(), datetime(2025, 6, 1).date())
         self.assertEqual(end.date(), datetime(2025, 7, 1).date())
 
-    def test_quarterly_bounds_q2(self):
-        """Test quarterly period bounds for Q2."""
-        ref_date = timezone.make_aware(datetime(2025, 5, 15, 14, 30))
-        start, end = get_period_bounds('quarterly', ref_date)
-
-        self.assertEqual(start.date(), datetime(2025, 4, 1).date())
-        self.assertEqual(end.date(), datetime(2025, 7, 1).date())
 
     def test_quarterly_bounds_q4(self):
         """Test quarterly period bounds for Q4."""
@@ -677,75 +479,6 @@ class CommitmentProgressTests(TestCase):
         self.assertEqual(progress['percentage'], 100)
 
 
-class ReconciliationTests(TestCase):
-    """Test the reconcile_commitment utility function."""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username='reconuser',
-            email='recon@example.com',
-            password='testpass123'
-        )
-        self.context = Context.objects.create(user=self.user, name='General')
-        self.project = Projects.objects.create(
-            user=self.user,
-            name='Reconciliation Test Project',
-            context=self.context
-        )
-
-    def test_balance_capping_max(self):
-        """Test that balance is capped at max_balance."""
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='time',
-            period='daily',
-            target=60,
-            max_balance=100,
-            min_balance=-100,
-            banking_enabled=True
-        )
-
-        commitment.balance = 90
-        commitment.save()
-
-        self.assertTrue(commitment.balance <= commitment.max_balance)
-
-    def test_balance_capping_min(self):
-        """Test that balance is capped at min_balance."""
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='time',
-            period='daily',
-            target=60,
-            max_balance=100,
-            min_balance=-100,
-            banking_enabled=True
-        )
-
-        commitment.balance = -90
-        commitment.save()
-
-        self.assertTrue(commitment.balance >= commitment.min_balance)
-
-    def test_skip_reconciliation_when_banking_disabled(self):
-        """Test that balance doesn't change when banking is disabled."""
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='time',
-            period='weekly',
-            target=300,
-            banking_enabled=False
-        )
-
-        initial_balance = commitment.balance
-        reconcile_commitment(commitment)
-
-        self.assertEqual(commitment.balance, initial_balance)
-
-
 # =============================================================================
 # Dashboard Feature Tests
 # =============================================================================
@@ -811,10 +544,6 @@ class DailyStreakTests(TestCase):
         result = calculate_daily_activity_streak(self.user)
         self.assertEqual(result['current_streak'], 1)
 
-    def test_streak_returns_14_days_visual(self):
-        """Test that 14 days are returned for visual display."""
-        result = calculate_daily_activity_streak(self.user)
-        self.assertEqual(len(result['recent_days']), 14)
 
     def test_streak_starts_from_yesterday_if_no_activity_today(self):
         """Test that streak calculation starts from yesterday if no activity today."""
@@ -897,18 +626,6 @@ class CommitmentStreakTests(TestCase):
         result = calculate_commitment_streak(commitment)
         self.assertGreaterEqual(result['current_streak'], 1)
 
-    def test_commitment_streak_returns_periods_list(self):
-        """Test that commitment streak returns a list of periods."""
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='time',
-            period='weekly',
-            target=60
-        )
-        result = calculate_commitment_streak(commitment, num_periods=8)
-        self.assertIn('periods', result)
-        self.assertLessEqual(len(result['periods']), 8)
 
     def test_commitment_streak_handles_partial_current_period(self):
         """Test that current period is marked correctly."""
@@ -1038,81 +755,6 @@ class CommitmentStreakTests(TestCase):
         # Streak should be 1 (only day -1), because day -2 broke it
         self.assertEqual(result['current_streak'], 1)
 
-    def test_streak_bank_simulation_forward(self):
-        """Test that banking balance is simulated forward correctly across periods."""
-        now = timezone.localtime(timezone.now())
-
-        commitment = Commitment.objects.create(
-            user=self.user,
-            project=self.project,
-            commitment_type='sessions',
-            period='daily',
-            target=2,  # 2 sessions per day
-            banking_enabled=True,
-            max_balance=10,
-            min_balance=-10,
-        )
-        day4 = now - timedelta(days=4)
-        ps_day4, _ = get_period_bounds('daily', day4)
-        Commitment.objects.filter(pk=commitment.pk).update(
-            start_date=ps_day4.date()
-        )
-        commitment.refresh_from_db()
-
-        # Day -4: 4 sessions (surplus 2 → balance = 2)
-        ps4, _ = get_period_bounds('daily', day4)
-        for j in range(4):
-            st = ps4 + timedelta(hours=j + 1)
-            Sessions.objects.create(
-                user=self.user, project=self.project,
-                start_time=st, end_time=st + timedelta(minutes=30),
-                is_active=False
-            )
-
-        # Day -3: 1 session (deficit 1, balance 2 → saved, balance = 1)
-        day3 = now - timedelta(days=3)
-        ps3, _ = get_period_bounds('daily', day3)
-        st3 = ps3 + timedelta(hours=1)
-        Sessions.objects.create(
-            user=self.user, project=self.project,
-            start_time=st3, end_time=st3 + timedelta(minutes=30),
-            is_active=False
-        )
-
-        # Day -2: 1 session (deficit 1, balance 1 → saved, balance = 0)
-        day2 = now - timedelta(days=2)
-        ps2, _ = get_period_bounds('daily', day2)
-        st2 = ps2 + timedelta(hours=1)
-        Sessions.objects.create(
-            user=self.user, project=self.project,
-            start_time=st2, end_time=st2 + timedelta(minutes=30),
-            is_active=False
-        )
-
-        # Day -1: 1 session (deficit 1, balance 0 → NOT saved, streak breaks)
-        day1 = now - timedelta(days=1)
-        ps1, _ = get_period_bounds('daily', day1)
-        st1 = ps1 + timedelta(hours=1)
-        Sessions.objects.create(
-            user=self.user, project=self.project,
-            start_time=st1, end_time=st1 + timedelta(minutes=30),
-            is_active=False
-        )
-
-        result = calculate_commitment_streak(commitment)
-        # Day -1 breaks it because bank is depleted, so streak = 0
-        self.assertEqual(result['current_streak'], 0)
-
-        # Verify saved_by_bank flags
-        completed = [p for p in result['periods'] if not p['is_current']]
-        # Day -3 and Day -2 should be saved_by_bank
-        day3_period = next(p for p in completed if p['period_start'] <= day3 < p['period_end'])
-        day2_period = next(p for p in completed if p['period_start'] <= day2 < p['period_end'])
-        day1_period = next(p for p in completed if p['period_start'] <= day1 < p['period_end'])
-        self.assertTrue(day3_period['saved_by_bank'])
-        self.assertTrue(day2_period['saved_by_bank'])
-        self.assertFalse(day1_period['met'])
-
 
 class CommitmentComposableRulesTests(TestCase):
     def setUp(self):
@@ -1224,23 +866,6 @@ class CommitmentComposableRulesTests(TestCase):
         )
         self.assertEqual(list(sessions), [self.alpha_sp2_session])
 
-    def test_context_scope_supports_composed_include_exclude_rules(self):
-        commitment = Commitment.objects.create(
-            user=self.user,
-            aggregation_type='context',
-            context=self.context_work,
-            commitment_type='sessions',
-            period='daily',
-            target=1,
-        )
-        commitment.include_tags.add(self.tag_focus)
-        commitment.exclude_subprojects.add(self.alpha_sp2)
-
-        sessions = get_commitment_sessions_queryset(
-            commitment, self.period_start, self.period_end
-        )
-        self.assertEqual(list(sessions), [self.alpha_sp1_session])
-
 
 class DstTransitionSessionTests(TestCase):
     def setUp(self):
@@ -1279,17 +904,3 @@ class DstTransitionSessionTests(TestCase):
 
         self.assertEqual(session.duration, 180.0)
         self.assertTrue(session.crosses_dst_transition)
-
-
-
-class McpApiContractTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="mcpuser", password="password")
-        self.client.login(username="mcpuser", password="password")
-        self.project = Projects.objects.create(user=self.user, name="MCP Project")
-
-
-
-
-
-

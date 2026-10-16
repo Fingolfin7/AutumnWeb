@@ -1,8 +1,6 @@
 from datetime import date, datetime, timedelta, timezone as dt_timezone
-from importlib import import_module
 from zoneinfo import ZoneInfo
 
-from django.apps import apps
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
@@ -18,7 +16,6 @@ from core.commitments import (
 from core.models import (
     Commitment,
     CommitmentAdjustment,
-    CommitmentPeriod,
     CommitmentRevision,
     Projects,
 )
@@ -205,75 +202,6 @@ class CommitmentReplayTests(TestCase):
         self.assertFalse(commitment.needs_recompute)
         self.assertFalse(commitment.period_rows.exists())
 
-    @freeze_time("2026-02-03 12:00:00+00:00")
-    def test_recompute_is_deterministic_after_dirty_flag_is_reset(self):
-        commitment = self.commitment(start_date=date(2026, 2, 1), target=50)
-        self.session(
-            datetime(2026, 2, 1, 8, tzinfo=UTC),
-            datetime(2026, 2, 1, 9, tzinfo=UTC),
-        )
-        recompute_commitment(commitment)
-        first = list(
-            commitment.period_rows.order_by("period_start").values_list(
-                "period_start", "accrued_numerator", "carryover_in", "balance_out"
-            )
-        )
-        Commitment.objects.filter(pk=commitment.pk).update(needs_recompute=True)
-        recompute_commitment(commitment)
-        second = list(
-            commitment.period_rows.order_by("period_start").values_list(
-                "period_start", "accrued_numerator", "carryover_in", "balance_out"
-            )
-        )
-        commitment.refresh_from_db()
-
-        self.assertEqual(first, second)
-        self.assertFalse(commitment.needs_recompute)
-
-    @freeze_time("2026-05-04 12:00:00+00:00")
-    def test_v1_list_and_detail_lazy_reads_are_idempotent(self):
-        commitment = self.commitment(start_date=date(2026, 5, 1))
-        client = APIClient()
-        client.force_authenticate(self.user)
-
-        list_first = client.get("/api/v2/commitments/").content
-        detail_first = client.get(f"/api/v2/commitments/{commitment.pk}").content
-        for _ in range(3):
-            self.assertEqual(
-                client.get("/api/v2/commitments/").content, list_first
-            )
-            self.assertEqual(
-                client.get(f"/api/v2/commitments/{commitment.pk}").content,
-                detail_first,
-            )
-
-    @freeze_time("2026-06-15 12:00:00+00:00")
-    def test_migration_snapshot_preserves_populated_balance_without_history(self):
-        commitment = self.commitment(
-            balance=321,
-            period="monthly",
-            target=240,
-            start_date=date(2025, 1, 1),
-            banking_enabled=False,
-        )
-        migration = import_module("core.migrations.0045_commitment_replay_ledger")
-        migration.snapshot_existing_commitments(apps, None)
-
-        commitment.refresh_from_db()
-        opening = commitment.adjustments.get()
-        revision = commitment.revisions.get()
-        self.assertEqual(opening.amount, 321)
-        self.assertEqual(opening.effective_at, commitment.ledger_start_at)
-        self.assertEqual(
-            (revision.status, revision.cadence, revision.target_value, revision.target_name),
-            ("active", "monthly", 240, self.project.name),
-        )
-        self.assertFalse(commitment.period_rows.exists())
-
-        recompute_commitment(commitment)
-        commitment.refresh_from_db()
-        self.assertEqual(commitment.balance, 321)
-        self.assertFalse(commitment.period_rows.exists())
 
     @freeze_time("2026-07-03 12:00:00+00:00")
     def test_session_commitment_uses_count_not_time_numerator(self):

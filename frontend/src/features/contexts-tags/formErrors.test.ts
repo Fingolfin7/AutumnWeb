@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@/api/errors";
-import { hasErrors, mergeErrors, parseFormErrors } from "./formErrors";
+import { hasErrors, parseFormErrors } from "./formErrors";
 
 describe("parseFormErrors", () => {
   it("files DRF field errors under their field", () => {
@@ -29,11 +29,8 @@ describe("parseFormErrors", () => {
     expect(parseFormErrors(new Error("boom")).general).toEqual(["boom"]);
   });
 
-  it("merges and detects errors", () => {
-    const a = { fields: { x: ["1"] }, general: [] };
-    const b = { fields: { x: ["2"] }, general: ["g"] };
-    expect(mergeErrors(a, b)).toEqual({ fields: { x: ["1", "2"] }, general: ["g"] });
-    expect(hasErrors(mergeErrors())).toBe(false);
-    expect(hasErrors(a)).toBe(true);
+  it("detects errors", () => {
+    expect(hasErrors({ fields: {}, general: [] })).toBe(false);
+    expect(hasErrors({ fields: { x: ["1"] }, general: [] })).toBe(true);
   });
 });

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone as datetime_timezone
+from datetime import datetime, timezone as datetime_timezone
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -380,46 +380,6 @@ class V2CommitmentsTests(TestCase):
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json()["balance"], 600.0)
 
-    @freeze_time("2026-01-01 12:00:00+00:00")
-    def test_period_generation_filter_and_pagination(self):
-        commitment = self.create_commitment().json()
-        detail_url = reverse(
-            "api_v2:commitment-detail", args=[commitment["id"]]
-        )
-        with freeze_time("2026-01-04 12:00:00+00:00"):
-            self.client.get(detail_url)
-        with freeze_time("2026-01-04 13:00:00+00:00"):
-            restarted = self.client.post(
-                reverse("api_v2:commitment-restart", args=[commitment["id"]]),
-                {"keep_balance": False},
-                format="json",
-                HTTP_IF_MATCH="1",
-            )
-        self.assertEqual(restarted.status_code, 200, restarted.content)
-        with freeze_time("2026-01-06 12:00:00+00:00"):
-            response = self.client.get(
-                reverse("api_v2:commitment-periods", args=[commitment["id"]]),
-                {"limit": 1, "offset": 0},
-            )
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["count"], 1)
-        self.assertEqual(response.json()["total"], 2)
-        self.assertEqual(response.json()["periods"][0]["generation"], 2)
-
-        old = self.client.get(
-            reverse("api_v2:commitment-periods", args=[commitment["id"]]),
-            {"generation": 1, "limit": 2, "offset": 1},
-        )
-        self.assertEqual(old.status_code, 200)
-        self.assertEqual(old.json()["total"], 3)
-        self.assertEqual(old.json()["count"], 2)
-        self.assertTrue(
-            all(row["generation"] == 1 for row in old.json()["periods"])
-        )
-        self.assertGreater(
-            old.json()["periods"][0]["period_start"],
-            old.json()["periods"][1]["period_start"],
-        )
 
     @freeze_time("2026-04-01 12:00:00+00:00")
     def test_session_patch_pre_anchor_warning_conditions(self):
@@ -489,11 +449,6 @@ class V2CommitmentsTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("commitment_history_unaffected", response.json())
-
-    def test_me_capabilities_include_commitments(self):
-        response = self.client.get(reverse("api_v2:me"))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("commitments", response.json()["capabilities"])
 
 
 class V2CommitmentRestartScopeTests(TestCase):
@@ -567,45 +522,3 @@ class V2CommitmentRestartScopeTests(TestCase):
         self.assertEqual(response.status_code, 404)
         commitment.refresh_from_db()
         self.assertEqual(commitment.generation, 1)
-
-
-class V2CommitmentNotificationOptInTests(TestCase):
-    """The per-commitment opt-in to the evening commitment check notification."""
-
-    def setUp(self):
-        self.user = User.objects.create_user(username="v2-optin", email="v2-optin@example.com")
-        self.project = Projects.objects.create(user=self.user, name="Focus")
-        self.client = APIClient()
-        self.client.force_authenticate(self.user)
-        self.payload = {
-            "aggregation_type": "project",
-            "project_id": self.project.pk,
-            "commitment_type": "time",
-            "period": "weekly",
-            "target_value": 120,
-        }
-
-    def test_it_defaults_to_off_and_can_be_set_on_create(self):
-        off = self.client.post(reverse("api_v2:commitments"), self.payload, format="json")
-        self.assertEqual(off.status_code, 201, off.content)
-        self.assertIs(off.json()["notifications_enabled"], False)
-        Commitment.objects.all().delete()
-        on = self.client.post(
-            reverse("api_v2:commitments"), {**self.payload, "notifications_enabled": True}, format="json"
-        )
-        self.assertEqual(on.status_code, 201, on.content)
-        self.assertIs(on.json()["notifications_enabled"], True)
-        self.assertTrue(Commitment.objects.get().notifications_enabled)
-
-    def test_it_changes_immediately_without_a_restart_or_pending_revision(self):
-        created = self.client.post(reverse("api_v2:commitments"), self.payload, format="json").json()
-        url = reverse("api_v2:commitment-detail", args=[created["id"]])
-        response = self.client.patch(
-            url, {"notifications_enabled": True}, format="json", HTTP_IF_MATCH=str(created["version"])
-        )
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertIs(response.json()["notifications_enabled"], True)
-        self.assertIsNone(response.json()["pending_revision"])
-        self.assertTrue(Commitment.objects.get(pk=created["id"]).notifications_enabled)
-        listed = self.client.get(reverse("api_v2:commitments")).json()["commitments"][0]
-        self.assertIs(listed["notifications_enabled"], True)

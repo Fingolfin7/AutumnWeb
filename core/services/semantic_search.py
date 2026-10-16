@@ -576,17 +576,6 @@ def _matrix(rows):
     return [pk for pk, _ in kept], {pk: digest for pk, digest in kept}, matrix
 
 
-def load_vectors(user, sessions):
-    """Current-model vectors for the user's sessions within ``sessions``."""
-    return _matrix(
-        SessionEmbedding.objects.filter(
-            session__user=user, model=MODEL, session__in=sessions.order_by().values("pk")
-        )
-        .order_by("session_id")
-        .values_list("session_id", "text_digest", "vector")
-    )
-
-
 def _session_vector_rows(user, sessions, *, passages=True):
     """[(kind, rows)]: the current-model vector rows of the user's ``sessions``."""
     scope = {"session__user": user, "model": MODEL, "session__in": sessions.order_by().values("pk")}

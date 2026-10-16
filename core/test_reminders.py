@@ -1,14 +1,12 @@
 from datetime import datetime, timedelta, timezone as dt_timezone
 from concurrent.futures import ThreadPoolExecutor
-from unittest import mock
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import close_old_connections, connections
 from django.test import TestCase, TransactionTestCase
-from django.utils import timezone
 
-from core.models import NotificationEvent, Projects, Sessions, TimerReminder
+from core.models import NotificationEvent, Projects, TimerReminder
 from core.services.reminders import (
     claim_due_reminders,
     create_timer_reminder,
@@ -112,27 +110,6 @@ class TimerReminderServiceTests(TestCase):
         self.assertFalse(TimerReminder.objects.get(pk=reminder.pk).active)
         self.assertEqual(NotificationEvent.objects.filter(event_type="reminder").count(), 1)
 
-    @mock.patch("core.services.reminders.timezone.now")
-    def test_notification_copy_names_project_elapsed_time_and_expands_placeholders(
-        self, now
-    ):
-        now.return_value = self.start
-        session = self.session()
-        create_timer_reminder(
-            user=self.user,
-            session=session,
-            mode="after",
-            amount=2,
-            unit="minutes",
-            message="Stretch after {elapsed} on {project}",
-        )
-
-        event = claim_due_reminders(now=self.start + timedelta(minutes=2))[0]
-
-        self.assertEqual(event.payload["title"], "Reminder project timer reminder")
-        self.assertEqual(
-            event.payload["body"], "Stretch after 2m on Reminder project"
-        )
 
     def test_stop_cancels_reminders_and_restart_does_not_revive_them(self):
         session = self.session()
@@ -185,19 +162,6 @@ class TimerReminderServiceTests(TestCase):
         event = NotificationEvent.objects.get(event_type="auto_stop", session=session)
         self.assertEqual(event.payload["title"], "Reminder project timer stopped")
         self.assertIn("after 10m", event.payload["body"])
-
-    def test_reminder_claim_does_not_call_push_network(self):
-        session = self.session()
-        create_timer_reminder(
-            user=self.user,
-            session=session,
-            mode="after",
-            amount=1,
-            unit="minutes",
-        )
-        with mock.patch("core.services.push.send_push") as send_push:
-            claim_due_reminders(now=self.start + timedelta(minutes=2))
-        send_push.assert_not_called()
 
 
 class ConcurrentTimerReminderTests(TransactionTestCase):

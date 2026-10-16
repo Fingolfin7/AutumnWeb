@@ -97,18 +97,3 @@ export function keepSubprojects(selected: number[], available: { id: number }[])
 export function toggleId(list: number[], id: number): number[] {
   return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
 }
-
-/** Whether the form differs from where it started (to warn before discarding an edit). */
-export function sameForm(a: ScheduleForm, b: ScheduleForm): boolean {
-  return (
-    a.target === b.target &&
-    a.project === b.project &&
-    a.context === b.context &&
-    a.tag === b.tag &&
-    a.date === b.date &&
-    a.time === b.time &&
-    a.cadence === b.cadence &&
-    a.message === b.message &&
-    [...a.subprojects].sort().join() === [...b.subprojects].sort().join()
-  );
-}

@@ -57,12 +57,3 @@ export function parseFormErrors(error: unknown, options: ParseOptions = {}): For
 export function hasErrors(errors: FormErrors): boolean {
   return errors.general.length > 0 || Object.keys(errors.fields).length > 0;
 }
-
-export function mergeErrors(...all: FormErrors[]): FormErrors {
-  const merged: FormErrors = { fields: {}, general: [] };
-  for (const errors of all) {
-    merged.general.push(...errors.general);
-    for (const [field, lines] of Object.entries(errors.fields)) (merged.fields[field] ??= []).push(...lines);
-  }
-  return merged;
-}

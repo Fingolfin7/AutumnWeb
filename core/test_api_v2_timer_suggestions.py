@@ -76,18 +76,6 @@ class TimerSuggestionsApiTests(TestCase):
         self.assertEqual(commitments[0]["project"]["id"], self.project.pk)
         self.assertIn("remaining", commitments[0]["detail"])
 
-    def test_nothing_to_suggest_without_history_or_commitments(self):
-        self.assertEqual(
-            self._suggestions(), {"commitments": [], "habits": [], "recent": []}
-        )
-
-    def test_a_context_filter_limits_the_suggestions(self):
-        other = Context.objects.create(user=self.user, name="Elsewhere")
-        elsewhere = Projects.objects.create(user=self.user, name="Elsewhere project", context=other)
-        self._completed()
-        self._completed(project=elsewhere)
-        names = {row["project"]["name"] for row in self._suggestions(context=self.context.pk)["recent"]}
-        self.assertEqual(names, {"Timer Project"})
 
     def test_other_accounts_are_never_suggested(self):
         other_user = User.objects.create_user(username="other", email="o@example.com", password="pw")

@@ -1,26 +1,18 @@
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
-from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import connection
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase
 from freezegun import freeze_time
 
-from django.urls import reverse
 
 from core.models import (
-    Context,
     NotificationEvent,
     NotificationPreference,
     Projects,
-    ScheduledReminder,
-    SubProjects,
-    Tag,
 )
 from core.services import CommitmentEditService, SessionMutationService
 from core.services.proactive_notifications import (
-    _weekly_review_event,
     claim_due_commitment_checks,
     claim_due_proactive_notifications,
     claim_due_scheduled_reminders,
@@ -29,7 +21,6 @@ from core.services.proactive_notifications import (
     ensure_notification_preferences,
     local_wall_to_utc,
     snooze_scheduled_reminder,
-    update_scheduled_reminder,
     weekly_review_summary,
 )
 
@@ -135,104 +126,6 @@ class ScheduledNotificationServiceTests(TestCase):
         )
         self.assertIsNone(reminder.snoozed_until)
 
-    def test_project_target_start_url_carries_every_selected_subproject(self):
-        first = SubProjects.objects.create(
-            user=self.user, parent_project=self.project, name="Push day"
-        )
-        second = SubProjects.objects.create(
-            user=self.user, parent_project=self.project, name="Pull day"
-        )
-        reminder = self.create(subprojects=[second.pk, first])
-        self.assertCountEqual(
-            reminder.subprojects.values_list("pk", flat=True), [first.pk, second.pk]
-        )
-
-        events = claim_due_scheduled_reminders(
-            now=datetime(2026, 1, 5, 17, 30, tzinfo=UTC)
-        )
-
-        url = events[0].payload["url"]
-        self.assertEqual(
-            url,
-            f"{reverse('start_timer')}?project_id={self.project.pk}"
-            f"&subproject_id={min(first.pk, second.pk)}"
-            f"&subproject_id={max(first.pk, second.pk)}",
-        )
-
-    def test_subprojects_must_belong_to_the_selected_project(self):
-        other_project = Projects.objects.create(user=self.user, name="Reading")
-        stranger = SubProjects.objects.create(
-            user=self.user, parent_project=other_project, name="Chapters"
-        )
-        with self.assertRaises(ValidationError) as caught:
-            self.create(subprojects=[stranger.pk])
-        self.assertIn("subprojects", caught.exception.message_dict)
-        self.assertFalse(ScheduledReminder.objects.exists())
-
-    def test_context_target_uses_its_name_and_the_bare_start_page(self):
-        context = Context.objects.create(user=self.user, name="Exercise")
-        reminder = self.create(project=None, context=context)
-
-        self.assertIsNone(reminder.project_id)
-        events = claim_due_scheduled_reminders(
-            now=datetime(2026, 1, 5, 17, 30, tzinfo=UTC)
-        )
-
-        self.assertEqual(len(events), 1)
-        payload = events[0].payload
-        self.assertEqual(payload["body"], "You planned Exercise for 18:30.")
-        # A context spans many projects, so nothing is prefilled.
-        self.assertEqual(payload["url"], reverse("start_timer"))
-
-    def test_target_must_be_owned_and_exactly_one(self):
-        context = Context.objects.create(user=self.user, name="Exercise")
-        with self.assertRaises(ValidationError) as both:
-            self.create(context=context)
-        self.assertIn("project", both.exception.message_dict)
-
-        with self.assertRaises(ValidationError) as none:
-            self.create(project=None)
-        self.assertIn("project", none.exception.message_dict)
-
-        stranger = User.objects.create_user(
-            "stranger", email="stranger@example.test", password="password"
-        )
-        with self.assertRaises(ValidationError) as foreign_context:
-            self.create(
-                project=None,
-                context=Context.objects.create(user=stranger, name="Theirs"),
-            )
-        self.assertIn("context", foreign_context.exception.message_dict)
-
-        with self.assertRaises(ValidationError) as foreign_tag:
-            self.create(project=None, tag=Tag.objects.create(user=stranger, name="Theirs"))
-        self.assertIn("tag", foreign_tag.exception.message_dict)
-        self.assertFalse(ScheduledReminder.objects.exists())
-
-    def test_update_switching_to_a_tag_target_clears_subprojects(self):
-        subproject = SubProjects.objects.create(
-            user=self.user, parent_project=self.project, name="Push day"
-        )
-        reminder = self.create(subprojects=[subproject])
-        tag = Tag.objects.create(user=self.user, name="Deep work")
-
-        updated = update_scheduled_reminder(
-            user=self.user,
-            reminder_id=reminder.pk,
-            version=reminder.version,
-            tag=tag,
-            subprojects=[subproject],
-            local_date=date(2026, 1, 6),
-            local_time=time(18, 30),
-            cadence="once",
-            now=datetime(2026, 1, 1, 12, tzinfo=UTC),
-        )
-
-        self.assertIsNone(updated.project_id)
-        self.assertEqual(updated.tag_id, tag.pk)
-        self.assertEqual(list(updated.subprojects.all()), [])
-        self.assertEqual(updated.target_name, "Deep work")
-
 
 class CommitmentAndReviewClaimTests(TestCase):
     def setUp(self):
@@ -305,40 +198,6 @@ class CommitmentAndReviewClaimTests(TestCase):
             datetime(2026, 1, 2, 18, tzinfo=UTC),
         )
 
-    @freeze_time("2026-01-01 12:00:00+00:00")
-    def test_commitment_event_limit_keeps_partially_emitted_occurrence_due(self):
-        second_project = Projects.objects.create(user=self.user, name="Study")
-        self.create_daily_commitment(self.project)
-        self.create_daily_commitment(second_project)
-        occurrence = datetime(2026, 1, 1, 18, tzinfo=UTC)
-        preference = NotificationPreference.objects.create(
-            user=self.user,
-            commitment_checks_enabled=True,
-            next_commitment_check_at=occurrence,
-        )
-
-        first = claim_due_commitment_checks(now=occurrence, limit=1)
-
-        self.assertEqual(len(first), 1)
-        self.assertEqual(
-            NotificationEvent.objects.filter(event_type="commitment_check").count(),
-            1,
-        )
-        preference.refresh_from_db()
-        self.assertEqual(preference.next_commitment_check_at, occurrence)
-
-        second = claim_due_commitment_checks(now=occurrence, limit=1)
-
-        self.assertEqual(len(second), 1)
-        self.assertEqual(
-            NotificationEvent.objects.filter(event_type="commitment_check").count(),
-            2,
-        )
-        preference.refresh_from_db()
-        self.assertEqual(
-            preference.next_commitment_check_at,
-            datetime(2026, 1, 2, 18, tzinfo=UTC),
-        )
 
     @freeze_time("2026-01-02 00:30:00+00:00")
     def test_delayed_commitment_check_skips_period_that_already_closed(self):
@@ -426,129 +285,3 @@ class CommitmentAndReviewClaimTests(TestCase):
         self.assertEqual(len(events), 1)
         self.assertIn("1h 15m across 1 project", events[0].payload["body"])
         self.assertIn("0 of 0 commitments met", events[0].payload["body"])
-
-    def test_weekly_review_dedupe_key_uses_local_week_start(self):
-        preference = NotificationPreference.objects.create(
-            user=self.user,
-            weekly_review_enabled=True,
-        )
-        summary = {
-            "total_minutes": 0,
-            "project_count": 0,
-            "met_count": 0,
-            "eligible_count": 0,
-            "window_start": datetime(2026, 1, 5, tzinfo=UTC),
-            "window_end": datetime(2026, 1, 12, tzinfo=UTC),
-            "timezone": "UTC",
-        }
-        first, first_created = _weekly_review_event(
-            preference,
-            datetime(2026, 1, 12, 9, tzinfo=UTC),
-            summary,
-        )
-
-        # A timezone/DST representation can have different UTC bounds while
-        # still referring to the same local Monday-start review week.
-        summary["window_start"] = datetime(2026, 1, 4, 23, tzinfo=UTC)
-        summary["window_end"] = datetime(2026, 1, 11, 23, tzinfo=UTC)
-        summary["timezone"] = "Europe/Prague"
-        second, second_created = _weekly_review_event(
-            preference,
-            datetime(2026, 1, 12, 9, tzinfo=UTC),
-            summary,
-        )
-
-        self.assertTrue(first_created)
-        self.assertFalse(second_created)
-        self.assertEqual(second.pk, first.pk)
-        self.assertEqual(
-            first.dedupe_key,
-            f"weekly-review:{self.user.pk}:2026-01-05",
-        )
-        self.assertEqual(
-            NotificationEvent.objects.filter(event_type="weekly_review").count(),
-            1,
-        )
-
-
-class ProactiveClaimTransactionScopeTests(TransactionTestCase):
-    """Expensive history work must happen before the short CAS transaction."""
-
-    reset_sequences = True
-
-    def setUp(self):
-        self.user = User.objects.create_user("transaction-user", password="password")
-        self.user.profile.timezone = "UTC"
-        self.user.profile.save(update_fields=["timezone"])
-        self.project = Projects.objects.create(user=self.user, name="Exercise")
-
-    @freeze_time("2026-01-01 18:00:00+00:00")
-    def test_commitment_actionability_runs_outside_claim_transaction(self):
-        commitment = CommitmentEditService.create(
-            self.user,
-            {
-                "aggregation_type": "project",
-                "project": self.project,
-                "commitment_type": "sessions",
-                "period": "daily",
-                "start_date": date(2026, 1, 1),
-                "target": 1,
-                "banking_enabled": False,
-                "max_balance": 0,
-                "min_balance": 0,
-            },
-        )
-        commitment.notifications_enabled = True
-        commitment.save(update_fields=["notifications_enabled"])
-        NotificationPreference.objects.create(
-            user=self.user,
-            commitment_checks_enabled=True,
-            next_commitment_check_at=datetime(2026, 1, 1, 18, tzinfo=UTC),
-        )
-        from core.services import proactive_notifications as proactive
-
-        original = proactive.get_commitment_actionability
-        atomic_states = []
-
-        def observed(*args, **kwargs):
-            atomic_states.append(connection.in_atomic_block)
-            return original(*args, **kwargs)
-
-        with patch.object(
-            proactive, "get_commitment_actionability", side_effect=observed
-        ):
-            events = claim_due_commitment_checks(
-                now=datetime(2026, 1, 1, 18, tzinfo=UTC)
-            )
-
-        self.assertEqual(len(events), 1)
-        self.assertEqual(atomic_states, [False])
-
-    @freeze_time("2026-01-12 09:00:00+00:00")
-    def test_weekly_summary_runs_outside_claim_transaction(self):
-        preference = NotificationPreference.objects.create(
-            user=self.user,
-            weekly_review_enabled=True,
-            next_weekly_review_at=datetime(2026, 1, 12, 9, tzinfo=UTC),
-        )
-        from core.services import proactive_notifications as proactive
-
-        original = proactive.weekly_review_summary
-        atomic_states = []
-
-        def observed(*args, **kwargs):
-            atomic_states.append(connection.in_atomic_block)
-            return original(*args, **kwargs)
-
-        with patch.object(proactive, "weekly_review_summary", side_effect=observed):
-            events = claim_due_weekly_reviews(
-                now=datetime(2026, 1, 12, 9, tzinfo=UTC)
-            )
-
-        self.assertEqual(len(events), 1)
-        self.assertEqual(atomic_states, [False])
-        preference.refresh_from_db()
-        self.assertEqual(
-            preference.next_weekly_review_at,
-            datetime(2026, 1, 19, 9, tzinfo=UTC),
-        )

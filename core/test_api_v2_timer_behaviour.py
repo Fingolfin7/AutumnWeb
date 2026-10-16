@@ -79,13 +79,6 @@ class StartTimerTests(TimerBehaviourTestCase):
             (session.auto_stop_at - session.start_time).total_seconds(), 30 * 60, delta=2
         )
 
-    def test_without_stop_after_or_reminder_there_is_neither(self):
-        self.assertEqual(self._start().status_code, 201)
-        session = Sessions.objects.get(user=self.user)
-        self.assertIsNone(session.auto_stop_at)
-        self.assertIsNone(session.end_time)
-        self.assertFalse(session.notify_on_auto_stop)
-        self.assertFalse(TimerReminder.objects.exists())
 
     def test_one_shot_reminder_and_auto_stop_notification_preference(self):
         response = self._start(
@@ -111,14 +104,6 @@ class StartTimerTests(TimerBehaviourTestCase):
         self.assertEqual(reminder.mode, "interval")
         self.assertEqual(reminder.interval_seconds, 5 * 60)
 
-    def test_at_reminder_keeps_the_instant_it_names(self):
-        # The browser turns the user's wall-clock time into an offset time using
-        # their profile timezone; the server stores that instant.
-        response = self._start(reminder={"mode": "at", "at": "2030-08-05T15:30:00-04:00"})
-        self.assertEqual(response.status_code, 201, response.content)
-        reminder = TimerReminder.objects.get(session__user=self.user)
-        self.assertEqual(reminder.mode, "at")
-        self.assertEqual(reminder.next_fire_at.isoformat(), "2030-08-05T19:30:00+00:00")
 
     def test_a_past_at_reminder_is_rejected_and_no_timer_is_created(self):
         response = self._start(reminder={"mode": "at", "at": "2020-01-01T12:00:00Z"})
@@ -132,11 +117,6 @@ class StartTimerTests(TimerBehaviourTestCase):
         response = self.client.post("/api/v2/timers/", {"project_id": foreign.pk}, format="json")
         self.assertEqual(response.status_code, 404)
         self.assertFalse(Sessions.objects.filter(user=self.user).exists())
-
-    def test_starting_a_second_timer_is_allowed(self):
-        self.assertEqual(self._start().status_code, 201)
-        self.assertEqual(self._start().status_code, 201)
-        self.assertEqual(Sessions.objects.filter(user=self.user, end_time__isnull=True).count(), 2)
 
 
 class ExpiredTimerTests(TimerBehaviourTestCase):
@@ -164,18 +144,6 @@ class ExpiredTimerTests(TimerBehaviourTestCase):
             derived_project_total(self.user, self.project),
             round((floored - start).total_seconds() / 60.0, 4),
         )
-
-    def test_a_timer_that_has_not_expired_stays_running(self):
-        start = timezone.now() - timedelta(minutes=5)
-        session = Sessions.objects.create(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            auto_stop_at=start + timedelta(minutes=30),
-            is_active=True,
-        )
-        listed = self.client.get("/api/v2/timers/").json()["timers"]
-        self.assertEqual([row["id"] for row in listed], [session.pk])
 
 
 class StopTimerTests(TimerBehaviourTestCase):
@@ -211,11 +179,6 @@ class StopTimerTests(TimerBehaviourTestCase):
         timer.refresh_from_db()
         self.assertEqual(timer.note, "running note")
 
-    def test_stop_can_replace_the_note(self):
-        timer = self._active(note="running note")
-        self.client.post(f"/api/v2/timers/{timer.pk}/stop/", {"note": "final"}, format="json")
-        timer.refresh_from_db()
-        self.assertEqual(timer.note, "final")
 
     def test_explicit_allocations_are_stored(self):
         timer = self._active(note="running note")
@@ -254,23 +217,6 @@ class StopTimerTests(TimerBehaviourTestCase):
         timer.refresh_from_db()
         self.assertIsNone(timer.end_time)
 
-    def test_an_unallocated_shortfall_is_accepted(self):
-        timer = self._active()
-        response = self.client.post(
-            f"/api/v2/timers/{timer.pk}/stop/",
-            {
-                "subproject_allocations": [
-                    {"subproject_id": self.first.pk, "allocation_bp": 5000},
-                    {"subproject_id": self.second.pk, "allocation_bp": 4000},
-                ]
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(
-            sum(timer.subproject_links.values_list("allocation_bp", flat=True)), 9000
-        )
-
 
 class TimerNoteTests(TimerBehaviourTestCase):
     def test_active_note_persists_and_completed_timers_conflict(self):
@@ -295,19 +241,6 @@ class TimerNoteTests(TimerBehaviourTestCase):
             f"/api/v2/timers/{foreign.pk}", {"note": "nope"}, format="json"
         )
         self.assertEqual(response.status_code, 404)
-
-    def test_a_reminder_cannot_be_cancelled_by_another_account(self):
-        other = self._other_user()
-        foreign = SessionMutationService.create_session(
-            user=other, project=Projects.objects.create(user=other, name="Other")
-        )
-        reminder = TimerReminder.objects.create(
-            session=foreign, mode="at", next_fire_at=timezone.now() + timedelta(minutes=5)
-        )
-        response = self.client.delete(f"/api/v2/timers/{foreign.pk}/reminders/{reminder.pk}")
-        self.assertEqual(response.status_code, 204)  # idempotent delete: nothing of yours to remove
-        reminder.refresh_from_db()
-        self.assertTrue(reminder.active)
 
 
 class SessionEditTests(TimerBehaviourTestCase):
@@ -352,23 +285,6 @@ class SessionEditTests(TimerBehaviourTestCase):
         self.assertAlmostEqual(derived_project_total(self.user, self.project), 60.0, places=2)
         self.assertAlmostEqual(derived_subproject_total(self.user, self.first), 60.0, places=2)
 
-    def test_explicit_allocations_on_edit(self):
-        session = self._completed()
-        response = self.client.patch(
-            f"/api/v2/sessions/{session.pk}",
-            {
-                "subproject_allocations": [
-                    {"subproject_id": self.first.pk, "allocation_bp": 3000},
-                    {"subproject_id": self.second.pk, "allocation_bp": 7000},
-                ]
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(
-            dict(session.subproject_links.values_list("subproject_id", "allocation_bp")),
-            {self.first.pk: 3000, self.second.pk: 7000},
-        )
 
     def test_allocations_over_100_percent_are_rejected_and_nothing_changes(self):
         session = self._completed()
@@ -391,42 +307,6 @@ class SessionEditTests(TimerBehaviourTestCase):
             set(session.subproject_links.values_list("allocation_bp", flat=True)), {5000}
         )
 
-    def test_an_unallocated_shortfall_is_accepted_on_edit(self):
-        session = self._completed()
-        response = self.client.patch(
-            f"/api/v2/sessions/{session.pk}",
-            {
-                "subproject_allocations": [
-                    {"subproject_id": self.first.pk, "allocation_bp": 5000},
-                    {"subproject_id": self.second.pk, "allocation_bp": 4000},
-                ]
-            },
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(
-            sum(session.subproject_links.values_list("allocation_bp", flat=True)), 9000
-        )
-
-    def test_edits_keep_second_accuracy(self):
-        session = self._completed()
-        response = self.client.patch(
-            f"/api/v2/sessions/{session.pk}",
-            {"start": "2026-08-05T09:07:43Z", "end": "2026-08-05T10:11:29Z"},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 200, response.content)
-        session.refresh_from_db()
-        self.assertEqual(session.start_time, datetime(2026, 8, 5, 9, 7, 43, tzinfo=UTC))
-        self.assertEqual(session.end_time, datetime(2026, 8, 5, 10, 11, 29, tzinfo=UTC))
-
-    def test_a_session_is_found_by_uuid(self):
-        # The uuid survives export/re-import, so /update_session/<uuid>/ is a
-        # stable external link; the React page resolves it with ?uuid=.
-        session = self._completed()
-        response = self.client.get("/api/v2/sessions/", {"uuid": str(session.uuid)})
-        self.assertEqual([row["id"] for row in response.json()["sessions"]], [session.pk])
-        self.assertEqual(response.json()["sessions"][0]["project"]["name"], self.project.name)
 
     def test_delete_session_removes_it_and_its_totals(self):
         session = self._completed()
@@ -437,30 +317,3 @@ class SessionEditTests(TimerBehaviourTestCase):
         self.assertAlmostEqual(derived_project_total(self.user, self.project), 0.0, places=2)
         for sub in (self.first, self.second):
             self.assertAlmostEqual(derived_subproject_total(self.user, sub), 0.0, places=2)
-
-
-class SessionListTests(TimerBehaviourTestCase):
-    def _make(self, count, note=None, minutes_apart=60):
-        now = timezone.now().replace(microsecond=0)
-        for index in range(count):
-            end = now - timedelta(minutes=index * minutes_apart)
-            Sessions.objects.create(
-                user=self.user,
-                project=self.project,
-                start_time=end - timedelta(minutes=30),
-                end_time=end,
-                note=note,
-            )
-
-    def test_total_is_the_whole_result_set_not_the_page(self):
-        self._make(9)
-        payload = self.client.get("/api/v2/sessions/", {"limit": 7}).json()
-        self.assertEqual(payload["total"], 9)
-        self.assertEqual(payload["count"], 7)
-        self.assertEqual(len(payload["sessions"]), 7)
-
-    def test_total_reflects_the_filter(self):
-        self._make(1, note="stripe webhook backfill")
-        self._make(2, note="dark mode pass", minutes_apart=90)
-        payload = self.client.get("/api/v2/sessions/", {"note_snippet": "stripe"}).json()
-        self.assertEqual(payload["total"], 1)

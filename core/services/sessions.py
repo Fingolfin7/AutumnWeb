@@ -318,11 +318,3 @@ class SessionMutationService:
         session.save(update_fields=["version"])
         _mark_commitments_dirty(session.user_id)
         return session
-
-    @staticmethod
-    @transaction.atomic
-    def replace_subprojects(session_id, *, user, subprojects):
-        """Replace a session's complete subproject link set."""
-        return SessionMutationService.mutate_session(
-            session_id, user=user, subprojects=subprojects
-        )

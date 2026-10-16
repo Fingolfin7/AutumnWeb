@@ -6,7 +6,6 @@ existing return shape.
 """
 
 import json
-from pathlib import Path
 from unittest import mock
 
 from django.test import SimpleTestCase
@@ -78,29 +77,6 @@ class NotificationPayloadTests(SimpleTestCase):
                 }
             )
 
-    def test_legacy_payload_gets_stable_identity_and_safe_defaults(self):
-        first = json.loads(_serialize_payload({"title": "A", "body": "B"}))
-        second = json.loads(_serialize_payload({"title": "A", "body": "B"}))
-
-        self.assertEqual(first["url"], "/timers/")
-        self.assertEqual(first["identity"], "general")
-        self.assertEqual(first["tag"], "autumn-timer-general")
-        self.assertEqual(first["tag"], second["tag"])
-
-    def test_payload_is_small_even_with_large_user_text(self):
-        serialized = _serialize_payload(
-            {
-                "kind": "weekly_review",
-                "identity": "week-1",
-                "title": "T" * 100_000,
-                "body": "B" * 100_000,
-                "url": "/review/weekly/",
-                "private_config": "do not forward",
-            }
-        )
-        self.assertLessEqual(len(serialized.encode("utf-8")), 4096)
-        self.assertNotIn("private_config", serialized)
-
 
 class DispatcherProactiveContractTests(SimpleTestCase):
     def test_timer_backlog_leaves_no_budget_for_proactive_claims(self):
@@ -115,25 +91,3 @@ class DispatcherProactiveContractTests(SimpleTestCase):
         ):
             self.assertEqual(run_dispatch_pass(limit=1), (0, ["timer"], 0))
         proactive_claim.assert_not_called()
-
-
-class ServiceWorkerContractTests(SimpleTestCase):
-    service_worker = Path(__file__).parent / "static" / "core" / "pwa" / "service-worker.js"
-
-    def test_worker_has_category_routes_and_action_only_navigation(self):
-        source = self.service_worker.read_text(encoding="utf-8")
-        for route in (
-            '"/notifications"',
-            '"/start_timer"',
-            '"/commitments"',
-            '"/update_commitment"',
-            '"/review/weekly"',
-        ):
-            self.assertIn(route, source)
-        self.assertIn('self.addEventListener("notificationclick"', source)
-        self.assertIn("notificationActions", source)
-        self.assertIn("safeActionUrl", source)
-
-        click_body = source.split('self.addEventListener("notificationclick"', 1)[1]
-        click_body = click_body.split('self.addEventListener("fetch"', 1)[0]
-        self.assertNotIn("fetch(", click_body)

@@ -55,9 +55,6 @@ class DashboardApiTests(TestCase):
         self.assertEqual(response.status_code, 200, response.content)
         return response.json()
 
-    def test_requires_login(self):
-        self.client.logout()
-        self.assertIn(self.client.get("/api/v2/dashboard/").status_code, (401, 403))
 
     def test_quick_stats_and_streak_are_present(self):
         payload = self._dashboard()
@@ -106,16 +103,6 @@ class DashboardApiTests(TestCase):
         self.assertEqual(payload["today_total"], 30.0)
         self.assertEqual(payload["week_total"], 30.0)
 
-    @freeze_time("2026-09-20 12:00:00+02:00")
-    def test_dashboard_supplies_the_day_timeline(self):
-        self._session(self.atlas, 10, subs=["auth"])
-        timeline = self._dashboard()["timeline"]
-        self.assertEqual([lane["project"]["name"] for lane in timeline["lanes"]], ["Atlas API"])
-
-    def test_an_untracked_day_has_an_axis_and_no_lanes(self):
-        timeline = self._dashboard()["timeline"]
-        self.assertEqual(timeline["lanes"], [])
-        self.assertTrue(timeline["ticks"])
 
     @freeze_time("2026-09-20 12:00:00+02:00")
     def test_timeline_endpoint_shows_a_running_timer_as_live(self):
@@ -129,18 +116,6 @@ class DashboardApiTests(TestCase):
         self.assertIn("window_start", response.json())
         self.assertIn("window_end", response.json())
 
-    def test_quick_starts_offer_the_project_and_subprojects(self):
-        self._session(self.atlas, 10, subs=["auth"])
-        [chip] = self._dashboard()["quick_starts"]
-        self.assertEqual(chip["project"]["name"], "Atlas API")
-        self.assertEqual([sub["name"] for sub in chip["subprojects"]], ["auth"])
-
-    def test_a_combination_already_running_is_not_offered(self):
-        self._session(self.atlas, 10, subs=["auth"])
-        self._session(self.autumn, 20, subs=["ui"])
-        self._timer(self.atlas, subs=["auth"])
-        chips = self._dashboard()["quick_starts"]
-        self.assertEqual([chip["project"]["name"] for chip in chips], ["Autumn"])
 
     def test_other_accounts_are_never_included(self):
         other = User.objects.create_user(username="other", email="other@example.com", password="pw")

@@ -1042,23 +1042,6 @@ class ReportHierarchySerializer(serializers.Serializer):
     projects = ReportHierarchyProjectSerializer(many=True)
 
 
-class ChartPayloadRowSerializer(serializers.Serializer):
-    x = serializers.DateTimeField(required=False)
-    y = serializers.FloatField(required=False)
-    series = serializers.CharField(required=False)
-    date = serializers.DateField(required=False)
-    hours = serializers.FloatField(required=False)
-    start_time = serializers.DateTimeField(required=False)
-    end_time = serializers.DateTimeField(required=False)
-    label = serializers.CharField(required=False)
-    count = serializers.IntegerField(required=False)
-    text = serializers.CharField(required=False)
-    weight = serializers.IntegerField(required=False)
-    weekday = serializers.IntegerField(required=False, min_value=0, max_value=6)
-    hour = serializers.IntegerField(required=False, min_value=0, max_value=23)
-    average_hours = serializers.FloatField(required=False, min_value=0)
-
-
 class ChartTallyRowSerializer(serializers.Serializer):
     name = serializers.CharField()
     total_time = serializers.FloatField(help_text="Minutes.")

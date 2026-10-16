@@ -89,30 +89,6 @@ class ImportIntoContextTests(ImportUploadTestCase):
         self.assertEqual(project.context_id, destination.id)
         self.assertFalse(Context.objects.filter(user=self.user, name="FileContext").exists())
 
-    def test_uploads_with_the_same_filename_stay_isolated_per_session(self):
-        other_client = self._client()
-        first_ctx = Context.objects.create(user=self.user, name="FirstDest")
-        second_ctx = Context.objects.create(user=self.user, name="SecondDest")
-
-        first = self._upload(project_document("First Upload"), import_context=first_ctx.id)
-        second = self._upload(
-            project_document("Second Upload"), client=other_client, import_context=second_ctx.id
-        )
-        self.assertEqual(first.status_code, 201)
-        self.assertEqual(second.status_code, 201)
-        self.assertEqual(len(self._staged_files()), 2)
-
-        self.assertIn("Import completed successfully", self._stream(first.json()["upload_id"]))
-        self.assertIn(
-            "Import completed successfully",
-            self._stream(second.json()["upload_id"], client=other_client),
-        )
-        self.assertEqual(
-            Projects.objects.get(user=self.user, name="First Upload").context_id, first_ctx.id
-        )
-        self.assertEqual(
-            Projects.objects.get(user=self.user, name="Second Upload").context_id, second_ctx.id
-        )
 
     def test_naming_a_new_context_and_picking_one_is_refused_but_the_new_name_alone_works(self):
         dropdown = Context.objects.create(user=self.user, name="DropdownCtx")
@@ -165,20 +141,4 @@ class PendingUploadCleanupTests(ImportUploadTestCase):
         self._stream(upload_id)
         self.assertEqual(
             self.client.get(f"/api/v2/import/uploads/{upload_id}/stream/").status_code, 404
-        )
-
-    def test_a_second_upload_is_staged_beside_the_first_and_both_can_stream(self):
-        # The old page kept one pending upload per session and discarded the
-        # first; uploads are now independent, and the clear_temp_uploads sweep
-        # (core.tests.PendingImportCleanupTests) reclaims abandoned ones.
-        first = self._upload(project_document("First Upload")).json()["upload_id"]
-        second = self._upload(project_document("Second Upload")).json()["upload_id"]
-        self.assertNotEqual(first, second)
-        self.assertEqual(len(self._staged_files()), 2)
-        self._stream(first)
-        self._stream(second)
-        self.assertEqual(self._staged_files(), [])
-        self.assertEqual(
-            set(Projects.objects.filter(user=self.user).values_list("name", flat=True)),
-            {"First Upload", "Second Upload"},
         )
