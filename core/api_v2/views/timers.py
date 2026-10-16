@@ -50,6 +50,15 @@ class TimersView(V2APIView):
             .order_by("-start_time", "-id")
         )
         context_key = context_request.session.get("active_context_id", "all")
+        # Timers in other contexts are hidden, not gone: say how many, so a
+        # timer started outside the current context doesn't seem lost.
+        outside_context_count = (
+            0
+            if context_key == "all"
+            else Sessions.objects.filter(user=request.user, end_time__isnull=True)
+            .exclude(pk__in=[timer.pk for timer in timers])
+            .count()
+        )
         timer_etags = []
         for timer in timers:
             value = f"{timer.pk}:{timer.version}"
@@ -59,7 +68,10 @@ class TimersView(V2APIView):
                     for reminder in timer.active_reminders
                 )
             timer_etags.append(value)
-        etag_source = f"{context_key}|{','.join(sorted(include))}|" + ",".join(timer_etags)
+        etag_source = (
+            f"{context_key}|{','.join(sorted(include))}|{outside_context_count}|"
+            + ",".join(timer_etags)
+        )
         etag = f'W/"{hashlib.sha256(etag_source.encode()).hexdigest()}"'
         if request.headers.get("If-None-Match") == etag:
             response = Response(status=status.HTTP_304_NOT_MODIFIED)
@@ -68,6 +80,7 @@ class TimersView(V2APIView):
         response = Response(
             {
                 "count": len(timers),
+                "outside_context_count": outside_context_count,
                 "timers": [
                     _serialize(
                         timer,

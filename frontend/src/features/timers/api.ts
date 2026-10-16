@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { ApiError, toApiError } from "@/api/errors";
 import { keys } from "@/api/keys";
@@ -18,9 +18,15 @@ import { useActiveContext } from "@/app/context";
 export const TIMER_POLL_MS = 15_000;
 
 /* Last ETag and body per URL (one per context scope). */
-const etagCache = new Map<string, { etag: string; timers: Timer[] }>();
+const etagCache = new Map<string, { etag: string; result: TimerList }>();
 
-export async function fetchTimers(context?: string): Promise<Timer[]> {
+export interface TimerList {
+  timers: Timer[];
+  /** Running timers the context filter hides (0 for all contexts). */
+  outsideContextCount: number;
+}
+
+export async function fetchTimers(context?: string): Promise<TimerList> {
   /* Reminders ride along (and are covered by the ETag), so the cards need no
      request of their own. */
   const url = `/api/v2/timers/?include=reminders${context ? `&context=${encodeURIComponent(context)}` : ""}`;
@@ -33,27 +39,43 @@ export async function fetchTimers(context?: string): Promise<Timer[]> {
   } catch (cause) {
     throw new ApiError(0, "network", "Can't reach Autumn. Check your connection.", cause);
   }
-  if (response.status === 304 && cached) return cached.timers;
+  if (response.status === 304 && cached) return cached.result;
   if (!response.ok) {
     const body = await response.json().catch(() => undefined);
     throw toApiError(response.status, body);
   }
-  const data = (await response.json()) as { timers: Timer[] };
+  const data = (await response.json()) as { timers: Timer[]; outside_context_count?: number };
+  const result = { timers: data.timers, outsideContextCount: data.outside_context_count ?? 0 };
   const etag = response.headers.get("ETag");
-  if (etag) etagCache.set(url, { etag, timers: data.timers });
-  return data.timers;
+  if (etag) etagCache.set(url, { etag, result });
+  return result;
 }
 
 /** Running timers in the active context (the header's switch). */
 export function useTimers() {
   const { contextIdsParam } = useActiveContext();
+  const client = useQueryClient();
+  const scope = contextIdsParam ?? "all";
   return useQuery({
-    queryKey: [...keys.timers(), contextIdsParam ?? "all"],
-    queryFn: async () => overlayTimers(await fetchTimers(contextIdsParam), pendingTimer),
+    queryKey: [...keys.timers(), scope],
+    queryFn: async () => {
+      const { timers, outsideContextCount } = await fetchTimers(contextIdsParam);
+      client.setQueryData(keys.timersOutsideContext(scope), outsideContextCount);
+      return overlayTimers(timers, pendingTimer);
+    },
     refetchInterval: TIMER_POLL_MS,
     refetchIntervalInBackground: false,
     staleTime: 5_000,
   });
+}
+
+/** How many running timers the active context hides, as of the last
+    useTimers fetch (it rides on that response, so this never requests). */
+export function useOutsideContextTimerCount(): number {
+  const { contextIdsParam } = useActiveContext();
+  const scope = contextIdsParam ?? "all";
+  const { data } = useQuery<number>({ queryKey: keys.timersOutsideContext(scope), queryFn: skipToken });
+  return contextIdsParam ? (data ?? 0) : 0;
 }
 
 /** Re-renders every second while mounted: the clock the live cards read. */

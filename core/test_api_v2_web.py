@@ -228,3 +228,29 @@ class ApiV2WebTests(TestCase):
             "/api/v2/timers/", {"context": self.personal.pk}
         )
         self.assertNotEqual(work["ETag"], personal["ETag"])
+
+    def test_timers_count_running_timers_outside_the_context(self):
+        work = self.client.get("/api/v2/timers/", {"context": self.work.pk})
+        self.assertEqual(
+            [timer["id"] for timer in work.json()["timers"]], [self.work_timer.pk]
+        )
+        self.assertEqual(work.json()["outside_context_count"], 1)
+        self.assertEqual(
+            self.client.get("/api/v2/timers/").json()["outside_context_count"], 0
+        )
+
+        # Starting a timer elsewhere changes the count, so the ETag moves.
+        Sessions.objects.create(
+            user=self.user,
+            project=self.personal_project,
+            start_time=timezone.now(),
+            end_time=None,
+            is_active=True,
+        )
+        again = self.client.get(
+            "/api/v2/timers/",
+            {"context": self.work.pk},
+            HTTP_IF_NONE_MATCH=work["ETag"],
+        )
+        self.assertEqual(again.status_code, 200)
+        self.assertEqual(again.json()["outside_context_count"], 2)

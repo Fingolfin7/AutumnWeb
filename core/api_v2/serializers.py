@@ -286,6 +286,9 @@ class SessionPatchRequestSerializer(serializers.Serializer):
 
 class TimerListResponseSerializer(serializers.Serializer):
     count = serializers.IntegerField()
+    outside_context_count = serializers.IntegerField(
+        help_text="Running timers hidden by the context filter; 0 for all contexts."
+    )
     timers = SessionResourceSerializer(many=True)
 
 

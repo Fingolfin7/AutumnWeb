@@ -10,7 +10,8 @@ test.afterEach(async ({ page }) => {
 
 test("timer lifecycle: start, see it running, stop with a note, find the session", async ({ page }, testInfo) => {
   const problems = trackErrors(page);
-  const note = `Lifecycle check ${testInfo.project.name}`;
+  // Unique per attempt, or the session search finds earlier attempts too.
+  const note = `Lifecycle check ${testInfo.project.name} ${testInfo.retry}.${testInfo.repeatEachIndex}`;
 
   await page.goto("/start_timer/");
   await pickProject(page, "Garden Planner App");
@@ -75,4 +76,38 @@ test.describe("offline", () => {
     await expect(card.getByText("Running · saved offline")).toHaveCount(0);
     await expect(card.getByText("Running", { exact: true })).toBeVisible();
   });
+});
+
+test("a timer started outside the active context is announced, and Show all reveals it", async ({ page }) => {
+  const problems = trackErrors(page);
+  const contextSwitch = page.getByRole("combobox", { name: "Active context" });
+  try {
+    await page.goto("/timers/");
+    // The switch is saved by a PATCH; let it land before leaving the page.
+    const saved = page.waitForResponse((r) => r.url().includes("/api/v2/me/preferences/") && r.request().method() === "PATCH");
+    await contextSwitch.selectOption({ label: "Study" });
+    expect((await saved).ok()).toBeTruthy();
+
+    await page.goto("/start_timer/");
+    await pickProject(page, "Garden Planner App"); // a Work project
+    await page.getByRole("button", { name: "Start timer" }).click();
+
+    await expect(page).toHaveURL(/\/timers\/$/);
+    const notice = page.getByText("1 timer running in other contexts");
+    await expect(notice).toBeVisible();
+    await expect(page.getByRole("article", { name: /Running timer/ })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Show all" }).click();
+    await expect(contextSwitch).toHaveValue("all");
+    await expect(page.getByRole("article", { name: "Running timer: Garden Planner App" })).toBeVisible();
+    await expect(notice).toHaveCount(0);
+    expect(problems()).toEqual([]);
+  } finally {
+    // The switch is saved on the profile: leave the demo account on all contexts.
+    const csrf = (await page.context().cookies()).find((c) => c.name === "csrftoken")?.value ?? "";
+    await page.request.patch("/api/v2/me/preferences/", {
+      data: { active_context_id: null },
+      headers: { "X-CSRFToken": csrf },
+    });
+  }
 });

@@ -2498,6 +2498,8 @@ export interface components {
         };
         TimerListResponse: {
             count: number;
+            /** @description Running timers hidden by the context filter; 0 for all contexts. */
+            outside_context_count: number;
             timers: components["schemas"]["SessionResource"][];
         };
         TimerReminder: {
