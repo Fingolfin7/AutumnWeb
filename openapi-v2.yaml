@@ -6858,12 +6858,16 @@ components:
       properties:
         count:
           type: integer
+        outside_context_count:
+          type: integer
+          description: Running timers hidden by the context filter; 0 for all contexts.
         timers:
           type: array
           items:
             $ref: '#/components/schemas/SessionResource'
       required:
       - count
+      - outside_context_count
       - timers
     TimerReminder:
       type: object

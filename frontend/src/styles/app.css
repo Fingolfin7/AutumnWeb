@@ -182,3 +182,22 @@
 
 /* Related slider in a filter sheet: room between its stop labels and the next field. */
 .sheet .similarity { padding-bottom: var(--s2); }
+
+/* Timers page: running timers hidden by the context switch. */
+.timers-outside-context {
+  margin: var(--s3) 0;
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+.timers-outside-context-show {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+.timers-outside-context-show:hover,
+.timers-outside-context-show:focus-visible { color: var(--ink); }

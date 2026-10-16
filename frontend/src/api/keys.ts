@@ -3,6 +3,8 @@
    details and the dashboard sections built from them. */
 export const keys = {
   timers: () => ["timers"] as const,
+  /* Not under ["timers"]: the optimistic updates there edit Timer[] lists. */
+  timersOutsideContext: (context: string) => ["timers-outside-context", context] as const,
   sessions: (params?: object) => (params ? (["sessions", params] as const) : (["sessions"] as const)),
   session: (id: number) => ["sessions", "detail", id] as const,
   projects: (params?: object) => (params ? (["projects", params] as const) : (["projects"] as const)),
