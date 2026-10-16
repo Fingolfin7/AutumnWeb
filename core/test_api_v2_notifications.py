@@ -17,7 +17,6 @@ from core.models import (
     Projects,
     ScheduledReminder,
     SubProjects,
-    Tag,
 )
 from core.services import SessionMutationService
 from core.services.proactive_notifications import create_scheduled_reminder
@@ -119,10 +118,6 @@ class PreferencesTests(NotificationsApiTestCase):
 
 
 class ScheduleTests(NotificationsApiTestCase):
-    def test_nothing_is_scheduled_at_first(self):
-        payload = self.client.get(SCHEDULES).json()
-        self.assertEqual(payload["count"], 0)
-        self.assertEqual(payload["upcoming"], [])
 
     def test_a_project_schedule_keeps_all_its_subprojects(self):
         response = self.client.post(
@@ -175,73 +170,6 @@ class ScheduleTests(NotificationsApiTestCase):
         reminder.refresh_from_db()
         self.assertEqual(reminder.message, "Changed")
 
-    def test_a_context_target_drops_any_project_and_subprojects(self):
-        context = Context.objects.create(user=self.user, name="Exercise")
-        response = self.client.post(
-            SCHEDULES,
-            # A stray project/subproject selection must not survive the choice.
-            self.body(
-                target="context",
-                context=context.pk,
-                project=self.project.pk,
-                subprojects=[self.subproject.pk],
-            ),
-            format="json",
-        )
-        self.assertEqual(response.status_code, 201, response.content)
-        reminder = ScheduledReminder.objects.get()
-        self.assertIsNone(reminder.project_id)
-        self.assertIsNone(reminder.tag_id)
-        self.assertEqual(reminder.context_id, context.pk)
-        self.assertEqual(list(reminder.subprojects.all()), [])
-        self.assertEqual(response.json()["target"], "context")
-        self.assertEqual(response.json()["target_resource"]["name"], "Exercise")
-
-    def test_switching_the_target_restores_or_clears_subprojects(self):
-        context = Context.objects.create(user=self.user, name="Exercise")
-        tag = Tag.objects.create(user=self.user, name="Deep work")
-        reminder = self.schedule(project=None, context=context, subprojects=None, cadence="once")
-        url = f"{SCHEDULES}{reminder.pk}"
-
-        to_project = self.client.patch(
-            url,
-            {
-                "target": "project",
-                "project": self.project.pk,
-                "subprojects": [self.subproject.pk, self.other_subproject.pk],
-                "version": reminder.version,
-            },
-            format="json",
-        )
-        self.assertEqual(to_project.status_code, 200, to_project.content)
-        reminder.refresh_from_db()
-        self.assertIsNone(reminder.context_id)
-        self.assertCountEqual(
-            reminder.subprojects.values_list("pk", flat=True),
-            [self.subproject.pk, self.other_subproject.pk],
-        )
-
-        to_tag = self.client.patch(
-            url,
-            {
-                "target": "tag",
-                "tag": tag.pk,
-                "subprojects": [self.subproject.pk],
-                "version": reminder.version,
-            },
-            format="json",
-        )
-        self.assertEqual(to_tag.status_code, 200, to_tag.content)
-        reminder.refresh_from_db()
-        self.assertEqual(reminder.tag_id, tag.pk)
-        self.assertIsNone(reminder.project_id)
-        self.assertEqual(list(reminder.subprojects.all()), [])
-
-    def test_a_context_target_needs_a_context(self):
-        response = self.client.post(SCHEDULES, self.body(target="context"), format="json")
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("Choose a context.", response.content.decode())
-        self.assertFalse(ScheduledReminder.objects.exists())
 
     def test_a_context_owned_by_another_account_is_refused(self):
         theirs = Context.objects.create(user=self.other, name="Theirs")

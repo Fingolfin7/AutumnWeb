@@ -18,7 +18,6 @@ const OFFLINE_URL = "/static/core/pwa/offline.html";
 const PRECACHE_URLS = [
     OFFLINE_URL,
     "/static/core/css/focus_desk.css",
-    "/static/core/js/local_times.js",
     "/static/core/js/pwa.js",
     "/static/core/js/page_loading.js",
     "/static/core/images/icons/autumn-icon-192.png",

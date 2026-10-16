@@ -284,7 +284,6 @@ export function patchPayload(base: FormState, next: FormState): CommitmentChange
   return patch;
 }
 
-export const hasRestartChanges = (changes: EditChanges) => changes.restart.length > 0;
 export const hasAnyChange = (changes: EditChanges) =>
   changes.restart.length + changes.nextPeriod.length + changes.immediate.length > 0;
 

@@ -34,7 +34,6 @@ class ClaudeHandler(BaseLLMHandler):
         self.username = None
         self.session_data = None
         self.conversation_history = []
-        self.usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
         self.system_prompt_template = """
         You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
         and session logs to provide insights based on the data provided.
@@ -152,15 +151,6 @@ class ClaudeHandler(BaseLLMHandler):
             "cached": cache_read,
         }
 
-    def _update_usage(self, response):
-        usage = self._usage_from_response(response)
-        self.usage_stats["prompt"] += usage["prompt"]
-        self.usage_stats["response"] += usage["response"]
-        self.usage_stats["cached"] += usage["cached"]
-        self.usage_stats["total"] += usage["prompt"] + usage["response"]
-
-    def get_usage_stats(self):
-        return self.usage_stats
 
     async def _stream_message_response(
         self, messages, system_text: str = ""
@@ -302,8 +292,6 @@ class ClaudeHandler(BaseLLMHandler):
             }
         )
 
-        if resp:
-            self._update_usage(resp)
         return text
 
     async def stream_update_session_data(
@@ -346,8 +334,6 @@ class ClaudeHandler(BaseLLMHandler):
                 "refusal": bool(result.get("refusal")),
             }
         )
-        if result.get("response"):
-            self._update_usage(result["response"])
 
     async def send_message(self, message) -> str:
         system_text = self._active_system_text()
@@ -419,8 +405,6 @@ class ClaudeHandler(BaseLLMHandler):
             }
         )
 
-        if resp:
-            self._update_usage(resp)
         return text
 
     async def stream_message(self, message) -> AsyncIterator[str]:
@@ -459,8 +443,6 @@ class ClaudeHandler(BaseLLMHandler):
                 "refusal": bool(result.get("refusal")),
             }
         )
-        if result.get("response"):
-            self._update_usage(result["response"])
 
     def get_conversation_history(self) -> list:
         return self.conversation_history

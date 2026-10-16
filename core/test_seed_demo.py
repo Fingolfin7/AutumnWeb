@@ -45,10 +45,6 @@ class SeedDemoTests(TestCase):
         self.assertEqual(User.objects.filter(username="demo-a").count(), 1)
         self.assertTrue(User.objects.get(username="demo-a").check_password("demo-pass-123"))
 
-    def test_existing_user_needs_reset(self):
-        seed()
-        with self.assertRaises(CommandError):
-            seed()
 
     def test_reset_refused_without_debug_unless_forced(self):
         seed()

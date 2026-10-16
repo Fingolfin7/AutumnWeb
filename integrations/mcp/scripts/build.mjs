@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { parse } from 'yaml';
 
-const spec = parse(await readFile(new URL('../openapi-v2.yaml', import.meta.url), 'utf8'));
+const spec = parse(await readFile(new URL('../../../openapi-v2.yaml', import.meta.url), 'utf8'));
 function schema(value) {
   if (Array.isArray(value)) return value.map(schema);
   if (!value || typeof value !== 'object') return value;

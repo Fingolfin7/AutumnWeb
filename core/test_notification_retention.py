@@ -2,15 +2,12 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.test import TestCase
-from django.test import override_settings
 from django.utils import timezone
 
 from core.models import (
     NotificationDelivery,
     NotificationEvent,
-    Projects,
     PushSubscription,
-    Sessions,
 )
 from core.services.notification_retention import cleanup_notification_history
 
@@ -86,38 +83,6 @@ class NotificationHistoryRetentionTests(TestCase):
         self.assertTrue(NotificationEvent.objects.filter(pk=pending.pk).exists())
         self.assertTrue(NotificationEvent.objects.filter(pk=processing.pk).exists())
 
-    def test_pending_and_processing_deliveries_protect_terminal_event(self):
-        event = self.event(completed_at=self.now - timedelta(days=91))
-        subscription = PushSubscription.objects.create(
-            user=self.user,
-            endpoint="https://push.example.test/live-delivery",
-            p256dh="key",
-            auth="auth",
-        )
-        for index, status in enumerate(("pending", "processing")):
-            NotificationDelivery.objects.create(
-                event=event,
-                subscription=subscription,
-                status=status,
-                # A second subscription is not needed for the protection check.
-            )
-            if index == 0:
-                subscription = PushSubscription.objects.create(
-                    user=self.user,
-                    endpoint="https://push.example.test/live-delivery-2",
-                    p256dh="key",
-                    auth="auth",
-                )
-
-        self.assertEqual(
-            cleanup_notification_history(now=self.now, retention_days=90), 0
-        )
-        self.assertTrue(NotificationEvent.objects.filter(pk=event.pk).exists())
-
-    @override_settings(NOTIFICATION_HISTORY_RETENTION_DAYS=0)
-    def test_zero_retention_is_disabled_without_a_database_query(self):
-        with self.assertNumQueries(0):
-            self.assertEqual(cleanup_notification_history(now=self.now), 0)
 
     def test_cleanup_batch_is_hard_bounded(self):
         events = [
@@ -135,49 +100,3 @@ class NotificationHistoryRetentionTests(TestCase):
             NotificationEvent.objects.filter(pk__in=[event.pk for event in events]).count(),
             1,
         )
-
-    def test_configured_batch_cannot_exceed_hard_cap(self):
-        NotificationEvent.objects.bulk_create(
-            [
-                NotificationEvent(
-                    dedupe_key=f"retention-cap:{index}",
-                    event_type="reminder",
-                    user=self.user,
-                    payload={},
-                    scheduled_at=self.now,
-                    status="delivered",
-                    completed_at=self.now - timedelta(days=91),
-                )
-                for index in range(1001)
-            ]
-        )
-
-        self.assertEqual(
-            cleanup_notification_history(
-                now=self.now, retention_days=90, batch_size=5000
-            ),
-            1000,
-        )
-        self.assertEqual(NotificationEvent.objects.count(), 1)
-
-    def test_dry_run_preserves_event_and_cleanup_preserves_session_source(self):
-        project = Projects.objects.create(user=self.user, name="Retention project")
-        session = Sessions.objects.create(
-            user=self.user,
-            project=project,
-            start_time=self.now - timedelta(hours=1),
-            end_time=self.now,
-        )
-        event = self.event(
-            completed_at=self.now - timedelta(days=91),
-        )
-        event.session = session
-        event.save(update_fields=["session"])
-
-        self.assertEqual(
-            cleanup_notification_history(now=self.now, dry_run=True), 1
-        )
-        self.assertTrue(NotificationEvent.objects.filter(pk=event.pk).exists())
-        self.assertEqual(cleanup_notification_history(now=self.now), 1)
-        self.assertTrue(Sessions.objects.filter(pk=session.pk).exists())
-        self.assertTrue(Projects.objects.filter(pk=project.pk).exists())

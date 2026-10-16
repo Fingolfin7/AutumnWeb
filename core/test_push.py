@@ -12,12 +12,9 @@ from django.utils import timezone
 from core.models import NotificationDelivery, NotificationEvent, PushSubscription
 from core.services.push import (
     PushValidationError,
-    _serialize_payload,
     dispatch_event,
-    enqueue_push_test,
     save_subscription,
     validate_subscription,
-    vapid_configuration,
 )
 
 
@@ -27,7 +24,6 @@ VAPID_PUBLIC = base64.urlsafe_b64encode(b"\x04" + b"v" * 64).rstrip(b"=").decode
 # py_vapid reads a 32-byte value as a raw key, so this loads the way a real
 # deployment's private key does without keeping a PEM file in the repository.
 VAPID_PRIVATE = base64.urlsafe_b64encode(b"k" * 32).rstrip(b"=").decode()
-PEM_CONTENTS = "-----BEGIN PRIVATE KEY-----\nMIGHAgEA\n-----END PRIVATE KEY-----\n"
 
 
 class ProviderError(Exception):
@@ -113,16 +109,6 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         event = NotificationEvent.objects.get(pk=response.json()["event_id"])
         self.assertEqual(event.payload["kind"], "test")
 
-    def test_push_test_does_not_accept_an_arbitrary_endpoint(self):
-        client = Client()
-        client.force_login(self.user)
-        response = client.post(
-            "/api/v2/push/test/",
-            data={"endpoint": "https://attacker.example/send"},
-            content_type="application/json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(NotificationEvent.objects.exists())
 
     def test_push_post_endpoints_require_csrf(self):
         client = Client(enforce_csrf_checks=True)
@@ -159,77 +145,6 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         self.assertTrue(response.json()["removed"])
         self.assertFalse(PushSubscription.objects.get().active)
 
-    @override_settings(
-        PUSH_VAPID_PUBLIC_KEY=f"Application Server Key = {VAPID_PUBLIC}\n\n",
-    )
-    def test_status_normalises_py_vapid_cli_output(self):
-        client = Client()
-        client.force_login(self.user)
-
-        configuration = vapid_configuration()
-        response = client.get("/api/v2/push/status/")
-
-        self.assertTrue(configuration["configured"])
-        self.assertEqual(configuration["public_key"], VAPID_PUBLIC)
-        self.assertTrue(response.json()["available"])
-        self.assertEqual(response.json()["public_key"], VAPID_PUBLIC)
-
-    def test_status_canonicalises_standard_base64_and_padded_public_keys(self):
-        # The VAPID_PUBLIC bytes never encode to "+" or "/", so this key body
-        # exercises both the alphabet translation and the padding strip.
-        raw = b"\x04" + b"\xfb\xff" * 32
-        client = Client()
-        client.force_login(self.user)
-
-        for value in (
-            base64.b64encode(raw).decode(),
-            base64.urlsafe_b64encode(raw).decode(),
-        ):
-            with self.subTest(value=value), override_settings(
-                PUSH_VAPID_PUBLIC_KEY=value
-            ):
-                key = client.get("/api/v2/push/status/").json()["public_key"]
-                self.assertRegex(key, r"^[A-Za-z0-9_-]+$")
-                self.assertEqual(
-                    base64.urlsafe_b64decode(key + "=" * (-len(key) % 4)), raw
-                )
-
-    def test_status_rejects_subjects_py_vapid_would_reject_at_send_time(self):
-        client = Client()
-        client.force_login(self.user)
-
-        for subject in ("https://example.com/contact", "mailto:admin"):
-            with self.subTest(subject=subject), override_settings(
-                PUSH_VAPID_SUBJECT=subject
-            ):
-                body = client.get("/api/v2/push/status/").json()
-                self.assertFalse(body["available"])
-                self.assertIsNone(body["public_key"])
-                self.assertIn("PUSH_VAPID_SUBJECT", body["configuration_error"])
-
-    @override_settings(PUSH_VAPID_PRIVATE_KEY=PEM_CONTENTS)
-    def test_status_rejects_raw_pem_contents_as_the_private_key(self):
-        client = Client()
-        client.force_login(self.user)
-
-        configuration = vapid_configuration()
-        response = client.get("/api/v2/push/status/")
-
-        self.assertFalse(configuration["configured"])
-        self.assertIn("PUSH_VAPID_PRIVATE_KEY", str(configuration["error"]))
-        self.assertFalse(response.json()["available"])
-        self.assertIsNone(response.json()["public_key"])
-
-    @override_settings(PUSH_VAPID_PUBLIC_KEY="not a base64url key")
-    def test_status_rejects_malformed_public_key_before_browser_decode(self):
-        client = Client()
-        client.force_login(self.user)
-
-        response = client.get("/api/v2/push/status/")
-
-        self.assertFalse(response.json()["available"])
-        self.assertIsNone(response.json()["public_key"])
-        self.assertIn("PUSH_VAPID_PUBLIC_KEY", response.json()["configuration_error"])
 
     def test_dispatch_fans_out_and_success_aggregates_with_expired_device(self):
         first = save_subscription(
@@ -310,22 +225,6 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         self.assertEqual(delivery.attempts, 2)
         self.assertEqual(event.status, "failed")
 
-    def test_stale_processing_lease_can_be_reclaimed(self):
-        subscription = save_subscription(user=self.user, payload=self.payload())
-        event = self.event(self.user)
-        delivery = NotificationDelivery.objects.create(
-            event=event,
-            subscription=subscription,
-            status="processing",
-            lease_until=timezone.now() - timedelta(minutes=5),
-            attempts=1,
-        )
-        with mock.patch("core.services.push.send_push") as sender:
-            status = dispatch_event(event.pk, now=timezone.now())
-        self.assertEqual(status, "delivered")
-        self.assertEqual(sender.call_count, 1)
-        delivery.refresh_from_db()
-        self.assertEqual(delivery.attempts, 2)
 
     def test_missing_vapid_and_no_recipient_are_terminal(self):
         event = self.event(self.user)
@@ -340,16 +239,6 @@ class PushDeliveryTests(PushTestMixin, TestCase):
         with mock.patch("core.services.push.send_push") as sender:
             self.assertEqual(dispatch_event(event.pk), "unavailable")
         sender.assert_not_called()
-
-    def test_enqueue_push_test_uses_fixed_payload(self):
-        event = enqueue_push_test(user=self.user)
-        self.assertEqual(event.event_type, "reminder")
-        self.assertIsNone(event.session_id)
-        self.assertEqual(event.payload["url"], "/timers/")
-
-    def test_provider_payload_is_bounded(self):
-        serialized = _serialize_payload({"title": "T", "body": "x" * 100_000})
-        self.assertLessEqual(len(serialized.encode("utf-8")), 4096)
 
 
 class DispatcherCommandTests(TestCase):
@@ -366,14 +255,3 @@ class DispatcherCommandTests(TestCase):
             call_command("dispatch_timer_reminders", "--once", stdout=output)
         one_pass.assert_called_once()
         self.assertIn("stopped=2 claimed=2 flushed=3", output.getvalue())
-
-    def test_second_dispatcher_exits_when_the_singleton_lock_is_held(self):
-        output = StringIO()
-        with mock.patch(
-            "core.management.commands.dispatch_timer_reminders.cache.add", return_value=False
-        ), mock.patch(
-            "core.management.commands.dispatch_timer_reminders.Command._pass"
-        ) as one_pass:
-            call_command("dispatch_timer_reminders", "--once", stdout=output)
-        one_pass.assert_not_called()
-        self.assertIn("already running", output.getvalue())

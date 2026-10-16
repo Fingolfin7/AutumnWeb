@@ -22,9 +22,6 @@ class GeminiHandler(BaseLLMHandler):
         self.session_data = None
         self.conversation_history = []
 
-        # Track cumulative usage stats
-        self.usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
-
         self.system_prompt_template = """
         You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
         and session logs to provide insights based on the data provided.
@@ -112,35 +109,6 @@ class GeminiHandler(BaseLLMHandler):
             "cached": getattr(metadata, "cached_content_token_count", 0) or 0,
         }
 
-    def _update_usage(self, response):
-        """Internal helper to extract and accumulate token usage metadata if available."""
-        metadata = getattr(response, "usage_metadata", None)
-        if metadata:
-            usage = self._usage_from_response(response)
-            total_tokens = (
-                getattr(metadata, "total_token_count", usage["prompt"] + usage["response"])
-                or 0
-            )
-            self.usage_stats["prompt"] += usage["prompt"]
-            self.usage_stats["response"] += usage["response"]
-            self.usage_stats["cached"] += usage["cached"]
-            self.usage_stats["total"] += total_tokens
-        else:
-            # Fallback approximation: word count heuristic for total
-            # Only approximate incremental tokens for the assistant response
-            last_assistant = (
-                self.conversation_history[-1]["content"]
-                if self.conversation_history
-                and self.conversation_history[-1]["role"] == "assistant"
-                else ""
-            )
-            approx = len(str(last_assistant).split())
-            self.usage_stats["response"] += approx
-            self.usage_stats["total"] += approx
-
-    def get_usage_stats(self):
-        """Return cumulative usage stats dict."""
-        return self.usage_stats
 
     def initialize_chat(self, username, sessions_data):
         """Initialize a new chat with username and session data"""
@@ -330,9 +298,6 @@ class GeminiHandler(BaseLLMHandler):
             }
         )
 
-        # Update usage stats after assistant response appended
-        self._update_usage(response)
-
         return str(assistant_response)
 
     async def stream_update_session_data(
@@ -397,8 +362,6 @@ class GeminiHandler(BaseLLMHandler):
                 "usage": result.get("usage", {"prompt": 0, "response": 0, "cached": 0}),
             }
         )
-        if result.get("response"):
-            self._update_usage(result["response"])
 
     async def send_message(self, message) -> str:
         """Send a message to the LLM and return the response"""
@@ -445,9 +408,6 @@ class GeminiHandler(BaseLLMHandler):
                     "usage": self._usage_from_response(response),
                 }
             )
-
-            # Update usage stats
-            self._update_usage(response)
 
             return str(assistant_response)
         except Exception as e:
@@ -500,8 +460,6 @@ class GeminiHandler(BaseLLMHandler):
                     "usage": result.get("usage", {"prompt": 0, "response": 0, "cached": 0}),
                 }
             )
-            if result.get("response"):
-                self._update_usage(result["response"])
         except Exception as e:
             error_text = self._handle_error(
                 e, original_message=message, allow_fallback=False

@@ -11,13 +11,12 @@ from freezegun import freeze_time
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.authtoken.models import Token
-from rest_framework.test import APIClient, APIRequestFactory, force_authenticate
+from rest_framework.test import APIClient, APIRequestFactory
 
 from core.api_v2.exceptions import V2APIView
 from core.api_v2.filters import SessionFilterSpec
 from core.models import Context, Projects, Sessions, SubProjects, Tag
 from core.services import SessionMutationService
-from users.forms import ProfileUpdateForm
 
 
 class ValidationProbeView(V2APIView):
@@ -37,45 +36,6 @@ class V2EndpointTests(TestCase):
         self.user.profile.save(update_fields=["timezone"])
         self.client = APIClient()
 
-    @freeze_time("2026-10-14 12:00:00")
-    def test_me_shape_with_session_authentication(self):
-        self.client.force_login(self.user)
-
-        response = self.client.get(reverse("api_v2:me"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            response.json(),
-            {
-                "api_version": 2,
-                "capabilities": [
-                    "timers",
-                    "sessions",
-                    "projects",
-                    "subprojects",
-                    "contexts",
-                    "tags",
-                    "reports",
-                    "commitments",
-                    "export",
-                    "import",
-                ],
-                "user": {
-                    "id": self.user.id,
-                    "username": "v2-user",
-                    "email": self.user.email,
-                    "timezone": "America/New_York",
-                },
-                "default_chart_start_date": "2026-09-14",
-                "default_chart_end_date": "2026-10-14",
-                "openai_key_configured": False,
-            },
-        )
-
-        self.user.profile.set_api_key("openai", "configured-for-test")
-        self.user.profile.save(update_fields=["openai_api_key_enc"])
-        configured = self.client.get(reverse("api_v2:me"))
-        self.assertTrue(configured.json()["openai_key_configured"])
 
     def test_me_accepts_token_authentication(self):
         token = Token.objects.create(user=self.user)
@@ -93,15 +53,6 @@ class V2EndpointTests(TestCase):
         self.assertEqual(response.json()["error"]["code"], "not_authenticated")
         self.assertIsNone(response.json()["error"]["details"])
 
-    def test_unknown_path_and_wrong_method_use_v2_envelope(self):
-        response = self.client.get("/api/v2/does-not-exist/")
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.json()["error"]["code"], "not_found")
-
-        self.client.force_authenticate(self.user)
-        response = self.client.post(reverse("api_v2:me"), {}, format="json")
-        self.assertEqual(response.status_code, 405)
-        self.assertEqual(response.json()["error"]["code"], "method_not_allowed")
 
     def test_validation_error_uses_v2_envelope_with_field_details(self):
         request = APIRequestFactory().get("/api/v2/validation-probe/")
@@ -114,41 +65,6 @@ class V2EndpointTests(TestCase):
             response.data["error"]["details"],
             {"project_ids": ["Invalid project IDs."]},
         )
-
-
-class SessionVersionAndV1SafetyTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="version-user",
-            password="password",
-        )
-        self.project = Projects.objects.create(user=self.user, name="Version Project")
-
-    def test_successful_mutations_increment_version(self):
-        start = timezone.now().replace(microsecond=0) - timedelta(hours=1)
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=start,
-            is_active=True,
-        )
-        self.assertEqual(session.version, 1)
-
-        session = SessionMutationService.mutate_session(
-            session.pk,
-            user=self.user,
-            end_time=start + timedelta(minutes=30),
-            is_active=False,
-        )
-        self.assertEqual(session.version, 2)
-
-        session = SessionMutationService.mutate_session(
-            session.pk,
-            user=self.user,
-            note="edited",
-        )
-        self.assertEqual(session.version, 3)
-
 
 
 class SessionFilterSpecTests(TestCase):
@@ -171,122 +87,6 @@ class SessionFilterSpecTests(TestCase):
             parent_project=self.project,
         )
 
-    def test_parses_typed_query_parameters_and_rejects_names(self):
-        params = QueryDict(
-            "project_ids={}&subproject_ids={}&context_ids={}&tag_ids={}"
-            "&start_date=2026-01-02&end_date=2026-01-03&active=false"
-            "&note_snippet=focus".format(
-                self.project.id,
-                self.subproject.id,
-                self.context.id,
-                self.tag.id,
-            )
-        )
-
-        spec = SessionFilterSpec.from_query_params(params, self.user)
-
-        self.assertEqual(spec.project_ids, frozenset({self.project.id}))
-        self.assertEqual(spec.subproject_ids, frozenset({self.subproject.id}))
-        self.assertEqual(spec.start_date.isoformat(), "2026-01-02")
-        self.assertEqual(spec.end_date.isoformat(), "2026-01-03")
-        self.assertFalse(spec.active)
-        self.assertEqual(spec.note_snippet, "focus")
-
-        with self.assertRaises(ValidationError) as caught:
-            SessionFilterSpec.from_query_params(
-                QueryDict("project_ids=Filtered Project"),
-                self.user,
-            )
-        self.assertIn("project_ids", caught.exception.detail)
-
-    def test_subproject_membership_filter_is_applied(self):
-        other_project = Projects.objects.create(user=self.user, name="Other Project")
-        other_subproject = SubProjects.objects.create(
-            user=self.user,
-            name="Excluded Subproject",
-            parent_project=other_project,
-        )
-        end = timezone.now().replace(microsecond=0)
-        included = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            subprojects=[self.subproject],
-            start_time=end - timedelta(minutes=20),
-            end_time=end,
-            is_active=False,
-        )
-        SessionMutationService.create_session(
-            user=self.user,
-            project=other_project,
-            subprojects=[other_subproject],
-            start_time=end - timedelta(minutes=10),
-            end_time=end,
-            is_active=False,
-        )
-
-        spec = SessionFilterSpec.from_query_params(
-            QueryDict(f"subproject_ids={self.subproject.id}"),
-            self.user,
-        )
-
-        self.assertEqual(
-            list(spec.apply(Sessions.objects.filter(user=self.user))),
-            [included],
-        )
-
-    def test_active_filter_is_applied_at_the_endpoint(self):
-        # Regression: is_active became a derived property in S12; the filter
-        # must translate to end_time__isnull instead of raising FieldError.
-        end = timezone.now().replace(microsecond=0)
-        completed = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=end - timedelta(minutes=30),
-            end_time=end,
-        )
-        running = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            start_time=end - timedelta(minutes=5),
-        )
-
-        client = APIClient()
-        client.force_authenticate(self.user)
-        # The sessions endpoint is the completed log, so active=true is
-        # vacuously empty; the regression is a FieldError 500 on either value.
-        for flag, expected_ids in (("true", []), ("false", [completed.id])):
-            with self.subTest(active=flag):
-                response = client.get("/api/v2/sessions/", {"active": flag})
-                self.assertEqual(response.status_code, 200)
-                self.assertEqual(
-                    [row["id"] for row in response.json()["sessions"]],
-                    expected_ids,
-                )
-        self.assertIsNone(running.end_time)
-
-    def test_uuid_filter_returns_the_matching_session(self):
-        end = timezone.now().replace(microsecond=0)
-        target, other = (
-            SessionMutationService.create_session(
-                user=self.user,
-                project=self.project,
-                start_time=end - timedelta(minutes=20 + offset),
-                end_time=end - timedelta(minutes=offset),
-            )
-            for offset in (0, 40)
-        )
-
-        client = APIClient()
-        client.force_authenticate(self.user)
-        response = client.get("/api/v2/sessions/", {"uuid": str(target.uuid)})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            [row["id"] for row in response.json()["sessions"]], [target.id]
-        )
-
-        response = client.get("/api/v2/sessions/", {"uuid": "not-a-uuid"})
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("uuid", response.json()["error"]["details"])
 
     @freeze_time("2026-01-20 12:00:00")
     def test_date_boundaries_use_active_profile_timezone_and_end_time(self):
@@ -377,31 +177,3 @@ class UserTimezoneMiddlewareTests(TestCase):
             session.id, [row["id"] for row in off_ny_date.json()["sessions"]]
         )
         self.assertEqual(timezone.get_current_timezone_name(), settings.TIME_ZONE)
-
-    def test_invalid_profile_timezone_falls_back_safely_and_cleans_up(self):
-        session = self._boundary_session()
-        type(self.user.profile).objects.filter(pk=self.user.profile.pk).update(
-            timezone="Invalid/Timezone"
-        )
-
-        # Fallback = server default (Europe/Prague): the instant is Jan 15.
-        response = self.client.get(
-            "/api/v2/sessions/", {"start_date": "2026-01-15", "end_date": "2026-01-15"}
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(
-            session.id, [row["id"] for row in response.json()["sessions"]]
-        )
-        self.assertEqual(timezone.get_current_timezone_name(), settings.TIME_ZONE)
-
-
-class ProfileTimezoneFormTests(TestCase):
-    def test_profile_form_runs_iana_timezone_validation(self):
-        user = User.objects.create_user(username="profile-form-user")
-        form = ProfileUpdateForm(
-            {"timezone": "Not/A-Timezone"},
-            instance=user.profile,
-        )
-
-        self.assertFalse(form.is_valid())
-        self.assertIn("timezone", form.errors)

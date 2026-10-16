@@ -2,37 +2,8 @@ from django.contrib.auth.models import User
 from django.contrib.messages import get_messages
 from django.test import Client, TestCase
 from django.urls import reverse
-from django.utils import timezone
-from rest_framework.test import APIClient
 
-from core.models import Commitment, Context, Projects, Sessions, SubProjects, Tag
-
-
-class DestructiveMutationApiTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username="destructive-user",
-            email="destructive@example.com",
-            password="testpass",
-        )
-        self.client = APIClient()
-        self.client.force_authenticate(self.user)
-
-    def make_commitment(self, *, kind, target, active=True):
-        return Commitment.objects.create(
-            user=self.user,
-            aggregation_type=kind,
-            target=60,
-            active=active,
-            **{kind: target},
-        )
-
-
-
-
-
-
-
+from core.models import Commitment, Projects
 
 
 class DestructiveMutationAdminTests(TestCase):

@@ -161,8 +161,8 @@ def _form_data(data):
     return query
 
 
-def _validated_schedule_form(user, data, instance=None):
-    form = ScheduledReminderForm(_form_data(data), user=user, instance=instance)
+def _validated_schedule_form(user, data):
+    form = ScheduledReminderForm(_form_data(data), user=user)
     if not form.is_valid():
         raise ValidationError(_form_errors(form))
     return form
@@ -277,7 +277,7 @@ class NotificationScheduleDetailView(V2APIView):
             "version": reminder.version,
         }
         current.update(serializer.validated_data)
-        form = _validated_schedule_form(request.user, current, reminder)
+        form = _validated_schedule_form(request.user, current)
         try:
             updated = update_scheduled_reminder(
                 user=request.user,

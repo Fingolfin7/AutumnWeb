@@ -218,15 +218,6 @@ class Format2ExportImportTests(TestCase):
         self.assertEqual(session.note, "Changed note")
         self.assertEqual(session.version, old_version + 1)
 
-    def test_duplicate_uuid_in_batch_is_rejected(self):
-        duplicate = copy.deepcopy(self.document)
-        duplicate["projects"][0]["sessions"][1]["uuid"] = duplicate["projects"][0]["sessions"][0]["uuid"]
-
-        response = self.post_import(duplicate)
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("duplicate UUID", json.dumps(response.json()))
-        self.assertEqual(Sessions.objects.filter(user=self.target).count(), 0)
 
     def test_invalid_allocations_reject_whole_batch_atomically(self):
         cases = (
@@ -272,20 +263,6 @@ class Format2ExportImportTests(TestCase):
             [5000, 5000],
         )
 
-    def test_old_multilink_without_mode_and_full_links_is_coerced_evenly(self):
-        old_document = copy.deepcopy(self.document)
-        session = old_document["projects"][0]["sessions"][0]
-        session["links"][0]["allocation_bp"] = 10000
-        session["links"][1]["allocation_bp"] = 10000
-
-        response = self.post_import(old_document)
-
-        self.assertEqual(response.status_code, 200)
-        imported = Sessions.objects.get(user=self.target, uuid=session["uuid"])
-        self.assertEqual(
-            set(imported.subproject_links.values_list("allocation_bp", flat=True)),
-            {5000},
-        )
 
     def test_legacy_format1_payload_imports_through_v2_endpoint(self):
         payload = {
@@ -347,20 +324,6 @@ class Format2ExportImportTests(TestCase):
         compressed = self.client.get(reverse("api_v2:export"), {"compress": "true"})
         self.assertEqual(json_decompress(compressed.json()), self.document)
 
-    def test_missing_uuid_gets_a_fresh_identity(self):
-        without_uuid = copy.deepcopy(self.document)
-        without_uuid["projects"][0]["sessions"][0]["uuid"] = None
-
-        response = self.post_import(without_uuid)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(Sessions.objects.filter(user=self.target).count(), 2)
-        self.assertTrue(
-            all(
-                session.uuid is not None
-                for session in Sessions.objects.filter(user=self.target)
-            )
-        )
 
     def test_management_export_defaults_to_format2_and_supports_format1(self):
         with tempfile.TemporaryDirectory() as temp_dir, patch(

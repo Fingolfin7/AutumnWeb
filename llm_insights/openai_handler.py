@@ -38,7 +38,6 @@ class OpenAIHandler(BaseLLMHandler):
         self.username = None
         self.session_data = None
         self.conversation_history = []
-        self.usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
         self.last_auth_source = self.auth_mode
         self.system_prompt_template = """
         You are an expert project and time tracking analyst. Your job is to analyze projects, sessions,
@@ -95,8 +94,6 @@ class OpenAIHandler(BaseLLMHandler):
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
 
-    def get_usage_stats(self):
-        return self.usage_stats
 
     def _messages_from_history(
         self, new_user_message: str | None = None, system_text: str | None = None
@@ -580,7 +577,6 @@ class OpenAIHandler(BaseLLMHandler):
                 "auth_source": result.get("source", self.last_auth_source),
             }
         )
-        self._update_usage(result.get("usage", {}))
 
     def _response_text(self, resp):
         if hasattr(resp, "output_text"):
@@ -694,13 +690,6 @@ class OpenAIHandler(BaseLLMHandler):
             "cached": self._cached_tokens(usage),
         }
 
-    def _update_usage(self, usage):
-        self.usage_stats["prompt"] += usage.get("prompt", 0)
-        self.usage_stats["response"] += usage.get("response", 0)
-        self.usage_stats["cached"] += usage.get("cached", 0)
-        self.usage_stats["total"] = (
-            self.usage_stats["prompt"] + self.usage_stats["response"]
-        )
 
     def get_conversation_history(self) -> list:
         return self.conversation_history

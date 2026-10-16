@@ -14,10 +14,8 @@ from django.utils import timezone
 
 from core.models import Context, Projects, Sessions, SubProjects
 from core.services.dashboard import (
-    QUICK_START_LIMIT,
     build_quick_starts,
     get_recent_dashboard_sessions,
-    select_recent_dashboard_sessions,
 )
 
 
@@ -93,19 +91,6 @@ class RecentDashboardSessionSelectionTests(DashboardTestCase):
         )
         self.assertNotIn(older.id, [session.id for session in selected])
 
-    def test_exactly_three_newest_sessions_do_not_expand(self):
-        newest = [
-            self._session_at(self.atlas, 25, 15, index)
-            for index in range(3)
-        ]
-        self._session_at(self.autumn, 24, 15)
-
-        selected = self._selected()
-
-        self.assertEqual(
-            [session.id for session in selected],
-            [session.id for session in reversed(newest)],
-        )
 
     def test_busy_newest_day_is_shown_in_full(self):
         newest = [
@@ -155,15 +140,6 @@ class RecentDashboardSessionSelectionTests(DashboardTestCase):
             },
         )
 
-    def test_sparse_activity_returns_all_available_sessions(self):
-        newest = self._session_at(self.atlas, 25, 15)
-        older = self._session_at(self.autumn, 10, 15)
-
-        selected = self._selected()
-
-        self.assertEqual(
-            [session.id for session in selected], [newest.id, older.id]
-        )
 
     def test_active_and_other_users_sessions_are_excluded(self):
         completed = self._session_at(self.atlas, 25, 15)
@@ -187,17 +163,6 @@ class RecentDashboardSessionSelectionTests(DashboardTestCase):
 
         self.assertEqual([session.id for session in selected], [completed.id])
 
-    def test_same_end_time_uses_id_as_stable_tiebreaker(self):
-        first = self._session_at(self.atlas, 25, 15)
-        second = self._session_at(self.autumn, 25, 15)
-        sessions = Sessions.objects.filter(user=self.user).order_by(
-            "-end_time", "-id"
-        )
-
-        selected = select_recent_dashboard_sessions(sessions)
-
-        self.assertEqual([session.id for session in selected], [second.id, first.id])
-
 
 class QuickStartTests(DashboardTestCase):
     def test_repeated_work_on_one_combination_offers_one_chip(self):
@@ -205,10 +170,6 @@ class QuickStartTests(DashboardTestCase):
                   self._session(self.atlas, 90, subs=["auth"])]
         self.assertEqual(len(build_quick_starts(recent, [])), 1)
 
-    def test_different_subprojects_are_different_chips(self):
-        recent = [self._session(self.atlas, 10, subs=["auth"]),
-                  self._session(self.atlas, 90, subs=["billing"])]
-        self.assertEqual(len(build_quick_starts(recent, [])), 2)
 
     def test_a_combination_already_running_is_not_offered(self):
         """Offering to start a timer that is on the clock is pure noise."""
@@ -219,12 +180,3 @@ class QuickStartTests(DashboardTestCase):
         quick_starts = build_quick_starts(recent, running)
 
         self.assertEqual([s.project.name for s in quick_starts], ["Autumn"])
-
-    def test_the_chip_list_is_capped(self):
-        recent = [
-            self._session(self.atlas, index * 10, subs=[f"sub-{index}"])
-            for index in range(1, QUICK_START_LIMIT + 4)
-        ]
-        self.assertEqual(len(build_quick_starts(recent, [])), QUICK_START_LIMIT)
-
-

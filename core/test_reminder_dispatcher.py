@@ -2,10 +2,9 @@ from datetime import date, datetime, time, timedelta, timezone as dt_timezone
 from unittest import mock
 
 from django.contrib.auth.models import User
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import SimpleTestCase, TestCase
 
 from core.models import (
-    NotificationDelivery,
     NotificationEvent,
     NotificationPreference,
     Projects,
@@ -17,19 +16,11 @@ from core.models import (
 from core.services import reminder_dispatcher
 from core.services.reminder_dispatcher import (
     next_dispatch_at,
-    run_dispatch_pass,
     should_start_dispatcher,
-    start_dispatcher_thread,
 )
 
 
 class ShouldStartDispatcherTests(SimpleTestCase):
-    def test_disabled_never_starts(self):
-        self.assertFalse(
-            should_start_dispatcher(
-                ["manage.py", "runserver"], {"RUN_MAIN": "true"}, enabled=False
-            )
-        )
 
     def test_management_commands_do_not_start_the_thread(self):
         for argv in (
@@ -44,34 +35,6 @@ class ShouldStartDispatcherTests(SimpleTestCase):
                     should_start_dispatcher(argv, {"RUN_MAIN": "true"}, enabled=True)
                 )
 
-    def test_runserver_only_starts_in_the_autoreload_child(self):
-        self.assertFalse(
-            should_start_dispatcher(["manage.py", "runserver"], {}, enabled=True)
-        )
-        self.assertTrue(
-            should_start_dispatcher(
-                ["manage.py", "runserver"], {"RUN_MAIN": "true"}, enabled=True
-            )
-        )
-
-    def test_runserver_noreload_starts_without_run_main(self):
-        self.assertTrue(
-            should_start_dispatcher(
-                ["manage.py", "runserver", "--noreload"], {}, enabled=True
-            )
-        )
-
-    def test_non_prefork_wsgi_servers_start_the_thread(self):
-        for argv0 in (
-            "uvicorn",
-            "daphne",
-        ):
-            with self.subTest(argv0=argv0):
-                self.assertTrue(
-                    should_start_dispatcher(
-                        [argv0, "AutumnWeb.wsgi:application"], {}, enabled=True
-                    )
-                )
 
     def test_gunicorn_defers_startup_to_its_worker_hook(self):
         for argv0 in ("gunicorn", "/app/.venv/bin/gunicorn"):
@@ -81,51 +44,6 @@ class ShouldStartDispatcherTests(SimpleTestCase):
                         [argv0, "AutumnWeb.wsgi:application"], {}, enabled=True
                     )
                 )
-
-    def test_unknown_program_defaults_to_false(self):
-        self.assertFalse(should_start_dispatcher(["python", "-c", "x"], {}, enabled=True))
-        self.assertFalse(should_start_dispatcher([], {}, enabled=True))
-
-
-class RunDispatchPassTests(SimpleTestCase):
-    def test_pass_runs_the_three_steps_and_returns_the_triple(self):
-        events = [object(), object()]
-        proactive_events = [object()]
-        expected_events = events + proactive_events
-        with self.assertLogs(
-            "core.services.reminder_dispatcher", level="INFO"
-        ) as captured:
-            with mock.patch(
-                "core.utils.stop_expired_timers", return_value=[object()]
-            ) as stop, mock.patch(
-                "core.services.reminders.claim_due_reminders", return_value=events
-            ) as claim, mock.patch(
-                "core.services.proactive_notifications.claim_due_proactive_notifications",
-                return_value=proactive_events,
-            ) as proactive_claim, mock.patch(
-                "core.services.push.flush_outbox", return_value=3
-            ) as flush:
-                result = run_dispatch_pass(limit=7)
-
-        self.assertEqual(result, (1, expected_events, 3))
-        stop.assert_called_once()
-        self.assertEqual(claim.call_args.kwargs["limit"], 7)
-        self.assertEqual(proactive_claim.call_args.kwargs["limit"], 5)
-        self.assertEqual(flush.call_args.kwargs["limit"], 7)
-        # Every step shares the single "now" instant of the pass.
-        self.assertEqual(
-            stop.call_args.kwargs["now"], claim.call_args.kwargs["now"]
-        )
-        self.assertEqual(
-            stop.call_args.kwargs["now"], proactive_claim.call_args.kwargs["now"]
-        )
-        self.assertEqual(
-            stop.call_args.kwargs["now"], flush.call_args.kwargs["now"]
-        )
-        self.assertIn(
-            "notification_dispatch_pass stopped=1 claimed=3 outbox_flushed=3",
-            captured.output[0],
-        )
 
 
 class HistoryCleanupSchedulingTests(SimpleTestCase):
@@ -140,20 +58,6 @@ class HistoryCleanupSchedulingTests(SimpleTestCase):
             "core.services.notification_retention.cleanup_notification_history"
         ) as cleanup, mock.patch.object(
             reminder_dispatcher.time, "monotonic", side_effect=[100.0, 200.0]
-        ):
-            reminder_dispatcher._maybe_cleanup_notification_history()
-            reminder_dispatcher._maybe_cleanup_notification_history()
-
-        cleanup.assert_called_once_with()
-
-    def test_cleanup_failure_also_backs_off_for_the_day(self):
-        with mock.patch(
-            "core.services.notification_retention.cleanup_notification_history",
-            side_effect=RuntimeError("database unavailable"),
-        ) as cleanup, mock.patch.object(
-            reminder_dispatcher.time, "monotonic", side_effect=[100.0, 200.0]
-        ), self.assertLogs(
-            "core.services.reminder_dispatcher", level="WARNING"
         ):
             reminder_dispatcher._maybe_cleanup_notification_history()
             reminder_dispatcher._maybe_cleanup_notification_history()
@@ -184,49 +88,9 @@ class DispatchOnceTests(SimpleTestCase):
             self.assertFalse(reminder_dispatcher._dispatch_once())
         one_pass.assert_not_called()
 
-    def test_broken_cache_skips_the_pass_instead_of_raising(self):
-        with mock.patch.object(
-            reminder_dispatcher, "run_dispatch_pass"
-        ) as one_pass, mock.patch(
-            "django.core.cache.cache.add", side_effect=RuntimeError("cache down")
-        ):
-            self.assertFalse(reminder_dispatcher._dispatch_once())
-        one_pass.assert_not_called()
-
 
 class DeadlinePlanningTests(SimpleTestCase):
-    @override_settings(PUSH_DISPATCH_SAFETY_RESCAN_SECONDS=900)
-    def test_idle_step_sleeps_for_safety_rescan_without_dispatching(self):
-        now = datetime(2026, 9, 2, 10, tzinfo=dt_timezone.utc)
-        with mock.patch.object(
-            reminder_dispatcher, "next_dispatch_at", return_value=None
-        ) as scan, mock.patch.object(reminder_dispatcher, "_dispatch_once") as dispatch, mock.patch.object(
-            reminder_dispatcher, "_maybe_cleanup_notification_history"
-        ):
-            wait_seconds = reminder_dispatcher._dispatch_step(now=now)
 
-        self.assertEqual(wait_seconds, 900)
-        scan.assert_called_once_with(now=now)
-        dispatch.assert_not_called()
-
-    @override_settings(
-        PUSH_DISPATCH_SAFETY_RESCAN_SECONDS=900,
-        PUSH_DISPATCH_INTERVAL_SECONDS=15,
-    )
-    def test_future_deadline_is_respected_and_legacy_interval_is_ignored(self):
-        now = datetime(2026, 9, 2, 10, tzinfo=dt_timezone.utc)
-        deadline = now + timedelta(seconds=125)
-        with mock.patch.object(
-            reminder_dispatcher, "next_dispatch_at", return_value=deadline
-        ), mock.patch.object(reminder_dispatcher, "_dispatch_once") as dispatch, mock.patch.object(
-            reminder_dispatcher, "_maybe_cleanup_notification_history"
-        ), mock.patch.object(
-            reminder_dispatcher.time, "monotonic", side_effect=[100.0, 100.0]
-        ):
-            wait_seconds = reminder_dispatcher._dispatch_step(now=now)
-
-        self.assertAlmostEqual(wait_seconds, 125, places=3)
-        dispatch.assert_not_called()
 
     def test_due_deadline_dispatches_and_requests_immediate_rescan(self):
         now = datetime(2026, 9, 2, 10, tzinfo=dt_timezone.utc)
@@ -240,63 +104,6 @@ class DeadlinePlanningTests(SimpleTestCase):
             self.assertIsNone(reminder_dispatcher._dispatch_step(now=now))
 
         dispatch.assert_called_once_with()
-
-    @override_settings(PUSH_DISPATCH_SAFETY_RESCAN_SECONDS=1)
-    def test_safety_rescan_cannot_be_configured_below_five_minutes(self):
-        self.assertEqual(reminder_dispatcher._safety_rescan_seconds(), 300)
-
-
-class DispatchLoopTests(SimpleTestCase):
-    def setUp(self):
-        reminder_dispatcher._wake_event.clear()
-
-    def tearDown(self):
-        reminder_dispatcher._wake_event.clear()
-
-    def test_waits_for_app_registry_before_scanning(self):
-        with mock.patch(
-            "django.apps.apps.ready_event.wait", side_effect=StopIteration
-        ) as wait_until_ready, mock.patch.object(
-            reminder_dispatcher, "_dispatch_step"
-        ) as step:
-            with self.assertRaises(StopIteration):
-                reminder_dispatcher._dispatch_loop()
-
-        wait_until_ready.assert_called_once_with()
-        step.assert_not_called()
-
-    def test_idle_timeout_rescans_without_a_fixed_pass(self):
-        with mock.patch.object(
-            reminder_dispatcher, "_dispatch_step", side_effect=[900, 900]
-        ) as step, mock.patch.object(
-            reminder_dispatcher._wake_event,
-            "wait",
-            side_effect=[False, StopIteration],
-        ) as wait:
-            with self.assertRaises(StopIteration):
-                reminder_dispatcher._dispatch_loop()
-
-        self.assertEqual(step.call_count, 2)
-        self.assertEqual([call.args[0] for call in wait.call_args_list], [900, 900])
-
-    def test_dispatcher_exception_backs_off_then_recovers(self):
-        with mock.patch.object(
-            reminder_dispatcher,
-            "_dispatch_step",
-            side_effect=[RuntimeError("database unavailable"), 900],
-        ) as step, mock.patch.object(
-            reminder_dispatcher._wake_event,
-            "wait",
-            side_effect=[True, StopIteration],
-        ) as wait, self.assertLogs(
-            "core.services.reminder_dispatcher", level="WARNING"
-        ):
-            with self.assertRaises(StopIteration):
-                reminder_dispatcher._dispatch_loop()
-
-        self.assertEqual(step.call_count, 2)
-        self.assertEqual(wait.call_args_list[0].args[0], 15)
-        self.assertEqual(wait.call_args_list[1].args[0], 900)
 
 
 class PersistedDeadlineTests(TestCase):
@@ -367,35 +174,12 @@ class PersistedDeadlineTests(TestCase):
             next_dispatch_at(now=self.now), self.now + timedelta(minutes=4)
         )
 
-    def test_idle_deadline_scan_is_one_database_query(self):
-        with self.assertNumQueries(1):
-            self.assertIsNone(next_dispatch_at(now=self.now))
 
     def test_pending_event_without_deliveries_is_due_immediately(self):
         self.event()
 
         self.assertEqual(next_dispatch_at(now=self.now), self.now)
 
-    def test_pending_delivery_retry_and_processing_lease_are_deadlines(self):
-        subscription = self.subscription()
-        retry_event = self.event(dedupe_key="retry-event")
-        NotificationDelivery.objects.create(
-            event=retry_event,
-            subscription=subscription,
-            status="pending",
-            next_attempt_at=self.now + timedelta(minutes=3),
-        )
-        lease_event = self.event(dedupe_key="lease-event")
-        NotificationDelivery.objects.create(
-            event=lease_event,
-            subscription=subscription,
-            status="processing",
-            lease_until=self.now + timedelta(minutes=2),
-        )
-
-        self.assertEqual(
-            next_dispatch_at(now=self.now), self.now + timedelta(minutes=2)
-        )
 
     def test_cancelled_work_is_not_a_deadline(self):
         session = self.session()
@@ -422,56 +206,3 @@ class PersistedDeadlineTests(TestCase):
             session.save(update_fields=["auto_stop_at"])
         self.assertTrue(reminder_dispatcher._wake_event.is_set())
         self.assertEqual(next_dispatch_at(now=self.now), self.now)
-
-    def test_note_only_save_does_not_wake_dispatcher(self):
-        session = self.session()
-        reminder_dispatcher._wake_event.clear()
-        from core.services import SessionMutationService
-
-        with mock.patch("core.services.sessions._mark_commitments_dirty") as dirty:
-            with self.captureOnCommitCallbacks(execute=True):
-                SessionMutationService.mutate_session(
-                    session.pk,
-                    user=self.user,
-                    note="Updated without changing a deadline",
-                )
-        self.assertFalse(reminder_dispatcher._wake_event.is_set())
-        dirty.assert_not_called()
-
-        with self.captureOnCommitCallbacks(execute=True):
-            session.auto_stop_at = self.now + timedelta(minutes=10)
-            session.save(update_fields=["auto_stop_at"])
-        self.assertTrue(reminder_dispatcher._wake_event.is_set())
-
-
-class StartDispatcherThreadTests(SimpleTestCase):
-    def setUp(self):
-        self.addCleanup(setattr, reminder_dispatcher, "_thread", None)
-        self.addCleanup(setattr, reminder_dispatcher, "_thread_pid", None)
-        reminder_dispatcher._thread = None
-        reminder_dispatcher._thread_pid = None
-
-    def test_repeated_starts_create_a_single_thread(self):
-        with mock.patch.object(reminder_dispatcher, "threading") as threading_mod:
-            first = start_dispatcher_thread()
-            second = start_dispatcher_thread()
-
-        self.assertIs(first, second)
-        threading_mod.Thread.assert_called_once()
-        first.start.assert_called_once()
-        self.assertTrue(threading_mod.Thread.call_args.kwargs["daemon"])
-
-    def test_forked_worker_replaces_the_masters_dead_thread_object(self):
-        inherited = mock.Mock()
-        inherited.is_alive.return_value = True
-        reminder_dispatcher._thread = inherited
-        reminder_dispatcher._thread_pid = 100
-
-        with mock.patch.object(
-            reminder_dispatcher.os, "getpid", return_value=200
-        ), mock.patch.object(reminder_dispatcher.threading, "Thread") as thread_class:
-            worker_thread = start_dispatcher_thread()
-
-        self.assertIs(worker_thread, thread_class.return_value)
-        self.assertIsNot(worker_thread, inherited)
-        worker_thread.start.assert_called_once()

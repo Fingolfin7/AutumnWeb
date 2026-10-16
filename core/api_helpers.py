@@ -7,8 +7,7 @@ S12, but the v2 API and tests still use this handful of utilities.
 from __future__ import annotations
 from datetime import date, datetime
 
-from core.models import Projects, Sessions, Tag
-from core.utils import stop_expired_timers
+from core.models import Projects, Tag
 
 
 def _coerce_list(val):
@@ -32,14 +31,6 @@ def _iso_value(value):
     if isinstance(value, list):
         return [_iso_value(item) for item in value]
     return value
-
-
-def _get_active_sessions(user, project_name=None):
-    stop_expired_timers(user)
-    qs = Sessions.objects.filter(end_time__isnull=True, user=user).order_by("-start_time")
-    if project_name:
-        qs = qs.filter(project__name__iexact=project_name)
-    return qs
 
 
 def _apply_tag_filters(qp, qs, *, kind: str, user=None):

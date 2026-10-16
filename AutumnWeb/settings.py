@@ -35,9 +35,6 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG", default=False)
 
-# NASA API Key (for Astronomy Picture of the Day, optional)
-NASA_API_KEY = env("NASA_API_KEY", default="DEMO_KEY")  # Use a demo key if not set
-
 # AWS/S3 media storage settings.
 # Django 4.2+ uses STORAGES; DEFAULT_FILE_STORAGE is ignored by Django 5.x.
 # Set USE_S3=FALSE to force local media storage even if bucket env vars are present.

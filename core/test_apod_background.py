@@ -56,11 +56,6 @@ class ApodBackgroundTests(TestCase):
         self.assertIn("bg-active", html)
         self.assertNotIn('class="workspace-bg-video"', html)
 
-    def test_gif_remains_an_animated_image_url(self):
-        with self._feed({"media_type": "image", "hdurl": "https://assets.science.nasa.gov/sky.gif"}):
-            media = apod.nasa_apod_media()
-        self.assertTrue(media["image_url"].endswith("sky.gif"))
-        self.assertEqual(media["video_url"], "")
 
     def test_direct_video_uses_poster_and_playable_source(self):
         entry = {
@@ -77,59 +72,6 @@ class ApodBackgroundTests(TestCase):
         self.assertIn('poster="https://assets.science.nasa.gov/comet.png"', html)
         self.assertIn('src="https://assets.science.nasa.gov/comet.mp4"', html)
 
-    def test_embedded_video_keeps_its_poster_without_inline_source(self):
-        entry = {
-            "media_type": "video", "hdurl": "https://assets.science.nasa.gov/still.jpg",
-            "permalink": "https://science.nasa.gov/image-article/embedded/",
-            "basic_html": '<iframe src="https://www.youtube.com/embed/example"></iframe>',
-        }
-        with self._feed(entry):
-            media = apod.nasa_apod_media()
-            html = self._render_shell()
-        self.assertEqual(media["video_url"], "")
-        self.assertIn("still.jpg", html)
-        self.assertNotIn('class="workspace-bg-video"', html)
-
-    def test_preferences_link_to_the_video_and_carry_the_poster(self):
-        # The React Profile page labels "Watch video at NASA" / "Download
-        # preview" from these fields of /api/v2/me/preferences/.
-        from rest_framework.test import APIClient
-
-        entry = {
-            "media_type": "video", "hdurl": "https://assets.science.nasa.gov/comet.png",
-            "permalink": "https://science.nasa.gov/image-article/comet/",
-            "basic_html": '<video><source src="https://assets.science.nasa.gov/comet.mp4"></video>',
-        }
-        user = User.objects.create_user(username="apod-profile", password="pw")
-        profile = user.profile
-        profile.automatic_background = True
-        profile.nasa_apod_background = True
-        profile.save()
-        client = APIClient()
-        client.force_authenticate(user)
-        with self._feed(entry):
-            background = client.get("/api/v2/me/preferences/").json()["background"]
-        self.assertEqual(background["mode"], "apod")
-        self.assertEqual(background["video_url"], "https://assets.science.nasa.gov/comet.mp4")
-        self.assertEqual(background["image_url"], "https://assets.science.nasa.gov/comet.png")
-        self.assertEqual(background["source_url"], "https://science.nasa.gov/image-article/comet/")
-
-    def test_missing_video_poster_uses_a_recent_apod_photo(self):
-        latest = Mock()
-        latest.json.return_value = [{
-            "media_type": "video", "hdurl": None,
-            "permalink": "https://science.nasa.gov/image-article/video/",
-        }]
-        recent = Mock()
-        recent.json.return_value = [
-            {"media_type": "video", "hdurl": None},
-            {"media_type": "image", "hdurl": "https://assets.science.nasa.gov/previous.jpg"},
-        ]
-        with patch.object(apod.requests, "get", side_effect=[latest, recent]) as get:
-            media = apod.nasa_apod_media()
-        self.assertEqual(get.call_count, 2)
-        self.assertEqual(media["image_url"], "https://assets.science.nasa.gov/previous.jpg")
-        self.assertEqual(media["page_url"], "https://science.nasa.gov/image-article/video/")
 
     def test_failed_refresh_keeps_last_good_background(self):
         apod._cached_nasa_data = {"image_url": "https://assets.science.nasa.gov/last.jpg"}

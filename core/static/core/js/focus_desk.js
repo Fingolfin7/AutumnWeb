@@ -1,25 +1,14 @@
 /* ============================================================================
    AUTUMN — "FOCUS DESK" SHELL BEHAVIOUR
    ----------------------------------------------------------------------------
-   Shell-level only: things every page that extends base_fd.html gets for free.
-   Page-specific behaviour (timeline, activity calendar, live timers) belongs
-   in that page's own script, not here.
+   Shell behaviour for the server-rendered pages (base.html): the bottom
+   sheet, self-submitting selects and flash-message celebrations.
 
    Everything is delegated from `document`, so markup rendered after load
    still works without re-binding.
    ==========================================================================*/
 (function () {
   "use strict";
-
-  /* -------------------------------------------------------- disclosure ---
-     A .disclose slab collapses by toggling .is-closed on the container.     */
-  document.addEventListener("click", function (event) {
-    var head = event.target.closest("[data-disclose] .disclose-head");
-    if (!head) { return; }
-    var box = head.closest("[data-disclose]");
-    var closed = box.classList.toggle("is-closed");
-    head.setAttribute("aria-expanded", String(!closed));
-  });
 
   /* ------------------------------------------------------------- sheet ---
      The bottom sheet is opened by [data-sheet-open="<id>"] and closed by any
@@ -55,16 +44,6 @@
     if (event.key !== "Escape") { return; }
     var open = document.querySelector(".sheet.is-open");
     if (open) { closeSheet(open); }
-  });
-
-  /* ------------------------------------------------- notes: no marquee ---
-     Long session notes clamp and expand on click. The legacy UI slid them
-     past on hover, which was unreadable and unreachable by keyboard.        */
-  document.addEventListener("click", function (event) {
-    var note = event.target.closest(".session-note");
-    /* let real links inside a note behave like links */
-    if (!note || event.target.closest("a")) { return; }
-    note.classList.toggle("is-open");
   });
 
   /* --------------------------------------------- self-submitting selects ---

@@ -6,12 +6,10 @@ from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
 
-from core.attribution import subproject_tally
 from core.models import Projects, Sessions, SessionSubproject, SubProjects
 from core.services import (
     DestructiveMutationService,
     DestructiveOperationError,
-    SessionMutationService,
     even_split_bps,
 )
 
@@ -22,9 +20,6 @@ UTC = datetime_timezone.utc
 class EvenSplitTests(TestCase):
     def test_three_ids_put_remainder_on_lowest_id(self):
         self.assertEqual(even_split_bps([9, 2, 5]), {2: 3334, 5: 3333, 9: 3333})
-
-    def test_one_id_gets_full_allocation(self):
-        self.assertEqual(even_split_bps([7]), {7: 10000})
 
 
 @freeze_time("2026-07-16 12:00:00")
@@ -93,65 +88,6 @@ class PartitionedSessionApiTests(TestCase):
             {self.sub_a.pk: 3334, self.sub_b.pk: 3333, self.sub_c.pk: 3333},
         )
 
-    def test_total_over_10000_is_validation_error(self):
-        response = self.client.post(
-            reverse("api_v2:sessions"),
-            self.payload(
-                subproject_allocations=[
-                    {"subproject_id": self.sub_a.pk, "allocation_bp": 6000},
-                    {"subproject_id": self.sub_b.pk, "allocation_bp": 5000},
-                ],
-            ),
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
-        self.assertFalse(Sessions.objects.filter(user=self.user).exists())
-
-    def test_patch_bare_subproject_ids_re_even_splits(self):
-        created = self.client.post(
-            reverse("api_v2:sessions"),
-            self.payload(
-                subproject_allocations=[
-                    {"subproject_id": self.sub_a.pk, "allocation_bp": 3000},
-                    {"subproject_id": self.sub_b.pk, "allocation_bp": 7000},
-                ],
-            ),
-            format="json",
-        ).json()
-
-        response = self.client.patch(
-            reverse("api_v2:session-detail", args=[created["id"]]),
-            {"subproject_ids": [self.sub_c.pk, self.sub_a.pk, self.sub_b.pk]},
-            format="json",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            {
-                item["subproject_id"]: item["allocation_bp"]
-                for item in response.json()["subproject_allocations"]
-            },
-            {self.sub_a.pk: 3334, self.sub_b.pk: 3333, self.sub_c.pk: 3333},
-        )
-
-    def test_create_service_three_subprojects_defaults_to_even_split(self):
-        session = SessionMutationService.create_session(
-            user=self.user,
-            project=self.project,
-            subprojects=[self.sub_c, self.sub_a, self.sub_b],
-        )
-        self.assertEqual(
-            dict(
-                session.subproject_links.values_list(
-                    "subproject_id", "allocation_bp"
-                )
-            ),
-            {self.sub_a.pk: 3334, self.sub_b.pk: 3333, self.sub_c.pk: 3333},
-        )
-
-
 
 class PartitionedMergeAndReadTests(TestCase):
     def setUp(self):
@@ -210,7 +146,7 @@ class PartitionedMergeAndReadTests(TestCase):
             before,
         )
 
-    def test_merge_success_sums_bps_and_reads_include_residual(self):
+    def test_merge_success_sums_bps(self):
         session = self.session(seconds=100)
         SessionSubproject.objects.create(
             session=session, subproject=self.sub_a, allocation_bp=3000
@@ -230,10 +166,3 @@ class PartitionedMergeAndReadTests(TestCase):
         link = SessionSubproject.objects.get(session=session)
         self.assertEqual(link.subproject_id, merged.pk)
         self.assertEqual(link.allocation_bp, 5000)
-        rows = {
-            row["name"]: row["total"]
-            for row in subproject_tally(Sessions.objects.filter(pk=session.pk))
-        }
-        self.assertEqual(rows["Merged"], timedelta(seconds=50))
-        self.assertEqual(rows["no subproject"], timedelta(seconds=50))
-

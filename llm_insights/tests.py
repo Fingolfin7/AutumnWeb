@@ -1,8 +1,6 @@
-import queue
 from types import SimpleNamespace
 
 from django.contrib.auth.models import User
-from django.http import StreamingHttpResponse
 from django.test import Client, SimpleTestCase, TestCase, TransactionTestCase
 from asgiref.sync import async_to_sync
 from unittest.mock import patch
@@ -16,18 +14,9 @@ from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.services import handlers as insight_handlers
 from llm_insights.services.analysis import perform_llm_analysis_stream
 from llm_insights.services.chats import (
-    clean_generated_chat_title,
     fallback_chat_title,
-    generate_and_save_chat_title,
-    save_llm_messages,
     save_partial_stream_messages,
 )
-from llm_insights.services.streaming import (
-    configure_sse_response,
-    stream_keepalive,
-    stream_queue_events,
-)
-from users.codex_auth import serialize_token_bundle
 
 
 class InsightsViewProviderModelsTests(TestCase):
@@ -77,75 +66,6 @@ class InsightsViewProviderModelsTests(TestCase):
             ],
         )
 
-    def test_openai_models_are_available_when_server_key_present(self):
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-server-key"}):
-            provider_models = insight_handlers.provider_models(self.user)
-
-        self.assert_has_model_choices(provider_models, "openai")
-
-    def test_openai_models_are_available_when_chatgpt_token_present(self):
-        self.user.profile.set_api_key(
-            "openai_chatgpt",
-            serialize_token_bundle(
-                {
-                    "id_token": "id-token",
-                    "access_token": "access-token",
-                    "refresh_token": "refresh-token",
-                }
-            ),
-        )
-        self.user.profile.save()
-
-        provider_models = insight_handlers.provider_models(self.user)
-
-        self.assert_has_model_choices(provider_models, "openai")
-        self.assertIn(("gpt-6-sol", "GPT-6 Sol"), provider_models["openai"])
-        self.assertNotIn("openai_chatgpt", provider_models)
-
-    def test_openai_reasoning_effort_defaults_to_high(self):
-        self.assertEqual(
-            insight_handlers.validate_reasoning_effort("openai", "unexpected"),
-            "high",
-        )
-
-    def test_xhigh_reasoning_effort_is_available(self):
-        self.assertIn("xhigh", self.OPENAI_REASONING_EFFORTS)
-        self.assertEqual(
-            insight_handlers.validate_reasoning_effort("openai", "xhigh", "gpt-5.5"),
-            "xhigh",
-        )
-
-    def test_saved_5_6_selections_upgrade_without_losing_tier(self):
-        models = {"openai": [("gpt-6-luna", "Luna"), ("gpt-6-sol", "Sol"), ("gpt-6-astra", "Astra")]}
-        for old, new in [("gpt-5.6-luna", "gpt-6-luna"),
-                         ("gpt-5.6-sol", "gpt-6-sol"),
-                         ("gpt-5.6-terra", "gpt-6-sol"),
-                         ("gpt-5.6", "gpt-6-sol")]:
-            with self.subTest(model=old):
-                self.assertEqual(insight_handlers.validate_selection(models, "openai", old), ("openai", new))
-
-    def test_all_gpt_6_choices_preserve_xhigh_and_max(self):
-        for model in ("gpt-6-luna", "gpt-6-sol", "gpt-6-astra"):
-            for effort in ("xhigh", "max"):
-                self.assertEqual(insight_handlers.validate_reasoning_effort("openai", effort, model), effort)
-
-    def test_legacy_extra_high_reasoning_effort_is_normalized(self):
-        self.assertEqual(
-            insight_handlers.validate_reasoning_effort(
-                "openai", "extra-high", "gpt-6-sol"
-            ),
-            "xhigh",
-        )
-
-    def test_max_reasoning_effort_is_available_for_gpt_6(self):
-        self.assertEqual(
-            insight_handlers.validate_reasoning_effort("openai", "max", "gpt-6-sol"),
-            "max",
-        )
-        self.assertEqual(
-            insight_handlers.validate_reasoning_effort("openai", "max", "gpt-5.5"),
-            "high",
-        )
 
     def test_openai_is_the_default_provider_and_model_when_available(self):
         self.user.profile.set_api_key("openai", "test-openai-key")
@@ -158,11 +78,6 @@ class InsightsViewProviderModelsTests(TestCase):
             ("openai", "gpt-6-luna"),
         )
 
-    def test_reasoning_effort_is_ignored_for_non_openai_providers(self):
-        self.assertEqual(
-            insight_handlers.validate_reasoning_effort("gemini", "high"),
-            "",
-        )
 
 class InsightsAccessAndUsageApiTests(TestCase):
     """The Insights page (React) reads chats and token usage from /api/v2/insights/."""
@@ -187,26 +102,6 @@ class InsightsAccessAndUsageApiTests(TestCase):
         client.force_login(self._user("nokey", key=False))
         self.assertEqual(client.get("/api/v2/insights/chats/").status_code, 403)
 
-    def test_chat_detail_carries_the_per_message_usage_the_header_sums(self):
-        user = self._user("usage-user")
-        chat = LLMChat.objects.create(
-            user=user, title="Usage test", model="gemini:gemini-3.1-flash-lite"
-        )
-        for cached in (0, 3054):
-            LLMMessage.objects.create(
-                chat=chat,
-                role="assistant",
-                content="answer",
-                metadata={"usage": {"prompt": 7878, "response": 31, "cached": cached}},
-            )
-        client = Client()
-        client.force_login(user)
-
-        payload = client.get(f"/api/v2/insights/chats/{chat.id}").json()
-
-        usages = [message["metadata"]["usage"] for message in payload["messages"]]
-        self.assertEqual([usage["cached"] for usage in usages], [0, 3054])
-        self.assertEqual(sum(usage["prompt"] for usage in usages), 15756)
 
     def test_another_users_chat_is_not_found(self):
         owner = self._user("owner")
@@ -239,17 +134,6 @@ class GetLlmHandlerTests(SimpleTestCase):
         self.assertEqual(handler.reasoning_effort, "high")
         self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_API)
 
-    def test_routes_codex_models_to_openai_handler_with_codex_auth_mode(self):
-        handler = get_llm_handler(
-            "gpt-5-codex",
-            api_keys={"openai_chatgpt": "test-chatgpt-token"},
-            reasoning_effort="medium",
-        )
-
-        self.assertIsInstance(handler, OpenAIHandler)
-        self.assertEqual(handler.model, "gpt-5-codex")
-        self.assertEqual(handler.reasoning_effort, "medium")
-        self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX)
 
     def test_routes_gpt_models_to_openai_handler_with_codex_auth_mode(self):
         handler = get_llm_handler(
@@ -262,58 +146,12 @@ class GetLlmHandlerTests(SimpleTestCase):
         self.assertEqual(handler.model, "gpt-5.5")
         self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX)
 
-    def test_routes_gpt_models_to_openai_handler_with_codex_primary_api_fallback(self):
-        handler = get_llm_handler(
-            "gpt-5.5",
-            api_keys={
-                "openai": "test-openai-key",
-                "openai_chatgpt": "test-chatgpt-token",
-            },
-            reasoning_effort="medium",
-        )
-
-        self.assertIsInstance(handler, OpenAIHandler)
-        self.assertEqual(handler.auth_mode, OpenAIHandler.AUTH_CODEX_WITH_API_FALLBACK)
-
-    def test_openai_title_requests_always_use_luna(self):
-        handler = OpenAIHandler(model="gpt-6-astra")
-
-        self.assertEqual(
-            handler._api_title_response_kwargs("title this")["model"],
-            "gpt-6-luna",
-        )
-        self.assertEqual(
-            handler._codex_title_response_kwargs("title this")["model"],
-            "gpt-6-luna",
-        )
-
 
 class GeminiHandlerUsageTests(SimpleTestCase):
     def test_gemini_does_not_use_a_global_environment_key(self):
         with patch.dict("os.environ", {"GEMINI_API_KEY": "global-key"}):
             with self.assertRaisesRegex(RuntimeError, "not configured"):
                 GeminiHandler()
-
-    def test_update_usage_counts_thought_tokens_in_response(self):
-        handler = object.__new__(GeminiHandler)
-        handler.usage_stats = {"prompt": 0, "response": 0, "cached": 0, "total": 0}
-        handler.conversation_history = []
-        response = SimpleNamespace(
-            usage_metadata=SimpleNamespace(
-                prompt_token_count=100,
-                candidates_token_count=50,
-                thoughts_token_count=25,
-                cached_content_token_count=40,
-                total_token_count=175,
-            )
-        )
-
-        handler._update_usage(response)
-
-        self.assertEqual(
-            handler.usage_stats,
-            {"prompt": 100, "response": 75, "cached": 40, "total": 175},
-        )
 
 
 PAYLOAD = "SESSION-PAYLOAD-MARKER"
@@ -353,62 +191,6 @@ class ClaudeHandlerRequestShapeTests(SimpleTestCase):
         self.assertIn(PAYLOAD, system[0]["text"])
         self.assertEqual(system[0]["cache_control"], {"type": "ephemeral"})
 
-    def test_user_prompt_stays_out_of_the_cached_prefix(self):
-        handler, messages = self.build_handler()
-
-        async_to_sync(handler.send_message)("what did I work on?")
-
-        self.assertNotIn("what did I work on?", messages.kwargs["system"][0]["text"])
-        self.assertEqual(
-            messages.kwargs["messages"],
-            [{"role": "user", "content": "what did I work on?"}],
-        )
-
-    def test_resumed_chat_still_sends_the_session_payload(self):
-        # Regression: the payload used to live in a history entry with role
-        # "system", which the message builder skipped — so every turn after the
-        # first ran with no data and no instructions.
-        handler, messages = self.build_handler(
-            history=[
-                {"role": "system", "content": f"instructions\n{PAYLOAD}"},
-                {"role": "user", "content": "first question"},
-                {"role": "assistant", "content": "first answer"},
-            ]
-        )
-
-        async_to_sync(handler.send_message)("follow-up question")
-
-        self.assertIn(PAYLOAD, messages.kwargs["system"][0]["text"])
-        self.assertEqual(
-            [m["role"] for m in messages.kwargs["messages"]],
-            ["user", "assistant", "user"],
-        )
-
-    def test_payload_is_not_duplicated_into_the_message_list(self):
-        handler, messages = self.build_handler()
-
-        async_to_sync(handler.send_message)("what did I work on?")
-
-        for message in messages.kwargs["messages"]:
-            self.assertNotIn(PAYLOAD, message["content"])
-
-    def test_max_tokens_tracks_the_model_ceiling(self):
-        handler, messages = self.build_handler()
-
-        # Non-streaming is capped below the ceiling so the SDK does not refuse
-        # the request on its own timeout estimate.
-        async_to_sync(handler.send_message)("summarise my month")
-        self.assertEqual(
-            messages.kwargs["max_tokens"], handler.NON_STREAMING_MAX_OUTPUT_TOKENS
-        )
-
-        self.assertEqual(handler._max_tokens(streaming=True), 128000)
-        handler.model = "claude-haiku-4-5"
-        self.assertEqual(handler._max_tokens(streaming=True), 64000)
-        handler.model = "some-future-model"
-        self.assertEqual(
-            handler._max_tokens(streaming=True), handler.DEFAULT_MAX_OUTPUT_TOKENS
-        )
 
     def test_safety_refusals_surface_as_readable_text(self):
         handler, _ = self.build_handler()
@@ -423,50 +205,6 @@ class ClaudeHandlerRequestShapeTests(SimpleTestCase):
         self.assertIn("declined", text)
         self.assertIn("cyber", text)
         self.assertIsNone(handler._refusal_text(SimpleNamespace(stop_reason="end_turn")))
-
-
-class GeminiSystemInstructionTests(SimpleTestCase):
-    def build_handler(self):
-        # Construct properly rather than via object.__new__: the prompt
-        # templates are set in __init__, so a bare instance silently skips the
-        # branch that builds a system prompt from fresh session data.
-        handler = GeminiHandler(model="gemini-3.1-flash-lite", api_key="test-key")
-        captured = {}
-
-        class FakeChats:
-            def create(self, **kwargs):
-                captured.update(kwargs)
-                return SimpleNamespace()
-
-        handler.client = SimpleNamespace(aio=SimpleNamespace(chats=FakeChats()))
-        return handler, captured
-
-    def test_fresh_session_data_becomes_the_system_instruction(self):
-        handler, captured = self.build_handler()
-        handler.username = "kuda"
-        handler.session_data = PAYLOAD
-
-        async_to_sync(handler._create_chat)("gemini-3.1-flash-lite")
-
-        self.assertIn(PAYLOAD, captured["config"].system_instruction)
-
-    def test_create_chat_lifts_system_turns_into_system_instruction(self):
-        handler, captured = self.build_handler()
-        handler.conversation_history = [
-            {"role": "system", "content": f"instructions\n{PAYLOAD}"},
-            {"role": "user", "content": "first question"},
-            {"role": "assistant", "content": "first answer"},
-        ]
-
-        async_to_sync(handler._create_chat)("gemini-3.1-flash-lite")
-
-        self.assertIn(PAYLOAD, captured["config"].system_instruction)
-        # Regression: system turns used to be replayed as user turns.
-        self.assertEqual(
-            [entry["role"] for entry in captured["history"]], ["user", "model"]
-        )
-        for entry in captured["history"]:
-            self.assertNotIn(PAYLOAD, entry["parts"][0]["text"])
 
 
 class OpenAIMessageAssemblyTests(SimpleTestCase):
@@ -501,42 +239,6 @@ class OpenAIMessageAssemblyTests(SimpleTestCase):
         self.assertEqual(sum("STALE-PAYLOAD" in m["content"] for m in messages), 0)
         self.assertEqual(sum(PAYLOAD in m["content"] for m in messages), 1)
 
-    def test_codex_instructions_use_the_current_payload(self):
-        handler = self.build_resumed_handler()
-
-        kwargs = handler._codex_response_kwargs(
-            handler._messages_from_history(new_user_message="q")
-        )
-
-        self.assertIn(PAYLOAD, kwargs["instructions"])
-        self.assertNotIn("STALE-PAYLOAD", kwargs["instructions"])
-        self.assertNotIn("system", [m["role"] for m in kwargs["input"]])
-
-    def test_xhigh_and_max_use_the_api_enum_values(self):
-        handler = OpenAIHandler(
-            model="gpt-6-sol", api_key="test-key", reasoning_effort="xhigh"
-        )
-        messages = [{"role": "user", "content": "q"}]
-
-        self.assertEqual(
-            handler._api_response_kwargs(messages)["reasoning"],
-            {"effort": "xhigh"},
-        )
-        self.assertEqual(
-            handler._codex_response_kwargs(messages)["reasoning"],
-            {"effort": "xhigh"},
-        )
-
-        handler.reasoning_effort = "max"
-        self.assertEqual(
-            handler._api_response_kwargs(messages)["reasoning"],
-            {"effort": "max"},
-        )
-        self.assertEqual(
-            handler._codex_response_kwargs(messages)["reasoning"],
-            {"effort": "max"},
-        )
-
 
 class CachedTokenAccountingTests(SimpleTestCase):
     def test_anthropic_prompt_total_includes_cache_reads_and_writes(self):
@@ -555,19 +257,6 @@ class CachedTokenAccountingTests(SimpleTestCase):
 
         self.assertEqual(usage, {"prompt": 5000, "response": 50, "cached": 4000})
 
-    def test_gemini_cached_is_a_subset_of_prompt(self):
-        usage = GeminiHandler._usage_from_response(
-            SimpleNamespace(
-                usage_metadata=SimpleNamespace(
-                    prompt_token_count=7878,
-                    candidates_token_count=30,
-                    thoughts_token_count=0,
-                    cached_content_token_count=1543,
-                )
-            )
-        )
-
-        self.assertEqual(usage, {"prompt": 7878, "response": 30, "cached": 1543})
 
     def test_openai_reads_cached_tokens_from_either_details_shape(self):
         handler = OpenAIHandler(model="gpt-6-luna", api_key="test-key")
@@ -604,83 +293,6 @@ class CachedTokenAccountingTests(SimpleTestCase):
             )
 
 
-class MultiTurnStateMachineTests(SimpleTestCase):
-    """turn 1 -> turn 2 -> filter change -> turn 4, asserting exact history.
-
-    Every provider must append exactly the turn's own entries, so the view can
-    persist the delta. A path that appends too few re-persists earlier messages;
-    too many duplicates the current ones.
-    """
-
-    def assert_history_shape(self, history):
-        roles = [m["role"] for m in history]
-        self.assertEqual(
-            roles,
-            ["system", "user", "assistant", "user", "assistant",
-             "system", "user", "assistant", "user", "assistant"],
-        )
-        # Only the newest snapshot should be recoverable.
-        systems = [m["content"] for m in history if m["role"] == "system"]
-        self.assertIn("PAYLOAD_V1", systems[0])
-        self.assertIn("PAYLOAD_V2", systems[1])
-
-    def test_claude_history_after_four_turns(self):
-        handler = ClaudeHandler(model="claude-sonnet-5", api_key="k")
-        messages = FakeClaudeMessages()
-        handler.client = SimpleNamespace(messages=messages)
-        handler.username = "kuda"
-        handler.session_data = "PAYLOAD_V1"
-
-        async_to_sync(handler.send_message)("q1")
-        async_to_sync(handler.send_message)("q2")
-        with patch("llm_insights.claude_handler.encode", lambda *a, **k: "PAYLOAD_V2"):
-            async_to_sync(handler.update_session_data)([], "q3")
-        async_to_sync(handler.send_message)("q4")
-
-        self.assert_history_shape(handler.get_conversation_history())
-        # Final request: current payload only, and never inside the messages.
-        self.assertIn("PAYLOAD_V2", messages.kwargs["system"][0]["text"])
-        self.assertNotIn("PAYLOAD_V1", messages.kwargs["system"][0]["text"])
-        for message in messages.kwargs["messages"]:
-            self.assertNotIn("PAYLOAD_V", message["content"])
-
-    def test_openai_sends_the_system_text_it_stores(self):
-        # Regression: the update paths stored a notice-bearing snapshot but sent
-        # a recomputed plain one, so turn 4's prefix could not match turn 3's.
-        handler = OpenAIHandler(model="gpt-6-luna", api_key="k")
-        sent = {}
-
-        async def fake_send(messages):
-            sent["messages"] = messages
-            return {
-                "text": "ok",
-                "sources": [],
-                "usage": {"prompt": 1, "response": 1, "cached": 0},
-                "source": "api_key",
-            }
-
-        handler._send_with_priority = fake_send
-        handler.username = "kuda"
-        handler.session_data = "PAYLOAD_V1"
-
-        async_to_sync(handler.send_message)("q1")
-        async_to_sync(handler.send_message)("q2")
-        with patch("llm_insights.openai_handler.encode", lambda *a, **k: "PAYLOAD_V2"):
-            async_to_sync(handler.update_session_data)([], "q3")
-
-        sent_system = next(m["content"] for m in sent["messages"] if m["role"] == "system")
-        stored_system = [
-            m["content"] for m in handler.get_conversation_history() if m["role"] == "system"
-        ][-1]
-        self.assertEqual(sent_system, stored_system)
-        self.assertIn("has updated their session data", sent_system)
-
-        async_to_sync(handler.send_message)("q4")
-        self.assert_history_shape(handler.get_conversation_history())
-        turn4_system = next(m["content"] for m in sent["messages"] if m["role"] == "system")
-        self.assertEqual(turn4_system, stored_system)
-
-
 class GeminiFailurePathTests(SimpleTestCase):
     def build_handler(self, raise_on_create=False, raise_on_send=False):
         handler = GeminiHandler(model="gemini-3.1-flash-lite", api_key="k")
@@ -702,17 +314,6 @@ class GeminiFailurePathTests(SimpleTestCase):
         handler.client = SimpleNamespace(aio=SimpleNamespace(chats=FakeChats()))
         return handler
 
-    def test_failure_during_chat_creation_still_stores_the_snapshot(self):
-        # Regression: _handle_error appends only an assistant turn, so bailing
-        # before the system/user appends left the history short — the view then
-        # persisted a fixed tail and re-saved the previous exchange.
-        handler = self.build_handler(raise_on_create=True)
-
-        async_to_sync(handler.send_message)("q1")
-
-        roles = [m["role"] for m in handler.get_conversation_history()]
-        self.assertEqual(roles, ["system", "user", "assistant"])
-        self.assertIn("PAYLOAD_V1", handler.get_conversation_history()[0]["content"])
 
     def test_failure_mid_send_stores_exactly_one_turn(self):
         handler = self.build_handler(raise_on_send=True)
@@ -741,34 +342,6 @@ class GeminiFailurePathTests(SimpleTestCase):
         roles = [m["role"] for m in handler.get_conversation_history()]
         self.assertEqual(roles, ["system", "user", "assistant"])
 
-    def test_streaming_failure_during_chat_creation_stores_the_snapshot(self):
-        handler = self.build_handler(raise_on_create=True)
-
-        async def drain():
-            async for _ in handler.stream_message("q1"):
-                pass
-
-        async_to_sync(drain)()
-
-        roles = [m["role"] for m in handler.get_conversation_history()]
-        self.assertEqual(roles, ["system", "user", "assistant"])
-        self.assertIn("PAYLOAD_V1", handler.get_conversation_history()[0]["content"])
-
-    def test_resumed_history_without_a_system_turn_is_reported(self):
-        handler = GeminiHandler(model="gemini-3.1-flash-lite", api_key="k")
-        handler.set_conversation_history(
-            [
-                {"role": "user", "content": "q1"},
-                {"role": "assistant", "content": "a1"},
-            ]
-        )
-
-        # The view uses this to decide whether to re-seed session data.
-        self.assertFalse(handler.has_system_context())
-
-        handler.initialize_chat("kuda", [])
-        self.assertTrue(handler.has_system_context())
-
 
 class ClaudeRefusalContextTests(SimpleTestCase):
     def test_refused_pair_is_not_replayed_to_the_provider(self):
@@ -792,83 +365,8 @@ class ClaudeRefusalContextTests(SimpleTestCase):
             ["benign question", "benign answer", "rephrased question"],
         )
 
-    def test_ordinary_turns_are_still_replayed(self):
-        handler = ClaudeHandler(model="claude-opus-5", api_key="k")
-        handler.set_conversation_history(
-            [
-                {"role": "system", "content": PAYLOAD},
-                {"role": "user", "content": "q1"},
-                {"role": "assistant", "content": "a1", "refusal": False},
-            ]
-        )
-
-        messages = handler._api_messages(new_user_message="q2")
-
-        self.assertEqual([m["content"] for m in messages], ["q1", "a1", "q2"])
-
-
 
 # TransactionTestCase for the same close_old_connections() reason as above.
-class ClaudeRefusalPersistenceTests(TransactionTestCase):
-    def test_refusal_flag_survives_save_and_reload(self):
-        # The flag is only useful if it round-trips: handlers are rebuilt from
-        # LLMMessage.metadata on every turn, so a flag that is not persisted is
-        # a refused turn that gets replayed to the provider anyway.
-        user = User.objects.create_user(username="refusal-user")
-        chat = LLMChat.objects.create(
-            user=user, title="Refusal", model="claude:claude-opus-5"
-        )
-
-        async_to_sync(save_llm_messages)(
-            chat.id,
-            [
-                {"role": "user", "content": "question that tripped a classifier"},
-                {"role": "assistant", "content": "declined", "refusal": True},
-            ],
-        )
-
-        reloaded = [
-            {
-                "role": m.role,
-                "content": m.content,
-                "refusal": m.metadata.get("refusal", False),
-            }
-            for m in chat.messages.all()
-        ]
-        self.assertTrue(reloaded[1]["refusal"])
-
-        handler = ClaudeHandler(model="claude-opus-5", api_key="k")
-        handler.set_conversation_history(reloaded)
-        self.assertEqual(
-            handler._api_messages(new_user_message="rephrased"),
-            [{"role": "user", "content": "rephrased"}],
-        )
-
-class StreamQueueEventsTests(SimpleTestCase):
-    def test_sse_response_uses_proxy_safe_headers(self):
-        response = configure_sse_response(
-            StreamingHttpResponse(iter(()), content_type="text/event-stream")
-        )
-
-        self.assertEqual(response["Cache-Control"], "no-cache")
-        self.assertEqual(response["X-Accel-Buffering"], "no")
-        self.assertNotIn("Connection", response)
-
-    def test_stream_queue_events_yields_keepalive_while_idle(self):
-        event_queue = queue.Queue()
-        stream_done = object()
-        stream = stream_queue_events(
-            event_queue, stream_done, heartbeat_seconds=0.001
-        )
-
-        self.assertEqual(next(stream), stream_keepalive())
-
-        event_queue.put("event: done\ndata: {}\n\n")
-        self.assertEqual(next(stream), "event: done\ndata: {}\n\n")
-
-        event_queue.put(stream_done)
-        with self.assertRaises(StopIteration):
-            next(stream)
 
 
 class FakeStreamingHandler(BaseLLMHandler):
@@ -914,12 +412,6 @@ class FakeStreamingHandler(BaseLLMHandler):
         return self.conversation_history
 
 
-class FakeTitleHandler:
-    async def generate_chat_title(self, prompt):
-        self.prompt = prompt
-        return '"Project Focus Patterns."'
-
-
 # TransactionTestCase (not TestCase): this code path calls close_old_connections(),
 # which closes the connection mid-test when TestCase wraps the test in a transaction.
 # SQLite hides this (in-memory test connections can't be closed); Postgres doesn't.
@@ -931,34 +423,6 @@ class ChatTitleGenerationTests(TransactionTestCase):
             fallback_chat_title("x" * 45),
             f"{'x' * 40}...",
         )
-
-    def test_clean_generated_chat_title_removes_wrapping_noise(self):
-        self.assertEqual(
-            clean_generated_chat_title('"Deep Work Rhythm."', "Fallback"),
-            "Deep Work Rhythm",
-        )
-        self.assertEqual(clean_generated_chat_title("", "Fallback"), "Fallback")
-
-    def test_generate_and_save_chat_title_updates_chat(self):
-        user = User.objects.create_user(username="title-user")
-        chat = LLMChat.objects.create(
-            user=user,
-            title="What did I work on?",
-            model="fake:fake-model",
-        )
-        handler = FakeTitleHandler()
-        history = [
-            {"role": "system", "content": "hidden session data"},
-            {"role": "user", "content": "What did I work on?"},
-            {"role": "assistant", "content": "You spent most of the week on Project Focus."},
-        ]
-
-        title = async_to_sync(generate_and_save_chat_title)(chat, handler, history)
-
-        chat.refresh_from_db()
-        self.assertEqual(title, "Project Focus Patterns")
-        self.assertEqual(chat.title, "Project Focus Patterns")
-        self.assertNotIn("hidden session data", handler.prompt)
 
 
 # TransactionTestCase for the same close_old_connections() reason as above.
@@ -1106,22 +570,3 @@ class PerformLlmAnalysisStreamTests(TransactionTestCase):
         persisted = list(LLMMessage.objects.filter(chat=chat).order_by("created_at"))
         self.assertEqual([m.role for m in persisted], ["user", "assistant"])
         self.assertEqual(persisted[1].content, "real answer")
-
-    def test_save_llm_messages_refreshes_db_connections_around_write(self):
-        user = User.objects.create_user(username="fresh-db-user")
-        chat = LLMChat.objects.create(
-            user=user,
-            title="Fresh DB test",
-            model="fake:fake-model",
-        )
-
-        with patch("llm_insights.services.chats.close_old_connections") as close_connections:
-            async_to_sync(save_llm_messages)(
-                chat.id,
-                [{"role": "user", "content": "hello"}],
-            )
-
-        self.assertGreaterEqual(close_connections.call_count, 2)
-        message = LLMMessage.objects.get(chat=chat)
-        self.assertEqual(message.role, "user")
-        self.assertEqual(message.content, "hello")

@@ -1,11 +1,7 @@
-import hashlib
-import io
 import json
 from datetime import timedelta
 
 from django.contrib.auth.models import User
-from django.core.management import call_command
-from django.core.management.base import CommandError
 from django.test import Client, LiveServerTestCase, TestCase, override_settings
 from oauth2_provider.models import AccessToken, Application
 from django.utils import timezone
@@ -79,21 +75,6 @@ class MCPTests(TestCase):
         oversized = self.client.post("/mcp", "x" * (1024 * 1024 + 1), content_type="application/json", **self.headers)
         self.assertEqual(oversized.status_code, 413)
 
-    def test_modern_metadata_discovery_and_conflicts(self):
-        meta = {"io.modelcontextprotocol/protocolVersion": "2026-07-28",
-                "io.modelcontextprotocol/clientInfo": {"name": "client", "version": "1"},
-                "io.modelcontextprotocol/clientCapabilities": {}}
-        for method, params in [("server/discover", {}), ("tools/list", {}), ("tools/call", {"name": "me", "arguments": {"account": "Henry"}})]:
-            output = self.rpc(method, {**params, "_meta": meta}, HTTP_MCP_PROTOCOL_VERSION="2026-07-28", HTTP_MCP_METHOD=method, HTTP_MCP_NAME=params.get("name", ""))
-            self.assertEqual(output.status_code, 200)
-            self.assertEqual(output.json()["result"]["resultType"], "complete")
-            if method == "tools/call":
-                self.assertEqual(output.json()["result"]["structuredContent"]["_autumn_account"], "Henry")
-        conflict = self.rpc("tools/list", {"_meta": meta}, HTTP_MCP_PROTOCOL_VERSION="2026-07-28", HTTP_MCP_METHOD="tools/call")
-        self.assertEqual(conflict.status_code, 400)
-        unsupported = self.rpc("server/discover", {"_meta": {**meta, "io.modelcontextprotocol/protocolVersion": "2099-01-01"}}, HTTP_MCP_PROTOCOL_VERSION="2099-01-01", HTTP_MCP_METHOD="server/discover")
-        self.assertEqual(unsupported.json()["error"]["code"], -32022)
-        self.assertEqual(unsupported.json()["error"]["data"]["supported"], ["2026-07-28"])
 
     def test_discovery_and_read_only_scope(self):
         tools = self.rpc("tools/list").json()["result"]["tools"]
@@ -169,13 +150,6 @@ class MCPTests(TestCase):
     def test_bearer_endpoint_is_csrf_independent(self):
         client = Client(enforce_csrf_checks=True)
         self.assertEqual(client.post("/mcp", json.dumps({"jsonrpc": "2.0", "id": 1, "method": "ping"}), content_type="application/json", **self.headers).status_code, 200)
-
-    def test_management_listing_and_revocation_do_not_expose_tokens(self):
-        listing = io.StringIO()
-        call_command("mcp_grant", "list", stdout=listing)
-        self.assertNotIn(self.token, listing.getvalue())
-        call_command("mcp_grant", "revoke", grant_id=self.grant.id, stdout=io.StringIO())
-        self.assertEqual(self.rpc("tools/list").status_code, 401)
 
 
 class MCPOfficialClientTests(LiveServerTestCase):

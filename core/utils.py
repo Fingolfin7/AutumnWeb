@@ -1,5 +1,4 @@
 import json
-import re
 import zlib
 import base64
 import time
@@ -8,7 +7,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from collections import defaultdict
 from django.db.models import QuerySet
-from django.db.models import Min, Max, Count
+from django.db.models import Min, Max
 from datetime import datetime, timedelta
 from django.http import HttpRequest
 from dateutil.relativedelta import relativedelta
@@ -17,40 +16,6 @@ from core.search import is_truthy, search_sessions
 
 
 ACTIVE_CONTEXT_SESSION_KEY = "active_context_id"
-MAX_AUTO_STOP_MINUTES = 7 * 24 * 60
-
-
-def parse_stop_after_duration(value) -> timedelta | None:
-    """Parse an optional auto-stop duration into a timedelta."""
-    if value is None:
-        return None
-
-    if isinstance(value, (int, float)):
-        minutes = float(value)
-    else:
-        text = str(value).strip().lower().replace(",", ".")
-        if not text:
-            return None
-
-        match = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([a-z]*)", text)
-        if not match:
-            raise ValueError("Stop after must be a number of minutes or hours.")
-
-        amount = float(match.group(1))
-        unit = match.group(2) or "minutes"
-        if unit in {"m", "min", "mins", "minute", "minutes"}:
-            minutes = amount
-        elif unit in {"h", "hr", "hrs", "hour", "hours"}:
-            minutes = amount * 60
-        else:
-            raise ValueError("Stop after unit must be minutes or hours.")
-
-    if minutes <= 0:
-        raise ValueError("Stop after must be greater than zero.")
-    if minutes > MAX_AUTO_STOP_MINUTES:
-        raise ValueError("Stop after cannot be longer than 7 days.")
-
-    return timedelta(minutes=minutes)
 
 
 def stop_expired_timers(user=None, now=None):

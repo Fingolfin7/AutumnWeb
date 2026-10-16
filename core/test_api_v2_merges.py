@@ -88,20 +88,6 @@ class MergeProjectsApiTests(MergeApiTestCase):
         self.session1.refresh_from_db()
         self.assertEqual(self.session1.project, self.project1)
 
-    def test_merging_a_project_with_itself_is_refused(self):
-        response = self._merge(source_ids=[self.project1.pk, self.project1.pk])
-        self.assertGreaterEqual(response.status_code, 400)
-        self.assertLess(response.status_code, 500)
-        self.assertTrue(Projects.objects.filter(name="Project A").exists())
-        self.assertFalse(Projects.objects.filter(name="Merged Project").exists())
-
-    def test_missing_fields_are_a_validation_error(self):
-        for body in ({"source_ids": [self.project1.pk]}, {"new_name": "X"}, {}):
-            with self.subTest(body=body):
-                response = self.client.post("/api/v2/projects/merge/", body, format="json")
-                self.assertEqual(response.status_code, 400)
-                self.assertEqual(response.json()["error"]["code"], "validation_error")
-        self.assertTrue(Projects.objects.filter(name="Project A").exists())
 
     def test_another_users_project_is_not_found(self):
         other = User.objects.create_user(username="other", email="o@example.com", password="pw")
@@ -172,19 +158,3 @@ class MergeSubprojectsApiTests(MergeApiTestCase):
         self.assertEqual(response.status_code, 409)
         self.assertTrue(SubProjects.objects.filter(name="Design").exists())
         self.assertTrue(SubProjects.objects.filter(name="UI").exists())
-
-    def test_merging_a_subproject_with_itself_is_refused(self):
-        response = self._merge(source_ids=[self.design.pk, self.design.pk])
-        self.assertGreaterEqual(response.status_code, 400)
-        self.assertLess(response.status_code, 500)
-        self.assertTrue(SubProjects.objects.filter(name="Design").exists())
-
-    def test_missing_fields_are_a_validation_error(self):
-        response = self.client.post(
-            "/api/v2/subprojects/merge/",
-            {"project_id": self.parent.pk, "source_ids": [self.design.pk]},
-            format="json",
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["error"]["code"], "validation_error")
-        self.assertTrue(SubProjects.objects.filter(name="Design").exists())

@@ -159,19 +159,6 @@ def bing_background_title():
     return _cached_bing_data.get('title', '')
 
 
-@register.simple_tag
-def bing_background_description():
-    now = timezone.now()
-    if (not _cached_bing_url) or (now >= _bing_expiry):
-        bing_background()
-    # Prefer description; append copyright if distinct
-    desc = _cached_bing_data.get('description', '')
-    copyright = _cached_bing_data.get('copyright', '')
-    if copyright and copyright not in desc:
-        return f"{desc} (© {copyright})" if desc else f"© {copyright}"
-    return desc
-
-
 def bing_background_metadata():
     """Return the metadata fetched alongside the current Bing image."""
     bing_background()
@@ -182,13 +169,3 @@ def bing_background_metadata():
 @register.simple_tag
 def nasa_apod_title():
     return nasa_apod_media().get('title', '')
-
-
-@register.simple_tag
-def nasa_apod_explanation():
-    media = nasa_apod_media()
-    expl = media.get('explanation', '')
-    copyright = media.get('copyright')
-    if copyright and copyright not in expl:
-        return f"{expl} (© {copyright})" if expl else f"© {copyright}"
-    return expl

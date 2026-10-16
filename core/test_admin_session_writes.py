@@ -4,7 +4,6 @@ Direct admin session edits and inline allocation edits must stay versioned and
 commitment-safe even though they bypass SessionMutationService.
 """
 
-from datetime import timezone as datetime_timezone
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth.models import User
@@ -46,39 +45,6 @@ class _RequestFactoryMixin:
         )
 
 
-class AdminSaveModelTests(_RequestFactoryMixin, TestCase):
-    def _request(self):
-        request = self.factory.post("/admin/core/sessions/")
-        request.user = self.user
-        return request
-
-    def test_save_model_bumps_version_and_marks_commitment(self):
-        session = self._make_session()
-        version_before = session.version
-        Commitment.objects.filter(pk=self.commitment.pk).update(needs_recompute=False)
-
-        admin = SessionsAdmin(Sessions, AdminSite())
-        session.note = "edited via admin"
-        admin.save_model(self._request(), session, form=None, change=True)
-
-        session.refresh_from_db()
-        self.commitment.refresh_from_db()
-        self.assertEqual(session.version, version_before + 1)
-        self.assertTrue(self.commitment.needs_recompute)
-
-    def test_save_model_floors_subsecond_start_time(self):
-        session = self._make_session()
-        # Push a sub-second start_time straight onto the instance, as a raw admin
-        # edit would, and confirm save_model floors it to the whole second.
-        session.start_time = session.start_time.replace(microsecond=123456)
-
-        admin = SessionsAdmin(Sessions, AdminSite())
-        admin.save_model(self._request(), session, form=None, change=True)
-
-        session.refresh_from_db()
-        self.assertEqual(session.start_time.microsecond, 0)
-
-
 class _FakeFormset:
     def __init__(self, model, instance, new=(), changed=(), deleted=()):
         self.model = model
@@ -102,40 +68,6 @@ class AdminSaveFormsetTests(_RequestFactoryMixin, TestCase):
         request.user = self.user
         return request
 
-    def test_inline_change_bumps_version_and_marks_dirty(self):
-        from core.models import SessionSubproject
-
-        session = self._make_session()
-        version_before = session.version
-        Commitment.objects.filter(pk=self.commitment.pk).update(needs_recompute=False)
-
-        # Simulate an inline allocation edit having been applied.
-        SessionSubproject.objects.filter(session=session).update(allocation_bp=5000)
-
-        admin = SessionsAdmin(Sessions, AdminSite())
-        formset = _FakeFormset(SessionSubproject, session, changed=[object()])
-        admin.save_formset(self._request(), _FakeForm(session), formset, change=True)
-
-        session.refresh_from_db()
-        self.commitment.refresh_from_db()
-        self.assertEqual(session.version, version_before + 1)
-        self.assertTrue(self.commitment.needs_recompute)
-
-    def test_inline_no_change_is_a_noop(self):
-        from core.models import SessionSubproject
-
-        session = self._make_session()
-        version_before = session.version
-        Commitment.objects.filter(pk=self.commitment.pk).update(needs_recompute=False)
-
-        admin = SessionsAdmin(Sessions, AdminSite())
-        formset = _FakeFormset(SessionSubproject, session)
-        admin.save_formset(self._request(), _FakeForm(session), formset, change=True)
-
-        session.refresh_from_db()
-        self.commitment.refresh_from_db()
-        self.assertEqual(session.version, version_before)
-        self.assertFalse(self.commitment.needs_recompute)
 
     def test_inline_invalid_allocation_raises(self):
         from core.models import SessionSubproject

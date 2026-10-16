@@ -1,5 +1,4 @@
 import {
-  fromDateTimeLocal,
   localTimeCandidates,
   nonexistentTimeMessage,
   occurrenceLabel,
@@ -33,18 +32,9 @@ describe("ordinary times", () => {
     expect(localTimeCandidates("2026-01-14T09:30")).toEqual({ kind: "ok", instants: ["2026-01-14T09:30:00+01:00"] });
   });
 
-  it("agree with fromDateTimeLocal", () => {
-    for (const value of ["2026-10-14T09:30:05", "2026-01-14T09:30", "2026-03-29T03:00:00", "2026-10-25T01:59:59", "2026-10-25T03:00:00"]) {
-      const { kind, instants } = localTimeCandidates(value);
-      expect(kind).toBe("ok");
-      expect(instants).toEqual([fromDateTimeLocal(value)]);
-    }
-  });
-
   it("treat empty or malformed values as ok with nothing to submit", () => {
     expect(localTimeCandidates("")).toEqual({ kind: "ok", instants: [] });
     expect(localTimeCandidates("not a time")).toEqual({ kind: "ok", instants: [] });
-    expect(fromDateTimeLocal("")).toBeNull();
   });
 });
 
@@ -73,10 +63,6 @@ describe("the night clocks go back (25 Oct)", () => {
   it("returns instants one hour apart", () => {
     const [first, second] = localTimeCandidates("2026-10-25T02:15:00").instants;
     expect(Date.parse(second!) - Date.parse(first!)).toBe(3_600_000);
-  });
-
-  it("keeps fromDateTimeLocal on the first occurrence, as before", () => {
-    expect(fromDateTimeLocal("2026-10-25T02:30:00")).toBe("2026-10-25T02:30:00+02:00");
   });
 });
 

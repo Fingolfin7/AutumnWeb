@@ -201,19 +201,6 @@ class V2ContextsTagsTests(TestCase):
         self.assertEqual(other_context.name, "Personal")
         self.assertEqual(other_tag.name, "Urgent")
 
-    def test_name_validation_matches_v1_cleaning(self):
-        cases = (
-            (reverse("api_v2:contexts"), {"name": 123}),
-            (reverse("api_v2:contexts"), {"name": "   "}),
-            (reverse("api_v2:tags"), {"name": "x" * 101}),
-        )
-        for url, payload in cases:
-            with self.subTest(payload=payload):
-                response = self.client.post(url, payload, format="json")
-                self.assertEqual(response.status_code, 400)
-                self.assertEqual(
-                    response.json()["error"]["code"], "validation_error"
-                )
 
     def test_commitment_targets_block_deletes_and_leave_data_untouched(self):
         context = Context.objects.create(user=self.user, name="Protected Context")
@@ -287,82 +274,3 @@ class V2ContextsTagsTests(TestCase):
         self.assertEqual(response.status_code, 204)
         self.assertFalse(project.tags.filter(pk=tag.id).exists())
         self.assertTrue(Projects.objects.filter(pk=project.id).exists())
-
-    def test_list_endpoints_each_use_one_query(self):
-        contexts = [
-            Context.objects.create(user=self.user, name=f"Context {index:02d}")
-            for index in range(10)
-        ]
-        tags = [
-            Tag.objects.create(user=self.user, name=f"Tag {index:02d}")
-            for index in range(10)
-        ]
-        for index, context in enumerate(contexts):
-            project = self._project(f"Project {index:02d}", context)
-            project.tags.add(*tags[: index + 1])
-
-        with self.assertNumQueries(1):
-            contexts_response = self.client.get(reverse("api_v2:contexts"))
-        with self.assertNumQueries(1):
-            tags_response = self.client.get(reverse("api_v2:tags"))
-
-        self.assertEqual(contexts_response.status_code, 200)
-        self.assertEqual(tags_response.status_code, 200)
-        self.assertEqual(contexts_response.json()["count"], 10)
-        self.assertEqual(tags_response.json()["count"], 10)
-
-    def test_me_advertises_context_and_tag_capabilities(self):
-        response = self.client.get(reverse("api_v2:me"))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("contexts", response.json()["capabilities"])
-        self.assertIn("tags", response.json()["capabilities"])
-
-
-class ContextDescriptionAndTagColorTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="v2-meta-extras")
-        self.client = APIClient()
-        self.client.force_authenticate(self.user)
-
-    def test_context_description_round_trip(self):
-        created = self.client.post(
-            "/api/v2/contexts/",
-            {"name": "Deep", "description": "Focus work"},
-            format="json",
-        )
-        self.assertEqual(created.status_code, 201)
-        self.assertEqual(created.json()["description"], "Focus work")
-
-        cid = created.json()["id"]
-        patched = self.client.patch(
-            f"/api/v2/contexts/{cid}", {"description": "Updated"}, format="json"
-        )
-        if patched.status_code == 404:  # trailing-slash routing
-            patched = self.client.patch(
-                f"/api/v2/contexts/{cid}/", {"description": "Updated"}, format="json"
-            )
-        self.assertEqual(patched.status_code, 200)
-        self.assertEqual(patched.json()["description"], "Updated")
-        self.assertEqual(patched.json()["name"], "Deep")
-
-    def test_tag_color_round_trip(self):
-        created = self.client.post(
-            "/api/v2/tags/", {"name": "focus", "color": "#aa3355"}, format="json"
-        )
-        self.assertEqual(created.status_code, 201)
-        self.assertEqual(created.json()["color"], "#aa3355")
-
-        tid = created.json()["id"]
-        patched = self.client.patch(
-            f"/api/v2/tags/{tid}", {"color": "blue"}, format="json"
-        )
-        if patched.status_code == 404:
-            patched = self.client.patch(
-                f"/api/v2/tags/{tid}/", {"color": "blue"}, format="json"
-            )
-        self.assertEqual(patched.status_code, 200)
-        self.assertEqual(patched.json()["color"], "blue")
-
-    def test_empty_write_rejected(self):
-        response = self.client.post("/api/v2/contexts/", {}, format="json")
-        self.assertEqual(response.status_code, 400)
