@@ -8,6 +8,8 @@ Autumn is a Django-based time and project tracking web application. It's the bro
 
 ## Commands
 
+Python 3.11 or newer is required (Pillow 13's minimum).
+
 ```bash
 # Create/activate virtual env (optional but recommended)
 python -m venv .venv
@@ -185,7 +187,7 @@ that the operating system displayed it.
 
 Tests are in `core/test_*.py`, `core/tests.py`, `users/`, and `llm_insights/`.
 Install `requirements-dev.txt` for test-only dependencies. CI runs on Windows
-with SQLite and Python 3.10, and Ubuntu with PostgreSQL and Python 3.13.
+with SQLite and Python 3.11, and Ubuntu with PostgreSQL and Python 3.13.
 Some failures only show on PostgreSQL (production runs it too):
 `scripts/test_postgres.sh` runs the suite against a local server from plain
 PostgreSQL binaries (e.g. EnterpriseDB's Windows "binaries" zip, unpacked

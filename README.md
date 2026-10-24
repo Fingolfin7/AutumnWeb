@@ -79,7 +79,7 @@ Autumn includes pie, bar, scatter, line, calendar, heatmap, stacked area, cumula
 
 ### Local Setup
 
-To run the project locally:
+Python 3.11 or newer is required. To run the project locally:
 
 ```bash
 git clone https://github.com/Fingolfin7/AutumnWeb.git

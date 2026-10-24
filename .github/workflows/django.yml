@@ -16,8 +16,8 @@ jobs:
           - os: ubuntu-latest # matches the Render deploy environment
             python-version: '3.13'
             db-image: postgres:16-alpine # test against the production DB engine
-          - os: windows-latest # matches local dev
-            python-version: '3.10'
+          - os: windows-latest # tests the minimum supported Python version
+            python-version: '3.11' # Pillow 13 requires Python 3.11+
             db-image: '' # empty image skips the service (SQLite; Windows runners can't host Linux containers)
 
     services:
