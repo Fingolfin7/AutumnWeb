@@ -79,14 +79,30 @@ Autumn includes pie, bar, scatter, line, calendar, heatmap, stacked area, cumula
 
 ### Local Setup
 
-Python 3.11 or newer is required. To run the project locally:
+Python 3.11 or newer and Node.js 22 (with npm) are required. To run the project locally:
 
 ```bash
 git clone https://github.com/Fingolfin7/AutumnWeb.git
 cd AutumnWeb
 python -m venv venv
-source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+source venv/bin/activate  # PowerShell: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+```
+
+Create a `.env` file in the repository root with local development settings:
+
+```text
+SECRET_KEY=<your-own-random-secret>
+DEBUG=TRUE
+```
+
+Build the React UI, then start Django from the repository root:
+
+```bash
+cd frontend
+npm ci
+npm run build
+cd ..
 python manage.py migrate
 python manage.py seed_demo  # optional: fictional demo account (demo / demo-pass-123)
 python manage.py runserver
@@ -99,6 +115,17 @@ python manage.py createsuperuser  # For admin access
 ```
 
 Access the app at `http://127.0.0.1:8000/`.
+
+The frontend build writes to `core/static/app/`, which is gitignored. Re-run
+`npm run build` in `frontend/` after changing frontend code or pulling frontend
+updates; run `npm ci` first when `frontend/package-lock.json` changes.
+
+For frontend development with hot reload, add
+`VITE_DEV_SERVER=http://localhost:5173` to `.env`, run `npm run dev` in
+`frontend/` in a separate terminal, and start (or restart) Django with
+`python manage.py runserver` from the repository root. Continue opening the app
+at `http://127.0.0.1:8000/`; Vite supplies the frontend assets on port 5173.
+Remove `VITE_DEV_SERVER` and restart Django to use the built UI again.
 
 ### Browser timer reminders
 
