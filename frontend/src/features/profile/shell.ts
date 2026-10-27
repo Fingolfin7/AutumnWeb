@@ -59,6 +59,8 @@ export function syncHeaderDimming(value: number) {
 export function applyBackground(background: Prefs["background"]) {
   const body = document.body;
   const url = background.image_url;
+  // A video rendered with the original page would otherwise cover the new image.
+  if (body.dataset.bgUrl !== (url ?? "")) document.querySelector(".workspace-bg-video")?.remove();
   if (url) {
     body.classList.add("bg-active");
     body.style.setProperty("--workspace-bg-image", `url('${url}')`);

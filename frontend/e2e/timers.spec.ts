@@ -26,9 +26,18 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   await expect(page.getByRole("article", { name: "Running timer: Garden Planner App" })).toBeVisible();
 
   await page.goto("/timers/");
-  await page.getByRole("article", { name: "Running timer: Garden Planner App" }).getByRole("link", { name: "Stop" }).click();
+  const runningCard = page.getByRole("article", { name: "Running timer: Garden Planner App" });
+  await runningCard.getByRole("textbox", { name: "Session note" }).fill(note);
+  await runningCard.getByRole("link", { name: "Stop" }).click();
   await expect(page).toHaveURL(/\/stop_timer\/\d+\/$/);
-  await page.getByRole("textbox", { name: "Note", exact: true }).fill(note);
+  await expect(page.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(note);
+  const end = page.locator("#id_end_time");
+  const initialEnd = await end.inputValue();
+  const duration = page.locator(".timer-duration");
+  const initialDuration = await duration.textContent();
+  await page.waitForTimeout(2_000);
+  await expect(end).toHaveValue(initialEnd);
+  await expect(duration).toHaveText(initialDuration!);
   await page.getByRole("button", { name: "Stop timer" }).click();
 
   await expect(page).toHaveURL(/\/timers\/$/);

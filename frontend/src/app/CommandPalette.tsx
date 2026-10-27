@@ -68,7 +68,10 @@ export function CommandPalette() {
           group: "Running",
           label: `Stop ${timer.project.name}`,
           icon: faStopwatch,
-          run: () => go(urls.stopTimer(timer.id)),
+          run: () => {
+            setOpen(false);
+            navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt: Date.now() } });
+          },
         });
       }
     }

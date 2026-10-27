@@ -1,4 +1,5 @@
 import { Fragment, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
 import { faRedo, faStopwatch, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog } from "@/components/Sheet";
@@ -28,6 +29,7 @@ export function FocusCard({
   beforeStop?: () => void;
 }) {
   const toast = useToast();
+  const navigate = useNavigate();
   const restart = useRestartTimer();
   const remove = useDeleteTimer();
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -103,7 +105,11 @@ export function FocusCard({
               event.preventDefault();
               return;
             }
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            const stopRequestedAt = Date.now();
             beforeStop?.();
+            navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt } });
           }}
         >
           <Icon icon={faStopwatch} /> Stop

@@ -47,7 +47,7 @@ export function TimerNoteEditor({ timer, registerStash }: { timer: Timer; regist
   useEffect(() => {
     registerStash?.(() => {
       try {
-        window.sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + timer.id, valueRef.current);
+        window.sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + timer.id, (textarea.current?.value ?? valueRef.current));
       } catch {
         /* storage unavailable */
       }

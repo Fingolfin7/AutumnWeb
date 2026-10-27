@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { faArrowLeft, faStopwatch } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
@@ -14,14 +14,15 @@ import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
 import { elapsedSeconds, formatDurationWords, toDateTimeLocal } from "@/lib/format";
 import { updateQueuedStart } from "@/lib/offlineQueue";
-import { useNow, useStopTimer, useTimers } from "./api";
+import { useStopTimer, useTimers } from "./api";
 
 /* Stop a timer (stop_timer.html): adjust start/end, write the note (a draft
    typed on the Timers page carries over), split the time across subprojects,
-   then stop. Leaving End untouched stops at the moment you press the button,
-   not when the page opened. */
+   then stop. The initial end time is when Stop was pressed. */
 export default function StopTimerPage() {
   const { sessionId } = useParams();
+  const location = useLocation();
+  const requestedAt = useRef(typeof location.state?.stopRequestedAt === "number" ? location.state.stopRequestedAt : Date.now());
   const id = Number(sessionId);
   const timers = useTimers();
   const navigate = useNavigate();
@@ -48,16 +49,15 @@ export default function StopTimerPage() {
     );
   }
   if (timers.isError || !timer) return <ErrorState error={timers.error} onRetry={() => void timers.refetch()} />;
-  return <StopForm timer={timer} onSubmitting={() => setStopping(timer)} />;
+  return <StopForm timer={timer} requestedAt={requestedAt.current} onSubmitting={() => setStopping(timer)} />;
 }
 
-function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => void }) {
+function StopForm({ timer, requestedAt, onSubmitting }: { timer: Timer; requestedAt: number; onSubmitting: () => void }) {
   const navigate = useNavigate();
   const toast = useToast();
   const invalidate = useInvalidate();
   const stop = useStopTimer();
-  const now = useNow();
-  const openedAt = useRef(new Date());
+  const openedAt = useRef(new Date(requestedAt));
 
   const initialStart = useMemo(() => toDateTimeLocal(timer.start), [timer.start]);
   const [start, setStart] = useState(initialStart);
@@ -72,17 +72,12 @@ function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => v
   const startTime = useLocalTime(start, timer.start);
   const endTime = useLocalTime(end);
 
-  /* Until End is edited, keep it showing "now". */
-  useEffect(() => {
-    if (!endTouched) setEnd(toDateTimeLocal(new Date(now)));
-  }, [now, endTouched]);
-
   const items = timer.subproject_allocations.map((a) => ({ id: a.subproject_id, name: a.name, bp: a.allocation_bp }));
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const startIso = startTime.instant;
-    const endIso = endTouched ? endTime.instant : new Date().toISOString();
+    const endIso = endTouched ? endTime.instant : openedAt.current.toISOString();
     const nextErrors: Record<string, string[]> = {};
     if (!startIso) nextErrors.start = [startTime.error ?? "Enter a valid date and time."];
     if (!endIso) nextErrors.end = [endTime.error ?? "Enter a valid date and time."];
@@ -177,8 +172,8 @@ function StopForm({ timer, onSubmitting }: { timer: Timer; onSubmitting: () => v
             </div>
           ) : null}
           <p className="project-total">
-            <span className="timer-duration">{formatDurationWords(elapsedSeconds(timer.start, now) / 60)}</span>{" "}
-            <span className="muted">so far</span>
+            <span className="timer-duration">{formatDurationWords(elapsedSeconds(timer.start, endTime.instant ? Date.parse(endTime.instant) : openedAt.current.getTime()) / 60)}</span>{" "}
+            <span className="muted">at the selected end time</span>
           </p>
         </section>
         <section className="slab slab-pad">

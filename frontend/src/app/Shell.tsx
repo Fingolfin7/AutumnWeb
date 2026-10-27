@@ -28,6 +28,8 @@ import { requestJson } from "@/api/client";
 import { AppLink, urls } from "./links";
 import { useActiveContext } from "./context";
 import { clearPersistedQueries } from "./persist";
+import { fetchPreferences } from "@/features/profile/api";
+import { applyBackground } from "@/features/profile/shell";
 
 interface Tab {
   href: string;
@@ -64,6 +66,31 @@ export function Shell({ children }: { children: ReactNode }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => setMoreOpen(false), [pathname]);
+
+  useEffect(() => {
+    const interval = 60 * 60 * 1000;
+    let lastCheck = Date.now();
+    let disposed = false;
+    let checking = false;
+    const refresh = () => {
+      if (document.hidden || checking || Date.now() - lastCheck < interval) return;
+      checking = true;
+      lastCheck = Date.now();
+      void fetchPreferences().then((prefs) => {
+        if (!disposed && prefs.automatic_background && prefs.background.image_url) applyBackground(prefs.background);
+      }).catch(() => {
+        // Retry on the next check if the connection is unavailable.
+        lastCheck = 0;
+      }).finally(() => { checking = false; });
+    };
+    const id = window.setInterval(refresh, interval);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      disposed = true;
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   return (
     <div className="app">
