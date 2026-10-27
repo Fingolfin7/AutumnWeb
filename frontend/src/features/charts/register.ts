@@ -55,5 +55,9 @@ Chart.defaults.borderColor = "rgba(217, 222, 219, 0.12)";
 Chart.defaults.font.family = '"Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 Chart.defaults.plugins.legend.labels.boxWidth = 12;
 Chart.defaults.plugins.legend.labels.boxHeight = 12;
+/* Fill #canvas_container's height rather than a 2:1 box of its width: on a
+   phone that box is ~180px tall and a long legend leaves the plot a sliver.
+   The calendar opts back in to its own ratio. */
+Chart.defaults.maintainAspectRatio = false;
 
 export { Chart };

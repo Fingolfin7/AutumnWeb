@@ -2651,7 +2651,9 @@ img.brand-mark {
 
 #canvas_container {
   display: flex; align-items: center; justify-content: center;
-  width: 100%; height: min(40rem, 66vh);
+  /* 66vh suits a portrait phone; 50vw keeps a landscape phone's chart as tall
+     as a 2:1 box instead of a few hundred pixels of legend and axes. */
+  width: 100%; height: min(40rem, max(66vh, 50vw));
 }
 /* Pie, radar and friends are square: cap the width so they do not stretch
    into ovals on a wide desk. */
