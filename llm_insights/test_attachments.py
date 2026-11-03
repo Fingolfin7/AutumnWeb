@@ -7,13 +7,12 @@ import shutil
 import tempfile
 import zipfile
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, SimpleTestCase, TransactionTestCase, override_settings
+from django.test import Client, RequestFactory, SimpleTestCase, TransactionTestCase, override_settings
 from PIL import Image
 
 from llm_insights.attachments import docx_text, files_to_send, gemini_parts, transcript_text
@@ -21,6 +20,8 @@ from llm_insights.base_handler import BaseLLMHandler
 from llm_insights.claude_handler import ClaudeHandler
 from llm_insights.models import LLMAttachment, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
+from llm_insights.services.analysis import perform_llm_analysis_stream
+from llm_insights.services.streaming import _prepare_stream_context
 
 W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
 
@@ -156,15 +157,28 @@ class AttachmentApiTests(TransactionTestCase):
             def get_conversation_history(self):
                 return self.conversation_history
 
-        with patch("llm_insights.services.streaming.get_llm_handler", return_value=RecordingHandler()), patch(
-            "llm_insights.services.streaming.generate_and_save_chat_title", return_value="Standup"
-        ):
-            response = self.client.post(
-                "/api/v2/insights/stream/",
-                {"message": "Who is blocked?", "attachment_ids": [attachment_id]},
-                content_type="application/json",
-            )
-            b"".join(response.streaming_content)
+        # The view's own steps, driven here rather than through its worker
+        # thread: that thread's DB work lands on a shared executor thread whose
+        # connection outlives the test and blocks Postgres' test-DB teardown.
+        request = RequestFactory().post(
+            "/api/v2/insights/stream/", {"prompt": "Who is blocked?", "attachment_ids": [attachment_id]}
+        )
+        request.user, request.session = self.user, self.client.session
+        context = _prepare_stream_context(request, self.user, None)
+
+        async def run():
+            async for _ in perform_llm_analysis_stream(
+                llm_handler=RecordingHandler(),
+                sessions=context["sessions"],
+                user_prompt=context["user_prompt"],
+                username="attacher",
+                conversation_history=context["history"],
+                chat_obj=context["chat_id"],
+                attachments=context["attachments"],
+            ):
+                pass
+
+        async_to_sync(run)()
 
         self.assertEqual(seen["attachments"][0]["text"], "Ada: Blocked on review.")
         attachment = LLMAttachment.objects.get(pk=attachment_id)
