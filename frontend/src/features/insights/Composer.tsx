@@ -1,11 +1,13 @@
-import { useEffect, useLayoutEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
-import { faPaperPlane, faStop } from "@fortawesome/free-solid-svg-icons";
+import { useEffect, useLayoutEffect, useRef, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
+import { faPaperclip, faPaperPlane, faStop } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
 import { effortLabel, effortsFor, openaiConnectionNote, pickEffort, providerLabel, type ModelSelection } from "./logic";
 import type { InsightOptions } from "./types";
+import { AttachmentTray } from "./AttachmentList";
+import { ACCEPT, MAX_FILES, type Draft } from "./attachments";
 
-/* Model pickers, the question box and Send. */
+/* Model pickers, attached files, the question box and Send. */
 export function Composer({
   options,
   selection,
@@ -15,6 +17,10 @@ export function Composer({
   busy,
   onSend,
   onStop,
+  drafts,
+  uploading,
+  onAddFiles,
+  onRemoveDraft,
 }: {
   options: InsightOptions;
   selection: ModelSelection;
@@ -24,8 +30,14 @@ export function Composer({
   busy: boolean;
   onSend: () => void;
   onStop: () => void;
+  drafts: Draft[];
+  uploading: boolean;
+  onAddFiles: (files: File[]) => void;
+  onRemoveDraft: (key: string) => void;
 }) {
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const canSend = !!prompt.trim() && !busy && !uploading;
   const provider = options.providers.find((p) => p.provider === selection.provider);
   const efforts = effortsFor(options, selection.provider, selection.model);
   const note = openaiConnectionNote(options.openai_source, options.providers.some((p) => p.provider === "openai"));
@@ -57,15 +69,23 @@ export function Composer({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
-    if (prompt.trim()) onSend();
+    if (canSend) onSend();
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && !busy) {
       event.preventDefault();
-      if (prompt.trim()) onSend();
+      if (canSend) onSend();
     }
   };
+  /* A pasted screenshot becomes an attachment. Copying text out of Word or a
+     web page can carry a picture of it too: text wins then. */
+  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const data = event.clipboardData;
+    if (!data?.files.length || data.getData("text/plain")) return;
+    event.preventDefault();
+    onAddFiles(Array.from(data.files));
+  };
+  const full = drafts.length >= MAX_FILES;
 
   return (
     <form className="composer" onSubmit={submit}>
@@ -123,7 +143,30 @@ export function Composer({
         ) : null}
       </div>
 
+      <AttachmentTray drafts={drafts} onRemove={onRemoveDraft} />
+
       <div className="composer-input-row">
+        <input
+          ref={picker}
+          type="file"
+          multiple
+          accept={ACCEPT}
+          hidden
+          onChange={(event) => {
+            onAddFiles(Array.from(event.target.files ?? []));
+            event.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className="composer-attach"
+          onClick={() => picker.current?.click()}
+          disabled={busy || full}
+          title={full ? `Up to ${MAX_FILES} files per message` : "Attach screenshots, PDFs, Word docs or transcripts (or paste and drop them)"}
+          aria-label="Attach files"
+        >
+          <Icon icon={faPaperclip} />
+        </button>
         <label className="sr-only" htmlFor="prompt">
           Your question
         </label>
@@ -132,19 +175,20 @@ export function Composer({
           name="prompt"
           ref={textarea}
           rows={1}
-          placeholder="Ask a question about your sessions…"
+          placeholder={drafts.length ? "Ask about these files and your sessions…" : "Ask a question about your sessions…"}
           value={prompt}
           readOnly={busy}
           onChange={(e) => onPrompt(e.target.value)}
           onKeyDown={onKeyDown}
+          onPaste={onPaste}
         />
         {busy ? (
           <button type="button" className="btn btn--ghost" title="Stop the answer" onClick={onStop}>
-            <Icon icon={faStop} /> Stop
+            <Icon icon={faStop} /> <span className="composer-btn-label">Stop</span>
           </button>
         ) : (
-          <button type="submit" className="btn btn--primary" title="Send (Enter)" disabled={!prompt.trim()}>
-            <Icon icon={faPaperPlane} /> Send
+          <button type="submit" className="btn btn--primary" title={uploading ? "Waiting for files to finish uploading" : "Send (Enter)"} disabled={!canSend}>
+            <Icon icon={faPaperPlane} /> <span className="composer-btn-label">Send</span>
           </button>
         )}
       </div>

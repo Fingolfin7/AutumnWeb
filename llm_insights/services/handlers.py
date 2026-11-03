@@ -18,6 +18,7 @@ def provider_models(user):
         models["openai"] = [
             ("gpt-6-luna", "GPT-6 Luna"),
             ("gpt-6.1-sol", "GPT-6.1 Sol"),
+            ("gpt-6.1-terra", "GPT-6.1 Terra"),
             ("gpt-6-astra", "GPT-6 Astra"),
             ("gpt-5.5", "GPT-5.5"),
         ]
@@ -67,7 +68,7 @@ def validate_selection(models, provider, model):
             "gpt-5.6-luna": "gpt-6-luna",
             "gpt-5.6-sol": "gpt-6.1-sol",
             "gpt-5.6": "gpt-6.1-sol",
-            "gpt-5.6-terra": "gpt-6.1-sol",
+            "gpt-5.6-terra": "gpt-6.1-terra",
             "gpt-6-sol": "gpt-6.1-sol",
         }.get(model, model)
     elif provider == "claude":

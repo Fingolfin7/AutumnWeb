@@ -4,7 +4,8 @@ from asgiref.sync import sync_to_async
 from django.db import close_old_connections, transaction
 from django.utils import timezone
 
-from llm_insights.models import LLMChat, LLMMessage
+from llm_insights.attachments import payload as attachment_payload
+from llm_insights.models import LLMAttachment, LLMChat, LLMMessage
 
 
 def database_sync_to_async(func):
@@ -120,7 +121,14 @@ async def generate_and_save_chat_title(
     return title
 
 
-def serialize_message(message, *, include_metadata=False, include_auth_source=False):
+def serialize_message(
+    message,
+    *,
+    include_metadata=False,
+    include_auth_source=False,
+    include_attachments=False,
+    send_files=None,
+):
     data = {
         "role": message.role,
         "content": message.content,
@@ -134,17 +142,41 @@ def serialize_message(message, *, include_metadata=False, include_auth_source=Fa
         data["refusal"] = message.metadata.get("refusal", False)
     if include_auth_source:
         data["auth_source"] = message.metadata.get("auth_source", "")
+    if include_attachments and message.role == "user":
+        attachments = [
+            attachment_payload(
+                a, send_file=send_files is None or a.id in send_files, earlier=True
+            )
+            for a in message.attachments.all()
+        ]
+        if attachments:
+            data["attachments"] = attachments
     return data
 
 
-def load_chat_history(chat_obj, *, include_metadata=False, include_auth_source=False):
+def load_chat_history(
+    chat_obj,
+    *,
+    include_metadata=False,
+    include_auth_source=False,
+    include_attachments=False,
+    send_files=None,
+):
+    """include_attachments reads attached files back from storage, for the
+    history a handler resends to the model: those in send_files (ids), or all
+    when it is None; the rest are named in a note instead."""
+    messages = chat_obj.messages.all()
+    if include_attachments:
+        messages = messages.prefetch_related("attachments")
     return [
         serialize_message(
             message,
             include_metadata=include_metadata,
             include_auth_source=include_auth_source,
+            include_attachments=include_attachments,
+            send_files=send_files,
         )
-        for message in chat_obj.messages.all()
+        for message in messages
     ]
 
 
@@ -155,7 +187,7 @@ async def save_llm_messages(chat_obj, messages_to_save):
         chat = LLMChat.objects.get(id=chat_id)
         with transaction.atomic():
             for msg in messages_to_save:
-                LLMMessage.objects.create(
+                created = LLMMessage.objects.create(
                     chat=chat,
                     role=msg["role"],
                     content=msg["content"],
@@ -169,6 +201,11 @@ async def save_llm_messages(chat_obj, messages_to_save):
                         "refusal": msg.get("refusal", False),
                     },
                 )
+                attachment_ids = [a["id"] for a in msg.get("attachments") or []]
+                if attachment_ids:
+                    LLMAttachment.objects.filter(
+                        id__in=attachment_ids, user_id=chat.user_id, message__isnull=True
+                    ).update(message=created)
 
     await database_sync_to_async(create_messages)()
 
@@ -181,6 +218,7 @@ async def save_partial_stream_messages(
     assistant_content,
     model,
     error_message,
+    attachments=None,
 ):
     current_history = llm_handler.get_conversation_history() if llm_handler else []
     pending_messages = (
@@ -203,8 +241,11 @@ async def save_partial_stream_messages(
                 }
             )
     elif user_prompt:
+        user_entry = {"role": "user", "content": user_prompt}
+        if attachments:
+            user_entry["attachments"] = attachments
         pending_messages = [
-            {"role": "user", "content": user_prompt},
+            user_entry,
             {
                 "role": "assistant",
                 "content": assistant_content,

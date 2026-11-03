@@ -196,6 +196,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/insights/attachments/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Upload a file to send with the next Insights message. Unsent
+         *     uploads are deleted after a day.
+         */
+        post: operations["insights_attachments_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/insights/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["insights_attachments_retrieve"];
+        put?: never;
+        post?: never;
+        /**
+         * @description Remove a file that has not been sent yet. Sent files stay with
+         *     their message and go when the chat is deleted.
+         */
+        delete: operations["insights_attachments_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/insights/chats/": {
         parameters: {
             query?: never;
@@ -1619,6 +1659,31 @@ export interface components {
             /** Format: uuid */
             upload_id: string;
         };
+        InsightAttachment: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            kind: components["schemas"]["InsightAttachmentKindEnum"];
+            mime: string;
+            /** @description Stored size in bytes. */
+            size: number;
+            /** @description Where the file itself is served to its owner. */
+            url: string;
+        };
+        /**
+         * @description * `image` - image
+         *     * `pdf` - pdf
+         *     * `text` - text
+         * @enum {string}
+         */
+        InsightAttachmentKindEnum: "image" | "pdf" | "text";
+        InsightAttachmentUpload: {
+            /**
+             * Format: uri
+             * @description Up to 10 MB: an image, a PDF, a Word document (.docx) or a text file (.csv, .docx, .gif, .jpeg, .jpg, .json, .log, .markdown, .md, .pdf, .png, .srt, .tsv, .txt, .vtt, .webp).
+             */
+            file: string;
+        };
         InsightChatDetail: {
             /** Format: uuid */
             id: string;
@@ -1676,6 +1741,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
             metadata: components["schemas"]["InsightMessageMetadata"];
+            attachments: components["schemas"]["InsightAttachment"][];
         };
         InsightMessageMetadata: {
             sources?: components["schemas"]["InsightSource"][];
@@ -1720,6 +1786,8 @@ export interface components {
             /** Format: uuid */
             chat_id?: string;
             message: string;
+            /** @description Files uploaded with POST /api/v2/insights/attachments/ to send with this message. */
+            attachment_ids?: string[];
             provider?: string;
             model?: string;
             reasoning_effort?: string;
@@ -3102,6 +3170,71 @@ export interface operations {
                 content: {
                     "text/event-stream": string;
                 };
+            };
+        };
+    };
+    insights_attachments_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["InsightAttachmentUpload"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightAttachment"];
+                };
+            };
+        };
+    };
+    insights_attachments_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file. Images are shown inline; other files download. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+        };
+    };
+    insights_attachments_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Attachment removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

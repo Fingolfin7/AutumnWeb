@@ -6,6 +6,7 @@ from toon import encode
 from core.utils import build_project_json_from_sessions
 from users.codex_auth import CODEX_CHATGPT_BASE_URL
 
+from .attachments import openai_content
 from .base_handler import BaseLLMHandler
 
 
@@ -96,7 +97,10 @@ class OpenAIHandler(BaseLLMHandler):
 
 
     def _messages_from_history(
-        self, new_user_message: str | None = None, system_text: str | None = None
+        self,
+        new_user_message: str | None = None,
+        system_text: str | None = None,
+        new_attachments=None,
     ):
         """Exactly one system message — the current one — followed by the
         conversation.
@@ -116,12 +120,21 @@ class OpenAIHandler(BaseLLMHandler):
         if system_text:
             messages.append({"role": "system", "content": system_text})
         messages.extend(
-            {"role": m["role"], "content": m["content"]}
+            {
+                "role": m["role"],
+                "content": (
+                    openai_content(m["content"], m.get("attachments"))
+                    if m["role"] == "user"
+                    else m["content"]
+                ),
+            }
             for m in self.conversation_history
             if m.get("role") in ("user", "assistant")
         )
         if new_user_message is not None:
-            messages.append({"role": "user", "content": new_user_message})
+            messages.append(
+                {"role": "user", "content": openai_content(new_user_message, new_attachments)}
+            )
         return messages
 
     def _api_response_kwargs(self, messages):
@@ -186,10 +199,16 @@ class OpenAIHandler(BaseLLMHandler):
         for msg in messages:
             role = "assistant" if msg["role"] == "assistant" else "user"
             text_part_type = "output_text" if role == "assistant" else "input_text"
+            content = msg["content"]
             items.append(
                 {
                     "role": role,
-                    "content": [{"type": text_part_type, "text": msg["content"]}],
+                    # A user turn with files is already a list of input parts.
+                    "content": (
+                        content
+                        if isinstance(content, list)
+                        else [{"type": text_part_type, "text": content}]
+                    ),
                 }
             )
         return items
@@ -471,7 +490,7 @@ class OpenAIHandler(BaseLLMHandler):
         return result["text"]
 
     async def stream_update_session_data(
-        self, sessions_data, user_prompt
+        self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
@@ -480,7 +499,9 @@ class OpenAIHandler(BaseLLMHandler):
             self.update_session_data_notice.format(username=self.username)
         )
         messages = self._messages_from_history(
-            new_user_message=user_prompt, system_text=update_prompt
+            new_user_message=user_prompt,
+            system_text=update_prompt,
+            new_attachments=attachments,
         )
 
         result = None
@@ -500,7 +521,7 @@ class OpenAIHandler(BaseLLMHandler):
             yield result["text"]
 
         self.conversation_history.append({"role": "system", "content": update_prompt})
-        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self.conversation_history.append(self._user_entry(user_prompt, attachments))
         self._append_assistant_result(result or {
             "text": "",
             "sources": [],
@@ -532,7 +553,7 @@ class OpenAIHandler(BaseLLMHandler):
         self._append_assistant_result(result)
         return result["text"]
 
-    async def stream_message(self, message) -> AsyncIterator[str]:
+    async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
         if not any(m.get("role") == "system" for m in self.conversation_history):
             # Stored so a resumed chat can recover it — a fresh handler on turn
             # 2+ never calls initialize_chat.
@@ -540,7 +561,9 @@ class OpenAIHandler(BaseLLMHandler):
                 {"role": "system", "content": self._active_system_text()}
             )
 
-        messages = self._messages_from_history(new_user_message=message)
+        messages = self._messages_from_history(
+            new_user_message=message, new_attachments=attachments
+        )
 
         result = None
         try:
@@ -558,7 +581,7 @@ class OpenAIHandler(BaseLLMHandler):
             }
             yield result["text"]
 
-        self.conversation_history.append({"role": "user", "content": message})
+        self.conversation_history.append(self._user_entry(message, attachments))
         self._append_assistant_result(result or {
             "text": "",
             "sources": [],

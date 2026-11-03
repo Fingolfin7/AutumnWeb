@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { faCheck, faCopy } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { MessageAttachments } from "./AttachmentList";
 import type { Run } from "./run";
 import type { Turn } from "./logic";
 
@@ -22,7 +23,7 @@ export function savedItems(turns: Turn[]): Item[] {
 export function runItems(run: Run): Item[] {
   const answered = run.status === "done" && !!run.html;
   return [
-    { key: `run-${run.id}-q`, role: "user", content: run.prompt, html: "", plain: run.prompt, model: "", sources: [], error: false, streaming: false, stopped: false },
+    { key: `run-${run.id}-q`, role: "user", content: run.prompt, html: "", plain: run.prompt, model: "", sources: [], error: false, attachments: run.attachments, streaming: false, stopped: false },
     {
       key: `run-${run.id}-a`,
       role: "assistant",
@@ -32,6 +33,7 @@ export function runItems(run: Run): Item[] {
       model: run.model,
       sources: run.sources,
       error: run.status === "error",
+      attachments: [],
       streaming: run.status === "streaming",
       stopped: run.status === "stopped",
     },
@@ -102,6 +104,7 @@ function Message({ item, selecting, selected, onToggle }: { item: Item; selectin
   return (
     <div className={className} data-model={item.role === "assistant" ? item.model : undefined} {...interactive}>
       <CopyButton text={item.content} />
+      <MessageAttachments items={item.attachments} />
       {body}
       {item.stopped ? <small className="muted"> Stopped.</small> : null}
       {item.sources.length ? (

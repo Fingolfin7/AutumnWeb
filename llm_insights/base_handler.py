@@ -54,7 +54,17 @@ class BaseLLMHandler(ABC):
         if username and not getattr(self, "username", None):
             self.username = username
 
-    async def stream_message(self, message) -> AsyncIterator[str]:
+    @staticmethod
+    def _user_entry(message, attachments=None) -> dict:
+        """A user turn for conversation history. Attachments ride along (see
+        llm_insights.attachments.payload) so they are linked when saved and
+        resent on later turns."""
+        entry = {"role": "user", "content": message}
+        if attachments:
+            entry["attachments"] = list(attachments)
+        return entry
+
+    async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
         """Stream a message response.
 
         Handlers can override this for token-by-token SDK streaming. The default
@@ -66,7 +76,7 @@ class BaseLLMHandler(ABC):
             yield response
 
     async def stream_update_session_data(
-        self, sessions_data, user_prompt
+        self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
         """Stream a response after updating the session data context."""
         response = await self.update_session_data(sessions_data, user_prompt)

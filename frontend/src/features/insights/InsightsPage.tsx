@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { faCalendarAlt, faCheck, faCheckSquare, faChevronLeft, faChevronRight, faComments, faCopy, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faCalendarAlt, faCheck, faCheckSquare, faChevronLeft, faChevronRight, faCloudUploadAlt, faComments, faCopy, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog } from "@/components/Sheet";
@@ -14,6 +14,7 @@ import { bootstrap } from "@/bootstrap";
 import { formatDayDate } from "@/lib/format";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useInsightSelection } from "./api";
+import { filesFrom, useAttachmentDrafts } from "./attachments";
 import { Composer } from "./Composer";
 import { FilterSheet } from "./FilterSheet";
 import { Sidebar } from "./Sidebar";
@@ -182,6 +183,9 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const [copiedPicked, setCopiedPicked] = useState(false);
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
   const ownRun = useRef<number | null>(null);
+  const attach = useAttachmentDrafts((message) => toast.error(message));
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
 
   const preview = useInsightSelection(selectionQuery(selection, defaults, contextId), true);
   const count = preview.data?.count;
@@ -225,9 +229,10 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
 
   const send = () => {
     const message = prompt.trim();
-    if (!message || !model || live) return;
+    if (!message || !model || live || attach.uploading) return;
     const body: StreamRequest = {
       message,
+      ...(attach.ids.length ? { attachment_ids: attach.ids } : {}),
       provider: model.provider,
       model: model.model,
       ...(model.effort ? { reasoning_effort: model.effort } : {}),
@@ -240,6 +245,8 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
       /* storage unavailable */
     }
     setPrompt("");
+    const sentFiles = attach.views;
+    attach.clear();
     const base = turns.length;
     void startRun({
       client,
@@ -247,6 +254,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
       baseCount: base,
       chatModel: `${model.provider}:${model.model}`,
       seedFilters: { ...selectionRequest(selection, defaults, contextId), reasoning_effort: model.effort },
+      attachments: sentFiles,
     }).then(() => {
       if (currentRun()?.status !== "error") setReselected(false);
     });
@@ -292,6 +300,37 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
       onSettled: () => setDeleting(null),
     });
   };
+
+  /* Files dropped anywhere on the transcript column. dragenter/leave fire for
+     every child crossed, hence the depth count. */
+  const canDrop = !!model && !live;
+  const isFileDrag = (event: React.DragEvent) => Array.from(event.dataTransfer.types).includes("Files");
+  const dropHandlers = canDrop
+    ? {
+        onDragEnter: (event: React.DragEvent) => {
+          if (!isFileDrag(event)) return;
+          event.preventDefault();
+          dragDepth.current += 1;
+          setDragging(true);
+        },
+        onDragOver: (event: React.DragEvent) => {
+          if (!isFileDrag(event)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        },
+        onDragLeave: () => {
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (!dragDepth.current) setDragging(false);
+        },
+        onDrop: (event: React.DragEvent) => {
+          if (!isFileDrag(event)) return;
+          event.preventDefault();
+          dragDepth.current = 0;
+          setDragging(false);
+          attach.add(filesFrom(event.dataTransfer));
+        },
+      }
+    : {};
 
   const showEmpty = count === 0 && !hasHistory;
   const loadingBody = preview.isPending && !hasHistory && !preview.isError;
@@ -372,7 +411,14 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
           onDelete={setDeleting}
         />
 
-        <main className="chat-main">
+        <main className={`chat-main${dragging ? " is-dropping" : ""}`} {...dropHandlers}>
+          {dragging ? (
+            <div className="chat-dropzone" aria-hidden="true">
+              <Icon icon={faCloudUploadAlt} />
+              <strong>Drop to attach</strong>
+              <span>Screenshots, PDFs, Word docs and transcripts</span>
+            </div>
+          ) : null}
           <div className="chat-header">
             <button type="button" id="toggle-sidebar-btn" className="btn-icon" onClick={toggleSidebar} title="Toggle chat list" aria-label="Toggle chat list" aria-expanded={!collapsed} aria-controls="chat-sidebar">
               <Icon icon={collapsed ? faChevronRight : faChevronLeft} />
@@ -438,11 +484,25 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                     <p className="empty">
                       {count ?? 0} {sessionLabel} selected. Ask something below to start the conversation.
                     </p>
+                    {model ? <p className="empty attach-hint">Add context with the paperclip: paste a Slack screenshot, or drop in a meeting transcript, PDF or Word doc.</p> : null}
                   </div>
                 }
               />
               {model ? (
-                <Composer options={options} selection={model} onSelection={setModel} prompt={prompt} onPrompt={setPrompt} busy={live} onSend={send} onStop={stopStream} />
+                <Composer
+                  options={options}
+                  selection={model}
+                  onSelection={setModel}
+                  prompt={prompt}
+                  onPrompt={setPrompt}
+                  busy={live}
+                  onSend={send}
+                  onStop={stopStream}
+                  drafts={attach.drafts}
+                  uploading={attach.uploading}
+                  onAddFiles={attach.add}
+                  onRemoveDraft={attach.remove}
+                />
               ) : (
                 <p className="empty">
                   No AI provider is set up. Add a key in your <AppLink href={urls.profile()}>Profile</AppLink>.

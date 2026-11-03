@@ -2,6 +2,7 @@ from toon import encode
 from anthropic import NOT_GIVEN, AsyncAnthropic
 from typing import Any, AsyncIterator
 from core.utils import build_project_json_from_sessions
+from .attachments import claude_content
 from .base_handler import BaseLLMHandler
 
 
@@ -116,7 +117,7 @@ class ClaudeHandler(BaseLLMHandler):
             }
         ]
 
-    def _api_messages(self, new_user_message: str | None = None):
+    def _api_messages(self, new_user_message: str | None = None, new_attachments=None):
         """History as Claude messages. System turns are excluded — they are
         delivered via the `system` parameter, not as conversation.
 
@@ -133,9 +134,14 @@ class ClaudeHandler(BaseLLMHandler):
                 if msgs and msgs[-1]["role"] == "user":
                     msgs.pop()
                 continue
-            msgs.append({"role": m["role"], "content": m["content"]})
+            content = m["content"]
+            if m["role"] == "user":
+                content = claude_content(content, m.get("attachments"))
+            msgs.append({"role": m["role"], "content": content})
         if new_user_message is not None:
-            msgs.append({"role": "user", "content": new_user_message})
+            msgs.append(
+                {"role": "user", "content": claude_content(new_user_message, new_attachments)}
+            )
         return msgs
 
     @staticmethod
@@ -299,7 +305,7 @@ class ClaudeHandler(BaseLLMHandler):
         return text
 
     async def stream_update_session_data(
-        self, sessions_data, user_prompt
+        self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
         """Update session data and stream the assistant response."""
         self.session_data = encode(
@@ -308,7 +314,9 @@ class ClaudeHandler(BaseLLMHandler):
         update_prompt = self._build_system_text(
             self.update_session_data_notice.format(username=self.username)
         )
-        msgs = self._api_messages(new_user_message=user_prompt)
+        msgs = self._api_messages(
+            new_user_message=user_prompt, new_attachments=attachments
+        )
 
         result = None
         try:
@@ -327,7 +335,7 @@ class ClaudeHandler(BaseLLMHandler):
             yield result["text"]
 
         self.conversation_history.append({"role": "system", "content": update_prompt})
-        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self.conversation_history.append(self._user_entry(user_prompt, attachments))
         self.conversation_history.append(
             {
                 "role": "assistant",
@@ -411,14 +419,14 @@ class ClaudeHandler(BaseLLMHandler):
 
         return text
 
-    async def stream_message(self, message) -> AsyncIterator[str]:
+    async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
         """Send a message to Claude and stream response text chunks."""
         system_text = self._active_system_text()
         if not any(m.get("role") == "system" for m in self.conversation_history):
             self.conversation_history.append(
                 {"role": "system", "content": system_text}
             )
-        msgs = self._api_messages(new_user_message=message)
+        msgs = self._api_messages(new_user_message=message, new_attachments=attachments)
 
         result = None
         try:
@@ -436,7 +444,7 @@ class ClaudeHandler(BaseLLMHandler):
             }
             yield result["text"]
 
-        self.conversation_history.append({"role": "user", "content": message})
+        self.conversation_history.append(self._user_entry(message, attachments))
         self.conversation_history.append(
             {
                 "role": "assistant",

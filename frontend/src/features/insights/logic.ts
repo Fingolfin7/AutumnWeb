@@ -1,5 +1,6 @@
 import type { paths } from "@/api/schema";
 import { accountSimilarity, fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
+import type { AttachmentView } from "./attachments";
 import type { ChatFiltersStored, ChatGroup, ChatMessage, InsightOptions, StreamRequest, Usage } from "./types";
 
 /* ---- the session selection (the page's filters) --------------------------- */
@@ -208,7 +209,7 @@ const MODEL_REPLACEMENTS: Record<string, Record<string, string>> = {
     "gpt-5.6-luna": "gpt-6-luna",
     "gpt-5.6-sol": "gpt-6.1-sol",
     "gpt-5.6": "gpt-6.1-sol",
-    "gpt-5.6-terra": "gpt-6.1-sol",
+    "gpt-5.6-terra": "gpt-6.1-terra",
     "gpt-6-sol": "gpt-6.1-sol",
   },
   claude: {
@@ -306,6 +307,7 @@ export interface Turn {
   model: string;
   sources: { link: string; title: string }[];
   error: boolean;
+  attachments: AttachmentView[];
 }
 
 /* Only user and assistant messages are on screen; the system context the model
@@ -320,14 +322,19 @@ export function visibleTurns(messages: ChatMessage[], fallbackModel: string): Tu
       model: m.metadata?.model || fallbackModel,
       sources: m.metadata?.sources ?? [],
       error: !!m.metadata?.error,
+      /* Absent on a chat stub seeded before the server answered. */
+      attachments: m.attachments ?? [],
     }));
 }
 
 /* "Copy chat" / "Copy (n)": each message under its sender, divided by rules. */
-export function buildTranscript(turns: Pick<Turn, "role" | "content" | "model">[], username: string): string {
+export function buildTranscript(turns: (Pick<Turn, "role" | "content" | "model"> & { attachments?: AttachmentView[] })[], username: string): string {
   return turns
     .filter((turn) => turn.content.trim())
-    .map((turn) => `[${turn.role === "user" ? username : `Autumn (${turn.model})`}]\n${turn.content.trim()}`)
+    .map((turn) => {
+      const files = turn.attachments?.length ? `\n[Attached: ${turn.attachments.map((a) => a.name).join(", ")}]` : "";
+      return `[${turn.role === "user" ? username : `Autumn (${turn.model})`}]\n${turn.content.trim()}${files}`;
+    })
     .join("\n\n---\n\n");
 }
 

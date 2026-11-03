@@ -29,6 +29,8 @@ from core.api_v2.views import (
     TagDetailView,
     TagsView,
     TimelineAPIView,
+    InsightAttachmentDetailView,
+    InsightAttachmentsView,
     InsightChatDetailView,
     InsightChatsView,
     InsightOptionsView,
@@ -118,6 +120,16 @@ urlpatterns = [
         name="insights-selection",
     ),
     path("insights/stream/", InsightStreamView.as_view(), name="insights-stream"),
+    path(
+        "insights/attachments/",
+        InsightAttachmentsView.as_view(),
+        name="insights-attachments",
+    ),
+    path(
+        "insights/attachments/<uuid:attachment_id>",
+        InsightAttachmentDetailView.as_view(),
+        name="insights-attachment-detail",
+    ),
     path(
         "notifications/preferences/",
         NotificationPreferencesView.as_view(),

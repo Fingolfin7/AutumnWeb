@@ -9,6 +9,7 @@ async def perform_llm_analysis_stream(
     conversation_history=None,
     sessions_updated=False,
     chat_obj=None,
+    attachments=None,
 ):
     llm_handler.set_username(username)
     already_persisted = len(llm_handler.get_conversation_history())
@@ -21,7 +22,7 @@ async def perform_llm_analysis_stream(
         llm_handler.initialize_chat(username, sessions)
     elif sessions_updated:
         async for chunk in llm_handler.stream_update_session_data(
-            sessions, user_prompt=user_prompt
+            sessions, user_prompt=user_prompt, attachments=attachments
         ):
             yield chunk
         if chat_obj:
@@ -31,7 +32,7 @@ async def perform_llm_analysis_stream(
         return
 
     if user_prompt:
-        async for chunk in llm_handler.stream_message(user_prompt):
+        async for chunk in llm_handler.stream_message(user_prompt, attachments=attachments):
             yield chunk
         if chat_obj:
             await save_llm_messages(

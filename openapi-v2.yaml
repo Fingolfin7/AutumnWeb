@@ -597,6 +597,79 @@ paths:
             JSON object with a message string containing an import progress, completion,
             skipped-project, or Error line from iter_import.
       x-autumn-mcp: exclude
+  /api/v2/insights/attachments/:
+    post:
+      operationId: insights_attachments_create
+      description: |-
+        Upload a file to send with the next Insights message. Unsent
+        uploads are deleted after a day.
+      tags:
+      - insights
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InsightAttachmentUpload'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightAttachment'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/insights/attachments/{attachment_id}:
+    get:
+      operationId: insights_attachments_retrieve
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - insights
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: The file. Images are shown inline; other files download.
+      x-autumn-mcp: exclude
+    delete:
+      operationId: insights_attachments_destroy
+      description: |-
+        Remove a file that has not been sent yet. Sent files stay with
+        their message and go when the chat is deleted.
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - insights
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '204':
+          description: Attachment removed.
+      x-autumn-mcp: exclude
   /api/v2/insights/chats/:
     get:
       operationId: insights_chats_list
@@ -4695,6 +4768,52 @@ components:
           format: uuid
       required:
       - upload_id
+    InsightAttachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        kind:
+          $ref: '#/components/schemas/InsightAttachmentKindEnum'
+        mime:
+          type: string
+        size:
+          type: integer
+          description: Stored size in bytes.
+        url:
+          type: string
+          description: Where the file itself is served to its owner.
+      required:
+      - id
+      - kind
+      - mime
+      - name
+      - size
+      - url
+    InsightAttachmentKindEnum:
+      enum:
+      - image
+      - pdf
+      - text
+      type: string
+      description: |-
+        * `image` - image
+        * `pdf` - pdf
+        * `text` - text
+    InsightAttachmentUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+          description: 'Up to 10 MB: an image, a PDF, a Word document (.docx) or a
+            text file (.csv, .docx, .gif, .jpeg, .jpg, .json, .log, .markdown, .md,
+            .pdf, .png, .srt, .tsv, .txt, .vtt, .webp).'
+      required:
+      - file
     InsightChatDetail:
       type: object
       properties:
@@ -4832,7 +4951,12 @@ components:
           format: date-time
         metadata:
           $ref: '#/components/schemas/InsightMessageMetadata'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/InsightAttachment'
       required:
+      - attachments
       - content
       - created_at
       - html
@@ -4949,6 +5073,14 @@ components:
           format: uuid
         message:
           type: string
+        attachment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          description: Files uploaded with POST /api/v2/insights/attachments/ to send
+            with this message.
+          maxItems: 5
         provider:
           type: string
         model:

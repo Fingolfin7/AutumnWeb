@@ -17,6 +17,7 @@ import {
   sumUsage,
   visibleTurns,
 } from "./logic";
+import { kindOf, nameFor } from "./attachments";
 import type { ChatGroup, ChatMessage, InsightOptions } from "./types";
 
 const defaults = { start: "2026-09-14", end: "2026-10-14" };
@@ -225,6 +226,7 @@ describe("transcript", () => {
     html: `<p>${content}</p>`,
     created_at: "2026-10-14T10:00:00Z",
     metadata,
+    attachments: [],
   });
 
   it("hides system messages and fills the model from the chat", () => {
@@ -255,6 +257,16 @@ describe("transcript", () => {
       "Finrod",
     );
     expect(text).toBe("[Finrod]\nhello\n\n---\n\n[Autumn (gpt-a)]\nhi there");
+  });
+
+  it("names a question's files in the copied transcript, and pasted screenshots by time", () => {
+    const file = { name: "standup.vtt", kind: "text" as const, size: 120, url: "/f" };
+    expect(buildTranscript([{ role: "user", content: "Who is blocked?", model: "", attachments: [file] }], "Finrod")).toBe(
+      "[Finrod]\nWho is blocked?\n[Attached: standup.vtt]",
+    );
+    const pasted = new File(["x"], "image.png", { type: "image/png" });
+    expect(nameFor(pasted, new Date(2026, 10, 3, 9, 5, 7))).toBe("Screenshot 2026-11-03 09.05.07.png");
+    expect(kindOf(pasted)).toBe("image");
   });
 
   it("sums token usage across messages and formats it", () => {
