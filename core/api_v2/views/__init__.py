@@ -27,6 +27,8 @@ from .timers import (
     TimerStopView,
 )
 from .insights import (
+    InsightAttachmentDetailView,
+    InsightAttachmentsView,
     InsightChatDetailView,
     InsightChatsView,
     InsightOptionsView,

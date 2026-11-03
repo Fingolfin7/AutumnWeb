@@ -9,7 +9,8 @@ from django.urls import reverse
 
 from core.templatetags.markdown_render import markdown as render_markdown
 from llm_insights.llm_handlers import get_llm_handler
-from llm_insights.models import LLMChat
+from llm_insights.attachments import files_to_send, payload as attachment_payload
+from llm_insights.models import LLMAttachment, LLMChat
 from llm_insights.services.analysis import perform_llm_analysis_stream
 from llm_insights.services.chats import (
     database_sync_to_async,
@@ -76,6 +77,7 @@ def _prepare_stream_context(request, user, chat_id):
     chat_obj = data["chat_obj"]
     reset_requested = "reset_conversation" in post_data
     user_prompt = (post_data.get("prompt") or "").strip()
+    new_attachments = _new_attachments(user, post_data.getlist("attachment_ids"))
     if not chat_obj:
         chat_obj = LLMChat.objects.create(
             user=user,
@@ -93,6 +95,15 @@ def _prepare_stream_context(request, user, chat_id):
         }
         chat_obj.save()
 
+    # The newest files first: this question's, then back through the chat.
+    earlier = LLMAttachment.objects.filter(message__chat=chat_obj).order_by(
+        "-message__created_at", "-created_at"
+    )
+    send_files = files_to_send([*new_attachments, *earlier])
+    attachments = [
+        attachment_payload(a, send_file=a.id in send_files) for a in new_attachments
+    ]
+
     chat_url = reverse("insights_detail", kwargs={"chat_id": chat_obj.id})
     stream_url = reverse("insights_detail_stream", kwargs={"chat_id": chat_obj.id})
     context = {
@@ -100,7 +111,13 @@ def _prepare_stream_context(request, user, chat_id):
         "chat_id": chat_obj.id,
         "chat_url": chat_url,
         "current_filters": data["current_filters"],
-        "history": load_chat_history(chat_obj, include_auth_source=True),
+        "history": load_chat_history(
+            chat_obj,
+            include_auth_source=True,
+            include_attachments=True,
+            send_files=send_files,
+        ),
+        "attachments": attachments,
         "model": selected_model,
         "provider": selected_provider,
         "reasoning_effort": selected_reasoning_effort,
@@ -116,6 +133,19 @@ def _prepare_stream_context(request, user, chat_id):
         request.session["sessions_updated"] = False
         request.session.save()
     return context
+
+
+def _new_attachments(user, ids):
+    """This question's files, in the order they were attached. Only the
+    user's own, not yet sent with another question (the API view has already
+    refused the request if any are missing)."""
+    if not ids:
+        return []
+    found = {
+        str(a.id): a
+        for a in LLMAttachment.objects.filter(user=user, id__in=ids, message__isnull=True)
+    }
+    return [found[i] for i in ids if i in found]
 
 
 async def _run_stream_worker(stream_context, event_queue, stream_done):
@@ -164,6 +194,7 @@ async def _run_stream_worker(stream_context, event_queue, stream_done):
             conversation_history=history,
             sessions_updated=stream_context["sessions_updated"],
             chat_obj=stream_context["chat_id"],
+            attachments=stream_context["attachments"],
         ):
             if chunk:
                 streamed_chunks.append(chunk)
@@ -230,6 +261,7 @@ async def _run_stream_worker(stream_context, event_queue, stream_done):
                     assistant_content,
                     stream_context["model"],
                     error_message,
+                    attachments=stream_context["attachments"],
                 )
             except Exception as save_exc:
                 assistant_content = (

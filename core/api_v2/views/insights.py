@@ -1,9 +1,11 @@
-from django.http import QueryDict
+from django.http import FileResponse, QueryDict
+from django.urls import reverse
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_field
 from rest_framework import serializers, status
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
@@ -12,7 +14,13 @@ from core.api_v2.exceptions import V2APIView
 from core.api_v2.renderers import EventStreamRenderer
 from core.api_v2.serializers import similarity_field
 from core.templatetags.markdown_render import markdown as render_markdown
-from llm_insights.models import LLMChat
+from llm_insights.attachments import (
+    ACCEPTED_EXTENSIONS,
+    MAX_FILES_PER_MESSAGE,
+    AttachmentError,
+    create_attachment,
+)
+from llm_insights.models import LLMAttachment, LLMChat
 from llm_insights.services.chats import group_chats_by_recency
 from llm_insights.services.handlers import (
     openai_connection_source,
@@ -76,12 +84,45 @@ class InsightMessageMetadataSerializer(serializers.Serializer):
     refusal = serializers.BooleanField(required=False)
 
 
+class InsightAttachmentSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+    kind = serializers.ChoiceField(choices=("image", "pdf", "text"))
+    mime = serializers.CharField()
+    size = serializers.IntegerField(help_text="Stored size in bytes.")
+    url = serializers.CharField(help_text="Where the file itself is served to its owner.")
+
+
+class InsightAttachmentUploadSerializer(serializers.Serializer):
+    file = serializers.FileField(
+        help_text=(
+            "Up to 10 MB: an image, a PDF, a Word document (.docx) or a text file ("
+            + ", ".join(ACCEPTED_EXTENSIONS)
+            + ")."
+        )
+    )
+
+
+def _attachment_data(attachment):
+    return {
+        "id": attachment.id,
+        "name": attachment.name,
+        "kind": attachment.kind,
+        "mime": attachment.mime,
+        "size": attachment.size,
+        "url": reverse(
+            "api_v2:insights-attachment-detail", kwargs={"attachment_id": attachment.id}
+        ),
+    }
+
+
 class InsightMessageSerializer(serializers.Serializer):
     role = serializers.ChoiceField(choices=("system", "user", "assistant"))
     content = serializers.CharField()
     html = serializers.CharField()
     created_at = serializers.DateTimeField()
     metadata = InsightMessageMetadataSerializer()
+    attachments = InsightAttachmentSerializer(many=True)
 
 
 @extend_schema_field(
@@ -163,6 +204,12 @@ class InsightOptionsSerializer(serializers.Serializer):
 class InsightStreamRequestSerializer(serializers.Serializer):
     chat_id = serializers.UUIDField(required=False)
     message = serializers.CharField(allow_blank=False)
+    attachment_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        max_length=MAX_FILES_PER_MESSAGE,
+        help_text="Files uploaded with POST /api/v2/insights/attachments/ to send with this message.",
+    )
     provider = serializers.CharField(required=False)
     model = serializers.CharField(required=False)
     reasoning_effort = serializers.CharField(required=False, allow_blank=True)
@@ -247,7 +294,7 @@ def _as_insights_post(data):
             post[key] = value.isoformat() if hasattr(value, "isoformat") else str(value)
     if data.get("related"):
         post["related"] = "on"
-    for key in ("tags", "include_projects", "exclude_projects"):
+    for key in ("tags", "include_projects", "exclude_projects", "attachment_ids"):
         if key in data:
             post.setlist(key, [str(value) for value in data[key]])
     if any(key in data for key in FILTER_FIELDS):
@@ -320,8 +367,12 @@ class InsightChatDetailView(V2APIView):
                         "html": render_markdown(message.content),
                         "created_at": message.created_at,
                         "metadata": message.metadata,
+                        "attachments": [
+                            _attachment_data(attachment)
+                            for attachment in message.attachments.all()
+                        ],
                     }
-                    for message in chat.messages.all()
+                    for message in chat.messages.prefetch_related("attachments")
                 ],
             }
         )
@@ -437,6 +488,17 @@ class InsightStreamView(V2APIView):
             user=request.user, pk=chat_id
         ).exists():
             raise NotFound("Chat not found.")
+        attachment_ids = set(data.get("attachment_ids", []))
+        if attachment_ids and LLMAttachment.objects.filter(
+            user=request.user, id__in=attachment_ids, message__isnull=True
+        ).count() != len(attachment_ids):
+            raise ValidationError(
+                {
+                    "attachment_ids": [
+                        "An attached file is no longer available. Remove it and attach it again."
+                    ]
+                }
+            )
         post = _as_insights_post(data)
         post["prompt"] = data["message"]
         request._request._post = post
@@ -445,3 +507,80 @@ class InsightStreamView(V2APIView):
         )
         request._related_outcome = getattr(request._request, "_related_outcome", None)
         return response
+
+
+class InsightAttachmentsView(V2APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @extend_schema(
+        operation_id="insights_attachments_create",
+        request={"multipart/form-data": InsightAttachmentUploadSerializer},
+        responses={201: InsightAttachmentSerializer},
+    )
+    def post(self, request):
+        """Upload a file to send with the next Insights message. Unsent
+        uploads are deleted after a day."""
+        _require_access(request.user)
+        upload = request.FILES.get("file")
+        if upload is None:
+            raise ValidationError({"file": ["Choose a file to attach."]})
+        try:
+            attachment = create_attachment(request.user, upload)
+        except AttachmentError as exc:
+            raise ValidationError({"file": [str(exc)]}) from exc
+        return Response(_attachment_data(attachment), status=status.HTTP_201_CREATED)
+
+
+class InsightAttachmentDetailView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _attachment(self, request, attachment_id):
+        _require_access(request.user)
+        attachment = LLMAttachment.objects.filter(
+            user=request.user, pk=attachment_id
+        ).first()
+        if attachment is None:
+            raise NotFound("Attachment not found.")
+        return attachment
+
+    @extend_schema(
+        operation_id="insights_attachments_retrieve",
+        responses={
+            (200, "application/octet-stream"): OpenApiResponse(
+                response=OpenApiTypes.BINARY,
+                description="The file. Images are shown inline; other files download.",
+            )
+        },
+    )
+    def get(self, request, attachment_id):
+        attachment = self._attachment(request, attachment_id)
+        try:
+            handle = attachment.file.open("rb")
+        except Exception as exc:
+            raise NotFound("This file is no longer available.") from exc
+        response = FileResponse(
+            handle,
+            content_type=attachment.mime,
+            as_attachment=attachment.kind != LLMAttachment.KIND_IMAGE,
+            filename=attachment.name,
+        )
+        # A file never changes under its id.
+        response["Cache-Control"] = "private, max-age=31536000, immutable"
+        return response
+
+    @extend_schema(
+        operation_id="insights_attachments_destroy",
+        request=None,
+        responses={204: OpenApiResponse(description="Attachment removed.")},
+    )
+    def delete(self, request, attachment_id):
+        """Remove a file that has not been sent yet. Sent files stay with
+        their message and go when the chat is deleted."""
+        attachment = self._attachment(request, attachment_id)
+        if attachment.message_id is not None:
+            raise ValidationError(
+                {"detail": "This file was sent with a message. Delete the chat to remove it."}
+            )
+        attachment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

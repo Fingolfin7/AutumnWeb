@@ -61,6 +61,7 @@ class InsightsViewProviderModelsTests(TestCase):
             [
                 ("gpt-6-luna", "GPT-6 Luna"),
                 ("gpt-6.1-sol", "GPT-6.1 Sol"),
+                ("gpt-6.1-terra", "GPT-6.1 Terra"),
                 ("gpt-6-astra", "GPT-6 Astra"),
                 ("gpt-5.5", "GPT-5.5"),
             ],
@@ -110,7 +111,7 @@ class InsightsViewProviderModelsTests(TestCase):
             ("openai", "gpt-6-sol", "gpt-6.1-sol"),
             ("openai", "gpt-5.6-sol", "gpt-6.1-sol"),
             ("openai", "gpt-5.6", "gpt-6.1-sol"),
-            ("openai", "gpt-5.6-terra", "gpt-6.1-sol"),
+            ("openai", "gpt-5.6-terra", "gpt-6.1-terra"),
             ("claude", "claude-haiku-4-5", "claude-haiku-5-5"),
             ("claude", "claude-sonnet-5", "claude-sonnet-5-5"),
             ("claude", "claude-opus-5", "claude-opus-5-5"),
@@ -440,7 +441,7 @@ class FakeStreamingHandler(BaseLLMHandler):
     async def update_session_data(self, sessions_data, user_prompt):
         raise NotImplementedError
 
-    async def stream_message(self, message):
+    async def stream_message(self, message, attachments=None):
         yield "Hello"
         yield " world"
         # Append in place, like every real handler — replacing the list would
@@ -556,7 +557,7 @@ class PerformLlmAnalysisStreamTests(TransactionTestCase):
         ]
 
         class ShortTurnHandler(FakeStreamingHandler):
-            async def stream_update_session_data(self, sessions, user_prompt):
+            async def stream_update_session_data(self, sessions, user_prompt, attachments=None):
                 yield "boom"
                 self.conversation_history.append(
                     {"role": "user", "content": user_prompt}

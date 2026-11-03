@@ -3,6 +3,7 @@ from google import genai
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
 from typing import Any, AsyncIterator
 from core.utils import build_project_json_from_sessions
+from .attachments import gemini_parts
 from .base_handler import BaseLLMHandler
 
 
@@ -81,8 +82,11 @@ class GeminiHandler(BaseLLMHandler):
             for m in history:
                 if m["role"] == "system":
                     continue
-                role = "user" if m["role"] == "user" else "model"
-                gemini_history.append({"role": role, "parts": [{"text": m["content"]}]})
+                if m["role"] == "user":
+                    parts = gemini_parts(m["content"], m.get("attachments"))
+                    gemini_history.append({"role": "user", "parts": parts})
+                else:
+                    gemini_history.append({"role": "model", "parts": [{"text": m["content"]}]})
 
         self.chat = self.client.aio.chats.create(
             model=model,
@@ -223,6 +227,12 @@ class GeminiHandler(BaseLLMHandler):
                 sources.append({"link": web.uri, "title": title})
         return sources
 
+    @staticmethod
+    def _outgoing(prompt, attachments):
+        """What send_message_stream is given: the bare prompt, or its parts
+        when files are attached."""
+        return gemini_parts(prompt, attachments) if attachments else prompt
+
     async def _stream_chat_response(self, prompt) -> AsyncIterator[dict[str, Any]]:
         stream = await self.chat.send_message_stream(prompt)
         chunks = []
@@ -301,7 +311,7 @@ class GeminiHandler(BaseLLMHandler):
         return str(assistant_response)
 
     async def stream_update_session_data(
-        self, sessions_data, user_prompt
+        self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
         """Update session data and stream the assistant response."""
         result = None
@@ -315,7 +325,7 @@ class GeminiHandler(BaseLLMHandler):
         self.conversation_history.append(
             {"role": "system", "content": update_session_data_prompt}
         )
-        self.conversation_history.append({"role": "user", "content": user_prompt})
+        self.conversation_history.append(self._user_entry(user_prompt, attachments))
 
         try:
             await self._create_chat(
@@ -333,7 +343,9 @@ class GeminiHandler(BaseLLMHandler):
                 }
                 yield result["text"]
             else:
-                async for event in self._stream_chat_response(user_prompt):
+                async for event in self._stream_chat_response(
+                    self._outgoing(user_prompt, attachments)
+                ):
                     if event.get("type") == "delta":
                         yield event.get("text", "")
                     elif event.get("type") == "final":
@@ -414,7 +426,7 @@ class GeminiHandler(BaseLLMHandler):
             # Catch any unexpected formatting/parsing errors
             return self._handle_error(e, original_message=message, allow_fallback=False)
 
-    async def stream_message(self, message) -> AsyncIterator[str]:
+    async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
         """Send a message to Gemini and stream response text chunks."""
         # Store this turn's system and user entries before anything that can
         # raise. _handle_error only appends an assistant turn, so bailing out
@@ -427,7 +439,7 @@ class GeminiHandler(BaseLLMHandler):
             self.conversation_history.append(
                 {"role": "system", "content": system_text}
             )
-        self.conversation_history.append({"role": "user", "content": message})
+        self.conversation_history.append(self._user_entry(message, attachments))
 
         try:
             if not self.chat:
@@ -439,7 +451,9 @@ class GeminiHandler(BaseLLMHandler):
                 raise RuntimeError("Chat not initialized")
 
             result = None
-            async for event in self._stream_chat_response(message):
+            async for event in self._stream_chat_response(
+                self._outgoing(message, attachments)
+            ):
                 if event.get("type") == "delta":
                     yield event.get("text", "")
                 elif event.get("type") == "final":

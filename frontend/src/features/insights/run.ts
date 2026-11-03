@@ -1,3 +1,4 @@
+import type { AttachmentView } from "./attachments";
 import type { Source, Usage } from "./types";
 
 /* One question being answered. The event names and payloads are exactly the
@@ -16,6 +17,8 @@ export interface Run {
   /** null until the first `chat` event on a new chat. */
   chatId: string | null;
   prompt: string;
+  /** The question's files, shown with it until the saved copy arrives. */
+  attachments: AttachmentView[];
   /** The answer so far (plain text while streaming). */
   text: string;
   /** Server-rendered markdown of the final answer. */
@@ -29,8 +32,8 @@ export interface Run {
   baseCount: number;
 }
 
-export function startRunState(args: { id: number; chatId: string | null; prompt: string; model: string; baseCount: number }): Run {
-  return { ...args, text: "", html: null, status: "streaming", sources: [], usage: null };
+export function startRunState(args: { id: number; chatId: string | null; prompt: string; attachments?: AttachmentView[]; model: string; baseCount: number }): Run {
+  return { ...args, attachments: args.attachments ?? [], text: "", html: null, status: "streaming", sources: [], usage: null };
 }
 
 function str(value: unknown): string {

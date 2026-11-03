@@ -6,6 +6,7 @@ import { csrfToken } from "@/lib/csrf";
 import { insightKeys } from "./keys";
 import { applyStreamEvent, failRun, isLive, startRunState, stopRun as stopped, type Run } from "./run";
 import { parsePayload, readSse, type SseEvent } from "./sse";
+import type { AttachmentView } from "./attachments";
 import type { StreamRequest } from "./types";
 
 /* The answer being streamed lives here, outside any component, because the
@@ -98,10 +99,12 @@ export interface StartArgs {
   chatModel: string;
   /** The filters sent, to seed a new chat's cache. */
   seedFilters: Record<string, unknown>;
+  /** The files sent with the question, to show with it while it streams. */
+  attachments?: AttachmentView[];
 }
 
 /* Begin answering. Resolves when the stream has ended, however it ended. */
-export async function startRun({ client, body, baseCount, chatModel, seedFilters }: StartArgs): Promise<void> {
+export async function startRun({ client, body, baseCount, chatModel, seedFilters, attachments }: StartArgs): Promise<void> {
   controller?.abort();
   const abort = new AbortController();
   controller = abort;
@@ -109,6 +112,7 @@ export async function startRun({ client, body, baseCount, chatModel, seedFilters
     id: nextId++,
     chatId: body.chat_id ?? null,
     prompt: body.message,
+    attachments,
     model: body.model ?? "",
     baseCount,
   });
