@@ -134,6 +134,8 @@ export function pendingTimer(op: QueuedStart): Timer {
   };
 }
 
+const pendingNoteSaves = new Map<number, Promise<Timer>>();
+
 const isOffline = (error: unknown) => error instanceof ApiError && isNetworkFailure(error.status);
 
 /* Client instants and a client uuid make start safe to retry and correct
@@ -210,6 +212,8 @@ export interface StopTimerInput {
   allocations?: { subproject_id: number; allocation_bp: number }[];
   /** ISO instant; defaults to now. */
   end?: string;
+  /** Automatic online stop must offer the note before falling back to a queue. */
+  queueOnFailure?: boolean;
 }
 
 export function useStopTimer() {
@@ -217,7 +221,7 @@ export function useStopTimer() {
   const invalidate = useInvalidate();
   return useMutation({
     networkMode: "always",
-    mutationFn: async ({ timer, note, allocations, end }: StopTimerInput): Promise<Timer> => {
+    mutationFn: async ({ timer, note, allocations, end, queueOnFailure = true }: StopTimerInput): Promise<Timer> => {
       const at = end ?? toOffsetIso(new Date());
       const queue = (target: { id: number } | { uuid: string }): Timer => {
         enqueueStop({
@@ -230,10 +234,12 @@ export function useStopTimer() {
       };
       /* Started offline: stop it in the queue, right behind its start. */
       if (timer.pending_sync && timer.uuid) return queue({ uuid: timer.uuid });
+      // A note PATCH already in flight must settle before Stop uses its version.
+      const written = await pendingNoteSaves.get(timer.id)?.catch(() => undefined);
       try {
         return await unwrap(
           api.POST("/api/v2/timers/{session_id}/stop/", {
-            params: { path: { session_id: timer.id }, header: { "If-Match": timer.version } },
+            params: { path: { session_id: timer.id }, header: { "If-Match": written?.version ?? timer.version } },
             body: {
               end: at,
               ...(note !== undefined ? { note } : {}),
@@ -242,7 +248,7 @@ export function useStopTimer() {
           }),
         );
       } catch (error) {
-        if (!isOffline(error)) throw error;
+        if (!isOffline(error) || !queueOnFailure) throw error;
         return queue({ id: timer.id });
       }
     },
@@ -304,7 +310,7 @@ export function useDeleteTimer() {
 
 /* Note autosave. Sends If-Match so an edit from the CLI (`autumn note`) in
    the meantime is reported instead of silently overwritten. */
-export async function saveTimerNote(timer: Pick<Timer, "id" | "version">, note: string): Promise<Timer> {
+async function patchTimerNote(timer: Pick<Timer, "id" | "version">, note: string): Promise<Timer> {
   const response = await fetch(`/api/v2/timers/${timer.id}`, {
     method: "PATCH",
     credentials: "same-origin",
@@ -319,4 +325,13 @@ export async function saveTimerNote(timer: Pick<Timer, "id" | "version">, note: 
   const body = await response.json().catch(() => undefined);
   if (!response.ok) throw toApiError(response.status, body);
   return body as Timer;
+}
+
+export function saveTimerNote(timer: Pick<Timer, "id" | "version">, note: string): Promise<Timer> {
+  const saving = patchTimerNote(timer, note);
+  pendingNoteSaves.set(timer.id, saving);
+  void saving.finally(() => {
+    if (pendingNoteSaves.get(timer.id) === saving) pendingNoteSaves.delete(timer.id);
+  }).catch(() => undefined);
+  return saving;
 }

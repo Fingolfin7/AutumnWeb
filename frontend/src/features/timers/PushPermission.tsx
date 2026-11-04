@@ -24,12 +24,12 @@ export function PushPermission() {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(() => {
-    permissionState()
+    Promise.race([permissionState(), new Promise<{ state: PermissionState; detail: string }>(resolve => window.setTimeout(() => resolve({ state: "unavailable", detail: "Notification status is unavailable. Check notification settings to try again." }), 5000))])
       .then((result) => {
         setState(result.state);
         setDetail(result.detail);
       })
-      .catch(() => setStatus("Notification status is temporarily unavailable."));
+      .catch(() => { setState("unavailable"); setStatus("Notification status is temporarily unavailable."); });
   }, []);
 
   useEffect(refresh, [refresh]);

@@ -47,7 +47,7 @@ export function FocusCard({
 
   return (
     <article
-      className="focus-card"
+      className={`focus-card ember-clock${elapsed >= 3600 ? " ember-clock--deep" : elapsed >= 1200 ? " ember-clock--warm" : ""}`}
       id={`timer-${timer.id}`}
       data-timer-id={timer.id}
       aria-label={`Running timer: ${timer.project.name}`}
@@ -87,15 +87,14 @@ export function FocusCard({
             stops in <span className="mono">{formatClock(countdown)}</span>
           </span>
         ) : (
-          <span className="muted">no auto-stop</span>
+          null
         )}
       </div>
       {stopAt ? (
         <div className="focus-autostop-bar">
-          <div className="focus-autostop-fill" style={{ width: `${fill.toFixed(1)}%` }} />
+          <progress className="focus-autostop-fill" max={100} value={fill} aria-label="Auto-stop progress" />
         </div>
       ) : null}
-      {children}
       <div className="focus-actions">
         <AppLink
           className="btn btn--stop btn--lg focus-stop"
@@ -140,6 +139,7 @@ export function FocusCard({
           <span className="sr-only">Remove timer</span>
         </button>
       </div>
+      {children}
       <ConfirmDialog
         open={confirmRemove}
         title="Remove this timer?"
@@ -160,17 +160,5 @@ export function FocusCard({
         }}
       />
     </article>
-  );
-}
-
-/* Phone carousel position dots (.focus-dots). Inert on the desk, where CSS
-   turns the track into a grid and hides them. */
-export function FocusDots({ count, active, onPick }: { count: number; active: number; onPick: (index: number) => void }) {
-  return (
-    <div className="focus-dots" aria-label="Choose a timer card">
-      {Array.from({ length: count }, (_, index) => (
-        <button type="button" key={index} className={`focus-dot${index === active ? " is-active" : ""}`} aria-label={`Timer card ${index + 1}`} aria-pressed={index === active} onClick={() => onPick(index)} />
-      ))}
-    </div>
   );
 }

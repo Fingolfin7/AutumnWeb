@@ -26,13 +26,32 @@ export function insertStamp(value: string, caret: number, stamp = timestamp()): 
    reported rather than overwritten). The component owns its text, so the
    timer poll can never wipe what you are typing: no dirty-editor guard
    needed. Unsaved text is stashed for the stop page via `stash()`. */
-export function TimerNoteEditor({ timer, registerStash }: { timer: Timer; registerStash?: (stash: () => void) => void }) {
+export function TimerNoteEditor({
+  timer,
+  registerStash,
+}: {
+  timer: Timer;
+  registerStash?: (stash: () => void) => void;
+}) {
   const client = useQueryClient();
-  const [value, setValue] = useState(timer.note ?? "");
-  const [status, setStatus] = useState<Status>({ text: "Saved", state: "saved" });
+  const draftKey = NOTE_DRAFT_KEY_PREFIX + (timer.uuid ?? timer.id);
+  const [value, setValue] = useState(() => {
+    try {
+      return (
+        sessionStorage.getItem(draftKey) ?? sessionStorage.getItem(NOTE_DRAFT_KEY_PREFIX + timer.id) ?? timer.note ?? ""
+      );
+    } catch {
+      return timer.note ?? "";
+    }
+  });
+  const [status, setStatus] = useState<Status>(() =>
+    value !== (timer.note ?? "")
+      ? { text: "Draft saved on this device", state: "dirty" }
+      : { text: "Saved", state: "saved" },
+  );
   const [saving, setSaving] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const dirty = useRef(false);
+  const dirty = useRef(value !== (timer.note ?? ""));
   const version = useRef(timer.version);
   const debounce = useRef<number | undefined>(undefined);
   const valueRef = useRef(value);
@@ -40,19 +59,24 @@ export function TimerNoteEditor({ timer, registerStash }: { timer: Timer; regist
 
   /* Adopt server-side note changes (CLI, another device) only while clean. */
   useEffect(() => {
-    version.current = Math.max(version.current, timer.version);
-    if (!dirty.current && (timer.note ?? "") !== valueRef.current) setValue(timer.note ?? "");
+    if (!dirty.current) {
+      version.current = Math.max(version.current, timer.version);
+      if ((timer.note ?? "") !== valueRef.current) setValue(timer.note ?? "");
+    }
   }, [timer.note, timer.version]);
 
   useEffect(() => {
     registerStash?.(() => {
+      window.clearTimeout(debounce.current);
       try {
-        window.sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + timer.id, (textarea.current?.value ?? valueRef.current));
+        const draft = textarea.current?.value ?? valueRef.current;
+        window.sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + timer.id, draft);
+        window.sessionStorage.setItem(draftKey, draft);
       } catch {
         /* storage unavailable */
       }
     });
-  }, [registerStash, timer.id]);
+  }, [registerStash, timer.id, draftKey]);
 
   useEffect(() => () => window.clearTimeout(debounce.current), []);
 
@@ -64,9 +88,17 @@ export function TimerNoteEditor({ timer, registerStash }: { timer: Timer; regist
     try {
       const saved = await saveTimerNote({ id: timer.id, version: version.current }, sent);
       version.current = saved.version;
-      client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) => list?.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)));
+      client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) =>
+        list?.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)),
+      );
       if (valueRef.current === sent) {
         dirty.current = false;
+        try {
+          sessionStorage.removeItem(NOTE_DRAFT_KEY_PREFIX + timer.id);
+          sessionStorage.removeItem(draftKey);
+        } catch {
+          /* unavailable storage */
+        }
         setStatus({ text: `Saved ✓ ${timestamp().replaceAll("—", "").trim()}`, state: "saved" });
       } else {
         markDirty();
@@ -84,8 +116,14 @@ export function TimerNoteEditor({ timer, registerStash }: { timer: Timer; regist
     }
   };
 
-  const markDirty = () => {
+  const markDirty = (next = textarea.current?.value ?? valueRef.current) => {
     dirty.current = true;
+    try {
+      sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + timer.id, next);
+      sessionStorage.setItem(draftKey, next);
+    } catch {
+      /* unavailable storage */
+    }
     setStatus({ text: "Draft — not saved", state: "dirty" });
     window.clearTimeout(debounce.current);
     debounce.current = window.setTimeout(() => void save(), 1500);
@@ -102,7 +140,7 @@ export function TimerNoteEditor({ timer, registerStash }: { timer: Timer; regist
             const node = textarea.current;
             const next = insertStamp(value, node?.selectionStart ?? value.length);
             setValue(next.value);
-            markDirty();
+            markDirty(next.value);
             requestAnimationFrame(() => {
               node?.focus();
               node?.setSelectionRange(next.caret, next.caret);
@@ -123,7 +161,10 @@ export function TimerNoteEditor({ timer, registerStash }: { timer: Timer; regist
         }}
       />
       <div className="timer-note-footer">
-        <small className={`timer-note-status${status.state === "saved" ? " saved" : status.state === "error" ? " error" : ""}`} role="status">
+        <small
+          className={`timer-note-status${status.state === "saved" ? " saved" : status.state === "error" ? " error" : ""}`}
+          role="status"
+        >
           {status.text}
         </small>
         <button

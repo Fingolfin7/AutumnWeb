@@ -64,10 +64,12 @@ export function useRefreshOnRunningChange(timers: Timer[] | undefined) {
       .map((t) => t.id)
       .sort((a, b) => a - b)
       .join(",");
-    if (last.current !== null && last.current !== signature) {
-      void client.invalidateQueries({ queryKey: ["dashboard"] });
-      void client.invalidateQueries({ queryKey: ["reports", "timeline"] });
-      void client.invalidateQueries({ queryKey: ["sessions"] });
+    // Local mutations already refresh these resources on settlement. Refresh
+    // only changes discovered by polling, avoiding overlapping dashboard GETs.
+    if (last.current !== null && last.current !== signature && client.isMutating() === 0) {
+      void client.invalidateQueries({ queryKey: ["dashboard"] }, { cancelRefetch: false });
+      void client.invalidateQueries({ queryKey: ["reports", "timeline"] }, { cancelRefetch: false });
+      void client.invalidateQueries({ queryKey: ["sessions"] }, { cancelRefetch: false });
     }
     last.current = signature;
   }, [timers, client]);

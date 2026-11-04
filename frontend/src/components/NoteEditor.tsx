@@ -204,6 +204,7 @@ export function NoteEditor({
           placeholder={placeholder}
           disabled={disabled}
           autoFocus={autoFocus}
+          data-autofocus={autoFocus || undefined}
           lang={lang}
           onChange={(event) => onChange(event.target.value)}
           onBlur={onBlur}
