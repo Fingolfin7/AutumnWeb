@@ -114,6 +114,7 @@
   --fs-sm:    .9375rem;
   --fs-xs:    .8125rem;
   --fs-label: .8125rem;
+  --fs-h1: clamp(1.65rem, 3.5vw, 2.75rem);
 
   /* --- layout ----------------------------------------------------------- */
   --col:        min(100%, 40rem);           /* the one content column       */
@@ -202,9 +203,11 @@ body.bg-active::after {
      where --scrim used to be. This element IS <body>, which is where the
      shell writes --background-dim-opacity inline and where the header slider
      updates it, so the var() resolves against a value that actually exists. */
-  background: rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
+  background: linear-gradient(180deg, rgba(8, 10, 12, .72), transparent 22rem), rgba(8, 10, 12, var(--background-dim-opacity, 0.55));
   pointer-events: none;
 }
+body.bg-active .app-header { background: rgba(12, 14, 16, .88); backdrop-filter: blur(24px); }
+body.bg-active :is(.review-period, .project-hero, .slab-focus) { background: rgba(22, 24, 26, .77); backdrop-filter: blur(18px); }
 body.bg-active .app { position: relative; z-index: 2; }
 .app { position: relative; z-index: 2; }
 
@@ -260,7 +263,7 @@ body.bg-active .dim-control { display: flex; }
   font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
   color: var(--muted); font-weight: 600;
 }
-.page-title { font-family: var(--font-display); font-size: var(--fs-xxl); font-weight: 650; line-height: 1.15; letter-spacing: -.01em; }
+.page-title { font-family: var(--font-display); font-size: var(--fs-h1); font-weight: 650; line-height: 1.2; letter-spacing: -.015em; }
 
 /* Below the desk breakpoint the head simply stacks: title, then the strip.
    At >=1000px they share one line (see the desktop layer). */
@@ -499,8 +502,8 @@ body.bg-active .dim-control { display: flex; }
 .commit-target { font-size: var(--fs-lg); font-weight: 650; letter-spacing: -.01em; }
 .commit-kind { font-size: var(--fs-xs); color: var(--muted); }
 .commit-period {
-  margin-left: auto; font-size: var(--fs-label); text-transform: uppercase;
-  letter-spacing: .12em; color: var(--muted);
+  margin-left: auto; font-size: var(--fs-label); text-transform: none;
+  letter-spacing: normal; color: var(--muted);
 }
 .commit-figures {
   margin-top: var(--s3);
@@ -779,8 +782,8 @@ body.bg-active .dim-control { display: flex; }
 }
 .field { margin-bottom: var(--s4); }
 .field-label {
-  display: block; font-size: var(--fs-label); text-transform: uppercase;
-  letter-spacing: .12em; color: var(--muted); margin-bottom: .35rem;
+  display: block; font-size: var(--fs-label); text-transform: none;
+  letter-spacing: normal; color: var(--muted); margin-bottom: .35rem;
 }
 .input, .select {
   width: 100%; padding: .7rem .85rem;
@@ -806,7 +809,7 @@ body.bg-active .dim-control { display: flex; }
 .btn--stop:hover { background: #f8cba5; }
 .btn--ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-2); }
 .btn--ghost:hover { background: var(--raised); }
-.btn--quiet { background: transparent; color: var(--muted); box-shadow: none; padding: .4rem .6rem; }
+.btn--quiet { background: transparent; color: var(--muted); box-shadow: none; padding: .4rem 0; }
 .btn--quiet:hover { color: var(--ink); background: var(--raised); }
 .btn--block { width: 100%; }
 .btn--lg { padding: 1rem 1.5rem; font-size: var(--fs-md); border-radius: var(--r-pill); }
@@ -1545,11 +1548,13 @@ img.brand-mark {
   object-fit: contain;
 }
 
-.avatar { overflow: hidden; padding: 0; }
+.avatar { overflow: hidden; padding: 6px; margin-left: var(--s2); flex: 0 0 44px; }
 .avatar img {
-  width: 100%; height: 100%;
+  width: 32px; height: 32px;
   object-fit: cover; border-radius: inherit;
 }
+
+.avatar-monogram { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-pill); background: var(--raised-2); color: var(--muted); font: 600 var(--fs-sm)/1 var(--font-display); }
 
 /* The log-out sheet item is a <button> inside a <form>; the form must not
    break the sheet list's hairline rhythm or the item's full-bleed hit area. */
@@ -1615,8 +1620,8 @@ img.brand-mark {
 }
 /* Django labels are plain <label>; give them the eyebrow treatment. */
 .fields label {
-  display: block; font-size: var(--fs-label); text-transform: uppercase;
-  letter-spacing: .12em; color: var(--muted); margin-bottom: .35rem;
+  display: block; font-size: var(--fs-label); text-transform: none;
+  letter-spacing: normal; color: var(--muted); margin-bottom: .35rem;
 }
 /* …except beside a checkbox, where the label is the option's name. */
 .fields .check-row label, .fields .check-grid label {
@@ -2206,8 +2211,8 @@ img.brand-mark {
 /* Notes-as-you-go, inside a focus card. Quiet until you use it. */
 .timer-note-editor { margin-top: var(--s4); }
 .timer-note-editor > label {
-  display: block; font-size: var(--fs-label); text-transform: uppercase;
-  letter-spacing: .12em; color: var(--muted); font-weight: 600;
+  display: block; font-size: var(--fs-label); text-transform: none;
+  letter-spacing: normal; color: var(--muted); font-weight: 600;
   margin-bottom: .35rem;
 }
 .timer-note-toolbar {
@@ -3283,13 +3288,24 @@ img.brand-mark {
 .similarity-disclosure[open] { display: grid; gap: .4rem; padding-bottom: var(--s4); }
 
 /* Shared controls: quiet alternatives, clear danger, comfortable hit areas. */
+/* Native semantics; one finish in React and server-rendered forms. */
+input[type="checkbox"]:not([role="switch"]) { appearance: none; position: relative; flex: 0 0 22px; width: 22px; height: 22px; min-width: 22px; min-height: 22px; margin: 0; border: 1px solid var(--muted); border-radius: var(--r-xs); background: var(--sunken); vertical-align: middle; cursor: pointer; }
+input[type="checkbox"]:not([role="switch"]):checked { background: var(--brand); border-color: var(--brand); }
+input[type="checkbox"]:not([role="switch"]):checked::after { content: ""; position: absolute; left: 7px; top: 3px; width: 6px; height: 11px; border: solid var(--ink-invert); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.check-row { display: flex; align-items: center; gap: var(--s3); min-height: 44px; }
+.check-row > label { min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; }
+.select, .fields select { padding-right: 2.5rem; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23aaa69f' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; }
+input[type="file"] { max-width: 100%; color: var(--muted); font: inherit; }
+input[type="file"]::file-selector-button { min-height: 44px; padding: var(--s2) var(--s4); margin-right: var(--s3); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); color: var(--ink); background: var(--surface-2); font: inherit; cursor: pointer; }
+
 .btn { min-height: 44px; border-radius: var(--r-sm); }
 .btn--secondary { background: var(--raised); }
 .btn--danger { color: var(--danger); background: #4b2933; box-shadow: inset 0 0 0 1px #87505f; }
 .btn--danger:hover { background: #633342; }
-.btn:disabled, .btn-icon:disabled { opacity: .55; cursor: not-allowed; }
+.btn:disabled, .btn-icon:disabled { opacity: 1; cursor: not-allowed; color: var(--muted); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline); }
 :focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 .input, .select, .fields input:not([type="checkbox"]):not([type="radio"]), .fields select { min-height: 44px; }
+.chip, span.tag-chip, span.context-chip, span.sub-chip { min-height: 24px; line-height: 1.2; }
 .chip { display: inline-flex; align-items: center; gap: var(--s2); padding: .25rem .65rem; border-radius: var(--r-pill); color: var(--ink-2); background: var(--raised); font-size: var(--fs-xs); }
 .tag-chip::before { content: ""; display: inline-block; width: .45rem; height: .45rem; border-radius: 50%; background: var(--tag, var(--muted)); margin-right: .35rem; }
 .toggle { display: flex; align-items: center; gap: var(--s3); min-height: 44px; cursor: pointer; }
@@ -3331,7 +3347,7 @@ img.brand-mark {
 .page-eyebrow, .focus-eyebrow, .stat-label, .field-label, .bank-label,
 .fd-tl-total-label, .commit-period, .sheet-title { text-transform: none; letter-spacing: .015em; }
 @media (max-width: 999px) {
-  .range-tab, .filter-launcher, .quick-chip, .sub-chip, .tag-chip, .context-chip,
+  .range-tab, .filter-launcher, .quick-chip, a.sub-chip, button.sub-chip, a.tag-chip, button.tag-chip, a.context-chip, button.context-chip,
   .note-editor-toolbar button, .palette-item { min-height: 44px; }
 }
 
