@@ -13,7 +13,7 @@ test("the command palette opens with Ctrl+K and navigates", async ({ page, isMob
   await palette.getByRole("textbox", { name: "Command" }).fill("review");
   await palette.getByRole("button", { name: /Review/ }).first().click();
 
-  await expect(page).toHaveURL(/\/charts\/$/);
+  await expect(page).toHaveURL(/\/review\/$/);
   await expect(palette).toBeHidden();
   expect(problems()).toEqual([]);
 });

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Sheet } from "@/components/Sheet";
 import type { Context, Project, Tag } from "@/api/types";
@@ -6,8 +6,7 @@ import { SimilaritySlider } from "@/features/search/SimilaritySlider";
 import { accountSimilarity, sameCutoff, similarityScale } from "@/features/search/similarity";
 import type { SelectionFilters } from "./logic";
 
-/* The narrowing controls that do not live on the page itself (the date range
-   does): search, related, project name, context, note, tags and projects. */
+/* One place for the conversation's dates, model and session filters. */
 export function FilterSheet({
   open,
   onClose,
@@ -20,6 +19,7 @@ export function FilterSheet({
   tags,
   contexts,
   activeContextId,
+  children,
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,6 +32,7 @@ export function FilterSheet({
   tags: Tag[];
   contexts: Context[];
   activeContextId: number | null;
+  children?: ReactNode;
 }) {
   /* The project picker narrows itself to the context and tags chosen beside
      it; a ticked project always stays visible. */
@@ -48,8 +49,11 @@ export function FilterSheet({
   }, [projects, draft.context, draft.tags, draft.projects, activeContextId]);
 
   return (
-    <Sheet className="filter-sheet" open={open} onClose={onClose} title="Filter sessions">
+    <Sheet className="filter-sheet" open={open} onClose={onClose} title="Conversation context">
       <div className="fields">
+        <div className="field"><label htmlFor="start_date">Start date</label><input id="start_date" type="date" value={draft.start_date} onChange={(event) => onDraft({ ...draft, start_date: event.target.value })} /></div>
+        <div className="field"><label htmlFor="end_date">End date</label><input id="end_date" type="date" value={draft.end_date} onChange={(event) => onDraft({ ...draft, end_date: event.target.value })} /></div>
+        {children}
         <div className="field">
           <label htmlFor="content-search">Search projects, subprojects, and session notes</label>
           <input id="content-search" type="search" placeholder="Projects, subprojects, or notes" value={draft.search} onChange={(e) => onDraft({ ...draft, search: e.target.value })} />
@@ -135,7 +139,7 @@ export function FilterSheet({
             Clear all
           </button>
           <button className="btn btn--primary" type="button" onClick={onApply}>
-            Apply filters
+            Use context
           </button>
         </div>
       </div>

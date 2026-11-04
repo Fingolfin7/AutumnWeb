@@ -35,6 +35,7 @@ export const pages: PageEntry[] = [
   { path: "/merge_projects/", title: "Merge projects", load: () => import("@/features/projects/MergeProjectsPage") },
   { path: "/merge_subprojects/:projectId/", title: "Merge subprojects", load: () => import("@/features/projects/MergeSubprojectsPage") },
 
+  { path: "/review/", title: "Review", load: () => import("@/features/review/ReviewPage") },
   { path: "/charts/", title: "Charts", load: () => import("@/features/charts/ChartsPage") },
 
   { path: "/contexts/", title: "Contexts", load: () => import("@/features/contexts-tags/ContextsPage") },

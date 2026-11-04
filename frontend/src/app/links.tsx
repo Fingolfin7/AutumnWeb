@@ -37,6 +37,7 @@ export const urls = {
   deleteSubproject: (id: number) => `/delete_subproject/${id}/`,
   mergeProjects: () => "/merge_projects/",
   mergeSubprojects: (projectId: number) => `/merge_subprojects/${projectId}/`,
+  review: () => "/review/",
   charts: () => "/charts/",
   insights: () => "/insights/",
   notifications: () => "/notifications/",
