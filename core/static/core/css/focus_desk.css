@@ -3756,7 +3756,7 @@ img.brand-mark {
 @media (max-width: 1000px) {
   .review-body { grid-template-columns: minmax(0, 1fr); }
   .ember-year { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--s4); }
-  .insights-context-bar + .chat-layout { --chat-h: calc(100dvh - 15rem); }
+  .insights-context-bar + .chat-layout { --chat-h: calc(100dvh - 15rem - var(--feedback-height, 0px) - var(--offline-height, 0px)); }
 }
 @media (max-width: 600px) {
   .review-desk { gap: var(--s4); }
@@ -3798,7 +3798,7 @@ img.brand-mark {
   .insights-context-bar > div { flex-direction: column; gap: 3px; }
   .insights-context-bar > div > span { font-size: .68rem; }
   .insights-context-bar > .btn { font-size: var(--fs-xs); padding-inline: .6rem; }
-  .insights-context-bar + .chat-layout { --chat-h: calc(100dvh - 13.3rem); min-height: 22rem; }
+  .insights-context-bar + .chat-layout { --chat-h: calc(100dvh - 13.3rem - var(--feedback-height, 0px) - var(--offline-height, 0px)); min-height: 22rem; }
   .chat-header { padding: var(--s2); flex-wrap: wrap; gap: var(--s2); }
   .chat-header-meta { gap: .2rem; }
   .chat-header-range { display: none; }
