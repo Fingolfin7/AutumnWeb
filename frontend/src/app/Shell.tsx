@@ -1,34 +1,22 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import {
-  faAdjust,
-  faBell,
   faChartPie,
   faPlus,
   faSearch,
-  faFileExport,
-  faFileImport,
   faFolderOpen,
   faHome,
-  faLayerGroup,
   faListUl,
-  faPlug,
-  faSignOutAlt,
-  faTags,
-  faUserCircle,
   type IconDefinition,
 } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { IconButton } from "@/components/ui";
-import { Sheet } from "@/components/Sheet";
+import { hasCustomAvatar } from "@/features/profile/model";
 import { bootstrap } from "@/bootstrap";
-import { csrfToken } from "@/lib/csrf";
-import { requestJson } from "@/api/client";
 import { AppLink, urls } from "./links";
 import { useActiveContext } from "./context";
 import { ToastOutlet } from "./toasts";
 import { OfflineSync } from "./OfflineSync";
-import { clearPersistedQueries } from "./persist";
 import { fetchPreferences } from "@/features/profile/api";
 import { TimerDock } from "@/features/timers/TimerDock";
 import { applyBackground } from "@/features/profile/shell";
@@ -55,9 +43,6 @@ function isActive(tab: Tab, pathname: string) {
 export function Shell({ children }: { children: ReactNode }) {
   const { pathname, search } = useLocation();
   const boot = bootstrap();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  useEffect(() => setSettingsOpen(false), [pathname]);
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [pathname, search]);
@@ -113,9 +98,10 @@ export function Shell({ children }: { children: ReactNode }) {
             <ContextSwitch />
             <IconButton icon={faSearch} label="Go anywhere" onClick={() => window.dispatchEvent(new Event("autumn:palette"))} />
             <AppLink className="header-capture btn-icon" href={urls.startTimer()} aria-label="New timer" title="New timer"><Icon icon={faPlus} /></AppLink>
-            <button className={`avatar${settingsActive ? " is-active" : ""}`} type="button" aria-label="Settings" title="Settings" aria-haspopup="dialog" aria-expanded={settingsOpen} onClick={() => setSettingsOpen(true)}>
-              <img src={boot.profile.avatar_url} alt="" />
-            </button>
+            <AppLink className={`avatar${settingsActive ? " is-active" : ""}`} href="/settings/" aria-label="Settings" title="Settings">
+              <img src={boot.profile.avatar_url} alt="" hidden={!hasCustomAvatar(boot.profile.avatar_url)} />
+              <span className="avatar-monogram" hidden={hasCustomAvatar(boot.profile.avatar_url)}>{boot.user.username.slice(0, 1).toUpperCase() || "A"}</span>
+            </AppLink>
           </div>
         </div>
       </header>
@@ -125,34 +111,7 @@ export function Shell({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Settings">
-        <div className="sheet-list">
-          <SheetLink href="/settings/" icon={faUserCircle} label="All settings" />
-          <SheetLink href={urls.profile()} icon={faUserCircle} label="Account & appearance" />
-          <DimControl initial={boot.profile.background_dimming} />
-          <SheetLink href={urls.notifications()} icon={faBell} label="Notifications" />
-          <SheetLink href={urls.contexts()} icon={faLayerGroup} label="Contexts" />
-          <SheetLink href={urls.tags()} icon={faTags} label="Tags" />
-          <SheetLink href={urls.import()} icon={faFileImport} label="Import" />
-          <SheetLink href={urls.export()} icon={faFileExport} label="Export" />
-          <SheetLink href="/settings/ai/" icon={faPlug} label="AI connections" />
-          <form method="POST" action={urls.logout()} onSubmit={clearPersistedQueries}>
-            <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} />
-            <button className="sheet-item" type="submit">
-              <Icon icon={faSignOutAlt} className="sheet-item-icon" /> Log out
-            </button>
-          </form>
-        </div>
-      </Sheet>
     </div>
-  );
-}
-
-function SheetLink({ href, icon, label }: { href: string; icon: IconDefinition; label: string }) {
-  return (
-    <AppLink className="sheet-item" href={href}>
-      <Icon icon={icon} className="sheet-item-icon" /> {label}
-    </AppLink>
   );
 }
 
@@ -180,38 +139,3 @@ function ContextSwitch() {
   );
 }
 
-/* Backdrop dimming, at hand in Settings. CSS shows it only when a photo
-   resolved (body.bg-active). Applies instantly; saves debounced. */
-function DimControl({ initial }: { initial: number }) {
-  const [value, setValue] = useState(initial);
-  const timer = useRef<number | undefined>(undefined);
-
-  const change = (next: number) => {
-    setValue(next);
-    document.body.style.setProperty("--background-dim-opacity", (next / 100).toFixed(2));
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => {
-      void requestJson("PATCH", "/api/v2/me/preferences/", { background_dimming: next }).catch(() => {
-        /* cosmetic: a failed save just means the old level returns next visit */
-      });
-    }, 400);
-  };
-
-  return (
-    <div className="dim-control" title="Backdrop dimming">
-      <Icon icon={faAdjust} className="dim-icon" />
-      <label className="sr-only" htmlFor="header-dimming">
-        Backdrop dimming
-      </label>
-      <input
-        type="range"
-        id="header-dimming"
-        min={0}
-        max={85}
-        step={5}
-        value={value}
-        onChange={(event) => change(Number(event.target.value))}
-      />
-    </div>
-  );
-}
