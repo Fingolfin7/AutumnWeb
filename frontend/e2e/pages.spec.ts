@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { trackErrors } from "./helpers";
 
 const PAGES = [
-  "/", "/timers/", "/sessions/", "/projects/", "/charts/", "/contexts/", "/tags/",
+  "/", "/timers/", "/sessions/", "/projects/", "/review/", "/charts/", "/contexts/", "/tags/",
   "/notifications/", "/review/weekly/", "/import/", "/export/", "/profile/", "/insights/",
 ];
 

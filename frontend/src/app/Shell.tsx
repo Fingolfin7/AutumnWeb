@@ -42,7 +42,7 @@ const tabs: Tab[] = [
   { href: urls.home(), label: "Today", icon: faHome, match: ["/", "/timers", "/start_timer", "/stop_timer", "/remove_timer"] },
   { href: urls.projects(), label: "Projects", icon: faFolderOpen, match: ["/projects", "/create_project", "/update_project", "/delete_project", "/merge_projects", "/create_subproject", "/update_subproject", "/delete_subproject", "/merge_subprojects", "/create_commitment", "/update_commitment", "/delete_commitment"] },
   { href: urls.sessions(), label: "Sessions", icon: faListUl, match: ["/sessions", "/update_session", "/delete_session"] },
-  { href: urls.charts(), label: "Review", icon: faChartPie, match: ["/charts", "/review", "/insights"] },
+  { href: urls.review(), label: "Review", icon: faChartPie, match: ["/charts", "/review", "/insights"] },
 ];
 
 function isActive(tab: Tab, pathname: string) {
@@ -58,7 +58,6 @@ export function Shell({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [pathname, search]);
-  const reviewActive = isActive(tabs[3]!, pathname);
   const settingsActive = ["/profile", "/settings", "/contexts", "/update_context", "/delete_context", "/tags", "/update_tag", "/delete_tag", "/notifications", "/import", "/export", "/mcp"].some((prefix) => pathname.startsWith(prefix));
 
   useEffect(() => {
@@ -117,11 +116,6 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main id="main-content" className="screen screen-pad">
-        {reviewActive ? <nav className="review-nav" aria-label="Review views">
-          <AppLink href={urls.charts()} aria-current={pathname.startsWith("/charts") ? "page" : undefined}>Charts</AppLink>
-          <AppLink href={urls.weeklyReview()} aria-current={pathname.startsWith("/review") ? "page" : undefined}>Weekly review</AppLink>
-          {boot.profile.insights_access_enabled ? <AppLink href={urls.insights()} aria-current={pathname.startsWith("/insights") ? "page" : undefined}>Insights</AppLink> : null}
-        </nav> : null}
         {children}
       </main>
 

@@ -9,9 +9,6 @@ import { ACCEPT, MAX_FILES, type Draft } from "./attachments";
 
 /* Model pickers, attached files, the question box and Send. */
 export function Composer({
-  options,
-  selection,
-  onSelection,
   prompt,
   onPrompt,
   busy,
@@ -22,9 +19,6 @@ export function Composer({
   onAddFiles,
   onRemoveDraft,
 }: {
-  options: InsightOptions;
-  selection: ModelSelection;
-  onSelection: (next: ModelSelection) => void;
   prompt: string;
   onPrompt: (value: string) => void;
   busy: boolean;
@@ -38,10 +32,6 @@ export function Composer({
   const textarea = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const canSend = !!prompt.trim() && !busy && !uploading;
-  const provider = options.providers.find((p) => p.provider === selection.provider);
-  const efforts = effortsFor(options, selection.provider, selection.model);
-  const note = openaiConnectionNote(options.openai_source, options.providers.some((p) => p.provider === "openai"));
-
   /* Auto-grow up to ~7 lines. */
   useLayoutEffect(() => {
     const node = textarea.current;
@@ -56,16 +46,6 @@ export function Composer({
     if (wasBusy.current && !busy) textarea.current?.focus();
     wasBusy.current = busy;
   }, [busy]);
-
-  const pickProvider = (name: string) => {
-    const next = options.providers.find((p) => p.provider === name);
-    const model = next?.models[0];
-    if (!next || !model) return;
-    onSelection({ provider: name, model: model.value, effort: pickEffort(model.reasoning_efforts, "high") });
-  };
-  const pickModel = (value: string) => {
-    onSelection({ ...selection, model: value, effort: pickEffort(effortsFor(options, selection.provider, value), selection.effort) });
-  };
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -89,7 +69,76 @@ export function Composer({
 
   return (
     <form className="composer" onSubmit={submit}>
-      <div className="composer-toolbar">
+      <AttachmentTray drafts={drafts} onRemove={onRemoveDraft} />
+
+      <div className="composer-input-row">
+        <input
+          ref={picker}
+          type="file"
+          multiple
+          accept={ACCEPT}
+          hidden
+          onChange={(event) => {
+            onAddFiles(Array.from(event.target.files ?? []));
+            event.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          className="composer-attach"
+          onClick={() => picker.current?.click()}
+          disabled={busy || full}
+          title={full ? `Up to ${MAX_FILES} files per message` : "Attach screenshots, PDFs, Word docs or transcripts (or paste and drop them)"}
+          aria-label="Attach files"
+        >
+          <Icon icon={faPaperclip} />
+        </button>
+        <label className="sr-only" htmlFor="prompt">
+          Your question
+        </label>
+        <textarea
+          id="prompt"
+          name="prompt"
+          ref={textarea}
+          rows={1}
+          placeholder={drafts.length ? "Ask about these files and your sessions…" : "Ask a question about your sessions…"}
+          value={prompt}
+          readOnly={busy}
+          onChange={(e) => onPrompt(e.target.value)}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
+        />
+        {busy ? (
+          <button type="button" className="btn btn--ghost" title="Stop the answer" onClick={onStop}>
+            <Icon icon={faStop} /> <span className="composer-btn-label">Stop</span>
+          </button>
+        ) : (
+          <button type="submit" className="btn btn--primary" title={uploading ? "Waiting for files to finish uploading" : "Send (Enter)"} disabled={!canSend}>
+            <Icon icon={faPaperPlane} /> <span className="composer-btn-label">Send</span>
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+export function ModelPicker({ options, selection, onSelection, busy }: { options: InsightOptions; selection: ModelSelection; onSelection: (next: ModelSelection) => void; busy: boolean }) {
+  const provider = options.providers.find((p) => p.provider === selection.provider);
+  const efforts = effortsFor(options, selection.provider, selection.model);
+  const note = openaiConnectionNote(options.openai_source, options.providers.some((p) => p.provider === "openai"));
+
+  const pickProvider = (name: string) => {
+    const next = options.providers.find((p) => p.provider === name);
+    const model = next?.models[0];
+    if (!next || !model) return;
+    onSelection({ provider: name, model: model.value, effort: pickEffort(model.reasoning_efforts, "high") });
+  };
+  const pickModel = (value: string) => {
+    onSelection({ ...selection, model: value, effort: pickEffort(effortsFor(options, selection.provider, value), selection.effort) });
+  };
+
+  return (
+<div className="composer-toolbar">
         <span className="composer-field">
           <label htmlFor="provider">Provider</label>
           <select id="provider" name="provider" value={selection.provider} onChange={(e) => pickProvider(e.target.value)} disabled={busy}>
@@ -142,56 +191,5 @@ export function Composer({
           </span>
         ) : null}
       </div>
-
-      <AttachmentTray drafts={drafts} onRemove={onRemoveDraft} />
-
-      <div className="composer-input-row">
-        <input
-          ref={picker}
-          type="file"
-          multiple
-          accept={ACCEPT}
-          hidden
-          onChange={(event) => {
-            onAddFiles(Array.from(event.target.files ?? []));
-            event.target.value = "";
-          }}
-        />
-        <button
-          type="button"
-          className="composer-attach"
-          onClick={() => picker.current?.click()}
-          disabled={busy || full}
-          title={full ? `Up to ${MAX_FILES} files per message` : "Attach screenshots, PDFs, Word docs or transcripts (or paste and drop them)"}
-          aria-label="Attach files"
-        >
-          <Icon icon={faPaperclip} />
-        </button>
-        <label className="sr-only" htmlFor="prompt">
-          Your question
-        </label>
-        <textarea
-          id="prompt"
-          name="prompt"
-          ref={textarea}
-          rows={1}
-          placeholder={drafts.length ? "Ask about these files and your sessions…" : "Ask a question about your sessions…"}
-          value={prompt}
-          readOnly={busy}
-          onChange={(e) => onPrompt(e.target.value)}
-          onKeyDown={onKeyDown}
-          onPaste={onPaste}
-        />
-        {busy ? (
-          <button type="button" className="btn btn--ghost" title="Stop the answer" onClick={onStop}>
-            <Icon icon={faStop} /> <span className="composer-btn-label">Stop</span>
-          </button>
-        ) : (
-          <button type="submit" className="btn btn--primary" title={uploading ? "Waiting for files to finish uploading" : "Send (Enter)"} disabled={!canSend}>
-            <Icon icon={faPaperPlane} /> <span className="composer-btn-label">Send</span>
-          </button>
-        )}
-      </div>
-    </form>
   );
 }

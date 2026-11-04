@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { faCalendarAlt, faCheck, faCheckSquare, faChevronLeft, faChevronRight, faCloudUploadAlt, faComments, faCopy, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faCheckSquare, faChevronLeft, faChevronRight, faCloudUploadAlt, faComments, faCopy, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog } from "@/components/Sheet";
@@ -15,7 +15,7 @@ import { formatDayDate } from "@/lib/format";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useInsightSelection } from "./api";
 import { filesFrom, useAttachmentDrafts } from "./attachments";
-import { Composer } from "./Composer";
+import { Composer, ModelPicker } from "./Composer";
 import { FilterSheet } from "./FilterSheet";
 import { Sidebar } from "./Sidebar";
 import { runItems, savedItems, Transcript } from "./Transcript";
@@ -26,15 +26,12 @@ import {
   buildTranscript,
   describeSelection,
   EMPTY_SELECTION,
-  formatUsage,
   readSelection,
   resolveSelection,
   selectionFromChat,
   selectionQuery,
   selectionRequest,
   splitChatModel,
-  sumUsage,
-  USAGE_TITLE,
   visibleTurns,
   type ModelSelection,
   type SelectionFilters,
@@ -196,8 +193,6 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const live = !!run && isLive(run) && (run.chatId === (chatId ?? null) || ownRun.current === run.id);
   const hasHistory = items.length > 0;
 
-  const usage = sumUsage([...(chat?.messages ?? []).map((m) => m.metadata?.usage), shownRun?.status === "done" ? shownRun.usage : null]);
-
   /* The first answer creates the chat: move the URL onto it. The page
      remounts there; the run carries over (runStore). */
   useEffect(() => {
@@ -220,10 +215,6 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
     setReselected(true);
     setSheetOpen(false);
     toast.success("Session selection updated.");
-  };
-  const onSelect = (event: FormEvent) => {
-    event.preventDefault();
-    select(draft);
   };
   const clearSelection = () => select({ ...EMPTY_SELECTION, start_date: defaults.start, end_date: defaults.end });
 
@@ -339,49 +330,11 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   return (
     <>
       <h1 className="sr-only">Insights</h1>
-      <form className="fields" id="search_form" onSubmit={onSelect}>
-        <div className="searchbar searchbar--range">
-          <Icon icon={faCalendarAlt} className="fas muted" />
-          <span className="range-fields">
-            <label className="sr-only" htmlFor="start_date">
-              Start date
-            </label>
-            <input id="start_date" type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
-            <span className="range-sep muted" aria-hidden="true">
-              &rarr;
-            </span>
-            <label className="sr-only" htmlFor="end_date">
-              End date
-            </label>
-            <input id="end_date" type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
-          </span>
-          <button
-            className="filter-launcher"
-            type="button"
-            aria-haspopup="dialog"
-            onClick={() => setSheetOpen(true)}
-          >
-            <Icon icon={faSlidersH} /> Filters
-            {pills.length ? <span className="filter-count">{pills.length}</span> : null}
-          </button>
-          <button type="submit" className="btn btn--secondary" id="search_button">
-            <Icon icon={faCheck} /> Select sessions
-          </button>
-        </div>
-
-        {pills.length ? (
-          <p className="filter-summary">
-            {pills.map((pill) => (
-              <span key={pill.label} className="filter-pill" id={pill.label === "Including" || pill.label === "Related" ? "related-pill" : undefined} title={pill.title}>
-                {pill.label} <b>{pill.value}</b>
-              </span>
-            ))}
-            <button className="btn btn--quiet" type="button" onClick={clearSelection}>
-              Clear
-            </button>
-          </p>
-        ) : null}
-      </form>
+      <div className="insights-context-bar">
+        <AppLink className="btn btn--quiet" href={urls.review()}>Review</AppLink>
+        <div><strong>Insights</strong><span className="muted">{selection.start_date ? formatDayDate(selection.start_date) : "All time"}{selection.end_date ? ` – ${formatDayDate(selection.end_date)}` : ""}</span></div>
+        <button className="btn btn--secondary" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context{pills.length ? ` (${pills.length})` : ""}</button>
+      </div>
 
       <FilterSheet
         open={sheetOpen}
@@ -395,7 +348,10 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
         tags={tags.data ?? []}
         contexts={contexts.data ?? []}
         activeContextId={contextId}
-      />
+      >
+        {model ? <ModelPicker options={options} selection={model} onSelection={setModel} busy={live} /> : null}
+        {pills.length ? <div className="filter-summary">{pills.map((pill) => <span className="filter-pill" id={pill.label === "Including" || pill.label === "Related" ? "related-pill" : undefined} key={pill.label} title={pill.title}>{pill.label} <b>{pill.value}</b></span>)}</div> : null}
+      </FilterSheet>
 
       <section className="slab chat-layout">
         <Sidebar
@@ -411,7 +367,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
           onDelete={setDeleting}
         />
 
-        <main className={`chat-main${dragging ? " is-dropping" : ""}`} {...dropHandlers}>
+        <div className={`chat-main${dragging ? " is-dropping" : ""}`} {...dropHandlers}>
           {dragging ? (
             <div className="chat-dropzone" aria-hidden="true">
               <Icon icon={faCloudUploadAlt} />
@@ -432,14 +388,11 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                       <span className="text-cyan">{formatDayDate(preview.data.first_date)}</span> &ndash; <span className="text-cyan">{formatDayDate(preview.data.last_date)}</span>
                     </span>
                   ) : null}
-                  <span id="token-usage" className="chat-header-tokens muted" title={USAGE_TITLE}>
-                    {formatUsage(usage)}
-                  </span>
                 </div>
                 {hasHistory ? (
                   <div className="chat-header-actions">
                     <button type="button" id="select-messages-btn" className="chat-action-btn" onClick={toggleSelecting} title="Select messages to copy">
-                      <Icon icon={selecting ? faTimes : faCheckSquare} /> {selecting ? "Cancel" : "Select"}
+                      <Icon icon={selecting ? faTimes : faCheckSquare} /> <span className="chat-action-label">{selecting ? "Cancel" : "Select"}</span>
                     </button>
                     {selecting ? (
                       <button
@@ -453,7 +406,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                       </button>
                     ) : null}
                     <button type="button" id="copy-full-chat-btn" className="chat-action-btn" onClick={() => copy(buildTranscript(items, username), setCopiedWhole)}>
-                      <Icon icon={copiedWhole ? faCheck : faCopy} /> {copiedWhole ? "Copied!" : "Copy chat"}
+                      <Icon icon={copiedWhole ? faCheck : faCopy} /> <span className="chat-action-label">{copiedWhole ? "Copied!" : "Copy chat"}</span>
                     </button>
                   </div>
                 ) : null}
@@ -467,7 +420,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             <div className="empty-state-container">
               {bootstrap().static.insights_empty ? <img src={bootstrap().static.insights_empty} alt="" /> : null}
               <p className="empty">
-                No sessions match these filters, so there is nothing to ask about yet. Widen the range in <b>Filters</b>, or{" "}
+                No sessions match these filters, so there is nothing to ask about yet. Widen the range in <b>Context</b>, or{" "}
                 <AppLink href={urls.sessions()}>check what you have tracked</AppLink>.
               </p>
             </div>
@@ -490,9 +443,6 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
               />
               {model ? (
                 <Composer
-                  options={options}
-                  selection={model}
-                  onSelection={setModel}
                   prompt={prompt}
                   onPrompt={setPrompt}
                   busy={live}
@@ -510,7 +460,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
               )}
             </div>
           )}
-        </main>
+        </div>
       </section>
 
       <ConfirmDialog

@@ -21,6 +21,7 @@ urlpatterns = [
     path("stop_timer/<int:session_id>/", spa, name="stop_timer"),
     path("remove_timer/<int:session_id>/", spa, name="remove_timer"),
     path("notifications/", spa, name="notifications"),
+    path("review/", spa, name="review"),
     path("review/weekly/", spa, name="weekly_review"),
     path(
         "notifications/schedules/<int:reminder_id>/edit/",
