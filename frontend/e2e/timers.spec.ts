@@ -21,6 +21,15 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   const card = page.getByRole("article", { name: "Running timer: Garden Planner App" });
   await expect(card).toBeVisible();
   await expect(card.getByText("Running", { exact: true })).toBeVisible();
+  if (testInfo.project.name === "phone") {
+    const headerHeight = await card.evaluate((element) => element.querySelector(".timer-note-editor")!.getBoundingClientRect().top - element.getBoundingClientRect().top);
+    expect(headerHeight).toBeLessThanOrEqual(180);
+    await expect(page.locator(".timer-dock")).toBeHidden();
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(page.locator(".timer-dock")).toBeVisible();
+    await card.scrollIntoViewIfNeeded();
+    await expect(page.locator(".timer-dock")).toBeHidden();
+  }
 
   await page.goto("/");
   await expect(page.getByRole("article", { name: "Running timer: Garden Planner App" })).toBeVisible();

@@ -120,7 +120,7 @@ export default function SessionsPage() {
 
   return (
     <>
-      <div className="desk-head journal-title"><h1 className="page-title">Sessions</h1><p className="muted">A record of time, in your own words.</p></div>
+      <div className="desk-head journal-title"><h1 className="page-title">Sessions</h1></div>
       <form className="fields journal-search" onSubmit={onSearch} role="search">
         <div className="searchbar">
           <Icon icon={faSearch} className="muted" />
@@ -134,8 +134,8 @@ export default function SessionsPage() {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <button className="btn btn--secondary" type="submit">
-            Search
+          <button className="btn btn--secondary" type="submit" aria-label="Search">
+            <Icon icon={faSearch} /><span className="search-submit-label">Search</span>
           </button>
           <button
             className="filter-launcher"
@@ -182,6 +182,13 @@ export default function SessionsPage() {
 
       <Sheet className="filter-sheet" open={sheetOpen} onClose={() => setSheetOpen(false)} title="Filter sessions">
         <div className="fields">
+        <div className="journal-presets journal-presets--sheet" aria-label="Date presets">
+          {["This week", "Last week", "30 days"].map((label) => {
+            const range = sessionRange(label);
+            return <button key={label} type="button" className="btn btn--quiet" aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
+          })}
+        </div>
+
           <div className="two-up">
             <div className="field">
               <label htmlFor="start_date">Start date</label>

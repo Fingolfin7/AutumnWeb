@@ -302,6 +302,12 @@ function ProfileEditor({
   return (
     <>
       <form className="fields profile-page" onSubmit={onSubmit} noValidate>
+        {section === "account" || prefs.ai_features_enabled ? <div className="form-actions phone-savebar profile-submit-row">
+          <span className="settings-save-status" role="status">{saving ? "Saving your changes…" : hasChanges ? "Unsaved changes" : "All changes saved"}</span>
+          <button type="submit" className="btn btn--primary btn--lg" disabled={saving || !hasChanges}>
+            <Icon icon={faCheckCircle} /> {saving ? "Saving..." : "Save changes"}
+          </button>
+        </div> : null}
         {section === "account" ? <>
         <section className="slab slab-pad">
           <div className="profile-account-grid">
@@ -549,12 +555,7 @@ function ProfileEditor({
           />
         ) : null}
 
-        {section === "account" || prefs.ai_features_enabled ? <div className="form-actions profile-submit-row">
-          <span className="settings-save-status" role="status">{saving ? "Saving your changes…" : hasChanges ? "Unsaved changes" : "All changes saved"}</span>
-          <button type="submit" className="btn btn--primary btn--lg" disabled={saving || !hasChanges}>
-            <Icon icon={faCheckCircle} /> {saving ? "Saving..." : "Save changes"}
-          </button>
-        </div> : null}
+
       </form>
 
       {section === "ai" ? <section className="slab slab-pad">

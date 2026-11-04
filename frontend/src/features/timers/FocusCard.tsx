@@ -59,6 +59,16 @@ export function FocusCard({
       <h2 className="focus-project">
         <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
       </h2>
+      <p className="focus-time" aria-live="off">
+        <span className="focus-time-compact">{formatClock(elapsed)}</span>
+        {heroParts(elapsed).map((part) => (
+          <span className="focus-time-part" key={part.unit}>
+            <span className="num">{part.value}</span>
+            <span className="unit">{part.unit}</span>
+          </span>
+        ))}
+      </p>
+      <div className="focus-details">
       {timer.subproject_allocations.length ? (
         <div className="focus-subs">
           {timer.subproject_allocations.map((sub) => (
@@ -70,14 +80,6 @@ export function FocusCard({
           ))}
         </div>
       ) : null}
-      <p className="focus-time" aria-live="off">
-        {heroParts(elapsed).map((part) => (
-          <span className="focus-time-part" key={part.unit}>
-            <span className="num">{part.value}</span>
-            <span className="unit">{part.unit}</span>
-          </span>
-        ))}
-      </p>
       <div className="focus-autostop">
         <span>
           started <span className="mono">{formatTime(timer.start)}</span>
@@ -89,6 +91,7 @@ export function FocusCard({
         ) : (
           null
         )}
+      </div>
       </div>
       {stopAt ? (
         <div className="focus-autostop-bar">

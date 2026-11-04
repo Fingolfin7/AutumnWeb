@@ -60,8 +60,8 @@ function HomeContent({ data }: { data: Dashboard }) {
       </header>
       {running.length ? (
         <section className="ember-deck" aria-label="Running timers">
-          {running.map((timer) => (
-            <TimerCard key={timer.id} timer={timer} now={now} />
+          {running.map((timer, index) => (
+            <TimerCard key={timer.id} timer={timer} now={now} primary={index === 0} />
           ))}
         </section>
       ) : (
@@ -157,16 +157,12 @@ function HomeContent({ data }: { data: Dashboard }) {
   );
 }
 
-function TimerCard({ timer, now }: { timer: Timer; now: number }) {
+function TimerCard({ timer, now, primary }: { timer: Timer; now: number; primary: boolean }) {
   const stash = useRef<() => void>(() => undefined);
+  const editor = <TimerNoteEditor timer={timer} registerStash={(fn) => { stash.current = fn; }} />;
   return (
     <FocusCard timer={timer} now={now} beforeStop={() => stash.current()}>
-      <TimerNoteEditor
-        timer={timer}
-        registerStash={(fn) => {
-          stash.current = fn;
-        }}
-      />
+      {primary ? editor : <details className="timer-note-disclosure"><summary>Session note</summary>{editor}</details>}
       <TimerReminders timer={timer} />
     </FocusCard>
   );

@@ -269,8 +269,45 @@ export default function StartTimerPage() {
                   }}
                 />
               </div>
+            </section>
+
+            {past ? (
+              <section className="capture-past fields">
+                <div className="two-up">
+                  <div className="field">
+                    <label htmlFor="past-anchor">Time is the</label>
+                    <select id="past-anchor" value={pastAnchor} onChange={(e) => setPastAnchor(e.target.value)}>
+                      <option value="start">Start</option>
+                      <option value="end">End</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="past-duration">Duration (minutes)</label>
+                    <input
+                      id="past-duration"
+                      type="number"
+                      min="1"
+                      required
+                      value={pastDuration}
+                      onChange={(e) => setPastDuration(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="past-at">Date and time</label>
+                  <input
+                    id="past-at"
+                    type="datetime-local"
+                    value={pastAt}
+                    onChange={(e) => setPastAt(e.target.value)}
+                    required
+                  />
+                  <LocalTimeNotice field={pastTime} label="the session" />
+                </div>
+              </section>
+            ) : null}
               {project ? (
-                <section id="pick-subprojects" className="field">
+                <details id="pick-subprojects" className={`field capture-subprojects${past ? " is-past" : ""}`} open={!past}><summary>Subproject (optional)</summary>
                   <div className="field-head" id="select-all-block">
                     <span className="field-label">Subprojects</span>
                     {subs.length ? (
@@ -350,45 +387,8 @@ export default function StartTimerPage() {
                       Add
                     </button>
                   </div>
-                </section>
+                </details>
               ) : null}
-            </section>
-
-            {past ? (
-              <section className="capture-past fields">
-                <div className="two-up">
-                  <div className="field">
-                    <label htmlFor="past-anchor">Time is the</label>
-                    <select id="past-anchor" value={pastAnchor} onChange={(e) => setPastAnchor(e.target.value)}>
-                      <option value="start">Start</option>
-                      <option value="end">End</option>
-                    </select>
-                  </div>
-                  <div className="field">
-                    <label htmlFor="past-duration">Duration (minutes)</label>
-                    <input
-                      id="past-duration"
-                      type="number"
-                      min="1"
-                      required
-                      value={pastDuration}
-                      onChange={(e) => setPastDuration(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="field">
-                  <label htmlFor="past-at">Date and time</label>
-                  <input
-                    id="past-at"
-                    type="datetime-local"
-                    value={pastAt}
-                    onChange={(e) => setPastAt(e.target.value)}
-                    required
-                  />
-                  <LocalTimeNotice field={pastTime} label="the session" />
-                </div>
-              </section>
-            ) : null}
             <NoteEditor value={note} onChange={setNote} rows={3} placeholder="Optional notes to begin with..." />
             {!past ? (
               <details className="capture-options">

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Sheet } from "@/components/Sheet";
 import { useActiveContext } from "@/app/context";
@@ -8,7 +8,7 @@ import { accountSimilarity, sameCutoff, similarityScale } from "@/features/searc
 import { semanticSearchAvailable } from "@/features/charts/api";
 import type { ChartFilters } from "@/features/charts/filters";
 
-export function ReviewFilters({ open, onClose, draft, onChange, onClear }: { open: boolean; onClose: () => void; draft: ChartFilters; onChange: (next: ChartFilters) => void; onClear: () => void }) {
+export function ReviewFilters({ open, onClose, draft, onChange, onClear, controls }: { open: boolean; onClose: () => void; draft: ChartFilters; onChange: (next: ChartFilters) => void; onClear: () => void; controls?: ReactNode }) {
   const projects = useAllProjects();
   const contexts = useContexts();
   const tags = useTags();
@@ -28,6 +28,7 @@ export function ReviewFilters({ open, onClose, draft, onChange, onClear }: { ope
 
   return <Sheet className="filter-sheet" open={open} onClose={onClose} title="Filter review">
     <div className="fields">
+      <div className="review-filter-controls">{controls}</div>
       <p className="muted">Changes update your review immediately.</p>
           <div className="field">
             <label htmlFor="content-search">Search projects, subprojects, and session notes</label>

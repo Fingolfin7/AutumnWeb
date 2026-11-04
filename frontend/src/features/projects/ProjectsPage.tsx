@@ -91,8 +91,8 @@ export default function ProjectsPage() {
 
   return (
     <>
-      <div className="desk-head"><h1 className="page-title">Projects</h1><AppLink className="btn btn--primary" href={urls.createProject()}><Icon icon={faPlus} /> New project</AppLink></div>
-      <form className="fields" onSubmit={onSearch} role="search">
+      <div className="desk-head project-directory-title"><h1 className="page-title">Projects</h1><AppLink className="btn btn--primary" href={urls.createProject()}><Icon icon={faPlus} /> New project</AppLink></div>
+      <form className="fields project-directory-search" onSubmit={onSearch} role="search">
         <div className="searchbar">
           <Icon icon={faSearch} className="muted" />
           <label className="sr-only" htmlFor="content-search">
@@ -105,8 +105,8 @@ export default function ProjectsPage() {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <button className="btn btn--secondary" type="submit">
-            Search
+          <button className="btn btn--secondary" type="submit" aria-label="Search">
+            <Icon icon={faSearch} /><span className="search-submit-label">Search</span>
           </button>
           <button
             className="filter-launcher"
@@ -188,17 +188,6 @@ export default function ProjectsPage() {
               emptyText="No projects match that search."
             />
           ) : null}
-          <div className="sheet-foot">
-            <button className="btn btn--ghost" type="button" onClick={() => setDraft({ ...emptyFilters, search: applied.search })}>
-              Clear all
-            </button>
-            <button className="btn btn--primary" type="button" onClick={() => apply({ ...draft, search: applied.search })}>
-              Apply filters
-            </button>
-          </div>
-        </div>
-      </Sheet>
-
       <div className="action-row">
         <AppLink className="btn btn--ghost" href={urls.mergeProjects()}>
           <Icon icon={faCodeBranch} /> Merge
@@ -210,6 +199,18 @@ export default function ProjectsPage() {
           <Icon icon={faTags} /> Tags
         </AppLink>
       </div>
+          <div className="sheet-foot">
+            <button className="btn btn--ghost" type="button" onClick={() => setDraft({ ...emptyFilters, search: applied.search })}>
+              Clear all
+            </button>
+            <button className="btn btn--primary" type="button" onClick={() => apply({ ...draft, search: applied.search })}>
+              Apply filters
+            </button>
+          </div>
+        </div>
+      </Sheet>
+
+
 
       {lists.isPending ? (
         <section className="slab">
