@@ -1,3 +1,4 @@
+import { ColorPicker } from "./ColorPicker";
 import { useState, type FormEvent } from "react";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -71,6 +72,7 @@ export default function TagsPage() {
         <form className="fields" id="create-tag" onSubmit={submit} noValidate>
           <FormLevelErrors errors={errors.general} />
           <section className="slab slab-pad">
+            <h2 className="settings-form-title">New tag</h2>
             <div className="field">
               <label htmlFor="id_name">Name</label>
               <input
@@ -86,14 +88,7 @@ export default function TagsPage() {
             </div>
             <div className="field">
               <label htmlFor="id_color">Color</label>
-              <input
-                id="id_color"
-                type="text"
-                placeholder="Optional color (e.g. #ff0000 or label)"
-                maxLength={20}
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-              />
+              <ColorPicker value={color} onChange={setColor} />
               <FieldErrors errors={errors.fields.color} />
               {name.trim() ? (
                 <p className="u-mt-4">

@@ -1,3 +1,5 @@
+import { useAllProjects } from "@/api/meta";
+import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { useState } from "react";
 import { faArrowRight, faCalendarAlt, faHistory, faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -21,6 +23,7 @@ import { useDashboard, useRefreshOnRunningChange, useTimeline, type Dashboard, t
    the shared, polled timers query so they stay live. */
 export default function HomePage() {
   const dashboard = useDashboard();
+  const projects = useAllProjects();
   const timers = useTimers();
   useRefreshOnRunningChange(timers.data);
 
@@ -37,6 +40,7 @@ export default function HomePage() {
     );
   }
   if (dashboard.isError) return <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />;
+  if (projects.isSuccess && projects.data.length === 0 && !dashboard.data.recent_sessions.length && !dashboard.data.active_timers.length) return <EmptyWorkspace />;
   return <HomeContent data={dashboard.data} />;
 }
 

@@ -1,3 +1,4 @@
+import { ColorPicker } from "./ColorPicker";
 import { useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { faArrowLeft, faCheckCircle, faTrash } from "@fortawesome/free-solid-svg-icons";
@@ -116,14 +117,7 @@ onChange={(event) => setName(event.target.value)}
             </div>
             <div className="field">
               <label htmlFor="id_color">Color</label>
-              <input
-                id="id_color"
-                type="text"
-                placeholder="Optional color (e.g. #ff0000 or label)"
-                maxLength={20}
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-              />
+              <ColorPicker value={color} onChange={setColor} />
               <FieldErrors errors={errors.fields.color} />
               {name.trim() ? (
                 <p className="u-mt-4">

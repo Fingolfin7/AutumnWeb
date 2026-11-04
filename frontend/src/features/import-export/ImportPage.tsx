@@ -4,7 +4,8 @@ import { Icon } from "@/components/Icon";
 import { useToast } from "@/app/toasts";
 import { requestJson } from "@/api/client";
 import { errorMessage } from "@/api/errors";
-import { useContexts } from "@/api/meta";
+import { previewImport, type ImportPreview } from "./preview";
+import { useAllProjects, useContexts } from "@/api/meta";
 import { useInvalidate } from "@/api/sync";
 import { classifyMessage, isFinal, parseSseBuffer, projectProgress, succeeded, type LogKind } from "./importStream";
 import "./import.css";
@@ -21,6 +22,9 @@ export default function ImportPage() {
   const toast = useToast();
   const invalidate = useInvalidate();
   const contexts = useContexts();
+  const projects = useAllProjects();
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [previewError, setPreviewError] = useState("");
 
   const [file, setFile] = useState<File | null>(null);
   const [contextId, setContextId] = useState("");
@@ -39,6 +43,18 @@ export default function ImportPage() {
   const [percent, setPercent] = useState<number | null>(null);
   const [done, setDone] = useState(false);
 
+  useEffect(() => {
+    let current = true;
+    setPreview(null);
+    setPreviewError("");
+    if (file) void file.text().then((text) => {
+      const inventory = previewImport(JSON.parse(text));
+      if (current) setPreview(inventory);
+    }).catch((failure: unknown) => {
+      if (current) setPreviewError(failure instanceof SyntaxError ? "This file is not valid JSON." : errorMessage(failure));
+    });
+    return () => { current = false; };
+  }, [file]);
   const source = useRef<AbortController | null>(null);
   const logEnd = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
@@ -53,7 +69,6 @@ export default function ImportPage() {
     setLines((current) => [...current, { id: nextId.current++, text, kind: kind ?? classifyMessage(text) }]);
 
   const finish = (ok: boolean) => {
-    source.current?.abort();
     source.current = null;
     setBusy(false);
     setDone(true);
@@ -107,7 +122,7 @@ export default function ImportPage() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !preview) return;
     const found: Record<string, string[]> = {};
     if (!file) found.file = ["Choose a JSON file to import."];
     const tol = Number(tolerance);
@@ -182,7 +197,21 @@ export default function ImportPage() {
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
               {fieldErrors("file")}
+              <small className="muted">Choose an Autumn JSON export. Nothing changes until you import.</small>
+              {previewError ? <p className="io-field-error" role="alert">{previewError}</p> : null}
+              {file && !preview && !previewError ? <p role="status">Reading file...</p> : null}
             </div>
+            {preview ? <section className="import-preview" aria-label="Import preview">
+              <h2 className="settings-form-title">Ready to bring over</h2>
+              <p><strong>{preview.names.length} projects</strong> and <strong>{preview.sessions} sessions</strong> in this file</p>
+              <ul tabIndex={0} aria-label="Projects in the import file">{preview.names.map((name, index) => {
+                const exists = projects.data?.some((project) => project.name === name);
+                const action = !projects.isSuccess ? "Checking existing projects..." : !exists ? "Add project" : preview.portable ? (force ? "Merge: update conflicting sessions" : "Merge: check conflicts") : force ? "Replace existing project" : merge ? "Merge into existing project" : "Skip existing project";
+                return <li key={index}><span>{name}</span><small className={exists && force ? "text-red" : "muted"}>{action}</small></li>;
+              })}</ul>
+              <p className="muted">Autumn checks the full file when importing. Existing duplicate sessions are kept once.</p>
+            </section> : null}
+            <details className="import-advanced"><summary>Advanced options</summary><div className="fields">
 
             <div className="field">
               <label htmlFor="import-context">Import under context</label>
@@ -219,7 +248,7 @@ export default function ImportPage() {
                 checked={autumnImport}
                 onChange={(event) => setAutumnImport(event.target.checked)}
               />
-              <label htmlFor="import-autumn">Autumn import</label>
+              <label htmlFor="import-autumn">Import an Autumn CLI legacy file</label>
             </div>
             {fieldErrors("autumn_import")}
 
@@ -230,9 +259,10 @@ export default function ImportPage() {
                 checked={force}
                 onChange={(event) => setForce(event.target.checked)}
               />
-              <label htmlFor="import-force">Force</label>
+              <label htmlFor="import-force">{preview?.portable ? "Update conflicting sessions" : "Replace matching projects"}</label>
             </div>
             {fieldErrors("force")}
+            {force ? <p className="io-field-error">{preview?.portable ? "Conflicting sessions with the same ID will be updated from the file." : "Matching projects and their existing sessions will be deleted before importing."}</p> : null}
 
             <div className="check-row">
               <input
@@ -241,7 +271,7 @@ export default function ImportPage() {
                 checked={merge}
                 onChange={(event) => setMerge(event.target.checked)}
               />
-              <label htmlFor="import-merge">Merge</label>
+              <label htmlFor="import-merge">Merge matching projects</label>
             </div>
             {fieldErrors("merge")}
 
@@ -252,12 +282,12 @@ export default function ImportPage() {
                 checked={verbose}
                 onChange={(event) => setVerbose(event.target.checked)}
               />
-              <label htmlFor="import-verbose">Verbose</label>
+              <label htmlFor="import-verbose">Show detailed progress</label>
             </div>
             {fieldErrors("verbose")}
 
             <div className="field u-mt-4">
-              <label htmlFor="import-tolerance">Tolerance (minutes)</label>
+              <label htmlFor="import-tolerance">Duplicate time tolerance (minutes)</label>
               <input
                 id="import-tolerance"
                 type="number"
@@ -269,8 +299,9 @@ export default function ImportPage() {
               {fieldErrors("tolerance")}
             </div>
 
+            </div></details>
             <div className="form-actions">
-              <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
+              <button type="submit" className="btn btn--primary btn--lg" disabled={busy || !preview}>
                 <Icon icon={faFileImport} /> {busy ? "Importing..." : "Import"}
               </button>
             </div>
@@ -301,7 +332,7 @@ export default function ImportPage() {
                   {percent === null ? "" : `${percent.toFixed(2)}%`}
                 </div>
               </div>
-              <div id="output-text" className="stream-log">
+              <div id="output-text" className="stream-log" tabIndex={0} aria-label="Import progress details">
                 {lines.map((line) => (
                   <div key={line.id} className={`log-entry${line.kind === "info" ? "" : ` ${line.kind}`}`}>
                     {line.text}

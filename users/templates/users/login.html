@@ -4,15 +4,19 @@
 {% load socialaccount %}
 
 {% block content %}
+<section class="auth-login">
+<div class="auth-intro"><span class="ember-seal" aria-hidden="true"></span><p>A little time, well spent.</p></div>
 
 <div class="desk-head auth-card">
     <div>
-        <h1 class="page-title">Log in</h1>
+        <h1 class="page-title">Log in to Autumn</h1>
+        <p class="auth-welcome">Your time. Your projects. Your story.</p>
     </div>
 </div>
 
 <form method="post" class="fields slab slab-pad auth-card">
     {% csrf_token %}
+    {{ form.non_field_errors }}
 
     <div class="field">
         {{ form.username.errors }}
@@ -26,7 +30,7 @@
         {{ form.password }}
     </div>
 
-    <div class="form-actions">
+    <div class="form-actions auth-login-actions">
         {% if allow_registration %}
         <a class="btn btn--ghost" href="{% url 'register' %}">
             <i class="fa fa-user-plus" aria-hidden="true"></i> Register
@@ -36,6 +40,7 @@
             <i class="fa fa-check-circle" aria-hidden="true"></i> Log in
         </button>
     </div>
+    <a class="auth-reset" href="{% url 'password_reset' %}">Forgot your password?</a>
 </form>
 
 {% if social_auth_enabled %}
@@ -69,11 +74,12 @@
             First time here? Continuing with a provider creates your Autumn account.
             {% else %}
             Registration is closed on this Autumn instance, so a provider only logs you
-            in to an account that already exists — connect it from Profile first.
+            in to an account that already exists — connect it from Settings first.
             {% endif %}
         </p>
     </div>
 </section>
 {% endif %}
 
+</section>
 {% endblock %}

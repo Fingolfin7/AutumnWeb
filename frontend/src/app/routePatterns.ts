@@ -37,10 +37,10 @@ export const pages: PageEntry[] = [
 
   { path: "/charts/", title: "Charts", load: () => import("@/features/charts/ChartsPage") },
 
-  { path: "/contexts/", title: "Contexts", load: () => import("@/features/contexts-tags/ContextsPage") },
+  { path: "/contexts/", title: "Contexts", load: () => import("@/features/settings/SettingsPage").then((m) => ({ default: m.LegacySettingsPage })) },
   { path: "/update_context/:contextId/", title: "Context", load: () => import("@/features/contexts-tags/UpdateContextPage") },
   { path: "/delete_context/:contextId/", title: "Delete context", load: () => import("@/features/contexts-tags/DeleteContextPage") },
-  { path: "/tags/", title: "Tags", load: () => import("@/features/contexts-tags/TagsPage") },
+  { path: "/tags/", title: "Tags", load: () => import("@/features/settings/SettingsPage").then((m) => ({ default: m.LegacySettingsPage })) },
   { path: "/update_tag/:tagId/", title: "Tag", load: () => import("@/features/contexts-tags/UpdateTagPage") },
   { path: "/delete_tag/:tagId/", title: "Delete tag", load: () => import("@/features/contexts-tags/DeleteTagPage") },
 
@@ -49,11 +49,20 @@ export const pages: PageEntry[] = [
   { path: "/update_commitment/:commitmentId/", title: "Commitment", load: () => import("@/features/commitments/UpdateCommitmentPage") },
   { path: "/delete_commitment/:commitmentId/", title: "Delete commitment", load: () => import("@/features/commitments/DeleteCommitmentPage") },
 
-  { path: "/notifications/", title: "Notifications", load: () => import("@/features/notifications/NotificationsPage") },
+  { path: "/notifications/", title: "Notifications", load: () => import("@/features/settings/SettingsPage").then((m) => ({ default: m.LegacySettingsPage })) },
   { path: "/review/weekly/", title: "Weekly review", load: () => import("@/features/review/WeeklyReviewPage") },
-  { path: "/import/", title: "Import", load: () => import("@/features/import-export/ImportPage") },
-  { path: "/export/", title: "Export", load: () => import("@/features/import-export/ExportPage") },
-  { path: "/profile/", title: "Profile", load: () => import("@/features/profile/ProfilePage") },
+  { path: "/import/", title: "Import", load: () => import("@/features/settings/SettingsPage").then((m) => ({ default: m.LegacySettingsPage })) },
+  { path: "/export/", title: "Export", load: () => import("@/features/settings/SettingsPage").then((m) => ({ default: m.LegacySettingsPage })) },
+  { path: "/welcome/", title: "Welcome to Autumn", load: () => import("@/features/settings/FirstRunPage") },
+  { path: "/settings/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/account/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/contexts/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/tags/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/notifications/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/ai/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/import/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/export/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/profile/", title: "Profile", load: () => import("@/features/settings/SettingsPage").then((m) => ({ default: m.LegacySettingsPage })) },
   { path: "/insights/", title: "Insights", load: () => import("@/features/insights/InsightsPage") },
   { path: "/insights/:chatId/", title: "Insights", load: () => import("@/features/insights/InsightsPage") },
 ];

@@ -61,6 +61,15 @@ class SpaViewTests(TestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get("/no/such/page/").status_code, 404)
 
+    def test_settings_bookmarks_keep_queries_and_deep_edit_pages(self, _manifest):
+        self.client.force_login(self.user)
+        for old, section in (("profile", "account"), ("contexts", "contexts"), ("tags", "tags"), ("notifications", "notifications"), ("import", "import"), ("export", "export")):
+            with self.subTest(old=old):
+                self.assertRedirects(self.client.get(f"/{old}/?edit=7&context=2"), f"/settings/{section}/?edit=7&context=2")
+        for url in ("/settings/", "/settings/ai/", "/welcome/", "/update_context/7/", "/update_tag/7/", "/delete_context/7/", "/delete_tag/7/"):
+            self.assertContains(self.client.get(url), 'id="autumn-bootstrap"')
+        self.assertEqual(self.client.get("/settings/unknown/").status_code, 404)
+
     def test_api_and_static_paths_are_not_swallowed(self, _manifest):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get("/api/v2/definitely-missing/").status_code, 404)

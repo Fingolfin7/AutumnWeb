@@ -127,6 +127,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <Sheet open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Settings">
         <div className="sheet-list">
+          <SheetLink href="/settings/" icon={faUserCircle} label="All settings" />
           <SheetLink href={urls.profile()} icon={faUserCircle} label="Account & appearance" />
           <DimControl initial={boot.profile.background_dimming} />
           <SheetLink href={urls.notifications()} icon={faBell} label="Notifications" />
@@ -134,7 +135,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <SheetLink href={urls.tags()} icon={faTags} label="Tags" />
           <SheetLink href={urls.import()} icon={faFileImport} label="Import" />
           <SheetLink href={urls.export()} icon={faFileExport} label="Export" />
-          <SheetLink href={urls.mcpConnections()} icon={faPlug} label="AI connections" />
+          <SheetLink href="/settings/ai/" icon={faPlug} label="AI connections" />
           <form method="POST" action={urls.logout()} onSubmit={clearPersistedQueries}>
             <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} />
             <button className="sheet-item" type="submit">
