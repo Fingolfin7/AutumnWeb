@@ -37,6 +37,8 @@ test("the shell keeps navigation, scroll and palette usable on both sizes", asyn
   await expect(nav.getByRole("link", { name: "Review", exact: true })).toHaveAttribute("aria-current", "page");
   await page.goto("/insights/");
   await expect(nav.getByRole("link", { name: "Review", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+  await expect(nav.getByRole("link", { name: "Sessions", exact: true })).not.toHaveClass(/is-active/);
 });
 
 test("Settings keeps bookmarks, swatches and import streaming usable", async ({ page }) => {

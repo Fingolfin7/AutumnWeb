@@ -63,5 +63,18 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
 
   await page.reload();
   await expect(page.getByRole("region", { name: "Sessions" }).getByText(note)).toBeVisible();
+  const id = (await first.getAttribute("id"))!.replace("session-", "");
+  const original = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
+  // An edit must prefill from the session even when its lookup cache is stale.
+  await page.route("**/api/v2/projects/?*", (route) => route.fulfill({ json: { projects: [], total: 0, count: 0 } }));
+  await page.goto(`/update_session/${id}/`);
+  await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveValue(original.project.name);
+  await page.getByRole("textbox", { name: "Note", exact: true }).fill(`${note} (metadata unavailable)`);
+  const patched = page.waitForRequest((request) => request.url().endsWith(`/api/v2/sessions/${id}`) && request.method() === "PATCH");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  expect((await patched).postDataJSON()).not.toHaveProperty("project_id");
+  await expect(toasts(page).getByText("Updated session", { exact: true })).toBeVisible();
+  const saved = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
+  expect(saved.project.id).toBe(original.project.id);
   expect(problems()).toEqual([]);
 });

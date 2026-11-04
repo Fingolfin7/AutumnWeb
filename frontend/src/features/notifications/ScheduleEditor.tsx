@@ -146,7 +146,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
             <div className="field">
               <label htmlFor="id_project">Project</label>
               <select id="id_project" value={form.project} aria-invalid={!!fieldError("project")} onChange={(event) => pickProject(event.target.value)}>
-                <option value="">---------</option>
+                <option value="">Choose a project</option>
                 {projectOptions.map((project) => (
                   <option key={project.id} value={project.id}>
                     {project.name}
@@ -160,7 +160,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
             <div className="field">
               <label htmlFor="id_context">Context</label>
               <select id="id_context" value={form.context} aria-invalid={!!fieldError("context")} onChange={(event) => set("context", event.target.value)}>
-                <option value="">---------</option>
+                <option value="">Choose a context</option>
                 {(contexts.data ?? []).map((context) => (
                   <option key={context.id} value={context.id}>
                     {context.name}
@@ -174,7 +174,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
             <div className="field">
               <label htmlFor="id_tag">Tag</label>
               <select id="id_tag" value={form.tag} aria-invalid={!!fieldError("tag")} onChange={(event) => set("tag", event.target.value)}>
-                <option value="">---------</option>
+                <option value="">Choose a tag</option>
                 {(tags.data ?? []).map((tag) => (
                   <option key={tag.id} value={tag.id}>
                     {tag.name}

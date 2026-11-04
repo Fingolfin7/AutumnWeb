@@ -3190,7 +3190,7 @@ img.brand-mark {
 }
 .similarity-readout b { color: var(--brand); font-weight: 600; }
 
-.similarity-slider { position: relative; height: 24px; }
+.similarity-slider { position: relative; height: 44px; }
 /* Where a value sits: the thumb's centre travels inside half a thumb of each end. */
 .similarity-slider::before,
 .similarity-slider::after,
@@ -3229,7 +3229,7 @@ img.brand-mark {
 .similarity-range::-moz-range-track { height: 100%; background: transparent; border: 0; }
 .similarity-range::-webkit-slider-thumb {
   -webkit-appearance: none; appearance: none;
-  width: var(--thumb); height: var(--thumb); margin-top: 3px; border: 0; border-radius: 50%;
+  width: var(--thumb); height: var(--thumb); margin-top: calc((44px - var(--thumb)) / 2); border: 0; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, var(--brand-hover), var(--brand) 55%, var(--brand-deep));
   box-shadow: 0 0 0 3px var(--slab-solid), 0 2px 8px rgba(0, 0, 0, .5);
   transition: transform .12s ease;
@@ -3240,11 +3240,11 @@ img.brand-mark {
   box-shadow: 0 0 0 3px var(--slab-solid), 0 2px 8px rgba(0, 0, 0, .5);
 }
 .similarity-range:active::-webkit-slider-thumb { transform: scale(1.12); }
-.similarity-range:focus { outline: 0; }
+.similarity-range:focus, .similarity .similarity-range:focus-visible { outline: 0; box-shadow: none; }
 .similarity-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--slab-solid), var(--focus-ring); }
 .similarity-range:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px var(--slab-solid), var(--focus-ring); }
 
-.similarity-labels { position: relative; height: 1.1rem; }
+.similarity-labels { position: relative; height: 44px; }
 .similarity-labels button {
   position: absolute; top: 0; transform: translateX(-50%);
   left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--at) / 100);
@@ -3555,7 +3555,6 @@ img.brand-mark {
 /* Stream A: status and quick-start labels stay clear of the timer dock. */
 .today-quick-pick .today-quick-verb { flex: 0 0 auto; white-space: nowrap; }
 @media (max-width: 999px) {
-  body:has(.timer-dock:not(.timer-dock--card-visible)) .offline-banner { bottom: calc(var(--tabbar-h) + 72px + env(safe-area-inset-bottom, 0px)); background: var(--surface-2); }
 }
 /* ========================================================================
    Stream C — Projects and Sessions / the journal ledger
@@ -3749,7 +3748,7 @@ img.brand-mark {
 .insights-context-bar > div { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: var(--s3); }
 .insights-context-bar > div > strong { font: 600 var(--fs-lg)/1.3 var(--font-display); }
 .insights-context-bar > div > span { font-size: var(--fs-xs); }
-.insights-context-bar + .chat-layout { --chat-h: max(28rem, calc(100dvh - 13rem - var(--feedback-height, 0px))); }
+.insights-context-bar + .chat-layout { --chat-h: max(28rem, calc(100dvh - 13rem - var(--feedback-height, 0px) - var(--offline-height, 0px))); }
 .filter-sheet .composer-toolbar { flex-direction: column; align-items: stretch; padding-bottom: var(--s4); border-bottom: 1px solid var(--hairline); }
 .filter-sheet .composer-field { display: grid; gap: var(--s2); }
 .filter-sheet .composer-field select { width: 100%; max-width: 100%; }
@@ -4052,7 +4051,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .journal-presets--sheet { display: flex; }
   .journal-search .filter-summary { margin: 0; min-height: 28px; }
   .journal-filter-total { flex-basis: auto; margin: 0 0 0 auto; font-size: var(--fs-lg); }
+  .screen.screen-pad:has(.review-desk) { padding-top: var(--s4); }
   .review-desk { gap: var(--s3); }
+  .review-desk .review-section-heading { padding-block: var(--s3); }
   .review-heading { align-items: center; }
   .review-heading p, .review-heading-actions > a, .review-main-controls { display: none; }
   .review-heading-actions { flex-direction: row; align-items: center; }
@@ -4064,7 +4065,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .review-total-row > .btn { font-size: var(--fs-xs); margin: 0; }
   .review-comparison { font-size: var(--fs-xs); }
   .review-question { margin: 0; }
-  .phone-savebar { order: -1; position: sticky; top: calc(var(--header-h) + var(--feedback-height, 0px)); z-index: 20; background: var(--surface-0); border-block: 1px solid var(--hairline-2); padding: var(--s2) 0; margin: 0 0 var(--s3); gap: var(--s2); }
+  .phone-savebar { order: -1; position: sticky; top: calc(var(--header-h) + var(--feedback-height, 0px) + var(--offline-height, 0px)); z-index: 20; background: var(--surface-0); border-block: 1px solid var(--hairline-2); padding: var(--s2) 0; margin: 0 0 var(--s3); gap: var(--s2); }
   .phone-savebar .btn { min-height: 44px; font-size: var(--fs-sm); padding-inline: var(--s3); }
   .phone-savebar .settings-save-status { font-size: var(--fs-xs); }
   .profile-page input, .completing-form input, .completing-form select { scroll-margin-top: calc(var(--header-h) + 110px); }
@@ -4092,4 +4093,15 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .review-comparison { grid-column: 1 / -1; grid-row: 2; margin: 0; line-height: 1.5; }
   .review-total-row > .btn { display: none; }
   .review-daily-breakdown { padding-inline: var(--s4); }
+}
+
+/* Keep utility controls inside the phone search surface and out of the prose. */
+.review-card-actions { margin-top: var(--s5); }
+@media (max-width: 999px) {
+  .journal-search .searchbar, .project-directory-search .searchbar { padding: var(--s1); border-radius: var(--r-md); }
+  .project-directory-title { justify-content: space-between; gap: var(--s4); }
+  body:has(.timer-note-editor textarea:focus, .note-editor-shell textarea:focus) .timer-dock { display: none; }
+}
+@media (hover: none) {
+  .nav-link:hover:not([aria-current="page"]) { background: transparent; color: var(--muted); }
 }

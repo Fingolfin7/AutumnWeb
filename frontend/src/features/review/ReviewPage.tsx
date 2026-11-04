@@ -77,9 +77,9 @@ export default function ReviewPage() {
   const setPeriod = (next: Period) => {
     const value = new URLSearchParams(params);
     value.set("start_date", next.start); value.set("end_date", next.end); value.delete("view");
-    setParams(value); setCustomOpen(false);
+    setParams(value); setCustomOpen(false); setFilterOpen(false);
   };
-  const setView = (next: string) => { const value = new URLSearchParams(params); value.set("view", next); setParams(value); };
+  const setView = (next: string) => { const value = new URLSearchParams(params); value.set("view", next); setParams(value); setFilterOpen(false); };
   const selectedPreset = PRESETS.find((preset) => { const value = presetPeriod(preset.value, today); return preset.value !== "custom" && value.start === period.start && value.end === period.end; })?.value ?? "custom";
   const rangeLabel = `${formatDate(period.start)} – ${formatDate(period.end, true)}`;
   const scope = query.context === "all" ? "All contexts" : contexts.data?.find((item) => String(item.id) === query.context)?.name ?? "Active context";
@@ -104,7 +104,7 @@ export default function ReviewPage() {
   const clearFilters = () => { const value = new URLSearchParams(); value.set("start_date", period.start); value.set("end_date", period.end); if (view === "year") value.set("view", "year"); setParams(value, { replace: true }); };
   const chartLabel = CHART_GROUPS.flatMap((group) => group.kinds).find((item) => item.value === kind)?.label ?? "Bar";
 
-  const toolbar = <div className="review-toolbar"><div className="review-view-switch" role="group" aria-label="Review view"><button type="button" aria-pressed={view === "period"} onClick={() => setView("period")}>Period</button><button type="button" aria-pressed={view === "year"} onClick={() => setView("year")}>Year of embers</button></div>{view === "period" ? <div className="review-presets" role="group" aria-label="Review period">{PRESETS.map((preset) => <button type="button" key={preset.value} aria-pressed={selectedPreset === preset.value} onClick={() => preset.value === "custom" ? setCustomOpen(true) : setPeriod(presetPeriod(preset.value, today))}>{preset.label}</button>)}</div> : null}</div>;
+  const toolbar = <div className="review-toolbar"><div className="review-view-switch" role="group" aria-label="Review view"><button type="button" aria-pressed={view === "period"} onClick={() => setView("period")}>Period</button><button type="button" aria-pressed={view === "year"} onClick={() => setView("year")}>Year of embers</button></div>{view === "period" ? <div className="review-presets" role="group" aria-label="Review period">{PRESETS.map((preset) => <button type="button" key={preset.value} aria-pressed={selectedPreset === preset.value} onClick={() => preset.value === "custom" ? (setFilterOpen(false), setCustomOpen(true)) : setPeriod(presetPeriod(preset.value, today))}>{preset.label}</button>)}</div> : null}</div>;
 
   if (projects.data?.length === 0) return <div className="review-desk">
     <h1 className="page-title">Review</h1>

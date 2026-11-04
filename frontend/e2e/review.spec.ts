@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { trackErrors } from "./helpers";
 
-test("Review preserves old links, applies filters immediately and offers every chart", async ({ page }) => {
+test("Review preserves old links, applies filters immediately and offers every chart", async ({ page }, testInfo) => {
   const problems = trackErrors(page);
   await page.goto("/charts/?chart_type=heatmap&start_date=2026-01-01&end_date=2026-12-31");
   await expect(page).toHaveURL(/\/review\/\?chart_type=heatmap/);
@@ -18,16 +18,20 @@ test("Review preserves old links, applies filters immediately and offers every c
   await expect(chooser.locator(".review-chart-choice")).toHaveCount(15);
   await chooser.getByRole("button", { name: /Ranked project bars/ }).click();
   await expect(page.locator(".review-project-row").first()).toBeVisible();
+  if (testInfo.project.name === "phone") await page.getByRole("button", { name: /^Filters/ }).click();
   await page.getByRole("button", { name: "Custom", exact: true }).click();
   await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
   await page.getByLabel("End date", { exact: true }).fill("2026-12-31");
   await page.getByRole("button", { name: "Done", exact: true }).click();
   const ask = page.getByRole("link", { name: "Ask about this" });
   if (await ask.isVisible()) await expect(ask).toHaveAttribute("href", /start_date=2026-01-01.*end_date=2026-12-31/);
+  if (testInfo.project.name === "phone") await page.getByRole("button", { name: /^Filters/ }).click();
   await page.getByRole("button", { name: "Year of embers", exact: true }).click();
   await expect(page.locator(".ember-month")).toHaveCount(12);
   await page.locator(".ember-month").first().click();
+  if (testInfo.project.name === "phone") await page.getByRole("button", { name: /^Filters/ }).click();
   await expect(page.getByRole("button", { name: "Period", exact: true })).toHaveAttribute("aria-pressed", "true");
+  if (testInfo.project.name === "phone") await page.getByRole("button", { name: "Done", exact: true }).click();
   await page.goto("/review/weekly/?week=2026-10-05");
   await expect(page).toHaveURL(/\/review\/\?start_date=2026-10-05&end_date=2026-10-11/);
   expect(problems()).toEqual([]);

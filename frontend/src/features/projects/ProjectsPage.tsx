@@ -101,7 +101,7 @@ export default function ProjectsPage() {
           <input
             id="content-search"
             type="search"
-            placeholder="Names, descriptions, or notes"
+            placeholder="Search projects"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />

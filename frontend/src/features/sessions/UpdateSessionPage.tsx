@@ -399,7 +399,8 @@ function ProjectField({
   errors?: string[];
 }) {
   const [focused, setFocused] = useState(false);
-  const selected = projects.find((p) => p.id === selectedId) ?? null;
+  // The session is authoritative even while lookup data is loading or stale.
+  const selected = projects.find((p) => p.id === selectedId) ?? (selectedId !== null ? { id: selectedId, name: text } : null);
   const unmatched = !focused && text.trim() !== "" && selectedId === null && !loading;
   return (
     <div className="field" onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>

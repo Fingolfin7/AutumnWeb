@@ -171,20 +171,21 @@
 .palette-hint { margin-left: auto; font-size: .85em; color: var(--muted); }
 .palette-group { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: .6rem .7rem .2rem; }
 
+.app:has(.offline-banner) { --offline-height: 40px; }
 .offline-banner {
-  position: fixed;
-  z-index: 85;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.5rem);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: .4rem .8rem;
-  border-radius: 999px;
-  background: var(--raised-2, #22262a);
-  border: 1px solid var(--hairline, #2a2e33);
-  color: var(--muted);
-  font-size: .85rem;
+  position: sticky;
+  top: calc(var(--header-h) + var(--feedback-height, 0px));
+  z-index: 43;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--hairline-2);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
 }
-@media (min-width: 1000px) { .offline-banner { bottom: 1rem; } }
 
 /* Which occurrence of a repeated wall time (components/LocalTimeNotice). */
 .local-time-notice { display: grid; gap: var(--s2); margin-top: var(--s2); }

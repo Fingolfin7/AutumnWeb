@@ -27,6 +27,7 @@ import { requestJson } from "@/api/client";
 import { AppLink, urls } from "./links";
 import { useActiveContext } from "./context";
 import { ToastOutlet } from "./toasts";
+import { OfflineSync } from "./OfflineSync";
 import { clearPersistedQueries } from "./persist";
 import { fetchPreferences } from "@/features/profile/api";
 import { TimerDock } from "@/features/timers/TimerDock";
@@ -119,6 +120,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
       <ToastOutlet />
+      <OfflineSync />
       <main id="main-content" className="screen screen-pad">
         {children}
       </main>

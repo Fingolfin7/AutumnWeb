@@ -130,7 +130,7 @@ export default function SessionsPage() {
           <input
             id="content-search"
             type="search"
-            placeholder="Projects, subprojects, or notes"
+            placeholder="Search sessions"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />

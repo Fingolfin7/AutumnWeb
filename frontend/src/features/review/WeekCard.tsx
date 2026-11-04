@@ -44,7 +44,7 @@ export function WeekCard({ open, onClose, period, minutes, rows }: { open: boole
       <label className="check-row"><input type="checkbox" checked={showTotal} onChange={(event) => setShowTotal(event.target.checked)} /> Total time</label>
       <label className="check-row"><input type="checkbox" checked={showProjects} onChange={(event) => setShowProjects(event.target.checked)} /> Project names and time</label>
       <div className="review-card-preview"><span>Autumn</span><h3>{range}</h3>{showTotal ? <strong>{formatDuration(minutes)}</strong> : null}{showProjects ? rows.map((row) => <p key={row.name}><span>{row.name}</span> <b>{formatDuration(row.total_time)}</b></p>) : null}</div>
-      <button className="btn btn--primary" type="button" onClick={() => void save()}>Save image</button>
+      <div className="review-card-actions"><button className="btn btn--primary" type="button" onClick={() => void save()}>Save image</button></div>
     </div>
   </Sheet>;
 }
