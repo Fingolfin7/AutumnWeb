@@ -40,8 +40,21 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await page.goto("/sessions/?search=Piano");
   const first = page.getByRole("region", { name: "Sessions" }).getByRole("listitem").first();
   await expect(first).toContainText("Piano Practice");
-  await first.hover(); // desktop reveals the row actions on hover
-  await first.getByRole("link", { name: "Edit session" }).click();
+  if (testInfo.project.name === "phone") {
+    const heading = first.locator(".journal-heading");
+    await heading.scrollIntoViewIfNeeded();
+    const box = (await heading.boundingBox())!;
+    const touch = await page.context().newCDPSession(page);
+    const y = box.y + 22;
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x + box.width - 30, y }] });
+    for (let i = 1; i <= 8; i++) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: box.x + box.width - 30 - i * 20, y }] });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await touch.detach();
+    await page.getByRole("dialog", { name: "Session actions" }).getByRole("link", { name: "Edit session" }).tap();
+  } else {
+    await first.getByRole("button", { name: "Session actions" }).click();
+    await page.getByRole("dialog", { name: "Session actions" }).getByRole("link", { name: "Edit session" }).click();
+  }
 
   await expect(page).toHaveURL(/\/update_session\/\d+\/$/);
   const field = page.getByRole("textbox", { name: "Note", exact: true });

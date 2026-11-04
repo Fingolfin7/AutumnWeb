@@ -188,4 +188,11 @@ export function useUpdateSession() {
     },
   });
 }
-
+/** Exact filtered total, independent of list pagination. */
+export function useSessionTotals(filters: SessionFilters) {
+  const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as SessionFilters;
+  return useQuery({
+    queryKey: keys.reports("totals", { ...query, active: "false", related: !!query.search }),
+    queryFn: () => unwrap(api.GET("/api/v2/reports/totals/", { params: { query: { ...query, active: "false", related: !!query.search } } })),
+  });
+}

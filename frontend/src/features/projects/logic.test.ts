@@ -65,7 +65,9 @@ describe("filters <-> URL", () => {
     expect(readFilters(params)).toEqual(state);
   });
 
-  it("reads repeated and comma-separated ids and falls back to exclude mode", () => {
+  it("defaults to including projects and preserves explicit exclusions", () => {
+    expect(readFilters(new URLSearchParams()).projectMode).toBe("include");
+    expect(readFilters(new URLSearchParams("include_projects=2&exclude_projects=4")).projectMode).toBe("include");
     const state = readFilters(new URLSearchParams("tags=1&tags=2,3&exclude_projects=4&tags=x"));
     expect(state.tags).toEqual([1, 2, 3]);
     expect(state.projects).toEqual([4]);
@@ -101,7 +103,7 @@ describe("filters <-> URL", () => {
       { label: "Search", value: "x" },
       { label: "Context", value: "All" },
       { label: "Tags", value: "fitness" },
-      { label: "Excluding", value: "Gym" },
+      { label: "Only", value: "Gym" },
     ]);
   });
 });

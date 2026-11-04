@@ -1,4 +1,4 @@
-import { formatDuration } from "@/lib/format";
+import { QuickTarget } from "@/features/commitments/QuickTarget";
 import { faBullseye, faPen, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Disclose } from "@/components/Disclose";
@@ -8,7 +8,6 @@ import type { Commitment } from "@/api/types";
 import { useSubprojectNames } from "./api";
 import {
   commitmentRuleLines,
-  formatNumber,
   formatSigned,
   unnamedSubprojectIds,
   type NameLookup,
@@ -52,6 +51,13 @@ export function CommitmentsPanel({
   };
   const tagColor = (id: number) => tags.data?.find((t) => t.id === id)?.color;
 
+  if (!commitments.length) return (
+    <div className="commitment-empty">
+      <AppLink className="btn btn--quiet" href={addUrl}><Icon icon={faPlus} /> Add commitment</AppLink>
+      <span className="muted">Set a rhythm for this {entityLabel}.</span>
+    </div>
+  );
+
   const target = (commitment: Commitment) => {
     const { kind, id, name } = commitment.target;
     switch (commitment.aggregation_type) {
@@ -92,11 +98,11 @@ export function CommitmentsPanel({
 
   return (
     <Disclose id="commitments" icon={faBullseye} iconClass="text-cyan" title="Commitments" summary={commitments.length} className="commitment-section">
-      {commitments.length ? (
-        <div className="band-list">
+      <div className="band-list">
           {commitments.map((commitment) => {
             const period = commitment.current_period;
             const timeBased = commitment.commitment_type === "time";
+
             const rules = commitmentRuleLines(commitment, names);
             const balance = commitment.balance;
             const surplus = commitment.current_surplus;
@@ -111,19 +117,11 @@ export function CommitmentsPanel({
 
                 {commitment.active ? (
                   <>
-                    <p className="commit-figures">
-                      <span className="commit-actual">{timeBased ? formatDuration(period.accrued) : Math.round(period.accrued)}</span>
-                      <span className="commit-goal">
-                        / {timeBased ? formatDuration(period.target) : `${formatNumber(period.target)} sessions`}
-                      </span>
-                      <span className="commit-pct">{Math.round(period.percentage ?? 0)}%</span>
-                    </p>
-                    <div className="meter">
-                      <div className={`meter-fill ${period.status ?? ""}`} style={{ width: `${Math.round(period.percentage ?? 0)}%` }} />
-                    </div>
+                    <QuickTarget key={commitment.version} commitment={commitment} />
+                    <progress className="subproject-progress commitment-progress" max={Math.max(period.target, period.accrued, 1)} value={period.accrued} aria-label="Commitment progress" />
 
                     {commitment.banking_enabled ? (
-                      <div className="bank-row">
+                      <details className="commitment-bank-detail"><summary>Banking details</summary><div className="bank-row">
                         <div className="bank-cell">
                           <span className="bank-label">Bank (reconciled)</span>
                           <span className={`bank-value ${balance >= 0 ? "text-green" : "text-red"}`}>{formatSigned(balance, timeBased)}</span>
@@ -132,7 +130,7 @@ export function CommitmentsPanel({
                           <span className="bank-label">This period (unbanked)</span>
                           <span className={`bank-value ${surplus >= 0 ? "text-green" : "text-red"}`}>{formatSigned(surplus, timeBased)}</span>
                         </div>
-                      </div>
+                      </div></details>
                     ) : null}
                   </>
                 ) : null}
@@ -155,10 +153,7 @@ export function CommitmentsPanel({
               </article>
             );
           })}
-        </div>
-      ) : (
-        <p className="empty">No commitments apply to this {entityLabel} yet.</p>
-      )}
+      </div>
 
       <div className="slab-foot">
         <AppLink className="btn btn--secondary" href={addUrl}>

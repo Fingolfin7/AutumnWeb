@@ -1,3 +1,4 @@
+import { hasPendingChange, liveDefinition } from "./QuickTarget";
 import { formatDuration } from "@/lib/format";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
@@ -266,7 +267,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
     <>
       <DeskHead title={commitment ? commitment.target.name : "New commitment"} />
 
-      <form className="fields" onSubmit={submit} noValidate>
+      <form className="fields commitment-editor" onSubmit={submit} noValidate>
         <div className="split">
           <div id="input-fields">
             {stale ? (
@@ -283,6 +284,62 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               </aside>
             ) : null}
 
+            <section className="slab slab-pad commitment-target-first">
+              <div className="two-up">
+                <div className="field">
+                  <label htmlFor="id_target">Target</label>
+                  <input
+                    id="id_target"
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    placeholder="Target amount"
+                    value={state.target}
+                    aria-invalid={!!shown.fields.target}
+                    onChange={(e) => setField({ target: e.target.value })}
+                  />
+                  <small className="help-text muted">
+                    {state.commitmentType === "time" ? "Minutes for time-based commitments" : "Count for session-based commitments"}
+                  </small>
+                  <FieldErrors errors={shown.fields.target} />
+                </div>
+                <div className="field">
+                  <label htmlFor="id_commitment_type">Measure</label>
+                  <select
+                    id="id_commitment_type"
+                    value={state.commitmentType}
+                    onChange={(e) => setField({ commitmentType: e.target.value as CommitmentType })}
+                  >
+                    {MEASURES.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldErrors errors={shown.fields.commitment_type} />
+                </div>
+                <div className="field">
+                  <label htmlFor="id_period">Period</label>
+                  <select id="id_period" value={state.period} onChange={(e) => setField({ period: e.target.value as Period })}>
+                    {PERIODS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldErrors errors={shown.fields.period} />
+                </div>
+                <div className="field">
+                  <label htmlFor="id_start_date">Start date</label>
+                  <input id="id_start_date" type="date" value={state.startDate} onChange={(e) => setField({ startDate: e.target.value })} />
+                  <FieldErrors errors={shown.fields.start_date} />
+                </div>
+
+              </div>
+            </section>
+
+            {commitment && hasPendingChange(commitment) ? <div className="slab slab-pad"><PendingNotice commitment={commitment} nameOf={nameOf} /><button className="btn btn--quiet" type="button" disabled={busy} onClick={() => update.mutate({ body: liveDefinition(commitment), version: commitment.version }, { onSuccess: (saved) => { toast.success("Pending changes cancelled."); navigate(redirectFor(saved)); }, onError: onFailure })}>Cancel pending change</button></div> : null}
             <section className="slab slab-pad">
               <div className="field">
                 <label htmlFor="id_aggregation_type">Applies to</label>
@@ -352,59 +409,6 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               <FieldErrors errors={shown.fields.rules} />
             </details>
 
-            <section className="slab slab-pad">
-              <div className="two-up">
-                <div className="field">
-                  <label htmlFor="id_commitment_type">Measure</label>
-                  <select
-                    id="id_commitment_type"
-                    value={state.commitmentType}
-                    onChange={(e) => setField({ commitmentType: e.target.value as CommitmentType })}
-                  >
-                    {MEASURES.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldErrors errors={shown.fields.commitment_type} />
-                </div>
-                <div className="field">
-                  <label htmlFor="id_period">Period</label>
-                  <select id="id_period" value={state.period} onChange={(e) => setField({ period: e.target.value as Period })}>
-                    {PERIODS.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldErrors errors={shown.fields.period} />
-                </div>
-                <div className="field">
-                  <label htmlFor="id_start_date">Start date</label>
-                  <input id="id_start_date" type="date" value={state.startDate} onChange={(e) => setField({ startDate: e.target.value })} />
-                  <FieldErrors errors={shown.fields.start_date} />
-                </div>
-                <div className="field">
-                  <label htmlFor="id_target">Target</label>
-                  <input
-                    id="id_target"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    step={1}
-                    placeholder="Target amount"
-                    value={state.target}
-                    aria-invalid={!!shown.fields.target}
-                    onChange={(e) => setField({ target: e.target.value })}
-                  />
-                  <small className="help-text muted">
-                    {state.commitmentType === "time" ? "Minutes for time-based commitments" : "Count for session-based commitments"}
-                  </small>
-                  <FieldErrors errors={shown.fields.target} />
-                </div>
-              </div>
-            </section>
 
             <section className="slab slab-pad">
               <div className="check-row">
@@ -457,7 +461,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                 </>
               ) : null}
 
-              {commitment?.pending_revision ? <PendingNotice commitment={commitment} nameOf={nameOf} /> : null}
+
 
               {changes && !showRestart ? <PolicyHints changes={changes} commitment={commitment!} /> : null}
 

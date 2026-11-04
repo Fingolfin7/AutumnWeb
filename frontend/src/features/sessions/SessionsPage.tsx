@@ -11,7 +11,7 @@ import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import { formatDayDate, formatDate, formatDuration } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "./SessionBand";
-import { useSessionList, type SessionFilters, type SessionRow } from "./api";
+import { useSessionList, useSessionTotals, type SessionFilters, type SessionRow } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { RelatedSlider } from "@/features/search/RelatedSlider";
 import { useRelatedSummary } from "@/features/search/api";
@@ -49,7 +49,7 @@ function readFilters(params: URLSearchParams): FilterState {
     note_snippet: params.get("note_snippet") ?? "",
     tags: ids("tags"),
     projects: include.length ? include : exclude,
-    projectMode: include.length ? "include" : "exclude",
+    projectMode: include.length || !exclude.length ? "include" : "exclude",
     similarity: parseSimilarity(params.get("similarity"), similarityScale()),
   };
 }
@@ -91,6 +91,7 @@ export default function SessionsPage() {
     ...(applied.search && applied.similarity !== null ? { similarity: applied.similarity } : {}),
   };
   const list = useSessionList(apiFilters);
+  const totals = useSessionTotals(apiFilters);
   const relatedQuery = Object.fromEntries(Object.entries(apiFilters).filter(([, value]) => value));
   const summary = useRelatedSummary("sessions", relatedQuery, !!applied.search && semanticSearchAvailable());
   const relatedSummary = summary.data?.available ? summary.data : null;
@@ -119,8 +120,8 @@ export default function SessionsPage() {
 
   return (
     <>
-      <h1 className="sr-only">Sessions</h1>
-      <form className="fields" onSubmit={onSearch} role="search">
+      <div className="desk-head journal-title"><h1 className="page-title">Sessions</h1><p className="muted">A record of time, in your own words.</p></div>
+      <form className="fields journal-search" onSubmit={onSearch} role="search">
         <div className="searchbar">
           <Icon icon={faSearch} className="muted" />
           <label className="sr-only" htmlFor="content-search">
@@ -133,7 +134,7 @@ export default function SessionsPage() {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <button className="btn btn--primary" type="submit">
+          <button className="btn btn--secondary" type="submit">
             Search
           </button>
           <button
@@ -150,8 +151,15 @@ export default function SessionsPage() {
           </button>
         </div>
 
+        <div className="journal-presets" aria-label="Date presets">
+          {["This week", "Last week", "30 days"].map((label) => {
+            const range = sessionRange(label);
+            return <button key={label} type="button" className="btn btn--quiet" aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
+          })}
+        </div>
         <p className="filter-summary">
           <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
+          {totals.data ? <strong className="journal-filter-total">{formatDuration(totals.data.total_minutes)}</strong> : null}
           {pills.map((pill) => (
             <span key={pill.label} className="filter-pill">
               {pill.label} <b>{pill.value}</b>
@@ -327,4 +335,19 @@ function describeFilters(
     pills.push({ label: state.projectMode === "include" ? "Only" : "Excluding", value: names(state.projects, lookup.projects) });
   }
   return pills;
+}
+
+function sessionRange(label: string) {
+  const end = new Date();
+  const start = new Date(end);
+  if (label === "30 days") start.setDate(start.getDate() - 29);
+  else {
+    start.setDate(start.getDate() - (start.getDay() + 6) % 7 - (label === "Last week" ? 7 : 0));
+    if (label === "Last week") {
+      end.setTime(start.getTime());
+      end.setDate(start.getDate() + 6);
+    }
+  }
+  const iso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return { start_date: iso(start), end_date: iso(end) };
 }
