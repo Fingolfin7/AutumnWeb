@@ -107,7 +107,7 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
         </div>
       </div>
       <div className="form-actions">
-        <button className="btn btn--primary" type="submit" disabled={save.isPending}>
+        <button className="btn btn--secondary" type="submit" disabled={save.isPending}>
           Save settings
         </button>
       </div>

@@ -5,7 +5,7 @@ import { Icon } from "@/components/Icon";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { ApiError } from "@/api/errors";
-import { formatDuration, formatTime } from "@/lib/format";
+import { formatDuration, formatTimeRange } from "@/lib/format";
 import { parseSessionParam, useDeleteSession, useSession, type SessionRow } from "./api";
 
 /* /delete_session/<id>/ (delete_session.html): a confirm page showing the
@@ -60,7 +60,7 @@ export default function DeleteSessionPage() {
           <AppLink className="btn btn--ghost" href={urls.sessions()}>
             <Icon icon={faArrowLeft} /> Back
           </AppLink>
-          <button className="btn btn--stop btn--spacer" type="submit" disabled={remove.isPending}>
+          <button className="btn btn--danger btn--spacer" type="submit" disabled={remove.isPending}>
             <Icon icon={faTrash} /> {remove.isPending ? "Deleting..." : "Delete session"}
           </button>
         </div>
@@ -91,9 +91,7 @@ function SessionSummary({ session, html }: { session: SessionRow; html?: string 
     <li className="band">
       <div className="session">
         <div className="session-mid">
-          <span className="session-time">{formatTime(session.start)}</span>
-          <span className="session-arrow">&rarr;</span>
-          <span className="session-time">{formatTime(session.end)}</span>
+          <span className="session-time">{formatTimeRange(session.start, session.end)}</span>
           {crossesDst ? (
             <span className="badge-dst" title="Session crosses a daylight savings transition">
               DST

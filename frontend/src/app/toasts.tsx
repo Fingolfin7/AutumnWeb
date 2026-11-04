@@ -61,7 +61,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback((input: ToastInput) => {
     const id = nextId.current++;
-    setToasts((current) => [...current.slice(-3), { ...input, id }]);
+    setToasts((current) => [...current, { ...input, id }]);
     return id;
   }, []);
 
@@ -80,7 +80,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={api}>
       {children}
       <section className="toast-region" aria-live="polite" aria-label="Notifications">
-        {toasts.map((toast) => (
+        {toasts.slice(0, 1).map((toast) => (
           <ToastView key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
         ))}
       </section>

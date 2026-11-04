@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { useMemo } from "react";
 import { faBullseye, faPen, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -9,7 +10,7 @@ import type { Commitment } from "@/api/types";
 import { tagStyle } from "@/features/contexts-tags/ui";
 import { useAllSubprojects, useCommitmentsAppliedTo } from "./api";
 import { needsSubprojects, ruleLines, type EntityKind } from "./applies";
-import { floatText, progressOf, signed, unitSuffix } from "./display";
+import { progressOf } from "./display";
 import { aggregationLabel } from "./scope";
 import { periodLabel } from "./formModel";
 
@@ -57,7 +58,7 @@ export function RelatedCommitments({ kind, id }: { kind: EntityKind; id: number 
         <Empty>No commitments apply to this {kind} yet.</Empty>
       )}
       <div className="slab-foot">
-        <AppLink className="btn btn--primary" href={addHref}>
+        <AppLink className="btn btn--secondary" href={addHref}>
           <Icon icon={faPlus} /> Add commitment
         </AppLink>
       </div>
@@ -96,7 +97,9 @@ function CommitmentTarget({ c, tagColor }: { c: Commitment; tagColor?: string | 
 
 function CommitmentCard({ commitment: c, lines, tagColor }: { commitment: Commitment; lines: string[]; tagColor?: string | null }) {
   const progress = progressOf(c);
-  const unit = unitSuffix(c.commitment_type);
+  const time = c.commitment_type === "time";
+  const num = (v: number) => time ? formatDuration(Math.abs(v)) : String(Math.abs(v));
+  const signedValue = (v: number) => `${v >= 0 ? "+" : "-"}${num(v)}`;
   const pct = Math.round(progress.percentage);
   const balance = c.balance;
   return (
@@ -111,10 +114,9 @@ function CommitmentCard({ commitment: c, lines, tagColor }: { commitment: Commit
       {c.active ? (
         <>
           <p className="commit-figures">
-            <span className="commit-actual">{Math.round(progress.actual)}</span>
+            <span className="commit-actual">{num(progress.actual)}</span>
             <span className="commit-goal">
-              / {progress.target}
-              {c.commitment_type === "time" ? "m" : " sessions"}
+              / {num(progress.target)}{time ? "" : " sessions"}
             </span>
             <span className="commit-pct">{pct}%</span>
           </p>
@@ -126,15 +128,13 @@ function CommitmentCard({ commitment: c, lines, tagColor }: { commitment: Commit
               <div className="bank-cell">
                 <span className="bank-label">Bank (reconciled)</span>
                 <span className={`bank-value ${balance >= 0 ? "text-green" : "text-red"}`}>
-                  {signed(balance)}
-                  {unit}
+                  {signedValue(balance)}
                 </span>
               </div>
               <div className="bank-cell">
                 <span className="bank-label">This period (unbanked)</span>
                 <span className={`bank-value ${progress.surplus >= 0 ? "text-green" : "text-red"}`}>
-                  {signed(progress.surplus, c.commitment_type === "time" ? floatText(progress.surplus) : String(progress.surplus))}
-                  {unit}
+                  {signedValue(progress.surplus)}
                 </span>
               </div>
             </div>

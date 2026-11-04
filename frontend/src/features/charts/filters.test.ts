@@ -93,7 +93,7 @@ describe("summary pills", () => {
       lookup,
       { available: false, state: null },
     );
-    expect(pills.map((p) => `${p.label}:${p.value}`)).toEqual(["From:2026-01-01", "Context:Study", "Tags:Language", "Only:Czech"]);
+    expect(pills.map((p) => `${p.label}:${p.value}`)).toEqual(["From:Thu 1 Jan", "Context:Study", "Tags:Language", "Only:Czech"]);
   });
 
   it("shows the related pill only for a related search, and flips it when unavailable", () => {

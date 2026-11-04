@@ -76,7 +76,7 @@ export default function DeleteContextPage() {
         <AppLink className="btn btn--ghost" href={urls.contexts()}>
           <Icon icon={faArrowLeft} /> Back
         </AppLink>
-        <button type="button" className="btn btn--stop btn--spacer" onClick={confirm} disabled={remove.isPending}>
+        <button type="button" className="btn btn--danger btn--spacer" onClick={confirm} disabled={remove.isPending}>
           <Icon icon={faTrash} /> Delete context
         </button>
       </div>

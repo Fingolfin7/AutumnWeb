@@ -364,7 +364,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             <Icon icon={faSlidersH} /> Filters
             {pills.length ? <span className="filter-count">{pills.length}</span> : null}
           </button>
-          <button type="submit" className="btn btn--primary" id="search_button">
+          <button type="submit" className="btn btn--secondary" id="search_button">
             <Icon icon={faCheck} /> Select sessions
           </button>
         </div>

@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import type { CSSProperties } from "react";
 import { faBullseye, faCheck, faFire, faHourglassHalf, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -12,11 +13,6 @@ const AGGREGATION_LABEL: Record<string, string> = {
   context: "Context",
   tag: "Tag",
 };
-
-/* Whole numbers read cleaner than the old "-180.0m"; keep one decimal only
-   when there is a real fraction. */
-const tidy = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(1));
-const signed = (value: number) => (value >= 0 ? `+${tidy(value)}` : tidy(value));
 
 /* Active commitments with progress, bank and streak strip (the dashboard's
    commitments slab). */
@@ -76,7 +72,9 @@ function CommitmentTarget({ item }: { item: DashboardCommitment }) {
 
 function CommitmentBand({ item }: { item: DashboardCommitment }) {
   const { progress, streak, commitment } = item;
-  const unit = progress.commitment_type === "time" ? "m" : "";
+  const time = progress.commitment_type === "time";
+  const num = (v: number) => time ? formatDuration(v) : String(Math.round(v));
+  const signed = (v: number) => `${v >= 0 ? "+" : "-"}${num(Math.abs(v))}`;
   const pct = Math.round(progress.percentage);
   return (
     <article className="band commit">
@@ -86,10 +84,9 @@ function CommitmentBand({ item }: { item: DashboardCommitment }) {
         <span className="commit-period">{progress.period}</span>
       </header>
       <p className="commit-figures">
-        <span className="commit-actual">{Math.round(progress.actual)}</span>{" "}
+        <span className="commit-actual">{num(progress.actual)}</span>{" "}
         <span className="commit-goal">
-          / {progress.target}
-          {progress.commitment_type === "time" ? "m" : " sessions"}
+          / {num(progress.target)}{time ? "" : " sessions"}
         </span>{" "}
         <span className="commit-pct">{pct}%</span>
       </p>
@@ -102,14 +99,12 @@ function CommitmentBand({ item }: { item: DashboardCommitment }) {
             <span className="bank-label">Bank (reconciled)</span>
             <span className={`bank-value ${progress.balance >= 0 ? "text-green" : "text-red"}`}>
               {signed(progress.balance)}
-              {unit}
             </span>
           </div>
           <div className="bank-cell">
             <span className="bank-label">This period (unbanked)</span>
             <span className={`bank-value ${progress.current_surplus >= 0 ? "text-green" : "text-red"}`}>
               {signed(progress.current_surplus)}
-              {unit}
             </span>
           </div>
         </div>

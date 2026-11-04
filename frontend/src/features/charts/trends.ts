@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { buildSeries, dateExtent, getChartUnit, OTHER_COLOR, paletteColor, parseDay, type ChartOptions, type DailySeriesRow } from "./data";
 import type { AnyConfig, TT, DailyTotalRow } from "./payloads";
 
@@ -37,7 +38,7 @@ function stackedAreaConfig(rows: DailySeriesRow[], topN: number | undefined): An
         title: { display: true, text: subprojects ? "Daily Time by Subproject (Stacked)" : "Daily Time by Project (Stacked)" },
         tooltip: {
           mode: "index",
-          callbacks: { label: (context: TT) => `${context.dataset.label}: ${context.parsed.y!.toFixed(2)} hours` },
+          callbacks: { label: (context: TT) => `${context.dataset.label}: ${formatDuration(context.parsed.y! * 60)}` },
         },
         ...(subprojects ? {} : { filler: { propagate: true } }),
       },
@@ -88,7 +89,7 @@ export function cumulativeConfig(data: DailyTotalRow[]): AnyConfig {
           callbacks: {
             label(context: TT) {
               const point = context.raw as { y: number; daily: number };
-              return [`Total: ${point.y.toFixed(1)} hours`, `This day: +${point.daily.toFixed(2)} hours`];
+              return [`Total: ${formatDuration(point.y * 60)}`, `This day: +${formatDuration(point.daily * 60)}`];
             },
           },
         },

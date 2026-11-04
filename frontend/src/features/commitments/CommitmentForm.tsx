@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -22,7 +23,7 @@ import type { Commitment } from "@/api/types";
 import { DeskHead, FieldErrors, FormLevelErrors } from "@/features/contexts-tags/ui";
 import { hasErrors, NO_ERRORS, parseFormErrors, type FormErrors } from "@/features/contexts-tags/formErrors";
 import { useAllSubprojects, useCommitments, useCreateCommitment, useRestartCommitment, useUpdateCommitment } from "./api";
-import { floatText, monthDay, monthDayYear, progressOf, redirectFor, signed, todayIn } from "./display";
+import { monthDay, monthDayYear, progressOf, redirectFor, todayIn } from "./display";
 import {
   API_FIELD_MAP,
   classifyChanges,
@@ -707,7 +708,7 @@ function PolicyHints({ changes, commitment }: { changes: ReturnType<typeof class
 function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
   const progress = progressOf(c);
   const time = c.commitment_type === "time";
-  const num = (value: number) => (time ? floatText(value) : String(value));
+  const num = (value: number) => (time ? formatDuration(Math.abs(value)) : String(Math.abs(value)));
   const period = c.current_period;
   return (
     <section id="progress-info" className="slab slab-pad">
@@ -717,8 +718,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
       <p className="commit-figures">
         <span className="commit-actual">{num(progress.actual)}</span>
         <span className="commit-goal">
-          / {progress.target}
-          {time ? " min" : " sessions"}
+          / {num(progress.target)}{time ? "" : " sessions"}
         </span>
         <span className="commit-pct">{progress.percentage.toFixed(1)}%</span>
       </p>
@@ -741,15 +741,13 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
             <div className="meta-row">
               <span className="meta-label">Bank balance</span>
               <span className={`meta-value ${c.balance >= 0 ? "text-green" : "text-red"}`}>
-                {signed(c.balance)}
-                {time ? " min" : ""}
+                {`${c.balance >= 0 ? "+" : "-"}${num(c.balance)}`}
               </span>
             </div>
             <div className="meta-row">
               <span className="meta-label">This period, unbanked</span>
               <span className={`meta-value ${progress.surplus >= 0 ? "text-green" : "text-red"}`}>
-                {signed(progress.surplus, num(progress.surplus))}
-                {time ? " min" : ""}
+                {`${progress.surplus >= 0 ? "+" : "-"}${num(progress.surplus)}`}
               </span>
             </div>
           </>

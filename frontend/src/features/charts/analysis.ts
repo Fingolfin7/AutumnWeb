@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { paletteColor, withAlpha } from "./data";
 import type { AnyConfig, TT, BubbleRow, HistogramRow, RadarRow } from "./payloads";
 
@@ -123,9 +124,9 @@ export function radarConfig(data: RadarRow[]): AnyConfig | null {
             label(context: TT) {
               const m = metrics[context.datasetIndex]!;
               const lines = [
-                `Total: ${m.totalTime.toFixed(1)}h`,
+                `Total: ${formatDuration(m.totalTime * 60)}`,
                 `Sessions: ${m.sessionCount}`,
-                `Avg: ${m.avgSessionLength.toFixed(1)}h`,
+                `Avg: ${formatDuration(m.avgSessionLength * 60)}`,
                 `Subprojects: ${m.subprojectCount}`,
                 `Recency: ${m.recency.toFixed(0)}/30`,
               ];
@@ -173,7 +174,7 @@ export function bubbleConfig(data: BubbleRow[]): AnyConfig | null {
           callbacks: {
             label(context: TT) {
               const point = context.raw as { name: string; x: number; y: number };
-              return [`Tag: ${point.name}`, `Projects: ${point.x}`, `Total Time: ${point.y.toFixed(1)} hours`];
+              return [`Tag: ${point.name}`, `Projects: ${point.x}`, `Total Time: ${formatDuration(point.y * 60)}`];
             },
           },
         },

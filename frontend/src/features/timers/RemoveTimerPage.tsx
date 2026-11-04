@@ -85,7 +85,7 @@ export default function RemoveTimerPage() {
           <AppLink className="btn btn--ghost" href={urls.timers()}>
             <Icon icon={faArrowLeft} /> Back
           </AppLink>
-          <button className="btn btn--stop btn--spacer" type="submit" disabled={remove.isPending}>
+          <button className="btn btn--danger btn--spacer" type="submit" disabled={remove.isPending}>
             <Icon icon={faTrash} /> Remove timer
           </button>
         </div>

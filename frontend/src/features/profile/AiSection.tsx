@@ -169,7 +169,7 @@ export function AiSection({
             <p className="muted profile-codex-code">Autumn checks for the authorization every few seconds.</p>
             <button
               type="button"
-              className="btn btn--primary u-mt-4"
+              className="btn btn--secondary u-mt-4"
               onClick={() => complete.mutate()}
               disabled={complete.isPending}
             >

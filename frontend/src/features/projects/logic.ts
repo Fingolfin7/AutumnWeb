@@ -1,3 +1,4 @@
+import { formatDuration, formatDate } from "@/lib/format";
 import type { Commitment, Project, ProjectListQuery, ProjectStatus } from "@/api/types";
 import { fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
 
@@ -123,8 +124,8 @@ export function describeFilters(state: ProjectFilters, lookup: FilterNames) {
     ids.map((id) => items.find((item) => item.id === id)?.name ?? `#${id}`).join(", ");
   const pills: { label: string; value: string }[] = [];
   if (state.search) pills.push({ label: "Search", value: state.search });
-  if (state.start_date) pills.push({ label: "From", value: state.start_date });
-  if (state.end_date) pills.push({ label: "To", value: state.end_date });
+  if (state.start_date) pills.push({ label: "From", value: formatDate(state.start_date) });
+  if (state.end_date) pills.push({ label: "To", value: formatDate(state.end_date) });
   if (state.context) {
     pills.push({
       label: "Context",
@@ -186,7 +187,7 @@ export function formatNumber(value: number): string {
 /** "+12m" / "-180m" / "+3" for bank figures. */
 export function formatSigned(value: number, timeBased: boolean): string {
   const rounded = Math.round(value * 100) / 100;
-  return `${rounded >= 0 ? "+" : ""}${formatNumber(rounded)}${timeBased ? "m" : ""}`;
+  return `${rounded >= 0 ? "+" : "-"}${timeBased ? formatDuration(Math.abs(rounded)) : formatNumber(Math.abs(rounded))}`;
 }
 
 /* ------------------------------------------------------------------ edits */

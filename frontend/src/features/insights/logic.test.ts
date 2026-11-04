@@ -212,10 +212,10 @@ describe("chat list", () => {
 
   it("stamps today and yesterday with a time, older chats with a date", () => {
     const now = new Date(2026, 9, 14, 15, 0);
-    expect(chatStamp(new Date(2026, 9, 14, 14, 14).toISOString(), now)).toMatch(/^2:14\s?PM$/i);
-    expect(chatStamp(new Date(2026, 9, 13, 9, 5).toISOString(), now)).toMatch(/^9:05\s?AM$/i);
-    expect(chatStamp(new Date(2026, 7, 13, 9, 5).toISOString(), now)).toBe("13 Aug");
-    expect(chatStamp(new Date(2025, 7, 13, 9, 5).toISOString(), now)).toBe("13 Aug 2025");
+    expect(chatStamp(new Date(2026, 9, 14, 14, 14).toISOString(), now)).toBe("14:14");
+    expect(chatStamp(new Date(2026, 9, 13, 9, 5).toISOString(), now)).toBe("09:05");
+    expect(chatStamp(new Date(2026, 7, 13, 9, 5).toISOString(), now)).toBe("Thu 13 Aug");
+    expect(chatStamp(new Date(2025, 7, 13, 9, 5).toISOString(), now)).toBe("Wed 13 Aug 2025");
   });
 });
 

@@ -1,3 +1,4 @@
+import { formatTime, formatDate } from "@/lib/format";
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
@@ -307,7 +308,7 @@ export default function StartTimerPage() {
                     <LocalTimeNotice field={atTime} label="the reminder" />
                   </div>
                   <p className="rm-note" id="reminder-timezone">
-                    {atTime.instant ? `${new Date(atTime.instant).toLocaleString([], { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}, ${zone} (profile timezone)` : `Your profile timezone: ${zone}`}
+                    {atTime.instant ? `${`${formatDate(atTime.instant)}, ${formatTime(atTime.instant)}`}, ${zone} (profile timezone)` : `Your profile timezone: ${zone}`}
                   </p>
                 </div>
               ) : null}
@@ -329,16 +330,16 @@ export default function StartTimerPage() {
                       style={{ "--x": `${tick.x}%` } as CSSProperties}
                     >
                       <span className="sr-only">
-                        Reminder at {tick.at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        Reminder at {formatTime(tick.at)}
                         {tick.beyondStop ? "; after the timer stops" : ""}
                       </span>
                     </span>
                   ))}
                 </div>
                 <div className="rm-rail-axis" aria-hidden="true">
-                  <span className="mono">now {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                  <span className="mono">now {formatTime(now)}</span>
                   <span className="mono">
-                    {plan.stopAt ? `stops ${plan.stopAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "open-ended"}
+                    {plan.stopAt ? `stops ${formatTime(plan.stopAt)}` : "open-ended"}
                   </span>
                 </div>
                 <p className="rm-plan" role="status">

@@ -40,7 +40,7 @@
   position: fixed;
   z-index: 80;
   left: 50%;
-  top: calc(env(safe-area-inset-top, 0px) + var(--s3, .75rem));
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--s3));
   transform: translateX(-50%);
   width: min(32rem, calc(100vw - 1.5rem));
   display: grid;
@@ -49,6 +49,11 @@
 }
 .toast-region .msg {
   pointer-events: auto;
+  background: var(--slab-solid);
+  border: 1px solid var(--hairline-2);
+  margin: 0;
+  max-height: min(35dvh, 18rem);
+  overflow: auto;
   box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
   animation: toast-in .18s var(--ease, ease-out);
 }
@@ -60,14 +65,18 @@
   font: inherit;
   font-weight: 650;
   cursor: pointer;
-  padding: 0 .25rem;
+  padding: .25rem .5rem;
+  min-width: 44px;
+  min-height: 44px;
 }
 .toast-close {
   background: none;
   border: 0;
   color: var(--muted);
   cursor: pointer;
-  padding: 0 .25rem;
+  padding: .25rem .5rem;
+  min-width: 44px;
+  min-height: 44px;
 }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .toast-region .msg { animation: none; } }
@@ -201,3 +210,9 @@
 }
 .timers-outside-context-show:hover,
 .timers-outside-context-show:focus-visible { color: var(--ink); }
+
+@media (min-width: 1000px) { .toast-region { left: auto; right: var(--s5); bottom: var(--s5); transform: none; } }
+.dialog-panel--wide { width: min(46rem, calc(100vw - 1.5rem)); }
+@media (max-width: 999px) {
+  .dialog-panel { top: auto; bottom: 0; left: 0; transform: none; width: 100%; max-height: 90dvh; border-radius: var(--r-xl) var(--r-xl) 0 0; padding-bottom: calc(var(--s5) + env(safe-area-inset-bottom, 0px)); }
+}

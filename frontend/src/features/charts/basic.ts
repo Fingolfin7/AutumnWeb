@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { buildSeries, consolidateTopN, dateExtent, getChartUnit, OTHER_COLOR, otherLabel, paletteColor, parseDay, type ChartOptions, type DailySeriesRow } from "./data";
 import type { AnyConfig, TT, ScatterRow, StatusRow, TallyRow } from "./payloads";
 
@@ -23,6 +24,7 @@ export function pieConfig(data: TallyRow[], { projectLimit }: ChartOptions): Any
       plugins: {
         title: { display: true, text: "Project Time Distribution" },
         legend: { position: "top" },
+        tooltip: { callbacks: { label: (context: TT) => `${context.label}: ${formatDuration(Number(context.parsed) * 60)}` } },
       },
       cutout: "40%",
     },
@@ -44,7 +46,7 @@ export function barConfig(data: TallyRow[], { projectLimit }: ChartOptions): Any
         },
       ],
     },
-    options: { responsive: true, indexAxis: "y" },
+    options: { responsive: true, indexAxis: "y", plugins: { tooltip: { callbacks: { label: (context: TT) => `${context.label}: ${formatDuration(context.parsed.x! * 60)}` } } } },
   };
 }
 
@@ -82,7 +84,6 @@ export function groupScatter(rows: ScatterRow[], topN?: number): ScatterGroup[] 
 function scatterConfig(rows: ScatterRow[], topN: number | undefined): AnyConfig {
   const groups = groupScatter(rows, topN);
   const { min, max } = dateExtent(rows.map((row) => new Date(row.x)));
-  const unit = topN === undefined ? "h" : "hours";
   return {
     type: "scatter",
     data: {
@@ -103,7 +104,7 @@ function scatterConfig(rows: ScatterRow[], topN: number | undefined): AnyConfig 
       },
       plugins: {
         tooltip: {
-          callbacks: { label: (context: TT) => `${context.dataset.label ?? ""}: ${context.parsed.y!.toFixed(2)} ${unit}` },
+          callbacks: { label: (context: TT) => `${context.dataset.label ?? ""}: ${formatDuration(context.parsed.y! * 60)}` },
         },
       },
     },
@@ -141,7 +142,7 @@ function lineConfig(rows: DailySeriesRow[], topN: number | undefined): AnyConfig
         y: { beginAtZero: true, title: { display: true, text: "Duration (hours)" } },
       },
       plugins: {
-        tooltip: { callbacks: { label: (context: TT) => `${context.dataset.label}: ${context.parsed.y!.toFixed(2)} hours` } },
+        tooltip: { callbacks: { label: (context: TT) => `${context.dataset.label}: ${formatDuration(context.parsed.y! * 60)}` } },
       },
     },
   };
@@ -177,7 +178,7 @@ export function statusConfig(data: StatusRow[]): AnyConfig {
       plugins: {
         title: { display: true, text: "Time by Project Status" },
         legend: { position: "top" },
-        tooltip: { callbacks: { label: (context: TT) => `${context.label}: ${(context.parsed as number).toFixed(1)} hours` } },
+        tooltip: { callbacks: { label: (context: TT) => `${context.label}: ${formatDuration((context.parsed as number) * 60)}` } },
       },
       cutout: "50%",
     },
@@ -205,7 +206,7 @@ export function contextConfig(data: TallyRow[]): AnyConfig {
       plugins: {
         title: { display: true, text: "Time by Context" },
         legend: { display: false },
-        tooltip: { callbacks: { label: (context: TT) => `${context.parsed.x!.toFixed(1)} hours` } },
+        tooltip: { callbacks: { label: (context: TT) => `${formatDuration(context.parsed.x! * 60)}` } },
       },
       scales: { x: { title: { display: true, text: "Hours" }, beginAtZero: true } },
     },

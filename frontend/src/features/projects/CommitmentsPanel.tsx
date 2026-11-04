@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { faBullseye, faPen, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Disclose } from "@/components/Disclose";
@@ -111,10 +112,9 @@ export function CommitmentsPanel({
                 {commitment.active ? (
                   <>
                     <p className="commit-figures">
-                      <span className="commit-actual">{Math.round(period.accrued)}</span>
+                      <span className="commit-actual">{timeBased ? formatDuration(period.accrued) : Math.round(period.accrued)}</span>
                       <span className="commit-goal">
-                        / {formatNumber(period.target)}
-                        {timeBased ? "m" : " sessions"}
+                        / {timeBased ? formatDuration(period.target) : `${formatNumber(period.target)} sessions`}
                       </span>
                       <span className="commit-pct">{Math.round(period.percentage ?? 0)}%</span>
                     </p>
@@ -161,7 +161,7 @@ export function CommitmentsPanel({
       )}
 
       <div className="slab-foot">
-        <AppLink className="btn btn--primary" href={addUrl}>
+        <AppLink className="btn btn--secondary" href={addUrl}>
           <Icon icon={faPlus} /> Add commitment
         </AppLink>
       </div>

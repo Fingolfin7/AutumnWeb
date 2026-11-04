@@ -90,7 +90,7 @@ function ConfirmDelete({ project, setDeleting }: { project: ProjectDetail; setDe
         <AppLink className="btn btn--ghost" href={urls.projects()}>
           <Icon icon={faArrowLeft} /> Back
         </AppLink>
-        <button className="btn btn--stop btn--spacer" type="button" onClick={onDelete} disabled={remove.isPending}>
+        <button className="btn btn--danger btn--spacer" type="button" onClick={onDelete} disabled={remove.isPending}>
           <Icon icon={faTrash} /> Delete project
         </button>
       </div>

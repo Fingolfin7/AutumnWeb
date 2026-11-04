@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { paletteColor } from "./data";
 import type { AnyConfig, HierarchyNode, TallyRow } from "./payloads";
 
@@ -94,7 +95,7 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
               if (value < 0.5) return ""; // no labels on tiny boxes
               /* A leaf carries its record in _data; a project container only
                  has its group name in g. */
-              if (item._data?.name) return `${item._data.name}\n${value.toFixed(1)}h`;
+              if (item._data?.name) return `${item._data.name}\n${formatDuration(value * 60)}`;
               if (item.g) return item.g;
               return "";
             },
@@ -120,7 +121,7 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
             label(context: TreemapContext) {
               const item = context.raw;
               const value = item.v || item.value || 0;
-              return `${item._data?.name || item.g || ""}: ${value.toFixed(2)} hours`;
+              return `${item._data?.name || item.g || ""}: ${formatDuration(value * 60)}`;
             },
           },
         },

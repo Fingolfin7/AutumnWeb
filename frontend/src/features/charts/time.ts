@@ -1,3 +1,4 @@
+import { formatDuration, formatDate } from "@/lib/format";
 import type { Chart } from "chart.js";
 import { dayKey, dateExtent, fillDates, getChartUnit, parseDay } from "./data";
 import type { AnyConfig, DailyTotalRow, HeatmapRow } from "./payloads";
@@ -60,8 +61,8 @@ export function calendarConfig(data: DailyTotalRow[]): AnyConfig {
             label(context: { raw: { d: string; v: number } }) {
               const cell = context.raw;
               return [
-                parseDay(cell.d).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
-                `${cell.v.toFixed(2)} hours`,
+                formatDate(cell.d, true),
+                `${formatDuration(cell.v * 60)}`,
               ];
             },
           },
@@ -132,7 +133,7 @@ export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
             title: () => "",
             label: (context: { raw: { x: number; y: number; v: number } }) => {
               const { x, y, v } = context.raw;
-              return `${WEEKDAYS[x]} ${y}:00 → ${(v || 0).toFixed(2)} h avg`;
+              return `${WEEKDAYS[x]} ${y}:00 → ${formatDuration((v || 0) * 60)} avg`;
             },
           },
         },

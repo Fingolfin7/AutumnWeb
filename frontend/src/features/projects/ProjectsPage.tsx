@@ -102,7 +102,7 @@ export default function ProjectsPage() {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <button className="btn btn--primary" type="submit">
+          <button className="btn btn--secondary" type="submit">
             Search
           </button>
           <button

@@ -167,9 +167,9 @@ export function FocusCard({
    turns the track into a grid and hides them. */
 export function FocusDots({ count, active, onPick }: { count: number; active: number; onPick: (index: number) => void }) {
   return (
-    <div className="focus-dots" aria-hidden="true">
+    <div className="focus-dots" aria-label="Choose a timer card">
       {Array.from({ length: count }, (_, index) => (
-        <span key={index} className={`focus-dot${index === active ? " is-active" : ""}`} onClick={() => onPick(index)} />
+        <button type="button" key={index} className={`focus-dot${index === active ? " is-active" : ""}`} aria-label={`Timer card ${index + 1}`} aria-pressed={index === active} onClick={() => onPick(index)} />
       ))}
     </div>
   );

@@ -1,10 +1,9 @@
+import { formatDate } from "@/lib/format";
 /* Calendar-date helpers for the reminder and weekly-review pages. Dates here
    are "YYYY-MM-DD" keys in the profile timezone (the server's frame of
    reference), never browser-local midnights, so a laptop in another zone
    still names the same days the schedules fire on. */
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -37,9 +36,7 @@ export function addDays(key: string, days: number): string {
 export function formatDateKey(key: string, withYear = false): string {
   const ymd = parseDateKey(key);
   if (!ymd) return key;
-  const weekday = WEEKDAYS[new Date(Date.UTC(ymd.year, ymd.month - 1, ymd.day)).getUTCDay()];
-  const text = `${weekday} ${ymd.day} ${MONTHS[ymd.month - 1]}`;
-  return withYear ? `${text} ${ymd.year}` : text;
+  return formatDate(key, withYear);
 }
 
 function zonedParts(instant: Date, timeZone: string) {

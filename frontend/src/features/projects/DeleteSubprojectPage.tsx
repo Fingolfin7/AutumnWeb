@@ -105,7 +105,7 @@ function ConfirmDelete({
         <AppLink className="btn btn--ghost" href={urls.updateProject(parent.id)}>
           <Icon icon={faArrowLeft} /> Back
         </AppLink>
-        <button className="btn btn--stop btn--spacer" type="button" onClick={onDelete} disabled={remove.isPending}>
+        <button className="btn btn--danger btn--spacer" type="button" onClick={onDelete} disabled={remove.isPending}>
           <Icon icon={faTrash} /> Delete subproject
         </button>
       </div>

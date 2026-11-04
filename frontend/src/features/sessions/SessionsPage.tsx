@@ -8,7 +8,7 @@ import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { useActiveContext } from "@/app/context";
 import { useAllProjects, useContexts, useTags } from "@/api/meta";
-import { formatDayDate, formatDuration } from "@/lib/format";
+import { formatDayDate, formatDate, formatDuration } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "./SessionBand";
 import { useSessionList, type SessionFilters, type SessionRow } from "./api";
@@ -313,8 +313,8 @@ function describeFilters(
   const names = (ids: number[], items: { id: number; name: string }[]) =>
     ids.map((id) => items.find((item) => item.id === id)?.name ?? `#${id}`).join(", ");
   const pills: { label: string; value: string }[] = [];
-  if (state.start_date) pills.push({ label: "From", value: state.start_date });
-  if (state.end_date) pills.push({ label: "To", value: state.end_date });
+  if (state.start_date) pills.push({ label: "From", value: formatDate(state.start_date) });
+  if (state.end_date) pills.push({ label: "To", value: formatDate(state.end_date) });
   if (state.context) {
     pills.push({
       label: "Context",

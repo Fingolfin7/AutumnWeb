@@ -4,7 +4,7 @@ import { Icon } from "@/components/Icon";
 import { ConfirmDialog } from "@/components/Sheet";
 import { SessionNote } from "@/components/SessionNote";
 import { AppLink, urls } from "@/app/links";
-import { formatDuration, formatShortDate, formatTime } from "@/lib/format";
+import { formatDuration, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
@@ -40,9 +40,7 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
         <div className="swipe-face session">
           <div className="session-mid">
             {showDate ? <span className="session-time session-day">{formatShortDate(session.end, new Date(0))}</span> : null}
-            <span className="session-time">{formatTime(session.start)}</span>
-            <span className="session-arrow">&rarr;</span>
-            <span className="session-time">{formatTime(session.end)}</span>
+            <span className="session-time">{formatTimeRange(session.start, session.end)}</span>
             {crossesDst(session) ? (
               <span className="badge-dst" title="Session crosses a daylight savings transition">
                 DST

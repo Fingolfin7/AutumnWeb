@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/format";
 import { DEFAULT_KIND, parseKind } from "./build";
 import type { ChartKind } from "./payloads";
 import { accountSimilarity, fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
@@ -166,8 +167,8 @@ export function describeFilters(
     pills.push({ label: "Closeness", value: fixed2(state.similarity ?? accountSimilarity()) });
   }
   if (state.project_name) pills.push({ label: "Project", value: state.project_name });
-  if (state.start_date) pills.push({ label: "From", value: state.start_date });
-  if (state.end_date) pills.push({ label: "To", value: state.end_date });
+  if (state.start_date) pills.push({ label: "From", value: formatDate(state.start_date) });
+  if (state.end_date) pills.push({ label: "To", value: formatDate(state.end_date) });
   if (state.context) {
     pills.push({
       label: "Context",

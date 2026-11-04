@@ -7,6 +7,7 @@ import { AppLink, urls } from "@/app/links";
 import { bootstrap } from "@/bootstrap";
 import { Icon } from "@/components/Icon";
 import { ErrorState, Skeleton } from "@/components/states";
+import { formatDuration } from "@/lib/format";
 import { formatDateKey, todayKey } from "@/features/notifications/dates";
 import { canGoNext, defaultStart, nextStart, selectedStart, sessionsLink, shiftWeek, weekParamFor } from "./weeks";
 import "./review.css";
@@ -87,7 +88,7 @@ export default function WeeklyReviewPage() {
           {review.isError ? <ErrorState error={review.error} onRetry={() => void review.refetch()} /> : null}
           <section className="slab slab-pad nx-review-hero" aria-labelledby="review-summary-title">
             <h2 className="nx-review-number" id="review-summary-title">
-              {data.duration_label}
+              {formatDuration(data.total_minutes)}
             </h2>
             <p className="nx-review-sub">
               across {data.project_count} project{plural(data.project_count)}
@@ -126,7 +127,7 @@ export default function WeeklyReviewPage() {
                         </small>
                       </div>
                       <div className="nx-review-actions">
-                        <strong className="mono text-green">{Math.round(project.total_minutes)}m</strong>
+                        <strong className="mono text-green">{formatDuration(project.total_minutes)}</strong>
                         <AppLink className="btn btn--quiet" href={`${urls.startTimer()}?project_id=${project.project_id}`}>
                           Start timer
                         </AppLink>

@@ -1,3 +1,4 @@
+import { formatTime, formatShortDate } from "@/lib/format";
 import type { paths } from "@/api/schema";
 import { accountSimilarity, fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
 import type { AttachmentView } from "./attachments";
@@ -292,10 +293,9 @@ export function chatStamp(value: string, now = new Date()): string {
   const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((startOf(now) - startOf(date)) / 86_400_000);
   if (days <= 1) {
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return formatTime(date);
   }
-  const base = `${String(date.getDate()).padStart(2, "0")} ${date.toLocaleDateString("en-GB", { month: "short" })}`;
-  return date.getFullYear() === now.getFullYear() ? base : `${base} ${date.getFullYear()}`;
+  return formatShortDate(date, now);
 }
 
 /* ---- transcript ----------------------------------------------------------- */

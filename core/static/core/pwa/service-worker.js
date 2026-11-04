@@ -1,14 +1,13 @@
 const CACHE_PREFIX = "autumn-pwa";
-/* Bumped to v4 for the React app: the shell and app-asset caches below are
-   new, and installed clients hold the old list until the name changes. */
-const PRECACHE = `${CACHE_PREFIX}-precache-v4`;
-const RUNTIME = `${CACHE_PREFIX}-runtime-v4`;
+/* v5: refresh the shared foundations and precache the display font. */
+const PRECACHE = `${CACHE_PREFIX}-precache-v5`;
+const RUNTIME = `${CACHE_PREFIX}-runtime-v5`;
 /* The last React page HTML (spa.html) this user loaded, served for any
    navigation while offline; the app routes itself from the URL. */
-const SHELL = `${CACHE_PREFIX}-shell-v4`;
+const SHELL = `${CACHE_PREFIX}-shell-v5`;
 const SHELL_KEY = "/__autumn-shell__";
 /* Every file of the current React build, so lazy pages open offline too. */
-const APP_ASSETS = `${CACHE_PREFIX}-app-v4`;
+const APP_ASSETS = `${CACHE_PREFIX}-app-v5`;
 const APP_MANIFEST = "/static/app/manifest.json";
 const OFFLINE_URL = "/static/core/pwa/offline.html";
 
@@ -18,6 +17,7 @@ const OFFLINE_URL = "/static/core/pwa/offline.html";
 const PRECACHE_URLS = [
     OFFLINE_URL,
     "/static/core/css/focus_desk.css",
+    "/static/core/fonts/manrope-latin.woff2",
     "/static/core/js/pwa.js",
     "/static/core/js/page_loading.js",
     "/static/core/images/icons/autumn-icon-192.png",

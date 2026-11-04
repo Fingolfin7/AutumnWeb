@@ -1,34 +1,11 @@
+import { formatDate } from "@/lib/format";
 import type { Commitment } from "@/api/types";
 
 /* Number and date display shared by the commitment pages. */
 
-/** Python-style float text: whole values keep one decimal ("-180.0"), like the template's raw floats. */
-export function floatText(value: number): string {
-  const rounded = Math.round(value * 100) / 100;
-  return Number.isInteger(rounded) ? rounded.toFixed(1) : String(rounded);
-}
-
-export const signed = (value: number, text: string = String(value)) => (value >= 0 ? `+${text}` : text);
-
-export const unitSuffix = (type: string) => (type === "time" ? "m" : "");
-
-/** "Oct 12" */
-export function monthDay(value: string | Date): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleDateString("en-US", { month: "short", day: "2-digit" });
-}
-
-/** "Oct 19, 2026" */
-export function monthDayYear(value: string | Date): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return date.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
-}
-
-/** "14 Oct 2026" (the template's `date:"d M Y"`). */
-export function dayMonthYear(value: string | Date): string {
-  const date = typeof value === "string" ? new Date(value) : value;
-  return `${String(date.getDate()).padStart(2, "0")} ${date.toLocaleDateString("en-US", { month: "short" })} ${date.getFullYear()}`;
-}
+export const monthDay = (value: string | Date) => formatDate(value);
+export const monthDayYear = (value: string | Date) => formatDate(value, true);
+export const dayMonthYear = monthDayYear;
 
 export function progressOf(c: Commitment) {
   const period = c.current_period;

@@ -66,7 +66,7 @@ function HomeContent({ data }: { data: Dashboard }) {
           </div>
           <div className="stat">
             <p className="stat-label">Current streak</p>
-            <p className="stat-value text-red">
+            <p className="stat-value text-orange">
               {data.daily_streak.current_streak} day{data.daily_streak.current_streak === 1 ? "" : "s"}
             </p>
           </div>
@@ -207,7 +207,7 @@ function ActivityPanel({ streak }: { streak: Dashboard["daily_streak"] }) {
           <div className="cal-grid">
             {cells.map((day, index) => {
               const date = new Date(`${day.date}T12:00:00`);
-              const title = `${date.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })}${
+              const title = `${formatDayDate(date, true)}${
                 day.active ? " — tracked" : ""
               }`;
               return (

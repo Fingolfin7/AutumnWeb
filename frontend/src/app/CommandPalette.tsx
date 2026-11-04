@@ -48,8 +48,10 @@ export function CommandPalette() {
         setOpen((value) => !value);
       }
     };
+    const show = () => { setQuery(""); setActive(0); setOpen(true); };
+    window.addEventListener("autumn:palette", show);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("autumn:palette", show); };
   }, []);
 
   const go = (href: string) => {
@@ -75,7 +77,7 @@ export function CommandPalette() {
         });
       }
     }
-    for (const project of rankProjects(projects.data ?? [], q, q ? 6 : 4)) {
+    for (const project of (q ? rankProjects(projects.data ?? [], q, 6) : [...(projects.data ?? [])].sort((a, b) => (Date.parse(b.last_activity ?? "") || 0) - (Date.parse(a.last_activity ?? "") || 0) || a.name.localeCompare(b.name)).slice(0, 4))) {
       out.push({
         id: `start-${project.id}`,
         group: "Start a timer",
@@ -95,12 +97,12 @@ export function CommandPalette() {
       });
     }
     const pages: [string, string][] = [
-      ["Home", urls.home()],
+      ["Today", urls.home()],
       ["Timers", urls.timers()],
       ["New timer", urls.startTimer()],
       ["Sessions", urls.sessions()],
       ["Projects", urls.projects()],
-      ["Charts", urls.charts()],
+      ["Review", urls.charts()],
       ...(bootstrap().profile.insights_access_enabled ? ([["Insights", urls.insights()]] as [string, string][]) : []),
       ["Weekly review", urls.weeklyReview()],
       ["Notifications", urls.notifications()],
@@ -109,7 +111,7 @@ export function CommandPalette() {
       ["New commitment", urls.createCommitment()],
       ["Import", urls.import()],
       ["Export", urls.export()],
-      ["Profile", urls.profile()],
+      ["Settings", urls.profile()],
     ];
     for (const [label, href] of pages) {
       if (!q || label.toLowerCase().includes(q)) {
@@ -159,15 +161,16 @@ export function CommandPalette() {
           }
         }}
       />
-      <ul className="palette-list" ref={list} role="listbox">
+      <ul className="palette-list" ref={list} aria-label="Commands">
         {commands.map((command, index) => {
           const header = command.group !== lastGroup ? command.group : null;
           lastGroup = command.group;
           return (
-            <li key={command.id} role="option" aria-selected={index === active}>
+            <li key={command.id}>
               {header ? <div className="palette-group">{header}</div> : null}
               <button
                 type="button"
+                aria-current={index === active ? "true" : undefined}
                 className={`palette-item${index === active ? " is-active" : ""}`}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => command.run()}

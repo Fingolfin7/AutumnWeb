@@ -1,6 +1,5 @@
-/* Duration and time formatting. These mirror core/templatetags/time_formats.py
-   so server-rendered pages and the app read the same; durations from the API
-   are minutes (float). */
+/* Single display contract for the frontend. API durations are minutes.
+   Date keys stay local calendar dates; input/wire values stay ISO. */
 
 interface Parts {
   days: number;
@@ -30,24 +29,16 @@ export function splitSeconds(totalSeconds: number): Parts {
 const pad = (n: number) => String(n).padStart(2, "0");
 const plural = (n: number, word: string) => (n === 1 ? word : word + "s");
 
-/** "01d 02h 30m", "02h 05m" or "45m 30s" (the `duration_formatter` filter). */
+/** Saved durations use whole minutes, without leading zeros or day units. */
 export function formatDuration(minutes: number | null | undefined): string {
-  const { days, hours, minutes: m, seconds } = splitMinutes(minutes ?? 0);
-  if (days > 0) return `${pad(days)}d ${pad(hours)}h ${pad(m)}m`;
-  if (hours > 0) return `${pad(hours)}h ${pad(m)}m`;
-  return `${pad(m)}m ${pad(seconds)}s`;
+  const value = minutes ?? 0;
+  const whole = Number.isFinite(value) ? Math.max(0, Math.floor(Math.round(value * 60_000) / 60_000)) : 0;
+  const hours = Math.floor(whole / 60);
+  return hours ? `${hours}h${whole % 60 ? ` ${whole % 60}m` : ""}` : `${whole}m`;
 }
 
-/** "3 hours 10 minutes": at most two non-zero units (`min_formatter_two`). */
-export function formatDurationWords(minutes: number | null | undefined): string {
-  const { days, hours, minutes: m, seconds } = splitMinutes(minutes ?? 0);
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days} ${plural(days, "day")}`);
-  if (hours > 0) parts.push(`${hours} ${plural(hours, "hour")}`);
-  if (m > 0) parts.push(`${m} ${plural(m, "minute")}`);
-  if (seconds > 0) parts.push(`${seconds} ${plural(seconds, "second")}`);
-  return parts.length ? parts.slice(0, 2).join(" ") : "0 seconds";
-}
+/** Compatibility name; all saved durations share the compact display. */
+export const formatDurationWords = formatDuration;
 
 /** The two-unit hero split used by the focus cards (`hero_duration`). */
 export function heroParts(totalSeconds: number): { value: number; unit: string }[] {
@@ -73,41 +64,33 @@ export function parseInstant(value: string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** 24-hour local clock time, "14:05:09". */
-export function formatTime(value: string | Date | null | undefined, withSeconds = true): string {
+/** 24-hour local clock time, "14:05"; seconds are opt-in for a live clock. */
+export function formatTime(value: string | Date | null | undefined, withSeconds = false): string {
   const date = value instanceof Date ? value : parseInstant(value);
   if (!date) return "";
-  return date.toLocaleTimeString([], {
+  return date.toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     ...(withSeconds ? { second: "2-digit" } : {}),
-    hour12: false,
+    hourCycle: "h23",
   });
 }
 
-/** "Saturday 12 Jun 2021" (`day_date_formatter`). */
-export function formatDayDate(value: string | Date | null | undefined): string {
+/** "Wed 28 Oct". Include the year when context needs it. */
+export function formatDate(value: string | Date | null | undefined, withYear = false): string {
   const date = value instanceof Date ? value : parseDateish(value);
-  if (!date) return "";
-  const weekday = date.toLocaleDateString("en-GB", { weekday: "long" });
-  const month = date.toLocaleDateString("en-GB", { month: "short" });
-  return `${weekday} ${pad(date.getDate())} ${month} ${date.getFullYear()}`;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}) }).replaceAll(",", "").replace("Sept", "Sep");
 }
 
-/** "12 June 2021" (`date_formatter`). */
-export function formatDate(value: string | Date | null | undefined): string {
-  const date = value instanceof Date ? value : parseDateish(value);
-  if (!date) return "";
-  const month = date.toLocaleDateString("en-GB", { month: "long" });
-  return `${pad(date.getDate())} ${month} ${date.getFullYear()}`;
-}
-
-/** "13 Aug" this year, "13 Aug 2025" otherwise. */
+export const formatDayDate = formatDate;
 export function formatShortDate(value: string | Date | null | undefined, now = new Date()): string {
   const date = value instanceof Date ? value : parseDateish(value);
-  if (!date) return "";
-  const base = `${date.getDate()} ${date.toLocaleDateString("en-GB", { month: "short" })}`;
-  return date.getFullYear() === now.getFullYear() ? base : `${base} ${date.getFullYear()}`;
+  return date ? formatDate(date, date.getFullYear() !== now.getFullYear()) : "";
+}
+
+export function formatTimeRange(start: string | Date | null | undefined, end: string | Date | null | undefined): string {
+  return `${formatTime(start)}–${formatTime(end)}`;
 }
 
 /* "2026-10-14" is a calendar date, not midnight UTC: parse it as local. */

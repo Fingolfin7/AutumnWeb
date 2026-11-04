@@ -185,7 +185,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         )}
 
         <div className="slab-foot action-row">
-          <AppLink className="btn btn--primary" href={urls.createSubproject(project.id)}>
+          <AppLink className="btn btn--secondary" href={urls.createSubproject(project.id)}>
             <Icon icon={faPlus} /> New subproject
           </AppLink>
           {project.subprojects.length ? (

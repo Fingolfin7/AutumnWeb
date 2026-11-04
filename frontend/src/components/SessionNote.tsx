@@ -1,23 +1,24 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
-/* A session note. The server renders markdown and sanitises it with nh3
-   (include=note_html), so the HTML here is trusted output of that one
-   sanitiser; plain notes fall back to text. Long notes clamp and expand on
-   click, as on the server-rendered pages; links inside still work. */
+/** Sanitized API markdown or plain text. Expand only when the note overflows. */
 export function SessionNote({ html, text, id }: { html?: string | null; text?: string | null; id?: string }) {
   const [open, setOpen] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const body = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = body.current;
+    if (!node || open) return;
+    const measure = () => setOverflows(node.scrollHeight > node.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [html, text, open]);
   if (!html && !text) return null;
-  const toggle = (event: React.MouseEvent) => {
-    if ((event.target as HTMLElement).closest("a")) return;
-    setOpen((value) => !value);
-  };
-  const className = `session-note${open ? " is-open" : ""}`;
-  if (html) {
-    return <div id={id} className={className} onClick={toggle} dangerouslySetInnerHTML={{ __html: html }} />;
-  }
   return (
-    <div id={id} className={className} onClick={toggle} style={{ whiteSpace: "pre-wrap" }}>
-      {text}
+    <div className={`session-note${open ? " is-open" : ""}`}>
+      {html ? <div ref={body} id={id} className="session-note-body" dangerouslySetInnerHTML={{ __html: html }} /> : <div ref={body} id={id} className="session-note-body session-note-body--plain">{text}</div>}
+      {overflows ? <button type="button" className="note-expand" aria-expanded={open} aria-controls={id} onClick={() => setOpen((value) => !value)}>{open ? "Show less" : "Read more"}</button> : null}
     </div>
   );
 }

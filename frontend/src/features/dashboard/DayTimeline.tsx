@@ -12,13 +12,6 @@ const RANGES: { key: TimelineRange; label: string }[] = [
 
 type Vars = CSSProperties & Record<`--${string}`, string>;
 
-const pad = (n: number) => String(n).padStart(2, "0");
-function compactMinutes(minutes: number) {
-  const whole = Math.round(minutes);
-  const hours = Math.floor(whole / 60);
-  return hours ? `${hours}h ${pad(whole % 60)}m` : `${whole % 60}m`;
-}
-
 /* The day timeline (partials/day_timeline.html). The server draws the
    geometry; between fetches the live blocks and the now-marker are walked
    forward here every 30 s, mapping the same absolute window onto 0-100%. */
@@ -81,11 +74,11 @@ export function DayTimeline({
                     {lane.project.name}
                   </AppLink>
                   <span className="fd-tl-fig">
-                    {lane.total_label ?? ""}
-                    {lane.live_label ? (
+                    {lane.total_minutes > 0 ? formatDuration(lane.total_minutes) : null}
+                    {lane.blocks.some((block) => block.is_live) ? (
                       <span className="muted">
-                        {lane.total_label ? " + " : ""}
-                        {lane.live_label} live
+                        {lane.total_minutes > 0 ? " + " : ""}
+                        {formatDuration(lane.blocks.filter((b) => b.is_live).reduce((sum, b) => sum + Math.max(0, Math.min(now, windowEnd) - Math.max(Date.parse(b.start), windowStart)) / 60000, 0))} live
                       </span>
                     ) : null}
                   </span>
@@ -95,7 +88,7 @@ export function DayTimeline({
                     let start = block.start_pct;
                     let end = block.end_pct;
                     let width = block.width_pct;
-                    let durationLabel = block.duration_label;
+                    let durationLabel = formatDuration(block.minutes);
                     if (block.is_live && valid) {
                       const started = parseInstant(block.start)?.getTime();
                       if (started !== undefined) {
@@ -103,7 +96,7 @@ export function DayTimeline({
                         start = pct(from);
                         end = pct(now);
                         width = Math.max(0, end - start);
-                        durationLabel = compactMinutes((now - from) / 60000);
+                        durationLabel = formatDuration((now - from) / 60000);
                       }
                     }
                     const label = `${lane.project.name}${block.label ? `, ${block.label}` : ""}, ${durationLabel}${block.is_live ? ", running" : ""}`;
@@ -116,6 +109,7 @@ export function DayTimeline({
                         <div
                           className={`fd-tl-block${block.is_live ? " is-live" : ""}${block.start_pct > 85 ? " is-endflip" : ""}`}
                           tabIndex={0}
+                          role="img"
                           aria-label={label}
                         >
                           <span className="fd-tl-b-text">
@@ -126,7 +120,7 @@ export function DayTimeline({
                         <div className={`fd-tl-tip${block.start_pct > 55 ? " fd-tl-tip--flip" : ""}`}>
                           <p>
                             <span className="mono text-cyan">
-                              {formatTime(block.start)} &rarr; {block.is_live ? "running" : formatTime(block.end)}
+                              {formatTime(block.start)}–{block.is_live ? "running" : formatTime(block.end)}
                             </span>{" "}
                             <span className="mono text-green">{durationLabel}</span>
                           </p>

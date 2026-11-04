@@ -68,11 +68,12 @@ export function Sheet({
   const panel = useRef<HTMLDivElement>(null);
   useModalFocus(open, onClose, panel);
   return createPortal(
-    <div className={`sheet${className ? " " + className : ""}${open ? " is-open" : ""}`} role="dialog" aria-modal="true" aria-label={title} aria-hidden={!open}>
+    <div className={`sheet${className ? " " + className : ""}${open ? " is-open" : ""}`} role="dialog" aria-modal="true" aria-label={title} aria-hidden={!open} inert={!open}>
       <div className="sheet-scrim" onClick={onClose} />
       <div className="sheet-panel" ref={panel} tabIndex={-1}>
         <div className="sheet-grab" />
         {title ? <p className="sheet-title">{title}</p> : null}
+        <button type="button" className="btn-icon sheet-close" aria-label="Close panel" onClick={onClose}>&times;</button>
         {children}
       </div>
     </div>,
@@ -102,13 +103,12 @@ export function Dialog({
     <>
       <div className="dialog-scrim" onClick={onClose} />
       <div
-        className="dialog-panel"
+        className={`dialog-panel${wide ? " dialog-panel--wide" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         ref={panel}
         tabIndex={-1}
-        style={wide ? { width: "min(46rem, calc(100vw - 1.5rem))" } : undefined}
       >
         <h2 className="dialog-title" id={titleId}>
           {title}
@@ -151,7 +151,6 @@ export function ConfirmDialog({
           className={`btn ${danger ? "btn--danger" : "btn--primary"}`}
           onClick={onConfirm}
           disabled={busy}
-          data-autofocus
         >
           {confirmLabel}
         </button>

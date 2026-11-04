@@ -147,8 +147,8 @@ describe("commitment display", () => {
   });
 
   it("signs bank figures", () => {
-    expect(formatSigned(-180, true)).toBe("-180m");
-    expect(formatSigned(2.5, true)).toBe("+2.5m");
+    expect(formatSigned(-180, true)).toBe("-3h");
+    expect(formatSigned(2.5, true)).toBe("+2m");
     expect(formatSigned(0, false)).toBe("+0");
   });
 });

@@ -1,106 +1,71 @@
-/* ============================================================================
-   AUTUMN — "FOCUS DESK" DESIGN SYSTEM                          focus_desk.css
-   ============================================================================
-   The single stylesheet for the React app (spa.html) and the server-rendered
-   pages (base.html).
-   Do not fork it, do not add a second stylesheet, do not use inline styles —
-   if a page needs a component that isn't here, APPEND it here in this style.
-
-   ============================================================================
-
-   THESIS
-   ------
-   Calm, one thing at a time — on a phone AND on a 27" display. The product
-   still answers one question above the fold: "what am I working on right now",
-   as a large FOCUS CARD with giant elapsed time, project, subprojects and one
-   primary Stop button.
-
-   What changed from Focus Card v1: v1 treated desktop as a widened phone —
-   the same single narrow column, everything else stacked and collapsed. That
-   read as calm on 390px and as wasteful on 1440px. So the calm is kept but the
-   width is now used. At >=1000px the page is a HERO ZONE above a DESK:
-
-     HERO (full width)  focus deck — "what am I doing right now"
-                        timeline   — "what has today looked like"
-                        Both are wide objects; neither belongs in a column.
-     DESK (two tracks)  PRIMARY (wide)   sessions — what you act on
-                        AMBIENT (narrow) commitments + activity — what you
-                                         glance at
-
-   Progressive disclosure is for when space is scarce; when it isn't, showing
-   the thing beats hiding it behind a tap.
-
-   Surfaces stay soft dark SLABS with big radii and real shadow — physical
-   depth, not frosted glass, not terminal panes, not paper, not kanban.
-   The backdrop photo still frames the desk: generous gutters, capped measure,
-   translucent slabs so the image reads through everywhere.
-
-   NAV MODEL
-   ---------
-   No sidebar at any width. One .tabbar element that changes station:
-     - <=560px  : full-width-inset bar fixed to the BOTTOM, 5 icon tabs
-                  (Home / Projects / Timers / Sessions / More).
-     - >560px   : shrinks to a centred bottom PILL, icons gain labels.
-     - >=1000px : the same pill unpins from the bottom and becomes a STICKY
-                  FLOATING PILL AT THE TOP, with Insights + Charts inline.
-                  Bottom-anchored nav is a thumb affordance; on a desktop the
-                  pointer is already at the top of the window.
-   Remaining items (Import, Export, Profile, Log out) live in a SHEET opened by
-   the "More" tab. The sheet is also reused for filters on Projects / Sessions
-   — never put an 8-control filter row on the page; put a search field plus a
-   "Filters" launcher that opens `.sheet`.
-
-   TYPE SCALE  (root 16px; body runs 17px — large type is part of the thesis)
-   ----------
-     --fs-hero    clamp(3.25rem, 15vw, 4.75rem)  mono, 600, tabular  live timer
-     --fs-xxl     2rem      big numbers (commitment actuals, project totals)
-     --fs-xl      1.5rem    focus-card project name
-     --fs-lg      1.1875rem section titles, project names in lists
-     --fs-md      1.0625rem body / session project names
-     --fs-sm      0.9375rem secondary rows, notes
-     --fs-xs      0.8125rem metadata, chips
-     --fs-label   0.6875rem uppercase 0.12em tracking, muted — eyebrow labels
-   Mono (--font-mono) is confined to numerals: durations, clock times, counts,
-   percentages. Never mono for prose.
-   ============================================================================ */
+/* Autumn / Night Ledger — shared foundations
+   Journal first: warm off-white prose, neutral clock/date labels; project red,
+   subproject blue and duration green have fixed meanings. Amber is for the
+   single primary action in a view; Stop uses copper, danger uses rose.
+   Surfaces: --surface-0 (workspace), --surface-1 (translucent content),
+   --surface-2 (raised controls and opaque overlays). Rows use straight dividers,
+   never another card. Keep the user's backdrop visible around the content.
+   Type: self-hosted OFL Manrope for titles and tabular numerals; --font-ui for
+   prose, notes at --fs-md / 1.75 and a comfortable 70ch reading measure.
+   Reuse --s1…--s8 spacing, --r-xs…--r-xl radii and --fs-* type scales below.
+   Navigation: Today / Projects / Sessions / Review. One desktop header row;
+   <1000px: 48px header and opaque bottom bar with a central capture action.
+   Settings lives behind the avatar. Insights belongs to Review, full height.
+   React primitives: components/ui.tsx; Sheet, Dialog and ConfirmDialog in
+   components/Sheet.tsx. Formatting ONLY through lib/format.ts (API minutes).
+   No inline layout styles, dependencies, new stylesheets or local token forks.
+   React additions belong in frontend/src/styles/app.css; shared styling here.
+   ======================================================================== */
+@font-face {
+  font-family: "Manrope";
+  src: url("../fonts/manrope-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
 
 /* ---------------------------------------------------------------- TOKENS -- */
 :root {
   /* --- semantic hues (LOAD-BEARING — meanings are fixed) ---------------- */
-  --project:        #d0796f;   /* PROJECT names        (from #be675f, +L)   */
+  --project:        #ee9b91;   /* PROJECT names        (from #be675f, +L)   */
   --project-deep:   #be675f;   /* canonical, for small text / borders       */
-  --sub:            #8aabce;   /* SUBPROJECT names     (from #7896b8)       */
+  --sub:            #9dbfe9;   /* SUBPROJECT names     (from #7896b8)       */
   --sub-deep:       #7896b8;
-  --duration:       #8dbc75;   /* DURATIONS / totals   (from #7ca36a)       */
+  --duration:       #a5cf88;   /* DURATIONS / totals   (from #7ca36a)       */
   --duration-deep:  #7ca36a;
-  --time:           #58b1a3;   /* CLOCK times          (from #4e9a8e)       */
-  --time-deep:      #4e9a8e;
-  --note:           #c6b276;   /* session NOTES        (from #b9a66a)       */
-  --note-deep:      #b9a66a;
-  --brand:          #d18b4c;   /* BRAND / accent       (from #c98245)       */
-  --brand-deep:     #c98245;
-  --brand-hover:    #e0a05f;
+  --time:           #aaa9a5;   /* CLOCK times          (from #93938f)       */
+  --time-deep:      #93938f;
+  --note:           #e6dfd5;   /* session NOTES        (from #c9c2b9)       */
+  --note-deep:      #c9c2b9;
+  --brand:          #e9a35b;   /* BRAND / accent       (from #e4a05b)       */
+  --brand-deep:     #e4a05b;
+  --brand-hover:    #f3b776;
   --magenta:        #9b83a7;
   --context:        #e0a458;   /* commitment target: context = orange       */
 
   /* --- progress / status (were literal hexes in v1) --------------------- */
   --status-complete:    #7ca36a;
   --status-approaching: #84cc16;
-  --status-on-track:    #b9a66a;
+  --status-on-track:    #c9c2b9;
   --status-warning:     #f97316;
   --status-behind:      #be675f;
 
   /* --- ink -------------------------------------------------------------- */
-  --ink:        #e4e8e5;
-  --ink-2:      #b9c1bc;
-  --muted:      #8b948f;
+  --ink:        #f0ece5;
+  --ink-2:      #cbc5bd;
+  --muted:      #aaa69f;
   --ink-invert: #101214;
 
   /* --- surfaces (translucent so the backdrop always reads through) ------ */
-  --base:        #101214;
-  --slab:        rgba(18, 21, 24, 0.80);
-  --slab-focus:  rgba(21, 25, 28, 0.88);
-  --slab-solid:  #15181b;
+  --surface-0:   #111315;
+  --surface-1:   rgba(25, 27, 29, .91);
+  --surface-2:   #202326;
+  --danger:      #f1a2b4;
+  --stop:        #efbb8f;
+  --base:        var(--surface-0);
+  --slab:        var(--surface-1);
+  --slab-focus:  rgba(29, 30, 30, .94);
+  --slab-solid:  var(--surface-2);
   --raised:      rgba(255, 255, 255, 0.045);
   --raised-2:    rgba(255, 255, 255, 0.075);
   --sunken:      rgba(0, 0, 0, 0.26);
@@ -126,11 +91,11 @@
   --focus-ring: 0 0 0 3px rgba(209,139,76,.30);
 
   /* --- radii (big and soft — the anti-thesis of v1's square corners) ---- */
-  --r-xs: 8px;
-  --r-sm: 12px;
-  --r-md: 18px;
-  --r-lg: 24px;
-  --r-xl: 30px;
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 26px;
   --r-pill: 999px;
 
   /* --- spacing ---------------------------------------------------------- */
@@ -139,20 +104,21 @@
 
   /* --- type ------------------------------------------------------------- */
   --font-ui:   "Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-display: "Manrope", "Aptos", "Segoe UI", sans-serif;
+  --font-mono: var(--font-display);
   --fs-hero:  clamp(3.25rem, 15vw, 4.75rem);
-  --fs-xxl:   2rem;
+  --fs-xxl:   clamp(2rem, 3.5vw, 2.75rem);
   --fs-xl:    1.5rem;
   --fs-lg:    1.1875rem;
   --fs-md:    1.0625rem;
   --fs-sm:    .9375rem;
   --fs-xs:    .8125rem;
-  --fs-label: .6875rem;
+  --fs-label: .8125rem;
 
   /* --- layout ----------------------------------------------------------- */
   --col:        min(100%, 40rem);           /* the one content column       */
   --tabbar-h:   4.25rem;
-  --header-h:   3.5rem;
+  --header-h:   4.25rem;
   --ease: cubic-bezier(.22,.61,.36,1);
 }
 
@@ -250,161 +216,60 @@ body.bg-active .app { position: relative; z-index: 2; }
 }
 .screen-pad { padding-top: var(--s5); }
 
-.app-header {
-  /* Deliberately NOT sticky and NOT filled: navigation lives at the bottom,
-     so the top of the screen can be given back to the backdrop photo.      */
-  position: relative; z-index: 30;
-  height: var(--header-h);
-  display: flex; align-items: center;
-  background: none;
-}
-.app-header > .screen { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
-.brand { display: flex; align-items: center; gap: .55rem; }
-.brand-mark { color: var(--brand); font-size: 1.15rem; }
-.brand-word { font-weight: 650; letter-spacing: .01em; font-size: var(--fs-md); }
-.header-right { display: flex; align-items: center; gap: var(--s3); }
-/* Active-context switcher in the header. Styled as a chip rather than a form
-   control because that is what it reads as — a statement of what you are
-   currently looking at, which happens to be changeable. It borrows the
-   --context orange the context chips use everywhere else so the connection to
-   Contexts is not something you have to learn. */
-.context-switch { display: flex; align-items: center; min-width: 0; }
-.context-switch select {
-  appearance: none;
-  max-width: min(14rem, 32vw);
-  padding: .2rem 1.5rem .2rem .6rem;
-  border: 0; border-radius: var(--r-pill);
-  font-family: inherit; font-size: var(--fs-xs);
-  color: var(--context); background: rgba(224, 164, 88, .13);
-  box-shadow: inset 0 0 0 1px rgba(224, 164, 88, .24);
-  text-overflow: ellipsis;
-  cursor: pointer;
-  /* the chevron, drawn rather than shipped as an asset */
-  background-image: linear-gradient(45deg, transparent 50%, var(--context) 50%),
-                    linear-gradient(135deg, var(--context) 50%, transparent 50%);
-  background-position: calc(100% - .75rem) 55%, calc(100% - .5rem) 55%;
-  background-size: .25rem .25rem, .25rem .25rem;
-  background-repeat: no-repeat;
-}
-.context-switch select:hover { background-color: rgba(224, 164, 88, .2); }
-@media (max-width: 560px) {
-  /* On a phone the brand, context, dimmer and avatar do not belong on one
-     increasingly compressed line. Keep the identity and viewing tools calm
-     on the first row, then give the active workspace its own utility row. */
-  .app-header--auth {
-    height: auto;
-    min-height: var(--header-h);
-    padding: var(--s2) 0;
-  }
-  .app-header > .app-header-screen--auth {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "brand dim avatar"
-      "context context context";
-    column-gap: var(--s3);
-    row-gap: var(--s2);
-  }
-  .app-header-screen--auth .brand { grid-area: brand; }
-  .app-header-screen--auth .header-right { display: contents; }
-  .app-header-screen--auth .context-switch {
-    grid-area: context;
-    width: min(100%, 14rem);
-    min-width: 0;
-  }
-  .app-header-screen--auth .context-switch select {
-    width: 100%;
-    max-width: none;
-    min-height: 2.25rem;
-    text-overflow: ellipsis;
-  }
-  .app-header-screen--auth .dim-control {
-    grid-area: dim;
-    justify-self: end;
-  }
-  .app-header-screen--auth .avatar {
-    grid-area: avatar;
-    justify-self: end;
-  }
-}
-
-/* Backdrop dimming, parked in the header beside the avatar. Hidden unless a
-   photo actually resolved — with no backdrop there is nothing to dim, and an
-   inert control in the chrome of every page is worse than no control. The
-   markup is rendered unconditionally and revealed here, so the shell does not
-   have to restate its three-way background resolution. */
-.dim-control {
-  display: none; align-items: center; gap: .5rem;
-  padding: .3rem .7rem;
-  background: rgba(16, 19, 22, .55);
-  border-radius: var(--r-pill);
-  box-shadow: var(--edge);
-}
+/* Opaque chrome keeps scrolling text from bleeding through. */
+.app-header { position: sticky; top: 0; z-index: 45; height: var(--header-h); display: flex; align-items: center; background: var(--surface-0); border-bottom: 1px solid var(--hairline-2); }
+.app-header > .screen { display: flex; align-items: center; justify-content: space-between; gap: var(--s5); width: 100%; max-width: 90rem; }
+.brand { display: flex; align-items: center; gap: .55rem; min-height: 44px; }
+.brand-word { font-family: var(--font-display); font-weight: 750; font-size: 1.2rem; letter-spacing: -.04em; }
+.header-right { display: flex; align-items: center; gap: var(--s2); }
+.context-switch { display: flex; min-width: 0; }
+.context-switch select { max-width: 12rem; min-height: 44px; padding: .5rem .65rem; font: inherit; font-size: var(--fs-xs); color: var(--ink-2); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); background: var(--surface-0); text-overflow: ellipsis; }
+.avatar { width: 44px; height: 44px; padding: 6px; border-radius: var(--r-pill); display: grid; place-items: center; }
+.avatar img { width: 32px; height: 32px; object-fit: cover; border-radius: var(--r-pill); }
+.avatar:hover, .avatar.is-active { background: var(--raised-2); box-shadow: inset 0 0 0 1px var(--brand); }
+.primary-nav { display: flex; gap: var(--s1); margin-right: auto; }
+.nav-slot { display: contents; }
+.nav-link { display: flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 44px; padding: .5rem .85rem; border-radius: var(--r-sm); color: var(--muted); font-size: var(--fs-sm); }
+.nav-link .icon { font-size: .95rem; }
+.nav-link:hover { background: var(--raised); color: var(--ink); }
+.nav-link.is-active { color: var(--ink); background: var(--raised-2); }
+.nav-link.is-active .icon { color: var(--brand); }
+.primary-nav .nav-capture { display: none; }
+.review-nav { display: flex; flex-wrap: wrap; gap: var(--s2); margin-bottom: var(--s4); }
+.review-nav a { min-height: 44px; display: flex; align-items: center; padding: .5rem .85rem; font-size: var(--fs-sm); color: var(--muted); border-bottom: 2px solid transparent; }
+.review-nav a[aria-current] { color: var(--brand); border-color: var(--brand); }
+.dim-control { display: none; align-items: center; gap: var(--s3); padding: var(--s3) var(--s2); }
 body.bg-active .dim-control { display: flex; }
-.dim-icon { font-size: .75rem; color: var(--muted); }
-.dim-control input[type="range"] {
-  width: 6rem; height: 1rem; margin: 0;
-  /* accent-color plus the root's color-scheme: dark is the whole styling
-     budget here — a native range renders correctly dark with an orange thumb,
-     and a hand-built one would be worse at every browser and input type. */
-  accent-color: var(--brand);
-  cursor: pointer;
-}
-@media (max-width: 560px) { .dim-control input[type="range"] { width: 4rem; } }
-
-.avatar {
-  width: 2rem; height: 2rem; border-radius: var(--r-pill);
-  background: linear-gradient(150deg, #5d6b4d, #3d4a55);
-  box-shadow: inset 0 0 0 1px var(--hairline-2);
-  display: grid; place-items: center;
-  font-size: var(--fs-xs); font-weight: 650; color: var(--ink);
+.dim-control input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--brand); }
+.skip-link { position: fixed; top: -5rem; left: 1rem; z-index: 100; background: var(--slab-solid); padding: var(--s3); }
+.skip-link:focus { top: .5rem; }
+@media (max-width: 999px) {
+  :root { --header-h: 3rem; }
+  .app-header > .app-header-screen--auth { gap: var(--s2); padding-inline: var(--s3); }
+  .brand-word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .brand { width: 44px; justify-content: center; }
+  .header-right { gap: 0; flex: 1; justify-content: flex-end; }
+  .context-switch { margin-right: auto; }
+  .context-switch select { max-width: min(40vw, 12rem); background: transparent; border-color: transparent; }
+  .header-right .header-capture { display: none; }
+  .primary-nav { position: fixed; z-index: 40; bottom: 0; left: 0; right: 0; display: grid; grid-template-columns: 1fr 1fr .8fr 1fr 1fr; gap: 0; margin: 0; padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom, 0px)); height: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); background: var(--surface-0); border-top: 1px solid var(--hairline-2); }
+  .nav-link { flex-direction: column; gap: .25rem; padding: .35rem .1rem; font-size: .6875rem; border-radius: var(--r-xs); }
+  .nav-link.is-active { background: transparent; color: var(--brand); }
+  .nav-link .icon { font-size: 1.1rem; }
+  .primary-nav .nav-capture { display: grid; align-self: center; justify-self: center; width: 46px; height: 46px; border-radius: var(--r-md); color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, var(--surface-0)); border: 1px solid color-mix(in srgb, var(--brand) 45%, transparent); }
 }
 
 .page-eyebrow {
   font-size: var(--fs-label); text-transform: uppercase; letter-spacing: .12em;
   color: var(--muted); font-weight: 600;
 }
-.page-title { font-size: var(--fs-xxl); font-weight: 650; line-height: 1.15; letter-spacing: -.01em; }
+.page-title { font-family: var(--font-display); font-size: var(--fs-xxl); font-weight: 650; line-height: 1.15; letter-spacing: -.01em; }
 
 /* Below the desk breakpoint the head simply stacks: title, then the strip.
    At >=1000px they share one line (see the desktop layer). */
 .desk-head { margin-bottom: var(--s5); }
 .desk-head .stat-strip { margin-top: var(--s4); }
 .desk-head--stats .stat-strip { margin-top: 0; flex: 1 1 auto; }
-
-/* -------------------------------------------------------------- TABBAR --- */
-.tabbar {
-  position: fixed; z-index: 40;
-  left: 0; right: 0; bottom: 0;
-  display: flex; justify-content: center;
-  padding: 0 var(--s3) calc(var(--s3) + env(safe-area-inset-bottom, 0px));
-  pointer-events: none;
-}
-.tabbar-inner {
-  pointer-events: auto;
-  display: flex; align-items: stretch; gap: 2px;
-  width: 100%; max-width: 30rem;
-  padding: .3rem;
-  background: rgba(16,19,22,.90);
-  border-radius: var(--r-pill);
-  box-shadow: var(--edge), var(--e3);
-}
-.tab {
-  flex: 1 1 0; min-width: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: .18rem; padding: .5rem .2rem;
-  border-radius: var(--r-pill);
-  color: var(--muted);
-  transition: color .18s var(--ease), background .18s var(--ease);
-}
-.tab:hover { color: var(--ink-2); background: var(--raised); }
-.tab.is-active { color: var(--ink); background: var(--raised-2); box-shadow: var(--edge); }
-.tab.is-active .tab-icon { color: var(--brand); }
-.tab-icon { font-size: 1.0625rem; line-height: 1; }
-.tab-label { font-size: .625rem; letter-spacing: .04em; white-space: nowrap; }
-/* Insights + Charts are hidden on phones (they live in the More sheet) and
-   surface inline once the pill has room. */
-.tab--overflow { display: none; }
 
 /* ---------------------------------------------------------------- SHEET -- */
 .sheet { position: fixed; inset: 0; z-index: 60; visibility: hidden; }
@@ -424,7 +289,7 @@ body.bg-active .dim-control { display: flex; }
   border-radius: var(--r-xl) var(--r-xl) 0 0;
   box-shadow: var(--edge), var(--e3);
   transition: transform .26s var(--ease);
-  max-height: 82vh; overflow-y: auto;
+  max-height: 90dvh; overflow-y: auto; overscroll-behavior: contain;
 }
 .sheet.is-open .sheet-panel { transform: translate(-50%, 0); }
 .sheet-grab {
@@ -600,11 +465,9 @@ body.bg-active .dim-control { display: flex; }
 .focus-quick form { display: contents; }
 
 .focus-dots { display: flex; justify-content: center; gap: .4rem; margin-top: var(--s1); }
-.focus-dot {
-  width: .4rem; height: .4rem; border-radius: var(--r-pill);
-  background: var(--hairline-2); transition: all .2s var(--ease);
-}
-.focus-dot.is-active { background: var(--brand); width: 1.35rem; }
+.focus-dot { width: 44px; height: 44px; display: grid; place-items: center; }
+.focus-dot::after { content: ""; width: .4rem; height: .4rem; border-radius: var(--r-pill); background: var(--hairline-2); }
+.focus-dot.is-active::after { background: var(--brand); width: 1.35rem; }
 
 /* ----------------------------------------------------------- STAT STRIP --
    Four numbers, ONE slab, hairline-divided. Not four cards.                */
@@ -684,7 +547,7 @@ body.bg-active .dim-control { display: flex; }
 
 .streak-row { margin-top: var(--s4); display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .streak-flame { font-size: .95rem; color: var(--muted); }
-.streak-flame.is-hot { color: var(--project-deep); }
+.streak-flame.is-hot { color: var(--brand); }
 .streak-count { font-size: var(--fs-xs); color: var(--muted); }
 .period-strip { display: flex; gap: .3rem; margin-left: auto; }
 .period-cell {
@@ -795,13 +658,12 @@ body.bg-active .dim-control { display: flex; }
   background: rgba(120,150,184,.14);
   box-shadow: inset 0 0 0 1px rgba(120,150,184,.22);
 }
-.session-note {
-  margin-top: .5rem; font-size: var(--fs-sm); color: var(--note);
-  line-height: 1.45;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden;                 /* clamp, never marquee */
-}
-.session-note.is-open { -webkit-line-clamp: unset; display: block; }
+.session-note { margin-top: .5rem; font-size: var(--fs-md); line-height: 1.75; max-width: 70ch; color: var(--note); }
+.session-note-body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.session-note.is-open .session-note-body { -webkit-line-clamp: unset; display: block; }
+.session-note-body--plain { white-space: pre-wrap; }
+.note-expand { display: inline-flex; align-items: center; min-height: 44px; padding: .25rem .4rem; margin-left: -.4rem; color: var(--ink-2); font-size: var(--fs-xs); text-decoration: underline; text-underline-offset: 3px; }
+.note-expand:hover { color: var(--brand); }
 .session-note a { color: var(--time); text-decoration: underline; text-underline-offset: 2px; }
 .session-note strong { color: var(--note); font-weight: 700; }
 /* Notes render through the markdown filter, so their real content is block
@@ -809,7 +671,9 @@ body.bg-active .dim-control { display: flex; }
    baseline the clamp expects. */
 .session-note p { margin: 0; }
 .session-note p + p { margin-top: .35rem; }
-.session-note ul, .session-note ol { padding-left: 1.1rem; list-style: disc; }
+.session-note ul, .session-note ol { padding-left: 1.3rem; }
+.session-note ul { list-style: disc; }
+.session-note ol { list-style: decimal; }
 .session-note code {
   font-family: var(--font-mono); font-size: .9em;
   padding: .05rem .3rem; border-radius: var(--r-xs); background: var(--sunken);
@@ -837,7 +701,7 @@ body.bg-active .dim-control { display: flex; }
 }
 .tag-chip {
   padding: .12rem .5rem; border-radius: var(--r-pill); font-size: var(--fs-xs);
-  color: var(--tag, var(--muted));
+  color: var(--ink);
   background: color-mix(in srgb, var(--tag, #888) 14%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tag, #888) 30%, transparent);
 }
@@ -853,12 +717,12 @@ body.bg-active .dim-control { display: flex; }
   flex: 0 0 auto; width: 3.25rem; height: 3.25rem;
   border-radius: var(--r-pill);
   display: grid; place-items: center;
-  background: var(--brand-deep); color: var(--ink-invert);
+  background: var(--raised); color: var(--brand);
   font-size: 1.05rem;
   box-shadow: var(--edge), var(--e1);
   transition: transform .16s var(--ease), background .16s var(--ease);
 }
-.project-start:hover { background: var(--brand-hover); transform: scale(1.04); }
+.project-start:hover { background: var(--raised-2); transform: scale(1.04); }
 
 /* --------------------------------------------------------------- FILTERS -- */
 .searchbar {
@@ -905,6 +769,7 @@ body.bg-active .dim-control { display: flex; }
 }
 
 .filter-launcher {
+  flex-shrink: 0;
   display: inline-flex; align-items: center; gap: .4rem;
   padding: .55rem .9rem; border-radius: var(--r-pill);
   background: var(--raised); font-size: var(--fs-sm); white-space: nowrap;
@@ -940,8 +805,8 @@ body.bg-active .dim-control { display: flex; }
 .btn:active { transform: translateY(1px); }
 .btn--primary { background: var(--brand-deep); color: var(--ink-invert); box-shadow: var(--edge), var(--e1); }
 .btn--primary:hover { background: var(--brand-hover); }
-.btn--stop { background: var(--project-deep); color: #17110f; box-shadow: var(--edge), var(--e1); }
-.btn--stop:hover { background: var(--project); }
+.btn--stop { background: var(--stop); color: #251b13; box-shadow: var(--edge), var(--e1); }
+.btn--stop:hover { background: #f8cba5; }
 .btn--ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-2); }
 .btn--ghost:hover { background: var(--raised); }
 .btn--quiet { background: transparent; color: var(--muted); box-shadow: none; padding: .4rem .6rem; }
@@ -949,7 +814,7 @@ body.bg-active .dim-control { display: flex; }
 .btn--block { width: 100%; }
 .btn--lg { padding: 1rem 1.5rem; font-size: var(--fs-md); border-radius: var(--r-pill); }
 .btn-icon {
-  width: 2.5rem; height: 2.5rem; border-radius: var(--r-pill);
+  width: 2.75rem; height: 2.75rem; border-radius: var(--r-sm);
   display: grid; place-items: center; color: var(--muted);
   background: var(--raised); font-size: .9rem;
   transition: color .16s var(--ease), background .16s var(--ease);
@@ -986,18 +851,7 @@ body.bg-active .dim-control { display: flex; }
   .stat-strip { grid-template-columns: repeat(4, 1fr); }
   .stat, .stat:nth-child(odd) { border-top: 0; border-left: 1px solid var(--hairline); }
   .stat:first-child { border-left: 0; }
-  /* Wide phones used to switch this bar to intrinsic width here. Five tabs
-     then grew wider than the viewport and the centred pill was clipped at
-     both edges. Keep the bounded, equal-width dock until the true desktop
-     breakpoint; only change the icon/label arrangement at this width. */
-  .tabbar-inner { padding: .35rem; }
-  .tab {
-    flex: 1 1 0;
-    flex-direction: row;
-    gap: .4rem;
-    padding: .6rem .55rem;
-  }
-  .tab-label { font-size: var(--fs-xs); }
+
 }
 
 /* A commitment's eight-period history and the activity range are the two
@@ -1071,32 +925,7 @@ body.bg-active .dim-control { display: flex; }
   }
 }
 
-/* ============================================================================
-   ═══  DESKTOP LAYER  —  "FOCUS DESK"  ═══════════════════════════════════════
-   ----------------------------------------------------------------------------
-   Everything above this line is the mobile-first Focus Card system, unchanged.
-   This layer keeps its FEEL — soft translucent slabs, big radii, real physical
-   depth, large calm type, one obvious primary action — but stops pretending a
-   1440px display is a tall phone.
-
-   What changes at >=1000px:
-     1. THE COLUMN BECOMES A DESK.  Two tracks: a wide primary track (focus +
-        sessions, the things you act on) and a narrower ambient track
-        (commitments + activity, the things you glance at). Nothing is hidden
-        behind a tap that the width can simply show.
-     2. THE CAROUSEL BECOMES A ROW.  .focus-track stops snapping and lays the
-        running timers out side by side — on a phone "one at a time" is a
-        kindness, on a desktop it is withheld information. Dots disappear.
-     3. THE PILL GOES UP.  The same .tabbar element unpins from the bottom of
-        the viewport and becomes a sticky floating pill at the top, gaining
-        text labels and surfacing Insights + Charts inline.
-     4. SESSIONS GO HORIZONTAL.  The stacked 3-line card becomes one aligned
-        row — time · project · subprojects · note · duration — with the action
-        cluster revealed on hover instead of by swiping.
-     5. THE BACKDROP GETS ROOM.  Generous gutters and a capped measure so the
-        user's photo still frames the desk rather than being covered by it.
-   ==========================================================================*/
-
+/* Desktop content layout. Navigation is defined in the shared shell above. */
 @media (min-width: 1000px) {
 
   /* ── shell ─────────────────────────────────────────────────────────────*/
@@ -1105,32 +934,6 @@ body.bg-active .dim-control { display: flex; }
      max-width instead. Overriding max-width alone does nothing here. */
   .screen { width: 100%; max-width: 90rem; padding-left: var(--s5); padding-right: var(--s5); }
   .screen-pad { padding-bottom: var(--s6); }
-  .app-header { position: sticky; top: 0; z-index: 45; }
-  /* body reserves --tabbar-h at the bottom so the fixed phone tabbar never
-     covers the last row. Up here the tabbar is a sticky pill at the TOP, so
-     that reservation is 100px of dead space at the foot of every page. */
-  body { padding-bottom: var(--s6); }
-
-  /* ── 3 · nav pill moves to the top ─────────────────────────────────────*/
-  .tabbar {
-    position: sticky; top: var(--s3); bottom: auto;
-    z-index: 44; padding: 0;
-    margin: 0 auto var(--s5); justify-content: center;
-  }
-  .tabbar-inner {
-    width: auto; max-width: none;
-    gap: .15rem; padding: .35rem;
-    box-shadow: var(--edge), var(--e2);
-  }
-  .tab {
-    flex: 0 0 auto;
-    flex-direction: row; align-items: center; gap: .5rem;
-    padding: .5rem 1rem;
-  }
-  .tab-icon { font-size: .9375rem; }
-  .tab-label { font-size: var(--fs-xs); letter-spacing: .01em; }
-  .tab--overflow { display: flex; }        /* Insights + Charts inline */
-
   /* ── page head: title and stats share the top line ─────────────────────*/
   .desk-head {
     display: flex; align-items: flex-end; justify-content: space-between;
@@ -3494,3 +3297,91 @@ img.brand-mark {
 .similarity-chevron { font-size: .7rem; color: var(--muted); transition: transform .15s ease; }
 .similarity-disclosure[open] .similarity-chevron { transform: rotate(180deg); }
 .similarity-disclosure[open] { display: grid; gap: .4rem; padding-bottom: var(--s4); }
+
+/* Shared controls: quiet alternatives, clear danger, comfortable hit areas. */
+.btn { min-height: 44px; border-radius: var(--r-sm); }
+.btn--secondary { background: var(--raised); }
+.btn--danger { color: var(--danger); background: #4b2933; box-shadow: inset 0 0 0 1px #87505f; }
+.btn--danger:hover { background: #633342; }
+.btn:disabled, .btn-icon:disabled { opacity: .55; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.input, .select, .fields input:not([type="checkbox"]):not([type="radio"]), .fields select { min-height: 44px; }
+.chip { display: inline-flex; align-items: center; gap: var(--s2); padding: .25rem .65rem; border-radius: var(--r-pill); color: var(--ink-2); background: var(--raised); font-size: var(--fs-xs); }
+.tag-chip::before { content: ""; display: inline-block; width: .45rem; height: .45rem; border-radius: 50%; background: var(--tag, var(--muted)); margin-right: .35rem; }
+.toggle { display: flex; align-items: center; gap: var(--s3); min-height: 44px; cursor: pointer; }
+.toggle input { appearance: none; flex: none; width: 44px; height: 26px; border-radius: 999px; background: #555552; border: 1px solid var(--hairline-2); position: relative; cursor: pointer; }
+.toggle input::before { content: ""; position: absolute; width: 18px; height: 18px; top: 3px; left: 3px; border-radius: 50%; background: var(--ink); transition: transform .15s var(--ease); }
+.toggle input:checked { background: var(--brand-deep); }
+.toggle input:checked::before { transform: translateX(18px); background: var(--ink-invert); }
+.segmented { min-width: 0; max-width: 100%; display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; margin: 0; border: 1px solid var(--hairline-2); border-radius: var(--r-sm); background: var(--sunken); }
+.segmented label { position: relative; display: flex; cursor: pointer; }
+.segmented input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; }
+.segmented span { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: .5rem .85rem; border-radius: var(--r-xs); color: var(--muted); font-size: var(--fs-sm); }
+.segmented input:checked + span { color: var(--ink); background: var(--surface-2); box-shadow: var(--e1); }
+.segmented input:focus-visible + span { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sheet-close { position: absolute; right: var(--s3); top: var(--s3); font-size: 1.5rem; }
+.sheet-title { padding-right: 44px; min-height: 44px; display: flex; align-items: center; font-size: var(--fs-lg); text-transform: none; letter-spacing: -.02em; font-family: var(--font-display); color: var(--ink); }
+.sheet-list > * + * { border-radius: 0; }
+.timer-note-editor textarea, .fields .note-editor-shell textarea { font-family: var(--font-ui); font-size: var(--fs-md); line-height: 1.75; color: var(--note); }
+.stat-strip .stat-value.text-cyan { color: var(--duration); }
+.slab .slab, .slab .stat-strip { background: transparent; box-shadow: none; border-radius: 0; }
+@media (min-width: 1000px) {
+  body { padding-bottom: var(--s6); }
+  .screen.screen-pad { padding-top: var(--s6); }
+  .sheet-panel { left: auto; right: 0; top: 0; bottom: 0; width: min(30rem, 90vw); max-height: 100dvh; border-radius: var(--r-lg) 0 0 var(--r-lg); transform: translateX(100%); padding: var(--s5); }
+  .sheet.is-open .sheet-panel { transform: translateX(0); }
+  .sheet-grab { display: none; }
+}
+@media (max-width: 999px) {
+  body { padding-bottom: calc(var(--tabbar-h) + var(--s6) + env(safe-area-inset-bottom, 0px)); }
+  .screen.screen-pad { padding-top: var(--s5); }
+  :where(button, a[href], summary, select, input:not([type="hidden"]), label[for], label:has(input), [role="button"], [role="tab"]) { min-height: 44px; min-width: 44px; }
+  label[for], label:has(input) { display: inline-flex; align-items: center; }
+  :where(input[type="checkbox"], input[type="radio"]):not(.toggle input):not(.segmented input) { min-width: 22px; min-height: 22px; margin: 11px; }
+  .btn-icon { width: 44px; height: 44px; flex-shrink: 0; }
+  .dim-control input[type="range"] { min-height: 44px; }
+  .session-project, .project-name, .focus-project { overflow-wrap: break-word; word-break: normal; }
+}
+
+/* Labels guide reading without shouting over the journal. */
+.page-eyebrow, .focus-eyebrow, .stat-label, .field-label, .bank-label,
+.fd-tl-total-label, .commit-period, .sheet-title { text-transform: none; letter-spacing: .015em; }
+@media (max-width: 999px) {
+  .range-tab, .filter-launcher, .quick-chip, .sub-chip, .tag-chip, .context-chip,
+  .note-editor-toolbar button, .palette-item { min-height: 44px; }
+}
+
+@media (max-width: 999px) {
+  .focus-project a, .session-project { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
+/* A compact drawn mark can still have a full-size pointer target. */
+.fd-tl-block::before { inset: auto; left: 50%; top: 50%; width: max(100%, 44px); height: max(100%, 44px); transform: translate(-50%, -50%); }
+/* Whole-row switches keep native checkbox behavior and a 44px input target. */
+.toggle input, .nx-switch input {
+  appearance: none; position: relative; flex: 0 0 44px; width: 44px; height: 44px; min-height: 44px; min-width: 44px;
+  background: transparent; border: 0; margin: 0; cursor: pointer;
+}
+.toggle input::after, .nx-switch input::after { content: ""; position: absolute; inset: 9px 0; border-radius: 999px; background: #555552; z-index: 0; }
+.toggle input::before, .nx-switch input::before { content: ""; position: absolute; width: 18px; height: 18px; left: 4px; top: 13px; border-radius: 50%; background: var(--ink); z-index: 1; transition: transform .15s var(--ease); }
+.toggle input:checked, .nx-switch input:checked { background: transparent; }
+.toggle input:checked::after, .nx-switch input:checked::after { background: var(--brand-deep); }
+.toggle input:checked::before, .nx-switch input:checked::before { transform: translateX(18px); background: var(--ink-invert); }
+@media (max-width: 999px) {
+  .fd-tl-name, .commit-target { display: inline-flex; align-items: center; min-height: 44px; }
+  /* The visual checkbox stays 20px; its transparent border owns the hit area. */
+  input[type="checkbox"]:not(.toggle input):not(.nx-switch input),
+  input[type="radio"]:not(.segmented input) {
+    appearance: none; position: relative; flex-shrink: 0; width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0;
+    border: 12px solid transparent; border-radius: 15px; background: #62635f; background-clip: content-box; cursor: pointer;
+  }
+  input[type="radio"]:not(.segmented input) { border-radius: 50%; }
+  input[type="checkbox"]:checked:not(.toggle input):not(.nx-switch input),
+  input[type="radio"]:checked:not(.segmented input) { background-color: var(--brand-deep); }
+  input[type="checkbox"]:checked:not(.toggle input):not(.nx-switch input)::after { content: ""; position: absolute; width: 6px; height: 11px; left: 7px; top: 2px; border: solid var(--ink-invert); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+}
+
+@media (max-width: 999px) {
+  .note-editor-toolbar .note-tool-button { min-width: 44px; width: 44px; }
+  a.context-chip, .page-eyebrow a, .fd-tl-empty a, .empty a { display: inline-flex; align-items: center; min-height: 44px; }
+}
