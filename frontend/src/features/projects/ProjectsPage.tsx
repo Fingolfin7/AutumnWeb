@@ -88,7 +88,7 @@ export default function ProjectsPage() {
 
   return (
     <>
-      <h1 className="sr-only">Projects</h1>
+      <div className="desk-head"><h1 className="page-title">Projects</h1><AppLink className="btn btn--primary" href={urls.createProject()}><Icon icon={faPlus} /> New project</AppLink></div>
       <form className="fields" onSubmit={onSearch} role="search">
         <div className="searchbar">
           <Icon icon={faSearch} className="muted" />
@@ -197,9 +197,6 @@ export default function ProjectsPage() {
       </Sheet>
 
       <div className="action-row">
-        <AppLink className="btn btn--primary" href={urls.createProject()}>
-          <Icon icon={faPlus} /> New project
-        </AppLink>
         <AppLink className="btn btn--ghost" href={urls.mergeProjects()}>
           <Icon icon={faCodeBranch} /> Merge
         </AppLink>
@@ -228,7 +225,7 @@ export default function ProjectsPage() {
             summary={group.projects.length}
             defaultOpen={group.status === "active"}
           >
-            <ul className="band-list band-list--grid">{group.projects.map(band)}</ul>
+            <ul className="band-list project-directory">{group.projects.map(band)}</ul>
           </Disclose>
         ))
       ) : (
@@ -256,7 +253,7 @@ export default function ProjectsPage() {
             <span className="day-total">{related.length}</span>
           </header>
           {relatedSummary ? <RelatedSlider summary={relatedSummary} loading={lists.isFetching} /> : null}
-          {related.length ? <ul className="band-list band-list--grid">{related.map(band)}</ul> : null}
+          {related.length ? <ul className="band-list project-directory">{related.map(band)}</ul> : null}
         </section>
       ) : null}
     </>

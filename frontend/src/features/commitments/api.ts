@@ -29,6 +29,7 @@ export function useCommitmentsAppliedTo(kind: EntityKind, id: number) {
       (await unwrap(api.GET("/api/v2/commitments/", { params: { query: { applies_to: `${kind}:${id}` } } }))).commitments,
     select: sortCommitments,
     staleTime: STALE,
+    refetchOnMount: "always",
   });
 }
 

@@ -1,7 +1,12 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useParams } from "react-router";
-import { faCheckCircle, faCodeBranch, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { Sheet } from "@/components/Sheet";
+import { SessionNote } from "@/components/SessionNote";
+import { useSessionList, useSessionTotals } from "@/features/sessions/api";
+import { SessionBand } from "@/features/sessions/SessionBand";
+import { useStartTimer } from "@/features/timers/api";
 import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -32,6 +37,13 @@ export default function UpdateProjectPage() {
 
 function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const toast = useToast();
+  const [editing, setEditing] = useState(false);
+  const start = useStartTimer();
+  const recent = useSessionList({ project_ids: String(project.id) });
+  const monday = new Date();
+  monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7);
+  const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
+  const week = useSessionTotals({ project_ids: String(project.id), start_date: weekStart });
   const update = useUpdateProject(project.id);
   const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
   /* The project as the form was opened (or last saved/reloaded): the edit is
@@ -58,6 +70,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         onSuccess: (saved) => {
           setBaseline((current) => ({ ...current, ...saved }));
           setConflict(null);
+          setEditing(false);
           setValues((current) => ({ ...current, name: saved.name }));
           /* The server words it (core/services/celebrations.py), the same as
              the CLI and MCP see. */
@@ -88,113 +101,107 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
     save(patch, baseline.version);
   };
 
-  const average = project.session_count > 0 ? project.total_minutes / project.session_count : 0;
-
   return (
     <>
-      <PageHead title={project.name} titleClass="text-red" />
-
-      {conflict || changedElsewhere ? (
-        <ConflictBanner
-          noun="project"
-          outcome={conflict ? "Your changes were not saved." : undefined}
-          onLoadLatest={() => reset(conflict ? { ...project, ...conflict } : project)}
-          onSaveAnyway={conflict ? () => save(changes(), conflict.version) : undefined}
-          busy={update.isPending}
-        />
-      ) : null}
-
-      <div className="split">
-        <form className="fields" onSubmit={onSubmit}>
-          <FormErrors errors={errors} />
-          <section className="slab slab-pad">
-            <ProjectFields values={values} onChange={setValues} errors={errors} showStatus />
-            <div className="form-actions">
-              <button className="btn btn--primary" type="submit" id="update-project" disabled={update.isPending}>
-                <Icon icon={faCheckCircle} /> Save changes
-              </button>
-              <AppLink className="btn btn--ghost btn--spacer" href={urls.deleteProject(project.id)}>
-                <Icon icon={faTrash} /> Delete project
-              </AppLink>
-            </div>
-          </section>
-        </form>
-
-        <section className="slab slab-pad">
-          <div className="meta-list">
-            <div className="meta-row">
-              <span className="meta-label">Total time</span>
-              <span className="meta-value text-green">{formatDurationWords(project.total_minutes)}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Sessions</span>
-              <span className="meta-value">{project.session_count}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Average session</span>
-              <span className="meta-value text-green">{formatDurationWords(average)}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Created</span>
-              <span className="meta-value text-cyan">{formatDate(project.start_date)}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Last updated</span>
-              <span className="meta-value text-cyan">{formatDate(project.last_activity)}</span>
-            </div>
-          </div>
+      <div className="project-overview">
+        <div className="desk-head project-page-head">
+          <PageHead title={project.name} titleClass="text-red" />
+          <button type="button" className="btn btn--quiet" onClick={() => { reset(project); setEditing(true); }}><Icon icon={faPen} /> Edit project</button>
+        </div>
+        <section className="slab slab-pad project-hero" aria-label="Project overview">
+          <button className="btn btn--primary" type="button" disabled={start.isPending} onClick={() => start.mutate({ project_id: project.id, optimistic: { projectName: project.name, subprojects: [] } }, { onSuccess: () => toast.success(`Started ${project.name}.`), onError: (error) => toast.error(failure("start the timer", error)) })}><Icon icon={faPlay} /> Start timer</button>
+          <div className="project-stat"><span>This week</span><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong></div>
+          <div className="project-stat"><span>Total time</span><strong>{formatDurationWords(project.total_minutes)}</strong></div>
+          <span className="muted">{project.session_count} sessions</span>
+          {project.description ? <div className="project-description"><SessionNote text={project.description} /></div> : null}
         </section>
-      </div>
+        <Sheet open={editing} onClose={() => setEditing(false)} title="Edit project" className="project-edit-sheet">
 
-      <CommitmentsPanel
-        commitments={related}
-        addUrl={urls.createCommitment(project.id)}
-        entityLabel="project"
-        knownSubprojects={knownSubprojects}
-      />
+        {conflict || changedElsewhere ? (
+          <ConflictBanner
+            noun="project"
+            outcome={conflict ? "Your changes were not saved." : undefined}
+            onLoadLatest={() => reset(conflict ? { ...project, ...conflict } : project)}
+            onSaveAnyway={conflict ? () => save(changes(), conflict.version) : undefined}
+            busy={update.isPending}
+          />
+        ) : null}
 
-      <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
-        {project.subprojects.length ? (
-          <ul className="band-list">
-            {project.subprojects.map((sub) => (
-              <li className="band project" id={`subproject-${sub.id}`} key={sub.id}>
-                <div className="u-grow">
-                  <div className="project-top">
-                    <AppLink className="project-name text-blue" href={urls.updateSubproject(sub.id)}>
-                      {sub.name}
+
+          <form className="fields" onSubmit={onSubmit}>
+            <FormErrors errors={errors} />
+            <section>
+              <p className="muted project-history">Created {formatDate(project.start_date)}. Last active {formatDate(project.last_activity) || "never"}. Average session {formatDurationWords(project.session_count ? project.total_minutes / project.session_count : 0)}.</p>
+              <ProjectFields values={values} onChange={setValues} errors={errors} showStatus />
+              <div className="form-actions">
+                <button className="btn btn--primary" type="submit" id="update-project" disabled={update.isPending}>
+                  <Icon icon={faCheckCircle} /> Save changes
+                </button>
+                <AppLink className="btn btn--danger btn--spacer" href={urls.deleteProject(project.id)}>
+                  <Icon icon={faTrash} /> Delete project
+                </AppLink>
+                <AppLink className="btn btn--quiet" href={urls.mergeProjects()}><Icon icon={faCodeBranch} /> Merge projects</AppLink>
+              </div>
+            </section>
+          </form>
+
+        </Sheet>
+
+        <CommitmentsPanel
+          commitments={related}
+          addUrl={urls.createCommitment(project.id)}
+          entityLabel="project"
+          knownSubprojects={knownSubprojects}
+        />
+
+        <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
+          {project.subprojects.length ? (
+            <ul className="band-list">
+              {project.subprojects.map((sub) => (
+                <li className="band project" id={`subproject-${sub.id}`} key={sub.id}>
+                  <div className="u-grow">
+                    <div className="project-top">
+                      <AppLink className="project-name text-blue" href={urls.updateSubproject(sub.id)}>
+                        {sub.name}
+                      </AppLink>
+                    </div>
+                    <p className="project-total">{formatDurationWords(sub.total_minutes)}</p>
+                    <progress className="subproject-progress" max={Math.max(project.total_minutes, sub.total_minutes, 1)} value={sub.total_minutes} aria-label={`${sub.name} share of total time`} />
+                    {sub.last_activity ? <p className="project-dates">Last active {formatDate(sub.last_activity)}</p> : null}
+                  </div>
+                  <div className="u-row u-gap-2">
+                    <AppLink className="btn-icon" href={urls.updateSubproject(sub.id)} title="Edit subproject">
+                      <Icon icon={faPen} />
+                      <span className="sr-only">Edit {sub.name}</span>
+                    </AppLink>
+                    <AppLink className="btn-icon btn-icon--danger" href={urls.deleteSubproject(sub.id)} title="Delete subproject">
+                      <Icon icon={faTrash} />
+                      <span className="sr-only">Delete {sub.name}</span>
                     </AppLink>
                   </div>
-                  <p className="project-total">{formatDurationWords(sub.total_minutes)}</p>
-                  {sub.last_activity ? <p className="project-dates">Last active {formatDate(sub.last_activity)}</p> : null}
-                </div>
-                <div className="u-row u-gap-2">
-                  <AppLink className="btn-icon" href={urls.updateSubproject(sub.id)} title="Edit subproject">
-                    <Icon icon={faPen} />
-                    <span className="sr-only">Edit {sub.name}</span>
-                  </AppLink>
-                  <AppLink className="btn-icon btn-icon--danger" href={urls.deleteSubproject(sub.id)} title="Delete subproject">
-                    <Icon icon={faTrash} />
-                    <span className="sr-only">Delete {sub.name}</span>
-                  </AppLink>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="empty">No subprojects yet.</p>
-        )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="empty">No subprojects yet.</p>
+          )}
 
-        <div className="slab-foot action-row">
-          <AppLink className="btn btn--secondary" href={urls.createSubproject(project.id)}>
-            <Icon icon={faPlus} /> New subproject
-          </AppLink>
-          {project.subprojects.length ? (
-            <AppLink className="btn btn--ghost" href={urls.mergeSubprojects(project.id)}>
-              <Icon icon={faCodeBranch} /> Merge
+          <div className="slab-foot action-row">
+            <AppLink className="btn btn--secondary" href={urls.createSubproject(project.id)}>
+              <Icon icon={faPlus} /> New subproject
             </AppLink>
-          ) : null}
-        </div>
-      </Disclose>
+            {project.subprojects.length ? (
+              <AppLink className="btn btn--ghost" href={urls.mergeSubprojects(project.id)}>
+                <Icon icon={faCodeBranch} /> Merge
+              </AppLink>
+            ) : null}
+          </div>
+        </Disclose>
+        <section className="slab session-list project-journal" aria-label="Recent journal entries">
+          <header className="day-head"><h2 className="day-date">Recent journal entries</h2><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></header>
+          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <ul className="band-list">{recent.data.pages[0].sessions.slice(0, 5).map((session) => <SessionBand key={session.id} session={session} showDate />)}</ul> : <p className="empty">Your first session will appear here.</p>}
+        </section>
+      </div>
     </>
   );
 }

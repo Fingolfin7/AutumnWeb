@@ -266,7 +266,7 @@ function SessionForm({ session }: { session: SessionRow }) {
         </div>
       ) : null}
 
-      <form className="fields" onSubmit={submit} noValidate>
+      <form className="fields session-edit-form" onSubmit={submit} noValidate>
         <section className="slab slab-pad">
           <ProjectField
             projects={projects.data ?? []}

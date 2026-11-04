@@ -26,7 +26,7 @@ export const emptyFilters: ProjectFilters = {
   context: "",
   tags: [],
   projects: [],
-  projectMode: "exclude",
+  projectMode: "include",
   similarity: null,
 };
 
@@ -46,7 +46,7 @@ export function readFilters(params: URLSearchParams): ProjectFilters {
     context: params.get("context") ?? "",
     tags: ids("tags"),
     projects: include.length ? include : exclude,
-    projectMode: include.length ? "include" : "exclude",
+    projectMode: include.length || !exclude.length ? "include" : "exclude",
     similarity: parseSimilarity(params.get("similarity"), similarityScale()),
   };
 }
