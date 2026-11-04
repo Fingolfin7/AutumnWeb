@@ -1,10 +1,10 @@
-import { formatTime, formatDate } from "@/lib/format";
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { formatTime, formatDate, toDateTimeLocal } from "@/lib/format";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
-import { ProjectCombobox } from "@/components/ProjectCombobox";
+import { CapturePicker } from "./CapturePicker";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { useAllProjects, useSubprojects } from "@/api/meta";
@@ -14,6 +14,14 @@ import type { Project } from "@/api/types";
 import { useStartTimer } from "./api";
 import { minutesOf, planReminders, type DurationUnit, type ReminderMode } from "./reminderPlan";
 import { PushPermission } from "./PushPermission";
+import { Sheet } from "@/components/Sheet";
+import { NoteEditor } from "@/components/NoteEditor";
+import HomePage from "@/features/dashboard/HomePage";
+import { useDashboard } from "@/features/dashboard/api";
+import { api, unwrap } from "@/api/client";
+import { useInvalidate } from "@/api/sync";
+import { useQueryClient } from "@tanstack/react-query";
+import { keys } from "@/api/keys";
 
 const PRESETS: Record<DurationUnit, { value: number; label: string }[]> = {
   minutes: [15, 25, 30, 45, 60].map((value) => ({ value, label: `${value}m` })),
@@ -41,6 +49,19 @@ export default function StartTimerPage() {
   const toast = useToast();
   const start = useStartTimer();
   const projects = useAllProjects();
+  const dashboard = useDashboard();
+  const invalidate = useInvalidate();
+  const client = useQueryClient();
+  const [past, setPast] = useState(params.get("mode") === "past");
+  const [pastAt, setPastAt] = useState(() => toDateTimeLocal(new Date()));
+  const [pastDuration, setPastDuration] = useState("45");
+  const [pastAnchor, setPastAnchor] = useState("start");
+  const [note, setNote] = useState("");
+  const pastTime = useLocalTime(pastAt);
+  const [savingPast, setSavingPast] = useState(false);
+  const [newSub, setNewSub] = useState("");
+  const [creatingSub, setCreatingSub] = useState(false);
+  const close = () => navigate(urls.home());
 
   const [project, setProject] = useState<Project | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
@@ -71,7 +92,12 @@ export default function StartTimerPage() {
     const initial = projects.data.find((p) => p.id === projectId);
     if (initial) {
       setProject(initial);
-      setSelected(params.getAll("subproject_id").map(Number).filter((n) => Number.isInteger(n) && n > 0));
+      setSelected(
+        params
+          .getAll("subproject_id")
+          .map(Number)
+          .filter((n) => Number.isInteger(n) && n > 0),
+      );
     }
   }, [params, prefilled, projects.data]);
 
@@ -94,7 +120,17 @@ export default function StartTimerPage() {
         },
         now,
       ),
-    [mode, stopAfter?.amount, stopAfter?.unit, afterAmount, afterUnit, intervalAmount, intervalUnit, atTime.instant, now],
+    [
+      mode,
+      stopAfter?.amount,
+      stopAfter?.unit,
+      afterAmount,
+      afterUnit,
+      intervalAmount,
+      intervalUnit,
+      atTime.instant,
+      now,
+    ],
   );
 
   const pickProject = (next: Project | null) => {
@@ -105,11 +141,53 @@ export default function StartTimerPage() {
   const subs = subprojects.data ?? [];
   const allChecked = subs.length > 0 && subs.every((s) => selected.includes(s.id));
   const stopMinutes = minutesOf(stopAfter);
-  const summary = project ? `${project.name}${stopAmount && autoStop ? ` - stops after ${stopAmount} ${stopUnit}` : ""}` : "No project selected";
+  const summary = project
+    ? `${project.name}${stopAmount && autoStop ? ` - stops after ${stopAmount} ${stopUnit}` : ""}`
+    : "No project selected";
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!project) return;
+    if (past) {
+      const duration = Number(pastDuration);
+      if (!pastTime.instant || !(duration > 0)) {
+        toast.error(pastTime.error ?? "Enter a time and a duration greater than zero.");
+        return;
+      }
+      const anchor = Date.parse(pastTime.instant);
+      const from = pastAnchor === "start" ? anchor : anchor - duration * 60000;
+      const to = pastAnchor === "start" ? anchor + duration * 60000 : anchor;
+      if (to > Date.now()) {
+        toast.error("Past time must end before now.");
+        return;
+      }
+      setSavingPast(true);
+      try {
+        await unwrap(
+          api.POST("/api/v2/sessions/", {
+            body: {
+              project_id: project.id,
+              subproject_ids: selected,
+              start: new Date(from).toISOString(),
+              end: new Date(to).toISOString(),
+              note,
+            },
+          }),
+        );
+        invalidate("sessions");
+        toast.success("Saved past session.");
+        close();
+      } catch (error) {
+        toast.error(errorMessage(error));
+      } finally {
+        setSavingPast(false);
+      }
+      return;
+    }
+    if (autoStop && !stopMinutes) {
+      toast.error("Choose an auto-stop duration greater than zero.");
+      return;
+    }
     let reminder: Parameters<typeof start.mutate>[0]["reminder"];
     if (mode === "after" || mode === "interval") {
       const amount = numberOrNull(mode === "after" ? afterAmount : intervalAmount);
@@ -130,7 +208,8 @@ export default function StartTimerPage() {
     start.mutate(
       {
         project_id: project.id,
-        subproject_ids: chosen.map((s) => s.id),
+        note,
+        subproject_ids: selected,
         ...(stopMinutes ? { stop_after_minutes: stopMinutes } : {}),
         ...(notifyOnAutoStop ? { notify_on_auto_stop: true } : {}),
         ...(reminder ? { reminder } : {}),
@@ -142,245 +221,376 @@ export default function StartTimerPage() {
       },
     );
     /* Optimistic: the new card is already on the Timers page. */
-    navigate(urls.timers());
+    navigate(urls.home());
   };
 
   const zone = bootstrap().profile.timezone || "UTC";
 
   return (
     <>
-      <div className="desk-head">
-        <div>
-          <h1 className="page-title">New timer</h1>
+      <HomePage />
+      <Sheet open onClose={close} title="Capture time" className="capture-sheet">
+        <div className="capture-modes range-tabs" role="tablist" aria-label="Capture mode">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!past}
+            className={`range-tab${!past ? " is-active" : ""}`}
+            onClick={() => setPast(false)}
+          >
+            Start timer
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={past}
+            className={`range-tab${past ? " is-active" : ""}`}
+            onClick={() => setPast(true)}
+          >
+            Log past time
+          </button>
         </div>
-      </div>
-      <form className="fields desk" onSubmit={submit}>
-        <div className="desk-main">
-          <section className="slab slab-pad">
-            <div className="field" id="search-projects">
-              <label htmlFor="project-search">Project</label>
-              <ProjectCombobox id="project-search" value={project} onChange={pickProject} autoFocus={!params.get("project_id")} />
-            </div>
-            {project ? (
-              <section id="pick-subprojects" className="field">
-                <div className="field-head" id="select-all-block">
-                  <span className="field-label">Subprojects</span>
-                  {subs.length ? (
-                    <span className="select-all-row">
-                      <input
-                        type="checkbox"
-                        id="select-all"
-                        className="select-all"
-                        checked={allChecked}
-                        onChange={() => setSelected(allChecked ? [] : subs.map((s) => s.id))}
-                      />
-                      <label htmlFor="select-all">All</label>
-                    </span>
-                  ) : null}
-                </div>
-                <div className="check-grid" id="subproject_options">
-                  {subprojects.isPending ? (
-                    <span className="subproject-empty-state">Loading...</span>
-                  ) : subprojects.isError ? (
-                    <span className="subproject-empty-state">Could not load subprojects.</span>
-                  ) : subs.length ? (
-                    subs.map((sub) => (
-                      <span className="subproject-option" key={sub.id}>
+        <div className="desk-head">
+          <div>
+            <h2 className="page-title">{past ? "A little time, remembered." : "What are you working on?"}</h2>
+          </div>
+        </div>
+        <form className="fields capture-form" onSubmit={submit}>
+          <div className="desk-main">
+            <section className="slab slab-pad">
+              <div className="field" id="search-projects">
+                <label htmlFor="project-search">Project</label>
+                <CapturePicker
+                  value={project}
+                  recent={dashboard.data?.quick_starts ?? []}
+                  onChange={(next, ids) => {
+                    pickProject(next);
+                    setSelected(ids);
+                  }}
+                />
+              </div>
+              {project ? (
+                <section id="pick-subprojects" className="field">
+                  <div className="field-head" id="select-all-block">
+                    <span className="field-label">Subprojects</span>
+                    {subs.length ? (
+                      <span className="select-all-row">
                         <input
                           type="checkbox"
-                          id={`subproject-option-${sub.id}`}
-                          checked={selected.includes(sub.id)}
-                          onChange={() =>
-                            setSelected((current) => (current.includes(sub.id) ? current.filter((id) => id !== sub.id) : [...current, sub.id]))
-                          }
+                          id="select-all"
+                          className="select-all"
+                          checked={allChecked}
+                          onChange={() => setSelected(allChecked ? [] : subs.map((s) => s.id))}
                         />
-                        <label htmlFor={`subproject-option-${sub.id}`}>{sub.name}</label>
+                        <label htmlFor="select-all">All</label>
                       </span>
-                    ))
-                  ) : (
-                    <span className="subproject-empty-state">No subprojects found.</span>
-                  )}
+                    ) : null}
+                  </div>
+                  <div className="check-grid" id="subproject_options">
+                    {subprojects.isPending ? (
+                      <span className="subproject-empty-state">Loading...</span>
+                    ) : subprojects.isError ? (
+                      <span className="subproject-empty-state">Could not load subprojects.</span>
+                    ) : subs.length ? (
+                      subs.map((sub) => (
+                        <span className="subproject-option" key={sub.id}>
+                          <input
+                            type="checkbox"
+                            id={`subproject-option-${sub.id}`}
+                            checked={selected.includes(sub.id)}
+                            onChange={() =>
+                              setSelected((current) =>
+                                current.includes(sub.id) ? current.filter((id) => id !== sub.id) : [...current, sub.id],
+                              )
+                            }
+                          />
+                          <label htmlFor={`subproject-option-${sub.id}`}>{sub.name}</label>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="subproject-empty-state">
+                        Track the whole project, or add a subproject below.
+                      </span>
+                    )}
+                  </div>
+                  <div className="capture-new-sub">
+                    <label className="sr-only" htmlFor="capture-new-sub">
+                      New subproject name
+                    </label>
+                    <input
+                      id="capture-new-sub"
+                      placeholder="New subproject (optional)"
+                      value={newSub}
+                      onChange={(e) => setNewSub(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn--quiet"
+                      disabled={!newSub.trim() || creatingSub}
+                      onClick={async () => {
+                        setCreatingSub(true);
+                        try {
+                          const created = await unwrap(
+                            api.POST("/api/v2/projects/{project_id}/subprojects/", {
+                              params: { path: { project_id: project.id } },
+                              body: { name: newSub.trim() },
+                            }),
+                          );
+                          await client.invalidateQueries({ queryKey: keys.subprojects(project.id) });
+                          setSelected((current) => [...current, created.id]);
+                          setNewSub("");
+                        } catch (error) {
+                          toast.error(errorMessage(error));
+                        } finally {
+                          setCreatingSub(false);
+                        }
+                      }}
+                    >
+                      Add
+                    </button>
+                  </div>
+                </section>
+              ) : null}
+            </section>
+
+            {past ? (
+              <section className="capture-past fields">
+                <div className="two-up">
+                  <div className="field">
+                    <label htmlFor="past-anchor">Time is the</label>
+                    <select id="past-anchor" value={pastAnchor} onChange={(e) => setPastAnchor(e.target.value)}>
+                      <option value="start">Start</option>
+                      <option value="end">End</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label htmlFor="past-duration">Duration (minutes)</label>
+                    <input
+                      id="past-duration"
+                      type="number"
+                      min="1"
+                      required
+                      value={pastDuration}
+                      onChange={(e) => setPastDuration(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="field">
+                  <label htmlFor="past-at">Date and time</label>
+                  <input
+                    id="past-at"
+                    type="datetime-local"
+                    value={pastAt}
+                    onChange={(e) => setPastAt(e.target.value)}
+                    required
+                  />
+                  <LocalTimeNotice field={pastTime} label="the session" />
                 </div>
               </section>
             ) : null}
-          </section>
-
-          <section className="slab slab-pad">
-            <label className="check-row">
-              <input
-                type="checkbox"
-                id="auto-stop-enabled"
-                checked={autoStop}
-                onChange={(event) => {
-                  setAutoStop(event.target.checked);
-                  if (!event.target.checked) {
-                    setStopAmount("");
-                    setPresetActive(false);
-                  }
-                }}
-              />
-              <span>Stop this timer automatically</span>
-            </label>
-            <div className="preset-row" role="group" aria-label="Stop after presets">
-              {PRESETS[stopUnit].map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  className={`timer-preset-button${autoStop && presetActive && stopAmount === String(preset.value) ? " is-active" : ""}`}
-                  disabled={!autoStop}
-                  onClick={() => {
-                    setPresetActive(true);
-                    setStopAmount(String(preset.value));
-                  }}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            <div className="two-up u-mt-4">
-              <div className="field">
-                <label htmlFor="stop-after-amount">Duration</label>
-                <input
-                  type="number"
-                  id="stop-after-amount"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  placeholder="No limit"
-                  disabled={!autoStop}
-                  value={stopAmount}
-                  onChange={(event) => {
-                    setPresetActive(false);
-                    setStopAmount(event.target.value);
-                  }}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="stop-after-unit">Unit</label>
-                <select
-                  id="stop-after-unit"
-                  disabled={!autoStop}
-                  value={stopUnit}
-                  onChange={(event) => {
-                    const unit = event.target.value as DurationUnit;
-                    setStopUnit(unit);
-                    if (presetActive) setStopAmount(String(PRESETS[unit][0]!.value));
-                  }}
-                >
-                  <option value="minutes">Minutes</option>
-                  <option value="hours">Hours</option>
-                </select>
-              </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="desk-side">
-          <section className="slab slab-pad rm-block" data-mode={mode}>
-            <fieldset className="rm-fieldset">
-              <legend className="field-label rm-legend">Reminder</legend>
-              <div className="rm-modes" role="radiogroup" aria-label="Reminder timing">
-                {MODES.map((option) => (
-                  <label className="rm-mode" key={option.value}>
-                    <input type="radio" name="reminder_mode" value={option.value} checked={mode === option.value} onChange={() => setMode(option.value)} />
-                    <span className="rm-mode-face">
-                      <span className="rm-mode-name">{option.label}</span>
-                    </span>
+            <NoteEditor value={note} onChange={setNote} rows={3} placeholder="Optional notes to begin with..." />
+            {!past ? (
+              <details className="capture-options">
+                <summary>
+                  Options <span className="muted">Auto-stop & reminders</span>
+                </summary>
+                <section className="slab slab-pad">
+                  <label className="check-row">
+                    <input
+                      type="checkbox"
+                      id="auto-stop-enabled"
+                      checked={autoStop}
+                      onChange={(event) => {
+                        setAutoStop(event.target.checked);
+                        if (!event.target.checked) {
+                          setStopAmount("");
+                          setPresetActive(false);
+                        }
+                      }}
+                    />
+                    <span>Stop this timer automatically</span>
                   </label>
-                ))}
-              </div>
-
-              {mode === "after" ? (
-                <div className="rm-panel rm-panel--after">
-                  <AmountUnit label="Notify me once after" id="reminder" amount={afterAmount} unit={afterUnit} onAmount={setAfterAmount} onUnit={setAfterUnit} />
-                </div>
-              ) : null}
-              {mode === "interval" ? (
-                <div className="rm-panel rm-panel--interval">
-                  <AmountUnit label="Notify me every" id="interval" amount={intervalAmount} unit={intervalUnit} onAmount={setIntervalAmount} onUnit={setIntervalUnit} />
-                </div>
-              ) : null}
-              {mode === "at" ? (
-                <div className="rm-panel rm-panel--at">
-                  <div className="field">
-                    <label htmlFor="reminder-at">Date and time</label>
-                    <input type="datetime-local" id="reminder-at" step={60} value={at} onChange={(event) => setAt(event.target.value)} aria-describedby="reminder-timezone" />
-                    <LocalTimeNotice field={atTime} label="the reminder" />
+                  <div className="preset-row" role="group" aria-label="Stop after presets">
+                    {PRESETS[stopUnit].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        className={`timer-preset-button${autoStop && presetActive && stopAmount === String(preset.value) ? " is-active" : ""}`}
+                        onClick={() => {
+                          setAutoStop(true);
+                          setPresetActive(true);
+                          setStopAmount(String(preset.value));
+                        }}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
                   </div>
-                  <p className="rm-note" id="reminder-timezone">
-                    {atTime.instant ? `${`${formatDate(atTime.instant)}, ${formatTime(atTime.instant)}`}, ${zone} (profile timezone)` : `Your profile timezone: ${zone}`}
-                  </p>
-                </div>
-              ) : null}
+                  <div className="two-up u-mt-4">
+                    <div className="field">
+                      <label htmlFor="stop-after-amount">Duration</label>
+                      <input
+                        type="number"
+                        id="stop-after-amount"
+                        min={1}
+                        step={1}
+                        inputMode="numeric"
+                        placeholder="No limit"
+                        disabled={!autoStop}
+                        value={stopAmount}
+                        onChange={(event) => {
+                          setPresetActive(false);
+                          setStopAmount(event.target.value);
+                        }}
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="stop-after-unit">Unit</label>
+                      <select
+                        id="stop-after-unit"
+                        disabled={!autoStop}
+                        value={stopUnit}
+                        onChange={(event) => {
+                          const unit = event.target.value as DurationUnit;
+                          setStopUnit(unit);
+                          if (presetActive) setStopAmount(String(PRESETS[unit][0]!.value));
+                        }}
+                      >
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                      </select>
+                    </div>
+                  </div>
+                </section>
+                <section className="slab slab-pad rm-block" data-mode={mode}>
+                  <fieldset className="rm-fieldset">
+                    <legend className="field-label rm-legend">Reminder</legend>
+                    <div className="rm-modes" role="radiogroup" aria-label="Reminder timing">
+                      {MODES.map((option) => (
+                        <label className="rm-mode" key={option.value}>
+                          <input
+                            type="radio"
+                            name="reminder_mode"
+                            value={option.value}
+                            checked={mode === option.value}
+                            onChange={() => setMode(option.value)}
+                          />
+                          <span className="rm-mode-face">
+                            <span className="rm-mode-name">{option.label}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
 
-              <figure className="rm-rail" aria-labelledby="rm-rail-title">
-                <figcaption className="rm-rail-cap">
-                  <span className="rm-rail-title" id="rm-rail-title">
-                    When this fires
-                  </span>
-                  <span className="rm-rail-count mono">{plan.count}</span>
-                </figcaption>
-                <div className="rm-rail-track">
-                  <span className="rm-rail-now" aria-hidden="true" />
-                  {plan.stopAt ? <span className="rm-rail-stop" aria-hidden="true" /> : null}
-                  {plan.ticks.map((tick) => (
-                    <span
-                      key={tick.at.getTime()}
-                      className={`rm-tick${tick.beyondStop ? " is-void" : tick.next ? " is-next" : ""}`}
-                      style={{ "--x": `${tick.x}%` } as CSSProperties}
-                    >
-                      <span className="sr-only">
-                        Reminder at {formatTime(tick.at)}
-                        {tick.beyondStop ? "; after the timer stops" : ""}
-                      </span>
-                    </span>
-                  ))}
-                </div>
-                <div className="rm-rail-axis" aria-hidden="true">
-                  <span className="mono">now {formatTime(now)}</span>
-                  <span className="mono">
-                    {plan.stopAt ? `stops ${formatTime(plan.stopAt)}` : "open-ended"}
-                  </span>
-                </div>
-                <p className="rm-plan" role="status">
-                  {plan.sentence}
-                </p>
-                {plan.warning ? <p className="rm-warn">{plan.warning}</p> : null}
-              </figure>
+                    {mode === "after" ? (
+                      <div className="rm-panel rm-panel--after">
+                        <AmountUnit
+                          label="Notify me once after"
+                          id="reminder"
+                          amount={afterAmount}
+                          unit={afterUnit}
+                          onAmount={setAfterAmount}
+                          onUnit={setAfterUnit}
+                        />
+                      </div>
+                    ) : null}
+                    {mode === "interval" ? (
+                      <div className="rm-panel rm-panel--interval">
+                        <AmountUnit
+                          label="Notify me every"
+                          id="interval"
+                          amount={intervalAmount}
+                          unit={intervalUnit}
+                          onAmount={setIntervalAmount}
+                          onUnit={setIntervalUnit}
+                        />
+                      </div>
+                    ) : null}
+                    {mode === "at" ? (
+                      <div className="rm-panel rm-panel--at">
+                        <div className="field">
+                          <label htmlFor="reminder-at">Date and time</label>
+                          <input
+                            type="datetime-local"
+                            id="reminder-at"
+                            step={60}
+                            value={at}
+                            onChange={(event) => setAt(event.target.value)}
+                            aria-describedby="reminder-timezone"
+                          />
+                          <LocalTimeNotice field={atTime} label="the reminder" />
+                        </div>
+                        <p className="rm-note" id="reminder-timezone">
+                          {atTime.instant
+                            ? `${`${formatDate(atTime.instant)}, ${formatTime(atTime.instant)}`}, ${zone} (profile timezone)`
+                            : `Your profile timezone: ${zone}`}
+                        </p>
+                      </div>
+                    ) : null}
 
-              <div className="field rm-message-field">
-                <label htmlFor="reminder-message">Message</label>
-                <input
-                  type="text"
-                  id="reminder-message"
-                  maxLength={240}
-                  placeholder="Time to check in"
-                  aria-describedby="reminder-message-help"
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
-                />
-                <p className="rm-note" id="reminder-message-help">
-                  Use <span className="mono">{"{project}"}</span> and <span className="mono">{"{elapsed}"}</span> to include live timer details.
-                </p>
-              </div>
-              <label className="check-row rm-auto-stop">
-                <input type="checkbox" checked={notifyOnAutoStop} onChange={(event) => setNotifyOnAutoStop(event.target.checked)} />
-                <span>Notify me when this timer auto-stops</span>
-              </label>
-              <PushPermission />
-            </fieldset>
-          </section>
-          <div className="form-actions">
-            <AppLink className="btn btn--ghost" href={urls.timers()}>
-              <Icon icon={faArrowLeft} /> Back
-            </AppLink>
-            <span className="start-summary">{summary}</span>
-            <button type="submit" id="start-timer" className="btn btn--primary btn--lg btn--spacer" disabled={!project || start.isPending}>
-              <span className="hourglass-icon" aria-hidden="true" /> Start timer
-            </button>
+                    <figure className="rm-rail" aria-labelledby="rm-rail-title">
+                      <figcaption className="rm-rail-cap">
+                        <span className="rm-rail-title" id="rm-rail-title">
+                          When this fires
+                        </span>
+                        <span className="rm-rail-count mono">{plan.count}</span>
+                      </figcaption>
+                      <div className="rm-rail-axis" aria-hidden="true">
+                        <span className="mono">now {formatTime(now)}</span>
+                        <span className="mono">{plan.stopAt ? `stops ${formatTime(plan.stopAt)}` : "open-ended"}</span>
+                      </div>
+                      <p className="rm-plan" role="status">
+                        {plan.sentence}
+                      </p>
+                      {plan.warning ? <p className="rm-warn">{plan.warning}</p> : null}
+                    </figure>
+
+                    <div className="field rm-message-field">
+                      <label htmlFor="reminder-message">Message</label>
+                      <input
+                        type="text"
+                        id="reminder-message"
+                        maxLength={240}
+                        placeholder="Time to check in"
+                        aria-describedby="reminder-message-help"
+                        value={message}
+                        onChange={(event) => setMessage(event.target.value)}
+                      />
+                      <p className="rm-note" id="reminder-message-help">
+                        Use <span className="mono">{"{project}"}</span> and <span className="mono">{"{elapsed}"}</span>{" "}
+                        to include live timer details.
+                      </p>
+                    </div>
+                    <label className="check-row rm-auto-stop">
+                      <input
+                        type="checkbox"
+                        checked={notifyOnAutoStop}
+                        onChange={(event) => setNotifyOnAutoStop(event.target.checked)}
+                      />
+                      <span>Notify me when this timer auto-stops</span>
+                    </label>
+                    <PushPermission />
+                  </fieldset>
+                </section>
+              </details>
+            ) : null}
+            <div className="form-actions">
+              <AppLink className="btn btn--ghost" href={urls.home()}>
+                <Icon icon={faArrowLeft} /> Back
+              </AppLink>
+              <span className="start-summary">{summary}</span>
+              <button
+                type="submit"
+                id="start-timer"
+                className="btn btn--primary btn--lg btn--spacer"
+                disabled={!project || start.isPending || savingPast}
+              >
+                {past ? "Save session" : "Start timer"}
+              </button>
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
+      </Sheet>
     </>
   );
 }
@@ -404,7 +614,15 @@ function AmountUnit({
     <div className="two-up">
       <div className="field">
         <label htmlFor={`${id}-amount`}>{label}</label>
-        <input type="number" id={`${id}-amount`} min={1} step={1} inputMode="numeric" value={amount} onChange={(event) => onAmount(event.target.value)} />
+        <input
+          type="number"
+          id={`${id}-amount`}
+          min={1}
+          step={1}
+          inputMode="numeric"
+          value={amount}
+          onChange={(event) => onAmount(event.target.value)}
+        />
       </div>
       <div className="field">
         <label htmlFor={`${id}-unit`}>Unit</label>

@@ -1,41 +1,34 @@
-import { useState } from "react";
-import { faArrowRight, faCalendarAlt, faHistory, faPlay } from "@fortawesome/free-solid-svg-icons";
+import { useRef, useState } from "react";
+import { faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
-import { Disclose } from "@/components/Disclose";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
+import { useActiveContext } from "@/app/context";
 import { errorMessage } from "@/api/errors";
-import { formatDayDate, formatDuration } from "@/lib/format";
+import { useAllProjects } from "@/api/meta";
+import type { Timer } from "@/api/types";
+import { formatDayDate, formatDuration, localDateKey } from "@/lib/format";
 import { FocusCard } from "@/features/timers/FocusCard";
-import { FocusDeck } from "@/features/timers/FocusDeck";
-import { useNow, useStartTimer, useTimers } from "@/features/timers/api";
+import { TimerNoteEditor } from "@/features/timers/TimerNoteEditor";
+import { TimerReminders } from "@/features/timers/TimerReminders";
+import { useNow, useOutsideContextTimerCount, useStartTimer, useTimers } from "@/features/timers/api";
+import { Suggestions } from "@/features/timers/Suggestions";
 import { SessionBand } from "@/features/sessions/SessionBand";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { DayTimeline } from "./DayTimeline";
 import { useDashboard, useRefreshOnRunningChange, useTimeline, type Dashboard, type TimelineRange } from "./api";
 
-/* Home (dashboard.html): quick stats, the focus deck of running timers plus
-   quick starts, the day timeline, recent sessions, commitments and activity.
-   One /dashboard/ request paints everything; running timers then come from
-   the shared, polled timers query so they stay live. */
 export default function HomePage() {
   const dashboard = useDashboard();
   const timers = useTimers();
   useRefreshOnRunningChange(timers.data);
-
-  if (dashboard.isPending) {
+  if (dashboard.isPending)
     return (
-      <>
-        <section className="slab">
-          <Skeleton lines={2} height="2.2rem" />
-        </section>
-        <section className="slab">
-          <Skeleton lines={5} />
-        </section>
-      </>
+      <section className="slab">
+        <Skeleton lines={5} />
+      </section>
     );
-  }
   if (dashboard.isError) return <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />;
   return <HomeContent data={dashboard.data} />;
 }
@@ -44,103 +37,172 @@ function HomeContent({ data }: { data: Dashboard }) {
   const timers = useTimers();
   const now = useNow();
   const running = timers.data ?? data.active_timers;
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [range, setRange] = useState<TimelineRange>("today");
   const timeline = useTimeline(range, data.timeline);
-
+  const outside = useOutsideContextTimerCount();
+  const { setContextId } = useActiveContext();
+  const firstRun = !running.length && !data.recent_sessions.length && !data.quick_starts.length;
+  const today = data.recent_sessions.filter((day) => day.date === localDateKey(new Date(now)));
   return (
-    <>
-      <h1 className="sr-only">Home</h1>
-      <div className="desk-head desk-head--stats">
-        <section className="stat-strip" aria-label="Quick stats">
-          <div className="stat">
-            <p className="stat-label">Today</p>
-            <p className="stat-value text-green">{formatDuration(data.today_total)}</p>
-          </div>
-          <div className="stat">
-            <p className="stat-label">This week</p>
-            <p className="stat-value text-cyan">{formatDuration(data.week_total)}</p>
-          </div>
-          <div className="stat">
-            <p className="stat-label">Active timers</p>
-            <p className={`stat-value ${running.length ? "text-yellow" : "muted"}`}>{running.length}</p>
-          </div>
-          <div className="stat">
-            <p className="stat-label">Current streak</p>
-            <p className="stat-value text-orange">
-              {data.daily_streak.current_streak} day{data.daily_streak.current_streak === 1 ? "" : "s"}
-            </p>
-          </div>
+    <div className="today-page">
+      <header className="today-heading">
+        <h1 className="page-title">Today</h1>
+        <span>{formatDayDate(new Date(now))}</span>
+        {running.length ? (
+          <AppLink className="btn btn--quiet" href={urls.startTimer()}>
+            + New timer
+          </AppLink>
+        ) : null}
+      </header>
+      {running.length ? (
+        <section className="ember-deck" aria-label="Running timers">
+          {running.map((timer) => (
+            <TimerCard key={timer.id} timer={timer} now={now} />
+          ))}
         </section>
-      </div>
-
-      <FocusDeck label="What you are working on right now">
-        {running.map((timer) => (
-          <FocusCard key={timer.id} timer={timer} now={now} />
-        ))}
+      ) : (
         <StartCard quickStarts={data.quick_starts} />
-      </FocusDeck>
-
-      {timeline.data ? <DayTimeline timeline={timeline.data} range={range} onRange={setRange} /> : null}
-
-      <div className="desk">
-        <div className="desk-main">
-          <Disclose
-            id="home-recent"
-            className="session-list"
-            icon={faHistory}
-            iconClass="text-blue"
-            title="Recent sessions"
-            summary={`last ${data.recent_sessions.reduce((n, day) => n + day.sessions.length, 0)}`}
-          >
-            {data.recent_sessions.length ? (
-              <>
-                {data.recent_sessions.map((day) => (
-                  <div className="day-group" key={day.date}>
-                    <header className="day-head">
-                      <span className="day-date">{formatDayDate(day.date)}</span>
-                      <span className="day-total">{formatDuration(day.total_minutes)}</span>
-                    </header>
-                    <ul className="band-list">
-                      {day.sessions.map((session) => (
-                        <SessionBand key={session.id} session={session} />
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-                <div className="slab-foot">
-                  <AppLink className="btn btn--ghost btn--block" href={urls.sessions()}>
-                    View all sessions <Icon icon={faArrowRight} />
-                  </AppLink>
-                </div>
-              </>
+      )}
+      {outside ? (
+        <p className="muted timers-outside-context">
+          {outside} timer{outside === 1 ? "" : "s"} running in other contexts {" / "}
+          <button type="button" className="btn btn--quiet" onClick={() => void setContextId(null)}>
+            Show all
+          </button>
+        </p>
+      ) : null}
+      {timeline.data && !firstRun ? (
+        <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} />
+      ) : null}
+      {data.commitments.length ? (
+        <section className="today-commitments" aria-label="Commitment summary">
+          <div className="today-section-head">
+            <h2>Commitments</h2>
+            <span className="muted today-scope">All contexts</span>
+          </div>
+          {data.commitments.map(({ commitment, progress }) => {
+            const time = progress.commitment_type === "time";
+            const amount = (value: number) => (time ? formatDuration(value) : `${Math.round(value)} sessions`);
+            return (
+              <AppLink className="today-commitment-row" key={commitment.id} href={urls.updateCommitment(commitment.id)}>
+                <span className="text-red">{commitment.target.name}</span>
+                <span>
+                  <span className="text-green">{amount(progress.actual)}</span> of {amount(progress.target)}{" "}
+                  <span className="muted">{progress.period}</span>
+                </span>
+              </AppLink>
+            );
+          })}
+          <details className="today-history">
+            <summary>Banking & commitment details</summary>
+            <CommitmentsPanel items={data.commitments} />
+            <AppLink className="btn btn--quiet" href={urls.weeklyReview()}>
+              Open weekly review
+            </AppLink>
+          </details>
+        </section>
+      ) : null}
+      {!firstRun ? (
+        <>
+          <details className="today-suggestions" onToggle={(event) => setSuggestionsOpen(event.currentTarget.open)}>
+            <summary>Need a starting point?</summary>
+            {suggestionsOpen ? <Suggestions /> : null}
+          </details>
+          <section className="today-journal" aria-label="Today's journal">
+            <header className="today-section-head">
+              <h2>Today's journal</h2>
+              <AppLink className="btn btn--quiet" href={urls.sessions()}>
+                All sessions
+              </AppLink>
+            </header>
+            {today.length ? (
+              today.map((day) => (
+                <ul className="band-list" key={day.date}>
+                  {day.sessions.map((session) => (
+                    <SessionBand key={session.id} session={session} />
+                  ))}
+                </ul>
+              ))
             ) : (
-              <p className="empty">
-                No sessions yet. <AppLink href={urls.startTimer()}>Start a timer</AppLink> to begin tracking.
-              </p>
+              <p className="empty">Your saved sessions and notes will gather here.</p>
             )}
-          </Disclose>
-        </div>
+            {data.recent_sessions.some((day) => day.date !== localDateKey(new Date(now))) ? (
+              <details className="today-history">
+                <summary>Earlier journal entries</summary>
+                {data.recent_sessions
+                  .filter((day) => day.date !== localDateKey(new Date(now)))
+                  .map((day) => (
+                    <div className="day-group" key={day.date}>
+                      <header className="day-head">
+                        <span>{formatDayDate(day.date)}</span>
+                        <span className="day-total">{formatDuration(day.total_minutes)}</span>
+                      </header>
+                      <ul className="band-list">
+                        {day.sessions.map((session) => (
+                          <SessionBand key={session.id} session={session} />
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+              </details>
+            ) : null}
+          </section>
+        </>
+      ) : null}
+    </div>
+  );
+}
 
-        <aside className="desk-side">
-          <CommitmentsPanel items={data.commitments} />
-          <ActivityPanel streak={data.daily_streak} />
-        </aside>
-      </div>
-    </>
+function TimerCard({ timer, now }: { timer: Timer; now: number }) {
+  const stash = useRef<() => void>(() => undefined);
+  return (
+    <FocusCard timer={timer} now={now} beforeStop={() => stash.current()}>
+      <TimerNoteEditor
+        timer={timer}
+        registerStash={(fn) => {
+          stash.current = fn;
+        }}
+      />
+      <TimerReminders timer={timer} />
+    </FocusCard>
   );
 }
 
 function StartCard({ quickStarts }: { quickStarts: Dashboard["quick_starts"] }) {
   const start = useStartTimer();
   const toast = useToast();
+  const projects = useAllProjects();
+  const empty = projects.isSuccess && projects.data.length === 0;
   return (
-    <article className="focus-card focus-card--start" aria-label="Start a new timer">
+    <section className="today-idle" aria-label="Start a new timer">
+      <div className="today-idle-intro">
+        <span className="ember-idle-clock" aria-hidden="true">
+          00<span>:00</span>
+        </span>
+        <h2>{empty ? "A project gives your time a home." : "Make room for what matters."}</h2>
+        {empty ? (
+          <AppLink className="btn btn--primary btn--lg" href={urls.createProject()}>
+            Create your first project
+          </AppLink>
+        ) : (
+          <>
+            <AppLink className="btn btn--primary btn--lg" href={urls.startTimer()}>
+              <Icon icon={faPlay} /> Start a timer
+            </AppLink>
+            <AppLink className="btn btn--quiet" href="/start_timer/?mode=past">
+              Log past time
+            </AppLink>
+          </>
+        )}
+      </div>
       {quickStarts.length ? (
-        <div className="focus-subs focus-quick">
-          {quickStarts.map((quick) => (
+        <div className="today-quick">
+          <h3>Pick up where you left off</h3>
+          {quickStarts.slice(0, 4).map((quick) => (
             <button
               key={quick.label}
-              className="quick-chip"
+              className="today-quick-pick"
               type="button"
               disabled={start.isPending}
               onClick={() =>
@@ -152,78 +214,23 @@ function StartCard({ quickStarts }: { quickStarts: Dashboard["quick_starts"] }) 
                   },
                   {
                     onSuccess: () => toast.success(`Started ${quick.project.name}.`),
-                    onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`),
+                    onError: (error) => toast.error(errorMessage(error)),
                   },
                 )
               }
             >
-              <Icon icon={faHistory} className="muted" /> {quick.project.name}
-              {quick.subprojects.length ? <span className="muted"> &middot; {quick.subprojects.map((s) => s.name).join(", ")}</span> : null}
+              <Icon icon={faPlay} />
+              <span>
+                <span className="text-red">{quick.project.name}</span>
+                {quick.subprojects.length ? (
+                  <small className="text-blue">{quick.subprojects.map((s) => s.name).join(", ")}</small>
+                ) : null}
+              </span>
+              <span className="today-quick-verb">Start</span>
             </button>
           ))}
         </div>
       ) : null}
-      <div className="focus-actions">
-        <AppLink className="btn btn--primary btn--lg" href={urls.startTimer()}>
-          <Icon icon={faPlay} /> Start a timer
-        </AppLink>
-      </div>
-    </article>
-  );
-}
-
-const ACTIVITY_RANGES = [
-  { days: 7, label: "Week" },
-  { days: 14, label: "2 weeks" },
-  { days: 30, label: "Month" },
-];
-
-function ActivityPanel({ streak }: { streak: Dashboard["daily_streak"] }) {
-  const [days, setDays] = useState(14);
-  const cells = streak.recent_days.slice(-days);
-  return (
-    <Disclose id="home-activity" icon={faCalendarAlt} iconClass="text-green" title="Activity" summary={`${streak.current_streak}-day streak`}>
-      <div className="activity">
-        <div className="range-tabs" role="tablist" aria-label="Activity range">
-          {ACTIVITY_RANGES.map((option) => (
-            <button
-              key={option.days}
-              className={`range-tab${days === option.days ? " is-active" : ""}`}
-              type="button"
-              role="tab"
-              aria-selected={days === option.days}
-              onClick={() => setDays(option.days)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="cal">
-          <div className="cal-head">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-              <span key={d}>{d}</span>
-            ))}
-          </div>
-          <div className="cal-grid">
-            {cells.map((day, index) => {
-              const date = new Date(`${day.date}T12:00:00`);
-              const title = `${formatDayDate(date, true)}${
-                day.active ? " — tracked" : ""
-              }`;
-              return (
-                <span
-                  key={day.date}
-                  className={`cal-cell ${day.active ? "is-active" : "is-inactive"}`}
-                  title={title}
-                  style={index === 0 ? { gridColumnStart: day.weekday + 1 } : undefined}
-                >
-                  {date.getDate()}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </Disclose>
+    </section>
   );
 }

@@ -17,7 +17,7 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   await pickProject(page, "Garden Planner App");
   await page.getByRole("button", { name: "Start timer" }).click();
 
-  await expect(page).toHaveURL(/\/timers\/$/);
+  await expect(page).toHaveURL(/\/$/);
   const card = page.getByRole("article", { name: "Running timer: Garden Planner App" });
   await expect(card).toBeVisible();
   await expect(card.getByText("Running", { exact: true })).toBeVisible();
@@ -28,9 +28,15 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   await page.goto("/timers/");
   const runningCard = page.getByRole("article", { name: "Running timer: Garden Planner App" });
   await runningCard.getByRole("textbox", { name: "Session note" }).fill(note);
+  const stoppedId = await runningCard.getAttribute("data-timer-id");
   await runningCard.getByRole("link", { name: "Stop" }).click();
   await expect(page).toHaveURL(/\/stop_timer\/\d+\/$/);
   await expect(page.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(note);
+  await page.getByText("Adjust times & allocation", { exact: true }).click();
+  const savedBeforeDone = await page.request.get(`/api/v2/sessions/${stoppedId}?include=note`);
+  // The session was saved by the first Stop action; Done only edits the journal.
+  expect(savedBeforeDone.ok()).toBeTruthy();
+  expect((await savedBeforeDone.json()).active).toBe(false);
   const end = page.locator("#id_end_time");
   const initialEnd = await end.inputValue();
   const duration = page.locator(".timer-duration");
@@ -38,9 +44,9 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   await page.waitForTimeout(2_000);
   await expect(end).toHaveValue(initialEnd);
   await expect(duration).toHaveText(initialDuration!);
-  await page.getByRole("button", { name: "Stop timer" }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
 
-  await expect(page).toHaveURL(/\/timers\/$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("article", { name: /Running timer/ })).toHaveCount(0);
   await expect(toasts(page).getByRole("status").first()).toBeVisible();
 
@@ -72,7 +78,7 @@ test.describe("offline", () => {
     await page.waitForTimeout(2_500); // the query cache is persisted on a throttle
 
     await context.setOffline(true);
-    await expect(page.getByText(/Offline/)).toBeVisible();
+    await expect(page.locator(".offline-banner")).toBeVisible();
     await pickProject(page, "Piano Practice");
     await page.getByRole("button", { name: "Start timer" }).click();
 
@@ -80,11 +86,40 @@ test.describe("offline", () => {
     await expect(card).toBeVisible();
     await expect(card.getByText("Running · saved offline")).toBeVisible();
 
+    await card.getByRole("textbox", { name: "Session note" }).fill("A journal started offline.");
     await context.setOffline(false);
     await expect(toasts(page).getByText(/Synced 1 offline change/)).toBeVisible({ timeout: 30_000 });
     await expect(card.getByText("Running · saved offline")).toHaveCount(0);
     await expect(card.getByText("Running", { exact: true })).toBeVisible();
+    await expect(card.getByRole("textbox", { name: "Session note" })).toHaveValue("A journal started offline.");
   });
+
+  test("an offline stop keeps its note and syncs the original session", async ({ page, context }) => {
+    await page.goto("/start_timer/");
+    await pickProject(page, "Piano Practice");
+    await page.getByRole("button", { name: "Start timer", exact: true }).click();
+    const card = page.getByRole("article", { name: "Running timer: Piano Practice" });
+    await expect(card).toBeVisible();
+    await expect(card).toHaveAttribute("data-timer-id", /^\d+$/);
+    const id = await card.getAttribute("data-timer-id");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForTimeout(2500);
+    await context.setOffline(true);
+    await card.getByRole("link", { name: "Stop", exact: true }).click();
+    const note = page.getByRole("textbox", { name: "Note", exact: true });
+    await note.fill("Offline reflection, saved before the stop is queued.");
+    await page.getByRole("button", { name: "Stop timer", exact: true }).click();
+    await expect(card).toHaveCount(0);
+    await expect(page).toHaveURL(/\/$/);
+    await context.setOffline(false);
+    await expect(toasts(page).getByText(/Synced 1 offline change/)).toBeVisible({ timeout: 30000 });
+    const response = await page.request.get(`/api/v2/sessions/${id}?include=note`);
+    expect(response.ok()).toBeTruthy();
+    const saved = await response.json();
+    expect(saved.active).toBe(false);
+    expect(saved.note).toBe("Offline reflection, saved before the stop is queued.");
+  });
+
 });
 
 test("a timer started outside the active context is announced, and Show all reveals it", async ({ page }) => {
@@ -101,7 +136,7 @@ test("a timer started outside the active context is announced, and Show all reve
     await pickProject(page, "Garden Planner App"); // a Work project
     await page.getByRole("button", { name: "Start timer" }).click();
 
-    await expect(page).toHaveURL(/\/timers\/$/);
+    await expect(page).toHaveURL(/\/$/);
     const notice = page.getByText("1 timer running in other contexts");
     await expect(notice).toBeVisible();
     await expect(page.getByRole("article", { name: /Running timer/ })).toHaveCount(0);
@@ -119,4 +154,24 @@ test("a timer started outside the active context is announced, and Show all reve
       headers: { "X-CSRFToken": csrf },
     });
   }
+});
+
+
+test("Undo stop resumes the same session from its original start", async ({ page }) => {
+  await page.goto("/start_timer/");
+  await pickProject(page, "Piano Practice");
+  await page.getByRole("button", { name: "Start timer", exact: true }).click();
+  const card = page.getByRole("article", { name: "Running timer: Piano Practice" });
+  await expect(card).toBeVisible();
+  await expect(card).toHaveAttribute("data-timer-id", /^\d+$/);
+  const id = await card.getAttribute("data-timer-id");
+  const original = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
+  await card.getByRole("link", { name: "Stop", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Done", exact: true })).toBeEnabled();
+  await page.getByRole("button", { name: "Undo stop", exact: true }).click();
+  await expect(card).toBeVisible();
+  const resumed = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
+  expect(resumed.uuid).toBe(original.uuid);
+  expect(resumed.start).toBe(original.start);
+  expect(resumed.active).toBe(true);
 });

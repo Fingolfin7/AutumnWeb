@@ -28,6 +28,7 @@ import { AppLink, urls } from "./links";
 import { useActiveContext } from "./context";
 import { clearPersistedQueries } from "./persist";
 import { fetchPreferences } from "@/features/profile/api";
+import { TimerDock } from "@/features/timers/TimerDock";
 import { applyBackground } from "@/features/profile/shell";
 
 interface Tab {
@@ -106,6 +107,7 @@ export function Shell({ children }: { children: ReactNode }) {
               </div>;
             })}
           </nav>
+          <TimerDock />
           <div className="header-right">
             <ContextSwitch />
             <IconButton icon={faSearch} label="Go anywhere" onClick={() => window.dispatchEvent(new Event("autumn:palette"))} />
