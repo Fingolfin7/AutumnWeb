@@ -50,19 +50,18 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
     for (let i = 1; i <= 8; i++) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: box.x + box.width - 30 - i * 20, y }] });
     await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
     await touch.detach();
-    await page.getByRole("dialog", { name: "Session actions" }).getByRole("link", { name: "Edit session" }).tap();
+    await page.getByRole("dialog", { name: "Session actions" }).getByRole("button", { name: "Edit note", exact: true }).tap();
   } else {
-    await first.getByRole("button", { name: "Session actions" }).click();
-    await page.getByRole("dialog", { name: "Session actions" }).getByRole("link", { name: "Edit session" }).click();
+    await first.getByRole("button", { name: "Edit note", exact: true }).click();
   }
 
-  await expect(page).toHaveURL(/\/update_session\/\d+\/$/);
+  await expect(page).toHaveURL(/\/sessions\/\?search=Piano/);
   const field = page.getByRole("textbox", { name: "Note", exact: true });
   await field.fill(note);
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(toasts(page).getByText("Updated session")).toBeVisible();
+  await expect(toasts(page).getByText("Note saved.", { exact: true })).toBeVisible();
 
-  await page.goto("/sessions/?search=Piano");
+  await page.reload();
   await expect(page.getByRole("region", { name: "Sessions" }).getByText(note)).toBeVisible();
   expect(problems()).toEqual([]);
 });

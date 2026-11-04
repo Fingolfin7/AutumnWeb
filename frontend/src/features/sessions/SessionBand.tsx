@@ -3,12 +3,13 @@ import { faEllipsisH, faPen, faRedo, faTrash } from "@fortawesome/free-solid-svg
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog, Sheet } from "@/components/Sheet";
 import { SessionNote } from "@/components/SessionNote";
+import { NoteEditor } from "@/components/NoteEditor";
 import { AppLink, urls } from "@/app/links";
 import { formatDuration, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
-import { useDeleteSession, type SessionRow } from "./api";
+import { useDeleteSession, useUpdateSession, type SessionRow } from "./api";
 
 /* Journal row shared with Today. Actions are explicit; a left swipe is an
    optional shortcut that reveals the same controls without moving the prose. */
@@ -18,7 +19,16 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [editing, setEditing] = useState<SessionRow | null>(null);
+  const [note, setNote] = useState("");
+  const update = useUpdateSession();
   const row = useRef<HTMLLIElement>(null);
+  const editNote = () => {
+    setNote(session.note ?? "");
+    setEditing(session);
+    setActionsOpen(false);
+    update.reset();
+  };
 
   useEffect(() => {
     const node = row.current;
@@ -80,6 +90,11 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
       <div className="journal-heading">
         <AppLink className="session-project" href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink>
         <span className="journal-duration">{formatDuration(session.duration_minutes)}</span>
+        <div className="journal-row-actions">
+          <button className="btn btn--quiet" type="button" onClick={editNote}><Icon icon={faPen} /> Edit note</button>
+          <button className="btn btn--quiet" type="button" onClick={restart} disabled={start.isPending}><Icon icon={faRedo} /> Restart</button>
+          <button className="btn btn--quiet journal-delete" type="button" onClick={() => setConfirming(true)}><Icon icon={faTrash} /> Delete session</button>
+        </div>
         <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${session.id}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
       </div>
       <div className="journal-meta">
@@ -88,10 +103,24 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
         <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
         {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
       </div>
-      <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} />
+      {editing ? <form className="journal-note-edit fields" onSubmit={(event) => {
+        event.preventDefault();
+        update.mutate({ session: editing, body: { note } }, {
+          onSuccess: () => { setEditing(null); toast.success("Note saved."); },
+        });
+      }}>
+        <NoteEditor value={note} onChange={setNote} autoFocus rows={8} />
+        {update.isError ? <p className="text-danger" role="alert">{errorMessage(update.error)} Your draft is still here. Copy it before reloading if this session changed elsewhere.</p> : null}
+        <div className="journal-edit-actions">
+          <button className="btn btn--primary" disabled={update.isPending}>{update.isPending ? "Saving…" : "Save changes"}</button>
+          <button className="btn btn--quiet" type="button" disabled={update.isPending} onClick={() => setEditing(null)}>Cancel</button>
+          <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
+        </div>
+      </form> : <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} />}
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Session actions" className="session-actions-sheet">
         <p className="session-action-context">{session.project.name} · {formatDuration(session.duration_minutes)}</p>
         <div className="journal-actions" id={`actions-${session.id}`}>
+        <button className="btn btn--quiet" type="button" onClick={editNote}><Icon icon={faPen} /> Edit note</button>
         <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}><Icon icon={faPen} /> Edit session</AppLink>
         <button className="btn btn--quiet" type="button" onClick={restart} disabled={start.isPending}><Icon icon={faRedo} /> Restart</button>
         <button className="btn btn--quiet journal-delete" type="button" onClick={() => { setActionsOpen(false); setConfirming(true); }}><Icon icon={faTrash} /> Delete session</button>

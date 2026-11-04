@@ -1708,7 +1708,7 @@ img.brand-mark {
 .fields .picker .option-chip,
 .fields .nx-subproject-options label {
   display: inline-flex; align-items: center; gap: .4rem;
-  max-width: 100%; margin: 0;
+  min-width: 0; max-width: 100%; margin: 0;
   padding: .3rem .6rem .3rem .45rem;
   border-radius: var(--r-pill);
   background: var(--raised);
@@ -1730,7 +1730,7 @@ img.brand-mark {
 }
 .picker .option-chip input[type="checkbox"],
 .nx-subproject-options input[type="checkbox"] { flex: 0 0 auto; }
-.option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.option-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .picker-empty {
   padding: 0 .7rem .6rem; margin: 0;
@@ -2130,11 +2130,12 @@ img.brand-mark {
   font-size: var(--fs-xs); color: var(--muted);
 }
 .filter-pill {
+  max-width: 100%; min-width: 0;
   display: inline-flex; align-items: center; gap: .35rem;
   padding: .2rem .6rem; border-radius: var(--r-pill);
   background: var(--raised); color: var(--ink-2);
 }
-.filter-pill b { color: var(--ink); font-weight: 600; }
+.filter-pill b { min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-weight: 600; }
 .result-count { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* The confirm pages (delete session, delete project, …) are one slab holding
@@ -3526,8 +3527,6 @@ img.brand-mark {
 .capture-picks > li.is-active, .capture-picks > li:hover { background: var(--raised-2); outline: 1px solid var(--hairline-2); }
 .capture-picks small { font-size: var(--fs-xs); }
 .today-suggestions summary { min-height: 44px; color: var(--muted); cursor: pointer; padding-block: var(--s3); }
-body:has(.timer-dock) .toast-region { bottom: calc(var(--tabbar-h) + 80px + env(safe-area-inset-bottom, 0px)); }
-@media (min-width: 1000px) { body:has(.timer-dock) .toast-region { bottom: var(--s5); } }
 /* Stream A: one writing surface, with the clock and journal sharing the desktop hero. */
 @media (min-width: 1000px) {
   .ember-clock { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); column-gap: var(--s7); }
@@ -3557,7 +3556,6 @@ body:has(.timer-dock) .toast-region { bottom: calc(var(--tabbar-h) + 80px + env(
 .today-quick-pick .today-quick-verb { flex: 0 0 auto; white-space: nowrap; }
 @media (max-width: 999px) {
   body:has(.timer-dock) .offline-banner { bottom: calc(var(--tabbar-h) + 72px + env(safe-area-inset-bottom, 0px)); background: var(--surface-2); }
-  body:has(.timer-dock):has(.offline-banner) .toast-region { bottom: calc(var(--tabbar-h) + 116px + env(safe-area-inset-bottom, 0px)); }
 }
 /* ========================================================================
    Stream C — Projects and Sessions / the journal ledger
@@ -3989,3 +3987,20 @@ body:has(.auth-login) .app-header .header-right { display: none; }
 .first-run-page .fields label { text-transform: none; letter-spacing: normal; font-size: var(--fs-sm); }
 
 .settings-content .profile-avatar-panel .field:focus-within .profile-avatar-upload { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+/* Review questions and journal actions share the quiet utility treatment. */
+.review-question { display: flex; align-items: center; gap: var(--s2); border-bottom: 1px solid var(--hairline-2); margin: 0 0 var(--s4); max-width: 42rem; }
+.review-question .input { flex: 1; min-width: 0; border: 0; background: transparent; box-shadow: none; }
+.review-question .btn { min-width: 44px; min-height: 44px; }
+.journal-row-actions { display: none; }
+.journal-note-edit { margin-top: var(--s4); max-width: 70ch; }
+.journal-edit-actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.journal-edit-actions .btn { min-height: 44px; }
+.split > *, .picker, .picker-options { min-width: 0; }
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  .journal-heading { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .journal-overflow { display: none; }
+  .journal-row-actions { display: flex; opacity: 0; gap: var(--s1); }
+  .journal-entry:hover .journal-row-actions, .journal-entry:focus-within .journal-row-actions { opacity: 1; }
+  .journal-row-actions .btn { padding-inline: var(--s2); }
+}

@@ -103,7 +103,7 @@ export default function SessionsPage() {
   const groups = groupByDay(direct);
 
   const pills = describeFilters(applied, {
-    projects: projects.data ?? [],
+    projects: [...(projects.data ?? []), ...all.map((session) => session.project)],
     tags: tags.data ?? [],
     contexts: contexts.data ?? [],
   });

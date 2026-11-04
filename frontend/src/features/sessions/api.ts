@@ -166,6 +166,11 @@ export function useSession(param: string | undefined) {
 function writeSessionCache(client: ReturnType<typeof useQueryClient>, session: SessionRow) {
   client.setQueryData(keys.session(session.id), session);
   if (session.uuid) client.setQueryData(uuidKey(session.uuid), session);
+  client.setQueriesData<{ pages: { sessions: SessionRow[] }[] }>({ queryKey: keys.sessions() }, (data) =>
+    data && Array.isArray(data.pages)
+      ? { ...data, pages: data.pages.map((page) => ({ ...page, sessions: page.sessions.map((row) => row.id === session.id ? { ...row, ...session, note_html: session.note_html ?? undefined } : row) })) }
+      : data,
+  );
 }
 
 /* PATCH with the version the form was opened on (If-Match): the server

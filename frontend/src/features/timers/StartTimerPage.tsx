@@ -319,6 +319,7 @@ export default function StartTimerPage() {
                     </label>
                     <input
                       id="capture-new-sub"
+                      className="input"
                       placeholder="New subproject (optional)"
                       value={newSub}
                       onChange={(e) => setNewSub(e.target.value)}

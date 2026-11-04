@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { faChevronLeft, faChevronRight, faSlidersH, faSyncAlt } from "@fortawesome/free-solid-svg-icons";
+import { faChevronLeft, faChevronRight, faPaperPlane, faSlidersH, faSyncAlt } from "@fortawesome/free-solid-svg-icons";
 import { api, unwrap } from "@/api/client";
 import { keys } from "@/api/keys";
 import { useAllProjects, useContexts, useTags } from "@/api/meta";
@@ -29,6 +29,8 @@ const totalOf = (rows: DailyTotalRow[]) => rows.reduce((sum, row) => sum + Numbe
 const deltaLabel = (now: number, before: number) => Math.abs(now - before) < 0.5 ? "Same time" : `${formatDuration(Math.abs(now - before))} ${now > before ? "more" : "less"}`;
 
 export default function ReviewPage() {
+  const navigate = useNavigate();
+  const [question, setQuestion] = useState("");
   const [params, setParams] = useSearchParams();
   const client = useQueryClient();
   const { contextId } = useActiveContext();
@@ -115,6 +117,14 @@ export default function ReviewPage() {
     <header className="review-heading"><div><h1 className="page-title">Review</h1><p className="muted">{scope} <span aria-hidden="true">·</span> Completed sessions</p></div><div className="review-heading-actions">{profile.insights_access_enabled ? <AppLink className="btn btn--secondary" href={`${urls.insights()}?${insightParams}`}>Ask about this</AppLink> : null}<button className="btn btn--quiet" type="button" onClick={() => setFilterOpen(true)}><Icon icon={faSlidersH} /> Filters{pills.length ? ` (${pills.length})` : ""}</button><button className="btn-icon" type="button" aria-label="Refresh review" onClick={() => { void client.invalidateQueries({ queryKey: ["reports"] }); void client.invalidateQueries({ queryKey: keys.commitments() }); }}><Icon icon={faSyncAlt} /></button></div></header>
     <div className="review-toolbar"><div className="review-view-switch" role="group" aria-label="Review view"><button type="button" aria-pressed={view === "period"} onClick={() => setView("period")}>Period</button><button type="button" aria-pressed={view === "year"} onClick={() => setView("year")}>Year of embers</button></div>{view === "period" ? <div className="review-presets" role="group" aria-label="Review period">{PRESETS.map((preset) => <button type="button" key={preset.value} aria-pressed={selectedPreset === preset.value} onClick={() => preset.value === "custom" ? setCustomOpen(true) : setPeriod(presetPeriod(preset.value, today))}>{preset.label}</button>)}</div> : null}</div>
     {pills.length ? <div className="filter-summary">{pills.map((pill) => <span className="filter-pill" title={pill.title} key={pill.label}>{pill.label} <b>{pill.value}</b></span>)}<button className="btn btn--quiet" type="button" onClick={clearFilters}>Clear filters</button></div> : null}
+    {profile.insights_access_enabled ? <form className="review-question" onSubmit={(event) => {
+      event.preventDefault();
+      if (question.trim()) navigate(`${urls.insights()}?${insightParams}`, { state: { reviewQuestion: question.trim() } });
+    }}>
+      <label className="sr-only" htmlFor="review-question">Ask about this period</label>
+      <input className="input" id="review-question" placeholder="Ask about this period…" value={question} onChange={(event) => setQuestion(event.target.value)} />
+      <button className="btn btn--quiet" aria-label="Send period question" disabled={!question.trim()}><Icon icon={faPaperPlane} /></button>
+    </form> : null}
 
     {view === "period" ? <>
       <section className="review-period slab" aria-label="Period summary">

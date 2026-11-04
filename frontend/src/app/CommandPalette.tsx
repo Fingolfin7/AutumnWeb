@@ -98,7 +98,6 @@ export function CommandPalette() {
     }
     const pages: [string, string][] = [
       ["Today", urls.home()],
-      ["Timers", urls.timers()],
       ["New timer", urls.startTimer()],
       ["Sessions", urls.sessions()],
       ["Projects", urls.projects()],

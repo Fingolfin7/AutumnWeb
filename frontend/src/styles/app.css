@@ -34,20 +34,20 @@
 @keyframes icon-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .icon--spin { animation: none; } }
 
-/* Toasts replace Django messages. Same .msg look, pinned above the content
-   so they never push the page around when they arrive or leave. */
+/* Feedback has its own lane below the header, above all page controls. */
 .toast-region {
-  position: fixed;
-  z-index: 80;
-  left: 50%;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--s3));
-  transform: translateX(-50%);
-  width: min(32rem, calc(100vw - 1.5rem));
+  position: sticky;
+  top: var(--header-h);
+  z-index: 44;
+  width: 100%;
   display: grid;
-  gap: var(--s2, .5rem);
-  pointer-events: none;
+  justify-items: center;
+  background: var(--surface-0);
 }
+.toast-region:has(.msg) { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--hairline); }
 .toast-region .msg {
+  width: min(42rem, 100%);
+  margin: 0;
   pointer-events: auto;
   background: var(--slab-solid);
   border: 1px solid var(--hairline-2);
@@ -211,7 +211,6 @@
 .timers-outside-context-show:hover,
 .timers-outside-context-show:focus-visible { color: var(--ink); }
 
-@media (min-width: 1000px) { .toast-region { left: auto; right: var(--s5); bottom: var(--s5); transform: none; } }
 .dialog-panel--wide { width: min(46rem, calc(100vw - 1.5rem)); }
 @media (max-width: 999px) {
   .dialog-panel { top: auto; bottom: 0; left: 0; transform: none; width: 100%; max-height: 90dvh; border-radius: var(--r-xl) var(--r-xl) 0 0; padding-bottom: calc(var(--s5) + env(safe-area-inset-bottom, 0px)); }

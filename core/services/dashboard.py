@@ -14,6 +14,7 @@ from core.totals import session_minute_totals_since
 from core.utils import (
     calculate_daily_activity_streak,
     filter_by_active_context,
+    get_active_context,
     group_sessions_by_date,
     stop_expired_timers,
 )
@@ -75,13 +76,15 @@ def select_recent_dashboard_sessions(sessions):
     return selected
 
 
-def get_recent_dashboard_sessions(user):
+def get_recent_dashboard_sessions(user, context=None):
     sessions = (
         Sessions.objects.filter(user=user, end_time__isnull=False)
         .select_related("project")
         .prefetch_related("subprojects")
         .order_by("-end_time", "-id")
     )
+    if context is not None:
+        sessions = filter_by_active_context(sessions, context)
     return select_recent_dashboard_sessions(sessions.iterator(chunk_size=100))
 
 
@@ -119,12 +122,13 @@ def build_dashboard(user, *, context=None, now=None) -> dict:
         )
     commitments_data.sort(key=lambda item: item["progress"]["percentage"])
 
-    recent_sessions = get_recent_dashboard_sessions(user)
+    recent_sessions = get_recent_dashboard_sessions(user, context)
     local_today = timezone.localdate(now)
     today_start = timezone.make_aware(datetime.combine(local_today, time.min))
     week_start = today_start - timedelta(days=local_today.weekday())
     summary_totals = session_minute_totals_since(
         user,
+        context=context,
         today_total=today_start,
         week_total=week_start,
     )
@@ -160,8 +164,11 @@ def build_dashboard(user, *, context=None, now=None) -> dict:
         Sessions.objects.filter(user=user, end_time__isnull=False)
         .select_related("project")
         .prefetch_related("subprojects")
-        .order_by("-end_time")[:QUICK_START_LOOKBACK]
+        .order_by("-end_time")
     )
+    if context is not None:
+        quick_start_source = filter_by_active_context(quick_start_source, context)
+    quick_start_source = quick_start_source[:QUICK_START_LOOKBACK]
 
     return {
         "daily_streak": calculate_daily_activity_streak(user, days=30),
@@ -171,6 +178,8 @@ def build_dashboard(user, *, context=None, now=None) -> dict:
         **summary_totals,
         "active_timers_count": active_timers_count,
         "active_timers": active_timers,
-        "timeline": build_dashboard_timeline(user),
+        "timeline": build_dashboard_timeline(
+            user, context=get_active_context(context)[0] if context is not None else None
+        ),
         "quick_starts": build_quick_starts(quick_start_source, active_timers),
     }

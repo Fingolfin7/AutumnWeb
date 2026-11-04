@@ -141,6 +141,7 @@ function PageError({ error, onRetry }: { error: unknown; onRetry: () => void }) 
 
 function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: ChatDetail | undefined; options: InsightOptions }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const toast = useToast();
   const client = useQueryClient();
   const [params] = useSearchParams();
@@ -180,6 +181,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const [copiedPicked, setCopiedPicked] = useState(false);
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
   const ownRun = useRef<number | null>(null);
+  const autoSent = useRef(false);
   const attach = useAttachmentDrafts((message) => toast.error(message));
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
@@ -218,8 +220,8 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   };
   const clearSelection = () => select({ ...EMPTY_SELECTION, start_date: defaults.start, end_date: defaults.end });
 
-  const send = () => {
-    const message = prompt.trim();
+  const send = (question = prompt) => {
+    const message = question.trim();
     if (!message || !model || live || attach.uploading) return;
     const body: StreamRequest = {
       message,
@@ -251,6 +253,15 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
     });
     ownRun.current = currentRun()?.id ?? null;
   };
+
+  useEffect(() => {
+    const question = (location.state as { reviewQuestion?: string } | null)?.reviewQuestion;
+    if (!question || autoSent.current || chatId || !model || live || preview.isPending) return;
+    autoSent.current = true;
+    // Consume the handoff so a reload cannot submit the question again.
+    window.history.replaceState({ ...window.history.state, usr: null }, "");
+    send(question);
+  });
 
   const toggleSidebar = () => {
     const next = !collapsed;
@@ -332,7 +343,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
       <h1 className="sr-only">Insights</h1>
       <div className="insights-context-bar">
         <AppLink className="btn btn--quiet" href={urls.review()}>Review</AppLink>
-        <div><strong>Insights</strong><span className="muted">{selection.start_date ? formatDayDate(selection.start_date) : "All time"}{selection.end_date ? ` – ${formatDayDate(selection.end_date)}` : ""}</span></div>
+        <div><strong>{chatId ? "Saved conversation" : "Insights"}</strong><span className="muted">{selection.start_date ? formatDayDate(selection.start_date) : "All time"}{selection.end_date ? ` – ${formatDayDate(selection.end_date)}` : ""}</span></div>
         <button className="btn btn--secondary" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context{pills.length ? ` (${pills.length})` : ""}</button>
       </div>
 
@@ -446,7 +457,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                   prompt={prompt}
                   onPrompt={setPrompt}
                   busy={live}
-                  onSend={send}
+                  onSend={() => send()}
                   onStop={stopStream}
                   drafts={attach.drafts}
                   uploading={attach.uploading}
