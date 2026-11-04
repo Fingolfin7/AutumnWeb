@@ -23,6 +23,7 @@ from django.contrib.auth import views as auth_views
 from rest_framework.authtoken.views import obtain_auth_token
 from core import pwa
 from core.spa import spa
+from core.settings_pages import settings_redirect
 from core.mcp import mcp_endpoint
 from core import mcp_oauth
 from oauth2_provider.views import OAuthServerMetadataView, OAuthProtectedResourceMetadataView
@@ -58,7 +59,7 @@ urlpatterns = [
         auth_views.LogoutView.as_view(template_name="users/logout.html"),
         name="logout",
     ),
-    path("profile/", spa, name="profile"),
+    path("profile/", settings_redirect, {"section": "account"}, name="profile"),
     path(
         "accounts/<str:provider>/disconnect/",
         user_views.disconnect_social_account,

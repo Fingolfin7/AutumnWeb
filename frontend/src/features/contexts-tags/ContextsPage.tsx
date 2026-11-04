@@ -70,6 +70,7 @@ export default function ContextsPage() {
         <form className="fields" id="create-context" onSubmit={submit} noValidate>
           <FormLevelErrors errors={errors.general} />
           <section className="slab slab-pad">
+            <h2 className="settings-form-title">New context</h2>
             <div className="field">
               <label htmlFor="id_name">Name</label>
               <input

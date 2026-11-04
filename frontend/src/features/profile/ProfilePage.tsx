@@ -54,7 +54,7 @@ import "./profile.css";
 
 /* Profile (users/templates/users/profile.html): account, avatar, backdrop,
    defaults, LLM connections, connected logins. */
-export default function ProfilePage() {
+export default function ProfilePage({ section = "account" }: { section?: "account" | "ai" }) {
   const account = useAccount();
   const prefs = useProfilePreferences();
   const social = useSocialAccounts();
@@ -70,7 +70,7 @@ export default function ProfilePage() {
     <>
       <div className="desk-head">
         <div>
-          <h1 className="page-title">Profile</h1>
+          <h1 className="page-title">{section === "ai" ? "AI connections" : "Account & appearance"}</h1>
         </div>
       </div>
       {failed ? (
@@ -82,7 +82,7 @@ export default function ProfilePage() {
           }}
         />
       ) : editable ? (
-        <ProfileEditor account={account.data} prefs={prefs.data} social={social.data ?? { accounts: [], has_usable_password: true }} />
+        <ProfileEditor section={section} account={account.data} prefs={prefs.data} social={social.data ?? { accounts: [], has_usable_password: true }} />
       ) : (
         <section className="slab slab-pad">
           <Skeleton lines={6} />
@@ -102,7 +102,9 @@ function ProfileEditor({
   account,
   prefs,
   social,
+  section,
 }: {
+  section: "account" | "ai";
   account: Account;
   prefs: Prefs;
   social: ReturnType<typeof useSocialAccounts>["data"] & object;
@@ -271,13 +273,14 @@ function ProfileEditor({
     if (Object.keys(found).length || general.length || !accountOk) {
       toast.error(general[0] ?? "Some changes could not be saved. Check the highlighted fields.");
     } else if (didSomething) {
-      toast.success("Profile updated successfully.");
+      toast.success("Settings saved.");
     } else {
       toast.info("No changes to save.");
     }
   };
 
   const customAvatar = hasCustomAvatar(prefs.avatar_url);
+  const hasChanges = !!(accountChanges(accountD, account) || prefsChanges(prefsD, prefs) || avatarFile || backgroundFile || removeBg || keyActions(keyDrafts).length);
   const dateRanges = [
     {
       id: "default_filter",
@@ -299,6 +302,7 @@ function ProfileEditor({
   return (
     <>
       <form className="fields profile-page" onSubmit={onSubmit} noValidate>
+        {section === "account" ? <>
         <section className="slab slab-pad">
           <div className="profile-account-grid">
             <div className="profile-avatar-panel">
@@ -308,13 +312,15 @@ function ProfileEditor({
                 alt={`${account.username} profile picture`}
               />
               <div className="field">
-                <label htmlFor="avatar_image">Profile image</label>
+                <label htmlFor="avatar_image" className="profile-avatar-upload">Change photo</label>
                 <input
                   id="avatar_image"
+                  className="sr-only"
                   type="file"
                   accept="image/*"
                   onChange={(event) => setAvatarFile(event.target.files?.[0] ?? null)}
                 />
+                {avatarFile ? <small className="muted">{avatarFile.name}</small> : null}
                 <FieldErrors lines={errors.avatar_image} />
               </div>
               {customAvatar && !avatarFile ? (
@@ -402,7 +408,7 @@ function ProfileEditor({
                   ))}
                 </datalist>
                 <small className="muted">
-                  IANA timezone name, for example Europe/Prague.
+                  Used for your day, dates and reminders.
                   {device && device !== prefsD.timezone ? (
                     <>
                       {" "}
@@ -435,10 +441,12 @@ function ProfileEditor({
           errors={errors}
         />
 
-        <section className="slab slab-pad">
-          <SlabHead title="Defaults" />
+        </> : null}
+
+        {section === "account" || (prefs.ai_features_enabled && prefs.configured_api_keys.openai) ? <section className="slab slab-pad">
+          <SlabHead title={section === "ai" ? "Related search" : "Everyday defaults"} />
           <div className="profile-defaults-grid">
-            {dateRanges.map((range) => {
+            {section === "account" ? dateRanges.map((range) => {
               const unit = prefsD[range.unitKey];
               return (
                 <div key={range.id} className="profile-default-item">
@@ -479,9 +487,9 @@ function ProfileEditor({
                   <FieldErrors lines={[...(errors[range.error] ?? []), ...(errors[`${range.id}_unit`] ?? [])]} />
                 </div>
               );
-            })}
+            }) : null}
 
-            <div className="profile-default-item">
+            {section === "account" ? <div className="profile-default-item">
               <label htmlFor="default_chart_project_count">Projects per chart</label>
               <div className="profile-default-control">
                 <input
@@ -497,9 +505,9 @@ function ProfileEditor({
               </div>
               <p className="muted">The rest are grouped as Other (max 100)</p>
               <FieldErrors lines={errors.default_chart_project_count} />
-            </div>
+            </div> : null}
 
-            {prefs.ai_features_enabled && prefs.configured_api_keys.openai ? (
+            {section === "ai" && prefs.ai_features_enabled && prefs.configured_api_keys.openai ? (
               <div className="profile-default-item profile-default-item--wide">
                 <SimilaritySlider
                   title="Related search closeness"
@@ -522,9 +530,10 @@ function ProfileEditor({
               </div>
             ) : null}
           </div>
-        </section>
+        </section> : null}
 
-        {prefs.ai_features_enabled ? (
+        {section === "ai" && !prefs.ai_features_enabled ? <p className="slab slab-pad">AI features are turned off on this Autumn instance. Connected apps can still be managed below.</p> : null}
+        {section === "ai" && prefs.ai_features_enabled ? (
           <AiSection
             prefs={prefs}
             keyDrafts={keyDrafts}
@@ -540,14 +549,15 @@ function ProfileEditor({
           />
         ) : null}
 
-        <div className="form-actions profile-submit-row">
-          <button type="submit" className="btn btn--primary btn--lg" disabled={saving}>
-            <Icon icon={faCheckCircle} /> {saving ? "Saving..." : "Update profile"}
+        {section === "account" || prefs.ai_features_enabled ? <div className="form-actions profile-submit-row">
+          <span className="settings-save-status" role="status">{saving ? "Saving your changes…" : hasChanges ? "Unsaved changes" : "All changes saved"}</span>
+          <button type="submit" className="btn btn--primary btn--lg" disabled={saving || !hasChanges}>
+            <Icon icon={faCheckCircle} /> {saving ? "Saving..." : "Save changes"}
           </button>
-        </div>
+        </div> : null}
       </form>
 
-      <section className="slab slab-pad">
+      {section === "ai" ? <section className="slab slab-pad">
         <div className="profile-codex-panel">
           <div>
             <h2 className="disclose-title">Autumn MCP</h2>
@@ -559,7 +569,7 @@ function ProfileEditor({
             </AppLink>
           </div>
         </div>
-      </section>
+      </section> : null}
       <SocialConnectForms accounts={social.accounts} />
     </>
   );

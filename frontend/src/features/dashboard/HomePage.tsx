@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { faPlay } from "@fortawesome/free-solid-svg-icons";
+import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { Icon } from "@/components/Icon";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -21,6 +22,7 @@ import { useDashboard, useRefreshOnRunningChange, useTimeline, type Dashboard, t
 
 export default function HomePage() {
   const dashboard = useDashboard();
+  const projects = useAllProjects();
   const timers = useTimers();
   useRefreshOnRunningChange(timers.data);
   if (dashboard.isPending)
@@ -30,6 +32,7 @@ export default function HomePage() {
       </section>
     );
   if (dashboard.isError) return <ErrorState error={dashboard.error} onRetry={() => void dashboard.refetch()} />;
+  if (projects.isSuccess && projects.data.length === 0 && !dashboard.data.recent_sessions.length && !dashboard.data.active_timers.length) return <EmptyWorkspace />;
   return <HomeContent data={dashboard.data} />;
 }
 

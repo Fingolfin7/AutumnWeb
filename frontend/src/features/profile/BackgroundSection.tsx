@@ -1,3 +1,4 @@
+import { Toggle } from "@/components/ui";
 import { useEffect, useMemo } from "react";
 import { faDownload, faExternalLinkAlt, faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -53,18 +54,10 @@ export function BackgroundSection({
   return (
     <section className="slab slab-pad">
       <SlabHead
-        title="Background"
+        title="Your backdrop"
         aside={
           <div>
-            <div className="check-row">
-              <input
-                type="checkbox"
-                id="automatic_background"
-                checked={draft.automatic}
-                onChange={(event) => onDraft({ automatic: event.target.checked })}
-              />
-              <label htmlFor="automatic_background">Automatic background</label>
-            </div>
+            <Toggle id="automatic_background" label="A new photo every day" checked={draft.automatic} onChange={(event) => onDraft({ automatic: event.target.checked })} />
             <FieldErrors lines={errors.automatic_background} />
           </div>
         }
@@ -202,7 +195,7 @@ export function BackgroundSection({
                     </button>
                   </>
                 ) : (
-                  <p className="muted">Not saved yet. Update profile to use it.</p>
+                  <p className="muted">Preview only. Save changes to use this photo.</p>
                 )}
               </div>
             </div>

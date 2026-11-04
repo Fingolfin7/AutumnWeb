@@ -1,5 +1,5 @@
 import { api } from "@/api/client";
-import { decodeBase64Url, describePushError, pushStatus, sameApplicationServerKey, sendTestPush } from "./push";
+import { decodeBase64Url, describePushError, permissionState, pushStatus, sameApplicationServerKey, sendTestPush } from "./push";
 
 vi.mock("@/api/client", () => ({
   api: { GET: vi.fn(), POST: vi.fn(), DELETE: vi.fn() },
@@ -45,4 +45,19 @@ it("queues a test notification with a bodyless POST to the v2 API", async () => 
   vi.mocked(api.POST).mockResolvedValueOnce({ data: { queued: true, event_id: 3 }, response: new Response() } as never);
   expect((await sendTestPush()).queued).toBe(true);
   expect(api.POST).toHaveBeenCalledWith("/api/v2/push/test/");
+});
+
+it("finishes a permission check before a service worker has registered", async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
+  vi.stubGlobal("Notification", { permission: "default" });
+  vi.stubGlobal("PushManager", class {});
+  Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: { ready: new Promise(() => {}), getRegistration: vi.fn().mockResolvedValue(undefined) } });
+  vi.mocked(api.GET).mockResolvedValueOnce({ data: { available: false, configuration_error: "Push is not configured." }, response: new Response() } as never);
+  try {
+    await expect(permissionState()).resolves.toEqual({ state: "unavailable", detail: "Push is not configured." });
+  } finally {
+    if (descriptor) Object.defineProperty(navigator, "serviceWorker", descriptor);
+    else Reflect.deleteProperty(navigator, "serviceWorker");
+    vi.unstubAllGlobals();
+  }
 });

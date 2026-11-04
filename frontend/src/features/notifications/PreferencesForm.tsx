@@ -51,21 +51,21 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
         <span>
           <strong>Scheduled reminders</strong>
         </span>
-        <input type="checkbox" checked={reminders} onChange={(event) => setReminders(event.target.checked)} />
+        <input type="checkbox" role="switch" checked={reminders} onChange={(event) => setReminders(event.target.checked)} />
       </label>
       <label className="nx-switch">
         <span>
           <strong>Commitment checks</strong>
           <small>When a period is about to close short of its target</small>
         </span>
-        <input type="checkbox" checked={checks} onChange={(event) => setChecks(event.target.checked)} />
+        <input type="checkbox" role="switch" checked={checks} onChange={(event) => setChecks(event.target.checked)} />
       </label>
       <label className="nx-switch">
         <span>
           <strong>Weekly review</strong>
           <small>A summary of last week</small>
         </span>
-        <input type="checkbox" checked={review} onChange={(event) => setReview(event.target.checked)} />
+        <input type="checkbox" role="switch" checked={review} onChange={(event) => setReview(event.target.checked)} />
       </label>
       <div className="nx-schedule-fields">
         <div className="field">

@@ -1,3 +1,4 @@
+import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import {
@@ -85,6 +86,8 @@ export default function ProjectsPage() {
       tagColors={tagColors}
     />
   );
+
+  if (allProjects.isSuccess && !allProjects.data.length && !filtered) return <EmptyWorkspace projects />;
 
   return (
     <>
