@@ -50,7 +50,9 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   const note = `Edited by the ${testInfo.project.name} e2e run ${testInfo.retry}.${testInfo.repeatEachIndex}`;
 
   await page.goto("/sessions/?search=Piano");
-  const first = page.getByRole("region", { name: "Sessions" }).getByRole("listitem").first();
+  const seedNote = testInfo.project.name === "phone" ? "First page of the waltz" : "Major scales at a slower tempo";
+  const firstId = await page.getByRole("region", { name: "Sessions" }).getByRole("listitem").filter({ hasText: seedNote }).first().getAttribute("id");
+  const first = page.locator(`#${firstId}`);
   await expect(first).toContainText("Piano Practice");
   if (testInfo.project.name === "phone") {
     const heading = first.locator(".journal-heading");
