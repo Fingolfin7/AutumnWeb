@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+﻿import { useEffect, useRef, useState } from "react";
+import type { ScaleOptions } from "chart.js";
 import { Chart } from "./register";
 import { drawWordcloud, stopWordcloud } from "./wordcloud";
 import type { Built } from "./build";
@@ -7,14 +8,29 @@ import type { Built } from "./build";
    The effect's cleanup destroys the chart, so a type change, new data or an
    unmount never leaves an instance behind or draws twice on a canvas. */
 export function ChartCanvas({ built }: { built: Built }) {
+  const [hidden, setHidden] = useState<number[]>([]);
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    setHidden([]);
     const element = canvas.current;
     if (!element) return;
 
     if (built.type === "chart") {
-      const chart = new Chart(element, built.config);
+      const config = built.config;
+      config.options ??= {};
+      config.options.plugins ??= {};
+      config.options.plugins.title = { ...config.options.plugins.title, display: false };
+      config.options.plugins.legend = { ...config.options.plugins.legend, display: false };
+      if (config.options.scales) Object.values(config.options.scales).forEach((value) => {
+        const scale = value as Partial<ScaleOptions<"linear">> | undefined;
+        if (!scale) return;
+        scale.grid = { ...scale.grid, color: "rgba(228,232,229,.06)", drawTicks: false };
+        scale.border = { display: false };
+        scale.title = { ...scale.title, display: false };
+        scale.ticks = { ...scale.ticks, maxTicksLimit: 6, padding: 10 };
+      });
+      const chart = new Chart(element, config);
       return () => chart.destroy();
     }
 
@@ -43,5 +59,8 @@ export function ChartCanvas({ built }: { built: Built }) {
     };
   }, [built]);
 
-  return <canvas id="chart" ref={canvas} role="img" aria-label={built.type === "wordcloud" ? "Word cloud of session notes" : "Chart of tracked time"} />;
+  const series = built.type === "chart" ? (built.config.type === "doughnut" ? (built.config.data.labels ?? []).map(String) : built.config.data.datasets.map((dataset) => dataset.label ?? "").filter(Boolean)) : [];
+  return <><canvas id="chart" ref={canvas} role="img" aria-label={built.type === "wordcloud" ? "Word cloud of session notes" : "Chart of tracked time"} />{series.length > 1 ? <details className="chart-series"><summary>{series.length} series Â· Show legend</summary><ul>{series.map((name, index) => <li key={`${name}-${index}`}><button type="button" aria-pressed={!hidden.includes(index)} onClick={() => { const chart = canvas.current ? Chart.getChart(canvas.current) : undefined; if (!chart) return; if (built.type === "chart" && built.config.type === "doughnut") chart.toggleDataVisibility(index); else chart.setDatasetVisibility(index, hidden.includes(index)); chart.update(); setHidden((items) => items.includes(index) ? items.filter((item) => item !== index) : [...items, index]); }}><span className={`chart-series-dot chart-series-dot--${index % 12}`} />{name}</button></li>)}</ul></details> : null}</>;
+
 }
+

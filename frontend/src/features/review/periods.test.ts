@@ -1,4 +1,4 @@
-import { calendarWeek, comparisonPeriod, legacyReviewTarget, presetPeriod, readPeriod } from "./periods";
+import { calendarWeek, elapsedComparison, comparisonPeriod, legacyReviewTarget, presetPeriod, readPeriod } from "./periods";
 
 it("uses Monday–Sunday weeks across year boundaries", () => {
   expect(calendarWeek("2027-01-03")).toEqual({ start: "2026-12-28", end: "2027-01-03" });
@@ -21,4 +21,9 @@ it("keeps chart bookmarks and the weekly notification's exact window", () => {
   expect(legacyReviewTarget("/charts/", "", "2026-11-04")).toBe("/review/?chart_type=pie");
   expect(legacyReviewTarget("/review/weekly/", "?week=2026-10-21&context=2", "2026-11-04")).toBe("/review/?context=2&start_date=2026-10-21&end_date=2026-10-27");
   expect(legacyReviewTarget("/review/weekly/", "", "2026-11-04")).toBe("/review/?start_date=2026-10-28&end_date=2026-11-03");
+});
+
+it("compares matching elapsed days while retaining completed periods", () => {
+  expect(elapsedComparison(calendarWeek("2026-11-04"), "2026-11-04")).toEqual({ start: "2026-10-26", end: "2026-10-28" });
+  expect(elapsedComparison({ start: "2026-10-26", end: "2026-11-01" }, "2026-11-04")).toEqual({ start: "2026-10-19", end: "2026-10-25" });
 });
