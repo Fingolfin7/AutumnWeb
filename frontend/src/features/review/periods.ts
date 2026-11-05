@@ -31,7 +31,7 @@ export function readPeriod(params: URLSearchParams, today: string): Period {
   return validEnd >= validStart ? { start: validStart, end: validEnd } : { start: validStart, end: validStart };
 }
 
-/** Compare the complete preceding period; explicit dates label partial weeks. */
+/** The complete preceding period remains available as secondary context. */
 export function comparisonPeriod(period: Period): Period {
   const span = periodDays(period);
   return { start: addDays(period.start, -span), end: addDays(period.end, -span) };
@@ -50,4 +50,11 @@ export function legacyReviewTarget(pathname: string, search: string, today: stri
     params.set("chart_type", "pie");
   }
   return `/review/${params.size ? `?${params}` : ""}`;
+}
+
+/** Compare matching elapsed calendar days, including today; never a partial week against seven days. */
+export function elapsedComparison(period: Period, today: string): Period {
+  const previous = comparisonPeriod(period);
+  const elapsed = Math.max(1, Math.min(periodDays(period), periodDays({ start: period.start, end: today })));
+  return { start: previous.start, end: addDays(previous.start, elapsed - 1) };
 }

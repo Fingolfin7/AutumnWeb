@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { faChevronDown } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
-import { countAt, fixed2, loosenTo, position, sameCutoff, snap, type SimilarityScale } from "./similarity";
+import { closenessLabel, countAt, fixed2, loosenTo, position, sameCutoff, snap, type SimilarityScale } from "./similarity";
 
 /* Arrow keys fire a change per press: wait until they settle. */
 const COMMIT_DELAY_MS = 450;
@@ -102,7 +102,7 @@ export function SimilaritySlider({
         {title}
       </span>
       <output className="similarity-readout" htmlFor={id} aria-live="polite">
-        <b>{fixed2(draft)}</b>
+        <b>{closenessLabel(draft)}</b>
         {count !== null ? <> · {count} related</> : null}
       </output>
       {collapsible ? <Icon icon={faChevronDown} className="similarity-chevron" /> : null}
@@ -124,7 +124,7 @@ export function SimilaritySlider({
           <span
             className="similarity-default"
             style={at(defaultValue)}
-            title={`${defaultLabel}, ${fixed2(defaultValue)}`}
+            title={`${defaultLabel}, ${closenessLabel(defaultValue)}`}
             aria-hidden="true"
           />
         ) : null}
@@ -139,7 +139,7 @@ export function SimilaritySlider({
           value={fixed2(draft)}
           aria-labelledby={`${id}-title`}
           aria-describedby={`${id}-help`}
-          aria-valuetext={`${fixed2(draft)}${count !== null ? `, ${count} related` : ""}`}
+          aria-valuetext={`${closenessLabel(draft)}${count !== null ? `, ${count} related` : ""}`}
           onChange={(event) => setDraft(snap(Number(event.target.value), scale))}
         />
       </div>
@@ -165,10 +165,10 @@ export function SimilaritySlider({
           {looser !== null && best != null ? (
             <>
               <span>
-                Nothing related at <b>{fixed2(draft)}</b>. The closest match is <b>{fixed2(looser)}</b>.
+                Nothing related at <b>{closenessLabel(draft)}</b>. The closest match is <b>{fixed2(looser)}</b>.
               </span>
               <button type="button" className="btn btn--ghost" onClick={() => jump(looser)}>
-                Loosen to {fixed2(looser)}
+                Include looser matches
               </button>
             </>
           ) : (

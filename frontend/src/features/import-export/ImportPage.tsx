@@ -24,6 +24,7 @@ export default function ImportPage() {
   const contexts = useContexts();
   const projects = useAllProjects();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [showAll, setShowAll] = useState(false);
   const [previewError, setPreviewError] = useState("");
 
   const [file, setFile] = useState<File | null>(null);
@@ -46,6 +47,7 @@ export default function ImportPage() {
   useEffect(() => {
     let current = true;
     setPreview(null);
+    setShowAll(false);
     setPreviewError("");
     if (file) void file.text().then((text) => {
       const inventory = previewImport(JSON.parse(text));
@@ -187,7 +189,7 @@ export default function ImportPage() {
 
       <form className="fields" onSubmit={onSubmit} noValidate>
         <div className="split">
-          <section id="import_options" className="slab slab-pad">
+          {!started ? <section id="import_options" className="slab slab-pad">
             <div className="field">
               <label htmlFor="import-file">JSON file</label>
               <input
@@ -204,11 +206,12 @@ export default function ImportPage() {
             {preview ? <section className="import-preview" aria-label="Import preview">
               <h2 className="settings-form-title">Ready to bring over</h2>
               <p><strong>{preview.names.length} projects</strong> and <strong>{preview.sessions} sessions</strong> in this file</p>
-              <ul tabIndex={0} aria-label="Projects in the import file">{preview.names.map((name, index) => {
+              <ul tabIndex={0} aria-label="Projects in the import file">{(showAll ? preview.names : preview.names.slice(0, 6)).map((name, index) => {
                 const exists = projects.data?.some((project) => project.name === name);
                 const action = !projects.isSuccess ? "Checking existing projects..." : !exists ? "Add project" : preview.portable ? (force ? "Merge: update conflicting sessions" : "Merge: check conflicts") : force ? "Replace existing project" : merge ? "Merge into existing project" : "Skip existing project";
                 return <li key={index}><span>{name}</span><small className={exists && force ? "text-red" : "muted"}>{action}</small></li>;
               })}</ul>
+              <p className="muted">Showing {showAll ? preview.names.length : Math.min(6, preview.names.length)} of {preview.names.length}{preview.names.length > 6 ? <button type="button" className="btn btn--quiet" onClick={() => setShowAll(!showAll)}>{showAll ? "Show fewer" : "Show all projects"}</button> : null}</p>
               <p className="muted">Autumn checks the full file when importing. Existing duplicate sessions are kept once.</p>
             </section> : null}
             <details className="import-advanced"><summary>Advanced options</summary><div className="fields">
@@ -300,17 +303,18 @@ export default function ImportPage() {
             </div>
 
             </div></details>
+            {!preview ? <p className="muted">Choose a valid Autumn JSON file to enable Import.</p> : null}
             <div className="form-actions">
               <button type="submit" className="btn btn--primary btn--lg" disabled={busy || !preview}>
                 <Icon icon={faFileImport} /> {busy ? "Importing..." : "Import"}
               </button>
             </div>
-          </section>
+          </section> : null}
 
           {started ? (
             <section className="slab slab-pad stream-output" id="output-section" aria-live="polite">
               <h2 className="disclose-title">
-                Importing{" "}
+                {done ? failed ? "Import needs attention: " : "Import complete: " : "Importing "}
                 <span id="output-title" className="text-orange">
                   {title}
                 </span>
@@ -332,6 +336,7 @@ export default function ImportPage() {
                   {percent === null ? "" : `${percent.toFixed(2)}%`}
                 </div>
               </div>
+              {done ? <><p className="muted">{failed ? "Review the details below before trying again." : "Your projects and sessions are ready."}</p><button className="btn btn--secondary" type="button" onClick={() => { setStarted(false); setDone(false); }}>Choose another file</button></> : null}
               <div id="output-text" className="stream-log" tabIndex={0} aria-label="Import progress details">
                 {lines.map((line) => (
                   <div key={line.id} className={`log-entry${line.kind === "info" ? "" : ` ${line.kind}`}`}>

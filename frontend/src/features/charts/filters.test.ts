@@ -100,9 +100,9 @@ describe("summary pills", () => {
     const filters = { ...EMPTY_FILTERS, search: "oauth", related: true };
     const on = describeFilters(filters, lookup, { available: true, state: "included" });
     expect(on.find((p) => p.value === "related")).toMatchObject({ label: "Including" });
-    expect(on.find((p) => p.label === "Closeness")).toMatchObject({ value: "0.45" });
+    expect(on.find((p) => p.label === "Closeness")).toMatchObject({ value: "Balanced" });
     const strict = describeFilters({ ...filters, similarity: 0.52 }, lookup, { available: true, state: "included" });
-    expect(strict.find((p) => p.label === "Closeness")).toMatchObject({ value: "0.52" });
+    expect(strict.find((p) => p.label === "Closeness")).toMatchObject({ value: "Strict" });
     const off = describeFilters(filters, lookup, { available: true, state: "unavailable" });
     expect(off.find((p) => p.label === "Related")).toMatchObject({ value: "unavailable" });
     expect(describeFilters({ ...filters, related: false }, lookup, { available: true, state: null }).map((p) => p.label)).toEqual(["Search"]);

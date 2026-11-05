@@ -22,11 +22,11 @@ export const FILTER_UNITS: { value: FilterUnit; label: string }[] = [
 ];
 
 export const LUNA_EFFORTS: { value: LunaEffort; label: string }[] = [
-  { value: "low", label: "Low effort" },
-  { value: "medium", label: "Medium effort" },
-  { value: "high", label: "High effort" },
-  { value: "xhigh", label: "xHigh effort" },
-  { value: "max", label: "Max effort" },
+  { value: "low", label: "Quick" },
+  { value: "medium", label: "Balanced" },
+  { value: "high", label: "Thorough" },
+  { value: "xhigh", label: "Very thorough" },
+  { value: "max", label: "Most thorough" },
 ];
 
 export const DIM_MAX = 85;

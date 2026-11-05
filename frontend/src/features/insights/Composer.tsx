@@ -109,11 +109,11 @@ export function Composer({
           onPaste={onPaste}
         />
         {busy ? (
-          <button type="button" className="btn btn--ghost" title="Stop the answer" onClick={onStop}>
+          <button type="button" className="btn btn--ghost" aria-label="Stop the answer" title="Stop the answer" onClick={onStop}>
             <Icon icon={faStop} /> <span className="composer-btn-label">Stop</span>
           </button>
         ) : (
-          <button type="submit" className="btn btn--primary" title={uploading ? "Waiting for files to finish uploading" : "Send (Enter)"} disabled={!canSend}>
+          <button type="submit" className="btn btn--primary" aria-label="Send question" title={uploading ? "Waiting for files to finish uploading" : "Send (Enter)"} disabled={!canSend}>
             <Icon icon={faPaperPlane} /> <span className="composer-btn-label">Send</span>
           </button>
         )}

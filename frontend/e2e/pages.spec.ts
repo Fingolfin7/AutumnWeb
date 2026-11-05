@@ -26,10 +26,9 @@ test("the shell keeps navigation, scroll and palette usable on both sizes", asyn
   await nav.getByRole("link", { name: "Projects", exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/$/);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
-  const settings = page.getByRole("dialog", { name: "Settings", exact: true });
-  await expect(settings.getByRole("link", { name: "Account & appearance" })).toHaveAttribute("href", "/settings/account/");
-  await settings.getByRole("button", { name: "Close panel" }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/$/);
+  await expect(page.locator(".settings-sections a[href='/settings/account/']")).toBeVisible();
   await page.getByRole("button", { name: "Go anywhere", exact: true }).click();
   const palette = page.getByRole("dialog", { name: "Go anywhere" });
   await palette.getByRole("textbox", { name: "Command" }).fill("Review");
@@ -45,10 +44,19 @@ test("Settings keeps bookmarks, swatches and import streaming usable", async ({ 
   const problems = trackErrors(page);
   await page.goto("/profile/");
   await expect(page).toHaveURL(/\/settings\/account\/$/);
+  const original = await (await page.request.get("/api/v2/me/preferences/")).json();
   const firstName = `Settings ${Date.now()}`;
+  // Invalid reporting edits must neither block Account nor be silently saved/reset by it.
+  await page.getByLabel("Projects per chart", { exact: true }).fill("0");
   await page.getByLabel("First name", { exact: true }).fill(firstName);
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
-  await expect(page.getByRole("status", { name: "" }).filter({ hasText: "All changes saved" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save changes", exact: true })).toBeDisabled();
+  await expect(page.getByLabel("Projects per chart", { exact: true })).toHaveValue("0");
+  expect((await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count);
+  await page.getByLabel("Projects per chart", { exact: true }).fill(String(original.default_chart_project_count + 1));
+  await page.getByRole("button", { name: "Save defaults", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save defaults", exact: true })).toBeDisabled();
+  expect((await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count + 1);
   expect((await (await page.request.get("/api/v2/me/account/")).json()).first_name).toBe(firstName);
   await page.goto("/tags/");
   await expect(page).toHaveURL(/\/settings\/tags\/$/);

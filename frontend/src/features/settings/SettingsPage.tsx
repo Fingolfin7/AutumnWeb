@@ -1,5 +1,9 @@
 import { Navigate, useLocation } from "react-router";
 import { faBell, faFileExport, faFileImport, faLayerGroup, faPlug, faTags, faUserCircle } from "@fortawesome/free-solid-svg-icons";
+import { bootstrap } from "@/bootstrap";
+import { csrfToken } from "@/lib/csrf";
+import { clearPersistedQueries } from "@/app/persist";
+import { useAccount, useProfilePreferences } from "@/features/profile/api";
 import { AppLink } from "@/app/links";
 import { Icon } from "@/components/Icon";
 import ProfilePage from "@/features/profile/ProfilePage";
@@ -21,13 +25,15 @@ const sections = [
 
 export default function SettingsPage() {
   const location = useLocation();
+  const prefs = useProfilePreferences();
+  const account = useAccount();
   const id = location.pathname.split("/")[2];
   const section = sections.find((item) => item.id === id);
   return <div className={`settings-page${section ? " settings-page--section" : ""}`}>
     <header className="settings-heading">
       {section ? <AppLink className="settings-back" href="/settings/">‹ All settings</AppLink> : null}
-      <h1 className="page-title">{section?.title ?? "Make Autumn yours"}</h1>
-      <p>{section?.description ?? "A little space for the way you work."}</p>
+      <h1 className="page-title">{section?.title ?? "Settings"}</h1>
+      <p>{section?.description ?? "Your account and workspace."}</p>
     </header>
     <div className="settings-layout">
       <nav className="settings-sections" aria-label="Settings sections">
@@ -36,9 +42,10 @@ export default function SettingsPage() {
         </AppLink>)}
       </nav>
       <div className="settings-content" key={id ?? "index"}>
-        {id === "account" ? <ProfilePage section="account" /> : id === "ai" ? <ProfilePage section="ai" /> : id === "contexts" ? <ContextsPage /> : id === "tags" ? <TagsPage /> : id === "notifications" ? <NotificationsPage /> : id === "import" ? <ImportPage /> : id === "export" ? <ExportPage /> : <div className="settings-welcome"><span className="ember-seal" aria-hidden="true" /><h2>A familiar place.<br />Your own rhythm.</h2><p>Choose a section to adjust your workspace.<br />Your projects and journal stay close.</p></div>}
+        {id === "account" ? <ProfilePage section="account" /> : id === "ai" ? <ProfilePage section="ai" /> : id === "contexts" ? <ContextsPage /> : id === "tags" ? <TagsPage /> : id === "notifications" ? <NotificationsPage /> : id === "import" ? <ImportPage /> : id === "export" ? <ExportPage /> : <section className="settings-overview slab slab-pad"><h2>Your workspace</h2><dl><div><dt>Signed in as</dt><dd>{account.data?.username ?? bootstrap().user.username}</dd></div><div><dt>Timezone</dt><dd>{prefs.data?.timezone ?? bootstrap().profile.timezone}</dd></div><div><dt>Backdrop</dt><dd>{prefs.data?.automatic_background ? "A new photo every day" : prefs.data?.background.image_url ? "Your uploaded photo" : "Night Ledger"}</dd></div><div><dt>Reporting range</dt><dd>{prefs.data ? prefs.data.default_filter_unit.endsWith("_to_date") ? prefs.data.default_filter_unit.replaceAll("_", " ") : `${prefs.data.default_filter_value} ${prefs.data.default_filter_value === 1 ? prefs.data.default_filter_unit.slice(0, -1) : prefs.data.default_filter_unit}` : "Loading…"}</dd></div></dl><AppLink className="btn btn--secondary" href="/settings/account/">Edit account & appearance</AppLink></section>}
       </div>
     </div>
+    <form className="settings-logout" method="POST" action="/logout/" onSubmit={clearPersistedQueries}><input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} /><button className="btn btn--quiet" type="submit">Log out</button></form>
   </div>;
 }
 

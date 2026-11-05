@@ -261,7 +261,7 @@ export function classifyChanges(base: FormState, next: FormState): EditChanges {
 
   const nextPeriod: string[] = [];
   if (Number(a.target) !== Number(b.target)) nextPeriod.push("Target");
-  if (a.banking !== b.banking) nextPeriod.push("Time banking");
+  if (a.banking !== b.banking) nextPeriod.push("Time carryover");
   if (Number(a.maxBalance) !== Number(b.maxBalance)) nextPeriod.push("Surplus cap");
   if (Number(a.minBalance) !== Number(b.minBalance)) nextPeriod.push("Deficit cap");
   if (RULE_FIELDS.some((field) => !sameIds(a.rules[field], b.rules[field]))) nextPeriod.push("Rules");

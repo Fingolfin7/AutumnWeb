@@ -16,6 +16,7 @@ test("Review preserves old links, applies filters immediately and offers every c
   await page.getByRole("button", { name: /^Chart:/ }).click();
   const chooser = page.getByRole("dialog", { name: "Choose a chart" });
   await expect(chooser.locator(".review-chart-choice")).toHaveCount(15);
+  await chooser.getByText("More charts · all 15 views", { exact: true }).click();
   await chooser.getByRole("button", { name: /Ranked project bars/ }).click();
   await expect(page.locator(".review-project-row").first()).toBeVisible();
   if (testInfo.project.name === "phone") await page.getByRole("button", { name: /^Filters/ }).click();

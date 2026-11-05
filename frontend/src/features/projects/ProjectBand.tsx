@@ -3,7 +3,7 @@ import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
-import { formatDate, formatDurationWords } from "@/lib/format";
+import { formatDurationWords } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
 import type { Commitment, Project } from "@/api/types";
 
@@ -14,10 +14,12 @@ export function ProjectBand({
   running,
   commitment,
   tagColors,
+  weekMinutes,
 }: {
   project: Project;
+  weekMinutes?: number;
   running: boolean;
-  /** The project's own active commitment, for the progress meter. */
+  /** The project's own active commitment, for the weekly summary. */
   commitment?: Commitment;
   tagColors: Map<number, string | null>;
 }) {
@@ -38,7 +40,7 @@ export function ProjectBand({
 
   const period = commitment?.current_period;
   return (
-    <li className="band project" id={`project-${project.id}`}>
+    <li className="band project project-directory-row" id={`project-${project.id}`}>
       <div className="u-grow">
         <div className="project-top">
           <AppLink className="project-name" href={urls.updateProject(project.id)}>
@@ -74,18 +76,9 @@ export function ProjectBand({
           </div>
         ) : null}
 
-        <p className="project-total">{formatDurationWords(project.total_minutes)}</p>
-        <p className="project-dates">
-          {formatDate(project.start_date)} &rarr; {formatDate(project.last_activity)}
-        </p>
+        <p className="project-total"><span className="muted">This week</span><strong>{weekMinutes === undefined ? "Loading…" : formatDurationWords(weekMinutes)}</strong>{commitment && period ? <small className="muted">{commitment.period === "weekly" ? commitment.commitment_type === "time" ? `/ ${formatDurationWords(period.target)}` : `${Math.round(period.accrued)}/${Math.round(period.target)} sessions` : `${period.met ? "Met" : "In progress"} this period`}{period.met && commitment.period === "weekly" ? " · Met" : ""}</small> : null}</p>
 
-        {period ? (
-          <div className="project-commit">
-            <div className="meter">
-              <div className={`meter-fill ${period.status ?? ""}`} style={{ width: `${Math.round(period.percentage ?? 0)}%` }} />
-            </div>
-          </div>
-        ) : null}
+
       </div>
 
       <button

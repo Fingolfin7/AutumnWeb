@@ -1,5 +1,5 @@
 import { QuickTarget } from "@/features/commitments/QuickTarget";
-import { faBullseye, faPen, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faBullseye, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
@@ -121,13 +121,13 @@ export function CommitmentsPanel({
                     <progress className="subproject-progress commitment-progress" max={Math.max(period.target, period.accrued, 1)} value={period.accrued} aria-label="Commitment progress" />
 
                     {commitment.banking_enabled ? (
-                      <details className="commitment-bank-detail"><summary>Banking details</summary><div className="bank-row">
+                      <details className="commitment-bank-detail"><summary>Time carryover</summary><div className="bank-row">
                         <div className="bank-cell">
-                          <span className="bank-label">Bank (reconciled)</span>
+                          <span className="bank-label">Carried balance</span>
                           <span className={`bank-value ${balance >= 0 ? "text-green" : "text-red"}`}>{formatSigned(balance, timeBased)}</span>
                         </div>
                         <div className="bank-cell">
-                          <span className="bank-label">This period (unbanked)</span>
+                          <span className="bank-label">This period</span>
                           <span className={`bank-value ${surplus >= 0 ? "text-green" : "text-red"}`}>{formatSigned(surplus, timeBased)}</span>
                         </div>
                       </div></details>
@@ -135,6 +135,7 @@ export function CommitmentsPanel({
                   </>
                 ) : null}
 
+                {!commitment.active ? <AppLink className="btn btn--quiet" href={urls.updateCommitment(commitment.id)}>Edit commitment</AppLink> : null}
                 {rules.length ? (
                   <div className="commit-rules">
                     {rules.map((line) => (
@@ -145,21 +146,14 @@ export function CommitmentsPanel({
                   </div>
                 ) : null}
 
-                <div className="commit-foot">
-                  <AppLink className="btn btn--ghost" href={urls.updateCommitment(commitment.id)}>
-                    <Icon icon={faPen} /> Edit commitment
-                  </AppLink>
-                </div>
+
               </article>
             );
           })}
       </div>
 
-      <div className="slab-foot">
-        <AppLink className="btn btn--secondary" href={addUrl}>
-          <Icon icon={faPlus} /> Add commitment
-        </AppLink>
-      </div>
+
+      <div className="slab-foot"><AppLink className="btn btn--quiet" href={addUrl}>Add another commitment</AppLink></div>
     </Disclose>
   );
 }

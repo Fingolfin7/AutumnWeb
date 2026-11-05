@@ -1,3 +1,4 @@
+import { addDays } from "@/features/notifications/dates";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { errorMessage } from "@/api/errors";
@@ -242,4 +243,9 @@ export function useMergeSubprojects() {
 /** Toast text for a failed mutation, with the server's own message. */
 export function failure(action: string, error: unknown): string {
   return `Couldn't ${action}: ${errorMessage(error)}`;
+}
+
+/** One weekly report serves the whole directory, keyed by stable project IDs. */
+export function useProjectWeek(week: string) {
+  return useQuery({ queryKey: keys.reports("project-week", { week }), queryFn: () => unwrap(api.GET("/api/v2/reports/tallies/", { params: { query: { by: "project", start_date: week, end_date: addDays(week, 6), active: "false" } } })) });
 }

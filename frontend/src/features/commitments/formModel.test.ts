@@ -1,3 +1,4 @@
+import { parseTimeTarget } from "./TargetInput";
 import { describe, expect, it } from "vitest";
 import type { Commitment, Project, Subproject, Tag } from "@/api/types";
 import {
@@ -247,7 +248,7 @@ describe("edit policy", () => {
       banking: false,
       rules: { ...base.rules, exclude_subproject_ids: [20] },
     };
-    expect(classifyChanges(base, next).nextPeriod).toEqual(["Target", "Time banking", "Surplus cap", "Rules"]);
+    expect(classifyChanges(base, next).nextPeriod).toEqual(["Target", "Time carryover", "Surplus cap", "Rules"]);
     expect(patchPayload(base, next)).toEqual({
       target_value: 240,
       banking_enabled: false,
@@ -314,4 +315,13 @@ describe("related commitments", () => {
     const lines = ruleLines(commitment({ filters: filters({ include_tag_ids: [100], exclude_project_ids: [2, 9] }) }), names);
     expect(lines).toEqual(["Include Tags: deep", "Exclude Projects: Beta, #9"]);
   });
+});
+
+it("accepts hours and minutes without changing the minute-based contract", () => {
+  expect(parseTimeTarget("3h 30m")).toBe("210");
+  expect(parseTimeTarget("3h")).toBe("180");
+  expect(parseTimeTarget("45m")).toBe("45");
+  expect(parseTimeTarget("240")).toBe("240");
+  expect(parseTimeTarget("3.5h")).toBe("");
+  expect(parseTimeTarget("-1h")).toBe("");
 });

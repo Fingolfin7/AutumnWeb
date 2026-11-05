@@ -53,7 +53,6 @@ export function FilterSheet({
       <div className="fields">
         <div className="field"><label htmlFor="start_date">Start date</label><input id="start_date" type="date" value={draft.start_date} onChange={(event) => onDraft({ ...draft, start_date: event.target.value })} /></div>
         <div className="field"><label htmlFor="end_date">End date</label><input id="end_date" type="date" value={draft.end_date} onChange={(event) => onDraft({ ...draft, end_date: event.target.value })} /></div>
-        {children}
         <div className="field">
           <label htmlFor="content-search">Search projects, subprojects, and session notes</label>
           <input id="content-search" type="search" placeholder="Projects, subprojects, or notes" value={draft.search} onChange={(e) => onDraft({ ...draft, search: e.target.value })} />
@@ -134,6 +133,7 @@ export function FilterSheet({
           />
         ) : null}
 
+        {children}
         <div className="sheet-foot">
           <button className="btn btn--ghost" type="button" onClick={onClear}>
             Clear all
