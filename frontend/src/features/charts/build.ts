@@ -28,7 +28,7 @@ export function parseKind(value: string | null | undefined): ChartKind {
 /* Square charts get a square box; everything else the full-width one. */
 export const CIRCULAR_KINDS: ChartKind[] = ["pie"];
 
-export type Built = { type: "chart"; config: AnyConfig } | { type: "wordcloud"; words: WordRow[] };
+export type Built = { type: "chart"; config: AnyConfig; labels?: "projects" | "subprojects" | "neutral" } | { type: "wordcloud"; words: WordRow[] };
 
 /* True when there is nothing worth drawing for this payload. */
 export function isEmptyPayload(kind: ChartKind, data: unknown): boolean {
@@ -43,7 +43,7 @@ export function isEmptyPayload(kind: ChartKind, data: unknown): boolean {
    stacked area for their subproject breakdowns. */
 export function buildChart(kind: ChartKind, data: unknown, options: ChartOptions & { subprojects: boolean }): Built | null {
   if (isEmptyPayload(kind, data)) return null;
-  const chart = (config: AnyConfig | null): Built | null => (config ? { type: "chart", config } : null);
+  const chart = (config: AnyConfig | null): Built | null => (config ? { type: "chart", config, labels: ["context", "histogram", "heatmap", "cumulative"].includes(kind) ? "neutral" : options.subprojects && kind !== "treemap" ? "subprojects" : "projects" } : null);
   switch (kind) {
     case "pie":
       return chart(pieConfig(data as TallyRow[], options));

@@ -103,7 +103,7 @@ function CommitmentCard({ commitment: c, lines, tagColor }: { commitment: Commit
   const pct = Math.round(progress.percentage);
   const balance = c.balance;
   return (
-    <article className="band commit">
+    <article className={`band commit${time ? "" : " commit--count"}`}>
       <header className="commit-head">
         <CommitmentTarget c={c} tagColor={tagColor} />
         <span className="commit-kind">({aggregationLabel(c.aggregation_type)})</span>
@@ -126,14 +126,14 @@ function CommitmentCard({ commitment: c, lines, tagColor }: { commitment: Commit
           {c.banking_enabled ? (
             <div className="bank-row">
               <div className="bank-cell">
-                <span className="bank-label">Bank (reconciled)</span>
-                <span className={`bank-value ${balance >= 0 ? "text-green" : "text-red"}`}>
+                <span className="bank-label">Carried over</span>
+                <span className={`bank-value ${time ? balance >= 0 ? "text-green" : "text-red" : ""}`}>
                   {signedValue(balance)}
                 </span>
               </div>
               <div className="bank-cell">
-                <span className="bank-label">This period (unbanked)</span>
-                <span className={`bank-value ${progress.surplus >= 0 ? "text-green" : "text-red"}`}>
+                <span className="bank-label">Before carryover</span>
+                <span className={`bank-value ${time ? progress.surplus >= 0 ? "text-green" : "text-red" : ""}`}>
                   {signedValue(progress.surplus)}
                 </span>
               </div>

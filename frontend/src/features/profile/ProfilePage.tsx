@@ -353,7 +353,7 @@ function ProfileEditor({
                 <input
                   id="avatar_image"
                   aria-label="Profile photo"
-                  className="sr-only"
+                  hidden
                   type="file"
                   accept="image/*"
                   onChange={(event) => setAvatarFile(event.target.files?.[0] ?? null)}
@@ -571,11 +571,12 @@ function ProfileEditor({
           </div>
         </Defaults> : null}
 
-        {section === "search" && (!prefs.ai_features_enabled || !prefs.configured_api_keys.openai) ? <p className="slab slab-pad">Connect an OpenAI API key in <AppLink href="/settings/ai/">AI connections</AppLink> to find related sessions by meaning.</p> : null}
+        {section === "search" && (!prefs.ai_features_enabled || !prefs.configured_api_keys.openai) ? <p className="slab slab-pad">Connect an OpenAI API key in <AppLink className="btn btn--quiet" href="/settings/ai/">AI connections</AppLink> to find related sessions by meaning.</p> : null}
         {section === "ai" && !prefs.ai_features_enabled ? <p className="slab slab-pad">AI features are turned off on this Autumn instance. Connected apps can still be managed below.</p> : null}
         {section === "ai" && prefs.ai_features_enabled ? (
           <AiSection
             prefs={prefs}
+            footer={saveButton("ai", "Save provider settings")}
             keyDrafts={keyDrafts}
             onKeyDraft={(provider, patch) =>
               setKeyDrafts((current) => ({
@@ -589,7 +590,6 @@ function ProfileEditor({
           />
         ) : null}
 
-        {section === "ai" && prefs.ai_features_enabled ? saveButton("ai", "Save provider settings") : null}
       </Root>
 
       {section === "ai" ? <section className="slab slab-pad">

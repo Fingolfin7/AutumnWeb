@@ -1769,7 +1769,7 @@ img.brand-mark {
 /* Which way the list reads is the one thing worth colour here: a deny-list
    wears the project hue the app already uses for "this project", an
    allow-list the brand accent every other applied filter wears. */
-.picker-mode-btn.is-active[data-picker-mode="exclude"] { color: var(--project); }
+.picker-mode-btn.is-active[data-picker-mode="exclude"] { color: var(--ink); }
 .picker-mode-btn.is-active[data-picker-mode="include"] { color: var(--brand); }
 
 /* The commitment form stacks six pickers, so those stay folded behind a
@@ -2639,10 +2639,17 @@ img.brand-mark {
   background: var(--sunken);
 }
 .fields .background-dimming-slider {
-  width: 100%;
-  margin: var(--s3) 0;
-  accent-color: var(--brand-deep);
+  appearance: none; width: 100%; height: 44px; padding: 0;
+  margin: var(--s3) 0; background: transparent; border: 0;
 }
+.fields .background-dimming-slider:focus-visible { outline: 0; box-shadow: none; }
+.background-dimming-slider::-webkit-slider-runnable-track { height: 6px; border-radius: var(--r-pill); background: var(--hairline-2); }
+.background-dimming-slider::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--brand); }
+.background-dimming-slider:focus-visible::-webkit-slider-thumb { outline: 0; box-shadow: var(--focus-ring); }
+.background-dimming-slider::-moz-range-track { height: 6px; border-radius: var(--r-pill); background: var(--hairline-2); }
+.background-dimming-slider::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--brand); }
+.background-dimming-slider:focus-visible::-moz-range-thumb { box-shadow: var(--focus-ring); }
+
 .profile-background-upload {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 1fr);
@@ -3309,7 +3316,8 @@ img.brand-mark {
 .file-drop input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .file-drop-action { display: flex; justify-content: center; align-items: center; min-height: 44px; border-radius: var(--r-xs); background: var(--raised-2); color: var(--ink); font-size: var(--fs-sm); }
 .file-drop-name { color: var(--muted); font-size: var(--fs-xs); overflow-wrap: anywhere; }
-.picker .option-chip { min-height: 44px; width: 100%; border: 0; border-radius: var(--r-xs); justify-content: flex-start; padding: var(--s2) var(--s3); background: transparent; }
+.picker .option-chip { display: flex; align-items: center; gap: var(--s3); text-align: left; font: inherit; min-height: 44px; width: 100%; border: 0; border-radius: var(--r-xs); justify-content: flex-start; padding: var(--s2) var(--s3); background: transparent; }
+.picker .option-label { white-space: normal; overflow-wrap: anywhere; }
 .picker .option-chip::after { content: "+"; margin-left: auto; color: var(--muted); }
 .picker .option-chip[aria-pressed="true"]::after { content: "\2713"; color: var(--brand); }
 .picker-options { gap: 2px; }
@@ -4931,6 +4939,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .project-start-control { width: 100%; }
   .project-progress-row { gap: var(--s3); }
   .project-progress-row .commitment-meter-values { display: block; }
+  .project-progress-row .commitment-meter-values > strong { margin-right: var(--s2); }
   .project-progress-row .commitment-meter-values > :last-child { display: block; }
   .project-page-head .page-title { font-size: 1.65rem; }
   .project-page-head .btn { font-size: var(--fs-xs); padding-inline: var(--s2); }
@@ -5029,3 +5038,21 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .project-journal .journal-duration { margin-right: 44px; }
 .project-directory .project-directory-row { min-height: 72px; }
 .review-future-day { justify-content: space-between; }
+
+.review-projects > .review-section-caption { padding: 0 var(--s5) var(--s2); }
+.project-directory .project-start { background: transparent; box-shadow: none; color: var(--brand); }
+.commit--count .commit-actual { color: var(--ink); }
+@media (max-width: 599px) { .review-projects > .review-section-caption { padding-inline: var(--s4); } }
+
+.chart-series--neutral button > span { color: var(--ink-2); }
+.chart-series--subprojects button > span { color: var(--sub); }
+.chart-series--counts button > strong { color: var(--ink); }
+
+.profile-page .profile-section-save { border-top: 1px solid var(--hairline); border-radius: 0; padding: var(--s4) 0 0; margin-top: var(--s4); background: transparent; position: static; }
+
+@media (max-width: 999px) {
+  .settings-content .export-lead > .btn--primary { width: 100%; }
+  .insights-conversation-scope { gap: 4px; }
+  .insights-conversation-scope .btn { padding-inline: 4px; }
+  .insights-workspace .chat-header .chat-action-btn { width: 44px; min-width: 44px; padding-inline: 0; }
+}

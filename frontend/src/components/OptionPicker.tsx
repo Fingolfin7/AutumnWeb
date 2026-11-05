@@ -100,7 +100,7 @@ export function OptionPicker({
         ) : null}
         <div className="picker-options">
           {visible.map((option) => (
-            <button type="button" aria-pressed={selectedSet.has(option.id)} onClick={() => toggle(option.id)} key={option.id} className="option-chip" style={option.color ? ({ "--tag": option.color } as React.CSSProperties) : undefined}>
+            <button type="button" aria-pressed={selectedSet.has(option.id)} onClick={() => toggle(option.id)} key={option.id} title={option.label} className="option-chip" style={option.color ? ({ "--tag": option.color } as React.CSSProperties) : undefined}>
               <span className="option-label tag-label">{option.label}</span>
             </button>
           ))}

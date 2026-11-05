@@ -280,8 +280,8 @@ describe("transcript", () => {
 describe("OpenAI connection note", () => {
   it("names the source of the key", () => {
     expect(openaiConnectionNote("server", true)).toMatchObject({ text: expect.stringContaining("server key"), profileLink: true });
-    expect(openaiConnectionNote("codex_with_api_fallback", true)?.text).toBe("OpenAI via Codex login, API key fallback.");
-    expect(openaiConnectionNote("codex", true)?.text).toBe("OpenAI via Codex login.");
+    expect(openaiConnectionNote("codex_with_api_fallback", true)?.text).toBe("OpenAI via Codex, with an API key fallback.");
+    expect(openaiConnectionNote("codex", true)?.text).toBe("OpenAI via Codex.");
     expect(openaiConnectionNote("profile", true)?.text).toBe("OpenAI via your profile API key.");
   });
 

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   faCheckCircle,
@@ -43,8 +43,10 @@ export function AiSection({
   luna,
   onLuna,
   errors,
+  footer,
 }: {
   prefs: Prefs;
+  footer?: ReactNode;
   keyDrafts: Record<KeyProvider, KeyDraft>;
   onKeyDraft: (provider: KeyProvider, patch: Partial<KeyDraft>) => void;
   luna: LunaEffort;
@@ -263,6 +265,7 @@ export function AiSection({
         <FieldErrors lines={errors.luna_recommendation_effort} />
       </div>
     </details>
+    {footer}
     </section>
   );
 }

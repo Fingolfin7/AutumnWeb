@@ -1,4 +1,5 @@
 import { BrowserPush } from "./BrowserPush";
+import { OptionPicker } from "@/components/OptionPicker";
 import { DateInput, Input } from "@/components/ui";
 import { todayKey } from "./dates";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -17,7 +18,6 @@ import {
   formFromSchedule,
   keepSubprojects,
   toPayload,
-  toggleId,
   validateForm,
   type Cadence,
   type Schedule,
@@ -180,21 +180,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
 
           {form.target === "project" && available.length > 0 ? (
             <div className="field nx-subprojects-field">
-              <label id="id_subprojects_label">Subprojects (optional)</label>
-              <div className="nx-subproject-options" role="group" aria-labelledby="id_subprojects_label">
-                {available.map((sub) => (
-                  <div key={sub.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={form.subprojects.includes(sub.id)}
-                        onChange={() => set("subprojects", toggleId(form.subprojects, sub.id))}
-                      />{" "}
-                      {sub.name}
-                    </label>
-                  </div>
-                ))}
-              </div>
+              <OptionPicker label="Subprojects (optional)" options={available.map(sub => ({ id: sub.id, label: sub.name }))} selected={form.subprojects} onChange={ids => set("subprojects", ids)} />
               <FieldErrors errors={fieldError("subprojects")} />
             </div>
           ) : null}

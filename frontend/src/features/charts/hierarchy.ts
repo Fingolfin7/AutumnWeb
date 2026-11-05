@@ -52,6 +52,7 @@ interface TreemapRaw {
   value?: number;
   g?: string;
   w?: number;
+  h?: number;
   _data?: { name?: string; project?: string; children?: { project?: string }[] };
 }
 interface TreemapContext {
@@ -102,8 +103,8 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
                  has its group name in g. */
               if (item._data?.name) {
                 const amount = formatDuration(value * 60);
-                if ((item.w ?? 100) < 85) return "";
-                if ((item.w ?? 100) < item._data.name.length * 7 + 16) return "";
+                if ((item.w ?? 100) < 52 || (item.h ?? 60) < 26) return "";
+                if ((item.w ?? 100) < item._data.name.length * 7 + 16 || (item.h ?? 60) < 50) return amount;
                 return [item._data.name, amount];
               }
               if (item.g) return item.g;
