@@ -74,7 +74,7 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
 
   await page.goto(`/sessions/?search=${encodeURIComponent(note)}`);
   const list = page.getByRole("region", { name: "Sessions" });
-  await expect(list.getByText(note)).toBeVisible();
+  await expect(list.locator(".session-note").getByText(note)).toBeVisible();
   await expect(list.getByRole("link", { name: "Garden Planner App" })).toBeVisible();
   expect(problems()).toEqual([]);
 });
