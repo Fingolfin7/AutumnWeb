@@ -77,15 +77,9 @@ export default function CreateProjectPage() {
     <>
       <PageHead title="New project" />
       <form className="fields completing-form" onSubmit={onSubmit}>
-        <div className="form-actions phone-savebar">
           <AppLink className="btn btn--ghost" href={urls.projects()}>
             <Icon icon={faArrowLeft} /> Back
           </AppLink>
-          <button className="btn btn--primary btn--spacer" type="submit" id="create-project" disabled={busy}>
-            <Icon icon={faCheckCircle} /> Create project
-          </button>
-          <button className="btn btn--secondary" type="submit" name="start" disabled={busy}><Icon icon={faPlay} /> Create and start</button>
-        </div>
         <FormErrors errors={errors} />
         {problem ? <div className="msg msg--error" role="alert">{problem}{created ? <AppLink href={urls.updateProject(created)}>Open project</AppLink> : null}</div> : null}
         <section className="slab slab-pad">
@@ -105,6 +99,12 @@ export default function CreateProjectPage() {
             </div>
         </section>
 
+        <div className="form-actions q-form-actions">
+          <button className="btn btn--primary btn--spacer" type="submit" id="create-project" disabled={busy}>
+            <Icon icon={faCheckCircle} /> Create project
+          </button>
+          <button className="btn btn--secondary" type="submit" name="start" disabled={busy}><Icon icon={faPlay} /> Create and start</button>
+        </div>
       </form>
     </>
   );

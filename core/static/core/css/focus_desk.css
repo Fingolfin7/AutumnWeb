@@ -4474,3 +4474,20 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .review-desk .review-section-heading { flex-wrap: wrap; gap: var(--s3); }
   .review-desk .review-commitment { padding-inline: var(--s4); }
 }
+
+.review-daily-breakdown > summary { display: flex; justify-content: space-between; gap: var(--s3); list-style: none; border-top: 1px solid var(--hairline); padding-block: var(--s3); }
+.review-daily-breakdown > summary::-webkit-details-marker { display: none; }
+.review-daily-breakdown > summary small { display: block; font-size: var(--fs-xs); margin-top: var(--s1); }
+.review-daily-breakdown[open] > summary .icon { transform: rotate(180deg); }
+.q-form-actions { margin-top: var(--s5); }
+@media (max-width:999px) {
+  .q-form-actions { position: sticky; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom,0px)); z-index: 22; background: var(--surface-2); border-top: 1px solid var(--hairline-2); padding: var(--s3); margin: var(--s5) calc(-1 * var(--s4)) 0; display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .q-form-actions > .btn { flex: 1; margin: 0; padding-inline: var(--s2); font-size: var(--fs-sm); }
+  .sheet .q-form-actions { bottom: calc(-1 * var(--s5)); margin-inline: 0; padding-bottom: calc(var(--s3) + env(safe-area-inset-bottom,0px)); }
+  .settings-reminder-sheet .sheet-panel { padding: var(--s4); }
+  .settings-reminder-sheet .nx-form-grid { margin-top: 0; gap: var(--s5); }
+  .settings-reminder-sheet .field { margin: 0; }
+  .settings-reminder-sheet .field > label { min-height: 0; padding: 0; margin-bottom: var(--s2); }
+  .settings-reminder-sheet .nx-schedule-editor { overflow: visible; padding: 0; }
+  .settings-reminder-sheet .nx-schedule-editor form { gap: var(--s5); padding-bottom: var(--s3); }
+}

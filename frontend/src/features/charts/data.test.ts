@@ -84,6 +84,7 @@ describe("treemap data", () => {
     const { leaves, colors } = flattenHierarchy(tree);
     expect(leaves).toEqual([
       { name: "Grammar", project: "Czech", value: 1.5 },
+      { name: "Unallocated", project: "Czech", value: .5 },
       { name: "Solo", project: "Solo", value: 1 },
     ]);
     expect(Object.keys(colors)).toEqual(["Czech", "Solo"]);
@@ -161,4 +162,10 @@ it("keeps chart pigments explicit and fills missing days with real zeroes", asyn
     expect(source).not.toMatch(/hsl\(|rgb\(0,\s*128,\s*0|#36a2eb|#ff6384|#4bc0c0/i);
   }
   for (const retired of ["scatter", "bubble", "radar", "status", "calendar"]) expect(parseKind(retired)).toBe("bar");
+});
+
+it("includes unallocated project time in the treemap total", () => {
+  const { leaves } = flattenHierarchy({ name: "All", children: [{ name: "Work", children: [{ name: "Garden", total_time: 270, children: [{ name: "Frontend", total_time: 80 }, { name: "Backend", total_time: 35 }] }] }] });
+  expect(leaves.find(leaf => leaf.name === "Unallocated")?.value).toBe(155 / 60);
+  expect(leaves.reduce((sum, leaf) => sum + leaf.value * 60, 0)).toBeCloseTo(270);
 });

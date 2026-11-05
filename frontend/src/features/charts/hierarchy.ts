@@ -26,6 +26,8 @@ export function flattenHierarchy(data: HierarchyNode | TallyRow[]): { leaves: Tr
         const subprojects = (project.children ?? []).filter((child) => (child.total_time ?? 0) > 0);
         if (project.children?.length) {
           for (const child of subprojects) leaves.push({ name: child.name, project: project.name, value: child.total_time! / 60 });
+          const unallocated = (project.total_time ?? 0) - subprojects.reduce((sum, child) => sum + (child.total_time ?? 0), 0);
+          if (unallocated > 0.000001) leaves.push({ name: "Unallocated", project: project.name, value: unallocated / 60 });
         } else {
           leaves.push({ name: project.name, project: project.name, value: project.total_time! / 60 });
         }
