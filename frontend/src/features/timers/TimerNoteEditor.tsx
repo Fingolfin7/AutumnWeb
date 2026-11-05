@@ -1,185 +1,36 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { faClock, faSave } from "@fortawesome/free-solid-svg-icons";
-import { Icon } from "@/components/Icon";
-import { ApiError } from "@/api/errors";
+import { NoteEditor, stashNoteDraft, takeNoteDraft } from "@/components/NoteEditor";
+import { useNoteDraft, readNoteDraft } from "@/lib/noteDraft";
 import { keys } from "@/api/keys";
 import type { Timer } from "@/api/types";
 import { saveTimerNote } from "./api";
-import { NOTE_DRAFT_KEY_PREFIX } from "./FocusCard";
 
-type Status = { text: string; state: "saved" | "dirty" | "error" };
-
-const pad = (n: number) => String(n).padStart(2, "0");
-export const timestamp = (date = new Date()) => `— ${pad(date.getHours())}:${pad(date.getMinutes())} —`;
-
-/* Insert "— HH:MM — " at the caret, on its own line (timer_notes.js). */
-export function insertStamp(value: string, caret: number, stamp = timestamp()): { value: string; caret: number } {
-  const before = value.slice(0, caret);
-  const after = value.slice(caret);
-  const insertion = `${before && !before.endsWith("\n") ? "\n" : ""}${stamp} `;
-  return { value: before + insertion + after, caret: before.length + insertion.length };
-}
-
-/* Notes-as-you-go on a running timer. Autosaves 1.5 s after typing stops
-   (with If-Match, so an `autumn note` from the CLI in the meantime is
-   reported rather than overwritten). The component owns its text, so the
-   timer poll can never wipe what you are typing: no dirty-editor guard
-   needed. Unsaved text is stashed for the stop page via `stash()`. */
-export function TimerNoteEditor({
-  timer,
-  registerStash,
-}: {
+export function TimerNoteEditor({ timer, registerStash }: {
   timer: Timer;
   registerStash?: (stash: () => void) => void;
 }) {
   const client = useQueryClient();
-  const draftKey = NOTE_DRAFT_KEY_PREFIX + (timer.uuid ?? timer.id);
-  const [value, setValue] = useState(() => {
-    try {
-      return (
-        sessionStorage.getItem(draftKey) ?? sessionStorage.getItem(NOTE_DRAFT_KEY_PREFIX + timer.id) ?? timer.note ?? ""
-      );
-    } catch {
-      return timer.note ?? "";
-    }
+  const draftKey = `session:${timer.uuid ?? timer.id}`;
+  const draft = useNoteDraft({
+    draftKey, text: timer.note ?? "", version: timer.version,
+    enabled: timer.id > 0 && !timer.pending_sync, revision: timer.id,
+    save: async (note, version) => {
+      const saved = await saveTimerNote({ id: timer.id, version }, note);
+      client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) => list?.map((item) => item.id === saved.id ? { ...item, ...saved } : item));
+      return saved;
+    },
   });
-  const [status, setStatus] = useState<Status>(() =>
-    value !== (timer.note ?? "")
-      ? { text: "Draft saved on this device", state: "dirty" }
-      : { text: "Saved", state: "saved" },
-  );
-  const [saving, setSaving] = useState(false);
-  const textarea = useRef<HTMLTextAreaElement>(null);
-  const dirty = useRef(value !== (timer.note ?? ""));
-  const version = useRef(timer.version);
-  const debounce = useRef<number | undefined>(undefined);
-  const valueRef = useRef(value);
-  valueRef.current = value;
-
-  /* Adopt server-side note changes (CLI, another device) only while clean. */
   useEffect(() => {
-    if (!dirty.current) {
-      version.current = Math.max(version.current, timer.version);
-      if ((timer.note ?? "") !== valueRef.current) setValue(timer.note ?? "");
-    }
-  }, [timer.note, timer.version]);
-
+    const legacy = takeNoteDraft(timer.uuid ?? timer.id) ?? takeNoteDraft(timer.id);
+    if (!readNoteDraft(draftKey) && legacy !== null && legacy !== draft.value) draft.change(legacy);
+  }, []);
   useEffect(() => {
     registerStash?.(() => {
-      window.clearTimeout(debounce.current);
-      try {
-        const draft = textarea.current?.value ?? valueRef.current;
-        window.sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + timer.id, draft);
-        window.sessionStorage.setItem(draftKey, draft);
-      } catch {
-        /* storage unavailable */
-      }
+      // Stop reads this synchronously, before the autosave or route can settle.
+      stashNoteDraft(timer.id, draft.value);
+      if (timer.uuid) stashNoteDraft(timer.uuid, draft.value);
     });
-  }, [registerStash, timer.id, draftKey]);
-
-  useEffect(() => () => window.clearTimeout(debounce.current), []);
-
-  const save = async () => {
-    if (saving || !dirty.current || timer.id < 0) return;
-    setSaving(true);
-    const sent = valueRef.current;
-    setStatus({ text: "Saving…", state: "dirty" });
-    try {
-      const saved = await saveTimerNote({ id: timer.id, version: version.current }, sent);
-      version.current = saved.version;
-      client.setQueriesData<Timer[]>({ queryKey: keys.timers() }, (list) =>
-        list?.map((t) => (t.id === saved.id ? { ...t, ...saved } : t)),
-      );
-      if (valueRef.current === sent) {
-        dirty.current = false;
-        try {
-          sessionStorage.removeItem(NOTE_DRAFT_KEY_PREFIX + timer.id);
-          sessionStorage.removeItem(draftKey);
-        } catch {
-          /* unavailable storage */
-        }
-        setStatus({ text: `Saved ✓ ${timestamp().replaceAll("—", "").trim()}`, state: "saved" });
-      } else {
-        markDirty();
-      }
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
-        setStatus({ text: "Changed elsewhere (CLI or another device). Copy your text, then reload.", state: "error" });
-      } else if (error instanceof ApiError && error.status === 0) {
-        setStatus({ text: "Offline — will retry when you edit again", state: "error" });
-      } else {
-        setStatus({ text: "Could not save — try again", state: "error" });
-      }
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const markDirty = (next = textarea.current?.value ?? valueRef.current) => {
-    dirty.current = true;
-    try {
-      sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + timer.id, next);
-      sessionStorage.setItem(draftKey, next);
-    } catch {
-      /* unavailable storage */
-    }
-    setStatus({ text: "Draft — not saved", state: "dirty" });
-    window.clearTimeout(debounce.current);
-    debounce.current = window.setTimeout(() => void save(), 1500);
-  };
-
-  return (
-    <div className="timer-note-editor">
-      <label htmlFor={`timer-note-${timer.id}`}>Session note</label>
-      <div className="timer-note-toolbar">
-        <button
-          type="button"
-          className="attr-mini-btn"
-          onClick={() => {
-            const node = textarea.current;
-            const next = insertStamp(value, node?.selectionStart ?? value.length);
-            setValue(next.value);
-            markDirty(next.value);
-            requestAnimationFrame(() => {
-              node?.focus();
-              node?.setSelectionRange(next.caret, next.caret);
-            });
-          }}
-        >
-          <Icon icon={faClock} /> Insert timestamp
-        </button>
-      </div>
-      <textarea
-        ref={textarea}
-        id={`timer-note-${timer.id}`}
-        placeholder="Jot down progress while this timer runs."
-        value={value}
-        onChange={(event) => {
-          setValue(event.target.value);
-          markDirty();
-        }}
-      />
-      <div className="timer-note-footer">
-        <small
-          className={`timer-note-status${status.state === "saved" ? " saved" : status.state === "error" ? " error" : ""}`}
-          role="status"
-        >
-          {status.text}
-        </small>
-        <button
-          type="button"
-          className="attr-mini-btn timer-note-save"
-          disabled={saving}
-          onClick={() => {
-            window.clearTimeout(debounce.current);
-            dirty.current = true;
-            void save();
-          }}
-        >
-          <Icon icon={faSave} /> Save note
-        </button>
-      </div>
-    </div>
-  );
+  }, [registerStash, timer.id, timer.uuid, timer.version, draftKey, draft.value]);
+  return <div className="timer-note-editor"><NoteEditor id={`timer-note-${timer.id}`} label="Session note" value={draft.value} onChange={draft.change} onBlur={() => void draft.flush()} saveStatus={draft.status} onRetry={() => void draft.flush()} rows={3} placeholder="Jot down progress while this timer runs." /></div>;
 }

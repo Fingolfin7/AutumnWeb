@@ -4105,3 +4105,59 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 @media (hover: none) {
   .nav-link:hover:not([aria-current="page"]) { background: transparent; color: var(--muted); }
 }
+
+/* Stream N — writing notes, Today and capture. Keep this section together. */
+.note-editor-field { min-width: 0; width: 100%; max-width: 70ch; }
+.note-editor-shell { background: var(--sunken); }
+.note-editor-shell .note-editor-toolbar { flex-wrap: wrap; gap: var(--s1); padding: var(--s1); }
+.note-editor-toolbar .note-tool-button { min-width: 44px; min-height: 44px; }
+.note-editor-toolbar .dictate-button { width: auto; }
+.note-editor-toolbar .note-writer-open { margin-left: auto; }
+.note-editor-shell textarea, .fields .note-editor-shell textarea, .ember-clock .note-editor-shell textarea {
+  display: block; width: 100%; min-height: 8rem; max-height: none; resize: vertical;
+  overflow: hidden; padding: var(--s4); border: 0; background: transparent;
+  color: var(--note); font: 400 var(--fs-md)/1.6 var(--font-ui);
+}
+.note-editor-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); min-height: 28px; color: var(--muted); font-size: var(--fs-xs); }
+.note-editor-status small { font-size: inherit; }
+.note-editor-status [data-note-status]:empty { display: none; }
+.note-editor-status [data-note-status] { margin-left: auto; }
+.note-writer-dialog { inset: 0; margin: 0; padding: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; border: 0; color: var(--ink); background: var(--surface-0); overflow-y: auto; }
+.note-writer-dialog::backdrop { background: var(--surface-0); }
+.note-editor-field.is-writing { min-height: 100%; max-width: 76ch; margin-inline: auto; padding: var(--s5); }
+.note-writer-heading { position: sticky; top: 0; z-index: 1; display: flex; gap: var(--s3); align-items: center; justify-content: space-between; padding-block: var(--s3); background: var(--surface-0); }
+.note-writer-heading h2 { margin: 0; font: 600 var(--fs-lg)/1.4 var(--font-display); }
+.is-writing > label { display: none; }
+.is-writing .note-editor-toolbar { position: sticky; top: 0; }
+.is-writing .note-editor-shell textarea { min-height: 65dvh; }
+.session-edit-form > .slab { width: 100%; }
+.session-edit-form { max-width: 78ch; margin-inline: auto; }
+.session-edit-form .note-editor-field { margin-top: var(--s5); }
+.journal-entry .session-note { margin: var(--s3) 0 0; padding: 0; border: 0; max-width: 70ch; font: 400 var(--fs-md)/1.6 var(--font-ui); }
+.journal-meta { align-items: center; gap: 0 var(--s3); }
+.journal-meta > * { line-height: 1.5; }
+.journal-meta a { min-height: 44px; display: inline-flex; align-items: center; }
+.journal-meta .journal-time { min-height: 44px; display: inline-flex; align-items: center; }
+.session-note-body { position: relative; }
+.session-note-body::after { content: none; }
+.journal-entry .session-note p + p { margin-top: .8em; }
+.session-note .note-expand, .session-note .note-tap-edit { min-height: 44px; margin: 0 var(--s4) 0 0; padding: var(--s2) 0; border: 0; background: transparent; color: var(--brand); font: 500 var(--fs-sm)/1.4 var(--font-ui); }
+.session-note .note-tap-edit { color: var(--muted); }
+.note-reading-head { position: sticky; top: 72px; z-index: 8; display: flex; flex-wrap: wrap; gap: 0 var(--s2); align-items: center; margin-bottom: var(--s3); padding: var(--s2) var(--s3); border-block: 1px solid var(--hairline-2); background: var(--surface-2); box-shadow: var(--e1); border-radius: var(--r-sm); font: 500 var(--fs-sm)/1.4 var(--font-ui); }
+.note-reading-identity { display: flex; flex: 1 1 12rem; flex-wrap: wrap; gap: var(--s2) var(--s3); min-width: 0; }
+.note-reading-identity > * { overflow-wrap: anywhere; }
+.journal-entry { scroll-margin-top: 84px; }
+.journal-entry-date { color: var(--time); }
+@media (max-width: 999px) {
+  .note-reading-head { top: 56px; }
+  .note-editor-toolbar .dictate-button span { display: none; }
+  .note-editor-toolbar .dictate-button { width: 44px; }
+  .note-editor-field.is-writing { padding: var(--s3); }
+  .note-writer-heading { gap: var(--s2); }
+  .note-writer-heading h2 { font-size: var(--fs-md); }
+  .note-writer-heading .btn { font-size: var(--fs-sm); }
+  .journal-entry .session-note { font-size: 1rem; }
+  .ember-clock .focus-subs { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .ember-clock .focus-subs .sub-chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; height: auto; border-radius: var(--r-sm); padding: 0 var(--s2); line-height: 1.4; }
+  body:has(.note-writer-dialog[open]) .timer-dock { display: none; }
+}

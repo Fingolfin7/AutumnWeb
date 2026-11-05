@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { Sheet } from "@/components/Sheet";
-import { NoteEditor, takeNoteDraft, stashNoteDraft } from "@/components/NoteEditor";
+import { useNoteDraft, readNoteDraft, clearNoteDraft } from "@/lib/noteDraft";
+import { NoteEditor, takeNoteDraft } from "@/components/NoteEditor";
 import { AllocationEditor } from "@/components/AllocationEditor";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { ErrorState, Skeleton } from "@/components/states";
@@ -48,12 +49,11 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
   const invalidate = useInvalidate();
   const stop = useStopTimer();
   const [offline, setOffline] = useState(() => !navigator.onLine || !!timer.pending_sync);
-  const [note, setNote] = useState(() => {
-    const byId = takeNoteDraft(timer.id);
-    const byUuid = timer.uuid ? takeNoteDraft(timer.uuid) : null;
-    return byId ?? byUuid ?? timer.note ?? "";
-  });
+  const draftKey = `session:${timer.uuid ?? timer.id}`;
+  const [openingNote] = useState(() => readNoteDraft(draftKey)?.text ?? sessionStorage.getItem(`autumn:timer-note-draft:${timer.uuid ?? timer.id}`) ?? sessionStorage.getItem(`autumn:timer-note-draft:${timer.id}`) ?? timer.note ?? "");
   const [current, setCurrent] = useState(timer);
+  const currentRef = useRef(current);
+  currentRef.current = current;
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -64,7 +64,20 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
   const startTime = useLocalTime(start, timer.start);
   const endTime = useLocalTime(end);
   const launched = useRef(false);
-  const initialNote = useRef(note);
+  const initialNote = useRef(openingNote);
+  const draft = useNoteDraft({
+    draftKey, text: openingNote, version: timer.version, enabled: saved && !current.pending_sync,
+    save: async (note, version) => {
+      const result = await unwrap(api.PATCH("/api/v2/sessions/{session_id}", {
+        params: { path: { session_id: currentRef.current.id }, header: { "If-Match": version } }, body: { note },
+      })) as Timer;
+      currentRef.current = result;
+      setCurrent(result);
+      invalidate("sessions");
+      return result;
+    },
+  });
+  const note = draft.value;
   const stopNow = async () => {
     setBusy(true);
     setError("");
@@ -75,7 +88,9 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
         end: new Date(requestedAt).toISOString(),
         queueOnFailure: false,
       });
+      currentRef.current = result;
       setCurrent(result);
+      draft.accept(initialNote.current, result.version);
       setSaved(true);
       if (result.pending_sync) toast.info("Stop saved on this device. It will sync when connected.");
     } catch (cause) {
@@ -105,14 +120,15 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
     setBusy(true);
     setError("");
     try {
-      let target = current;
+      if (saved && !current.pending_sync && !(await draft.flush())) return;
+      let target = currentRef.current;
       if (!saved) {
         if (start !== toDateTimeLocal(timer.start)) {
           if (timer.pending_sync && timer.uuid) updateQueuedStart(timer.uuid, startTime.instant);
           else
             target = (await unwrap(
               api.PATCH("/api/v2/sessions/{session_id}", {
-                params: { path: { session_id: timer.id }, header: { "If-Match": current.version } },
+                params: { path: { session_id: timer.id }, header: { "If-Match": target.version } },
                 body: { start: startTime.instant },
               }),
             )) as Timer;
@@ -125,7 +141,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
         }
         target = (await unwrap(
           api.PATCH("/api/v2/sessions/{session_id}", {
-            params: { path: { session_id: current.id }, header: { "If-Match": current.version } },
+            params: { path: { session_id: target.id }, header: { "If-Match": target.version } },
             body: {
               note,
               start: startTime.instant,
@@ -137,6 +153,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
         setCurrent(target);
         invalidate("sessions");
       }
+      clearNoteDraft(draftKey, note);
       takeNoteDraft(timer.id);
       if (timer.uuid) takeNoteDraft(timer.uuid);
       toast.success("Session saved.");
@@ -155,11 +172,12 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
     setBusy(true);
     setError("");
     try {
-      let target = current;
+      if (saved && !current.pending_sync && !(await draft.flush())) return;
+      let target = currentRef.current;
       if (note !== initialNote.current) {
         target = (await unwrap(
           api.PATCH("/api/v2/sessions/{session_id}", {
-            params: { path: { session_id: current.id }, header: { "If-Match": current.version } },
+            params: { path: { session_id: target.id }, header: { "If-Match": target.version } },
             body: { note },
           }),
         )) as Timer;
@@ -171,6 +189,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
           body: { start: timer.start },
         }),
       );
+      clearNoteDraft(draftKey, note);
       takeNoteDraft(timer.id);
       if (timer.uuid) takeNoteDraft(timer.uuid);
       invalidate("timers", "sessions");
@@ -216,11 +235,10 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
         <NoteEditor
           id="id_note"
           value={note}
-          onChange={(next) => {
-            setNote(next);
-            stashNoteDraft(timer.id, next);
-            if (timer.uuid) stashNoteDraft(timer.uuid, next);
-          }}
+          onChange={draft.change}
+          saveStatus={draft.status}
+          onRetry={() => void draft.flush()}
+          onBlur={() => { if (saved) void draft.flush(); }}
           autoFocus
           rows={10}
           placeholder="What moved forward? What is on your mind?"

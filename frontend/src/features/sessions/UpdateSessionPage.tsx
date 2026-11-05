@@ -5,6 +5,7 @@ import { AllocationEditor } from "@/components/AllocationEditor";
 import { Icon } from "@/components/Icon";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
+import { clearNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -181,6 +182,7 @@ function SessionForm({ session }: { session: SessionRow }) {
       { session: baseline, body, version },
       {
         onSuccess: (saved) => {
+          clearNoteDraft(`edit-session:${session.uuid ?? session.id}`, saved.note ?? "");
           toast.success("Updated session");
           reset(saved);
           /* Where the old view redirected: the numeric URL of this session. */
@@ -304,7 +306,7 @@ function SessionForm({ session }: { session: SessionRow }) {
             </div>
           </div>
 
-          <NoteEditor rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
+          <NoteEditor persistKey={`edit-session:${session.uuid ?? session.id}`} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
         </section>
 
         <section className="slab slab-pad">

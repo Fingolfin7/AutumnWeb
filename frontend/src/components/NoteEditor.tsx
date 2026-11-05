@@ -1,5 +1,8 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { faLink, faMicrophone } from "@fortawesome/free-solid-svg-icons";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
+import { formatTime } from "@/lib/format";
+import { readNoteDraft, writeNoteDraft } from "@/lib/noteDraft";
+import { faClock, faExpand, faLink, faMicrophone } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
 
 /* The session note editor (session_note_editor.js + the markup the edit-
@@ -71,6 +74,9 @@ export function NoteEditor({
   onBlur,
   error,
   draftKey,
+  persistKey,
+  saveStatus,
+  onRetry,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -85,19 +91,56 @@ export function NoteEditor({
   onBlur?: () => void;
   error?: string | string[] | null;
   draftKey?: string | number;
+  persistKey?: string;
+  saveStatus?: string;
+  onRetry?: () => void;
 }) {
+  const [writing, setWriting] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const baseline = useRef(value);
+  const opener = useRef<HTMLElement | null>(null);
+  const selection = useRef({ start: 0, end: 0 });
   const generated = useId();
   const textareaId = id ?? `note-${generated}`;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const node = textareaRef.current;
+    if (!node) return;
+    node.style.height = "auto";
+    node.style.height = `${node.scrollHeight}px`;
+  }, [value, writing]);
+  useEffect(() => {
+    if (!persistKey) return;
+    const draft = readNoteDraft(persistKey);
+    if (draft) onChangeRef.current(draft.text);
+  }, [persistKey]);
+  useEffect(() => {
+    if (!writing) return;
+    const node = dialog.current;
+    node?.showModal();
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    textareaRef.current?.focus();
+    textareaRef.current?.setSelectionRange(selection.current.start, selection.current.end);
+    return () => {
+      node?.close();
+      document.body.style.overflow = overflow;
+      opener.current?.focus();
+    };
+  }, [writing]);
+  const change = (next: string) => {
+    if (persistKey) writeNoteDraft(persistKey, { text: next, version: 0 });
+    onChange(next);
+  };
   const supported = dictationSupported();
   const [status, setStatus] = useState(supported ? "" : "Dictation unavailable in this browser.");
   const [dictating, setDictating] = useState(false);
 
   /* Latest callbacks for the dictation session, which outlives renders. */
-  const onChangeRef = useRef(onChange);
+  const onChangeRef = useRef(change);
   const langRef = useRef(lang);
   useEffect(() => {
-    onChangeRef.current = onChange;
+    onChangeRef.current = change;
     langRef.current = lang;
   });
 
@@ -130,7 +173,7 @@ export function NoteEditor({
     const textarea = textareaRef.current;
     if (!textarea || disabled) return;
     edit(textarea);
-    onChange(textarea.value);
+    change(textarea.value);
     textarea.focus();
   };
 
@@ -152,7 +195,7 @@ export function NoteEditor({
     const url = window.prompt("Enter URL", "https://");
     if (!url) return;
     textarea.setRangeText(`[${selected}](${url})`, start, end, "end");
-    onChange(textarea.value);
+    change(textarea.value);
     textarea.focus();
   };
 
@@ -169,11 +212,17 @@ export function NoteEditor({
 
   const errors = error ? (Array.isArray(error) ? error : [error]) : [];
 
-  return (
-    <div className="field note-editor-field">
+  const field = (
+    <div className={`field note-editor-field${writing ? " is-writing" : ""}`}>
+      {writing ? <header className="note-writer-heading"><h2>{label || "Session note"}</h2><button className="btn btn--secondary" type="button" onClick={() => setWriting(false)}>Return to session</button></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
         <div className="note-editor-toolbar" role="toolbar" aria-label="Note formatting">
+          <button type="button" className="note-tool-button" title="Insert timestamp" aria-label="Insert timestamp" disabled={disabled} onClick={() => apply((node) => {
+            const start = node.selectionStart;
+            const prefix = start && !node.value.slice(0, start).endsWith("\n") ? "\n" : "";
+            node.setRangeText(`${prefix}— ${formatTime(new Date())} — `, start, start, "end");
+          })}><Icon icon={faClock} /></button>
           <button type="button" className="note-tool-button" title="Bold (Ctrl+B)" aria-label="Bold" disabled={disabled} onClick={() => wrap("**", "**")}>
             <b>B</b>
           </button>
@@ -194,6 +243,11 @@ export function NoteEditor({
             <Icon icon={faMicrophone} />
             <span>{!supported ? "Unavailable" : dictating ? "Stop" : "Dictate"}</span>
           </button>
+          {!writing ? <button type="button" className="note-tool-button note-writer-open" aria-label="Expand note" title="Full-screen writer" onClick={() => {
+            opener.current = document.activeElement as HTMLElement;
+            selection.current = { start: textareaRef.current?.selectionStart ?? value.length, end: textareaRef.current?.selectionEnd ?? value.length };
+            setWriting(true);
+          }}><Icon icon={faExpand} /></button> : null}
         </div>
         <textarea
           ref={textareaRef}
@@ -206,14 +260,16 @@ export function NoteEditor({
           autoFocus={autoFocus}
           data-autofocus={autoFocus || undefined}
           lang={lang}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => change(event.target.value)}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
         />
       </div>
-      <small data-note-status="" aria-live="polite">
-        {status}
-      </small>
+      <div className="note-editor-status">
+        <small role="status">{saveStatus ?? (value === baseline.current ? "Saved" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
+        {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
+        <small data-note-status="" aria-live="polite">{status}</small>
+      </div>
       {errors.length ? (
         <ul className="errorlist">
           {errors.map((message) => (
@@ -223,6 +279,7 @@ export function NoteEditor({
       ) : null}
     </div>
   );
+  return writing ? createPortal(<dialog ref={dialog} className="note-writer-dialog" aria-label="Full-screen note writer" onCancel={(event) => { event.preventDefault(); setWriting(false); }} onKeyDown={(event) => event.stopPropagation()}>{field}</dialog>, document.body) : field;
 }
 
 /* ----- Dictation ---------------------------------------------------------
