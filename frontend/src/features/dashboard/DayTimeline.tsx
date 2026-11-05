@@ -76,7 +76,10 @@ export function DayTimeline({
       ? Math.max(from + 4 * hour, Math.ceil(latest / hour) * hour + hour)
       : Date.parse(timeline.window_end);
   const x = (at: number) => 240 + Math.max(0, Math.min(1, (at - from) / (to - from))) * 740;
-  const ticks = Array.from({ length: 5 }, (_, i) => from + ((to - from) * i) / 4);
+  const tickHours = Math.max(1, Math.ceil((to - from) / hour / 4));
+  const ticks = range === "today"
+    ? Array.from({ length: Math.floor((to - from) / (tickHours * hour)) + 1 }, (_, i) => from + i * tickHours * hour)
+    : Array.from({ length: 5 }, (_, i) => from + ((to - from) * i) / 4);
   return (
     <section className="day-ledger" id="day-timeline" aria-label="Timeline">
       <header className="today-section-head">
@@ -146,9 +149,9 @@ export function DayTimeline({
                   <g key={`${b.session_id}-${b.start}`}>
                     <rect
                       x={x(Date.parse(b.start))}
-                      y={56 + index * 82}
+                      y={66 + index * 82}
                       width={Math.max(5, x(b.is_live ? now : Date.parse(b.end ?? b.start)) - x(Date.parse(b.start)))}
-                      height={42}
+                      height={20}
                       rx={5}
                       className={b.is_live ? "ledger-block is-live" : "ledger-block"}
                     >
@@ -164,15 +167,16 @@ export function DayTimeline({
             {now >= from && now <= to ? (
               <g>
                 <line x1={x(now)} x2={x(now)} y1={38} y2={65 + lanes.length * 82} className="ledger-now" />
-                <circle cx={x(now)} cy={38} r={4} className="ledger-now-dot" />
+                <circle cx={x(now)} cy={38} r={4} className="ledger-now-dot" /><text x={x(now)} y={58 + lanes.length * 82} textAnchor="middle" className="ledger-axis ledger-now-label">Now</text>
               </g>
             ) : null}
           </svg>
           <div className="day-ledger-phone" aria-label="Day's blocks">
-            <svg viewBox="0 0 1000 20" preserveAspectRatio="none" className="day-ember-ribbon" role="img" aria-label={`${formatDuration(total)} across ${blocks.length} blocks`}>
-              {blocks.map((block) => <rect key={`${block.session_id}-${block.start}`} x={(x(Date.parse(block.start)) - 240) / 740 * 1000} y="2" width={Math.max(3, (x(block.is_live ? now : Date.parse(block.end!)) - x(Date.parse(block.start))) / 740 * 1000)} height="16" rx="4" className={`ledger-block${block.is_live ? " is-live" : ""}`}><title>{block.project.name}: {formatTime(block.start)} · {formatDuration(block.minutes)}</title></rect>)}
+            <svg viewBox="0 0 1000 52" preserveAspectRatio="none" className="day-ember-ribbon" role="img" aria-label={`${formatDuration(total)} across ${blocks.length} blocks`}>
+              {blocks.map((block) => <rect key={`${block.session_id}-${block.start}`} x={(x(Date.parse(block.start)) - 240) / 740 * 1000} y="4" width={Math.max(3, (x(block.is_live ? now : Date.parse(block.end!)) - x(Date.parse(block.start))) / 740 * 1000)} height="16" rx="4" className={`ledger-block${block.is_live ? " is-live" : ""}`}><title>{block.project.name}: {formatTime(block.start)} · {formatDuration(block.minutes)}</title></rect>)}
+              {now >= from && now <= to ? <g><circle cx={(x(now) - 240) / 740 * 1000} cy="12" r="5" className="ledger-now-dot" /><text x={Math.max(55, Math.min(945, (x(now) - 240) / 740 * 1000))} y="48" textAnchor="middle" className="ribbon-now-label">Now</text></g> : null}
             </svg>
-            <div className="day-ribbon-labels"><span>{formatTime(new Date(from))}</span><span>{range === "today" ? "Now" : timeline.range_title}</span><span>{formatTime(new Date(to))}</span></div>
+            <div className="day-ribbon-labels"><span>{formatTime(new Date(from))}</span><span>{formatTime(new Date(to))}</span></div>
           </div>
         </>
       ) : (

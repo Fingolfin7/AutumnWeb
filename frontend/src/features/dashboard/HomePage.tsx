@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -56,12 +56,8 @@ function HomeContent({ data }: { data: Dashboard }) {
       <header className="today-heading">
         <h1 className="page-title">Today</h1>
         <span className="today-date">{formatDayDate(new Date(now))}</span>
-        <strong className="today-total">{formatDuration(total)} <small>today{running.length ? " · including live time" : ""}</small></strong>
-        {running.length ? (
-          <AppLink className="btn btn--quiet" href={urls.startTimer()}>
-            + New timer
-          </AppLink>
-        ) : null}
+        <span className="today-heading-dot" aria-hidden="true">·</span>
+        <strong className="today-total" title={running.length ? "Including live time" : "Saved time today"}>{formatDuration(total)}</strong>
       </header>
       {firstRun ? <p className="muted">Pick a project and start. Your notes and time will make this day your own.</p> : null}
       {outside ? (
@@ -72,6 +68,15 @@ function HomeContent({ data }: { data: Dashboard }) {
           </button>
         </p>
       ) : null}
+      {running.length ? (
+        <section className="ember-deck" aria-label="Running timers">
+          {running.map((timer) => (
+            <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} />
+          ))}
+        </section>
+      ) : (
+        <StartCard items={data.quick_starts} />
+      )}
       {!firstRun ? <div className="today-picture">
         {timeline.data ? <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} /> : null}
         {data.commitments.length ? <section className="today-commitments" aria-label="Commitment summary">
@@ -83,15 +88,6 @@ function HomeContent({ data }: { data: Dashboard }) {
           </div>)}
         </section> : null}
       </div> : null}
-      {running.length ? (
-        <section className="ember-deck" aria-label="Running timers">
-          {running.map((timer) => (
-            <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} />
-          ))}
-        </section>
-      ) : (
-        <StartCard items={data.quick_starts} />
-      )}
       {!firstRun ? (<>
           <section className="today-journal" aria-label="Today's journal">
             <header className="today-section-head">
@@ -102,11 +98,11 @@ function HomeContent({ data }: { data: Dashboard }) {
             </header>
             {today.length ? (
               today.map((day) => (
-                <ul className="band-list" key={day.date}>
+                <div className="day-group" key={day.date}><header className="day-head"><span className="day-date">{formatDayDate(day.date)}</span><span className="day-total">{formatDuration(day.totalMinutes)}</span></header><ul className="band-list">
                   {day.sessions.map((session) => (
                     <SessionBand key={session.id} session={session} day={day.date} />
                   ))}
-                </ul>
+                </ul></div>
               ))
             ) : (
               <p className="empty">Your saved sessions and notes will gather here.</p>
@@ -123,15 +119,8 @@ function HomeContent({ data }: { data: Dashboard }) {
 function TimerCard({ timer, now }: { timer: Timer; now: number }) {
   const stash = useRef<() => void>(() => undefined);
   const [expanded, setExpanded] = useState(false);
-  const [desktop, setDesktop] = useState(() => window.matchMedia("(min-width: 1000px)").matches);
-  useEffect(() => {
-    const media = window.matchMedia("(min-width: 1000px)");
-    const update = () => setDesktop(media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
   return <FocusCard timer={timer} now={now} expanded={expanded} onExpand={() => setExpanded((value) => !value)} beforeStop={() => stash.current()}>
-    <TimerNoteEditor preview={!desktop && !expanded} timer={timer} registerStash={(fn) => { stash.current = fn; }} />
+    <TimerNoteEditor timer={timer} registerStash={(fn) => { stash.current = fn; }} />
     {expanded ? <TimerReminders timer={timer} /> : null}
   </FocusCard>;
 }
@@ -139,15 +128,16 @@ function TimerCard({ timer, now }: { timer: Timer; now: number }) {
 function StartCard({ items }: { items: Dashboard["quick_starts"] }) {
   const start = useStartTimer();
   const toast = useToast();
-  const recent = items.slice(0, 4);
+  const recent = items.filter((item, index) => items.findIndex((other) => other.project.id === item.project.id) === index).slice(0, 6);
   return <section className="today-idle" aria-label="Start a new timer">
-    <div className="today-section-head"><h2>Pick up where you left off</h2><AppLink className="btn btn--secondary today-log-past" href="/start_timer/?mode=past">Log past time</AppLink></div>
+    <div className="today-section-head"><h2>Pick up where you left off</h2></div>
     <div className="today-pickups">{recent.map((item) => <button className="today-quick-pick" type="button" key={`${item.project.id}-${item.subprojects.map((sub) => sub.id).join("-")}`} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => start.mutate({
       project_id: item.project.id, subproject_ids: item.subprojects.map((sub) => sub.id),
       optimistic: { projectName: item.project.name, subprojects: item.subprojects },
     }, { onSuccess: () => toast.success("Started timer"), onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`) })}>
       <Icon icon={faPlay} /><CapturePickLabel project={item.project.name} sublabel={item.subprojects.map((sub) => sub.name).join(", ")} />
-    </button>)}</div>
-    <AppLink className="btn btn--quiet today-something-else" href={urls.startTimer()}>Something else</AppLink>
+    </button>)}
+    <AppLink className="today-quick-pick today-something-else" href={urls.startTimer()}>Another project</AppLink>
+    <AppLink className="today-quick-pick today-log-past" href="/start_timer/?mode=past">Log past time</AppLink></div>
   </section>;
 }

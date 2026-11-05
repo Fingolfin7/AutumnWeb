@@ -161,7 +161,7 @@ function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; o
     },
   });
   const complete = async () => {
-    if (!(await draft.flush())) return;
+    if (!(await draft.flush())) return false;
     if (onSaved) {
       // PATCH returns plain text; retain the sanitized rendering as well when
       // this entry no longer matches its list's search.
@@ -174,12 +174,13 @@ function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; o
     }
     onDone();
     toast.success("Note saved.");
+    return true;
   };
   return <form className="journal-note-edit fields" onSubmit={(event) => {
     event.preventDefault();
     void complete();
   }}>
-    <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} onDone={draft.flush} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
+    <NoteEditor initiallyWriting={window.matchMedia("(max-width: 999px)").matches} sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} onDone={window.matchMedia("(max-width: 999px)").matches ? complete : draft.flush} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
     <div className="journal-edit-actions">
       <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
       {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}

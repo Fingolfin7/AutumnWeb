@@ -4,6 +4,7 @@ import { AppLink, urls } from "@/app/links";
 import { Sheet } from "@/components/Sheet";
 import { elapsedSeconds, formatClock } from "@/lib/format";
 import { useNow, useTimers } from "./api";
+import { ClockDigits } from "./ClockDigits";
 
 export function TimerDock() {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ export function TimerDock() {
   const timer = timers.data?.[0];
   if (!timer) return null;
   const multiple = timers.data!.length > 1;
-  const label = multiple ? <><span className="live-dot" /><span>{timers.data!.length} running</span></> : <><span className="live-dot" /><span className="timer-dock-project text-red">{timer.project.name}</span><span className="timer-dock-clock">{formatClock(elapsedSeconds(timer.start, now))}</span></>;
+  const label = multiple ? <><span className="live-dot" /><span>{timers.data!.length} running</span></> : <><span className="live-dot" /><span className="timer-dock-project text-red">{timer.project.name}</span><span className="timer-dock-clock"><ClockDigits value={formatClock(elapsedSeconds(timer.start, now))} /></span></>;
   return (
     <><div className={`timer-dock${cardVisible && pathname === "/" ? " timer-dock--card-visible" : ""}`} aria-label="Running timer dock">
       {multiple ? <button type="button" className="timer-dock-open" aria-haspopup="dialog" onClick={() => setListOpen(true)}>{label}</button> :
@@ -64,7 +65,7 @@ export function TimerDock() {
     <Sheet open={listOpen} onClose={() => setListOpen(false)} title="Running timers">
       <div className="dock-timer-list">{timers.data!.map((item) => <div key={item.id}>
         <AppLink className="text-red" href={`/#timer-${item.id}`} onClick={() => { setListOpen(false); requestAnimationFrame(() => document.getElementById(`timer-${item.id}`)?.scrollIntoView({ block: "start" })); }}>{item.project.name}</AppLink>
-        <span className="timer-dock-clock">{formatClock(elapsedSeconds(item.start, now))}</span>
+        <span className="timer-dock-clock"><ClockDigits value={formatClock(elapsedSeconds(item.start, now))} /></span>
         <button className="btn btn--stop" type="button" onClick={() => { setListOpen(false); navigate(urls.stopTimer(item.id), { state: { stopRequestedAt: Date.now() } }); }}>Stop</button>
       </div>)}</div>
     </Sheet></>
