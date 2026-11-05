@@ -22,7 +22,8 @@ export function TimerDock() {
       entries.forEach((entry) => seen.set(entry.target, entry.isIntersecting));
       setCardVisible([...seen.values()].some(Boolean));
     }, { rootMargin: "-68px 0px -80px 0px" });
-    const attach = () => document.querySelectorAll(".ember-deck article").forEach((card) => {
+    // A long note can keep the card in view after its timer controls leave.
+    const attach = () => document.querySelectorAll(".ember-deck .focus-actions").forEach((card) => {
       if (!seen.has(card)) { seen.set(card, false); observer.observe(card); }
     });
     attach();

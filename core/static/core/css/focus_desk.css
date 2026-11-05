@@ -4914,7 +4914,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .palette-input { box-sizing: border-box; min-height: 48px; height: auto; line-height: 1.5; padding-block: var(--s3); }
 
 /* Compact journal: metadata and the first line of prose share a baseline. */
-:is(.session-list, .today-journal, .project-journal) .journal-entry { display: grid; grid-template-columns: minmax(230px, .9fr) minmax(0, 2fr) 64px 100px 44px; grid-template-rows: auto; gap: 0 var(--s3); align-items: start; min-height: 76px; padding: var(--s3) var(--s4); }
+:is(.session-list, .today-journal, .project-journal) .journal-entry { display: grid; grid-template-columns: minmax(320px, 1fr) minmax(0, 1.5fr) 64px 100px 44px; grid-template-rows: auto; gap: 0 var(--s3); align-items: start; min-height: 76px; padding: var(--s3) var(--s4); }
 :is(.session-list, .today-journal, .project-journal) .journal-heading { display: contents; }
 .journal-identity { grid-column: 1; grid-row: 1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 var(--s2); min-width: 0; }
 .journal-heading .journal-identity .session-project { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; color: var(--project); font: 500 var(--fs-sm)/1.65 var(--font-display); padding: 0; min-height: 0; max-width: 100%; }
