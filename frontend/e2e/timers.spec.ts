@@ -25,7 +25,8 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
     const headerHeight = await card.evaluate((element) => element.querySelector(".timer-note-editor")!.getBoundingClientRect().top - element.getBoundingClientRect().top);
     expect(headerHeight).toBeLessThanOrEqual(180);
     await expect(page.locator(".timer-dock")).toBeHidden();
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    // Today may be short on a quiet day; the dock only cares that Stop has left view.
+    await page.evaluate(() => { document.body.style.minHeight = "3000px"; window.scrollTo(0, document.body.scrollHeight); });
     await expect(page.locator(".timer-dock")).toBeVisible();
     await card.scrollIntoViewIfNeeded();
     await expect(page.locator(".timer-dock")).toBeHidden();

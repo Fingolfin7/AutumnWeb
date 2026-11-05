@@ -82,10 +82,12 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await retained.locator(".session-note-body").click();
   await retained.getByRole("button", { name: "Edit", exact: true }).click();
   const revised = `A different **reflection** for ${testInfo.project.name}, with the search word removed.`;
-  await retained.getByRole("textbox", { name: "Note", exact: true }).fill(revised);
-  await expect(retained.getByRole("status")).toHaveText("Saved");
-  await expect(retained.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(revised);
-  await retained.getByRole("button", { name: "Done", exact: true }).click();
+  // A phone edits in the full-screen writer; a desktop edits in the row.
+  const surface = testInfo.project.name === "phone" ? page.getByRole("dialog", { name: "Full-screen note writer" }) : retained;
+  await surface.getByRole("textbox", { name: "Note", exact: true }).fill(revised);
+  await expect(surface.getByRole("status")).toHaveText(/^Saved/);
+  await expect(surface.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(revised);
+  await surface.getByRole("button", { name: "Done", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`search=${encodeURIComponent(note)}`));
   await expect(retained.getByText(revised.replaceAll("**", ""), { exact: true })).toBeVisible();
   await expect(retained.locator(".session-note strong")).toHaveText("reflection");
