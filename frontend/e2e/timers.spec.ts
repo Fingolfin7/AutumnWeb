@@ -88,7 +88,7 @@ test.describe("offline", () => {
       return (await cache.keys()).length > 5;
     });
     await page.goto("/start_timer/");
-    await expect(page.getByRole("combobox", { name: "Project" })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Project", exact: true })).toBeVisible();
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(2_500); // the query cache is persisted on a throttle
 

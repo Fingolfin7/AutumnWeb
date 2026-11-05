@@ -3388,7 +3388,7 @@ input[type="file"]::file-selector-button { min-height: 44px; padding: var(--s2) 
 }
 
 @media (max-width: 999px) {
-  .note-editor-field:focus-within .note-editor-toolbar, .note-editor-field.is-writing .note-editor-toolbar { display: flex; }
+  .note-editor-field.is-focused .note-editor-toolbar, .note-editor-field.is-writing .note-editor-toolbar { display: flex; }
 .note-editor-toolbar .note-tool-button { min-width: 44px; width: 44px; }
   a.context-chip, .page-eyebrow a, .fd-tl-empty a, .empty a { display: inline-flex; align-items: center; min-height: 44px; }
 }
@@ -4141,7 +4141,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-editor-field { min-width: 0; width: 100%; max-width: 70ch; }
 .note-editor-shell { background: var(--sunken); }
 .note-editor-shell .note-editor-toolbar { display: none; flex-wrap: wrap; gap: var(--s1); padding: var(--s1); }
-.note-editor-field:focus-within .note-editor-toolbar, .note-editor-field.is-writing .note-editor-toolbar { display: flex; }
+.note-editor-field.is-focused .note-editor-toolbar, .note-editor-field.is-writing .note-editor-toolbar { display: flex; }
 .note-editor-toolbar .note-tool-button { min-width: 44px; min-height: 44px; }
 .note-editor-toolbar .dictate-button { width: auto; }
 .note-editor-toolbar .note-writer-open { margin-left: auto; }
@@ -4472,8 +4472,8 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .ember-clock .focus-time .num { font-size: clamp(2rem, 8vw, 3rem); }
   .ember-clock.is-compact { padding: var(--s4); gap: var(--s2) var(--s3); }
   .ember-clock .focus-project { padding-right: var(--s6); }
-  .note-editor-field:focus-within .note-editor-shell { overflow: visible; }
-  .note-editor-field:focus-within .note-editor-toolbar { position: sticky; bottom: 0; top: auto; z-index: 12; background: var(--surface-2); }
+  .note-editor-field.is-focused .note-editor-shell { overflow: visible; }
+  .note-editor-field.is-focused .note-editor-toolbar { position: sticky; bottom: 0; top: auto; z-index: 12; background: var(--surface-2); }
 }
 
 /* The ledger shares one aligned heading, metadata rail and reading measure. */

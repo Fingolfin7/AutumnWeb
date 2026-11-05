@@ -16,22 +16,9 @@ const AGGREGATION_LABEL: Record<string, string> = {
 
 /* Active commitments with progress, bank and streak strip (the dashboard's
    commitments slab). */
-export function CommitmentsPanel({ items }: { items: DashboardCommitment[] }) {
-  return (
-    <Disclose id="home-commitments" icon={faBullseye} iconClass="text-cyan" title="Commitments" summary={`${items.length} active`}>
-      {items.length ? (
-        <div className="band-list">
-          {items.map((item) => (
-            <CommitmentBand key={item.commitment.id} item={item} />
-          ))}
-        </div>
-      ) : (
-        <p className="empty">
-          No active commitments. <AppLink href={urls.createCommitment()}>Add one</AppLink>.
-        </p>
-      )}
-    </Disclose>
-  );
+export function CommitmentsPanel({ items, bare = false }: { items: DashboardCommitment[]; bare?: boolean }) {
+  const content = items.length ? <div className="band-list">{items.map((item) => <CommitmentBand key={item.commitment.id} item={item} />)}</div> : <p className="empty">No active commitments. <AppLink href={urls.createCommitment()}>Add one</AppLink>.</p>;
+  return bare ? content : <Disclose id="home-commitments" icon={faBullseye} iconClass="text-cyan" title="Commitments" summary={`${items.length} active`}>{content}</Disclose>;
 }
 
 function CommitmentTarget({ item }: { item: DashboardCommitment }) {
