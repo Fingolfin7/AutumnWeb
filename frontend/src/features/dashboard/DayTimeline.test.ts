@@ -24,3 +24,9 @@ describe("timeline live state", () => {
     expect(entries[0]).toMatchObject({ session_id: 20, project: timer.project, minutes: 30, is_live: true });
   });
 });
+
+it("counts only the local-day portion of a saved midnight crossing", () => {
+  const start = new Date(2026, 10, 3, 21, 53).toISOString(), end = new Date(2026, 10, 4, 0, 28).toISOString();
+  const crossing = { ...report, lanes: [{ project, blocks: [{ ...block, start, end, minutes: 155, is_live: false }] }] } as Timeline;
+  expect(ledgerEntries(crossing, [], now)[0]?.minutes).toBe(28);
+});

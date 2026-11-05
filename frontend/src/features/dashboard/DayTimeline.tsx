@@ -14,15 +14,18 @@ const RANGES: { key: TimelineRange; label: string }[] = [
  * a stopped timer or omit one just started offline. Saved blocks stay intact. */
 export function ledgerEntries(timeline: Timeline, running: Timer[], now: number) {
   const activeIds = new Set(running.map((timer) => timer.id));
-  const saved = timeline.lanes.flatMap((lane) =>
-    lane.blocks
-      .filter((block) => !block.is_live && !activeIds.has(block.session_id))
-      .map((block) => ({ ...block, project: lane.project })),
-  );
   const dayStart = new Date(`${timeline.start_date}T00:00:00`).getTime();
   const lastDay = new Date(`${timeline.end_date}T00:00:00`);
   lastDay.setDate(lastDay.getDate() + 1);
   const dayEnd = lastDay.getTime();
+  const saved = timeline.lanes.flatMap((lane) => lane.blocks
+    .filter((block) => !block.is_live && !activeIds.has(block.session_id))
+    .flatMap((block) => {
+      const originalStart = Date.parse(block.start), originalEnd = Date.parse(block.end ?? block.start);
+      const start = Math.max(originalStart, dayStart), end = Math.min(originalEnd, dayEnd);
+      if (end <= start) return [];
+      return [{ ...block, project: lane.project, start: new Date(start).toISOString(), end: new Date(end).toISOString(), minutes: block.minutes * (end - start) / (originalEnd - originalStart) }];
+    }));
   const live = running.flatMap((timer) => {
     const start = Math.max(Date.parse(timer.start), dayStart);
     const end = Math.min(now, dayEnd);

@@ -78,6 +78,8 @@ export function NoteEditor({
   persistVersion = 0,
   saveStatus,
   onRetry,
+  sessionTitle,
+  preview = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -96,7 +98,11 @@ export function NoteEditor({
   persistVersion?: number;
   saveStatus?: string;
   onRetry?: () => void;
+  sessionTitle?: string;
+  preview?: boolean;
 }) {
+  const [edited, setEdited] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [writing, setWriting] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const baseline = useRef(value);
@@ -115,7 +121,7 @@ export function NoteEditor({
       node.setSelectionRange(selection.current.start, selection.current.end);
     }
     wasWriting.current = writing;
-  }, [value, writing]);
+  }, [value, writing, preview]);
   useEffect(() => {
     if (!persistKey) return;
     const draft = readNoteDraft(persistKey);
@@ -139,6 +145,7 @@ export function NoteEditor({
     };
   }, [writing]);
   const change = (next: string) => {
+    setEdited(true);
     if (persistKey) writeNoteDraft(persistKey, { text: next, version: persistVersion });
     onChange(next);
   };
@@ -228,8 +235,8 @@ export function NoteEditor({
   const errors = error ? (Array.isArray(error) ? error : [error]) : [];
 
   const field = (
-    <div className={`field note-editor-field${writing ? " is-writing" : ""}`}>
-      {writing ? <header className="note-writer-heading"><h2>{label || "Session note"}</h2><button className="btn btn--secondary" type="button" onClick={closeWriter}>Return to session</button></header> : null}
+    <div className={`field note-editor-field${writing ? " is-writing" : ""}${focused ? " is-focused" : ""}`} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget) && !(event.relatedTarget instanceof Element && event.relatedTarget.closest("button, a, summary"))) setFocused(false); }}>
+      {writing ? <header className="note-writer-heading"><div><h2>{sessionTitle?.split(" · ")[0] || "Session note"}</h2><small>{sessionTitle?.includes(" · ") ? `${sessionTitle.split(" · ").slice(1).join(" · ")} · ` : ""}{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><button className="btn btn--secondary" type="button" onClick={closeWriter}>Return to session</button></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
         <div className="note-editor-toolbar" role="toolbar" aria-label="Note formatting">
@@ -281,7 +288,7 @@ export function NoteEditor({
         />
       </div>
       <div className="note-editor-status">
-        <small role="status">{saveStatus ?? (value === baseline.current ? "Saved" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
+        <small role="status">{saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
         {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
       <small data-note-status="" aria-live="polite">{status}</small>
       </div>
@@ -294,6 +301,7 @@ export function NoteEditor({
       ) : null}
     </div>
   );
+  if (preview && !writing) return <div className="note-compact-preview"><p>{value.split(/\n\s*\n|\n/)[0] || "A thought, a question, a small discovery."}</p><button className="btn btn--secondary" type="button" onClick={() => { selection.current = { start: value.length, end: value.length }; setWriting(true); }}>Write</button></div>;
   return writing ? createPortal(<dialog ref={dialog} className="note-writer-dialog" aria-label="Full-screen note writer" onCancel={(event) => { event.preventDefault(); closeWriter(); }} onKeyDown={(event) => event.stopPropagation()}>{field}</dialog>, document.body) : field;
 }
 

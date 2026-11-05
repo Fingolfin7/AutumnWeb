@@ -14,7 +14,7 @@ import { useAllProjects, useSubprojects } from "@/api/meta";
 import { ApiError, errorMessage } from "@/api/errors";
 import type { Project, SessionPatch } from "@/api/types";
 import { sameAllocations, type AllocationItem, type AllocationWrite } from "@/lib/allocation";
-import { toDateTimeLocal } from "@/lib/format";
+import { formatDate, formatDuration, toDateTimeLocal } from "@/lib/format";
 import { parseSessionParam, useSession, useUpdateSession, type SessionRow } from "./api";
 
 /* /update_session/<id or uuid>/ (update_session.html). Three slabs' worth of
@@ -307,7 +307,7 @@ function SessionForm({ session }: { session: SessionRow }) {
             </div>
           </div>
 
-          <NoteEditor disabled={update.isPending} persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
+          <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} disabled={update.isPending} persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
         </section>
 
         <section className="slab slab-pad">

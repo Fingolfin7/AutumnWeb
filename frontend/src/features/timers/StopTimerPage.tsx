@@ -11,7 +11,7 @@ import { api, unwrap } from "@/api/client";
 import { ApiError, errorMessage } from "@/api/errors";
 import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
-import { formatDuration, toDateTimeLocal } from "@/lib/format";
+import { formatDate, formatDuration, toDateTimeLocal } from "@/lib/format";
 import { updateQueuedStart } from "@/lib/offlineQueue";
 import HomePage from "@/features/dashboard/HomePage";
 import { useStopTimer, useTimers } from "./api";
@@ -223,6 +223,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
         }}
       >
         <NoteEditor
+          sessionTitle={`${timer.project.name} · ${formatDate(timer.start)} · ${formatDuration((requestedAt - Date.parse(timer.start)) / 60000)}`}
           id="id_note"
           disabled={busy && (saved || offline)}
           value={note}

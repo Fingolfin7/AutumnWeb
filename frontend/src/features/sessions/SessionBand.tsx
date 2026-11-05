@@ -8,7 +8,8 @@ import { useNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
 import { api, unwrap } from "@/api/client";
 import { AppLink, urls } from "@/app/links";
-import { formatDuration, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
+import { dayPortions } from "@/lib/sessions";
+import { formatDate, formatDuration, localDateKey, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
@@ -16,7 +17,7 @@ import { useDeleteSession, useUpdateSession, type SessionRow } from "./api";
 
 /* Journal row shared with Today. Actions are explicit; a left swipe is an
    optional shortcut that reveals the same controls without moving the prose. */
-export function SessionBand({ session, showDate, hideProject = false, onEditNote, onNoteSaved }: { session: SessionRow; showDate?: boolean; hideProject?: boolean; onEditNote?: (session: SessionRow) => void; onNoteSaved?: (session: SessionRow) => void }) {
+export function SessionBand({ session, showDate, hideProject = false, onEditNote, onNoteSaved, search, day }: { search?: string; day?: string; session: SessionRow; showDate?: boolean; hideProject?: boolean; onEditNote?: (session: SessionRow) => void; onNoteSaved?: (session: SessionRow) => void }) {
   const location = useLocation();
   hideProject = hideProject || location.pathname === urls.updateProject(session.project.id);
   const start = useStartTimer();
@@ -91,21 +92,18 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
     <li ref={row} className="band journal-entry" id={`session-${session.id}`}>
       <div className="journal-heading">
         {hideProject ? <span className="session-project journal-entry-date">{formatShortDate(session.end)}</span> : <AppLink className="session-project" href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink>}
-        <span className="journal-duration">{formatDuration(session.duration_minutes)}</span>
-        <div className="journal-row-actions">
-          <button className="btn btn--quiet" type="button" onClick={editNote}><Icon icon={faPen} /> Edit note</button>
-          <button className="btn btn--quiet" type="button" onClick={restart} disabled={start.isPending}><Icon icon={faRedo} /> Restart</button>
-          <button className="btn btn--quiet journal-delete" type="button" onClick={() => setConfirming(true)}><Icon icon={faTrash} /> Delete session</button>
-        </div>
+        <span className="journal-duration">{formatDuration(day ? dayPortions(session).find((part) => part.date === day)?.minutes ?? session.duration_minutes : session.duration_minutes)}</span>
         <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${session.id}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
       </div>
       <div className="journal-meta">
         {session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}
         {showDate && !hideProject ? <span>{formatShortDate(session.end)}</span> : null}
         <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
+        {dayPortions(session).length > 1 ? <span className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === localDateKey(new Date()) ? "today" : part.date === localDateKey(new Date(Date.now() - 86400000)) ? "yesterday" : formatShortDate(part.date)}`).join(" · ")}</span> : null}
         {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
       </div>
-      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} onEdit={editNote} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
+      {!session.note && !session.note_html && !editing ? <button className="btn btn--quiet journal-add-note" type="button" onClick={editNote}>Add a note</button> : null}
+      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote search={search} id={`note-${session.id}`} html={session.note_html} text={session.note} onEdit={editNote} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
 
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Session actions" className="session-actions-sheet">
         <p className="session-action-context">{session.project.name} · {formatDuration(session.duration_minutes)}</p>
@@ -177,10 +175,9 @@ function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; o
     event.preventDefault();
     void complete();
   }}>
-    <NoteEditor value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
+    <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
     <div className="journal-edit-actions">
       <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
-      <button className="btn btn--quiet" type="button" onClick={() => void complete()}>Close editor</button>
       {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}
       <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
     </div>
