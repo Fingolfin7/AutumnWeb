@@ -3372,9 +3372,15 @@ input[type="file"]::file-selector-button { min-height: 44px; padding: var(--s2) 
   input[type="checkbox"]:not(.toggle input):not(.nx-switch input),
   input[type="radio"]:not(.segmented input) {
     appearance: none; position: relative; flex-shrink: 0; width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0;
-    border: 12px solid transparent; border-radius: 15px; background: #62635f; background-clip: content-box; cursor: pointer;
+    border: 12px solid transparent; border-radius: 17px; background: transparent; background-clip: content-box; cursor: pointer;
   }
   input[type="radio"]:not(.segmented input) { border-radius: 50%; }
+  input[type="checkbox"]:not(.toggle input):not(.nx-switch input)::before,
+  input[type="radio"]:not(.segmented input)::before { content: ""; position: absolute; inset: 0; border: 1px solid var(--muted); border-radius: 5px; }
+  input[type="radio"]:not(.segmented input)::before { border-radius: 50%; }
+  input[type="checkbox"]:checked:not(.toggle input):not(.nx-switch input)::before,
+  input[type="radio"]:checked:not(.segmented input)::before { border-color: var(--brand); }
+
   input[type="checkbox"]:checked:not(.toggle input):not(.nx-switch input),
   input[type="radio"]:checked:not(.segmented input) { background-color: var(--brand-deep); }
   input[type="checkbox"]:checked:not(.toggle input):not(.nx-switch input)::after { content: ""; position: absolute; width: 6px; height: 11px; left: 7px; top: 2px; border: solid var(--ink-invert); border-width: 0 2px 2px 0; transform: rotate(45deg); }
@@ -4224,3 +4230,11 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .project-journal .journal-meta { grid-column: 1; grid-row: 1; padding-right: 0; align-self: center; }
 .project-journal :is(.session-note, .journal-note-edit) { grid-column: 1 / -1; }
 .project-journal .day-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+
+@media (max-width: 999px) {
+  .review-desk .review-projects .review-section-heading { padding-block: 0; min-height: 44px; align-items: center; }
+  .profile-section-save { position: sticky; top: calc(var(--header-h) + var(--feedback-height, 0px) + var(--offline-height, 0px)); z-index: 20; display: flex; flex-direction: row; align-items: center; justify-content: space-between; padding: var(--s2) 0; background: var(--surface-2); border-bottom: 1px solid var(--hairline); }
+  .profile-section-save > .btn { margin: 0; padding-inline: var(--s3); font-size: var(--fs-sm); }
+}
+
+.profile-page > form.slab { overflow: visible; }

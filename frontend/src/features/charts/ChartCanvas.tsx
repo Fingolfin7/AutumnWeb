@@ -61,7 +61,14 @@ export function ChartCanvas({ built }: { built: Built }) {
   }, [built]);
 
   const series = built.type === "chart" ? (built.config.type === "doughnut" ? (built.config.data.labels ?? []).map(String) : built.config.data.datasets.map((dataset) => dataset.label ?? "").filter(Boolean)) : [];
-  return <><canvas id="chart" ref={canvas} role="img" aria-label={built.type === "wordcloud" ? "Word cloud of session notes" : "Chart of tracked time"} />{series.length > 1 ? <details className="chart-series"><summary>{series.length} series · Show legend</summary><ul>{series.map((name, index) => <li key={`${name}-${index}`}><button type="button" aria-pressed={!hidden.includes(index)} onClick={() => { const chart = canvas.current ? Chart.getChart(canvas.current) : undefined; if (!chart) return; if (built.type === "chart" && built.config.type === "doughnut") chart.toggleDataVisibility(index); else chart.setDatasetVisibility(index, hidden.includes(index)); chart.update(); setHidden((items) => items.includes(index) ? items.filter((item) => item !== index) : [...items, index]); }}><svg className="chart-series-dot" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={paletteColor(index)} /></svg>{name}</button></li>)}</ul></details> : null}</>;
+  const seriesColor = (index: number) => {
+    if (built.type !== "chart") return paletteColor(index);
+    const dataset = built.config.data.datasets[built.config.type === "doughnut" ? 0 : index];
+    const candidate = built.config.type === "line" ? dataset?.borderColor : dataset?.backgroundColor;
+    const color = Array.isArray(candidate) ? candidate[index] : candidate;
+    return typeof color === "string" ? color : paletteColor(index);
+  };
+  return <><canvas id="chart" ref={canvas} role="img" aria-label={built.type === "wordcloud" ? "Word cloud of session notes" : "Chart of tracked time"} />{series.length > 1 ? <details className="chart-series"><summary>{series.length} series · Show legend</summary><ul>{series.map((name, index) => <li key={`${name}-${index}`}><button type="button" aria-pressed={!hidden.includes(index)} onClick={() => { const chart = canvas.current ? Chart.getChart(canvas.current) : undefined; if (!chart) return; if (built.type === "chart" && built.config.type === "doughnut") chart.toggleDataVisibility(index); else chart.setDatasetVisibility(index, hidden.includes(index)); chart.update(); setHidden((items) => items.includes(index) ? items.filter((item) => item !== index) : [...items, index]); }}><svg className="chart-series-dot" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={seriesColor(index)} /></svg>{name}</button></li>)}</ul></details> : null}</>;
 
 }
 
