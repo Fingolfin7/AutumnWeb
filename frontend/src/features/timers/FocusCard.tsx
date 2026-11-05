@@ -7,10 +7,8 @@ import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
 import type { Timer } from "@/api/types";
-import { elapsedSeconds, formatClock, formatTime, heroParts, parseInstant } from "@/lib/format";
+import { elapsedSeconds, formatClock, formatTime, parseInstant } from "@/lib/format";
 import { useDeleteTimer, useRestartTimer } from "./api";
-
-export const NOTE_DRAFT_KEY_PREFIX = "autumn:timer-note-draft:";
 
 /* A running timer as a .focus-card (partials/active_timers_*.html). Live
    figures are computed from `now`, which the parent ticks once a second, so
@@ -50,6 +48,7 @@ export function FocusCard({
       className={`focus-card ember-clock${elapsed >= 3600 ? " ember-clock--deep" : elapsed >= 1200 ? " ember-clock--warm" : ""}`}
       id={`timer-${timer.id}`}
       data-timer-id={timer.id}
+      data-ember-step={Math.min(6, Math.floor(elapsed / 900))}
       aria-label={`Running timer: ${timer.project.name}`}
       aria-busy={pending || undefined}
     >
@@ -60,11 +59,11 @@ export function FocusCard({
         <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
       </h2>
       <p className="focus-time" aria-live="off">
-        <span className="focus-time-compact">{formatClock(elapsed)}</span>
-        {heroParts(elapsed).map((part) => (
-          <span className="focus-time-part" key={part.unit}>
-            <span className="num">{part.value}</span>
-            <span className="unit">{part.unit}</span>
+        <span className="sr-only">{formatClock(elapsed)} elapsed</span>
+        {formatClock(elapsed).split(":").map((part, index) => (
+          <span className={`focus-time-part${index === 2 ? " focus-seconds" : ""}`} key={index} aria-hidden="true">
+            <span className="num">{index === 0 ? Number(part) : part}</span>
+            <span className="unit">{["h", "m", "s"][index]}</span>
           </span>
         ))}
       </p>

@@ -1,9 +1,12 @@
+import { useLocation } from "react-router";
 import { useEffect, useRef, useState } from "react";
 import { faEllipsisH, faPen, faRedo, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog, Sheet } from "@/components/Sheet";
 import { SessionNote } from "@/components/SessionNote";
+import { useNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
+import { api, unwrap } from "@/api/client";
 import { AppLink, urls } from "@/app/links";
 import { formatDuration, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
@@ -13,21 +16,20 @@ import { useDeleteSession, useUpdateSession, type SessionRow } from "./api";
 
 /* Journal row shared with Today. Actions are explicit; a left swipe is an
    optional shortcut that reveals the same controls without moving the prose. */
-export function SessionBand({ session, showDate }: { session: SessionRow; showDate?: boolean }) {
+export function SessionBand({ session, showDate, hideProject = false, onEditNote, onNoteSaved }: { session: SessionRow; showDate?: boolean; hideProject?: boolean; onEditNote?: (session: SessionRow) => void; onNoteSaved?: (session: SessionRow) => void }) {
+  const location = useLocation();
+  hideProject = hideProject || location.pathname === urls.updateProject(session.project.id);
   const start = useStartTimer();
   const remove = useDeleteSession();
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [editing, setEditing] = useState<SessionRow | null>(null);
-  const [note, setNote] = useState("");
-  const update = useUpdateSession();
   const row = useRef<HTMLLIElement>(null);
   const editNote = () => {
-    setNote(session.note ?? "");
+    onEditNote?.(session);
     setEditing(session);
     setActionsOpen(false);
-    update.reset();
   };
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
   return (
     <li ref={row} className="band journal-entry" id={`session-${session.id}`}>
       <div className="journal-heading">
-        <AppLink className="session-project" href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink>
+        {hideProject ? <span className="session-project journal-entry-date">{formatShortDate(session.end)}</span> : <AppLink className="session-project" href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink>}
         <span className="journal-duration">{formatDuration(session.duration_minutes)}</span>
         <div className="journal-row-actions">
           <button className="btn btn--quiet" type="button" onClick={editNote}><Icon icon={faPen} /> Edit note</button>
@@ -99,24 +101,12 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
       </div>
       <div className="journal-meta">
         {session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}
-        {showDate ? <span>{formatShortDate(session.end)}</span> : null}
+        {showDate && !hideProject ? <span>{formatShortDate(session.end)}</span> : null}
         <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
         {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
       </div>
-      {editing ? <form className="journal-note-edit fields" onSubmit={(event) => {
-        event.preventDefault();
-        update.mutate({ session: editing, body: { note } }, {
-          onSuccess: () => { setEditing(null); toast.success("Note saved."); },
-        });
-      }}>
-        <NoteEditor value={note} onChange={setNote} autoFocus rows={8} />
-        {update.isError ? <p className="text-danger" role="alert">{errorMessage(update.error)} Your draft is still here. Copy it before reloading if this session changed elsewhere.</p> : null}
-        <div className="journal-edit-actions">
-          <button className="btn btn--primary" disabled={update.isPending}>{update.isPending ? "Saving…" : "Save changes"}</button>
-          <button className="btn btn--quiet" type="button" disabled={update.isPending} onClick={() => setEditing(null)}>Cancel</button>
-          <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
-        </div>
-      </form> : <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} />}
+      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} onEdit={editNote} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
+
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Session actions" className="session-actions-sheet">
         <p className="session-action-context">{session.project.name} · {formatDuration(session.duration_minutes)}</p>
         <div className="journal-actions" id={`actions-${session.id}`}>
@@ -155,4 +145,44 @@ function crossesDst(session: SessionRow): boolean {
   const start = new Date(session.start);
   const end = new Date(session.end);
   return start.getTimezoneOffset() !== end.getTimezoneOffset();
+}
+
+function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; onDone: () => void; onSaved?: (session: SessionRow) => void }) {
+  const update = useUpdateSession();
+  const toast = useToast();
+  const draft = useNoteDraft({
+    draftKey: `session:${session.uuid ?? session.id}`, text: session.note ?? "", version: session.version,
+    save: async (note, version) => {
+      const saved = await update.mutateAsync({ session, body: { note }, version });
+      onSaved?.(saved);
+      return saved;
+    },
+  });
+  const complete = async () => {
+    if (!(await draft.flush())) return;
+    if (onSaved) {
+      // PATCH returns plain text; retain the sanitized rendering as well when
+      // this entry no longer matches its list's search.
+      try {
+        const rendered = await unwrap(api.GET("/api/v2/sessions/{session_id}", {
+          params: { path: { session_id: session.id }, query: { include: "note_html" } },
+        }));
+        if (rendered.note === draft.value) onSaved(rendered);
+      } catch { /* The successfully saved plain note stays available. */ }
+    }
+    onDone();
+    toast.success("Note saved.");
+  };
+  return <form className="journal-note-edit fields" onSubmit={(event) => {
+    event.preventDefault();
+    void complete();
+  }}>
+    <NoteEditor value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
+    <div className="journal-edit-actions">
+      <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
+      <button className="btn btn--quiet" type="button" onClick={() => void complete()}>Close editor</button>
+      {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}
+      <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
+    </div>
+  </form>;
 }

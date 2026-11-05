@@ -1,13 +1,13 @@
 const CACHE_PREFIX = "autumn-pwa";
-/* v5: refresh the shared foundations and precache the display font. */
-const PRECACHE = `${CACHE_PREFIX}-precache-v5`;
-const RUNTIME = `${CACHE_PREFIX}-runtime-v5`;
+/* v6: keep the journal reading face available when writing offline. */
+const PRECACHE = `${CACHE_PREFIX}-precache-v6`;
+const RUNTIME = `${CACHE_PREFIX}-runtime-v6`;
 /* The last React page HTML (spa.html) this user loaded, served for any
    navigation while offline; the app routes itself from the URL. */
-const SHELL = `${CACHE_PREFIX}-shell-v5`;
+const SHELL = `${CACHE_PREFIX}-shell-v6`;
 const SHELL_KEY = "/__autumn-shell__";
 /* Every file of the current React build, so lazy pages open offline too. */
-const APP_ASSETS = `${CACHE_PREFIX}-app-v5`;
+const APP_ASSETS = `${CACHE_PREFIX}-app-v6`;
 const APP_MANIFEST = "/static/app/manifest.json";
 const OFFLINE_URL = "/static/core/pwa/offline.html";
 
@@ -18,6 +18,7 @@ const PRECACHE_URLS = [
     OFFLINE_URL,
     "/static/core/css/focus_desk.css",
     "/static/core/fonts/manrope-latin.woff2",
+    "/static/core/fonts/newsreader-reading.woff2",
     "/static/core/js/pwa.js",
     "/static/core/js/page_loading.js",
     "/static/core/images/icons/autumn-icon-192.png",

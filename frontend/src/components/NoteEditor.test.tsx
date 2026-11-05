@@ -72,7 +72,7 @@ it("keeps the value when there is no draft", () => {
 
 it("disables dictation where the browser has no speech recognition", () => {
   render(<Harness />);
-  expect(screen.getByRole("button", { name: /Unavailable/ })).toBeDisabled();
+  expect(screen.getByRole("button", { name: /unavailable/i })).toBeDisabled();
   expect(screen.getByText("Dictation unavailable in this browser.")).toBeInTheDocument();
 });
 

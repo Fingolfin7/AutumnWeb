@@ -97,6 +97,8 @@ export function useNow(intervalMs = 1000): number {
 
 export interface StartTimerInput {
   project_id: number;
+  /** Shared by optimistic and confirmed records so a note keeps its identity. */
+  uuid?: string;
   subproject_ids?: number[];
   note?: string | null;
   stop_after_minutes?: number;
@@ -148,7 +150,7 @@ export function useStartTimer() {
     networkMode: "always",
     mutationFn: async (input: StartTimerInput): Promise<Timer> => {
       const { optimistic, ...rest } = input;
-      const body = { ...rest, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() };
+      const body = { ...rest, start: toOffsetIso(new Date()), uuid: input.uuid ?? crypto.randomUUID() };
       try {
         return await unwrap(
           api.POST("/api/v2/timers/", { body }),
@@ -164,13 +166,14 @@ export function useStartTimer() {
       }
     },
     onMutate: async (input) => {
+      input.uuid ??= crypto.randomUUID();
       await client.cancelQueries({ queryKey: keys.timers() });
       const previous = client.getQueriesData<Timer[]>({ queryKey: keys.timers() });
       const placeholderId = -Date.now();
       if (input.optimistic) {
         const placeholder: Timer = {
           id: placeholderId,
-          uuid: null,
+          uuid: input.uuid,
           version: 0,
           project: { id: input.project_id, name: input.optimistic.projectName },
           subproject_allocations: input.optimistic.subprojects.map((sub) => ({

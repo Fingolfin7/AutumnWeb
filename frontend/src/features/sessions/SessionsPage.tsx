@@ -96,7 +96,26 @@ export default function SessionsPage() {
   const summary = useRelatedSummary("sessions", relatedQuery, !!applied.search && semanticSearchAvailable());
   const relatedSummary = summary.data?.available ? summary.data : null;
 
-  const all: SessionRow[] = list.data?.pages.flatMap((page) => page.sessions) ?? [];
+  const scope = JSON.stringify(apiFilters);
+  const [retained, setRetained] = useState<{ scope: string; rows: Record<number, { session: SessionRow; index: number }> }>({ scope, rows: {} });
+  useEffect(() => setRetained({ scope, rows: {} }), [scope]);
+  const pinned = retained.scope === scope ? retained.rows : {};
+  const fetched = list.data?.pages.flatMap((page) => page.sessions) ?? [];
+  const all: SessionRow[] = fetched.map((session) => {
+    const saved = pinned[session.id]?.session;
+    return saved && (saved.version > session.version || (saved.version === session.version && saved.note_html && !session.note_html)) ? saved : session;
+  });
+  for (const { session, index } of Object.values(pinned).sort((a, b) => a.index - b.index)) {
+    if (!all.some((row) => row.id === session.id)) all.splice(Math.min(index, all.length), 0, session);
+  }
+  const retainNote = (session: SessionRow) => setRetained((previous) => {
+    const rows = previous.scope === scope ? previous.rows : {};
+    const existing = rows[session.id];
+    return { scope, rows: { ...rows, [session.id]: {
+      session: { ...session, match: existing?.session.match ?? session.match },
+      index: existing?.index ?? Math.max(0, all.findIndex((row) => row.id === session.id)),
+    } } };
+  });
   const direct = all.filter((s) => s.match !== "related");
   const related = all.filter((s) => s.match === "related");
   const total = list.data?.pages[0]?.total ?? 0;
@@ -250,6 +269,7 @@ export default function SessionsPage() {
         </div>
       </Sheet>
 
+      {Object.keys(pinned).some((id) => !fetched.some((session) => session.id === Number(id))) ? <p className="muted">Your edited entry stays here until you change the search or filters.</p> : null}
       {list.isPending ? (
         <section className="slab">
           <Skeleton lines={6} />
@@ -266,7 +286,7 @@ export default function SessionsPage() {
               </header>
               <ul className="band-list">
                 {group.sessions.map((session) => (
-                  <SessionBand key={session.id} session={session} />
+                  <SessionBand key={session.id} session={session} onEditNote={retainNote} onNoteSaved={retainNote} />
                 ))}
               </ul>
             </div>
@@ -300,7 +320,7 @@ export default function SessionsPage() {
           {related.length ? (
             <ul className="band-list">
               {related.map((session) => (
-                <SessionBand key={session.id} session={session} showDate />
+                <SessionBand key={session.id} session={session} showDate onEditNote={retainNote} onNoteSaved={retainNote} />
               ))}
             </ul>
           ) : relatedSummary?.count && list.hasNextPage ? (

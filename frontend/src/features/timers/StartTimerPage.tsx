@@ -1,11 +1,9 @@
 import { formatTime, formatDate, toDateTimeLocal } from "@/lib/format";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
-import { Icon } from "@/components/Icon";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { CapturePicker } from "./CapturePicker";
-import { AppLink, urls } from "@/app/links";
+import { urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { useAllProjects, useSubprojects } from "@/api/meta";
 import { errorMessage } from "@/api/errors";
@@ -15,6 +13,7 @@ import { useStartTimer } from "./api";
 import { minutesOf, planReminders, type DurationUnit, type ReminderMode } from "./reminderPlan";
 import { PushPermission } from "./PushPermission";
 import { Sheet } from "@/components/Sheet";
+import { clearNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
 import HomePage from "@/features/dashboard/HomePage";
 import { useDashboard } from "@/features/dashboard/api";
@@ -174,6 +173,7 @@ export default function StartTimerPage() {
             },
           }),
         );
+        clearNoteDraft("capture", note);
         invalidate("sessions");
         toast.success("Saved past session.");
         close();
@@ -216,7 +216,7 @@ export default function StartTimerPage() {
         optimistic: { projectName: project.name, subprojects: chosen.map((s) => ({ id: s.id, name: s.name })) },
       },
       {
-        onSuccess: () => toast.success("Started timer"),
+        onSuccess: () => { clearNoteDraft("capture", note); toast.success("Started timer"); },
         onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`),
       },
     );
@@ -389,7 +389,7 @@ export default function StartTimerPage() {
                   </div>
                 </details>
               ) : null}
-            <NoteEditor value={note} onChange={setNote} rows={3} placeholder="Optional notes to begin with..." />
+            <NoteEditor persistKey="capture" value={note} onChange={setNote} rows={3} placeholder="Optional notes to begin with..." />
             {!past ? (
               <details className="capture-options">
                 <summary>
@@ -576,9 +576,6 @@ export default function StartTimerPage() {
               </details>
             ) : null}
             <div className="form-actions">
-              <AppLink className="btn btn--ghost" href={urls.home()}>
-                <Icon icon={faArrowLeft} /> Back
-              </AppLink>
               <span className="start-summary">{summary}</span>
               <button
                 type="submit"

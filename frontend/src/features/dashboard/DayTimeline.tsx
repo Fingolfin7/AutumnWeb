@@ -63,7 +63,6 @@ export function DayTimeline({
     project,
     blocks: blocks.filter((block) => block.project.id === project.id),
   }));
-  const ordered = [...blocks].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
   const liveMinutes = blocks.filter((block) => block.is_live).reduce((sum, block) => sum + block.minutes, 0);
   const total = blocks.reduce((sum, block) => sum + block.minutes, 0);
   const hour = 3600000;
@@ -110,7 +109,7 @@ export function DayTimeline({
             className="day-ledger-chart"
             viewBox={`0 0 1000 ${76 + lanes.length * 82}`}
             role="img"
-            aria-label={`${timeline.range_title}: ${formatDuration(total)}. Session details follow.`}
+            aria-label={`${timeline.range_title}: ${formatDuration(total)}. Session details are in the journal below.`}
           >
             <defs>
               <linearGradient id="ledger-ember">
@@ -167,29 +166,16 @@ export function DayTimeline({
               </g>
             ) : null}
           </svg>
-          <ol className="day-ledger-entries">
-            {ordered.map((b) => (
-              <li key={`${b.session_id}-${b.start}`} className={b.is_live ? "is-live" : ""}>
-                <div className="ledger-entry-time">
-                  <time>
-                    {range === "today" ? formatTime(b.start) : `${formatDayDate(b.start)} ${formatTime(b.start)}`}
-                  </time>
-                  <span>{b.is_live ? "Now" : formatTime(b.end)}</span>
-                </div>
-                <AppLink
-                  href={b.is_live ? urls.home() : urls.updateSession(b.session_id)}
-                  className="ledger-entry-project"
-                >
-                  <span className="text-red">{b.project.name}</span>
-                  {b.label ? <small className="text-blue">{b.label}</small> : null}
-                </AppLink>
-                <span className="text-green">
-                  {formatDuration(b.is_live ? Math.max(0, now - Date.parse(b.start)) / 60000 : b.minutes)}
-                  {b.is_live ? <small className="ledger-live-label">Live</small> : null}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <div className="day-ledger-phone" aria-label="Time by project">
+            {lanes.map((lane) => {
+              const minutes = lane.blocks.reduce((sum, block) => sum + block.minutes, 0);
+              return <div className="ledger-phone-project" key={lane.project.id}>
+                <AppLink href={`${urls.sessions()}?include_projects=${lane.project.id}&start_date=${timeline.start_date}&end_date=${timeline.end_date}`} className="ledger-phone-label"><span className="text-red">{lane.project.name}</span><span className="text-green">{formatDuration(minutes)}</span></AppLink>
+                <svg viewBox="0 0 300 8" preserveAspectRatio="none" className="ledger-phone-bar" role="img" aria-label={`${lane.project.name}: ${formatDuration(minutes)}`}><rect x="0" y="0" width={Math.max(1, total ? minutes / total * 300 : 0)} height="8" rx="4" className="ledger-block" /></svg>
+                {lane.blocks.some((block) => block.is_live) ? <small className="ledger-live-label">Including live time</small> : null}
+              </div>;
+            })}
+          </div>
         </>
       ) : (
         <p className="empty">An open day. Start a timer and see it take shape.</p>
