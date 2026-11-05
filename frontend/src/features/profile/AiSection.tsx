@@ -114,7 +114,7 @@ export function AiSection({
       <ul className="profile-provider-status" aria-label="Provider status">{KEY_PROVIDERS.map(provider => <li key={provider}><strong>{KEY_LABELS[provider]}</strong><span>{configured[provider] ? "Key connected" : provider === "openai" && connected ? "Via Codex" : "Not connected"}</span></li>)}</ul>
       <div className="profile-codex-panel">
         <div>
-          <h3 className="disclose-title">Connect Codex</h3>
+          <h3 className="disclose-title">Codex</h3>
           <p className="focus-lede">OpenAI models use Codex first, then the API key below.</p>
           {connected ? (
             <span className="context-chip">

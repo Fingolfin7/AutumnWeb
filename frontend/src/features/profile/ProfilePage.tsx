@@ -302,7 +302,7 @@ function ProfileEditor({
 
   const customAvatar = hasCustomAvatar(prefs.avatar_url);
   const dirty = (scope: SaveScope) => DRAFT_SCOPE[scope].some(key => prefsD[key] !== prefsDraft(prefs)[key]) || (scope === "account" && !!(accountChanges(accountD, account) || avatarFile)) || (scope === "appearance" && !!(backgroundFile || removeBg)) || (scope === "ai" && keyActions(keyDrafts).length > 0);
-  const saveButton = (scope: SaveScope, label: string) => scope === "ai" ? <div className="form-actions profile-section-save"><span className="settings-save-status" role="status">{saving ? "Saving" : dirty(scope) ? "Changes to save" : "Saved"}</span><button type="submit" className="btn btn--primary" disabled={saving || !dirty(scope)}><Icon icon={faCheckCircle} /> {label}</button></div> : null;
+  const saveButton = (scope: SaveScope, label: string) => scope === "ai" && (saving || dirty(scope)) ? <div className="form-actions profile-section-save"><span className="settings-save-status" role="status">{saving ? "Saving" : "Changes to save"}</span><button type="submit" className="btn btn--primary" disabled={saving}><Icon icon={faCheckCircle} /> {label}</button></div> : null;
   const lastAttempt = useRef("");
   const fingerprint = JSON.stringify([accountD, prefsD, avatarFile?.name, avatarFile?.lastModified, backgroundFile?.name, backgroundFile?.lastModified, removeBg]);
   const pendingScope = (["account", "appearance", "defaults", "search"] as const).find(dirty);
