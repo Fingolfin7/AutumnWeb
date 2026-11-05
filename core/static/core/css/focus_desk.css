@@ -712,7 +712,6 @@ body.bg-active .dim-control { display: flex; }
 }
 .project-dates { margin-top: .2rem; font-size: var(--fs-xs); color: var(--time); font-family: var(--font-mono); }
 .project-subs { margin-top: .5rem; display: flex; flex-wrap: wrap; gap: .3rem; }
-.project-commit { margin-top: var(--s3); }
 .project-start {
   flex: 0 0 auto; width: 3.25rem; height: 3.25rem;
   border-radius: var(--r-pill);
@@ -4177,7 +4176,6 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .project-journal .session-project { display: none; }
 .project-hero { gap: var(--s5); padding-block: var(--s4); }
 .project-hero .project-description { margin-top: var(--s3); }
-.project-commit { display: none; }
 .project-directory .project-total, .project-total { font-variant-numeric: tabular-nums; }
 .commitment-quick-target { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; }
 .commitment-quick-target .field { flex: 1 1 12rem; margin: 0; }
