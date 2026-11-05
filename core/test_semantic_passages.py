@@ -117,6 +117,16 @@ class PassageSearchTests(SemanticSearchTestCase):
         SessionPassageEmbedding.objects.all().delete()
         self.assertNotIn(self.long.pk, self._related("sign-in failure"))
 
+    def test_list_excerpt_uses_the_matching_passage_without_an_extra_embedding(self):
+        rows = self._search("sign-in failure", include="note,note_html").json()["sessions"]
+        row = next(row for row in rows if row["id"] == self.long.pk)
+        self.assertEqual(row["match_passage"], split_passages(LONG_NOTE)[1])
+        self.assertEqual(row["note"], LONG_NOTE)
+        calls = [text for batch in FakeOpenAI.all_inputs() for text in batch if text == "sign-in failure"]
+        self.assertEqual(len(calls), 1)
+        Sessions.objects.filter(pk=self.long.pk).update(note=LONG_NOTE + " A different day.")
+        self.assertNotIn(self.long.pk, self._related("sign-in failure"))
+
     def test_the_best_passage_sets_the_score(self):
         sessions = Sessions.objects.filter(user=self.user)
         query = semantic_search.decode_vector(

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useSearchParams } from "react-router";
+import { useLocation, useSearchParams } from "react-router";
 import { faSearch, faSlidersH } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Sheet } from "@/components/Sheet";
@@ -13,9 +13,11 @@ import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "./SessionBand";
 import { useSessionList, useSessionTotals, type SessionFilters, type SessionRow } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
-import { RelatedSlider } from "@/features/search/RelatedSlider";
+import { SimilaritySlider } from "@/features/search/SimilaritySlider";
+import { summaryScale } from "@/features/search/api";
+import { SegmentedControl } from "@/components/ui";
 import { useRelatedSummary } from "@/features/search/api";
-import { fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
+import { closenessLabel, fixed2, parseSimilarity, similarityParam, similarityScale } from "@/features/search/similarity";
 
 /* URL <-> filter state. The URL is the source of truth so a filtered view can
    be bookmarked, shared between devices and survives a reload. */
@@ -67,6 +69,7 @@ function writeFilters(state: FilterState): URLSearchParams {
 
 export default function SessionsPage() {
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
   const applied = useMemo(() => readFilters(params), [params]);
   const [draft, setDraft] = useState<FilterState>(applied);
   const [searchText, setSearchText] = useState(applied.search);
@@ -132,6 +135,24 @@ export default function SessionsPage() {
     contexts: contexts.data ?? [],
   });
 
+  const preset = ["This week", "Last week", "30 days"].find((label) => {
+    const range = sessionRange(label);
+    return applied.start_date === range.start_date && applied.end_date === range.end_date;
+  }) ?? (applied.start_date || applied.end_date ? "Custom" : "All");
+  const filtered = !!(pills.length || applied.search || contextIdsParam);
+  const rowIds = all.map((session) => session.id).join(",");
+  useEffect(() => {
+    if (!location.hash.startsWith("#session-")) return;
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: "center" });
+  }, [location.hash, rowIds]);
+  const clearPill = (label: string) => {
+    const reset = readFilters(new URLSearchParams());
+    const fields: Record<string, (keyof FilterState)[]> = { From: ["start_date"], To: ["end_date"], Context: ["context"], Note: ["note_snippet"], Tags: ["tags"], Only: ["projects"], Excluding: ["projects"] };
+    const next = { ...applied };
+    for (const key of fields[label] ?? []) Object.assign(next, { [key]: reset[key] });
+    setParams(writeFilters(next));
+  };
+
   const apply = (state: FilterState) => {
     setParams(writeFilters(state));
     setSheetOpen(false);
@@ -159,47 +180,25 @@ export default function SessionsPage() {
             onChange={(event) => setSearchText(event.target.value)}
           />
           {searchText ? <button className="search-clear btn btn--quiet" type="button" aria-label="Clear search" onClick={() => { setSearchText(""); setParams(writeFilters({ ...applied, search: "" })); }}>Clear</button> : null}
-          <button
-            className="filter-launcher"
-            type="button"
-            aria-haspopup="dialog"
-            onClick={() => {
-              setDraft(applied);
-              setSheetOpen(true);
-            }}
-          >
-            <Icon icon={faSlidersH} /> Filters
-            {pills.length ? <span className="filter-count">{pills.length}</span> : null}
-          </button>
         </div>
+        <SegmentedControl label="Session dates" value={preset} options={["All", "This week", "Last week", "30 days", ...(preset === "Custom" ? ["Custom"] : [])].map((label) => ({ value: label, label }))} onChange={(value) => {
+          if (value === "Custom") { setDraft(applied); setSheetOpen(true); }
+          else apply({ ...applied, ...(value === "All" ? { start_date: "", end_date: "" } : sessionRange(value)) });
+        }} />
+        <button className="filter-launcher" aria-label={`Filters${pills.length ? `, ${pills.length} active` : ""}`} type="button" aria-haspopup="dialog" onClick={() => { setDraft(applied); setSheetOpen(true); }}><Icon icon={faSlidersH} /><span>Filters</span>{pills.length ? <span className="filter-count">{pills.length}</span> : null}</button>
+        {filtered ? <p className="filter-summary">
 
-        <div className="journal-presets range-tabs" aria-label="Date presets">
-          {["This week", "Last week", "30 days"].map((label) => {
-            const range = sessionRange(label);
-            return <button key={label} type="button" className={`range-tab${applied.start_date === range.start_date && applied.end_date === range.end_date ? " is-active" : ""}`} aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
-          })}
-        </div>
-        <p className="filter-summary">
           <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
           {totals.data ? <strong className="journal-filter-total">{formatDuration(totals.data.total_minutes)}</strong> : null}
-        </p>
+        </p> : null}
         <div className="journal-filter-chips">
           {pills.map((pill) => (
-            <span key={pill.label} className="filter-pill">
-              {pill.label} <b>{pill.value}</b>
+            <span key={pill.label} className={pill.value.length > 85 ? "filter-selection-summary" : "filter-pill"}>
+              <span title={`${pill.label}: ${pill.value}`}><span>{pill.label}</span> <b>{pill.value}</b></span>
+              <button className="btn btn--quiet" type="button" aria-label={`Clear ${pill.label} filter`} onClick={() => clearPill(pill.label)}>×</button>
             </span>
           ))}
-          {pills.length ? (
-            <button
-              className="btn btn--quiet"
-              type="button"
-              onClick={() => {
-                setParams(writeFilters({ ...readFilters(new URLSearchParams()), search: applied.search }));
-              }}
-            >
-              Clear filters
-            </button>
-          ) : null}
+          {pills.length ? <span className="filter-pill filter-clear-all"><button className="btn btn--quiet" type="button" onClick={() => setParams(writeFilters({ ...readFilters(new URLSearchParams()), search: applied.search }))}>Clear filters</button></span> : null}
         </div>
       </form> : null}
 
@@ -286,7 +285,7 @@ export default function SessionsPage() {
             <div className="day-group" key={group.date}>
               <header className="day-head">
                 <span className="day-date">{formatDayDate(group.date)}</span>
-                <span className="day-total">{formatDuration(group.totalMinutes)}</span>
+                {group.sessions.length > 1 ? <span className="day-total">{formatDuration(group.totalMinutes)}</span> : null}
               </header>
               <ul className="band-list">
                 {group.sessions.map((session) => (
@@ -317,7 +316,15 @@ export default function SessionsPage() {
             ) : null}
           </header>
           {relatedSummary ? (
-            <RelatedSlider summary={relatedSummary} loading={list.isFetching && !list.isFetchingNextPage} />
+            <details className="journal-related-controls">
+              <summary>{closenessLabel(relatedSummary.similarity)} · {relatedSummary.count} related</summary>
+              <p className="muted">These sessions match the meaning of your search. Open a note to read it in full.</p>
+              <SimilaritySlider value={relatedSummary.similarity} defaultValue={relatedSummary.default} scale={summaryScale(relatedSummary)} counts={relatedSummary.counts} best={relatedSummary.best} loading={list.isFetching && !list.isFetchingNextPage} onCommit={(value) => {
+                const next = new URLSearchParams(params); const param = similarityParam(value, relatedSummary.default);
+                if (param === null) next.delete("similarity"); else next.set("similarity", param);
+                setParams(next);
+              }} />
+            </details>
           ) : null}
           {related.length ? (
             <ul className="band-list">

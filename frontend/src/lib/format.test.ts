@@ -14,7 +14,7 @@ import {
 describe("formatDuration uses the shared compact saved-duration contract", () => {
   it.each([
     [0, "0m"],
-    [0.5, "0m"],
+    [0.5, "<1m"],
     [45.5, "45m"],
     [125, "2h 5m"],
     [60 * 24 + 61, "25h 1m"],

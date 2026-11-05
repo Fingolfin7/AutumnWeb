@@ -6433,6 +6433,9 @@ components:
           - $ref: '#/components/schemas/Celebration'
           nullable: true
           readOnly: true
+        match_passage:
+          type: string
+          description: The closest fresh note passage for a related match, when available.
         match:
           allOf:
           - $ref: '#/components/schemas/MatchEnum'

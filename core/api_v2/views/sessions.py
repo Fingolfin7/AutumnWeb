@@ -41,6 +41,10 @@ class SessionsView(V2APIView):
         else:
             total = search.total
             rows = search.page(offset, limit)
+        passages = {}
+        if include_note or include_note_html:
+            from core.services.semantic_search import matching_passages
+            passages = matching_passages(request.user, [session for session, match in rows if match == RELATED], related_outcome(request).query_embedding)
         sessions = []
         for session, match in rows:
             row = _serialize(
@@ -50,6 +54,8 @@ class SessionsView(V2APIView):
             )
             if spec.search is not None:
                 row["match"] = match
+                if session.pk in passages:
+                    row["match_passage"] = passages[session.pk]
             sessions.append(row)
         return Response({"count": len(sessions), "total": total, "sessions": sessions})
 

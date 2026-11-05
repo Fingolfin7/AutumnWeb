@@ -106,6 +106,7 @@ export function NoteEditor({
   const [edited, setEdited] = useState(false);
   const [focused, setFocused] = useState(false);
   const [writing, setWriting] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const baseline = useRef(value);
   const selection = useRef({ start: 0, end: 0 });
@@ -152,11 +153,15 @@ export function NoteEditor({
     onChange(next);
   };
   const closeWriter = async () => {
-    if (onDone && await onDone() === false) return;
-    if (!onDone) onBlur?.();
-    const node = textareaRef.current;
-    if (node) selection.current = { start: node.selectionStart, end: node.selectionEnd };
-    setWriting(false);
+    if (finishing) return;
+    setFinishing(true);
+    try {
+      if (onDone && await onDone() === false) return;
+      if (!onDone) onBlur?.();
+      const node = textareaRef.current;
+      if (node) selection.current = { start: node.selectionStart, end: node.selectionEnd };
+      setWriting(false);
+    } finally { setFinishing(false); }
   };
   const supported = dictationSupported();
   const [status, setStatus] = useState(supported ? "" : "Dictation unavailable in this browser.");
@@ -240,7 +245,7 @@ export function NoteEditor({
 
   const field = (
     <div className={`field note-editor-field${writing ? " is-writing" : ""}${focused ? " is-focused" : ""}`} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget) && !(event.relatedTarget instanceof Element && event.relatedTarget.closest("button, a, summary"))) setFocused(false); }}>
-      {writing ? <header className="note-writer-heading"><div><h2>{sessionTitle?.split(" · ")[0] || "Session note"}</h2><small>{sessionTitle?.includes(" · ") ? `${sessionTitle.split(" · ").slice(1).join(" · ")} · ` : ""}{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><button className="btn btn--secondary" type="button" onClick={closeWriter}>Done</button></header> : null}
+      {writing ? <header className="note-writer-heading"><div><h2>{sessionTitle?.split(" · ")[0] || "Session note"}</h2><small>{sessionTitle?.includes(" · ") ? `${sessionTitle.split(" · ").slice(1).join(" · ")} · ` : ""}{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><button className="btn btn--secondary" type="button" aria-label="Done" disabled={finishing} onClick={() => void closeWriter()}><span className="note-writer-back" aria-hidden="true">&lsaquo;</span>{finishing ? "Saving..." : "Done"}</button></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
         <div className="note-editor-toolbar" role="toolbar" aria-label="Note formatting">
@@ -292,8 +297,9 @@ export function NoteEditor({
         />
       </div>
       <div className="note-editor-status">
-        <small role="status">{saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
+        <small role="status">{writing && saveStatus === "Saved" ? "Saved to session" : writing && (saveStatus?.startsWith("Unsaved changes") || (!saveStatus && persistKey)) ? "Draft kept on this device" : saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
         {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
+      {writing ? <small className="writer-done-help">{onDone ? "Done saves to this session." : "Done keeps your note in the session form."}</small> : null}
       <small data-note-status="" aria-live="polite">{status}</small>
       </div>
       {errors.length ? (

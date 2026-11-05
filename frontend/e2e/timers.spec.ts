@@ -44,6 +44,7 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   await writer.getByRole("button", { name: "Done" }).click();
   await expect(runningCard.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
   const stoppedId = await runningCard.getAttribute("data-timer-id");
+  await expect.poll(async () => (await (await page.request.get(`/api/v2/sessions/${stoppedId}?include=note`)).json()).note).toBe(note);
   await runningCard.getByRole("link", { name: "Stop" }).click();
   await expect(page).toHaveURL(/\/stop_timer\/\d+\/$/);
   await expect(page.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(note);

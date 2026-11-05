@@ -725,6 +725,30 @@ def session_scores(user, sessions, query_vector, *, cutoff, passages=True):
     return scores
 
 
+def matching_passages(user, sessions, vector):
+    """Closest fresh passage for the returned page only; never embeds or writes."""
+    if vector is None or not sessions:
+        return {}
+    sources = session_sources(Sessions.objects.filter(user=user, pk__in=[s.pk for s in sessions]), note_chars=MAX_PASSAGE_NOTE_CHARS)
+    best = {}
+    rows = SessionPassageEmbedding.objects.filter(session__user=user, session_id__in=sources, model=MODEL)
+    # A page is bounded, but a journal may be very long: keep vector batches bounded too.
+    for chunk in _chunks(list(rows.order_by("pk").values_list("pk", flat=True)), SCORE_BATCH_ROWS):
+        kept, matrix = _stack(rows.filter(pk__in=chunk).order_by("pk").values_list("position", "session_id", "text_digest", "vector"))
+        if matrix is None:
+            continue
+        with _numpy().errstate(all="ignore"):
+            scores = matrix @ vector
+        for (position, pk, digest), score in zip(kept, scores):
+            project, names, note = sources[pk]
+            if not math.isfinite(float(score)) or digest != passage_digest(project, names, note):
+                continue
+            passages = split_passages(note)
+            if position < len(passages) and (pk not in best or score > best[pk][0]):
+                best[pk] = (float(score), passages[position])
+    return {pk: passage for pk, (_, passage) in best.items()}
+
+
 def fresh_project_ids(user, ids, digests):
     """Those of ``ids`` whose vector still matches the project's current text."""
     texts = project_texts(Projects.objects.filter(pk__in=ids, user=user))
@@ -773,6 +797,8 @@ class RelatedOutcome:
     # slider can show how many a looser or stricter cutoff would give.
     collect_scores: bool = False
     scores: list = field(default_factory=list)
+    # Request-local only; excerpts reuse the query already embedded for ranking.
+    query_embedding: object = field(default=None, repr=False)
 
     @property
     def unavailable(self):
@@ -824,6 +850,7 @@ def related_session_ids(
     if outcome is not None:
         outcome.included = True
         outcome.cutoff = cutoff
+        outcome.query_embedding = vector
     floor = _scoring_floor(cutoff, outcome)
     scores = session_scores(user, sessions, vector, cutoff=floor)
     ranked = sorted(scores, key=lambda pk: (-scores[pk], pk))
