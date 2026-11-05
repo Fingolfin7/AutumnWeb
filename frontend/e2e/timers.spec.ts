@@ -79,6 +79,20 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   expect(problems()).toEqual([]);
 });
 
+test("capture opens over the current page and Back closes it", async ({ page }) => {
+  await page.goto("/sessions/?search=Piano");
+  const list = page.getByRole("region", { name: "Sessions" });
+  await expect(list).toBeVisible();
+  await page.getByRole("link", { name: "New timer", exact: true }).filter({ visible: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Capture time" });
+  await expect(sheet.getByRole("combobox", { name: "Project", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/sessions\/\?search=Piano$/);
+  await expect(list).toBeAttached();
+  await page.goBack();
+  await expect(sheet).toHaveCount(0);
+  await expect(list).toBeVisible();
+});
+
 test.describe("offline", () => {
   test.use({ serviceWorkers: "allow" });
 
