@@ -9,7 +9,7 @@ import { NoteEditor } from "@/components/NoteEditor";
 import { api, unwrap } from "@/api/client";
 import { AppLink, urls } from "@/app/links";
 import { dayPortions } from "@/lib/sessions";
-import { formatDate, formatDuration, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
+import { formatDate, formatDuration, localDateKey, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
@@ -99,7 +99,7 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
         {session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}
         {showDate && !hideProject ? <span>{formatShortDate(session.end)}</span> : null}
         <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
-        {dayPortions(session).length > 1 ? <span className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === day ? "this day" : formatShortDate(part.date)}`).join(" · ")}</span> : null}
+        {dayPortions(session).length > 1 ? <span className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === localDateKey(new Date()) ? "today" : part.date === localDateKey(new Date(Date.now() - 86400000)) ? "yesterday" : formatShortDate(part.date)}`).join(" · ")}</span> : null}
         {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
       </div>
       {!session.note && !session.note_html && !editing ? <button className="btn btn--quiet journal-add-note" type="button" onClick={editNote}>Add a note</button> : null}

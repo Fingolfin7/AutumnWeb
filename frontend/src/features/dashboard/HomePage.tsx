@@ -91,8 +91,9 @@ function HomeContent({ data }: { data: Dashboard }) {
                 <span>
                   <span className="text-green">{amount(progress.actual)}</span> of {amount(progress.target)}{" "}
                   <span className="muted">{progress.period}</span>
+                  <small className="today-commitment-status">{progress.actual > progress.target ? `${amount(progress.actual - progress.target)} over` : progress.actual === progress.target ? "Target met" : `${amount(progress.target - progress.actual)} left`}</small>
                 </span>
-              </AppLink><details className="today-history"><summary>Banking & details</summary><CommitmentsPanel items={data.commitments.filter((item) => item.commitment.id === commitment.id)} /></details></div>
+              </AppLink><progress className="subproject-progress commitment-progress" max={Math.max(progress.target, progress.actual, 1)} value={progress.actual} aria-label={`${commitment.target.name} commitment progress`} /><details className="today-history"><summary>Banking & details</summary><CommitmentsPanel items={data.commitments.filter((item) => item.commitment.id === commitment.id)} /></details></div>
             );
           })}
 

@@ -4563,3 +4563,12 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .ember-clock.is-compact .focus-stop { min-width: 84px; min-height: 44px; }
   .ember-clock.is-compact .focus-time .num { font-size: 2rem; }
 }
+
+.today-commitment-status { display: block; color: var(--muted); font-size: var(--fs-sm); }
+.today-commitment .commitment-progress { margin: 0 0 var(--s2); }
+@media (max-width: 999px) {
+  .note-editor-field.is-focused .note-editor-shell { display: flex; flex-direction: column; }
+  .note-editor-field.is-focused .note-editor-toolbar { order: 2; flex: none; }
+  .note-editor-field.is-focused textarea { order: 1; }
+  .note-editor-field.is-writing .note-editor-toolbar { order: 2; bottom: 0; }
+}
