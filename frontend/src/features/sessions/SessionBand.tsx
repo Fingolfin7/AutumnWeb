@@ -206,15 +206,17 @@ function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; o
     toast.success("Note saved.");
     return true;
   };
+  /* A phone edits in the full-screen writer, whose Done saves and closes. */
+  const [phone] = useState(() => window.matchMedia("(max-width: 999px)").matches);
   return <form className="journal-note-edit fields" onSubmit={(event) => {
     event.preventDefault();
     void complete();
   }}>
-    <NoteEditor initiallyWriting={window.matchMedia("(max-width: 999px)").matches} sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} onDone={window.matchMedia("(max-width: 999px)").matches ? complete : draft.flush} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
-    <div className="journal-edit-actions">
+    <NoteEditor initiallyWriting={phone} sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} onDone={phone ? complete : draft.flush} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
+    {!phone ? <div className="journal-edit-actions">
       <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
       {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}
       <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
-    </div>
+    </div> : null}
   </form>;
 }
