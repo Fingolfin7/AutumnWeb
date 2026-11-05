@@ -1,23 +1,17 @@
-import { NoteEditor } from "@/components/NoteEditor";
-import { clearNoteDraft } from "@/lib/noteDraft";
-import { CapturePicker } from "@/features/timers/CapturePicker";
+import { CaptureForm } from "@/features/timers/CaptureForm";
 import { useNavigate } from "react-router";
 import { useRef, useState } from "react";
-import { faPlay } from "@fortawesome/free-solid-svg-icons";
 import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
-import { Icon } from "@/components/Icon";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
-import { useToast } from "@/app/toasts";
 import { useActiveContext } from "@/app/context";
-import { errorMessage } from "@/api/errors";
-import { useAllProjects, useSubprojects } from "@/api/meta";
-import type { Project, Timer } from "@/api/types";
+import { useAllProjects } from "@/api/meta";
+import type { Timer } from "@/api/types";
 import { elapsedSeconds, formatClock, formatDayDate, formatDuration, localDateKey } from "@/lib/format";
 import { FocusCard } from "@/features/timers/FocusCard";
 import { TimerNoteEditor } from "@/features/timers/TimerNoteEditor";
 import { TimerReminders } from "@/features/timers/TimerReminders";
-import { useNow, useOutsideContextTimerCount, useStartTimer, useTimers } from "@/features/timers/api";
+import { useNow, useOutsideContextTimerCount, useTimers } from "@/features/timers/api";
 import { Suggestions } from "@/features/timers/Suggestions";
 import { SessionBand } from "@/features/sessions/SessionBand";
 import { CommitmentsPanel } from "./CommitmentsPanel";
@@ -69,7 +63,7 @@ function HomeContent({ data }: { data: Dashboard }) {
           ))}
         </section>
       ) : (
-        <StartCard quickStarts={data.quick_starts} />
+        <StartCard />
       )}
       {outside ? (
         <p className="muted timers-outside-context">
@@ -186,31 +180,6 @@ function CompactTimer({ timer, now, onExpand }: { timer: Timer; now: number; onE
   </article>;
 }
 
-function StartCard({ quickStarts }: { quickStarts: Dashboard["quick_starts"] }) {
-  const start = useStartTimer();
-  const toast = useToast();
-  const [project, setProject] = useState<Project | null>(null);
-  const [selected, setSelected] = useState<number[]>([]);
-  const [note, setNote] = useState("");
-  const subs = useSubprojects(project?.id);
-  const quick = [...new Map(quickStarts.map((item) => [`${item.project.id}:${item.subprojects.map((s) => s.id).sort().join(",")}`, item])).values()].slice(0, 4);
-  const begin = (chosen: { id: number; name: string }, subprojects: { id: number; name: string }[], text = "") => start.mutate({
-    project_id: chosen.id, subproject_ids: subprojects.map((sub) => sub.id), note: text,
-    optimistic: { projectName: chosen.name, subprojects },
-  }, { onSuccess: () => { clearNoteDraft("capture", text); toast.success(`Started ${chosen.name}.`); }, onError: (error) => toast.error(errorMessage(error)) });
-  return <section className="today-idle" aria-label="Start a new timer">
-    <form className="today-start-form" onSubmit={(event) => { event.preventDefault(); if (project) begin(project, (subs.data ?? []).filter((sub) => selected.includes(sub.id)), note); }}>
-      <label className="today-start-prompt" htmlFor="today-project-search">What are you working on?</label>
-      <CapturePicker id="today-project-search" autoFocus={false} placeholder="Find a project" value={project} recent={quickStarts} onChange={(next, ids) => { setProject(next); setSelected(ids); }} />
-      {project ? <div className="today-start-details fields">
-        {subs.data?.length ? <fieldset className="today-start-subs"><legend>Subproject (optional)</legend>{subs.data.map((sub) => <label className="check-row" key={sub.id}><input type="checkbox" checked={selected.includes(sub.id)} onChange={(event) => setSelected((list) => event.target.checked ? [...list, sub.id] : list.filter((id) => id !== sub.id))} />{sub.name}</label>)}</fieldset> : null}
-        <NoteEditor persistKey="capture" value={note} onChange={setNote} rows={3} placeholder="A thought to begin with (optional)" />
-        <div className="today-start-actions"><button className="btn btn--primary" disabled={start.isPending}>Start timer</button><AppLink className="btn btn--quiet" href={`${urls.startTimer()}?project_id=${project.id}${selected.map((id) => `&subproject_id=${id}`).join("")}`}>Auto-stop & reminders</AppLink></div>
-      </div> : null}
-      <AppLink className="btn btn--quiet today-log-past" href="/start_timer/?mode=past">Log past time</AppLink>
-    </form>
-    {!project && quick.length ? <div className="today-quick"><h3>Pick up where you left off</h3>{quick.map((item) => <button key={`${item.project.id}:${item.subprojects.map((s) => s.id).join(",")}`} className="today-quick-pick" type="button" disabled={start.isPending} onClick={() => begin(item.project, item.subprojects)}>
-      <Icon icon={faPlay} /><span><span className="text-red">{item.project.name}</span>{item.subprojects.length ? <small className="text-blue">{item.subprojects.map((s) => s.name).join(", ")}</small> : null}</span><span className="today-quick-verb">Start</span>
-    </button>)}</div> : null}
-  </section>;
+function StartCard() {
+  return <section className="today-idle" aria-label="Start a new timer"><CaptureForm inline /></section>;
 }

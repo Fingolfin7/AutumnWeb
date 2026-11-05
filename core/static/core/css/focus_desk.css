@@ -4409,3 +4409,30 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 
 .import-preview li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(7rem, .45fr); }
 .import-preview > p:has(button) { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3); }
+
+
+/* ========================================================================
+   Stream P ? capture, Today, timers and the journal
+   ======================================================================== */
+.capture-control { min-width: 0; }
+.capture-control [hidden] { display: none; }
+.capture-control .desk-main { display: flex; flex-direction: column; gap: var(--s4); }
+.capture-control .desk-main > .slab { padding: 0; border: 0; box-shadow: none; background: transparent; }
+.capture-picker > input { min-height: 48px; border-radius: var(--r-sm); }
+.capture-control .capture-subprojects { margin: 0; }
+.capture-multiple > summary { min-height: 44px; display: flex; align-items: center; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
+.capture-multiple[open] > summary { margin-bottom: var(--s3); }
+.capture-control .capture-new-sub { margin-top: var(--s3); }
+.capture-control .form-actions { position: sticky; bottom: 0; z-index: 4; margin: 0; padding: var(--s3) 0; background: var(--surface-2); border-top: 1px solid var(--hairline); }
+.capture-control .capture-form { padding-bottom: var(--s4); }
+.capture-control--inline .form-actions { position: static; background: transparent; }
+.capture-control--inline .desk-head { display: none; }
+.capture-control--inline #search-projects > label { font: 550 clamp(1.4rem, 2.8vw, 2rem)/1.35 var(--font-display); color: var(--ink); margin-bottom: var(--s4); }
+.capture-awaiting-project > :is(.note-editor-field, .capture-options, .form-actions) { display: none; }
+.capture-control .preset-row .is-active { background: var(--raised-2); box-shadow: inset 0 0 0 1px var(--brand); color: var(--ink); }
+.capture-control .today-quick { display: flex; flex-direction: column; gap: 0; max-width: none; margin-top: var(--s4); }
+.capture-control .today-quick-pick { display: flex; width: 100%; gap: var(--s3); text-align: left; padding: var(--s3) var(--s2); border-bottom: 1px solid var(--hairline); }
+.capture-control .today-quick-pick > span:first-child { color: var(--brand); font-size: var(--fs-lg); }
+.capture-control .today-quick-pick small { display: block; margin-top: var(--s1); }
+.capture-control .today-log-past { margin-top: var(--s4); }
+@media (min-width: 1000px) { .capture-control--inline { max-width: 46rem; } }

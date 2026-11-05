@@ -10,6 +10,7 @@ type Pick = { project: Project; subprojectIds: number[]; label: string; sublabel
 export function CapturePicker({
   value,
   onChange,
+  onStart,
   recent,
   id = "project-search",
   autoFocus = true,
@@ -17,6 +18,7 @@ export function CapturePicker({
 }: {
   value: Project | null;
   onChange: (project: Project | null, subprojectIds: number[]) => void;
+  onStart?: (project: Project, subprojectIds: number[]) => void;
   recent: Dashboard["quick_starts"];
   id?: string;
   autoFocus?: boolean;
@@ -93,7 +95,9 @@ export function CapturePicker({
             setActive((index) => Math.max(0, Math.min(picks.length - 1, index + (event.key === "ArrowDown" ? 1 : -1))));
           } else if (event.key === "Enter" && open && picks[active]) {
             event.preventDefault();
-            choose(picks[active]!);
+            const pick = picks[active]!;
+            choose(pick);
+            onStart?.(pick.project, pick.subprojectIds);
           } else if (event.key === "Escape" && open) {
             event.preventDefault();
             event.stopPropagation();
