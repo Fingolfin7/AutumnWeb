@@ -160,6 +160,7 @@ function InlineNoteWriter({ session, onDone }: { session: SessionRow; onDone: ()
     <div className="journal-edit-actions">
       <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
       <button className="btn btn--quiet" type="button" onClick={() => { void draft.flush().then((ok) => { if (ok) onDone(); }); }}>Close editor</button>
+      {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}
       <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
     </div>
   </form>;

@@ -89,7 +89,8 @@ export function useNoteDraft({ draftKey, text, version, save, enabled = true, re
   const change = (next: string) => {
     latest.current = next;
     setValue(next);
-    writeNoteDraft(draftKey, { text: next, version: match.current });
+    if (next === baseline.current && !pending.current) clearNoteDraft(draftKey);
+    else writeNoteDraft(draftKey, { text: next, version: match.current });
     report(next === baseline.current ? "Saved" : "Unsaved changes · kept on this device");
     clearTimeout(timer.current);
     timer.current = setTimeout(() => void flushRef.current(), 1200);
