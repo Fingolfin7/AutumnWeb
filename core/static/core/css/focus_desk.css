@@ -4124,12 +4124,13 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-editor-status [data-note-status] { margin-left: auto; }
 .note-writer-dialog { inset: 0; margin: 0; padding: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; border: 0; color: var(--ink); background: var(--surface-0); overflow-y: auto; }
 .note-writer-dialog::backdrop { background: var(--surface-0); }
-.note-editor-field.is-writing { min-height: 100%; max-width: 76ch; margin-inline: auto; padding: var(--s5); }
+.note-editor-field.is-writing { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; max-width: 76ch; margin-inline: auto; padding: var(--s5); }
 .note-writer-heading { position: sticky; top: 0; z-index: 1; display: flex; gap: var(--s3); align-items: center; justify-content: space-between; padding-block: var(--s3); background: var(--surface-0); }
 .note-writer-heading h2 { margin: 0; font: 600 var(--fs-lg)/1.4 var(--font-display); }
 .is-writing > label { display: none; }
-.is-writing .note-editor-toolbar { position: sticky; top: 0; }
-.is-writing .note-editor-shell textarea { min-height: 65dvh; }
+.is-writing .note-editor-shell { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.is-writing .note-editor-toolbar { position: static; flex-shrink: 0; }
+.is-writing .note-editor-shell textarea { flex: 1; min-height: 0; height: 100% !important; overflow-y: auto; resize: none; }
 .session-edit-form > .slab { width: 100%; }
 .session-edit-form { max-width: 78ch; margin-inline: auto; }
 .session-edit-form .note-editor-field { margin-top: var(--s5); }
@@ -4148,6 +4149,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-reading-identity > * { overflow-wrap: anywhere; }
 .journal-entry { scroll-margin-top: 84px; }
 .session-list { overflow: visible; }
+.slab:has(.note-reading-head) { overflow: visible; }
 .journal-entry-date { color: var(--time); }
 @media (max-width: 999px) {
   .note-reading-head { top: 56px; }
