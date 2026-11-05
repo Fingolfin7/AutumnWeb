@@ -4164,7 +4164,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .today-page { max-width: 1240px; margin-inline: auto; gap: var(--s6); }
 .ember-deck { display: flex; flex-direction: column; gap: var(--s3); }
 .ember-clock { isolation: isolate; border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: var(--r-xl); background: linear-gradient(120deg, #2a1b149c, transparent 60%), var(--surface-1); box-shadow: var(--edge), 0 20px 65px #00000024; overflow: visible; }
-.ember-clock::before { pointer-events: none; z-index: -1; inset: 0; border-radius: inherit; background: radial-gradient(ellipse at 12% 74%, #ec883d80, #c95c2720 45%, transparent 75%); opacity: .18; transform: none; animation: none; transition: opacity 90s linear; }
+.ember-clock::before { pointer-events: none; z-index: -1; inset: 0; width: auto; height: auto; border-radius: inherit; background: radial-gradient(ellipse at 12% 74%, #ec883d80, #c95c2720 45%, transparent 75%); opacity: .18; transform: none; animation: none; transition: opacity 90s linear; }
 .ember-clock[data-ember-step="1"]::before { opacity: .30; }
 .ember-clock[data-ember-step="2"]::before { opacity: .42; }
 .ember-clock[data-ember-step="3"]::before { opacity: .54; }

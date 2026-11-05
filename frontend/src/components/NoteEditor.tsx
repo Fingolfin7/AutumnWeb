@@ -118,6 +118,10 @@ export function NoteEditor({
     if (!writing) return;
     const node = dialog.current;
     node?.showModal();
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     textareaRef.current?.focus();
@@ -268,7 +272,7 @@ export function NoteEditor({
       <div className="note-editor-status">
         <small role="status">{saveStatus ?? (value === baseline.current ? "Saved" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
         {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
-        <small data-note-status="" aria-live="polite">{status}</small>
+      <small data-note-status="" aria-live="polite">{status}</small>
       </div>
       {errors.length ? (
         <ul className="errorlist">

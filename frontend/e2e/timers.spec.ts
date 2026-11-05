@@ -37,6 +37,11 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   await page.goto("/timers/");
   const runningCard = page.getByRole("article", { name: "Running timer: Garden Planner App" });
   await runningCard.getByRole("textbox", { name: "Session note" }).fill(note);
+  await runningCard.getByRole("button", { name: "Expand note" }).click();
+  const writer = page.getByRole("dialog", { name: "Full-screen note writer" });
+  await expect(writer.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
+  await writer.getByRole("button", { name: "Return to session" }).click();
+  await expect(runningCard.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
   const stoppedId = await runningCard.getAttribute("data-timer-id");
   await runningCard.getByRole("link", { name: "Stop" }).click();
   await expect(page).toHaveURL(/\/stop_timer\/\d+\/$/);
@@ -100,6 +105,10 @@ test.describe("offline", () => {
     await expect(toasts(page).getByText(/Synced 1 offline change/)).toBeVisible({ timeout: 30_000 });
     await expect(card.getByText("Running · saved offline")).toHaveCount(0);
     await expect(card.getByText("Running", { exact: true })).toBeVisible();
+    await expect(card.getByRole("textbox", { name: "Session note" })).toHaveValue("A journal started offline.");
+    const id = await card.getAttribute("data-timer-id");
+    await expect.poll(async () => (await (await page.request.get(`/api/v2/sessions/${id}?include=note`)).json()).note).toBe("A journal started offline.");
+    await page.reload();
     await expect(card.getByRole("textbox", { name: "Session note" })).toHaveValue("A journal started offline.");
   });
 
