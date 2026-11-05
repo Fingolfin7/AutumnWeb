@@ -4934,9 +4934,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .session-list .day-head { align-items: baseline; }
 .note-reading-slot::before { content: ""; position: absolute; z-index: -1; inset: -16px -20px auto; height: 70px; background: var(--surface-0); }
 .note-reading-slot .note-reading-head { box-shadow: 0 -12px 0 var(--surface-0); }
-.journal-entry:target { animation: journal-found 3s ease-out; scroll-margin-top: 100px; }
+:is(.journal-entry:target, .journal-entry.is-highlighted) { animation: journal-found 3s ease-out; scroll-margin-top: 100px; }
 @keyframes journal-found { 0%, 30% { background: color-mix(in srgb, var(--brand) 16%, var(--surface-0)); } 100% { background: transparent; } }
-@media (prefers-reduced-motion: reduce) { .journal-entry:target { animation: none; outline: 1px solid var(--brand); } }
+@media (prefers-reduced-motion: reduce) { :is(.journal-entry:target, .journal-entry.is-highlighted) { animation: none; outline: 1px solid var(--brand); } }
 .journal-search { display: grid; grid-template-columns: minmax(160px, 1fr) auto auto; align-items: center; gap: var(--s3); }
 .journal-search .filter-launcher { position: static; display: inline-flex; align-items: center; gap: var(--s2); min-height: 44px; width: auto; font-size: var(--fs-sm); padding-inline: var(--s3); }
 .journal-search .filter-count { position: static; display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; border-radius: var(--r-pill); margin: 0; font-size: var(--fs-xs); }

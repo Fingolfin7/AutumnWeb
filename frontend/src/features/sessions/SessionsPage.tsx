@@ -143,7 +143,13 @@ export default function SessionsPage() {
   const rowIds = all.map((session) => session.id).join(",");
   useEffect(() => {
     if (!location.hash.startsWith("#session-")) return;
-    document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: "center" });
+    const row = document.getElementById(location.hash.slice(1));
+    if (!row) return;
+    row.scrollIntoView({ block: "center" });
+    // Router history updates do not run the browser's :target algorithm.
+    row.classList.add("is-highlighted");
+    const timer = window.setTimeout(() => row.classList.remove("is-highlighted"), 3000);
+    return () => { window.clearTimeout(timer); row.classList.remove("is-highlighted"); };
   }, [location.hash, rowIds]);
   const clearPill = (label: string) => {
     const reset = readFilters(new URLSearchParams());
