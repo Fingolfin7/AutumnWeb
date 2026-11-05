@@ -127,6 +127,8 @@ function ProfileEditor({
   const [keyDrafts, setKeyDrafts] = useState(EMPTY_KEYS);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+  const [retryVersion, setRetryVersion] = useState(0);
 
   const patchPrefsDraft = (patch: Partial<PrefsDraft>) => setPrefsD((current) => ({ ...current, ...patch }));
   const zones = useMemo(timeZoneNames, []);
@@ -173,11 +175,13 @@ function ProfileEditor({
 
     const invalid = Object.fromEntries(Object.entries(validatePrefs(prefsD)).filter(([key]) => PREF_SCOPE[scope].includes(key)));
     if (Object.keys(invalid).length) {
+      setSaveFailed(true);
       setErrors(Object.fromEntries(Object.entries(invalid).map(([field, message]) => [field, [message]])));
       toast.error("Please fix the highlighted fields.");
       return;
     }
 
+    setSaveFailed(false);
     setSaving(true);
     const found: Record<string, string[]> = {};
     const general: string[] = [];
@@ -208,7 +212,7 @@ function ProfileEditor({
       const result = await attempt("avatar_image", () => uploadAvatar(avatarFile));
       if (result) {
         applyAvatar(result.url ?? "");
-        setAvatarFile(null);
+        setAvatarFile(current => current === avatarFile ? null : current);
       }
     }
 
@@ -231,7 +235,7 @@ function ProfileEditor({
     if (scope === "appearance" && !prefsD.automatic) {
       if (backgroundFile) {
         const result = await attempt("background_image", () => uploadBackground(backgroundFile));
-        if (result) setBackgroundFile(null);
+        if (result) setBackgroundFile(current => current === backgroundFile ? null : current);
         else prefsOk = false;
       } else if (removeBg && prefs.background.mode === "upload") {
         const result = await attempt(null, () => removeBackground());
@@ -254,7 +258,7 @@ function ProfileEditor({
         if (result)
           setKeyDrafts((current) => ({
             ...current,
-            [item.provider]: { value: "", clear: false },
+            [item.provider]: current[item.provider].value === keyDrafts[item.provider].value && current[item.provider].clear === keyDrafts[item.provider].clear ? { value: "", clear: false } : current[item.provider],
           }));
       }
     }
@@ -287,6 +291,7 @@ function ProfileEditor({
     setErrors(found);
     setSaving(false);
     if (Object.keys(found).length || general.length || !accountOk) {
+      setSaveFailed(true);
       toast.error(general[0] ?? "Some changes could not be saved. Check the highlighted fields.");
     } else if (didSomething && !automatic) {
       toast.success({ account: "Account saved.", appearance: "Appearance saved.", defaults: "Reporting defaults saved.", ai: "AI connections saved." }[scope]);
@@ -303,14 +308,14 @@ function ProfileEditor({
   const fingerprint = JSON.stringify([accountD, prefsD, avatarFile?.name, avatarFile?.lastModified, backgroundFile?.name, backgroundFile?.lastModified, removeBg]);
   const pendingScope = (["account", "appearance", "defaults"] as const).find(dirty);
   useEffect(() => {
-    if (section !== "account" || saving || !pendingScope || lastAttempt.current === fingerprint) return;
+    if (section !== "account" || saving || !pendingScope || lastAttempt.current === `${pendingScope}:${fingerprint}`) return;
     const timer = window.setTimeout(() => {
-      lastAttempt.current = fingerprint;
+      lastAttempt.current = `${pendingScope}:${fingerprint}`;
       setDidSave(true);
       void onSubmit(undefined, pendingScope, true);
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [section, saving, fingerprint, pendingScope]);
+  }, [section, saving, fingerprint, pendingScope, retryVersion]);
   const Defaults = section === "account" ? "form" : "section";
   const Root = section === "ai" ? "form" : "div";
   const dateRanges = [
@@ -334,11 +339,10 @@ function ProfileEditor({
   return (
     <>
       <Root className="fields profile-page" onSubmit={section === "ai" ? (event: FormEvent) => void onSubmit(event, "ai") : undefined}>
-        {section === "account" ? <div className="settings-autosave" role="status">{saving ? "Saving" : pendingScope ? "Unsaved changes" : didSave ? "Saved" : "Changes save automatically"}{Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); }}>Retry saving</button> : null}</div> : null}
+        {section === "account" ? <div className="settings-autosave" role="status">{saving ? "Saving" : pendingScope ? "Unsaved changes" : didSave ? "Saved" : "Changes save automatically"}{saveFailed || Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); setSaveFailed(false); setRetryVersion(value => value + 1); }}>Retry saving</button> : null}</div> : null}
         {section === "account" ? <>
         <form className="slab slab-pad" onSubmit={(event) => void onSubmit(event, "account")} noValidate>
           <SlabHead title="Account" />
-          {saveButton("account", "Save changes")}
           <div className="profile-account-grid">
             <div className="profile-avatar-panel">
               <img
@@ -466,7 +470,6 @@ function ProfileEditor({
         <SocialSection social={social} />
 
         <form className="profile-appearance" onSubmit={(event) => void onSubmit(event, "appearance")} noValidate>
-        {saveButton("appearance", "Save appearance")}
         <BackgroundSection
           prefs={prefs}
           draft={prefsD}
@@ -483,7 +486,6 @@ function ProfileEditor({
 
         {section === "account" || (prefs.ai_features_enabled && prefs.configured_api_keys.openai) ? <Defaults className="slab slab-pad" onSubmit={section === "account" ? (event: FormEvent) => { event.stopPropagation(); void onSubmit(event, "defaults"); } : undefined}>
           <SlabHead title={section === "ai" ? "Related search" : "Reporting defaults"} />
-          {section === "account" ? saveButton("defaults", "Save defaults") : null}
           <div className="profile-defaults-grid">
             {section === "account" ? dateRanges.map((range) => {
               const unit = prefsD[range.unitKey];

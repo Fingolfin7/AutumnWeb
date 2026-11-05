@@ -1,3 +1,4 @@
+import { FileDrop } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { faFileImport } from "@fortawesome/free-solid-svg-icons";
 import { AppLink, urls } from "@/app/links";
@@ -193,11 +194,10 @@ export default function ImportPage() {
           {!started ? <section id="import_options" className="slab slab-pad">
             <div className="field">
               <label htmlFor="import-file">JSON file</label>
-              <input
+              <FileDrop
                 id="import-file"
-                type="file"
                 accept=".json,application/json"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                onFile={setFile}
               />
               {fieldErrors("file")}
               <small className="muted">Choose an Autumn JSON export. Nothing changes until you import.</small>

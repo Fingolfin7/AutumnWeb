@@ -114,7 +114,8 @@ export default function ReviewPage() {
 
   if (projects.data?.length === 0) return <div className="review-desk">
     <h1 className="page-title">Review</h1>
-    <section className="review-welcome slab">
+    <section className="review-welcome first-run-empty">
+      <span className="ember-seal" aria-hidden="true" />
       <h2>Your review starts with a session.</h2>
       <div className="review-empty-embers" aria-hidden="true">{Array.from({ length: 84 }, (_, i) => <span key={i} />)}</div>
       <p>Save some time and come back to see where it went, how your weeks compare, and a year of little lights.</p>
@@ -133,7 +134,7 @@ export default function ReviewPage() {
         <div className="review-range"><button className="btn-icon" type="button" aria-label="Previous period" onClick={() => shift(-1)}><Icon icon={faChevronLeft} /></button><h2>{rangeLabel}</h2><button className="btn-icon" type="button" aria-label="Next period" disabled={period.end >= today} onClick={() => shift(1)}><Icon icon={faChevronRight} /></button></div>
         {loading ? <Skeleton lines={2} /> : failed ? <ErrorState error={current.error ?? daily.error} onRetry={() => { void current.refetch(); void daily.refetch(); }} /> : <div className="review-total-row"><div><strong className="review-total">{formatDuration(minutes)}</strong>{rows[0] ? <p className="review-summary">Mostly <span className="text-red">{rows[0].name}</span>.</p> : null}<p className="review-comparison" aria-live="polite">{priorDaily.isError ? "Previous period unavailable" : priorDaily.isPending ? "Comparing periods…" : <><b>{deltaLabel(minutes, before)}</b> {Math.abs(minutes - before) < 0.5 ? "as" : "than"} {comparisonLabel}</>}{partial && completePriorDaily.data ? <small className="review-complete-comparison">Complete previous period: {formatDuration(totalOf(completePriorDaily.data.data as DailyTotalRow[]))}</small> : null}</p></div><AppLink className="btn btn--quiet" href={`${urls.sessions()}?${sessionParams}`}>Browse sessions</AppLink></div>}
 
-        {!loading && !failed ? <PeriodEmbers period={period} rows={(daily.data?.data ?? []) as DailyTotalRow[]} onWeek={setPeriod} /> : null}
+        {!loading && !failed && periodDays(period) <= 31 ? <PeriodEmbers period={period} rows={(daily.data?.data ?? []) as DailyTotalRow[]} onWeek={setPeriod} /> : null}
       </section>
 
       <div className="review-body"><section className={`review-projects slab${applied.project_name ? " review-projects--subprojects" : ""}`} aria-labelledby="review-projects-title"><div className="review-section-heading"><h2 id="review-projects-title">{CHART_QUESTIONS[kind] ?? "Where did the time go?"}</h2><button type="button" className="btn btn--quiet" aria-label="Choose chart" onClick={() => setChooserOpen(true)}>{chartLabel} <Icon icon={faChevronDown} /></button></div>

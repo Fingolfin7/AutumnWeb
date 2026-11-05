@@ -1,14 +1,13 @@
 import { emberColor } from "./data";
 import type { AnyConfig, TT, HistogramRow } from "./payloads";
 
-/* Session histogram, project radar and tag bubble
-   (core/static/core/js/charts/analysis.js). */
+/* Session length distribution, in ember pigments. */
 
 export function histogramConfig(data: HistogramRow[]): AnyConfig {
   const labels = data.map((row) => row.label);
   const counts = data.map((row) => Number(row.count));
   const total = counts.reduce((a, b) => a + b, 0);
-  /* Short sessions cool, long ones warm. */
+  /* Longer sessions glow more warmly. */
   const colors = labels.map((_, i) => emberColor(i + 1, labels.length));
 
   return {

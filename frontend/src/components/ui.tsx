@@ -39,7 +39,9 @@ export function SegmentedControl<T extends string>({ label, value, options, onCh
 /** Date values stay ISO; presets use the account's local day supplied by the caller. */
 export function DateInput({ value, onValueChange, today, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & { value: string; onValueChange: (value: string) => void; today: string }) {
   const yesterday = new Date(`${today}T12:00Z`); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  return <div className="date-control"><Input {...props} type="date" value={value} onChange={event => onValueChange(event.target.value)} /><div className="date-presets"><Button variant="quiet" onClick={() => onValueChange(today)}>Today</Button><Button variant="quiet" onClick={() => onValueChange(yesterday.toISOString().slice(0,10))}>Yesterday</Button></div></div>;
+  const yesterdayKey = yesterday.toISOString().slice(0,10);
+  const outside = (day: string) => props.disabled || !!(props.min && day < String(props.min)) || !!(props.max && day > String(props.max));
+  return <div className="date-control"><Input {...props} type="date" value={value} onChange={event => onValueChange(event.target.value)} /><div className="date-presets"><Button variant="quiet" disabled={outside(today)} onClick={() => onValueChange(today)}>Today</Button><Button variant="quiet" disabled={outside(yesterdayKey)} onClick={() => onValueChange(yesterdayKey)}>Yesterday</Button></div></div>;
 }
 /** One keyboard-accessible file picker with a drop target; browsers keep the native input. */
 export function FileDrop({ onFile, hint = "Choose a file or drop it here", ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> & { onFile: (file: File | null) => void; hint?: string }) {

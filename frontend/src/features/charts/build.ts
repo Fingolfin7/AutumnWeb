@@ -7,7 +7,7 @@ import type { ChartOptions } from "./data";
 import type { AnyConfig, ChartKind, DailyTotalRow, HeatmapRow, HierarchyNode, HistogramRow, TallyRow, WordRow } from "./payloads";
 import type { DailySeriesRow } from "./data";
 
-/* The chart picker's groups, in the old page's order. */
+/* Questions first; legacy reports stay available through the API. */
 export const CHART_GROUPS: { label: string; kinds: { value: ChartKind; label: string }[] }[] = [
   { label: "Where", kinds: [{ value: "bar", label: "Ranked bars" }, { value: "pie", label: "Donut" }, { value: "treemap", label: "Treemap" }, { value: "context", label: "Contexts" }] },
   { label: "Over time", kinds: [{ value: "line", label: "Trend" }, { value: "stacked_area", label: "Stacked area" }, { value: "cumulative", label: "Cumulative" }] },
@@ -40,7 +40,7 @@ export function isEmptyPayload(kind: ChartKind, data: unknown): boolean {
 }
 
 /* Turn a payload into something drawable, or null when it has no data.
-   `subprojects` (an explicit project-name filter) swaps scatter, line and
+   `subprojects` (an explicit project-name filter) swaps line and
    stacked area for their subproject breakdowns. */
 export function buildChart(kind: ChartKind, data: unknown, options: ChartOptions & { subprojects: boolean }): Built | null {
   if (isEmptyPayload(kind, data)) return null;

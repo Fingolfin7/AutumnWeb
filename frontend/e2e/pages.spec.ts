@@ -48,6 +48,14 @@ test("Settings keeps bookmarks, swatches and import streaming usable", async ({ 
   const firstName = `Settings ${Date.now()}`;
   // Invalid reporting edits must neither block Account nor be silently saved/reset by it.
   await page.getByLabel("Projects per chart", { exact: true }).fill("0");
+  let delayedAccount = false;
+  await page.route("**/api/v2/me/account/", async route => {
+    if (route.request().method() === "PATCH" && !delayedAccount) { delayedAccount = true; const response = await route.fetch(); await new Promise(resolve => setTimeout(resolve,350)); await route.fulfill({ response }); }
+    else await route.continue();
+  });
+  const savingAccount = page.waitForRequest(request => request.url().endsWith("/api/v2/me/account/") && request.method() === "PATCH");
+  await page.getByLabel("First name", { exact: true }).fill(`${firstName} initial`);
+  await savingAccount;
   await page.getByLabel("First name", { exact: true }).fill(firstName);
   await expect.poll(async () => (await (await page.request.get("/api/v2/me/account/")).json()).first_name).toBe(firstName);
   await expect(page.getByLabel("Projects per chart", { exact: true })).toHaveValue("0");

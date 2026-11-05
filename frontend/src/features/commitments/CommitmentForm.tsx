@@ -1,3 +1,4 @@
+import { DateInput } from "@/components/ui";
 import { CommitmentMeter } from "./CommitmentMeter";
 import { TargetInput } from "./TargetInput";
 import { hasPendingChange, liveDefinition } from "./QuickTarget";
@@ -322,7 +323,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                 </div>
                 <div className="field">
                   <label htmlFor="id_start_date">Start date</label>
-                  <input id="id_start_date" type="date" value={state.startDate} onChange={(e) => setField({ startDate: e.target.value })} />
+                  <DateInput today={todayIn(bootstrap().profile.timezone)} id="id_start_date" value={state.startDate} onValueChange={value => setField({ startDate: value })} />
                   <FieldErrors errors={shown.fields.start_date} />
                 </div>
 

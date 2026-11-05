@@ -201,7 +201,7 @@ function Rail({
                 <time className="mono" dateTime={schedule.next_fire_at ?? undefined}>
                   {formatInstant(schedule.next_fire_at, schedule.timezone || timezone)}
                 </time>
-                <strong>{schedule.target_resource.name}</strong>
+                <strong className={schedule.target === "project" ? "text-red" : schedule.target === "subproject" ? "text-blue" : undefined}>{schedule.target_resource.name}</strong>
                 <TargetKind schedule={schedule} />
                 {schedule.subprojects.map((sub) => (
                   <span key={sub.id}>{sub.name}</span>
@@ -274,7 +274,7 @@ function ScheduleRow({
     <article className="band nx-schedule-row" aria-current={editing ? "true" : undefined}>
       <div className="nx-schedule-copy">
         <div className="nx-schedule-name">
-          <strong>{schedule.target_resource.name}</strong>
+          <strong className={schedule.target === "project" ? "text-red" : schedule.target === "subproject" ? "text-blue" : undefined}>{schedule.target_resource.name}</strong>
           <TargetKind schedule={schedule} />
           {schedule.subprojects.map((sub) => (
             <span key={sub.id} className="text-blue">
@@ -313,7 +313,7 @@ const SNOOZE_OPTIONS: { value: SnoozeChoice; label: string; hint: string }[] = [
 function ScheduleSummary({ schedule }: { schedule: Schedule }) {
   return (
     <p className="nx-lede">
-      <strong>{schedule.target_resource.name}</strong>
+      <strong className={schedule.target === "project" ? "text-red" : schedule.target === "subproject" ? "text-blue" : undefined}>{schedule.target_resource.name}</strong>
       {schedule.target !== "project" ? <span className="muted nx-target-kind"> {schedule.target}</span> : null}
       {schedule.subprojects.map((sub) => ` · ${sub.name}`).join("")} · <span className="mono">{clockText(schedule.local_time)}</span>
     </p>

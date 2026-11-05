@@ -1,3 +1,6 @@
+import { DateInput } from "@/components/ui";
+import { todayKey } from "@/features/notifications/dates";
+import { bootstrap } from "@/bootstrap";
 import { useMemo, useState, type FormEvent } from "react";
 import { faFileExport } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -119,21 +122,21 @@ export default function ExportPage() {
                 <div className="two-up">
                   <div className="field">
                     <label htmlFor="export-start-date">Start date</label>
-                    <input
+                    <DateInput
+                      today={todayKey(bootstrap().profile.timezone)}
                       id="export-start-date"
-                      type="date"
                       value={form.startDate}
-                      onChange={(event) => patch({ startDate: event.target.value })}
+                      onValueChange={value => patch({ startDate: value })}
                     />
                     {fieldErrors("start_date")}
                   </div>
                   <div className="field">
                     <label htmlFor="export-end-date">End date</label>
-                    <input
+                    <DateInput
+                      today={todayKey(bootstrap().profile.timezone)}
                       id="export-end-date"
-                      type="date"
                       value={form.endDate}
-                      onChange={(event) => patch({ endDate: event.target.value })}
+                      onValueChange={value => patch({ endDate: value })}
                     />
                     {fieldErrors("end_date")}
                   </div>
