@@ -98,10 +98,11 @@ export default function SessionsPage() {
 
   const scope = JSON.stringify(apiFilters);
   const [retained, setRetained] = useState<{ scope: string; rows: Record<number, { session: SessionRow; index: number }> }>({ scope, rows: {} });
+  useEffect(() => setRetained({ scope, rows: {} }), [scope]);
   const pinned = retained.scope === scope ? retained.rows : {};
   const fetched = list.data?.pages.flatMap((page) => page.sessions) ?? [];
   const all: SessionRow[] = fetched.map((session) => pinned[session.id]?.session ?? session);
-  for (const { session, index } of Object.values(pinned)) {
+  for (const { session, index } of Object.values(pinned).sort((a, b) => a.index - b.index)) {
     if (!all.some((row) => row.id === session.id)) all.splice(Math.min(index, all.length), 0, session);
   }
   const retainNote = (session: SessionRow) => setRetained((previous) => {
