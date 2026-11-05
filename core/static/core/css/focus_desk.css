@@ -4163,7 +4163,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .slab:has(.note-reading-head) { overflow: visible; }
 .journal-entry-date { color: var(--time); }
 @media (max-width: 999px) {
-  .note-reading-head { top: 56px; }
+  .note-reading-head { top: 56px; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--s1); }
+  .note-reading-identity { flex-direction: column; gap: 2px; }
+  .note-reading-head .btn { padding-inline: var(--s2); }
   .note-editor-toolbar .dictate-button span { display: none; }
   .note-editor-toolbar .dictate-button { width: 44px; }
   .note-editor-field.is-writing { padding: var(--s3); }
