@@ -1,6 +1,6 @@
 import { formatTime, formatShortDate } from "@/lib/format";
 import type { paths } from "@/api/schema";
-import { accountSimilarity, fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
+import { closenessLabel, accountSimilarity, parseSimilarity, similarityScale } from "@/features/search/similarity";
 import type { AttachmentView } from "./attachments";
 import type { ChatFiltersStored, ChatGroup, ChatMessage, InsightOptions, StreamRequest, Usage } from "./types";
 
@@ -168,7 +168,7 @@ export function describeSelection(
         : { label: "Including", value: "related" },
     );
     // The cutoff decides which sessions are included, so it is always on show.
-    pills.push({ label: "Closeness", value: fixed2(filters.similarity ?? accountSimilarity()) });
+    pills.push({ label: "Closeness", value: closenessLabel(filters.similarity ?? accountSimilarity()) });
   }
   if (filters.project_name) pills.push({ label: "Project", value: filters.project_name });
   if (filters.start_date && filters.start_date !== defaults.start) pills.push({ label: "From", value: filters.start_date });

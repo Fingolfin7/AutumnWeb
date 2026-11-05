@@ -183,25 +183,7 @@ export default function ExportPage() {
                   </div>
                 )}
 
-                <div id="search_projects" className="field">
-                  <label htmlFor="project-search">Project name</label>
-                  <input
-                    id="project-search"
-                    type="text"
-                    list="export-project-names"
-                    autoComplete="off"
-                    placeholder="Projects (leave blank to export all)"
-                    value={form.projectName}
-                    onChange={(event) => patch({ projectName: event.target.value })}
-                  />
-                  <datalist id="export-project-names">
-                    {allProjects.map((project) => (
-                      <option key={project.id} value={project.name} />
-                    ))}
-                  </datalist>
-                  {fieldErrors("project_name")}
-                </div>
-
+                <p className="muted export-scope-summary">{form.projects.length ? `${form.projects.length} selected projects` : "Everything"} · narrow by project, context or tag below</p>
                 {allProjects.length ? (
                   <>
                     <OptionPicker
@@ -209,7 +191,7 @@ export default function ExportPage() {
                       options={offered.map((project) => ({ id: project.id, label: project.name }))}
                       selected={form.projects}
                       onChange={(ids) => patch({ projects: ids })}
-                      searchPlaceholder="Search projects..."
+                      searchPlaceholder="Find a project"
                       emptyText="No projects match that search."
                       mode={form.projectMode}
                       onModeChange={(projectMode) => patch({ projectMode })}
@@ -235,6 +217,7 @@ export default function ExportPage() {
             </div>
 
             <section className="slab slab-pad">
+              <details className="export-format-options"><summary>Format & file options</summary><p className="muted">Standard JSON keeps your complete journal. Use legacy format for older Autumn tools; compression makes a smaller file.</p>
               <div className="field">
                 <label htmlFor="export-output-file">Output file</label>
                 <input
@@ -279,6 +262,7 @@ export default function ExportPage() {
                 <label htmlFor="export-compress">Compress</label>
               </div>
 
+              </details>
               <div className="form-actions">
                 <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
                   <Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export"}

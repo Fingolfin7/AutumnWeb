@@ -360,7 +360,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
         contexts={contexts.data ?? []}
         activeContextId={contextId}
       >
-        {model ? <ModelPicker options={options} selection={model} onSelection={setModel} busy={live} /> : null}
+        {model ? <details className="insights-model-settings"><summary>AI settings: {model.provider} · {model.model}</summary><ModelPicker options={options} selection={model} onSelection={setModel} busy={live} /></details> : null}
         {pills.length ? <div className="filter-summary">{pills.map((pill) => <span className="filter-pill" id={pill.label === "Including" || pill.label === "Related" ? "related-pill" : undefined} key={pill.label} title={pill.title}>{pill.label} <b>{pill.value}</b></span>)}</div> : null}
       </FilterSheet>
 
@@ -402,7 +402,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                 </div>
                 {hasHistory ? (
                   <div className="chat-header-actions">
-                    <button type="button" id="select-messages-btn" className="chat-action-btn" onClick={toggleSelecting} title="Select messages to copy">
+                    <button type="button" id="select-messages-btn" aria-label={selecting ? "Cancel message selection" : "Select messages to copy"} className="chat-action-btn" onClick={toggleSelecting} title="Select messages to copy">
                       <Icon icon={selecting ? faTimes : faCheckSquare} /> <span className="chat-action-label">{selecting ? "Cancel" : "Select"}</span>
                     </button>
                     {selecting ? (
@@ -416,7 +416,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                         <Icon icon={copiedPicked ? faCheck : faCopy} /> {copiedPicked ? "Copied!" : `Copy (${picked.size})`}
                       </button>
                     ) : null}
-                    <button type="button" id="copy-full-chat-btn" className="chat-action-btn" onClick={() => copy(buildTranscript(items, username), setCopiedWhole)}>
+                    <button type="button" id="copy-full-chat-btn" aria-label="Copy full conversation" className="chat-action-btn" onClick={() => copy(buildTranscript(items, username), setCopiedWhole)}>
                       <Icon icon={copiedWhole ? faCheck : faCopy} /> <span className="chat-action-label">{copiedWhole ? "Copied!" : "Copy chat"}</span>
                     </button>
                   </div>

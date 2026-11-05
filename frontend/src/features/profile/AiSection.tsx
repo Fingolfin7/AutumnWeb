@@ -101,7 +101,7 @@ export function AiSection({
   return (
     <section className="slab slab-pad">
       <SlabHead
-        title="LLM connections"
+        title="AI providers"
         aside={
           <span className="muted">
             <Icon icon={faLock} /> Encrypted at rest
@@ -179,6 +179,7 @@ export function AiSection({
         </div>
       ) : null}
 
+      <details className="profile-ai-advanced"><summary>Advanced: API keys & model effort</summary>
       <div className="profile-keys-grid">
         {KEY_PROVIDERS.map((provider) => {
           const stored = configured[provider];
@@ -260,6 +261,7 @@ export function AiSection({
         <p className="muted">How hard Luna thinks when suggesting timers</p>
         <FieldErrors lines={errors.luna_recommendation_effort} />
       </div>
+    </details>
     </section>
   );
 }
