@@ -24,7 +24,7 @@ test("Review preserves old links, applies filters immediately and offers every c
   await page.getByLabel("End date", { exact: true }).fill("2026-12-31");
   await page.getByRole("button", { name: "Done", exact: true }).click();
 
-  await page.getByRole("radio", { name: "Year of embers", exact: true }).check();
+  await page.getByRole("radio", { name: "Year of embers", exact: true }).click();
   await expect(page.locator(".ember-month")).toHaveCount(12);
   await page.locator(".ember-month").first().click();
   await expect(page.getByRole("radio", { name: "Period", exact: true })).toBeChecked();
