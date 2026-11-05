@@ -1,4 +1,4 @@
-import { DateInput } from "@/components/ui";
+import { DateInput, Input } from "@/components/ui";
 import { todayKey } from "./dates";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AppLink, urls } from "@/app/links";
@@ -202,6 +202,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
             <label htmlFor="id_local_date">Date</label>
             <DateInput
               today={todayKey(timezone)}
+              presets="future"
               id="id_local_date"
               value={form.date}
               aria-invalid={!!fieldError("local_date")}
@@ -211,7 +212,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
           </div>
           <div className="field">
             <label htmlFor="id_local_time">Time</label>
-            <input
+            <Input
               id="id_local_time"
               type="time"
               step={60}

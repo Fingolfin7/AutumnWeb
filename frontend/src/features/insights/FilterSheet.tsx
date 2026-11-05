@@ -87,7 +87,7 @@ export function FilterSheet({
         <div className="field">
           <label htmlFor="context-filter">Context</label>
           <select id="context-filter" value={draft.context} onChange={(e) => onDraft({ ...draft, context: e.target.value })}>
-            <option value="">Active context (header)</option>
+            <option value="">Current context</option>
             <option value="all">All contexts</option>
             {contexts.map((ctx) => (
               <option key={ctx.id} value={ctx.id}>

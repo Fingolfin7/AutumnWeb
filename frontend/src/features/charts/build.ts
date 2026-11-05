@@ -1,6 +1,6 @@
-import { barConfig, contextConfig, lineProjectsConfig, lineSubprojectsConfig, pieConfig } from "./basic";
+import { barConfig, contextConfig, pieConfig } from "./basic";
 import { heatmapConfig } from "./time";
-import { cumulativeConfig, stackedAreaProjectsConfig, stackedAreaSubprojectsConfig } from "./trends";
+import { cumulativeConfig, dailyBarsConfig } from "./trends";
 import { treemapConfig } from "./hierarchy";
 import { histogramConfig } from "./analysis";
 import type { ChartOptions } from "./data";
@@ -10,12 +10,11 @@ import type { DailySeriesRow } from "./data";
 /* Questions first; legacy reports stay available through the API. */
 export const CHART_GROUPS: { label: string; kinds: { value: ChartKind; label: string }[] }[] = [
   { label: "Where", kinds: [{ value: "bar", label: "Ranked bars" }, { value: "pie", label: "Donut" }, { value: "treemap", label: "Treemap" }, { value: "context", label: "Contexts" }] },
-  { label: "Over time", kinds: [{ value: "line", label: "Trend" }, { value: "stacked_area", label: "Stacked area" }, { value: "cumulative", label: "Cumulative" }] },
+  { label: "Over time", kinds: [{ value: "daily_bars", label: "Daily bars" }, { value: "cumulative", label: "Cumulative" }] },
   { label: "Patterns", kinds: [{ value: "histogram", label: "Session lengths" }, { value: "heatmap", label: "Work hours" }, { value: "wordcloud", label: "Words in your notes" }] },
 ];
 export const CHART_QUESTIONS: Partial<Record<ChartKind, string>> = {
-  bar: "Where did the time go?", pie: "How did you divide your time?", line: "How is your time changing?",
-  stacked_area: "What fills your days?", cumulative: "How does your time add up?", treemap: "What makes up your time?",
+  bar: "Where did the time go?", pie: "How did you divide your time?", daily_bars: "How is it changing?", cumulative: "How does your time add up?", treemap: "What makes up your time?",
   context: "Which parts of life got your time?", histogram: "How long are your sessions?", heatmap: "When do you work?", wordcloud: "What is in your notes?",
 };
 
@@ -50,12 +49,10 @@ export function buildChart(kind: ChartKind, data: unknown, options: ChartOptions
       return chart(pieConfig(data as TallyRow[], options));
     case "bar":
       return chart(barConfig(data as TallyRow[], options));
-    case "line":
-      return chart(options.subprojects ? lineSubprojectsConfig(data as DailySeriesRow[], options) : lineProjectsConfig(data as DailySeriesRow[], options));
+    case "daily_bars":
+      return chart(dailyBarsConfig(data as DailySeriesRow[], options, options.subprojects));
     case "heatmap":
       return chart(heatmapConfig(data as HeatmapRow[]));
-    case "stacked_area":
-      return chart(options.subprojects ? stackedAreaSubprojectsConfig(data as DailySeriesRow[], options) : stackedAreaProjectsConfig(data as DailySeriesRow[], options));
     case "cumulative":
       return chart(cumulativeConfig(data as DailyTotalRow[], options));
     case "treemap":

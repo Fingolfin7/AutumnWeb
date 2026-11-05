@@ -100,10 +100,9 @@ export function OptionPicker({
         ) : null}
         <div className="picker-options">
           {visible.map((option) => (
-            <label key={option.id} className="option-chip" style={option.color ? ({ "--tag": option.color } as React.CSSProperties) : undefined}>
-              <input type="checkbox" checked={selectedSet.has(option.id)} onChange={() => toggle(option.id)} />
+            <button type="button" aria-pressed={selectedSet.has(option.id)} onClick={() => toggle(option.id)} key={option.id} className="option-chip" style={option.color ? ({ "--tag": option.color } as React.CSSProperties) : undefined}>
               <span className="option-label tag-label">{option.label}</span>
-            </label>
+            </button>
           ))}
         </div>
         {visible.length === 0 ? <p className="picker-empty">{emptyText}</p> : null}

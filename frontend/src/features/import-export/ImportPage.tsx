@@ -220,7 +220,7 @@ export default function ImportPage() {
             <div className="field">
               <label htmlFor="import-context">Import under context</label>
               <select id="import-context" value={contextId} onChange={(event) => setContextId(event.target.value)}>
-                <option value="">(Use file context / default)</option>
+                <option value="">Use the file context</option>
                 {(contexts.data ?? []).map((context) => (
                   <option key={context.id} value={context.id}>
                     {context.name}
@@ -291,7 +291,7 @@ export default function ImportPage() {
             {fieldErrors("verbose")}
 
             <div className="field u-mt-4">
-              <label htmlFor="import-tolerance">Duplicate time tolerance (minutes)</label>
+              <label htmlFor="import-tolerance">Allow time overlap up to (minutes)</label>
               <input
                 id="import-tolerance"
                 type="number"

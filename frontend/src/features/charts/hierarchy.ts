@@ -1,5 +1,5 @@
 import { formatDuration } from "@/lib/format";
-import { seriesColor, withAlpha } from "./data";
+import { seriesColor, seriesColors, withAlpha } from "./data";
 import type { AnyConfig, HierarchyNode, TallyRow } from "./payloads";
 
 /* Treemap (core/static/core/js/charts/hierarchy.js). The server sends
@@ -27,7 +27,7 @@ export function flattenHierarchy(data: HierarchyNode | TallyRow[]): { leaves: Tr
         if (project.children?.length) {
           for (const child of subprojects) leaves.push({ name: child.name, project: project.name, value: child.total_time! / 60 });
           const unallocated = (project.total_time ?? 0) - subprojects.reduce((sum, child) => sum + (child.total_time ?? 0), 0);
-          if (unallocated > 0.000001) leaves.push({ name: "Unallocated", project: project.name, value: unallocated / 60 });
+          if (unallocated > 0.000001) leaves.push({ name: "No subproject", project: project.name, value: unallocated / 60 });
         } else {
           leaves.push({ name: project.name, project: project.name, value: project.total_time! / 60 });
         }
@@ -44,7 +44,7 @@ export function flattenHierarchy(data: HierarchyNode | TallyRow[]): { leaves: Tr
       }
     });
   }
-  return { leaves, colors };
+  return { leaves, colors: Object.fromEntries(seriesColors(Object.keys(colors))) };
 }
 
 interface TreemapRaw {
@@ -81,7 +81,7 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
           spacing: 1,
           borderWidth: 0.75,
           borderColor: "rgba(240,236,229,.16)",
-          captions: { display: true, color: "#f0ece5", font: { size: 11, weight: "500" }, padding: 8 },
+          captions: { display: false, color: "#f0ece5", font: { size: 13, weight: "500" }, padding: 8 },
           backgroundColor(context: TreemapContext) {
             if (context.type !== "data") return "transparent";
             const project = projectOf(context.raw);
@@ -103,15 +103,14 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
               if (item._data?.name) {
                 const amount = formatDuration(value * 60);
                 if ((item.w ?? 100) < 85) return "";
-                const limit = Math.max(6, Math.floor(((item.w ?? 100) - 16) / 6.5));
-                const name = item._data.name.length > limit ? item._data.name.slice(0, limit - 1) + "…" : item._data.name;
-                return [name, amount];
+                if ((item.w ?? 100) < item._data.name.length * 7 + 16) return "";
+                return [item._data.name, amount];
               }
               if (item.g) return item.g;
               return "";
             },
             color: "#e6dfd5",
-            font: { size: 11, weight: "500" },
+            font: { size: 13, weight: "500" },
           },
         },
       ],

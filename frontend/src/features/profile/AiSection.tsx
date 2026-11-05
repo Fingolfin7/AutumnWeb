@@ -56,7 +56,7 @@ export function AiSection({
   const login = useChatGPTLogin(true);
   const configured = prefs.configured_api_keys;
 
-  const onConnected = useCallback(() => toast.success("Connected Codex login for Insights."), [toast]);
+  const onConnected = useCallback(() => toast.success("Connected Connect Codex for Insights."), [toast]);
   useOnCodexConnected(login.data, onConnected);
 
   const setLogin = (data: unknown) => qc.setQueryData(meKeys.chatgpt(), data);
@@ -66,16 +66,16 @@ export function AiSection({
     mutationFn: startChatGPTLogin,
     onSuccess: (data) => {
       setLogin(data);
-      toast.success("Codex login started. Use the code shown below, then complete the login.");
+      toast.success("Connect Codex started. Use the code shown below, then complete the login.");
     },
-    onError: (error) => toast.error(`Could not start Codex login: ${errorMessage(error)}`),
+    onError: (error) => toast.error(`Could not start Connect Codex: ${errorMessage(error)}`),
   });
   const disconnect = useMutation({
     mutationFn: disconnectChatGPT,
     onSuccess: () => {
       setLogin({ status: "disconnected" });
       refreshPrefs();
-      toast.success("Disconnected OpenAI Codex login.");
+      toast.success("Disconnected OpenAI Connect Codex.");
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -89,7 +89,7 @@ export function AiSection({
         toast.info("Still waiting for OpenAI authorization. Try Complete again after entering the code.");
       }
     },
-    onError: (error) => toast.error(`Could not complete Codex login: ${errorMessage(error)}`),
+    onError: (error) => toast.error(`Could not complete Connect Codex: ${errorMessage(error)}`),
   });
 
   const status = login.data?.status;
@@ -111,7 +111,7 @@ export function AiSection({
 
       <div className="profile-codex-panel">
         <div>
-          <h3 className="disclose-title">Codex login</h3>
+          <h3 className="disclose-title">Connect Codex</h3>
           <p className="focus-lede">OpenAI models use Codex first, then the API key below.</p>
           {connected ? (
             <span className="context-chip">
@@ -142,7 +142,7 @@ export function AiSection({
               onClick={() => start.mutate()}
               disabled={start.isPending || login.isPending}
             >
-              <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Use Codex login"}
+              <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Use Connect Codex"}
             </button>
           )}
         </div>
@@ -173,7 +173,7 @@ export function AiSection({
               onClick={() => complete.mutate()}
               disabled={complete.isPending}
             >
-              <Icon icon={faSyncAlt} spin={complete.isPending} /> Complete Codex login
+              <Icon icon={faSyncAlt} spin={complete.isPending} /> Complete Connect Codex
             </button>
           </div>
         </div>

@@ -726,7 +726,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
         {c.banking_enabled ? (
           <>
             <div className="meta-row">
-              <span className="meta-label">Carried balance</span>
+              <span className="meta-label">Carried over</span>
               <span className={`meta-value ${c.balance >= 0 ? "text-green" : "text-red"}`}>
                 {`${c.balance >= 0 ? "+" : "-"}${num(c.balance)}`}
               </span>

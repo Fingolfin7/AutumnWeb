@@ -40,6 +40,7 @@ export interface HierarchyNode {
 export type AnyConfig = ChartConfiguration<any, any, any>;
 
 export type ChartKind =
+  | "daily_bars"
   | "pie"
   | "bar"
   | "scatter"

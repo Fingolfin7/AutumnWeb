@@ -302,7 +302,7 @@ function ProfileEditor({
 
   const customAvatar = hasCustomAvatar(prefs.avatar_url);
   const dirty = (scope: SaveScope) => Object.keys(prefsChanges(prefsD, prefs) ?? {}).some((key) => PREF_SCOPE[scope].includes(key)) || (scope === "account" && !!(accountChanges(accountD, account) || avatarFile)) || (scope === "appearance" && !!(backgroundFile || removeBg)) || (scope === "ai" && keyActions(keyDrafts).length > 0);
-  const saveButton = (scope: SaveScope, label: string) => scope === "ai" ? <div className="form-actions profile-section-save"><span className="settings-save-status" role="status">{saving ? "Saving" : dirty(scope) ? "Unsaved changes" : "Saved"}</span><button type="submit" className="btn btn--primary" disabled={saving || !dirty(scope)}><Icon icon={faCheckCircle} /> {label}</button></div> : null;
+  const saveButton = (scope: SaveScope, label: string) => scope === "ai" ? <div className="form-actions profile-section-save"><span className="settings-save-status" role="status">{saving ? "Saving" : dirty(scope) ? "Waiting to save" : "Saved"}</span><button type="submit" className="btn btn--primary" disabled={saving || !dirty(scope)}><Icon icon={faCheckCircle} /> {label}</button></div> : null;
   const lastAttempt = useRef("");
   const [didSave, setDidSave] = useState(false);
   const fingerprint = JSON.stringify([accountD, prefsD, avatarFile?.name, avatarFile?.lastModified, backgroundFile?.name, backgroundFile?.lastModified, removeBg]);
@@ -339,7 +339,7 @@ function ProfileEditor({
   return (
     <>
       <Root className="fields profile-page" onSubmit={section === "ai" ? (event: FormEvent) => void onSubmit(event, "ai") : undefined}>
-        {section === "account" ? <div className="settings-autosave" role="status">{saving ? "Saving" : pendingScope ? "Unsaved changes" : didSave ? "Saved" : "Changes save automatically"}{saveFailed || Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); setSaveFailed(false); setRetryVersion(value => value + 1); }}>Retry saving</button> : null}</div> : null}
+        {section === "account" ? <div className="settings-autosave" role="status">{saving ? "Saving" : pendingScope ? "Waiting to save" : didSave ? "Saved" : "Saved automatically"}{saveFailed || Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); setSaveFailed(false); setRetryVersion(value => value + 1); }}>Retry saving</button> : null}</div> : null}
         {section === "account" ? <>
         <form className="slab slab-pad" onSubmit={(event) => void onSubmit(event, "account")} noValidate>
           <SlabHead title="Account" />

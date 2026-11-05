@@ -1,4 +1,5 @@
-import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from "react";
+import { faCalendarAlt, faClock, faChevronLeft, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
 
@@ -17,6 +18,7 @@ export function Chip({ children, className = "" }: { children: ReactNode; classN
 }
 
 export function Input({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  if (props.type === "time") return <TimeInput {...props} className={className} />;
   return <input className={`input ${className}`} {...props} />;
 }
 
@@ -36,15 +38,51 @@ export function SegmentedControl<T extends string>({ label, value, options, onCh
   return <fieldset className="segmented"><legend className="sr-only">{label}</legend>{options.map((option) => <label key={option.value}><input type="radio" name={name} checked={value === option.value} onChange={() => onChange(option.value)} /><span>{option.label}</span></label>)}</fieldset>;
 }
 
-/** Date values stay ISO; presets use the account's local day supplied by the caller. */
-export function DateInput({ value, onValueChange, today, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & { value: string; onValueChange: (value: string) => void; today: string }) {
-  const yesterday = new Date(`${today}T12:00Z`); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  const yesterdayKey = yesterday.toISOString().slice(0,10);
-  const outside = (day: string) => props.disabled || !!(props.min && day < String(props.min)) || !!(props.max && day > String(props.max));
-  return <div className="date-control"><Input {...props} type="date" value={value} onChange={event => onValueChange(event.target.value)} /><div className="date-presets"><Button variant="quiet" disabled={outside(today)} onClick={() => onValueChange(today)}>Today</Button><Button variant="quiet" disabled={outside(yesterdayKey)} onClick={() => onValueChange(yesterdayKey)}>Yesterday</Button></div></div>;
+function usePopover() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); setOpen(false); ref.current?.querySelector<HTMLButtonElement>(".temporal-trigger")?.focus(); } };
+    document.addEventListener("pointerdown", close);
+    ref.current?.addEventListener("keydown", escape);
+    const element = ref.current;
+    return () => { document.removeEventListener("pointerdown", close); element?.removeEventListener("keydown", escape); };
+  }, [open]);
+  return { open, setOpen, ref };
 }
-/** One keyboard-accessible file picker with a drop target; browsers keep the native input. */
-export function FileDrop({ onFile, hint = "Choose a file or drop it here", ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> & { onFile: (file: File | null) => void; hint?: string }) {
+
+/** ISO input and a Monday-first calendar. Presets live in the calendar, not below every field. */
+export function DateInput({ value, onValueChange, today, presets = "past", ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & { value: string; onValueChange: (value: string) => void; today: string; presets?: "past" | "future" | "none" }) {
+  const { open, setOpen, ref } = usePopover();
+  const [month, setMonth] = useState((value || today).slice(0, 7));
+  const shift = (amount: number) => { const date = new Date(`${month}-01T12:00Z`); date.setUTCMonth(date.getUTCMonth() + amount); setMonth(date.toISOString().slice(0, 7)); };
+  const first = new Date(`${month}-01T12:00Z`);
+  const offset = (first.getUTCDay() + 6) % 7;
+  const days = new Date(first.getUTCFullYear(), first.getUTCMonth() + 1, 0).getDate();
+  const nearby = new Date(`${today}T12:00Z`); nearby.setUTCDate(nearby.getUTCDate() + (presets === "future" ? 1 : -1));
+  const outside = (day: string) => props.disabled || !!(props.min && day < String(props.min)) || !!(props.max && day > String(props.max));
+  const choose = (day: string) => { onValueChange(day); setOpen(false); ref.current?.querySelector<HTMLInputElement>("input")?.focus(); };
+  return <div className="date-control temporal-control" ref={ref}><input {...props} className={`input ${props.className ?? ""}`} type="date" value={value} onChange={event => onValueChange(event.target.value)} /><button className="temporal-trigger btn-icon" type="button" aria-label={`Choose ${props["aria-label"] ?? "date"}`} aria-expanded={open} disabled={props.disabled} onClick={() => { setMonth((value || today).slice(0, 7)); setOpen(!open); }}><Icon icon={faCalendarAlt} /></button>{open ? <div className="temporal-popover" role="group" aria-label="Calendar"><div className="calendar-heading"><IconButton icon={faChevronLeft} label="Previous month" onClick={() => shift(-1)} /><strong>{first.toLocaleDateString("en", { month: "long", year: "numeric", timeZone: "UTC" })}</strong><IconButton icon={faChevronRight} label="Next month" onClick={() => shift(1)} /></div><div className="calendar-days">{["M", "T", "W", "T", "F", "S", "S"].map((label, index) => <span key={index} aria-hidden="true">{label}</span>)}{Array.from({ length: offset }, (_, index) => <span key={`blank-${index}`} />)}{Array.from({ length: days }, (_, index) => { const day = `${month}-${String(index + 1).padStart(2, "0")}`; return <button type="button" key={day} disabled={outside(day)} aria-label={new Date(`${day}T12:00Z`).toLocaleDateString("en", { dateStyle: "full", timeZone: "UTC" })} aria-pressed={day === value} onClick={() => choose(day)}>{index + 1}</button>; })}</div>{presets !== "none" ? <div className="date-presets"><Button variant="quiet" disabled={outside(today)} onClick={() => choose(today)}>Today</Button><Button variant="quiet" disabled={outside(nearby.toISOString().slice(0, 10))} onClick={() => choose(nearby.toISOString().slice(0, 10))}>{presets === "future" ? "Tomorrow" : "Yesterday"}</Button></div> : null}</div> : null}</div>;
+}
+
+function TimeInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  const { open, setOpen, ref } = usePopover();
+  const value = String(props.value ?? "").slice(0, 5);
+  const change = (next: string) => {
+    const input = ref.current?.querySelector("input");
+    if (!input) return;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, next);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  return <div className="temporal-control" ref={ref}><input {...props} type="time" step={60} value={value} className={`input ${className}`} /><button type="button" className="temporal-trigger btn-icon" aria-label="Choose time" disabled={props.disabled} aria-expanded={open} onClick={() => setOpen(!open)}><Icon icon={faClock} /></button>{open ? <div className="temporal-popover time-popover" role="group" aria-label="Time"><label>Hour<select value={value.slice(0, 2) || "09"} onChange={event => change(`${event.target.value}:${value.slice(3, 5) || "00"}`)}>{Array.from({ length: 24 }, (_, hour) => <option key={hour}>{String(hour).padStart(2, "0")}</option>)}</select></label><label>Minute<select value={value.slice(3, 5) || "00"} onChange={event => change(`${value.slice(0, 2) || "09"}:${event.target.value}`)}>{Array.from({ length: 60 }, (_, minute) => <option key={minute}>{String(minute).padStart(2, "0")}</option>)}</select></label><Button variant="quiet" onClick={() => setOpen(false)}>Done</Button></div> : null}</div>;
+}
+
+/** One full-width file action; drag-and-drop remains a desktop shortcut. */
+export function FileDrop({ onFile, hint, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> & { onFile: (file: File | null) => void; hint?: string }) {
   const [dragging, setDragging] = useState(false);
-  return <div className={`file-drop${dragging ? " is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); onFile(event.dataTransfer.files[0] ?? null); }}><input {...props} type="file" onChange={event => onFile(event.target.files?.[0] ?? null)} /><span>{hint}</span></div>;
+  const [name, setName] = useState("");
+  const pick = (file: File | null) => { setName(file?.name ?? ""); onFile(file); };
+  return <div className={`file-drop${dragging ? " is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!props.disabled) pick(event.dataTransfer.files[0] ?? null); }}><input {...props} type="file" onChange={event => pick(event.target.files?.[0] ?? null)} /><span className="file-drop-action">Choose file</span><span className="file-drop-name">{name || hint || "JSON, text or image"}</span></div>;
 }
