@@ -71,7 +71,8 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await expect(page).toHaveURL(/\/sessions\/\?search=Piano/);
   const field = page.getByRole("textbox", { name: "Note", exact: true });
   await field.fill(note);
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  if (testInfo.project.name === "phone") await page.getByRole("dialog", { name: "Full-screen note writer" }).getByRole("button", { name: "Done", exact: true }).click();
+  await first.getByRole("button", { name: "Done", exact: true }).click();
   await expect(toasts(page).getByText("Note saved.", { exact: true })).toBeVisible();
 
   await page.reload();
