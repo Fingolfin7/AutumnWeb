@@ -16,6 +16,12 @@ it("skips sessions that have not ended", () => {
   expect(groupByDay([{ start: new Date().toISOString(), end: null, duration_minutes: null }])).toEqual([]);
 });
 
+it("orders a day by start time even when a longer session ends later", () => {
+  const early = at(new Date(2026, 9, 14, 18).toISOString(), 180);
+  const late = at(new Date(2026, 9, 14, 17).toISOString(), 30);
+  expect(groupByDay([early, late])[0]!.sessions).toEqual([late, early]);
+});
+
 it("splits a midnight crossing while preserving the exact saved duration", () => {
   const row = { start: new Date(2026, 10, 4, 21, 53).toISOString(), end: new Date(2026, 10, 5, 0, 28).toISOString(), duration_minutes: 155 };
   const groups = groupByDay([row]);

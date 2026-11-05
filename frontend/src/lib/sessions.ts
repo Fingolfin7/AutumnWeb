@@ -41,5 +41,7 @@ export function groupByDay<T extends Groupable>(sessions: T[]): DayGroup<T>[] {
       group.totalMinutes += part.minutes;
     }
   }
-  return [...groups.values()].sort((a, b) => b.date.localeCompare(a.date));
+  return [...groups.values()].sort((a, b) => b.date.localeCompare(a.date)).map((group) => ({
+    ...group, sessions: group.sessions.sort((a, b) => Date.parse(b.start) - Date.parse(a.start)),
+  }));
 }

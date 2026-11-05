@@ -5240,3 +5240,60 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .insights-conversation-scope .btn { padding-inline: 4px; }
   .insights-workspace .chat-header .chat-action-btn { width: 44px; min-width: 44px; padding-inline: 0; }
 }
+
+/* ========================================================================
+   Stream U — one journal, a living clock, and a comfortable writing surface.
+   ======================================================================== */
+:is(.session-list, .today-journal, .project-journal) .journal-entry {
+  display: block; min-height: 0; padding: var(--s4); border: 0;
+  border-bottom: 1px solid var(--hairline); background: transparent;
+}
+:is(.session-list, .today-journal, .project-journal) .journal-heading {
+  display: grid; grid-template-columns: minmax(0, 1fr) 7rem 140px;
+  gap: 0 var(--s3); align-items: start; min-height: 44px;
+}
+.journal-heading .journal-identity { display: block; grid-column: 1; grid-row: 1; min-width: 0; }
+.journal-heading .journal-identity .session-project {
+  display: block; min-height: 44px; padding: 10px 0; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; -webkit-line-clamp: unset;
+  font: 600 var(--fs-md)/24px var(--font-display); text-decoration: none;
+}
+:is(.session-list, .today-journal, .project-journal) .journal-meta {
+  display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center;
+  gap: var(--s3); min-width: 0; min-height: 24px; margin: 0; padding: 0;
+  overflow: hidden; font-size: max(13px, var(--fs-xs)); line-height: 24px;
+}
+.journal-meta > *::before, .journal-identity > .journal-meta::before { content: none; }
+.journal-meta > * { flex: none; white-space: nowrap; }
+.journal-meta .journal-subproject { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.journal-meta a, .journal-meta .journal-time { display: inline-flex; align-items: center; min-height: 44px; margin: 0; padding: 0; line-height: 24px; }
+.journal-heading .journal-duration {
+  grid-column: 2; grid-row: 1; margin: 0; padding: 10px 0;
+  font: 600 var(--fs-md)/24px var(--font-display); font-variant-numeric: tabular-nums;
+}
+.journal-heading .journal-row-actions { display: flex; grid-column: 3; grid-row: 1; margin: 0; opacity: 1; gap: 0; justify-self: start; }
+.journal-heading .journal-overflow { grid-column: 3; grid-row: 1; justify-self: end; margin: 0; }
+:is(.session-list, .today-journal, .project-journal) .journal-entry :is(.session-note, .journal-note-edit, .journal-add-note) {
+  width: 100%; max-width: 68ch; margin: var(--s2) 0 0; padding: 0; border: 0;
+  font: 400 1.125rem/1.7 var(--font-reading);
+}
+:is(.session-list, .today-journal, .project-journal) .day-head {
+  display: grid; grid-template-columns: minmax(0, 1fr) 7rem 140px; gap: var(--s3);
+  align-items: baseline; margin: 0; padding: var(--s3) var(--s4);
+  border-radius: 0; background: transparent; border-bottom: 1px solid var(--hairline);
+}
+:is(.session-list, .today-journal, .project-journal) .day-total { grid-column: 2; margin: 0; text-align: right; }
+.today-journal .journal-entry::before, .today-journal .journal-entry::after { content: none; }
+.journal-entry .journal-day-split, .journal-match-reason { margin: var(--s2) 0; font-size: 13px; color: var(--muted); }
+.journal-duration.is-zero, .day-total.is-zero { color: var(--muted); }
+@media (max-width: 999px) {
+  :is(.session-list, .today-journal, .project-journal) .journal-entry { padding: var(--s3); }
+  :is(.session-list, .today-journal, .project-journal) .journal-heading,
+  :is(.session-list, .today-journal, .project-journal) .day-head { grid-template-columns: minmax(0, 1fr) 5rem 44px; gap: 0 var(--s2); }
+  :is(.session-list, .today-journal, .project-journal) .day-head { padding-inline: var(--s3); }
+  .journal-heading .journal-row-actions { display: none; }
+  .journal-heading .journal-duration { grid-column: 2; font-size: var(--fs-sm); }
+  .journal-heading .journal-overflow { grid-column: 3; }
+  .journal-heading .journal-identity .session-project { font-size: var(--fs-sm); }
+  :is(.session-list, .today-journal, .project-journal) .journal-meta { width: calc(100% + 5rem + var(--s2)); }
+}
