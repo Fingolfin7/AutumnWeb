@@ -291,7 +291,7 @@ export default function SessionsPage() {
             <div className="day-group" key={group.date}>
               <header className="day-head">
                 <span className="day-date">{formatDayDate(group.date)}</span>
-                {group.sessions.length > 1 ? <span className="day-total">{formatDuration(group.totalMinutes)}</span> : null}
+                <span className={`day-total${!group.totalMinutes ? " is-zero" : ""}`}>{formatDuration(group.totalMinutes)}</span>
               </header>
               <ul className="band-list">
                 {group.sessions.map((session) => (

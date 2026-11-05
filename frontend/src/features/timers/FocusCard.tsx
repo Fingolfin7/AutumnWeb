@@ -9,6 +9,7 @@ import { errorMessage } from "@/api/errors";
 import type { Timer } from "@/api/types";
 import { elapsedSeconds, formatClock, formatTime, parseInstant } from "@/lib/format";
 import { useDeleteTimer, useRestartTimer } from "./api";
+import { ClockDigits } from "./ClockDigits";
 
 /* A running timer as a .focus-card (partials/active_timers_*.html). Live
    figures are computed from `now`, which the parent ticks once a second, so
@@ -64,7 +65,7 @@ export function FocusCard({
         <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
       </h2>
       <button className="focus-time" type="button" aria-label={`${expanded ? "Collapse" : "Open"} ${timer.project.name} timer`} aria-expanded={expanded} onClick={onExpand}>
-        <span className="num">{formatClock(elapsed)}</span>
+        <span className="num"><ClockDigits value={formatClock(elapsed)} /></span>
       </button>
       <div className="focus-details">
       {timer.subproject_allocations.length ? (

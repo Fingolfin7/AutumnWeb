@@ -4,6 +4,7 @@ import { formatTime } from "@/lib/format";
 import { readNoteDraft, writeNoteDraft } from "@/lib/noteDraft";
 import { faClock, faExpand, faLink, faMicrophone } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
+import { renderNoteDraft } from "./SessionNote";
 
 /* The session note editor (session_note_editor.js + the markup the edit-
    session and stop-timer templates wrap around it): a markdown toolbar
@@ -81,6 +82,8 @@ export function NoteEditor({
   sessionTitle,
   preview = false,
   onDone,
+  initiallyWriting = false,
+  richPreview = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -102,10 +105,13 @@ export function NoteEditor({
   sessionTitle?: string;
   preview?: boolean;
   onDone?: () => boolean | void | Promise<boolean | void>;
+  initiallyWriting?: boolean;
+  richPreview?: boolean;
 }) {
   const [edited, setEdited] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [writing, setWriting] = useState(false);
+  const [writing, setWriting] = useState(initiallyWriting);
+  const [richEditing, setRichEditing] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const baseline = useRef(value);
@@ -124,7 +130,7 @@ export function NoteEditor({
       node.setSelectionRange(selection.current.start, selection.current.end);
     }
     wasWriting.current = writing;
-  }, [value, writing, preview]);
+  }, [value, writing, preview, richEditing]);
   useEffect(() => {
     if (!persistKey) return;
     const draft = readNoteDraft(persistKey);
@@ -205,6 +211,8 @@ export function NoteEditor({
     if (!textarea || disabled) return;
     edit(textarea);
     change(textarea.value);
+    setRichEditing(true);
+    requestAnimationFrame(() => textarea.focus());
     textarea.focus();
   };
 
@@ -280,7 +288,9 @@ export function NoteEditor({
             setWriting(true);
           }}><Icon icon={faExpand} /></button> : null}
         </div>
+        {richPreview && !richEditing && !writing ? <button className="note-rich-preview" type="button" aria-label="Edit session note" onClick={() => { setRichEditing(true); requestAnimationFrame(() => textareaRef.current?.focus()); }}><span className="session-note-body" dangerouslySetInnerHTML={{ __html: renderNoteDraft(value || placeholder) }} /></button> : null}
         <textarea
+          hidden={richPreview && !richEditing && !writing}
           ref={textareaRef}
           id={textareaId}
           name={name}
@@ -292,7 +302,7 @@ export function NoteEditor({
           data-autofocus={autoFocus || undefined}
           lang={lang}
           onChange={(event) => change(event.target.value)}
-          onBlur={onBlur}
+          onBlur={(event) => { onBlur?.(); if (!event.currentTarget.closest(".note-editor-field")?.contains(event.relatedTarget)) setRichEditing(false); }}
           onKeyDown={onKeyDown}
         />
       </div>

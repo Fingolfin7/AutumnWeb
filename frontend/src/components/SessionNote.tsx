@@ -1,5 +1,20 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
+/** Local draft preview. Escape first; saved notes still use the server's renderer. */
+export function renderNoteDraft(text: string): string {
+  const node = document.createElement("div"); node.textContent = text;
+  const inline = (line: string) => line
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*\n]+)\*/g, "<em>$1</em>")
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+  return node.innerHTML.split(/\n\s*\n/).map((paragraph) => {
+    const lines = paragraph.split("\n");
+    if (lines.every((line) => /^\d+[.)]\s/.test(line))) return `<ol>${lines.map((line) => `<li>${inline(line.replace(/^\d+[.)]\s+/, ""))}</li>`).join("")}</ol>`;
+    if (lines.every((line) => /^[-*]\s/.test(line))) return `<ul>${lines.map((line) => `<li>${inline(line.slice(2))}</li>`).join("")}</ul>`;
+    return `<p>${inline(paragraph).replace(/\n/g, "<br>")}</p>`;
+  }).join("");
+}
+
 /** Keep complete paragraphs/list items in previews; the full journal remains in place. */
 function previewHtml(html: string) {
   const root = document.createElement("div");
@@ -63,8 +78,7 @@ export function SessionNote({ html, text, id, identity, onEdit, passage, search 
   const root = useRef<HTMLDivElement>(null);
   const full = useMemo(() => {
     if (html) return html;
-    const node = document.createElement("div"); node.textContent = text ?? "";
-    return node.innerHTML.replace(/\n/g, "<br>");
+    return renderNoteDraft(text ?? "");
   }, [html, text]);
   const preview = useMemo(() => {
     if (passage) {
