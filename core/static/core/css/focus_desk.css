@@ -5464,6 +5464,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .chart-terms ol { grid-template-columns: 1fr; }
 }
 /* Stream V2 */
+.commitment-target-sheet .commitment-editor .split { display: block; }
+.commitment-target-sheet .commitment-editor .slab { background: transparent; box-shadow: none; border: 0; padding-inline: 0; }
+.commitment-target-sheet .commitment-editor-actions { position: sticky; bottom: 0; z-index: 2; padding: var(--s3) 0; background: var(--surface-2); border-top: 1px solid var(--hairline); }
 .review-desk { grid-template-columns: minmax(0, 1fr); }
 .review-main-controls, .review-toolbar { min-width: 0; }
 .review-desk .review-range { grid-template-columns: minmax(0, 1fr) 44px 44px; }

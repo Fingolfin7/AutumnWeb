@@ -1,7 +1,6 @@
 import { DateInput } from "@/components/ui";
 import { CommitmentMeter } from "./CommitmentMeter";
 import { TargetInput } from "./TargetInput";
-import { hasPendingChange, liveDefinition } from "./QuickTarget";
 import { formatDate, formatDuration } from "@/lib/format";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
@@ -27,7 +26,7 @@ import type { Commitment } from "@/api/types";
 import { DeskHead, FieldErrors, FormLevelErrors } from "@/features/contexts-tags/ui";
 import { hasErrors, NO_ERRORS, parseFormErrors, type FormErrors } from "@/features/contexts-tags/formErrors";
 import { useAllSubprojects, useCommitments, useCreateCommitment, useRestartCommitment, useUpdateCommitment } from "./api";
-import { monthDay, monthDayYear, progressOf, redirectFor, todayIn } from "./display";
+import { hasPendingChange, liveDefinition, monthDay, monthDayYear, progressOf, redirectFor, todayIn } from "./display";
 import {
   API_FIELD_MAP,
   classifyChanges,
@@ -72,12 +71,13 @@ export interface CommitmentFormProps {
   commitment?: Commitment;
   /** Create: a scope to start from (a project page's "Add commitment"). */
   prefill?: { aggregation: Aggregation; targetId: number };
+  onClose?: () => void;
 }
 
 /* One form for creating and editing a commitment (create_commitment.html and
    update_commitment.html). The scope metadata the old pages had injected is
    derived from the projects, subprojects, contexts and tags lists. */
-export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProps) {
+export function CommitmentForm({ mode, commitment, prefill, onClose }: CommitmentFormProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const projects = useAllProjects();
@@ -87,6 +87,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
   const create = useCreateCommitment();
   const update = useUpdateCommitment(commitment?.id ?? 0);
   const restart = useRestartCommitment(commitment?.id ?? 0);
+  const finish = (saved: Commitment) => onClose ? onClose() : navigate(redirectFor(saved));
 
   /* The scope-target label of an existing commitment is its target's name. */
   const [base, setBase] = useState<FormState>(() => {
@@ -205,7 +206,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
       create.mutate(createPayload(current), {
         onSuccess: (created) => {
           toast.success("Commitment added successfully");
-          navigate(redirectFor(created));
+          finish(created);
         },
         onError: onFailure,
       });
@@ -229,7 +230,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               ? `Commitment updated. Changes to ${changes.nextPeriod.join(", ")} apply from ${monthDayYear(queued.effective_from)}.`
               : "Commitment updated successfully",
           );
-          navigate(redirectFor(saved));
+          finish(saved);
         },
         onError: onFailure,
       },
@@ -245,7 +246,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
           toast.success(
             `Commitment restarted. ${keepBalance ? "The existing bank balance was carried forward." : "The bank balance was reset to zero."}`,
           );
-          navigate(redirectFor(saved));
+          finish(saved);
         },
         onError: onFailure,
       },
@@ -268,7 +269,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
 
   return (
     <>
-      <DeskHead title={commitment ? <span className={commitment.target.kind === "project" ? "text-red" : commitment.target.kind === "subproject" ? "text-blue" : undefined}>{commitment.target.name}</span> : "New commitment"} />
+      {!onClose ? <DeskHead title={commitment ? <span className={commitment.target.kind === "project" ? "text-red" : commitment.target.kind === "subproject" ? "text-blue" : undefined}>{commitment.target.name}</span> : "New commitment"} /> : null}
 
       <form className="fields commitment-editor" onSubmit={submit} noValidate>
         <div className="split">
@@ -330,7 +331,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               </div>
             </section>
 
-            {commitment && hasPendingChange(commitment) ? <div className="slab slab-pad"><PendingNotice commitment={commitment} nameOf={nameOf} /><button className="btn btn--quiet" type="button" disabled={busy} onClick={() => update.mutate({ body: liveDefinition(commitment), version: commitment.version }, { onSuccess: (saved) => { toast.success("Pending changes cancelled."); navigate(redirectFor(saved)); }, onError: onFailure })}>Cancel pending change</button></div> : null}
+            {commitment && hasPendingChange(commitment) ? <div className="slab slab-pad"><PendingNotice commitment={commitment} nameOf={nameOf} /><button className="btn btn--quiet" type="button" disabled={busy} onClick={() => update.mutate({ body: liveDefinition(commitment), version: commitment.version }, { onSuccess: (saved) => { toast.success("Pending changes cancelled."); finish(saved); }, onError: onFailure })}>Cancel pending change</button></div> : null}
             <section className="slab slab-pad">
               <div className="field">
                 <label htmlFor="id_aggregation_type">Applies to</label>
@@ -496,10 +497,10 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                 </aside>
               ) : null}
 
-              <div className="form-actions">
-                <AppLink className="btn btn--ghost" href={urls.home()}>
+              <div className="form-actions commitment-editor-actions">
+                {onClose ? <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button> : <AppLink className="btn btn--ghost" href={urls.home()}>
                   <Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}
-                </AppLink>
+                </AppLink>}
                 {commitment ? (
                   <AppLink className="btn btn--stop" href={urls.deleteCommitment(commitment.id)}>
                     <Icon icon={faTrash} /> Delete
@@ -508,14 +509,14 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                 {commitment && changes?.nextPeriod.length ? <span className="muted">Applies from {formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}</span> : null}
                 {!showRestart ? (
                   <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}>
-                    <Icon icon={faCheckCircle} /> {commitment ? "Update commitment" : "Create commitment"}
+                    <Icon icon={faCheckCircle} /> {onClose ? "Save target" : commitment ? "Update commitment" : "Create commitment"}
                   </button>
                 ) : null}
               </div>
             </section>
           </div>
 
-          {commitment ? <ProgressPanel commitment={commitment} /> : null}
+          {commitment && !onClose ? <ProgressPanel commitment={commitment} /> : null}
         </div>
       </form>
     </>
