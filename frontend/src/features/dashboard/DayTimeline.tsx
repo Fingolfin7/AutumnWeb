@@ -1,4 +1,3 @@
-import { AppLink, urls } from "@/app/links";
 import { formatDuration, formatTime, formatDayDate } from "@/lib/format";
 import { useNow } from "@/features/timers/api";
 import type { Timer } from "@/api/types";
@@ -155,7 +154,7 @@ export function DayTimeline({
                     >
                       <title>
                         {lane.project.name}
-                        {b.label ? ` / ${b.label}` : ""}: {formatTime(b.start)}–{b.is_live ? "now" : formatTime(b.end)}
+                        {b.label ? ` / ${b.label}` : ""}: {formatTime(b.start)}â€“{b.is_live ? "now" : formatTime(b.end)}
                       </title>
                     </rect>
                   </g>
@@ -169,15 +168,11 @@ export function DayTimeline({
               </g>
             ) : null}
           </svg>
-          <div className="day-ledger-phone" aria-label="Time by project">
-            {lanes.map((lane) => {
-              const minutes = lane.blocks.reduce((sum, block) => sum + block.minutes, 0);
-              return <div className="ledger-phone-project" key={lane.project.id}>
-                <AppLink href={`${urls.sessions()}?include_projects=${lane.project.id}&start_date=${timeline.start_date}&end_date=${timeline.end_date}`} className="ledger-phone-label"><span className="text-red">{lane.project.name}</span><span className="text-green">{formatDuration(minutes)}</span></AppLink>
-                <svg viewBox="0 0 300 8" preserveAspectRatio="none" className="ledger-phone-bar" role="img" aria-label={`${lane.project.name}: ${formatDuration(minutes)}`}><rect x="0" y="0" width={Math.max(1, total ? minutes / total * 300 : 0)} height="8" rx="4" className="ledger-block" /></svg>
-                {lane.blocks.some((block) => block.is_live) ? <small className="ledger-live-label">Including live time</small> : null}
-              </div>;
-            })}
+          <div className="day-ledger-phone" aria-label="Day's blocks">
+            <svg viewBox="0 0 1000 20" preserveAspectRatio="none" className="day-ember-ribbon" role="img" aria-label={`${formatDuration(total)} across ${blocks.length} blocks`}>
+              {blocks.map((block) => <rect key={`${block.session_id}-${block.start}`} x={(x(Date.parse(block.start)) - 240) / 740 * 1000} y="2" width={Math.max(3, (x(block.is_live ? now : Date.parse(block.end!)) - x(Date.parse(block.start))) / 740 * 1000)} height="16" rx="4" className={`ledger-block${block.is_live ? " is-live" : ""}`}><title>{block.project.name}: {formatTime(block.start)} · {formatDuration(block.minutes)}</title></rect>)}
+            </svg>
+            <div className="day-ribbon-labels"><span>{formatTime(new Date(from))}</span><span>{range === "today" ? "Now" : timeline.range_title}</span><span>{formatTime(new Date(to))}</span></div>
           </div>
         </>
       ) : (

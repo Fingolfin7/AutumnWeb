@@ -4833,3 +4833,46 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 
 .review-projects:not([data-chart-kind="context"]):not([data-chart-kind="histogram"]):not([data-chart-kind="cumulative"]) .chart-series button > span { color: var(--project); }
 .review-projects--subprojects:not([data-chart-kind="histogram"]):not([data-chart-kind="cumulative"]) .chart-series button > span { color: var(--sub); }
+
+
+/* ================================================================= Stream T
+   Today is the picture of a day; the journal remains the reading surface. */
+.today-heading { flex-wrap: wrap; align-items: baseline; gap: var(--s2) var(--s4); }
+.today-heading .today-total { margin-left: auto; color: var(--duration); font: 600 var(--fs-lg)/1.4 var(--font-display); }
+.today-total small { display: block; color: var(--muted); font: 400 var(--fs-xs)/1.4 var(--font-ui); text-align: right; }
+.today-picture { display: grid; gap: var(--s5); align-items: start; }
+.today-picture .day-ledger { min-width: 0; margin: 0; }
+.today-picture .day-ledger .today-section-head p { display: none; }
+.today-picture .today-commitments { min-width: 0; width: 100%; max-width: 480px; margin: 0; }
+.today-commitment-name { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
+.today-picture .today-commitment { padding-block: var(--s2); }
+.today-pickups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--s5); }
+.today-idle .today-quick-pick { display: flex; align-items: center; gap: var(--s4); padding: var(--s3) 0; min-height: 56px; text-align: left; background: transparent; border: 0; border-bottom: 1px solid var(--hairline); cursor: pointer; }
+.today-idle .today-quick-pick > .icon { flex: none; color: var(--brand); width: 20px; }
+.today-idle .capture-pick-label > .text-red { font-weight: 500; }
+.today-idle .capture-pick-label small { font-size: var(--fs-xs); }
+.today-something-else { margin-top: var(--s2); }
+.timer-dock--card-visible { display: none; }
+.ember-clock .focus-autostop-bar, .ember-clock.is-compact .focus-autostop-bar { position: relative; inset: auto; width: auto; grid-column: 1 / -1; margin: var(--s3) 0 0; }
+.ember-clock .focus-autostop-fill { display: block; width: 100%; }
+@media (min-width: 1000px) {
+  .today-picture:has(.today-commitments) { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: var(--s6); }
+  .today-picture .today-section-head { flex-wrap: wrap; gap: var(--s2); }
+  .ember-clock.is-compact .timer-note-editor { margin-top: var(--s3); }
+}
+@media (max-width: 999px) {
+  .today-page > * { order: 0 !important; }
+  .today-heading .today-date { font-size: var(--fs-sm); }
+  .today-heading .today-total { font-size: var(--fs-lg); }
+  .today-heading .page-title { width: 100%; }
+  .today-picture { display: contents; }
+  .today-picture .day-ledger { padding: var(--s3) 0; border: 0; background: transparent; box-shadow: none; }
+  .today-picture .day-ledger h2 { display: none; }
+  .today-picture .day-ledger .today-section-head { justify-content: flex-end; margin-bottom: var(--s2); }
+  .day-ledger-phone { display: block; }
+  .day-ember-ribbon { display: block; width: 100%; height: 20px; background: var(--raised); border-radius: var(--r-xs); }
+  .day-ribbon-labels { display: flex; justify-content: space-between; color: var(--time); font-size: var(--fs-xs); margin-top: var(--s1); }
+  .today-picture .today-commitments { order: 2; }
+  .today-pickups { grid-template-columns: minmax(0, 1fr); }
+  .today-idle .today-section-head { flex-wrap: wrap; }
+}
