@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { faEllipsisH, faPen, faRedo, faSlidersH, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog, Sheet } from "@/components/Sheet";
@@ -8,14 +8,43 @@ import { NoteEditor } from "@/components/NoteEditor";
 import { api, unwrap } from "@/api/client";
 import { AppLink, urls } from "@/app/links";
 import { dayPortions } from "@/lib/sessions";
-import { formatDate, formatDuration, localDateKey, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
+import { formatDate, formatDayDate, formatDuration, localDateKey, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
 import { useDeleteSession, useUpdateSession, type SessionRow } from "./api";
 
-/* Journal row shared with Today. Actions are explicit; a left swipe is an
-   optional shortcut that reveals the same controls without moving the prose. */
+/** A day of the journal: its heading shares the rows' duration column. Pass
+ *  `label` to name the day in words instead of its date. */
+export function JournalDay({ date, label, minutes, children }: { date?: string; label?: string; minutes?: number; children?: ReactNode }) {
+  return <div className="day-group">
+    <header className="day-head">
+      <span className="day-date">{label ?? (date ? formatDayDate(date) : "")}</span>
+      {minutes !== undefined ? <span className={`day-total${!Math.round(minutes) ? " is-zero" : ""}`}>{formatDuration(minutes)}</span> : null}
+    </header>
+    {children ? <ul className="band-list">{children}</ul> : null}
+  </div>;
+}
+
+/** Why a search returned this row: the fields it matched, or its related meaning. */
+function matchReason(session: SessionRow, search?: string) {
+  if (session.match === "related") return session.match_passage ? "Related in meaning to this passage" : "Related in meaning to the project or note";
+  const words = search?.toLowerCase().match(/"[^"]+"|[^\s]+/g)?.map((word) => word.replace(/^"|"$/g, "")) ?? [];
+  if (!words.length) return null;
+  const has = (text?: string | null) => words.some((word) => text?.toLowerCase().includes(word));
+  const fields = [
+    has(session.note) ? "the note" : "",
+    has(session.project.name) ? "the project name" : "",
+    session.subproject_allocations.some((sub) => has(sub.name)) ? "the subproject" : "",
+  ].filter(Boolean);
+  return `Matches “${search}”${fields.length ? ` in ${fields.join(" and ")}` : ""}`;
+}
+
+/* The one journal row, on Today, Sessions and project pages: project and
+   duration, then subproject and time on one truncating line, then the note.
+   `hideProject` drops the project line where the page already names it, and
+   `day` shows a midnight-crossing session's share of that day. A left swipe is
+   an optional shortcut to the same actions. */
 export function SessionBand({ session, showDate, hideProject = false, onEditNote, onNoteSaved, search, day }: { search?: string; day?: string; session: SessionRow; showDate?: boolean; hideProject?: boolean; onEditNote?: (session: SessionRow) => void; onNoteSaved?: (session: SessionRow) => void }) {
   const start = useStartTimer();
   const remove = useDeleteSession();
@@ -70,6 +99,9 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
     };
   }, []);
 
+  const minutes = (day ? dayPortions(session).find((part) => part.date === day)?.minutes : undefined) ?? session.duration_minutes ?? 0;
+  const reason = matchReason(session, search);
+
   const restart = () => {
     const subprojects = session.subproject_allocations.map((a) => ({ id: a.subproject_id, name: a.name }));
     start.mutate(
@@ -86,26 +118,24 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
   };
 
   return (
-    <li ref={row} className="band journal-entry" id={`session-${session.id}`}>
+    <li ref={row} className={`band journal-entry${hideProject ? " journal-entry--in-project" : ""}`} id={`session-${session.id}`}>
       <div className="journal-heading">
-        <div className="journal-identity">
-        <AppLink className="session-project" title={session.project.name} href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink>
-      <div className="journal-meta">
-        {session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}
-        {showDate ? <span>{formatShortDate(session.start)}</span> : null}
-        <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
-        {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
-      </div>
+        {!hideProject ? <AppLink className="session-project" title={session.project.name} href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink> : null}
+        <span className={`journal-duration${!Math.round(minutes) ? " is-zero" : ""}`}>{formatDuration(minutes)}</span>
+        <div className="journal-meta">
+          {session.subproject_allocations.length ? <span className="journal-subs" title={session.subproject_allocations.map((sub) => sub.name).join(", ")}>{session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}</span> : null}
+          {showDate ? <span className="journal-time">{formatShortDate(session.start)}</span> : null}
+          <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
+          {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
         </div>
-        <span className={`journal-duration${!session.duration_minutes ? " is-zero" : ""}`}>{formatDuration(day ? dayPortions(session).find((part) => part.date === day)?.minutes ?? session.duration_minutes : session.duration_minutes)}</span>
         <div className="journal-row-actions">
-          <button className="btn btn--quiet" type="button" aria-label="Edit" onClick={editNote}>Edit</button>
-          <button className="btn-icon journal-delete" type="button" aria-label="Delete session" title="Delete session" onClick={() => setConfirming(true)}><Icon icon={faTrash} /></button>
+          <button className="btn-icon journal-action" type="button" aria-label="Edit note" title="Edit note" onClick={editNote}><Icon icon={faPen} /></button>
+          <button className="btn-icon journal-action journal-delete" type="button" aria-label="Delete session" title="Delete session" onClick={() => setConfirming(true)}><Icon icon={faTrash} /></button>
+          <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" title="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${session.id}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
         </div>
-        <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${session.id}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
       </div>
       {dayPortions(session).length > 1 ? <p className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === localDateKey(new Date()) ? "today" : part.date === localDateKey(new Date(Date.now() - 86400000)) ? "yesterday" : formatShortDate(part.date)}`).join(" · ")}</p> : null}
-      {session.match === "related" ? <p className="journal-match-reason">{session.match_passage ? "Related meaning in this passage" : "Related meaning in the project or session note"}</p> : search ? <p className="journal-match-reason">Matches “{search}”</p> : null}
+      {reason ? <p className="journal-match-reason">{reason}</p> : null}
       {!session.note && !session.note_html && !editing ? <button className="btn btn--quiet journal-add-note" type="button" onClick={editNote}>Add a note</button> : null}
       {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote search={search} id={`note-${session.id}`} html={session.note_html} text={session.note} onEdit={editNote} passage={session.match_passage} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
 

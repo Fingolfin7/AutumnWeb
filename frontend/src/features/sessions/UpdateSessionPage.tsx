@@ -19,8 +19,8 @@ import { parseSessionParam, useSession, useUpdateSession, type SessionRow } from
 
 /* /update_session/<id or uuid>/ (update_session.html). Three slabs' worth of
    fields in two: what it was (project), when it ran, the note, then how the
-   time splits across subprojects. Only fields the user changed are sent, so
-   an untouched start/end keeps its sub-second precision, and the PATCH
+   time splits across subprojects. Times show minutes; only fields the user
+   changed are sent, so an untouched start/end keeps its seconds, and the PATCH
    carries the version the form was opened on (If-Match). */
 export default function UpdateSessionPage() {
   const { sessionId } = useParams();
@@ -70,8 +70,8 @@ function initialState(session: SessionRow): FormState {
   return {
     projectId: session.project.id,
     projectText: session.project.name,
-    start: toDateTimeLocal(session.start, true),
-    end: toDateTimeLocal(session.end, true),
+    start: toDateTimeLocal(session.start, false),
+    end: toDateTimeLocal(session.end, false),
     note: session.note ?? "",
     subprojectIds: session.subproject_allocations.map((a) => a.subproject_id).sort((a, b) => a - b),
   };
@@ -159,7 +159,7 @@ function SessionForm({ session }: { session: SessionRow }) {
     if (start && end && new Date(end) < new Date(start)) errors.end = ["End time cannot be earlier than start time."];
     /* Picking the other occurrence of a repeated time changes the instant
        without changing the field's text. */
-    const moved = (instant: string, was: string | null) => !was || Math.floor(Date.parse(instant) / 1000) !== Math.floor(Date.parse(was) / 1000);
+    const moved = (instant: string, was: string | null) => !was || Math.floor(Date.parse(instant) / 60_000) !== Math.floor(Date.parse(was) / 60_000);
     if (start && (form.start !== initial.start || moved(start, baseline.start))) body.start = start;
     if (end && (form.end !== initial.end || moved(end, baseline.end))) body.end = end;
 
@@ -230,12 +230,8 @@ function SessionForm({ session }: { session: SessionRow }) {
   };
 
   return (
-    <>
-      <div className="desk-head">
-        <div>
-          <h1 className="page-title">{baseline.project.name || "Session"}</h1>
-        </div>
-      </div>
+    <div className="session-edit-page">
+      <h1 className="page-title session-edit-title text-red" title={baseline.project.name}>{baseline.project.name || "Session"}</h1>
 
       {conflict || changedElsewhere ? (
         <div ref={bannerRef} className="msg msg--warning" role="alert" style={{ marginBottom: "var(--s4)" }}>
@@ -270,7 +266,7 @@ function SessionForm({ session }: { session: SessionRow }) {
       ) : null}
 
       <form className="fields session-edit-form" onSubmit={submit} noValidate>
-        <section className="slab slab-pad">
+        <section className="session-edit-section">
           <ProjectField
             projects={projects.data ?? []}
             loading={projects.isPending}
@@ -286,7 +282,7 @@ function SessionForm({ session }: { session: SessionRow }) {
               <input
                 id={startId}
                 type="datetime-local"
-                step={1}
+                step={60}
                 value={form.start}
                 onChange={(event) => setForm({ ...form, start: event.target.value })}
               />
@@ -298,7 +294,7 @@ function SessionForm({ session }: { session: SessionRow }) {
               <input
                 id={endId}
                 type="datetime-local"
-                step={1}
+                step={60}
                 value={form.end}
                 onChange={(event) => setForm({ ...form, end: event.target.value })}
               />
@@ -307,10 +303,10 @@ function SessionForm({ session }: { session: SessionRow }) {
             </div>
           </div>
 
-          <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} disabled={update.isPending} persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
+          <NoteEditor richPreview writerOnly placeholder="Add a note" sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} disabled={update.isPending} persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
         </section>
 
-        <section className="slab slab-pad">
+        <section className="session-edit-section">
           <p className="field-label">Subprojects</p>
           <div className="check-grid" id="subproject_options">
             {form.projectId === null ? (
@@ -348,7 +344,7 @@ function SessionForm({ session }: { session: SessionRow }) {
           </button>
         </div>
       </form>
-    </>
+    </div>
   );
 }
 

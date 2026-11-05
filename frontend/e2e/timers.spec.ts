@@ -36,13 +36,18 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
 
   await page.goto("/timers/");
   const runningCard = page.getByRole("article", { name: "Running timer: Garden Planner App" });
-  await runningCard.getByRole("button", { name: "Open Garden Planner App timer", exact: true }).click();
-  await runningCard.getByRole("textbox", { name: "Session note" }).fill(note);
-  await runningCard.getByRole("button", { name: "Expand note" }).click();
+  await runningCard.getByRole("button", { name: "Edit session note", exact: true }).click();
   const writer = page.getByRole("dialog", { name: "Full-screen note writer" });
-  await expect(writer.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
+  // A phone goes straight to the writer; a desktop edits in place and can expand.
+  if (testInfo.project.name === "phone") {
+    await writer.getByRole("textbox", { name: "Session note" }).fill(note);
+  } else {
+    await runningCard.getByRole("textbox", { name: "Session note" }).fill(note);
+    await runningCard.getByRole("button", { name: "Expand note" }).click();
+    await expect(writer.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
+  }
   await writer.getByRole("button", { name: "Done" }).click();
-  await expect(runningCard.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
+  await expect(runningCard.locator(".timer-note-editor")).toContainText(note);
   const stoppedId = await runningCard.getAttribute("data-timer-id");
   await expect.poll(async () => (await (await page.request.get(`/api/v2/sessions/${stoppedId}?include=note`)).json()).note).toBe(note);
   await runningCard.getByRole("link", { name: "Stop" }).click();
@@ -76,7 +81,7 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
 test.describe("offline", () => {
   test.use({ serviceWorkers: "allow" });
 
-  test("a timer started offline is saved, then synced when the connection returns", async ({ page, context }) => {
+  test("a timer started offline is saved, then synced when the connection returns", async ({ page, context }, testInfo) => {
     // Load the app online so the service worker, the build and the project list are cached.
     await page.goto("/timers/");
     await page.evaluate(() => navigator.serviceWorker.ready);
@@ -102,10 +107,14 @@ test.describe("offline", () => {
     await expect(card).toBeVisible();
     await expect(card.getByText("Running · saved offline")).toBeVisible();
 
-    await card.getByRole("button", { name: "Open Piano Practice timer", exact: true }).click();
-    await card.getByRole("textbox", { name: "Session note" }).fill("A journal started offline.");
-    await card.getByRole("button", { name: "Expand note", exact: true }).click();
+    await card.getByRole("button", { name: "Edit session note", exact: true }).click();
     const offlineWriter = page.getByRole("dialog", { name: "Full-screen note writer" });
+    if (testInfo.project.name === "phone") {
+      await offlineWriter.getByRole("textbox", { name: "Session note" }).fill("A journal started offline.");
+    } else {
+      await card.getByRole("textbox", { name: "Session note" }).fill("A journal started offline.");
+      await card.getByRole("button", { name: "Expand note", exact: true }).click();
+    }
     await expect(offlineWriter.getByRole("status")).toHaveText("Draft kept on this device");
     await offlineWriter.getByRole("button", { name: "Done", exact: true }).click();
     await expect(offlineWriter).toHaveCount(0);
@@ -113,12 +122,11 @@ test.describe("offline", () => {
     await expect(toasts(page).getByText(/Synced 1 offline change/)).toBeVisible({ timeout: 30_000 });
     await expect(card.getByText("Running · saved offline")).toHaveCount(0);
     await expect(card.getByText("Running", { exact: true })).toBeVisible();
-    await expect(card.getByRole("textbox", { name: "Session note" })).toHaveValue("A journal started offline.");
+    await expect(card.locator(".timer-note-editor")).toContainText("A journal started offline.");
     const id = await card.getAttribute("data-timer-id");
     await expect.poll(async () => (await (await page.request.get(`/api/v2/sessions/${id}?include=note`)).json()).note).toBe("A journal started offline.");
     await page.reload();
-    await card.getByRole("button", { name: "Open Piano Practice timer", exact: true }).click();
-    await expect(card.getByRole("textbox", { name: "Session note" })).toHaveValue("A journal started offline.");
+    await expect(card.locator(".timer-note-editor")).toContainText("A journal started offline.");
   });
 
   test("an offline stop keeps its note and syncs the original session", async ({ page, context }) => {

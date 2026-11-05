@@ -8,18 +8,17 @@ import type { Timer } from "@/api/types";
 import { formatDayDate, formatDuration, localDateKey } from "@/lib/format";
 import { FocusCard } from "@/features/timers/FocusCard";
 import { TimerNoteEditor } from "@/features/timers/TimerNoteEditor";
-import { TimerReminders } from "@/features/timers/TimerReminders";
-import { useNow, useOutsideContextTimerCount, useTimers } from "@/features/timers/api";
+import { useNow, useOutsideContextTimerCount, useStartTimer, useTimers } from "@/features/timers/api";
 import { groupByDay } from "@/lib/sessions";
-import { SessionBand } from "@/features/sessions/SessionBand";
+import { JournalDay, SessionBand } from "@/features/sessions/SessionBand";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { CommitmentMeter } from "@/features/commitments/CommitmentMeter";
+import { CaptureLink } from "@/features/timers/CaptureLayer";
 import { CapturePickLabel } from "@/features/timers/CapturePicker";
-import { useStartTimer } from "@/features/timers/api";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
 import { Icon } from "@/components/Icon";
-import { faPlay } from "@fortawesome/free-solid-svg-icons";
+import { faHistory, faPlay, faSearch } from "@fortawesome/free-solid-svg-icons";
 import { DayTimeline, ledgerEntries } from "./DayTimeline";
 import { useDashboard, useRefreshOnRunningChange, useTimeline, type Dashboard, type TimelineRange } from "./api";
 
@@ -50,14 +49,16 @@ function HomeContent({ data }: { data: Dashboard }) {
   const outside = useOutsideContextTimerCount();
   const { setContextId } = useActiveContext();
   const firstRun = !running.length && !data.recent_sessions.length && !data.quick_starts.length;
-  const today = groupByDay(data.recent_sessions.flatMap((day) => day.sessions)).filter((day) => day.date === localDateKey(new Date(now)));
+  const today = groupByDay(data.recent_sessions.flatMap((day) => day.sessions)).find((day) => day.date === localDateKey(new Date(now)));
   return (
     <div className="today-page">
       <header className="today-heading">
         <h1 className="page-title">Today</h1>
-        <span className="today-date">{formatDayDate(new Date(now))}</span>
-        <span className="today-heading-dot" aria-hidden="true">·</span>
-        <strong className="today-total" title={running.length ? "Including live time" : "Saved time today"}>{formatDuration(total)}</strong>
+        <p className="today-summary">
+          <span>{formatDayDate(new Date(now))}</span>
+          <span aria-hidden="true"> · </span>
+          <strong className="today-total" title={running.length ? "Including live time" : "Saved time today"}>{formatDuration(total)}</strong>
+        </p>
       </header>
       {firstRun ? <p className="muted">Pick a project and start. Your notes and time will make this day your own.</p> : null}
       {outside ? (
@@ -68,76 +69,80 @@ function HomeContent({ data }: { data: Dashboard }) {
           </button>
         </p>
       ) : null}
-      {running.length ? (
-        <section className="ember-deck" aria-label="Running timers">
-          {running.map((timer) => (
-            <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} />
-          ))}
-        </section>
-      ) : (
-        <StartCard items={data.quick_starts} />
-      )}
-      {!firstRun ? <div className="today-picture">
-        {timeline.data ? <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} /> : null}
-        {data.commitments.length ? <section className="today-commitments" aria-label="Commitment summary">
-          <div className="today-section-head"><h2>Commitments</h2><span className="muted today-scope">All contexts</span></div>
-          {data.commitments.map(({ commitment }) => <div className="today-commitment" key={commitment.id}>
-            <AppLink className="today-commitment-name text-red" href={urls.updateCommitment(commitment.id)}>{commitment.target.name}</AppLink>
-            <CommitmentMeter commitment={commitment} />
-            <details className="today-history"><summary>Balance & details</summary><CommitmentsPanel bare items={data.commitments.filter((item) => item.commitment.id === commitment.id)} /></details>
-          </div>)}
+      <div className="today-layout">
+        <div className="today-lead">
+          {running.length ? (
+            <section className="ember-deck" aria-label="Running timers">
+              {running.map((timer) => (
+                <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} />
+              ))}
+            </section>
+          ) : (
+            <StartCard items={data.quick_starts} />
+          )}
+        </div>
+        {!firstRun ? <aside className="today-rail">
+          {timeline.data ? <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} /> : null}
+          {data.commitments.length ? <section className="today-commitments" aria-label="Commitment summary">
+            <header className="today-section-head"><h2>Commitments</h2><span className="today-scope">All contexts</span></header>
+            {data.commitments.map(({ commitment }) => <div className="today-commitment" key={commitment.id}>
+              <AppLink className="today-commitment-name text-red" href={urls.updateCommitment(commitment.id)}>{commitment.target.name}</AppLink>
+              <CommitmentMeter commitment={commitment} />
+            </div>)}
+            <details className="today-history"><summary>Streaks & balance</summary><CommitmentsPanel bare items={data.commitments} /></details>
+          </section> : null}
+        </aside> : null}
+        {!firstRun ? <section className="today-journal" aria-label="Today's journal">
+          <JournalDay label="Today's journal" minutes={today?.totalMinutes}>
+            {today?.sessions.map((session) => <SessionBand key={session.id} session={session} day={today.date} />)}
+          </JournalDay>
+          {!today ? <p className="empty">Your saved sessions and notes will gather here.</p> : null}
+          <AppLink className="today-all-sessions" href={urls.sessions()}>All sessions</AppLink>
         </section> : null}
-      </div> : null}
-      {!firstRun ? (<>
-          <section className="today-journal" aria-label="Today's journal">
-            <header className="today-section-head">
-              <h2>Today's journal</h2>
-              <AppLink className="btn btn--quiet" href={urls.sessions()}>
-                All sessions
-              </AppLink>
-            </header>
-            {today.length ? (
-              today.map((day) => (
-                <div className="day-group" key={day.date}><header className="day-head"><span className="day-date">{formatDayDate(day.date)}</span><span className="day-total">{formatDuration(day.totalMinutes)}</span></header><ul className="band-list">
-                  {day.sessions.map((session) => (
-                    <SessionBand key={session.id} session={session} day={day.date} />
-                  ))}
-                </ul></div>
-              ))
-            ) : (
-              <p className="empty">Your saved sessions and notes will gather here.</p>
-            )}
-
-          </section>
-
-
-        </>) : null}
+      </div>
     </div>
   );
 }
 
 function TimerCard({ timer, now }: { timer: Timer; now: number }) {
   const stash = useRef<() => void>(() => undefined);
-  const [expanded, setExpanded] = useState(false);
-  return <FocusCard timer={timer} now={now} expanded={expanded} onExpand={() => setExpanded((value) => !value)} beforeStop={() => stash.current()}>
+  return <FocusCard timer={timer} now={now} beforeStop={() => stash.current()}>
     <TimerNoteEditor timer={timer} registerStash={(fn) => { stash.current = fn; }} />
-    {expanded ? <TimerReminders timer={timer} /> : null}
   </FocusCard>;
+}
+
+/** Recent project and subproject pairs, each project's subprojects beneath it. */
+function pickupRows(items: Dashboard["quick_starts"]) {
+  const projects = new Map<number, Dashboard["quick_starts"]>();
+  for (const item of items) projects.set(item.project.id, [...(projects.get(item.project.id) ?? []), item]);
+  return [...projects.values()].flatMap((pairs) => pairs.map((item, index) => ({ item, nested: index > 0 }))).slice(0, 6);
 }
 
 function StartCard({ items }: { items: Dashboard["quick_starts"] }) {
   const start = useStartTimer();
   const toast = useToast();
-  const recent = items.filter((item, index) => items.findIndex((other) => other.project.id === item.project.id) === index).slice(0, 6);
   return <section className="today-idle" aria-label="Start a new timer">
-    <div className="today-section-head"><h2>Pick up where you left off</h2></div>
-    <div className="today-pickups">{recent.map((item) => <button className="today-quick-pick" type="button" key={`${item.project.id}-${item.subprojects.map((sub) => sub.id).join("-")}`} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => start.mutate({
-      project_id: item.project.id, subproject_ids: item.subprojects.map((sub) => sub.id),
-      optimistic: { projectName: item.project.name, subprojects: item.subprojects },
-    }, { onSuccess: () => toast.success("Started timer"), onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`) })}>
-      <Icon icon={faPlay} /><CapturePickLabel project={item.project.name} sublabel={item.subprojects.map((sub) => sub.name).join(", ")} />
-    </button>)}
-    <AppLink className="today-quick-pick today-something-else" href={urls.startTimer()}>Another project</AppLink>
-    <AppLink className="today-quick-pick today-log-past" href="/start_timer/?mode=past">Log past time</AppLink></div>
+    <header className="today-section-head"><h2>Pick up where you left off</h2></header>
+    <div className="today-pickups">
+      {pickupRows(items).map(({ item, nested }) => {
+        const sublabel = item.subprojects.map((sub) => sub.name).join(", ");
+        return <button
+          className={`today-quick-pick${nested ? " is-nested" : ""}`}
+          type="button"
+          key={`${item.project.id}-${item.subprojects.map((sub) => sub.id).join("-")}`}
+          disabled={start.isPending}
+          aria-label={`Start ${item.project.name}${sublabel ? ` / ${sublabel}` : ""}`}
+          onClick={() => start.mutate({
+            project_id: item.project.id, subproject_ids: item.subprojects.map((sub) => sub.id),
+            optimistic: { projectName: item.project.name, subprojects: item.subprojects },
+          }, { onSuccess: () => toast.success("Started timer"), onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`) })}
+        >
+          <Icon icon={faPlay} />
+          {nested ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{sublabel || "Whole project"}</span></span> : <CapturePickLabel project={item.project.name} sublabel={sublabel} />}
+        </button>;
+      })}
+      <CaptureLink className="today-quick-pick today-something-else"><Icon icon={faSearch} /><span>Another project</span></CaptureLink>
+      <CaptureLink className="today-quick-pick today-log-past" mode="past"><Icon icon={faHistory} /><span>Log past time</span></CaptureLink>
+    </div>
   </section>;
 }

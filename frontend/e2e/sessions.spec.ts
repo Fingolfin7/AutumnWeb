@@ -94,7 +94,10 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await page.route("**/api/v2/projects/?*", (route) => route.fulfill({ json: { projects: [], total: 0, count: 0 } }));
   await page.goto(`/update_session/${id}/`);
   await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveValue(original.project.name);
-  await page.getByRole("textbox", { name: "Note", exact: true }).fill(`${note} (metadata unavailable)`);
+  await page.getByRole("button", { name: "Edit session note", exact: true }).click();
+  const writer = page.getByRole("dialog", { name: "Full-screen note writer" });
+  await writer.getByRole("textbox", { name: "Note", exact: true }).fill(`${note} (metadata unavailable)`);
+  await writer.getByRole("button", { name: "Done", exact: true }).click();
   const patched = page.waitForRequest((request) => request.url().endsWith(`/api/v2/sessions/${id}`) && request.method() === "PATCH");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   expect((await patched).postDataJSON()).not.toHaveProperty("project_id");

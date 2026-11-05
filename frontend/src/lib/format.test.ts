@@ -46,8 +46,8 @@ it("heroParts steps units up with magnitude", () => {
   ]);
 });
 
-it("formatClock pads hours", () => {
-  expect(formatClock(3725)).toBe("01:02:05");
+it("formatClock shows hours only once they count", () => {
+  expect(formatClock(3725)).toBe("1:02:05");
 });
 
 it("formats clock ranges without seconds and ignores invalid durations", () => {

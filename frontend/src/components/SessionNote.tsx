@@ -49,7 +49,7 @@ function highlight(html: string, query: string) {
 }
 
 /** Mark only timestamp text, never touch the sanitized markup or saved journal. */
-function timestamps(html: string) {
+export function markTimestamps(html: string) {
   const root = document.createElement("div"); root.innerHTML = html;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = []; while (walker.nextNode()) nodes.push(walker.currentNode as Text);
@@ -92,10 +92,10 @@ export function SessionNote({ html, text, id, identity, onEdit, passage, search 
     return previewHtml(matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 350 ? matched.outerHTML : full);
   }, [full, search, passage]);
   const clipped = preview !== full;
-  const rendered = useMemo(() => timestamps(highlight(open ? full : preview, search)), [full, preview, open, search]);
+  const rendered = useMemo(() => markTimestamps(highlight(open ? full : preview, search)), [full, preview, open, search]);
   useEffect(() => {
     if (!open) { setStuck(false); return; }
-    const heading = root.current?.closest(".journal-entry")?.querySelector(".journal-identity") ?? root.current;
+    const heading = root.current?.closest(".journal-entry")?.querySelector(".journal-heading") ?? root.current;
     if (!heading) return;
     const top = matchMedia("(max-width: 999px)").matches ? 56 : 72;
     const observer = new IntersectionObserver(([entry]) => setStuck(!!entry && !entry.isIntersecting && entry.boundingClientRect.bottom <= top), { rootMargin: `-${top}px 0px 0px 0px` });

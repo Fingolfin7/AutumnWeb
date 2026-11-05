@@ -57,12 +57,14 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [start, setStart] = useState(() => toDateTimeLocal(timer.start));
-  const [end, setEnd] = useState(() => toDateTimeLocal(new Date(requestedAt)));
+  const [start, setStart] = useState(() => toDateTimeLocal(timer.start, false));
+  const [end, setEnd] = useState(() => toDateTimeLocal(new Date(requestedAt), false));
   const [endTouched, setEndTouched] = useState(false);
   const [allocations, setAllocations] = useState<{ subproject_id: number; allocation_bp: number }[] | null>(null);
   const startTime = useLocalTime(start, timer.start);
   const endTime = useLocalTime(end);
+  /* Minute fields: an untouched start keeps the seconds it was saved with. */
+  const startMoved = start !== toDateTimeLocal(timer.start, false);
   const launched = useRef(false);
   const initialNote = useRef(openingNote);
   const draft = useNoteDraft({
@@ -123,7 +125,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
       if (saved && !current.pending_sync && !(await draft.flush())) return;
       let target = currentRef.current;
       if (!saved) {
-        if (start !== toDateTimeLocal(timer.start)) {
+        if (startMoved) {
           if (timer.pending_sync && timer.uuid) updateQueuedStart(timer.uuid, startTime.instant);
           else
             target = (await unwrap(
@@ -134,7 +136,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
             )) as Timer;
         }
         await stop.mutateAsync({ timer: target, note, end: endIso, ...(allocations ? { allocations } : {}) });
-      } else if (endTouched || start !== toDateTimeLocal(timer.start) || allocations) {
+      } else if (endTouched || startMoved || allocations) {
         if (current.pending_sync) {
           setError("This stop is queued. Reconnect before editing the saved session.");
           return;
@@ -143,7 +145,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
           api.PATCH("/api/v2/sessions/{session_id}", {
             params: { path: { session_id: target.id }, header: { "If-Match": target.version } },
             body: {
-              start: startTime.instant,
+              ...(startMoved ? { start: startTime.instant } : {}),
               end: endIso,
               ...(allocations ? { subproject_allocations: allocations } : {}),
             },
@@ -244,7 +246,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
               <input
                 id="id_start_time"
                 type="datetime-local"
-                step={1}
+                step={60}
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
               />
@@ -255,7 +257,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
               <input
                 id="id_end_time"
                 type="datetime-local"
-                step={1}
+                step={60}
                 value={end}
                 onChange={(e) => {
                   setEnd(e.target.value);

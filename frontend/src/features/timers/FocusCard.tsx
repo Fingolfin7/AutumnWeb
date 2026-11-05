@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { faEllipsisH, faRedo, faStopwatch, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -10,24 +10,15 @@ import type { Timer } from "@/api/types";
 import { elapsedSeconds, formatClock, formatTime, parseInstant } from "@/lib/format";
 import { useDeleteTimer, useRestartTimer } from "./api";
 import { ClockDigits } from "./ClockDigits";
+import { TimerReminders } from "./TimerReminders";
 
-/* A running timer as a .focus-card (partials/active_timers_*.html). Live
-   figures are computed from `now`, which the parent ticks once a second, so
-   every card on the page shares one clock. `children` slot in above the
-   actions (the Timers page puts reminders and the note editor there). */
-export function FocusCard({
-  timer,
-  now,
-  children,
-  beforeStop,
-  expanded = true,
-  onExpand,
-}: {
+/* A running timer: the journal row's project and metadata lines, the clock with
+   Stop beside it, then the live note. Live figures come from `now`, which the
+   parent ticks once a second, so every card on the page shares one clock. */
+export function FocusCard({ timer, now, children, beforeStop }: {
   timer: Timer;
   now: number;
   children?: ReactNode;
-  expanded?: boolean;
-  onExpand?: () => void;
   /** Runs before navigating to the stop page (e.g. stash an unsaved note). */
   beforeStop?: () => void;
 }) {
@@ -44,14 +35,13 @@ export function FocusCard({
   const start = parseInstant(timer.start);
   const stopAt = parseInstant(timer.auto_stop_at);
   const countdown = stopAt ? Math.max(0, Math.floor((stopAt.getTime() - now) / 1000)) : null;
-  const fill =
-    stopAt && start && stopAt > start
-      ? Math.max(0, Math.min(100, ((now - start.getTime()) / (stopAt.getTime() - start.getTime())) * 100))
-      : 0;
+  const fill = stopAt && start && stopAt > start
+    ? Math.max(0, Math.min(100, ((now - start.getTime()) / (stopAt.getTime() - start.getTime())) * 100))
+    : 0;
 
   return (
     <article
-      className={`focus-card ember-clock${!expanded ? " is-compact" : ""}${elapsed >= 3600 ? " ember-clock--deep" : elapsed >= 1200 ? " ember-clock--warm" : ""}`}
+      className={`focus-card ember-clock${pending || timer.pending_sync ? " is-unsettled" : ""}`}
       id={`timer-${timer.id}`}
       data-timer-id={timer.id}
       data-ember-step={Math.min(6, Math.floor(elapsed / 900))}
@@ -59,67 +49,50 @@ export function FocusCard({
       aria-busy={pending || undefined}
     >
       <p className="focus-eyebrow">
-        <span className="live-dot" /> {pending ? "Starting…" : timer.pending_sync ? "Running · saved offline" : "Running"}
+        <span className="live-dot" /> <span>{pending ? "Starting…" : timer.pending_sync ? "Running · saved offline" : "Running"}</span>
       </p>
       <h2 className="focus-project">
-        <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
+        <AppLink href={urls.updateProject(timer.project.id)} title={timer.project.name}>{timer.project.name}</AppLink>
       </h2>
-      <button className="focus-time" type="button" aria-label={`${expanded ? "Collapse" : "Open"} ${timer.project.name} timer`} aria-expanded={expanded} onClick={onExpand}>
-        <span className="num"><ClockDigits value={formatClock(elapsed)} /></span>
-      </button>
-      <div className="focus-details">
-      {timer.subproject_allocations.length ? (
-        <div className="focus-subs">
-          {timer.subproject_allocations.map((sub) => (
-            <Fragment key={sub.subproject_id}>
-              <AppLink className="sub-chip" href={urls.updateSubproject(sub.subproject_id)}>
-                {sub.name}
-              </AppLink>{" "}
-            </Fragment>
-          ))}
-        </div>
-      ) : null}
-      <div className="focus-autostop">
-        <span>
-          started <span className="mono">{formatTime(timer.start)}</span>
-        </span>
-        {countdown !== null ? (
-          <span>
-            stops in <span className="mono">{formatClock(countdown)}</span>
-          </span>
-        ) : (
-          null
-        )}
+      <button className="btn-icon timer-overflow" type="button" aria-label="Timer actions" aria-expanded={actionsOpen} onClick={() => setActionsOpen(true)}><Icon icon={faEllipsisH} /></button>
+      <div className="focus-meta">
+        {timer.subproject_allocations.length ? <span className="journal-subs">{timer.subproject_allocations.map((sub) => (
+          <AppLink className="journal-subproject" key={sub.subproject_id} href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>
+        ))}</span> : null}
+        <span className="journal-time">started {formatTime(timer.start)}</span>
+        {countdown !== null ? <span className="journal-time">stops in {formatClock(countdown)}</span> : null}
       </div>
+      <div className="focus-clockline">
+        <span className={`focus-time${elapsed >= 36000 ? " is-long" : ""}`}><span className="num"><ClockDigits value={formatClock(elapsed)} /></span></span>
+        <div className="focus-actions">
+          <AppLink
+            className="btn btn--stop btn--lg focus-stop"
+            href={urls.stopTimer(timer.id)}
+            onClick={(event) => {
+              if (pending) {
+                event.preventDefault();
+                return;
+              }
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              const stopRequestedAt = Date.now();
+              beforeStop?.();
+              navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt } });
+            }}
+          >
+            <Icon icon={faStopwatch} /> Stop
+          </AppLink>
+        </div>
       </div>
       {stopAt ? (
         <div className="focus-autostop-bar">
           <progress className="focus-autostop-fill" max={100} value={fill} aria-label="Auto-stop progress" />
         </div>
       ) : null}
-      <div className="focus-actions">
-        <AppLink
-          className="btn btn--stop btn--lg focus-stop"
-          href={urls.stopTimer(timer.id)}
-          onClick={(event) => {
-            if (pending) {
-              event.preventDefault();
-              return;
-            }
-            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            event.preventDefault();
-            const stopRequestedAt = Date.now();
-            beforeStop?.();
-            navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt } });
-          }}
-        >
-          <Icon icon={faStopwatch} /> Stop
-        </AppLink>
-      </div>
-      <button className="btn-icon timer-overflow" type="button" aria-label="Timer actions" aria-expanded={actionsOpen} onClick={() => setActionsOpen(true)}><Icon icon={faEllipsisH} /></button>
       <div className="timer-expanded-content">{children}</div>
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Timer actions">
         <p className="text-red">{timer.project.name}</p>
+        <TimerReminders timer={timer} />
         <div className="timer-actions-menu">
           <button className="btn btn--quiet" type="button" disabled={pending || timer.pending_sync || restart.isPending} onClick={() => {
             setActionsOpen(false);
