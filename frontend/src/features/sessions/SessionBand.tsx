@@ -1,6 +1,6 @@
 import { useLocation } from "react-router";
 import { useEffect, useRef, useState } from "react";
-import { faEllipsisH, faPen, faRedo, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEllipsisH, faPen, faRedo, faSlidersH, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog, Sheet } from "@/components/Sheet";
 import { SessionNote } from "@/components/SessionNote";
@@ -93,6 +93,12 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
       <div className="journal-heading">
         {hideProject ? <span className="session-project journal-entry-date">{formatShortDate(session.end)}</span> : <AppLink className="session-project" href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink>}
         <span className="journal-duration">{formatDuration(day ? dayPortions(session).find((part) => part.date === day)?.minutes ?? session.duration_minutes : session.duration_minutes)}</span>
+        <div className="journal-row-actions">
+          <button className="btn-icon" type="button" aria-label="Edit note" title="Edit note" onClick={editNote}><Icon icon={faPen} /></button>
+          <AppLink className="btn-icon" aria-label="Edit session" title="Edit session" href={urls.updateSession(session.id)}><Icon icon={faSlidersH} /></AppLink>
+          <button className="btn-icon" type="button" aria-label="Restart" title="Restart" onClick={restart} disabled={start.isPending}><Icon icon={faRedo} /></button>
+          <button className="btn-icon journal-delete" type="button" aria-label="Delete session" title="Delete session" onClick={() => setConfirming(true)}><Icon icon={faTrash} /></button>
+        </div>
         <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${session.id}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
       </div>
       <div className="journal-meta">

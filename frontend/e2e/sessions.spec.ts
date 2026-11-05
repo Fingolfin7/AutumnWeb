@@ -31,6 +31,19 @@ test("searching sessions narrows the list and the filter survives a reload", asy
   expect(problems()).toEqual([]);
 });
 
+test("a session's actions stay reachable with a mouse or a finger", async ({ page }, testInfo) => {
+  await page.goto("/sessions/?search=Piano");
+  const first = page.getByRole("region", { name: "Sessions" }).getByRole("listitem").first();
+  if (testInfo.project.name === "phone") {
+    await first.getByRole("button", { name: "Session actions" }).tap();
+    await page.getByRole("dialog", { name: "Session actions" }).getByRole("button", { name: "Delete session" }).tap();
+  } else {
+    await first.hover();
+    await first.getByRole("button", { name: "Delete session" }).click();
+  }
+  await expect(page.getByRole("dialog", { name: "Delete this session?" })).toBeVisible();
+});
+
 test("editing a session note saves it", async ({ page }, testInfo) => {
   const problems = trackErrors(page);
   // Each attempt writes a new note, or a retry would have nothing to save.

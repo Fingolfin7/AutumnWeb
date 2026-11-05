@@ -4502,6 +4502,10 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .journal-heading .session-project { grid-column: 1; min-width: 0; font-size: var(--fs-md); line-height: 1.5; overflow-wrap: break-word; word-break: normal; }
 .journal-heading .journal-duration { grid-column: 3; grid-row: 1; padding-top: var(--s2); text-align: right; white-space: nowrap; }
 .journal-heading .journal-overflow { grid-column: 2; grid-row: 1; }
+@media (min-width: 1000px) and (hover: hover) and (pointer: fine) {
+  :is(.session-list, .today-journal, .project-journal) .journal-heading { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .journal-heading .journal-row-actions { grid-column: 2; grid-row: 1; }
+}
 :is(.session-list, .today-journal, .project-journal) .journal-meta { grid-column: 1; grid-row: 2; align-self: start; display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 0; margin: 0; }
 :is(.session-list, .today-journal, .project-journal) :is(.session-note, .journal-note-edit, .journal-add-note) { grid-column: 2; grid-row: 2; max-width: 70ch; margin: 0; min-width: 0; }
 .journal-add-note { justify-self: start; }
