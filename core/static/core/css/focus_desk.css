@@ -5467,6 +5467,10 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .review-desk { grid-template-columns: minmax(0, 1fr); }
 .review-main-controls, .review-toolbar { min-width: 0; }
 .review-desk .review-range { grid-template-columns: minmax(0, 1fr) 44px 44px; }
+.review-desk .first-run-empty { padding-block: var(--s6); margin-block: var(--s3); }
+.review-desk .first-run-empty h2 { margin-block: var(--s4); }
+.review-desk .review-empty-embers { max-width: 420px; gap: 4px; margin-block: var(--s3); }
+.review-desk .first-run-empty p { margin-bottom: var(--s4); }
 .settings-group-links { display: flex; gap: var(--s2); overflow-x: auto; margin-bottom: var(--s4); }
 .settings-group-links a { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s3); color: var(--ink-2); border-radius: var(--r-sm); text-decoration: none; }
 .settings-group-links a[aria-current="page"] { color: var(--brand); background: var(--raised); }
