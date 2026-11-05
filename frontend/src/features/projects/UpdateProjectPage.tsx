@@ -48,7 +48,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const week = useSessionTotals({ project_ids: String(project.id), start_date: weekStart });
   const update = useUpdateProject(project.id);
   const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
-  const ownCommitment = related.find((item) => item.active && item.aggregation_type === "project" && item.target.id === project.id);
+  const ownCommitment = related.find((item) => item.active && item.aggregation_type === "project" && item.target.id === project.id) ?? related.find((item) => item.aggregation_type === "project" && item.target.id === project.id);
   /* The project as the form was opened (or last saved/reloaded): the edit is
      diffed against it and the PATCH carries its version (If-Match). */
   const [baseline, setBaseline] = useState(project);
@@ -116,7 +116,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
           <div className="project-stat"><span>This week</span><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong></div>
           <div className="project-stat"><span>Total time</span><strong>{formatDurationWords(project.total_minutes)}</strong></div>
           <span className="muted">{project.session_count} sessions</span>
-          <div className="project-week-target">{ownCommitment ? <QuickTarget key={ownCommitment.version} commitment={ownCommitment} /> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}>Add commitment</AppLink>}</div>
+          <div className="project-week-target">{ownCommitment ? <>{!ownCommitment.active ? <p className="muted">Commitment paused</p> : null}<QuickTarget key={ownCommitment.version} commitment={ownCommitment} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}>Add commitment</AppLink>}</div>
           {project.description ? <div className="project-description"><SessionNote text={project.description} /></div> : null}
         </section>
         <Sheet open={editing} onClose={() => setEditing(false)} title="Edit project" className="project-edit-sheet">

@@ -248,7 +248,7 @@ describe("edit policy", () => {
       banking: false,
       rules: { ...base.rules, exclude_subproject_ids: [20] },
     };
-    expect(classifyChanges(base, next).nextPeriod).toEqual(["Target", "Time banking", "Surplus cap", "Rules"]);
+    expect(classifyChanges(base, next).nextPeriod).toEqual(["Target", "Time carryover", "Surplus cap", "Rules"]);
     expect(patchPayload(base, next)).toEqual({
       target_value: 240,
       banking_enabled: false,

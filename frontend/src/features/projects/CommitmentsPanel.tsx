@@ -135,6 +135,7 @@ export function CommitmentsPanel({
                   </>
                 ) : null}
 
+                {!commitment.active ? <AppLink className="btn btn--quiet" href={urls.updateCommitment(commitment.id)}>Edit commitment</AppLink> : null}
                 {rules.length ? (
                   <div className="commit-rules">
                     {rules.map((line) => (

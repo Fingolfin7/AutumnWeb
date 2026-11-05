@@ -87,7 +87,7 @@ export default function ProjectsPage() {
       project={project}
       running={runningIds.has(project.id)}
       commitment={commitmentByProject.get(project.id)}
-      weekMinutes={week.data ? week.data.per_project.find((row) => row.project_id === project.id)?.total_minutes ?? 0 : undefined}
+      weekMinutes={week.data ? week.data.entries.find((row) => row.id === project.id)?.total_minutes ?? 0 : undefined}
       tagColors={tagColors}
     />
   );

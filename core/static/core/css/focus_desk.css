@@ -806,7 +806,7 @@ body.bg-active .dim-control { display: flex; }
 .btn--primary:hover { background: var(--brand-hover); }
 .btn--stop { background: var(--stop); color: #251b13; box-shadow: var(--edge), var(--e1); }
 .btn--stop:hover { background: #f8cba5; }
-.btn--ghost { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-2); }
+.btn--ghost { background: transparent; box-shadow: none; padding-inline: 0; }
 .btn--ghost:hover { background: var(--raised); }
 .btn--quiet { background: transparent; color: var(--muted); box-shadow: none; padding: .4rem 0; }
 .btn--quiet:hover { color: var(--ink); background: var(--raised); }
@@ -4210,3 +4210,17 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .project-week-target .commitment-readable { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
 .project-week-target .commitment-readable strong { color: var(--duration); font-variant-numeric: tabular-nums; }
 .project-week-target .commitment-readable br { display: none; }.project-week-target .commitment-readable br::after { content: " "; }
+
+.project-directory-row > .u-grow { display: grid; grid-template-columns: minmax(0, 1fr) 8rem; column-gap: var(--s4); align-items: center; }
+.project-directory-row .project-top { grid-column: 1; grid-row: 1; }
+.project-directory-row .project-meta { grid-column: 1; grid-row: 2; }
+.project-directory-row .project-total { grid-column: 2; grid-row: 1 / 3; display: grid; align-content: center; text-align: right; gap: var(--s1); margin: 0; min-height: 4.3rem; font-variant-numeric: tabular-nums; }
+.project-directory-row .project-total > span, .project-directory-row .project-total > small { font: 400 var(--fs-xs)/1.2 var(--font-ui); }
+.project-directory-row .project-total > strong { color: var(--duration); font: 650 var(--fs-lg)/1.3 var(--font-display); white-space: nowrap; }
+@media (max-width: 999px) { .project-directory-row > .u-grow { grid-template-columns: minmax(0, 1fr) 5rem; column-gap: var(--s2); }.project-directory-row .project-total > strong { font-size: var(--fs-sm); } }
+
+.project-journal .journal-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 var(--s3); }
+.project-journal .journal-heading { grid-column: 2; grid-row: 1; grid-template-columns: auto auto; }
+.project-journal .journal-meta { grid-column: 1; grid-row: 1; padding-right: 0; align-self: center; }
+.project-journal :is(.session-note, .journal-note-edit) { grid-column: 1 / -1; }
+.project-journal .day-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }

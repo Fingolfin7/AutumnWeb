@@ -1,3 +1,4 @@
+import { addDays } from "@/features/notifications/dates";
 import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { errorMessage } from "@/api/errors";
@@ -246,5 +247,5 @@ export function failure(action: string, error: unknown): string {
 
 /** One weekly report serves the whole directory, keyed by stable project IDs. */
 export function useProjectWeek(week: string) {
-  return useQuery({ queryKey: keys.reports("weekly-review", { week }), queryFn: () => unwrap(api.GET("/api/v2/reports/weekly-review/", { params: { query: { week } } })) });
+  return useQuery({ queryKey: keys.reports("project-week", { week }), queryFn: () => unwrap(api.GET("/api/v2/reports/tallies/", { params: { query: { by: "project", start_date: week, end_date: addDays(week, 6), active: "false" } } })) });
 }

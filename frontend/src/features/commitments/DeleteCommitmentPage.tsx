@@ -90,7 +90,7 @@ export default function DeleteCommitmentPage() {
       </section>
 
       <p className="confirm-warn">
-        <Icon icon={faExclamationTriangle} /> This deletes the commitment and its banking history. Your sessions are untouched, but the
+        <Icon icon={faExclamationTriangle} /> This deletes the commitment and its carryover history. Your sessions are untouched, but the
         streak and balance are gone for good.
       </p>
 

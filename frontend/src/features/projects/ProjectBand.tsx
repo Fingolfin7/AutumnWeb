@@ -19,7 +19,7 @@ export function ProjectBand({
   project: Project;
   weekMinutes?: number;
   running: boolean;
-  /** The project's own active commitment, for the progress meter. */
+  /** The project's own active commitment, for the weekly summary. */
   commitment?: Commitment;
   tagColors: Map<number, string | null>;
 }) {
@@ -40,7 +40,7 @@ export function ProjectBand({
 
   const period = commitment?.current_period;
   return (
-    <li className="band project" id={`project-${project.id}`}>
+    <li className="band project project-directory-row" id={`project-${project.id}`}>
       <div className="u-grow">
         <div className="project-top">
           <AppLink className="project-name" href={urls.updateProject(project.id)}>
@@ -76,8 +76,8 @@ export function ProjectBand({
           </div>
         ) : null}
 
-        <p className="project-total"><span className="muted">This week </span>{weekMinutes === undefined ? "Loading…" : formatDurationWords(weekMinutes)}{commitment?.period === "weekly" && commitment.commitment_type === "time" ? <> <span className="muted">/ {formatDurationWords(period?.target ?? 0)} {period?.met ? "· Target met" : ""}</span></> : null}</p>
-        {period && commitment?.period !== "weekly" ? <p className="project-dates">Commitment: {commitment?.commitment_type === "time" ? formatDurationWords(period.accrued) : `${period.accrued} sessions`} / {commitment?.commitment_type === "time" ? formatDurationWords(period.target) : period.target} this period</p> : null}
+        <p className="project-total"><span className="muted">This week</span><strong>{weekMinutes === undefined ? "Loading…" : formatDurationWords(weekMinutes)}</strong>{commitment && period ? <small className="muted">{commitment.period === "weekly" ? commitment.commitment_type === "time" ? `/ ${formatDurationWords(period.target)}` : `${Math.round(period.accrued)}/${Math.round(period.target)} sessions` : `${period.met ? "Met" : "In progress"} this period`}{period.met && commitment.period === "weekly" ? " · Met" : ""}</small> : null}</p>
+
 
       </div>
 
