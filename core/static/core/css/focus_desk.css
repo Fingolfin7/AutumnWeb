@@ -4838,7 +4838,8 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 /* ================================================================= Stream T
    Today is the picture of a day; the journal remains the reading surface. */
 .today-heading { flex-wrap: wrap; align-items: baseline; gap: var(--s2) var(--s4); }
-.today-heading .today-total { margin-left: auto; color: var(--duration); font: 600 var(--fs-lg)/1.4 var(--font-display); }
+.today-heading .today-total { margin-left: 0; color: var(--duration); font: 600 var(--fs-lg)/1.4 var(--font-display); }
+.today-heading > .btn { margin-left: auto; }
 .today-total small { display: block; color: var(--muted); font: 400 var(--fs-xs)/1.4 var(--font-ui); text-align: right; }
 .today-picture { display: grid; gap: var(--s5); align-items: start; }
 .today-picture .day-ledger { min-width: 0; margin: 0; }
@@ -5003,7 +5004,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .ember-clock.is-compact .timer-note-editor .note-editor-shell { flex: none; }
 .ember-clock.is-compact .timer-note-editor textarea { flex: none; max-height: 28rem; overflow-y: auto; }
 .note-reading-slot::after { content: ""; position: absolute; pointer-events: none; inset: 52px -20px auto; height: 12px; background: linear-gradient(var(--surface-0), transparent); }
-.project-journal .journal-entry { grid-template-columns: minmax(0, 1fr) 64px 100px 44px; }
+.project-journal .journal-entry { grid-template-columns: minmax(0, 1fr) 64px 100px 44px; padding-block: var(--s2); }
 .project-journal .journal-heading .journal-duration { grid-column: 2; }
 .project-journal .journal-heading .journal-row-actions { grid-column: 3; }
 .project-journal .journal-heading .journal-overflow { grid-column: 4; }
@@ -5011,3 +5012,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 @media (max-width: 999px) {
   .project-journal .journal-heading .journal-overflow { grid-column: 3; }
 }
+
+/* The phone ribbon owns its paint; desktop SVG definitions may be hidden. */
+.day-ember-ribbon .ledger-block { fill: var(--brand-deep); opacity: .7; }
+.day-ember-ribbon .ledger-block.is-live { fill: var(--brand-hover); opacity: 1; }
+.ember-clock .focus-autostop-bar { grid-row: 8; }
+.ember-clock.is-compact .focus-autostop-bar { grid-row: 6; }

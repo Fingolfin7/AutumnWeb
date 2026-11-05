@@ -140,7 +140,7 @@ export function CommandPalette() {
       <input
         className="palette-input"
         data-autofocus
-        placeholder="Start a timer, open a page, search sessions…"
+        placeholder="Search commands or projects"
         aria-label="Command"
         value={query}
         onChange={(event) => {
