@@ -134,7 +134,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
             )) as Timer;
         }
         await stop.mutateAsync({ timer: target, note, end: endIso, ...(allocations ? { allocations } : {}) });
-      } else if (note !== initialNote.current || endTouched || start !== toDateTimeLocal(timer.start) || allocations) {
+      } else if (endTouched || start !== toDateTimeLocal(timer.start) || allocations) {
         if (current.pending_sync) {
           setError("This stop is queued. Reconnect before editing the saved session.");
           return;
@@ -143,7 +143,6 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
           api.PATCH("/api/v2/sessions/{session_id}", {
             params: { path: { session_id: target.id }, header: { "If-Match": target.version } },
             body: {
-              note,
               start: startTime.instant,
               end: endIso,
               ...(allocations ? { subproject_allocations: allocations } : {}),
@@ -174,15 +173,6 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
     try {
       if (saved && !current.pending_sync && !(await draft.flush())) return;
       let target = currentRef.current;
-      if (note !== initialNote.current) {
-        target = (await unwrap(
-          api.PATCH("/api/v2/sessions/{session_id}", {
-            params: { path: { session_id: target.id }, header: { "If-Match": target.version } },
-            body: { note },
-          }),
-        )) as Timer;
-        setCurrent(target);
-      }
       await unwrap(
         api.POST("/api/v2/timers/{session_id}/restart/", {
           params: { path: { session_id: target.id }, header: { "If-Match": target.version } },
@@ -234,6 +224,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
       >
         <NoteEditor
           id="id_note"
+          disabled={busy && (saved || offline)}
           value={note}
           onChange={draft.change}
           saveStatus={draft.status}

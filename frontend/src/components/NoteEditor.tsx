@@ -105,11 +105,17 @@ export function NoteEditor({
   const generated = useId();
   const textareaId = id ?? `note-${generated}`;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const wasWriting = useRef(false);
   useLayoutEffect(() => {
     const node = textareaRef.current;
     if (!node) return;
     node.style.height = "auto";
     node.style.height = `${node.scrollHeight}px`;
+    if (!writing && wasWriting.current) {
+      node.focus();
+      node.setSelectionRange(selection.current.start, selection.current.end);
+    }
+    wasWriting.current = writing;
   }, [value, writing]);
   useEffect(() => {
     if (!persistKey) return;
