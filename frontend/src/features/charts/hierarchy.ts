@@ -1,5 +1,5 @@
 import { formatDuration } from "@/lib/format";
-import { paletteColor } from "./data";
+import { paletteColor, withAlpha } from "./data";
 import type { AnyConfig, HierarchyNode, TallyRow } from "./payloads";
 
 /* Treemap (core/static/core/js/charts/hierarchy.js). The server sends
@@ -50,6 +50,7 @@ interface TreemapRaw {
   v?: number;
   value?: number;
   g?: string;
+  w?: number;
   _data?: { name?: string; project?: string; children?: { project?: string }[] };
 }
 interface TreemapContext {
@@ -77,17 +78,20 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
           key: "value",
           groups: ["project", "name"],
           spacing: 1,
-          borderWidth: 2,
-          borderColor: "rgba(255,255,255,0.8)",
+          borderWidth: 0.75,
+          borderColor: "rgba(240,236,229,.16)",
+          captions: { display: true, color: "#f0ece5", font: { size: 11, weight: "500" }, padding: 8 },
           backgroundColor(context: TreemapContext) {
             if (context.type !== "data") return "transparent";
             const project = projectOf(context.raw);
-            return project ? (colors[project] ?? "hsl(200, 70%, 60%)") : "transparent";
+            return project ? withAlpha(colors[project] ?? paletteColor(0), 0.32) : "transparent";
           },
           labels: {
             display: true,
             align: "center",
             position: "middle",
+            overflow: "fit",
+            padding: 8,
             formatter(context: TreemapContext) {
               if (context.type !== "data") return "";
               const item = context.raw;
@@ -95,12 +99,18 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
               if (value < 0.5) return ""; // no labels on tiny boxes
               /* A leaf carries its record in _data; a project container only
                  has its group name in g. */
-              if (item._data?.name) return `${item._data.name}\n${formatDuration(value * 60)}`;
+              if (item._data?.name) {
+                const amount = formatDuration(value * 60);
+                if ((item.w ?? 100) < 85) return [amount];
+                const limit = Math.max(6, Math.floor(((item.w ?? 100) - 16) / 6.5));
+                const name = item._data.name.length > limit ? item._data.name.slice(0, limit - 1) + "…" : item._data.name;
+                return [name, amount];
+              }
               if (item.g) return item.g;
               return "";
             },
-            color: "white",
-            font: { size: 11, weight: "bold" },
+            color: "#e6dfd5",
+            font: { size: 11, weight: "500" },
           },
         },
       ],
