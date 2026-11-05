@@ -170,7 +170,7 @@ export function DayTimeline({
             {lanes.map((lane) => {
               const minutes = lane.blocks.reduce((sum, block) => sum + block.minutes, 0);
               return <div className="ledger-phone-project" key={lane.project.id}>
-                <AppLink href={`${urls.sessions()}?project_ids=${lane.project.id}&start_date=${timeline.start_date}&end_date=${timeline.end_date}`} className="ledger-phone-label"><span className="text-red">{lane.project.name}</span><span className="text-green">{formatDuration(minutes)}</span></AppLink>
+                <AppLink href={`${urls.sessions()}?include_projects=${lane.project.id}&start_date=${timeline.start_date}&end_date=${timeline.end_date}`} className="ledger-phone-label"><span className="text-red">{lane.project.name}</span><span className="text-green">{formatDuration(minutes)}</span></AppLink>
                 <svg viewBox="0 0 300 8" preserveAspectRatio="none" className="ledger-phone-bar" role="img" aria-label={`${lane.project.name}: ${formatDuration(minutes)}`}><rect x="0" y="0" width={Math.max(1, total ? minutes / total * 300 : 0)} height="8" rx="4" className="ledger-block" /></svg>
                 {lane.blocks.some((block) => block.is_live) ? <small className="ledger-live-label">Including live time</small> : null}
               </div>;
