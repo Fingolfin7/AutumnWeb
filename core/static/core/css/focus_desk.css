@@ -4604,7 +4604,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .chat-layout .chat-header-range { display: none; }
   .chat-layout .composer { margin: var(--s2); padding: var(--s2); }
   .chat-layout .composer textarea:not(:focus) { max-height: 48px; }
-  .chat-layout .composer:focus-within textarea { min-height: 72px; }
+  .chat-layout .composer textarea:focus { min-height: 72px; }
   .chat-layout .user-message { width: 95%; }
   .insights-filter-sheet .sheet-panel { padding: var(--s4); }
   .insights-filter-sheet .two-up { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s3); }
@@ -4636,3 +4636,8 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .insights-context-apply > .btn { min-height: 44px; white-space: nowrap; }
 .chat-layout .assistant-message .message-content > :first-child { margin-top: 0; }
 @media (max-width:999px) { .project-journal .journal-entry { padding-inline: var(--s4); } }
+
+.settings-reminder-sheet .nx-schedule-editor { overflow: visible; }
+.review-desk .review-projects .review-section-heading { min-height: 72px; padding-block: var(--s4); align-items: center; }
+.field > small, .profile-default-item > p, .nx-timezone-note { font-size: var(--fs-xs); }
+@media (max-width:999px) { .review-desk .review-projects .review-section-heading { padding-inline: var(--s4); } }
