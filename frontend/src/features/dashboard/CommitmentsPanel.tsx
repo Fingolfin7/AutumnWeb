@@ -1,8 +1,7 @@
 import { formatDuration } from "@/lib/format";
 import type { CSSProperties } from "react";
-import { faBullseye, faCheck, faFire, faHourglassHalf, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faFire, faHourglassHalf, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
-import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
 import { useTags } from "@/api/meta";
 import type { DashboardCommitment } from "./api";
@@ -14,11 +13,10 @@ const AGGREGATION_LABEL: Record<string, string> = {
   tag: "Tag",
 };
 
-/* Active commitments with progress, bank and streak strip (the dashboard's
-   commitments slab). */
-export function CommitmentsPanel({ items, bare = false }: { items: DashboardCommitment[]; bare?: boolean }) {
-  const content = items.length ? <div className="band-list">{items.map((item) => <CommitmentBand key={item.commitment.id} item={item} />)}</div> : <p className="empty">No active commitments. <AppLink href={urls.createCommitment()}>Add one</AppLink>.</p>;
-  return bare ? content : <Disclose id="home-commitments" icon={faBullseye} iconClass="text-cyan" title="Commitments" summary={`${items.length} active`}>{content}</Disclose>;
+/* Active commitments with progress, bank and streak strip (Today's "Streaks &
+   balance" disclosure). */
+export function CommitmentsPanel({ items }: { items: DashboardCommitment[] }) {
+  return <div className="band-list">{items.map((item) => <CommitmentBand key={item.commitment.id} item={item} />)}</div>;
 }
 
 function CommitmentTarget({ item }: { item: DashboardCommitment }) {

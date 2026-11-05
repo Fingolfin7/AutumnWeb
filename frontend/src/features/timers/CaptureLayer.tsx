@@ -1,4 +1,4 @@
-import type { ComponentProps, MouseEvent } from "react";
+import { useCallback, type ComponentProps, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { AppLink, urls } from "@/app/links";
 import { Sheet } from "@/components/Sheet";
@@ -10,7 +10,7 @@ import { CaptureForm, type CaptureMode } from "./CaptureForm";
 export function useOpenCapture() {
   const navigate = useNavigate();
   const { pathname, search, hash } = useLocation();
-  return (mode: CaptureMode = "timer") => navigate(`${pathname}${search}${hash}`, { state: { capture: mode } });
+  return useCallback((mode: CaptureMode = "timer") => navigate(`${pathname}${search}${hash}`, { state: { capture: mode } }), [navigate, pathname, search, hash]);
 }
 
 export function CaptureLink({ mode = "timer", onClick, ...rest }: Omit<ComponentProps<typeof AppLink>, "href"> & { mode?: CaptureMode }) {

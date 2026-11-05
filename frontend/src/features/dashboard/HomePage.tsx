@@ -89,7 +89,7 @@ function HomeContent({ data }: { data: Dashboard }) {
               <AppLink className="today-commitment-name text-red" href={urls.updateCommitment(commitment.id)}>{commitment.target.name}</AppLink>
               <CommitmentMeter commitment={commitment} />
             </div>)}
-            <details className="today-history"><summary>Streaks & balance</summary><CommitmentsPanel bare items={data.commitments} /></details>
+            <details className="today-history"><summary>Streaks & balance</summary><CommitmentsPanel items={data.commitments} /></details>
           </section> : null}
         </aside> : null}
         {!firstRun ? <section className="today-journal" aria-label="Today's journal">

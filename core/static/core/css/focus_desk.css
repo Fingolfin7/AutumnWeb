@@ -4688,6 +4688,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .journal-entry .session-note .note-expand { color: var(--muted); font: 400 var(--fs-sm) var(--font-ui); }
 .journal-entry :is(.note-reading-actions, .note-reading-head) .btn { font: 500 var(--fs-sm) var(--font-ui); }
 .journal-entry .note-reading-actions .btn:first-child { padding-left: 0; }
+.journal-entry .note-reading-slot::before, .journal-entry .note-reading-slot::after { inset-inline: -16px; }
 .journal-add-note { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 -10px; padding: 0; color: var(--muted); font: 400 max(13px, var(--fs-xs)) var(--font-ui); }
 .journal-day-split, .journal-match-reason { margin: var(--s1) 0 0; max-width: 68ch; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .journal-note-edit { display: grid; gap: var(--s2); max-width: 68ch; margin-top: var(--s2); }
@@ -4925,6 +4926,8 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .session-edit-form input { text-overflow: ellipsis; }
 .session-edit-section { display: grid; gap: var(--s4); padding-block: var(--s4); border-top: 1px solid var(--hairline); }
 .session-edit-section:first-child { padding-top: 0; border-top: 0; }
+.session-edit-section .field { margin: 0; }
+.session-edit-section .two-up { gap: var(--s3) var(--s4); margin: 0; }
 .session-edit-form .note-editor-field { max-width: none; margin: 0; }
 .session-edit-form .note-rich-preview { min-height: 6rem; max-height: 16rem; padding: var(--s3) var(--s4); }
 .session-edit-form .form-actions { position: sticky; bottom: 0; z-index: 5; display: flex; justify-content: space-between; gap: var(--s3); margin: 0; padding-block: var(--s3); border-top: 1px solid var(--hairline); background: var(--surface-0); }
