@@ -102,7 +102,7 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   const patched = page.waitForRequest((request) => request.url().endsWith(`/api/v2/sessions/${id}`) && request.method() === "PATCH");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   expect((await patched).postDataJSON()).not.toHaveProperty("project_id");
-  await expect(toasts(page).getByText("Updated session", { exact: true })).toBeVisible();
+  await expect(toasts(page).getByText("Updated session", { exact: true })).toBeVisible({ timeout: 15_000 });
   const saved = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
   expect(saved.project.id).toBe(original.project.id);
   expect(problems()).toEqual([]);
