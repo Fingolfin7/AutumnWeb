@@ -37,7 +37,7 @@
 /* A single opaque snackbar overlays the page without moving its content. */
 .toast-region { position: fixed; bottom: var(--s5); left: 50%; transform: translateX(-50%); z-index: 65; width: min(360px,calc(100% - 24px)); pointer-events: none; }
 .toast-region .msg { display: flex; align-items: center; gap: var(--s2); min-height: 48px; width: 100%; pointer-events: auto; background: var(--surface-2); border: 1px solid var(--hairline-2); margin: 0; padding: 0 var(--s2) 0 var(--s3); box-shadow: var(--e3); animation: toast-in .18s var(--ease); font-size: var(--fs-xs); }
-.toast-region .msg > span { flex: 1; min-width: 0; white-space: nowrap; overflow: auto; scrollbar-width: none; }
+.toast-region .msg > span { display: flex; align-items: center; min-height: 44px; flex: 1; min-width: 0; white-space: nowrap; overflow: auto; scrollbar-width: none; }
 .toast-region .msg-icon { flex: 0 0 16px; }
 @media (max-width:999px) { .toast-region { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom,0px) + 12px); } }
 .toast-action {

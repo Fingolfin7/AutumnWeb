@@ -4641,3 +4641,13 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .review-desk .review-projects .review-section-heading { min-height: 72px; padding-block: var(--s4); align-items: center; }
 .field > small, .profile-default-item > p, .nx-timezone-note { font-size: var(--fs-xs); }
 @media (max-width:999px) { .review-desk .review-projects .review-section-heading { padding-inline: var(--s4); } }
+
+/* Associated labels extend over their own input, preserving a 44px hit area
+   while the visible label stays eight pixels above the control. */
+@media (max-width:999px) {
+  .settings-content .profile-page .field > label:not(.toggle):not(.check-row),
+  .settings-reminder-sheet .field > label {
+    display: flex; align-items: flex-start; min-height: 44px; line-height: 20px;
+    font-size: var(--fs-xs); margin-bottom: -16px;
+  }
+}
