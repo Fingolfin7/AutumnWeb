@@ -100,7 +100,6 @@ export function NoteEditor({
   const [writing, setWriting] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const baseline = useRef(value);
-  const opener = useRef<HTMLElement | null>(null);
   const selection = useRef({ start: 0, end: 0 });
   const generated = useId();
   const textareaId = id ?? `note-${generated}`;
@@ -137,12 +136,16 @@ export function NoteEditor({
     return () => {
       node?.close();
       document.body.style.overflow = overflow;
-      opener.current?.focus();
     };
   }, [writing]);
   const change = (next: string) => {
     if (persistKey) writeNoteDraft(persistKey, { text: next, version: persistVersion });
     onChange(next);
+  };
+  const closeWriter = () => {
+    const node = textareaRef.current;
+    if (node) selection.current = { start: node.selectionStart, end: node.selectionEnd };
+    setWriting(false);
   };
   const supported = dictationSupported();
   const [status, setStatus] = useState(supported ? "" : "Dictation unavailable in this browser.");
@@ -226,7 +229,7 @@ export function NoteEditor({
 
   const field = (
     <div className={`field note-editor-field${writing ? " is-writing" : ""}`}>
-      {writing ? <header className="note-writer-heading"><h2>{label || "Session note"}</h2><button className="btn btn--secondary" type="button" onClick={() => setWriting(false)}>Return to session</button></header> : null}
+      {writing ? <header className="note-writer-heading"><h2>{label || "Session note"}</h2><button className="btn btn--secondary" type="button" onClick={closeWriter}>Return to session</button></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
         <div className="note-editor-toolbar" role="toolbar" aria-label="Note formatting">
@@ -257,7 +260,6 @@ export function NoteEditor({
             <span>{!supported ? "Unavailable" : dictating ? "Stop" : "Dictate"}</span>
           </button>
           {!writing ? <button type="button" className="note-tool-button note-writer-open" aria-label="Expand note" title="Full-screen writer" onClick={() => {
-            opener.current = document.activeElement as HTMLElement;
             selection.current = { start: textareaRef.current?.selectionStart ?? value.length, end: textareaRef.current?.selectionEnd ?? value.length };
             setWriting(true);
           }}><Icon icon={faExpand} /></button> : null}
@@ -292,7 +294,7 @@ export function NoteEditor({
       ) : null}
     </div>
   );
-  return writing ? createPortal(<dialog ref={dialog} className="note-writer-dialog" aria-label="Full-screen note writer" onCancel={(event) => { event.preventDefault(); setWriting(false); }} onKeyDown={(event) => event.stopPropagation()}>{field}</dialog>, document.body) : field;
+  return writing ? createPortal(<dialog ref={dialog} className="note-writer-dialog" aria-label="Full-screen note writer" onCancel={(event) => { event.preventDefault(); closeWriter(); }} onKeyDown={(event) => event.stopPropagation()}>{field}</dialog>, document.body) : field;
 }
 
 /* ----- Dictation ---------------------------------------------------------
