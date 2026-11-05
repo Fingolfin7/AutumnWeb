@@ -4216,7 +4216,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .project-week-target { flex-basis: 100%; border-top: 1px solid var(--hairline); padding-top: var(--s3); }
 .project-week-target .commitment-readable { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
 .project-week-target .commitment-readable strong { color: var(--duration); font-variant-numeric: tabular-nums; }
-.project-week-target .commitment-readable br { display: none; }.project-week-target .commitment-readable br::after { content: " "; }
+
 
 .project-directory-row > .u-grow { display: grid; grid-template-columns: minmax(0, 1fr) 8rem; column-gap: var(--s4); align-items: center; }
 .project-directory-row .project-top { grid-column: 1; grid-row: 1; }
@@ -4240,3 +4240,6 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 }
 
 .profile-page > form.slab { overflow: visible; }
+
+.import-preview li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(7rem, .45fr); }
+.import-preview > p:has(button) { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3); }
