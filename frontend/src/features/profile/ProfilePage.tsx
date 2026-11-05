@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { faCheckCircle, faPlug, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faPlug, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -9,12 +9,10 @@ import { bootstrap } from "@/bootstrap";
 import { keys } from "@/api/keys";
 import { ApiError, errorMessage } from "@/api/errors";
 import {
-  deleteApiKey,
   fetchPreferences,
   meKeys,
   patchAccount,
   patchPreferences,
-  putApiKey,
   removeAvatar,
   removeBackground,
   uploadAvatar,
@@ -31,15 +29,12 @@ import {
   FILTER_UNITS,
   hasCustomAvatar,
   isToDate,
-  keyActions,
   prefsChanges,
   prefsDraft,
   timeZoneNames,
   validatePrefs,
   type Account,
   type AccountDraft,
-  type KeyDraft,
-  type KeyProvider,
   type Prefs,
   type PrefsDraft,
 } from "./model";
@@ -100,12 +95,6 @@ const PREF_SCOPE: Record<SaveScope, string[]> = {
 };
 const DRAFT_SCOPE: Record<SaveScope, (keyof PrefsDraft)[]> = { account: ["timezone"], appearance: ["automatic", "choice", "dimming"], defaults: ["filterValue", "filterUnit", "insightsValue", "insightsUnit", "chartCount"], search: ["similarity"], ai: ["luna"] };
 
-const EMPTY_KEYS: Record<KeyProvider, KeyDraft> = {
-  gemini: { value: "", clear: false },
-  openai: { value: "", clear: false },
-  claude: { value: "", clear: false },
-};
-
 function ProfileEditor({
   account,
   prefs,
@@ -124,7 +113,6 @@ function ProfileEditor({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [removeBg, setRemoveBg] = useState(false);
-  const [keyDrafts, setKeyDrafts] = useState(EMPTY_KEYS);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -250,19 +238,6 @@ function ProfileEditor({
       if (!updated) prefsOk = false;
     }
 
-    if (scope === "ai" && prefs.ai_features_enabled) {
-      for (const item of keyActions(keyDrafts)) {
-        const result = await attempt(`key_${item.provider}`, () =>
-          item.action === "clear" ? deleteApiKey(item.provider) : putApiKey(item.provider, item.key ?? ""),
-        );
-        if (result)
-          setKeyDrafts((current) => ({
-            ...current,
-            [item.provider]: current[item.provider].value === keyDrafts[item.provider].value && current[item.provider].clear === keyDrafts[item.provider].clear ? { value: "", clear: false } : current[item.provider],
-          }));
-      }
-    }
-
     /* Whatever happened, show what the server now holds. */
     if (didSomething) {
       try {
@@ -301,13 +276,12 @@ function ProfileEditor({
   };
 
   const customAvatar = hasCustomAvatar(prefs.avatar_url);
-  const dirty = (scope: SaveScope) => DRAFT_SCOPE[scope].some(key => prefsD[key] !== prefsDraft(prefs)[key]) || (scope === "account" && !!(accountChanges(accountD, account) || avatarFile)) || (scope === "appearance" && !!(backgroundFile || removeBg)) || (scope === "ai" && keyActions(keyDrafts).length > 0);
-  const saveButton = (scope: SaveScope, label: string) => scope === "ai" && (saving || dirty(scope)) ? <div className="form-actions profile-section-save"><span className="settings-save-status" role="status">{saving ? "Saving" : "Changes to save"}</span><button type="submit" className="btn btn--primary" disabled={saving}><Icon icon={faCheckCircle} /> {label}</button></div> : null;
+  const dirty = (scope: SaveScope) => DRAFT_SCOPE[scope].some(key => prefsD[key] !== prefsDraft(prefs)[key]) || (scope === "account" && !!(accountChanges(accountD, account) || avatarFile)) || (scope === "appearance" && !!(backgroundFile || removeBg));
   const lastAttempt = useRef("");
   const fingerprint = JSON.stringify([accountD, prefsD, avatarFile?.name, avatarFile?.lastModified, backgroundFile?.name, backgroundFile?.lastModified, removeBg]);
-  const pendingScope = (["account", "appearance", "defaults", "search"] as const).find(dirty);
+  const pendingScope = (["account", "appearance", "defaults", "search", "ai"] as const).find(dirty);
   useEffect(() => {
-    if (section === "ai" || saving || !pendingScope || lastAttempt.current === `${pendingScope}:${fingerprint}`) return;
+    if (saving || !pendingScope || lastAttempt.current === `${pendingScope}:${fingerprint}`) return;
     const timer = window.setTimeout(() => {
       lastAttempt.current = `${pendingScope}:${fingerprint}`;
       void onSubmit(undefined, pendingScope, true);
@@ -337,7 +311,7 @@ function ProfileEditor({
   return (
     <>
       <Root className="fields profile-page" onSubmit={section === "ai" ? (event: FormEvent) => void onSubmit(event, "ai") : undefined}>
-        {section !== "ai" ? <div className="settings-autosave" role="status">{saveFailed ? "Not saved" : saving ? "Saving" : pendingScope ? "Waiting to save" : "Saved automatically"}{saveFailed || Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); setSaveFailed(false); setRetryVersion(value => value + 1); }}>Retry saving</button> : null}</div> : null}
+        {saveFailed || saving || pendingScope || lastAttempt.current ? <div className="settings-autosave" role="status">{saveFailed ? "Not saved" : saving ? "Saving" : pendingScope ? "Waiting to save" : "Saved automatically"}{saveFailed || Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); setSaveFailed(false); setRetryVersion(value => value + 1); }}>Retry saving</button> : null}</div> : null}
         {section === "account" ? <>
         <form className="slab slab-pad" onSubmit={(event) => void onSubmit(event, "account")} noValidate>
           <SlabHead title="Account" />
@@ -576,14 +550,6 @@ function ProfileEditor({
         {section === "ai" && prefs.ai_features_enabled ? (
           <AiSection
             prefs={prefs}
-            footer={saveButton("ai", "Save provider settings")}
-            keyDrafts={keyDrafts}
-            onKeyDraft={(provider, patch) =>
-              setKeyDrafts((current) => ({
-                ...current,
-                [provider]: { ...current[provider], ...patch },
-              }))
-            }
             luna={prefsD.luna}
             onLuna={(luna) => patchPrefsDraft({ luna })}
             errors={errors}
