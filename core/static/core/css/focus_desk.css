@@ -4845,7 +4845,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .capture-sheet:not(.stop-sheet) .sheet-panel { display: flex; flex-direction: column; overflow: hidden; }
 .capture-sheet:not(.stop-sheet) .sheet-title { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; overflow: hidden; clip-path: inset(50%); }
 .capture-control { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--s4); min-width: 0; min-height: 0; }
-.capture-modes { align-self: flex-start; margin-right: 44px; }
+.capture-modes { flex: none; align-self: flex-start; width: auto; max-width: calc(100% - 52px); }
 .capture-form { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; }
 .capture-fields { display: flex; flex: 1 1 auto; flex-direction: column; gap: var(--s4); min-height: 0; padding: 3px 3px var(--s4); overflow-y: auto; overscroll-behavior: contain; }
 .capture-fields .field { margin: 0; }

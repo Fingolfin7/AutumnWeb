@@ -315,7 +315,7 @@ export function NoteEditor({
       <div className="note-editor-status">
         <small role="status">{writing && saveStatus === "Saved" ? "Saved to session" : writing && (saveStatus?.startsWith("Unsaved changes") || (!saveStatus && persistKey)) ? "Draft kept on this device" : saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
         {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
-      {writing ? <small className="writer-done-help">{!navigator.onLine ? "Done keeps your draft on this device." : onDone ? "Done saves to this session." : "Done keeps your note in the session form."}</small> : null}
+      {writing && (!onDone || !navigator.onLine) ? <small className="writer-done-help">{!navigator.onLine ? "Done keeps your draft on this device." : "Done keeps your note in the session form."}</small> : null}
       <small data-note-status="" aria-live="polite">{status}</small>
       </div>
       {errors.length ? (
