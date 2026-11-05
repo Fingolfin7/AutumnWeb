@@ -4147,6 +4147,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-reading-identity { display: flex; flex: 1 1 12rem; flex-wrap: wrap; gap: var(--s2) var(--s3); min-width: 0; }
 .note-reading-identity > * { overflow-wrap: anywhere; }
 .journal-entry { scroll-margin-top: 84px; }
+.session-list { overflow: visible; }
 .journal-entry-date { color: var(--time); }
 @media (max-width: 999px) {
   .note-reading-head { top: 56px; }

@@ -75,6 +75,7 @@ export function NoteEditor({
   error,
   draftKey,
   persistKey,
+  persistVersion = 0,
   saveStatus,
   onRetry,
 }: {
@@ -92,6 +93,7 @@ export function NoteEditor({
   error?: string | string[] | null;
   draftKey?: string | number;
   persistKey?: string;
+  persistVersion?: number;
   saveStatus?: string;
   onRetry?: () => void;
 }) {
@@ -133,7 +135,7 @@ export function NoteEditor({
     };
   }, [writing]);
   const change = (next: string) => {
-    if (persistKey) writeNoteDraft(persistKey, { text: next, version: 0 });
+    if (persistKey) writeNoteDraft(persistKey, { text: next, version: persistVersion });
     onChange(next);
   };
   const supported = dictationSupported();
@@ -240,6 +242,7 @@ export function NoteEditor({
           <button
             type="button"
             className={`note-tool-button dictate-button${dictating ? " listening" : ""}`}
+            aria-label={!supported ? "Dictation unavailable" : dictating ? "Stop dictation" : "Dictate"}
             disabled={disabled || !supported}
             aria-pressed={supported ? dictating : undefined}
             onClick={() => dictation.current?.toggle()}

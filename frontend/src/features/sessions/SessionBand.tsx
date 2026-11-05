@@ -158,8 +158,8 @@ function InlineNoteWriter({ session, onDone }: { session: SessionRow; onDone: ()
   }}>
     <NoteEditor value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
     <div className="journal-edit-actions">
-      <button className="btn btn--primary" disabled={update.isPending}>{update.isPending ? "Saving…" : "Done"}</button>
-      <button className="btn btn--quiet" type="button" onClick={onDone}>Close editor</button>
+      <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
+      <button className="btn btn--quiet" type="button" onClick={() => { void draft.flush().then((ok) => { if (ok) onDone(); }); }}>Close editor</button>
       <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
     </div>
   </form>;

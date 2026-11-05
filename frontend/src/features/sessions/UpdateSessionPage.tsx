@@ -5,7 +5,7 @@ import { AllocationEditor } from "@/components/AllocationEditor";
 import { Icon } from "@/components/Icon";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
-import { clearNoteDraft } from "@/lib/noteDraft";
+import { clearNoteDraft, readNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -84,8 +84,9 @@ function SessionForm({ session }: { session: SessionRow }) {
   const projects = useAllProjects();
 
   /* The session as the form was opened (or last saved/reloaded). */
-  const [baseline, setBaseline] = useState(session);
-  const [form, setForm] = useState(() => initialState(session));
+  const draftKey = `session:${session.uuid ?? session.id}`;
+  const [baseline, setBaseline] = useState(() => ({ ...session, version: readNoteDraft(draftKey)?.version || session.version }));
+  const [form, setForm] = useState(() => ({ ...initialState(session), note: readNoteDraft(draftKey)?.text ?? session.note ?? "" }));
   const [allocations, setAllocations] = useState<AllocationWrite[] | null>(null);
   const [conflict, setConflict] = useState<SessionRow | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -182,7 +183,7 @@ function SessionForm({ session }: { session: SessionRow }) {
       { session: baseline, body, version },
       {
         onSuccess: (saved) => {
-          clearNoteDraft(`edit-session:${session.uuid ?? session.id}`, saved.note ?? "");
+          clearNoteDraft(draftKey, saved.note ?? "");
           toast.success("Updated session");
           reset(saved);
           /* Where the old view redirected: the numeric URL of this session. */
@@ -306,7 +307,7 @@ function SessionForm({ session }: { session: SessionRow }) {
             </div>
           </div>
 
-          <NoteEditor persistKey={`edit-session:${session.uuid ?? session.id}`} saveStatus={update.isPending ? "Saving..." : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes - kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
+          <NoteEditor persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
         </section>
 
         <section className="slab slab-pad">
