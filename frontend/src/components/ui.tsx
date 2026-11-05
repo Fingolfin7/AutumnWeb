@@ -77,7 +77,17 @@ function TimeInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputEl
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, next);
     input.dispatchEvent(new Event("input", { bubbles: true }));
   };
-  return <div className="temporal-control" ref={ref}><input {...props} type="time" step={60} value={value} className={`input ${className}`} /><button type="button" className="temporal-trigger btn-icon" aria-label="Choose time" disabled={props.disabled} aria-expanded={open} onClick={() => setOpen(!open)}><Icon icon={faClock} /></button>{open ? <div className="temporal-popover time-popover" role="group" aria-label="Time"><label>Hour<select value={value.slice(0, 2) || "09"} onChange={event => change(`${event.target.value}:${value.slice(3, 5) || "00"}`)}>{Array.from({ length: 24 }, (_, hour) => <option key={hour}>{String(hour).padStart(2, "0")}</option>)}</select></label><label>Minute<select value={value.slice(3, 5) || "00"} onChange={event => change(`${value.slice(0, 2) || "09"}:${event.target.value}`)}>{Array.from({ length: 60 }, (_, minute) => <option key={minute}>{String(minute).padStart(2, "0")}</option>)}</select></label><Button variant="quiet" onClick={() => setOpen(false)}>Done</Button></div> : null}</div>;
+  const hour = value.slice(0, 2) || "09";
+  const minute = value.slice(3, 5) || "00";
+  return <div className="temporal-control time-control" ref={ref}>
+    <input {...props} type="time" step={60} value={value} className={`input ${className}`} />
+    <button type="button" className="temporal-trigger btn-icon" aria-label="Choose time" disabled={props.disabled} aria-expanded={open} onClick={() => setOpen(!open)}><Icon icon={faClock} /></button>
+    {open ? <div className="time-chips" role="group" aria-label="Time">
+      <fieldset><legend>Hour</legend><div>{Array.from({ length: 24 }, (_, index) => { const next = String(index).padStart(2, "0"); return <button type="button" key={next} aria-pressed={hour === next} onClick={() => change(`${next}:${minute}`)}>{next}</button>; })}</div></fieldset>
+      <fieldset><legend>Minute</legend><div>{["00", "15", "30", "45"].map(next => <button type="button" key={next} aria-pressed={minute === next} onClick={() => change(`${hour}:${next}`)}>{next}</button>)}</div></fieldset>
+      <Button variant="quiet" onClick={() => setOpen(false)}>Done</Button>
+    </div> : null}
+  </div>;
 }
 
 /** One full-width file action; drag-and-drop remains a desktop shortcut. */

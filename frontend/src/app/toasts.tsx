@@ -116,7 +116,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   return (
     <div ref={ref} className={classes} role={kind === "error" || kind === "warning" ? "alert" : "status"}>
       <Icon icon={ICONS[kind]} className="msg-icon" />
-      <span tabIndex={0}>{toast.message}</span>
+      <span>{toast.message}</span>
       {toast.action ? (
         <button
           type="button"

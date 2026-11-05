@@ -80,7 +80,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <div className="screen app-header-screen--auth">
           <AppLink className="brand" href={urls.home()} aria-label="Autumn">
             <img className="brand-mark" src={boot.static.leaf} alt="" />
-            <span className="brand-word">Autumn</span>
+            <span className="brand-word">{settingsActive ? "Settings" : "Autumn"}</span>
           </AppLink>
           <nav className="primary-nav" aria-label="Primary">
             {tabs.map((tab, index) => {
@@ -108,7 +108,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <ToastOutlet />
       <OfflineSync />
       <main id="main-content" className="screen screen-pad">
-        <ContextScope />
+
         {children}
       </main>
 
@@ -119,15 +119,24 @@ export function Shell({ children }: { children: ReactNode }) {
 function ContextSwitch() {
   const { contextId, contexts, setContextId } = useActiveContext();
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const params = new URLSearchParams(search);
+  const selected = params.get("context");
+  const activeId = selected === "all" ? null : selected ? Number(selected) : contextId;
   return (
-    <div className={`context-switch${contextId !== null ? " is-filtered" : ""}`}>
+    <div className={`context-switch${activeId !== null ? " is-filtered" : ""}`}>
       <label className="sr-only" htmlFor="context-switch">
         Active context
       </label>
       <select
         id="context-switch"
-        value={contextId === null ? "all" : String(contextId)}
-        onChange={(event) => event.target.value === "manage" ? navigate("/settings/contexts/") : void setContextId(event.target.value === "all" ? null : Number(event.target.value))}
+        value={activeId === null ? "all" : String(activeId)}
+        onChange={(event) => {
+          const value = event.target.value;
+          if (value === "manage") { navigate("/settings/contexts/"); return; }
+          if (selected) { params.set("context", value); navigate(`${pathname}?${params}`, { replace: true }); }
+          else void setContextId(value === "all" ? null : Number(value));
+        }}
       >
         <option value="all">All contexts</option>
         {contexts.map((ctx) => (
@@ -139,17 +148,4 @@ function ContextSwitch() {
       </select>
     </div>
   );
-}
-
-
-function ContextScope() {
-  const { contextId, contexts, setContextId } = useActiveContext();
-  const { pathname, search } = useLocation();
-  const navigate = useNavigate();
-  const params = new URLSearchParams(search);
-  const selected = params.get("context");
-  const id = selected === "all" ? null : selected ? Number(selected) : contextId;
-  const name = contexts.find(item => item.id === id)?.name;
-  if (!name || !["/", "/projects/", "/sessions/", "/review/"].includes(pathname)) return null;
-  return <p className="context-scope">{name} only <span aria-hidden="true">·</span><button type="button" aria-label="Clear context filter" onClick={() => { if (selected) { params.set("context", "all"); navigate(`${pathname}?${params}`, { replace: true }); } else void setContextId(null); }}>Show all</button></p>;
 }

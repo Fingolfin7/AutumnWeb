@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { faArrowLeft, faCheckCircle, faPlay } from "@fortawesome/free-solid-svg-icons";
+import { faCheckCircle, faPlay } from "@fortawesome/free-solid-svg-icons";
+import { Sheet } from "@/components/Sheet";
+import ProjectsPage from "./ProjectsPage";
 import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -13,7 +15,7 @@ import { errorMessage } from "@/api/errors";
 import { failure, useCreateProject } from "./api";
 import { splitErrors } from "./forms";
 import type { ProjectValues } from "./logic";
-import { FormErrors, PageHead, ProjectFields } from "./Parts";
+import { FormErrors, ProjectFields } from "./Parts";
 
 const FIELDS = ["name", "description", "context_id", "tag_ids", "status"];
 
@@ -64,7 +66,7 @@ export default function CreateProjectPage() {
       }
       invalidate("projects");
       if (shouldStart) await start.mutateAsync({ project_id: projectId, subproject_ids: subs.map((sub) => sub.id), optimistic: { projectName: values.name.trim(), subprojects: subs } });
-      toast.success(shouldStart ? "Project created and timer started." : "Project created successfully");
+      toast.success(shouldStart ? "Project created. Timer started." : "Project created.");
       navigate(urls.updateProject(projectId));
     } catch (error) {
       setProblem(projectId ? `Your project is saved. ${errorMessage(error)} Retry to finish, or open the project.` : failure("create the project", error));
@@ -75,16 +77,14 @@ export default function CreateProjectPage() {
 
   return (
     <>
-      <PageHead title="New project" />
+      <ProjectsPage />
+      <Sheet open onClose={() => navigate(urls.projects())} title="New project" className="project-create-sheet">
       <form className="fields completing-form" onSubmit={onSubmit}>
-          <AppLink className="btn btn--ghost" href={urls.projects()}>
-            <Icon icon={faArrowLeft} /> Back
-          </AppLink>
         <FormErrors errors={errors} />
         {problem ? <div className="msg msg--error" role="alert">{problem}{created ? <AppLink href={urls.updateProject(created)}>Open project</AppLink> : null}</div> : null}
         <section className="slab slab-pad">
           <fieldset disabled={created !== null || busy} className="project-create-fields">
-            <ProjectFields
+            <ProjectFields compact
               values={values}
               onChange={(next) => {
                 if (next.context_id !== values.context_id) setTouchedContext(true);
@@ -106,6 +106,7 @@ export default function CreateProjectPage() {
           <button className="btn btn--primary" type="submit" name="start" disabled={busy}><Icon icon={faPlay} /> Create and start</button>
         </div>
       </form>
+      </Sheet>
     </>
   );
 }
