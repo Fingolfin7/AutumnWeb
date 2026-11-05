@@ -48,8 +48,8 @@ export function SessionNote({ html, text, id, identity, onEdit, search = "" }: {
   const preview = useMemo(() => {
     // A search result starts at the matching paragraph, preserving its markup.
     const node = document.createElement("div"); node.innerHTML = full;
-    const needle = search.trim().replace(/^"|"$/g, "").toLowerCase();
-    const matched = needle ? [...node.children].find((child) => child.textContent?.toLowerCase().includes(needle)) : undefined;
+    const needles = search.toLowerCase().match(/"[^"]+"|[^\s]+/g)?.map((word) => word.replace(/^"|"$/g, "")) ?? [];
+    const matched = needles.length ? [...node.children].find((child) => needles.some((word) => child.textContent?.toLowerCase().includes(word))) : undefined;
     return previewHtml(matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 350 ? matched.outerHTML : full);
   }, [full, search]);
   const clipped = preview !== full;

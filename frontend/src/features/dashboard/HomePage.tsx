@@ -63,6 +63,7 @@ function HomeContent({ data }: { data: Dashboard }) {
       ) : (
         <StartCard />
       )}
+      {firstRun ? <p className="muted">Pick a project and start. Your notes and time will make this day your own.</p> : null}
       {outside ? (
         <p className="muted timers-outside-context">
           {outside} timer{outside === 1 ? "" : "s"} running in other contexts {" / "}

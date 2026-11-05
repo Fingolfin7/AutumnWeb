@@ -13,6 +13,7 @@ import { bootstrap } from "@/bootstrap";
 import type { Project } from "@/api/types";
 import { useStartTimer } from "./api";
 import { minutesOf, planReminders, type DurationUnit, type ReminderMode } from "./reminderPlan";
+import { Suggestions } from "./Suggestions";
 import { PushPermission } from "./PushPermission";
 import { clearNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
@@ -60,6 +61,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
   const [pastAnchor, setPastAnchor] = useState("start");
   const [note, setNote] = useState("");
   const pastTime = useLocalTime(pastAt);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [savingPast, setSavingPast] = useState(false);
   const [newSub, setNewSub] = useState("");
   const [creatingSub, setCreatingSub] = useState(false);
@@ -588,6 +590,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
                     <PushPermission />
                   </fieldset>
                 </section>
+                <details className="capture-options" onToggle={(event) => setSuggestionsOpen(event.currentTarget.open)}><summary>Suggestions for what to work on</summary>{suggestionsOpen ? <Suggestions /> : null}</details>
               </details>
             ) : null}
 
