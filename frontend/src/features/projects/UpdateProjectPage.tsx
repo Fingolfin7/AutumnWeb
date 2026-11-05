@@ -15,6 +15,7 @@ import { formatDate, formatDurationWords } from "@/lib/format";
 import type { Project, ProjectDetail } from "@/api/types";
 import { useCommitmentsAppliedTo } from "@/features/commitments/api";
 import { failure, useProject, useUpdateProject } from "./api";
+import { QuickTarget } from "@/features/commitments/QuickTarget";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { conflictCurrent, splitErrors } from "./forms";
 import { changedFields, type ProjectValues } from "./logic";
@@ -47,6 +48,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const week = useSessionTotals({ project_ids: String(project.id), start_date: weekStart });
   const update = useUpdateProject(project.id);
   const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
+  const ownCommitment = related.find((item) => item.active && item.aggregation_type === "project" && item.target.id === project.id);
   /* The project as the form was opened (or last saved/reloaded): the edit is
      diffed against it and the PATCH carries its version (If-Match). */
   const [baseline, setBaseline] = useState(project);
@@ -114,6 +116,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
           <div className="project-stat"><span>This week</span><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong></div>
           <div className="project-stat"><span>Total time</span><strong>{formatDurationWords(project.total_minutes)}</strong></div>
           <span className="muted">{project.session_count} sessions</span>
+          <div className="project-week-target">{ownCommitment ? <QuickTarget key={ownCommitment.version} commitment={ownCommitment} /> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}>Add commitment</AppLink>}</div>
           {project.description ? <div className="project-description"><SessionNote text={project.description} /></div> : null}
         </section>
         <Sheet open={editing} onClose={() => setEditing(false)} title="Edit project" className="project-edit-sheet">
@@ -148,12 +151,6 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
 
         </Sheet>
 
-        <CommitmentsPanel
-          commitments={related}
-          addUrl={urls.createCommitment(project.id)}
-          entityLabel="project"
-          knownSubprojects={knownSubprojects}
-        />
 
         <section className="slab session-list project-journal" aria-label="Recent journal entries">
           <header className="day-head"><h2 className="day-date">Recent journal entries</h2><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></header>
@@ -203,6 +200,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
             ) : null}
           </div>
         </Disclose>
+        {related.some((item) => item.id !== ownCommitment?.id) ? <CommitmentsPanel commitments={related.filter((item) => item.id !== ownCommitment?.id)} addUrl={urls.createCommitment(project.id)} entityLabel="project" knownSubprojects={knownSubprojects} /> : null}
 
       </div>
     </>

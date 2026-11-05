@@ -264,9 +264,11 @@ function ProfileEditor({
           queryFn: fetchPreferences,
           staleTime: 0,
         });
-        applyBackground(fresh.background);
-        applyDimming(fresh.background_dimming);
-        syncHeaderDimming(fresh.background_dimming);
+        if (scope === "appearance") {
+          applyBackground(fresh.background);
+          applyDimming(fresh.background_dimming);
+          syncHeaderDimming(fresh.background_dimming);
+        }
         applyPrefs(fresh);
         if (prefsOk) setPrefsD((draft) => {
           const next = prefsDraft(fresh);

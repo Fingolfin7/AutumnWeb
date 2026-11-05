@@ -129,7 +129,7 @@ describe("describeSelection", () => {
   it("resolves ids to names and flips the related pill when meaning search is unavailable", () => {
     const f = { ...EMPTY_SELECTION, search: "x", related: true, context: "3", tags: [2], projects: [1], projectMode: "include" as const };
     const pills = describeSelection(f, lookup, defaults, { available: true, state: "included" });
-    expect(pills.map((p) => `${p.label}=${p.value}`)).toEqual(["Search=x", "Including=related", "Closeness=0.45", "Context=Work", "Tags=deep", "Only=Writing"]);
+    expect(pills.map((p) => `${p.label}=${p.value}`)).toEqual(["Search=x", "Including=related", "Closeness=Balanced", "Context=Work", "Tags=deep", "Only=Writing"]);
     const unavailable = describeSelection(f, lookup, defaults, { available: true, state: "unavailable" });
     expect(unavailable[1]).toMatchObject({ label: "Related", value: "unavailable" });
     expect(unavailable[1]!.title).toBeTruthy();
