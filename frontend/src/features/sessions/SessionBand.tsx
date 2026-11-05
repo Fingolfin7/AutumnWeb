@@ -15,7 +15,7 @@ import { useDeleteSession, useUpdateSession, type SessionRow } from "./api";
 
 /* Journal row shared with Today. Actions are explicit; a left swipe is an
    optional shortcut that reveals the same controls without moving the prose. */
-export function SessionBand({ session, showDate, hideProject = false }: { session: SessionRow; showDate?: boolean; hideProject?: boolean }) {
+export function SessionBand({ session, showDate, hideProject = false, onEditNote, onNoteSaved }: { session: SessionRow; showDate?: boolean; hideProject?: boolean; onEditNote?: (session: SessionRow) => void; onNoteSaved?: (session: SessionRow) => void }) {
   const location = useLocation();
   hideProject = hideProject || location.pathname === urls.updateProject(session.project.id);
   const start = useStartTimer();
@@ -26,6 +26,7 @@ export function SessionBand({ session, showDate, hideProject = false }: { sessio
   const [editing, setEditing] = useState<SessionRow | null>(null);
   const row = useRef<HTMLLIElement>(null);
   const editNote = () => {
+    onEditNote?.(session);
     setEditing(session);
     setActionsOpen(false);
   };
@@ -99,11 +100,11 @@ export function SessionBand({ session, showDate, hideProject = false }: { sessio
       </div>
       <div className="journal-meta">
         {session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}
-        {showDate ? <span>{formatShortDate(session.end)}</span> : null}
+        {showDate && !hideProject ? <span>{formatShortDate(session.end)}</span> : null}
         <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
         {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
       </div>
-      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} /> : <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} onEdit={editNote} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
+      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} onEdit={editNote} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
 
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Session actions" className="session-actions-sheet">
         <p className="session-action-context">{session.project.name} · {formatDuration(session.duration_minutes)}</p>
@@ -145,12 +146,16 @@ function crossesDst(session: SessionRow): boolean {
   return start.getTimezoneOffset() !== end.getTimezoneOffset();
 }
 
-function InlineNoteWriter({ session, onDone }: { session: SessionRow; onDone: () => void }) {
+function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; onDone: () => void; onSaved?: (session: SessionRow) => void }) {
   const update = useUpdateSession();
   const toast = useToast();
   const draft = useNoteDraft({
     draftKey: `session:${session.uuid ?? session.id}`, text: session.note ?? "", version: session.version,
-    save: (note, version) => update.mutateAsync({ session, body: { note }, version }),
+    save: async (note, version) => {
+      const saved = await update.mutateAsync({ session, body: { note }, version });
+      onSaved?.(saved);
+      return saved;
+    },
   });
   return <form className="journal-note-edit fields" onSubmit={(event) => {
     event.preventDefault();

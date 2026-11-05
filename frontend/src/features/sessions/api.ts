@@ -180,6 +180,7 @@ export function useUpdateSession() {
   const client = useQueryClient();
   const invalidate = useInvalidate();
   return useMutation({
+    networkMode: "always",
     mutationFn: async ({ session, body, version }: { session: SessionRow; body: SessionPatch; version?: number }) =>
       unwrap(
         api.PATCH("/api/v2/sessions/{session_id}", {
