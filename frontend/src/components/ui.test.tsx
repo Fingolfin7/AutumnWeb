@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { DateInput, Input, SegmentedControl } from "./ui";
 
 it("keeps reminder presets inside the calendar and respects the date boundary", () => {
@@ -20,8 +20,10 @@ it("edits whole minutes and lets an already selected Custom range reopen", () =>
   const reselect = vi.fn();
   render(<><Fields /><SegmentedControl label="Range" value="custom" options={[{ value: "custom", label: "Custom" }]} onChange={vi.fn()} onReselect={reselect} /></>);
   fireEvent.click(screen.getByRole("button", { name: "Choose time" }));
-  fireEvent.change(screen.getByLabelText("Minute"), { target: { value: "30" } });
+  fireEvent.click(within(screen.getByRole("group", { name: "Minute" })).getByRole("button", { name: "30" }));
   expect(screen.getByLabelText("Reminder time")).toHaveValue("09:30");
+  fireEvent.change(screen.getByLabelText("Reminder time"), { target: { value: "09:37" } });
+  expect(screen.getByLabelText("Reminder time")).toHaveValue("09:37");
   fireEvent.click(screen.getByRole("radio", { name: "Custom" }));
   expect(reselect).toHaveBeenCalledWith("custom");
 });
