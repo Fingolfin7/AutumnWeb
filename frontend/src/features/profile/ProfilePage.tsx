@@ -323,7 +323,7 @@ function ProfileEditor({
       valueKey: "filterValue",
       unitKey: "filterUnit",
       error: "default_filter_value",
-      hint: "Charts and other date-filtered pages",
+      hint: "Review and other date-filtered pages",
     },
     {
       id: "insights_default_filter",
