@@ -22,7 +22,7 @@ export function TimerDock() {
       entries.forEach((entry) => seen.set(entry.target, entry.isIntersecting));
       setCardVisible([...seen.values()].some(Boolean));
     }, { rootMargin: "-68px 0px -80px 0px" });
-    const attach = () => document.querySelectorAll(".ember-deck .ember-clock").forEach((card) => {
+    const attach = () => document.querySelectorAll(".ember-deck article").forEach((card) => {
       if (!seen.has(card)) { seen.set(card, false); observer.observe(card); }
     });
     attach();

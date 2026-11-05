@@ -11,10 +11,16 @@ export function CapturePicker({
   value,
   onChange,
   recent,
+  id = "project-search",
+  autoFocus = true,
+  placeholder = "Search projects or recent subprojects",
 }: {
   value: Project | null;
   onChange: (project: Project | null, subprojectIds: number[]) => void;
   recent: Dashboard["quick_starts"];
+  id?: string;
+  autoFocus?: boolean;
+  placeholder?: string;
 }) {
   const projects = useAllProjects();
   const listId = useId();
@@ -35,10 +41,15 @@ export function CapturePicker({
       if (!project || (needle && !`${project.name} ${sublabel}`.toLowerCase().includes(needle))) return [];
       return [{ project, subprojectIds: quick.subprojects.map((s) => s.id), label: project.name, sublabel }];
     });
-    const names: Pick[] = rankProjects(all, text)
-      .filter((p) => !pairs.some((pair) => pair.project.id === p.id && !pair.subprojectIds.length))
-      .map((project) => ({ project, subprojectIds: [], label: project.name, sublabel: "" }));
-    return [...pairs, ...names].slice(0, 10);
+    const unique = [...new Map(pairs.map((pair) => [`${pair.project.id}:${[...pair.subprojectIds].sort().join(",")}`, pair])).values()];
+    const ranked = rankProjects(all, text, 12);
+    const ordered = [...new Map([...unique.map((pair) => pair.project), ...ranked].map((project) => [project.id, project])).values()];
+    // Each project appears once, followed by its visibly named recent subprojects.
+    return ordered.flatMap((project) => [
+      { project, subprojectIds: [], label: project.name, sublabel: "" },
+      ...unique.filter((pair) => pair.project.id === project.id && pair.subprojectIds.length),
+    ]);
+
   }, [projects.data, recent, text]);
   const choose = (pick: Pick) => {
     onChange(pick.project, pick.subprojectIds);
@@ -54,18 +65,18 @@ export function CapturePicker({
       }}
     >
       <input
-        id="project-search"
+        id={id}
         type="text"
         className="input"
-        data-autofocus
+        data-autofocus={autoFocus || undefined}
         role="combobox"
         aria-autocomplete="list"
         aria-controls={listId}
         aria-expanded={open}
         aria-activedescendant={open && picks[active] ? `${listId}-${active}` : undefined}
         autoComplete="off"
-        autoFocus
-        placeholder="Search projects or recent subprojects"
+        autoFocus={autoFocus}
+        placeholder={placeholder}
         value={text}
         onFocus={() => setOpen(true)}
         onClick={() => setOpen(true)}
@@ -100,11 +111,11 @@ export function CapturePicker({
                 id={`${listId}-${index}`}
                 aria-selected={active === index}
                 aria-label={`${pick.label}${pick.sublabel ? ` / ${pick.sublabel}` : ""}`}
-                className={active === index ? "is-active" : ""}
+                className={`${active === index ? "is-active" : ""}${pick.sublabel ? " capture-pick-sub" : ""}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(pick)}
               >
-                <span className="text-red">{pick.label}</span>
+                {!pick.sublabel ? <span className="text-red">{pick.label}</span> : null}
                 {pick.sublabel ? <small className="text-blue">{pick.sublabel}</small> : null}
               </li>
             ))

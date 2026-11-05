@@ -96,6 +96,12 @@ export function useNoteDraft({ draftKey, text, version, save, enabled = true, re
   };
 
   useEffect(() => {
+    // A locally created timer has version 0 until the same UUID is confirmed.
+    // Adopt that first version only if its original server text still agrees.
+    if (match.current === 0 && version > 0 && text === baseline.current) {
+      match.current = version;
+      if (latest.current !== baseline.current) writeNoteDraft(draftKey, { text: latest.current, version });
+    }
     // Polls can update a clean editor, never the text being written.
     if (!pending.current && latest.current === baseline.current) {
       baseline.current = text;
@@ -103,7 +109,7 @@ export function useNoteDraft({ draftKey, text, version, save, enabled = true, re
       match.current = version;
       setValue(text);
     }
-  }, [text, version]);
+  }, [text, version, revision, draftKey]);
   useEffect(() => {
     if (enabled && latest.current !== baseline.current) void flushRef.current();
   }, [enabled, revision]);
