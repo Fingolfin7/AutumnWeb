@@ -4185,3 +4185,13 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .chart-series-dot--11 { background: #596d80; }
 .chart-series button { display: flex; align-items: baseline; gap: var(--s2); min-height: 44px; text-align: left; padding: 0; overflow-wrap: anywhere; }
 .chart-series button[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+
+.project-journal .session-project { display: none; }
+.project-hero { gap: var(--s5); padding-block: var(--s4); }
+.project-hero .project-description { margin-top: var(--s3); }
+.project-commit { display: none; }
+.project-directory .project-total, .project-total { font-variant-numeric: tabular-nums; }
+.commitment-quick-target { display: flex; flex-wrap: wrap; gap: var(--s3); align-items: center; }
+.commitment-quick-target .field { flex: 1 1 12rem; margin: 0; }
+.commitment-quick-target > .muted { font-size: var(--fs-xs); }
+@media (max-width: 999px) { .project-hero { gap: var(--s3); }.project-hero .project-stat strong { font-size: var(--fs-xl); } }

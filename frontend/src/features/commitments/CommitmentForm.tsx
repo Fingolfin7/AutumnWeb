@@ -1,5 +1,6 @@
+import { TargetInput } from "./TargetInput";
 import { hasPendingChange, liveDefinition } from "./QuickTarget";
-import { formatDuration } from "@/lib/format";
+import { formatDate, formatDuration } from "@/lib/format";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -288,20 +289,8 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               <div className="two-up">
                 <div className="field">
                   <label htmlFor="id_target">Target</label>
-                  <input
-                    id="id_target"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    step={1}
-                    placeholder="Target amount"
-                    value={state.target}
-                    aria-invalid={!!shown.fields.target}
-                    onChange={(e) => setField({ target: e.target.value })}
-                  />
-                  <small className="help-text muted">
-                    {state.commitmentType === "time" ? "Minutes for time-based commitments" : "Count for session-based commitments"}
-                  </small>
+                  <TargetInput id="id_target" time={state.commitmentType === "time"} value={state.target} invalid={!!shown.fields.target} onChange={(target) => setField({ target })} />
+                  <small className="help-text muted" id="id_target-help">{state.commitmentType === "time" ? "Hours and minutes, e.g. 3h 30m. Plain numbers are minutes." : "Number of sessions"}</small>
                   <FieldErrors errors={shown.fields.target} />
                 </div>
                 <div className="field">
@@ -413,7 +402,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
             <section className="slab slab-pad">
               <div className="check-row">
                 <input id="id_banking_enabled" type="checkbox" checked={state.banking} onChange={(e) => setField({ banking: e.target.checked })} />
-                <label htmlFor="id_banking_enabled">Enable time banking</label>
+                <label htmlFor="id_banking_enabled">Carry extra time into the next period</label>
               </div>
 
               <div className="two-up u-mt-4">
@@ -514,6 +503,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                     <Icon icon={faTrash} /> Delete
                   </AppLink>
                 ) : null}
+                {commitment && changes?.nextPeriod.length ? <span className="muted">Applies from {formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}</span> : null}
                 {!showRestart ? (
                   <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}>
                     <Icon icon={faCheckCircle} /> {commitment ? "Update commitment" : "Create commitment"}
@@ -646,7 +636,7 @@ function PendingNotice({ commitment, nameOf }: { commitment: Commitment; nameOf:
   const lines: string[] = [];
   for (const [key, value] of Object.entries(pending.changes as Record<string, unknown>)) {
     if (key === "target_value") lines.push(`Target: ${value}${unit}`);
-    else if (key === "banking_enabled") lines.push(`Time banking: ${value ? "on" : "off"}`);
+    else if (key === "banking_enabled") lines.push(`Time carryover: ${value ? "on" : "off"}`);
     else if (key === "max_balance") lines.push(`Surplus cap: ${value}`);
     else if (key === "min_balance") lines.push(`Deficit cap: ${value}`);
     else {
@@ -743,7 +733,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
         {c.banking_enabled ? (
           <>
             <div className="meta-row">
-              <span className="meta-label">Bank balance</span>
+              <span className="meta-label">Carried balance</span>
               <span className={`meta-value ${c.balance >= 0 ? "text-green" : "text-red"}`}>
                 {`${c.balance >= 0 ? "+" : "-"}${num(c.balance)}`}
               </span>

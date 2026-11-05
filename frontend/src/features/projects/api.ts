@@ -243,3 +243,8 @@ export function useMergeSubprojects() {
 export function failure(action: string, error: unknown): string {
   return `Couldn't ${action}: ${errorMessage(error)}`;
 }
+
+/** One weekly report serves the whole directory, keyed by stable project IDs. */
+export function useProjectWeek(week: string) {
+  return useQuery({ queryKey: keys.reports("weekly-review", { week }), queryFn: () => unwrap(api.GET("/api/v2/reports/weekly-review/", { params: { query: { week } } })) });
+}

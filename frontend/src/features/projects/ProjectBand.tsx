@@ -3,7 +3,7 @@ import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
-import { formatDate, formatDurationWords } from "@/lib/format";
+import { formatDurationWords } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
 import type { Commitment, Project } from "@/api/types";
 
@@ -14,8 +14,10 @@ export function ProjectBand({
   running,
   commitment,
   tagColors,
+  weekMinutes,
 }: {
   project: Project;
+  weekMinutes?: number;
   running: boolean;
   /** The project's own active commitment, for the progress meter. */
   commitment?: Commitment;
@@ -74,18 +76,9 @@ export function ProjectBand({
           </div>
         ) : null}
 
-        <p className="project-total">{formatDurationWords(project.total_minutes)}</p>
-        <p className="project-dates">
-          {formatDate(project.start_date)} &rarr; {formatDate(project.last_activity)}
-        </p>
+        <p className="project-total"><span className="muted">This week </span>{weekMinutes === undefined ? "Loading…" : formatDurationWords(weekMinutes)}{commitment?.period === "weekly" && commitment.commitment_type === "time" ? <> <span className="muted">/ {formatDurationWords(period?.target ?? 0)} {period?.met ? "· Target met" : ""}</span></> : null}</p>
+        {period && commitment?.period !== "weekly" ? <p className="project-dates">Commitment: {commitment?.commitment_type === "time" ? formatDurationWords(period.accrued) : `${period.accrued} sessions`} / {commitment?.commitment_type === "time" ? formatDurationWords(period.target) : period.target} this period</p> : null}
 
-        {period ? (
-          <div className="project-commit">
-            <div className="meter">
-              <div className={`meter-fill ${period.status ?? ""}`} style={{ width: `${Math.round(period.percentage ?? 0)}%` }} />
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <button

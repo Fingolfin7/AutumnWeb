@@ -3,9 +3,10 @@ import { useParams } from "react-router";
 import { faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Sheet } from "@/components/Sheet";
+import { SessionBand } from "@/features/sessions/SessionBand";
 import { SessionNote } from "@/components/SessionNote";
 import { useSessionList, useSessionTotals } from "@/features/sessions/api";
-import { SessionBand } from "@/features/sessions/SessionBand";
+
 import { useStartTimer } from "@/features/timers/api";
 import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
@@ -154,6 +155,10 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
           knownSubprojects={knownSubprojects}
         />
 
+        <section className="slab session-list project-journal" aria-label="Recent journal entries">
+          <header className="day-head"><h2 className="day-date">Recent journal entries</h2><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></header>
+          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <ul className="band-list">{recent.data.pages[0].sessions.slice(0, 5).map((session) => <SessionBand key={session.id} session={session} showDate />)}</ul> : <p className="empty">Your first session will appear here.</p>}
+        </section>
         <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
           {project.subprojects.length ? (
             <ul className="band-list">
@@ -170,6 +175,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
                     {sub.last_activity ? <p className="project-dates">Last active {formatDate(sub.last_activity)}</p> : null}
                   </div>
                   <div className="u-row u-gap-2">
+                    <button className="btn btn--secondary" type="button" disabled={start.isPending} onClick={() => start.mutate({ project_id: project.id, subproject_ids: [sub.id], optimistic: { projectName: project.name, subprojects: [{ id: sub.id, name: sub.name }] } }, { onSuccess: () => toast.success(`Started ${sub.name}.`), onError: (error) => toast.error(failure("start the timer", error)) })}><Icon icon={faPlay} /> Start<span className="sr-only"> {sub.name}</span></button>
                     <AppLink className="btn-icon" href={urls.updateSubproject(sub.id)} title="Edit subproject">
                       <Icon icon={faPen} />
                       <span className="sr-only">Edit {sub.name}</span>
@@ -197,10 +203,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
             ) : null}
           </div>
         </Disclose>
-        <section className="slab session-list project-journal" aria-label="Recent journal entries">
-          <header className="day-head"><h2 className="day-date">Recent journal entries</h2><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></header>
-          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <ul className="band-list">{recent.data.pages[0].sessions.slice(0, 5).map((session) => <SessionBand key={session.id} session={session} showDate />)}</ul> : <p className="empty">Your first session will appear here.</p>}
-        </section>
+
       </div>
     </>
   );

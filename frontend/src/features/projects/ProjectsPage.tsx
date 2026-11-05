@@ -1,3 +1,6 @@
+import { bootstrap } from "@/bootstrap";
+import { calendarWeek } from "@/features/review/periods";
+import { todayKey } from "@/features/notifications/dates";
 import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
@@ -20,7 +23,7 @@ import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import type { Commitment } from "@/api/types";
 import { useTimers } from "@/features/timers/api";
 import { ProjectBand } from "./ProjectBand";
-import { useCommitments, useProjectLists } from "./api";
+import { useCommitments, useProjectLists, useProjectWeek } from "./api";
 import { describeFilters, emptyFilters, groupByStatus, readFilters, serverQuery, writeFilters, type ProjectFilters } from "./logic";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { useActiveContext } from "@/app/context";
@@ -45,6 +48,7 @@ export default function ProjectsPage() {
   const tags = useTags();
   const contexts = useContexts();
   const commitments = useCommitments();
+  const week = useProjectWeek(calendarWeek(todayKey(bootstrap().profile.timezone)).start);
   const timers = useTimers();
 
   const runningIds = useMemo(() => new Set((timers.data ?? []).map((timer) => timer.project.id)), [timers.data]);
@@ -83,6 +87,7 @@ export default function ProjectsPage() {
       project={project}
       running={runningIds.has(project.id)}
       commitment={commitmentByProject.get(project.id)}
+      weekMinutes={week.data ? week.data.per_project.find((row) => row.project_id === project.id)?.total_minutes ?? 0 : undefined}
       tagColors={tagColors}
     />
   );
