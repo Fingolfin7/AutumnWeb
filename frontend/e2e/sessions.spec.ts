@@ -72,7 +72,7 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   const field = page.getByRole("textbox", { name: "Note", exact: true });
   await field.fill(note);
   if (testInfo.project.name === "phone") await page.getByRole("dialog", { name: "Full-screen note writer" }).getByRole("button", { name: "Done", exact: true }).click();
-  await first.getByRole("button", { name: "Done", exact: true }).click();
+  else await first.getByRole("button", { name: "Done", exact: true }).click();
   await expect(toasts(page).getByText("Note saved.", { exact: true })).toBeVisible();
 
   await page.reload();
@@ -83,10 +83,11 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await retained.locator(".session-note-body").click();
   await retained.getByRole("button", { name: "Edit", exact: true }).click();
   const revised = `A different **reflection** for ${testInfo.project.name}, with the search word removed.`;
-  await retained.getByRole("textbox", { name: "Note", exact: true }).fill(revised);
-  await expect(retained.getByRole("status")).toHaveText("Saved");
-  await expect(retained.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(revised);
-  await retained.getByRole("button", { name: "Done", exact: true }).click();
+  const editor = testInfo.project.name === "phone" ? page.getByRole("dialog", { name: "Full-screen note writer" }) : retained;
+  await editor.getByRole("textbox", { name: "Note", exact: true }).fill(revised);
+  await expect(editor.getByRole("status")).toHaveText(testInfo.project.name === "phone" ? "Saved to session" : "Saved");
+  await expect(editor.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(revised);
+  await editor.getByRole("button", { name: "Done", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`search=${encodeURIComponent(note)}`));
   await expect(retained.getByText(revised.replaceAll("**", ""), { exact: true })).toBeVisible();
   await expect(retained.locator(".session-note strong")).toHaveText("reflection");
