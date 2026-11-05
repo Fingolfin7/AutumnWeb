@@ -5470,7 +5470,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .settings-group-links { display: flex; gap: var(--s2); overflow-x: auto; margin-bottom: var(--s4); }
 .settings-group-links a { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--s3); color: var(--ink-2); border-radius: var(--r-sm); text-decoration: none; }
 .settings-group-links a[aria-current="page"] { color: var(--brand); background: var(--raised); }
+.insights-workspace .assistant-message .message-content { font-family: var(--font-reading); }
 @media (max-width: 600px) {
   .review-heading-actions { display: flex; flex: none; }
   .review-heading-actions > button { scroll-margin-top: 80px; }
+  .insights-workspace .chat-layout { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 }
