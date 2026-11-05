@@ -223,7 +223,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
         }}
       >
         <NoteEditor
-          sessionTitle={`${timer.project.name} ? ${formatDate(timer.start)} ? ${formatDuration((requestedAt - Date.parse(timer.start)) / 60000)}`}
+          sessionTitle={`${timer.project.name} · ${formatDate(timer.start)} · ${formatDuration((requestedAt - Date.parse(timer.start)) / 60000)}`}
           id="id_note"
           disabled={busy && (saved || offline)}
           value={note}

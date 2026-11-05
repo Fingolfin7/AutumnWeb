@@ -300,7 +300,7 @@ export default function SessionsPage() {
       ) : !related.length ? (
         <section className="slab">
           {pills.length || applied.search ? (
-            <Empty>No sessions match{applied.search ? ` ?${applied.search}?` : " these filters"}. Try another search or clear the filters.</Empty>
+            <Empty>No sessions match{applied.search ? ` “${applied.search}”` : " these filters"}. Try another search or clear the filters.</Empty>
           ) : (
             <div className="first-run-empty journal-empty"><span className="ember-seal" aria-hidden="true" /><h2>A little time, a place to keep it.</h2><p>Your sessions and the thoughts that go with them will gather here.</p><AppLink className="btn btn--primary" href={urls.startTimer()}>Start your first timer</AppLink></div>
           )}

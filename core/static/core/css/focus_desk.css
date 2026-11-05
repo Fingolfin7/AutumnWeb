@@ -4540,3 +4540,26 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .note-compact-preview { gap: var(--s3); }
   .note-compact-preview p { font-size: var(--fs-md); }
 }
+
+.ember-clock .focus-details { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1); grid-column: 1; grid-row: 5; }
+.ember-clock .focus-details > * { grid-row: auto; grid-column: auto; margin: 0; }
+.capture-control .capture-form, .capture-control .desk-main > .slab, .capture-control #search-projects { margin: 0; }
+.capture-control .capture-form .desk-main { gap: var(--s4); }
+.capture-control--inline .today-quick { margin-top: 0; }
+.capture-control .today-quick-pick > .svg-inline--fa { color: var(--brand); flex: none; width: 20px; align-self: center; }
+@media (min-width: 1000px) {
+  .capture-control--inline { display: grid; max-width: none; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr); column-gap: var(--s7); }
+  .capture-control--inline .capture-form { grid-column: 1; grid-row: 1 / 3; }
+  .capture-control--inline .today-quick { grid-column: 2; grid-row: 1; align-self: start; }
+  .capture-control--inline .today-log-past { grid-column: 2; grid-row: 2; justify-self: start; align-self: end; }
+}
+@media (max-width: 999px) {
+  .today-page > .today-heading { order: 0; }
+  .today-page > :is(.ember-deck, .today-idle) { order: 1; }
+  .today-page > .today-commitments { order: 2; }
+  .today-page > .today-journal { order: 3; }
+  .today-page > .day-ledger { order: 4; }
+  .ember-clock .focus-details { flex-direction: row; align-items: center; flex-wrap: wrap; gap: var(--s2); }
+  .ember-clock.is-compact .focus-stop { min-width: 84px; min-height: 44px; }
+  .ember-clock.is-compact .focus-time .num { font-size: 2rem; }
+}

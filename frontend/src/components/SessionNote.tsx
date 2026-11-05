@@ -8,7 +8,7 @@ function previewHtml(html: string) {
   const nodes = [...root.childNodes];
   for (const node of nodes) {
     count += node.textContent?.length ?? 0;
-    if (count > 650 && node !== nodes[0]) node.remove();
+    if (count > 350 && node !== nodes[0]) node.remove();
   }
   // A single long paragraph stays whole: never cut a sentence behind a mask.
   return root.innerHTML;
@@ -50,7 +50,7 @@ export function SessionNote({ html, text, id, identity, onEdit, search = "" }: {
     const node = document.createElement("div"); node.innerHTML = full;
     const needle = search.trim().replace(/^"|"$/g, "").toLowerCase();
     const matched = needle ? [...node.children].find((child) => child.textContent?.toLowerCase().includes(needle)) : undefined;
-    return previewHtml(matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 650 ? matched.outerHTML : full);
+    return previewHtml(matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 350 ? matched.outerHTML : full);
   }, [full, search]);
   const clipped = preview !== full;
   const rendered = useMemo(() => highlight(open ? full : preview, search), [full, preview, open, search]);

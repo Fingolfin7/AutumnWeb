@@ -288,7 +288,7 @@ export function NoteEditor({
         />
       </div>
       <div className="note-editor-status">
-        <small role="status">{saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes ? kept on this device" : "Unsaved changes")}</small>
+        <small role="status">{saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
         {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
       <small data-note-status="" aria-live="polite">{status}</small>
       </div>

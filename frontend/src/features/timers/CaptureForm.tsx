@@ -1,3 +1,5 @@
+import { faPlay } from "@fortawesome/free-solid-svg-icons";
+import { Icon } from "@/components/Icon";
 import { formatTime, formatDate, toDateTimeLocal } from "@/lib/format";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -596,7 +598,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
           {[...new Map(dashboard.data.quick_starts.map((item) => [item.project.id, item])).values()].slice(0, 4).map((item) => <button className="today-quick-pick" type="button" key={item.project.id} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => {
             const next = projects.data?.find((p) => p.id === item.project.id);
             if (next) void submit(undefined, next, item.subprojects.map((sub) => sub.id));
-          }}><span aria-hidden="true">?</span><CapturePickLabel project={item.project.name} sublabel={item.subprojects.map((sub) => sub.name).join(", ")} /></button>)}
+          }}><Icon icon={faPlay} /><CapturePickLabel project={item.project.name} sublabel={item.subprojects.map((sub) => sub.name).join(", ")} /></button>)}
         </div> : null}
         {inline ? <AppLink className="btn btn--secondary today-log-past" href="/start_timer/?mode=past">Log past time</AppLink> : null}
     </div>

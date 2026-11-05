@@ -307,7 +307,7 @@ function SessionForm({ session }: { session: SessionRow }) {
             </div>
           </div>
 
-          <NoteEditor sessionTitle={`${session.project.name} ? ${formatDate(session.end)} ? ${formatDuration(session.duration_minutes)}`} disabled={update.isPending} persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
+          <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} disabled={update.isPending} persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
         </section>
 
         <section className="slab slab-pad">

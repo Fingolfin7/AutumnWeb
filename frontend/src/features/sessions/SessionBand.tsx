@@ -99,7 +99,7 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
         {session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}
         {showDate && !hideProject ? <span>{formatShortDate(session.end)}</span> : null}
         <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
-        {dayPortions(session).length > 1 ? <span className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === day ? "this day" : formatShortDate(part.date)}`).join(" ? ")}</span> : null}
+        {dayPortions(session).length > 1 ? <span className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === day ? "this day" : formatShortDate(part.date)}`).join(" · ")}</span> : null}
         {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
       </div>
       {!session.note && !session.note_html && !editing ? <button className="btn btn--quiet journal-add-note" type="button" onClick={editNote}>Add a note</button> : null}
@@ -175,7 +175,7 @@ function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; o
     event.preventDefault();
     void complete();
   }}>
-    <NoteEditor sessionTitle={`${session.project.name} ? ${formatDate(session.end)} ? ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
+    <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
     <div className="journal-edit-actions">
       <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
       {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}
