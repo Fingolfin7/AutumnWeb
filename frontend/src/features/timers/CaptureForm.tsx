@@ -597,7 +597,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
           </div>
         </form>
         {!past && !project && dashboard.data?.quick_starts.length ? <div className="today-quick">
-          <h3>Pick up where you left off</h3>
+          <h2>Pick up where you left off</h2>
           {[...new Map(dashboard.data.quick_starts.map((item) => [item.project.id, item])).values()].slice(0, 4).map((item) => <button className="today-quick-pick" type="button" key={item.project.id} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => {
             const next = projects.data?.find((p) => p.id === item.project.id);
             if (next) void submit(undefined, next, item.subprojects.map((sub) => sub.id));

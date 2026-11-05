@@ -189,16 +189,15 @@ export default function SessionsPage() {
               {pill.label} <b>{pill.value}</b>
             </span>
           ))}
-          {pills.length || applied.search ? (
+          {pills.length ? (
             <button
               className="btn btn--quiet"
               type="button"
               onClick={() => {
-                setSearchText("");
-                setParams(new URLSearchParams());
+                setParams(writeFilters({ ...readFilters(new URLSearchParams()), search: applied.search }));
               }}
             >
-              Clear
+              Clear filters
             </button>
           ) : null}
         </div>

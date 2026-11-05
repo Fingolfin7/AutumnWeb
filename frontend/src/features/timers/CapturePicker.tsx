@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from "react";
-import { useAllProjects } from "@/api/meta";
+import { useAllProjects, useSubprojects } from "@/api/meta";
 import type { Project } from "@/api/types";
 import { rankProjects } from "@/components/ProjectCombobox";
 import type { Dashboard } from "@/features/dashboard/api";
@@ -34,6 +34,8 @@ export function CapturePicker({
   const [lastValue, setLastValue] = useState(value);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  const exactProject = projects.data?.find((project) => project.name.toLowerCase() === text.trim().toLowerCase());
+  const searchedSubs = useSubprojects(exactProject?.id);
   if (value !== lastValue) {
     setLastValue(value);
     if (value) setText(value.name);
@@ -47,6 +49,7 @@ export function CapturePicker({
       if (!project || (needle && !`${project.name} ${sublabel}`.toLowerCase().includes(needle))) return [];
       return [{ project, subprojectIds: quick.subprojects.map((s) => s.id), label: project.name, sublabel }];
     });
+    if (exactProject) pairs.push(...(searchedSubs.data ?? []).map((sub) => ({ project: exactProject, subprojectIds: [sub.id], label: exactProject.name, sublabel: sub.name })));
     const unique = [...new Map(pairs.map((pair) => [`${pair.project.id}:${[...pair.subprojectIds].sort().join(",")}`, pair])).values()];
     const ranked = rankProjects(all, text, 12);
     const ordered = [...new Map([...unique.map((pair) => pair.project), ...ranked].map((project) => [project.id, project])).values()];
@@ -56,7 +59,7 @@ export function CapturePicker({
       ...unique.filter((pair) => pair.project.id === project.id && pair.subprojectIds.length),
     ]);
 
-  }, [projects.data, recent, text]);
+  }, [projects.data, recent, text, exactProject, searchedSubs.data]);
   const choose = (pick: Pick) => {
     onChange(pick.project, pick.subprojectIds);
     setText(pick.project.name);

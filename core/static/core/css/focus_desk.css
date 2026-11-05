@@ -4572,3 +4572,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .note-editor-field.is-focused textarea { order: 1; }
   .note-editor-field.is-writing .note-editor-toolbar { order: 2; bottom: 0; }
 }
+
+.capture-control .today-quick h2 { font: 600 var(--fs-lg)/1.35 var(--font-display); margin: 0 0 var(--s2); }
+.capture-control .preset-row .btn { min-width: 44px; min-height: 44px; padding-inline: var(--s3); }
+@media (max-width: 999px) {
+  .session-note-body { min-height: 44px; }
+}
