@@ -268,7 +268,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
 
   return (
     <>
-      <DeskHead title={commitment ? commitment.target.name : "New commitment"} />
+      <DeskHead title={commitment ? <span className={commitment.target.kind === "project" ? "text-red" : commitment.target.kind === "subproject" ? "text-blue" : undefined}>{commitment.target.name}</span> : "New commitment"} />
 
       <form className="fields commitment-editor" onSubmit={submit} noValidate>
         <div className="split">
@@ -727,13 +727,13 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
           <>
             <div className="meta-row">
               <span className="meta-label">Carried over</span>
-              <span className={`meta-value ${c.balance >= 0 ? "text-green" : "text-red"}`}>
+              <span className={`meta-value ${time ? c.balance >= 0 ? "text-green" : "text-red" : ""}`}>
                 {`${c.balance >= 0 ? "+" : "-"}${num(c.balance)}`}
               </span>
             </div>
             <div className="meta-row">
-              <span className="meta-label">This period, unbanked</span>
-              <span className={`meta-value ${progress.surplus >= 0 ? "text-green" : "text-red"}`}>
+              <span className="meta-label">This period, before carryover</span>
+              <span className={`meta-value ${time ? progress.surplus >= 0 ? "text-green" : "text-red" : ""}`}>
                 {`${progress.surplus >= 0 ? "+" : "-"}${num(progress.surplus)}`}
               </span>
             </div>

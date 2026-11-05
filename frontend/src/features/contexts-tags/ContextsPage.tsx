@@ -46,7 +46,7 @@ export default function ContextsPage() {
   return (
     <>
       <DeskHead title="Contexts" />
-      <div className="settings-create-action"><button className="btn btn--secondary" type="button" onClick={() => setCreating(true)}><Icon icon={faPlus} /> New context</button></div>
+      <div className="settings-list-heading"><h2>Your contexts</h2><button className="btn btn--primary" type="button" onClick={() => setCreating(true)}><Icon icon={faPlus} /> New context</button></div>
       <div className="split">
         <section id="contexts-list" className="slab" aria-label="Contexts">
           {contexts.isPending ? (
@@ -56,11 +56,9 @@ export default function ContextsPage() {
           ) : contexts.data.length ? (
             <ul className="band-list">
               {contexts.data.map((ctx) => (
-                <li key={ctx.id} className="band band--tap">
-                  <AppLink className="context-chip" href={urls.updateContext(ctx.id)}>
-                    {ctx.name}
-                  </AppLink>
-                  {ctx.description ? <p className="muted u-mt-4">{ctx.description}</p> : null}
+                <li key={ctx.id} className="band settings-list-row">
+                  <AppLink className="chip-link" href={urls.updateContext(ctx.id)}><span className="context-chip">{ctx.name}</span></AppLink>
+                  <span className="muted">{ctx.project_count} {ctx.project_count === 1 ? "project" : "projects"}</span><AppLink className="settings-row-edit" href={urls.updateContext(ctx.id)}>Edit</AppLink>
                 </li>
               ))}
             </ul>

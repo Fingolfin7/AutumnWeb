@@ -26,7 +26,6 @@ export default function ImportPage() {
   const contexts = useContexts();
   const projects = useAllProjects();
   const [preview, setPreview] = useState<ImportPreview | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const [previewError, setPreviewError] = useState("");
 
   const [file, setFile] = useState<File | null>(null);
@@ -49,7 +48,6 @@ export default function ImportPage() {
   useEffect(() => {
     let current = true;
     setPreview(null);
-    setShowAll(false);
     setPreviewError("");
     if (file) void file.text().then((text) => {
       const inventory = previewImport(JSON.parse(text));
@@ -205,15 +203,8 @@ export default function ImportPage() {
               {file && !preview && !previewError ? <p role="status">Reading file...</p> : null}
             </div>
             {preview ? <section className="import-preview" aria-label="Import preview">
-              <h2 className="settings-form-title">Ready to bring over</h2>
-              <p><strong>{preview.names.length} projects</strong> and <strong>{preview.sessions} sessions</strong> in this file</p>
-              <ul tabIndex={0} aria-label="Projects in the import file">{(showAll ? preview.names : preview.names.slice(0, 6)).map((name, index) => {
-                const exists = projects.data?.some((project) => project.name === name);
-                const action = !projects.isSuccess ? "Checking existing projects..." : !exists ? "Add project" : preview.portable ? (force ? "Merge: update conflicting sessions" : "Existing project - conflicts checked during import") : force ? "Replace existing project" : merge ? "Merge into existing project" : "Skip existing project";
-                return <li key={index}><span>{name}</span><small className={exists && force ? "text-red" : "muted"}>{action}</small></li>;
-              })}</ul>
-              <p className="muted">Showing {showAll ? preview.names.length : Math.min(6, preview.names.length)} of {preview.names.length}{preview.names.length > 6 ? <button type="button" className="btn btn--quiet" onClick={() => setShowAll(!showAll)}>{showAll ? "Show fewer" : "Show all projects"}</button> : null}</p>
-              <p className="muted">Autumn checks the full file when importing. Existing duplicate sessions are kept once.</p>
+              <div className="import-decision"><div><h2 className="settings-form-title">Ready to bring over</h2><p><strong>{projects.isSuccess ? `${preview.names.filter(name => projects.data.some(project => project.name === name)).length} name matches, ${preview.names.filter(name => !projects.data.some(project => project.name === name)).length} new` : `${preview.names.length} projects`}</strong> · {preview.sessions} sessions</p><p className="muted">{preview.conflicts ? `${preview.conflicts} conflicting session IDs in this file. ` : ""}{preview.repeated ? `${preview.repeated} repeated session IDs in this file. ` : ""}Autumn checks contexts and existing sessions during import.</p><p className="import-policy">{force ? "Conflicts: replace from this file" : merge ? "Conflicts: merge projects, preserve existing sessions" : "Conflicts: skip existing projects"}</p></div><button type="submit" className="btn btn--primary" disabled={busy}><Icon icon={faFileImport} /> {busy ? "Importing..." : "Import"}</button></div>
+              <details className="import-inventory"><summary>Project inventory ({preview.names.length})</summary><ul aria-label="Projects in the import file">{preview.projects.map((project, index) => { const exists = projects.data?.some(item => item.name === project.name); return <li key={index}><span>{project.name}<small>{project.sessions} {project.sessions === 1 ? "session" : "sessions"}</small></span><small className="muted">{exists ? "Name matches" : "New name"}</small></li>; })}</ul></details>
             </section> : null}
             <details className="import-advanced"><summary>Advanced options</summary><div className="fields">
 
@@ -305,12 +296,6 @@ export default function ImportPage() {
 
             </div></details>
             {!preview ? <p className="muted">Choose a valid Autumn JSON file to enable Import.</p> : null}
-            <p className="import-policy">{force ? "Conflicts: replace from this file" : merge ? "Conflicts: merge projects, preserve existing sessions" : "Conflicts: skip existing projects"}</p>
-            <div className="form-actions">
-              <button type="submit" className="btn btn--primary btn--lg" disabled={busy || !preview}>
-                <Icon icon={faFileImport} /> {busy ? "Importing..." : "Import"}
-              </button>
-            </div>
           </section> : null}
 
           {started ? (

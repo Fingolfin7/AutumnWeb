@@ -249,3 +249,13 @@ export function failure(action: string, error: unknown): string {
 export function useProjectWeek(week: string) {
   return useQuery({ queryKey: keys.reports("project-week", { week }), queryFn: () => unwrap(api.GET("/api/v2/reports/tallies/", { params: { query: { by: "project", start_date: week, end_date: addDays(week, 6), active: "false" } } })) });
 }
+
+/** Eight complete weekly tallies, plus a bounded journal preview; no per-row requests. */
+export function useDirectoryActivity(week: string) {
+  const weeks = useQueries({ queries: Array.from({ length: 8 }, (_, index) => {
+    const start = addDays(week, (index - 7) * 7);
+    return { queryKey: keys.reports("project-week", { week: start }), staleTime: 300_000, queryFn: () => unwrap(api.GET("/api/v2/reports/tallies/", { params: { query: { by: "project", start_date: start, end_date: addDays(start,6), active: "false" } } })) };
+  }) });
+  const notes = useQuery({ queryKey: keys.sessions({ directoryNotes: true }), staleTime: 300_000, queryFn: () => unwrap(api.GET("/api/v2/sessions/", { params: { query: { active: false, ordering: "newest", limit: 100, include: "note" } } })) });
+  return { trend: (id: number) => weeks.every(query => query.isSuccess) ? weeks.map(query => query.data?.entries.find(row => row.id === id)?.total_minutes ?? 0) : undefined, note: (id: number) => notes.data?.sessions.find(row => row.project.id === id)?.note };
+}

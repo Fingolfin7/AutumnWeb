@@ -151,5 +151,5 @@ function ContextScope() {
   const id = selected === "all" ? null : selected ? Number(selected) : contextId;
   const name = contexts.find(item => item.id === id)?.name;
   if (!name || !["/", "/projects/", "/sessions/", "/review/"].includes(pathname)) return null;
-  return <p className="context-scope">{name} only <span aria-hidden="true">?</span><button type="button" onClick={() => { if (selected) { params.set("context", "all"); navigate(`${pathname}?${params}`, { replace: true }); } else void setContextId(null); }}>Show all</button></p>;
+  return <p className="context-scope">{name} only <span aria-hidden="true">·</span><button type="button" aria-label="Clear context filter" onClick={() => { if (selected) { params.set("context", "all"); navigate(`${pathname}?${params}`, { replace: true }); } else void setContextId(null); }}>Show all</button></p>;
 }

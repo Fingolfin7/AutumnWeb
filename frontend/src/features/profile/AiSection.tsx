@@ -56,7 +56,7 @@ export function AiSection({
   const login = useChatGPTLogin(true);
   const configured = prefs.configured_api_keys;
 
-  const onConnected = useCallback(() => toast.success("Connected Connect Codex for Insights."), [toast]);
+  const onConnected = useCallback(() => toast.success("Connected Codex for Insights."), [toast]);
   useOnCodexConnected(login.data, onConnected);
 
   const setLogin = (data: unknown) => qc.setQueryData(meKeys.chatgpt(), data);
@@ -66,16 +66,16 @@ export function AiSection({
     mutationFn: startChatGPTLogin,
     onSuccess: (data) => {
       setLogin(data);
-      toast.success("Connect Codex started. Use the code shown below, then complete the login.");
+      toast.success("Use the code below to connect Codex.");
     },
-    onError: (error) => toast.error(`Could not start Connect Codex: ${errorMessage(error)}`),
+    onError: (error) => toast.error(`Could not connect Codex: ${errorMessage(error)}`),
   });
   const disconnect = useMutation({
     mutationFn: disconnectChatGPT,
     onSuccess: () => {
       setLogin({ status: "disconnected" });
       refreshPrefs();
-      toast.success("Disconnected OpenAI Connect Codex.");
+      toast.success("Disconnected Codex.");
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -89,7 +89,7 @@ export function AiSection({
         toast.info("Still waiting for OpenAI authorization. Try Complete again after entering the code.");
       }
     },
-    onError: (error) => toast.error(`Could not complete Connect Codex: ${errorMessage(error)}`),
+    onError: (error) => toast.error(`Could not finish connecting Codex: ${errorMessage(error)}`),
   });
 
   const status = login.data?.status;
@@ -109,6 +109,7 @@ export function AiSection({
         }
       />
 
+      <ul className="profile-provider-status" aria-label="Provider status">{KEY_PROVIDERS.map(provider => <li key={provider}><strong>{KEY_LABELS[provider]}</strong><span>{configured[provider] ? "Key connected" : provider === "openai" && connected ? "Via Codex" : "Not connected"}</span></li>)}</ul>
       <div className="profile-codex-panel">
         <div>
           <h3 className="disclose-title">Connect Codex</h3>
@@ -142,7 +143,7 @@ export function AiSection({
               onClick={() => start.mutate()}
               disabled={start.isPending || login.isPending}
             >
-              <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Use Connect Codex"}
+              <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Connect Codex"}
             </button>
           )}
         </div>
@@ -173,7 +174,7 @@ export function AiSection({
               onClick={() => complete.mutate()}
               disabled={complete.isPending}
             >
-              <Icon icon={faSyncAlt} spin={complete.isPending} /> Complete Connect Codex
+              <Icon icon={faSyncAlt} spin={complete.isPending} /> Finish connecting
             </button>
           </div>
         </div>

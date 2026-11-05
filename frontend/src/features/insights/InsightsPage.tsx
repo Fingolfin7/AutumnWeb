@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { faCheck, faCheckSquare, faChevronLeft, faChevronRight, faCloudUploadAlt, faComments, faCopy, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faCheckSquare, faChevronLeft, faCloudUploadAlt, faComments, faCopy, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog } from "@/components/Sheet";
@@ -11,7 +11,6 @@ import { useToast } from "@/app/toasts";
 import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import { ApiError } from "@/api/errors";
 import { bootstrap } from "@/bootstrap";
-import { formatDayDate } from "@/lib/format";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useInsightSelection } from "./api";
 import { filesFrom, useAttachmentDrafts } from "./attachments";
@@ -57,7 +56,7 @@ function initialCollapsed(): boolean {
      whatever was stored (and without overwriting what the wide layout chose). */
   if (window.matchMedia?.("(max-width: 700px)").matches) return true;
   try {
-    return window.localStorage.getItem(COLLAPSED_KEY) === "true";
+    return window.localStorage.getItem(COLLAPSED_KEY) !== "false";
   } catch {
     return false;
   }
@@ -339,14 +338,8 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const sessionLabel = count === 1 ? "session" : "sessions";
 
   return (
-    <>
-      <h1 className="sr-only">Insights</h1>
-      <div className="insights-context-bar">
-        <AppLink className="btn btn--quiet" href={urls.review()}><Icon icon={faChevronLeft} /> Review</AppLink>
-        <div><strong>{chatId ? "Saved conversation" : "Insights"}</strong><span className="muted">{selection.start_date ? formatDayDate(selection.start_date) : "All time"}{selection.end_date ? ` – ${formatDayDate(selection.end_date)}` : ""}</span></div>
-        <button className="btn btn--secondary" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context{pills.length ? ` (${pills.length})` : ""}</button>
-      </div>
-
+    <div className="insights-workspace">
+      <h1 className="sr-only">{chat?.title || "Insights"}</h1>
       <FilterSheet
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
@@ -365,7 +358,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
         {pills.length ? <div className="filter-summary">{pills.map((pill) => <span className="filter-pill" id={pill.label === "Including" || pill.label === "Related" ? "related-pill" : undefined} key={pill.label} title={pill.title}>{pill.label} <b>{pill.value}</b></span>)}</div> : null}
       </FilterSheet>
 
-      <section className="slab chat-layout">
+      <section className="chat-layout">
         <Sidebar
           groups={chats.data}
           loading={chats.isPending}
@@ -388,19 +381,8 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             </div>
           ) : null}
           <div className="chat-header">
-            <button type="button" id="toggle-sidebar-btn" className="btn-icon" onClick={toggleSidebar} title="Toggle chat list" aria-label="Toggle chat list" aria-expanded={!collapsed} aria-controls="chat-sidebar">
-              <Icon icon={collapsed ? faChevronRight : faChevronLeft} />
-            </button>
-            {(count ?? 0) > 0 || hasHistory ? (
-              <>
-                <div className="chat-header-meta">
-                  <h3>{count ? `${count} ${sessionLabel}` : "Conversation"}</h3>
-                  {count && preview.data?.first_date && preview.data.last_date ? (
-                    <span className="chat-header-range muted">
-                      <span className="text-cyan">{formatDayDate(preview.data.first_date)}</span> &ndash; <span className="text-cyan">{formatDayDate(preview.data.last_date)}</span>
-                    </span>
-                  ) : null}
-                </div>
+            <div className="insights-conversation-heading"><AppLink className="btn btn--quiet insights-review-back" href={urls.review()}><Icon icon={faChevronLeft} /> Review</AppLink><h2>{chat?.title || "Insights"}</h2></div>
+            <div className="insights-conversation-scope"><span>{count === undefined ? "Counting sessions…" : `${count} ${sessionLabel}`}</span><button className="btn btn--quiet" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context</button><button type="button" id="toggle-sidebar-btn" className="btn btn--quiet" onClick={toggleSidebar} aria-expanded={!collapsed} aria-controls="chat-sidebar">History</button></div>
                 {hasHistory ? (
                   <div className="chat-header-actions">
                     <button type="button" id="select-messages-btn" aria-label={selecting ? "Cancel message selection" : "Select messages to copy"} className="chat-action-btn" onClick={toggleSelecting} title="Select messages to copy">
@@ -422,8 +404,6 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                     </button>
                   </div>
                 ) : null}
-              </>
-            ) : null}
           </div>
 
           {loadingBody ? (
@@ -485,6 +465,6 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
         onConfirm={confirmDelete}
         onClose={() => setDeleting(null)}
       />
-    </>
+    </div>
   );
 }

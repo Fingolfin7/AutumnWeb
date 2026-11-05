@@ -19,7 +19,7 @@ test("Review preserves old links, applies filters immediately and offers every c
   await chooser.getByText("More ways to look", { exact: true }).click();
   await chooser.getByRole("button", { name: /Ranked project bars/ }).click();
   await expect(page.locator(".review-project-row").first()).toBeVisible();
-  await page.getByRole("radio", { name: "Custom", exact: true }).check();
+  await page.getByRole("radio", { name: "Custom", exact: true }).click();
   await page.getByLabel("Start date", { exact: true }).fill("2026-01-01");
   await page.getByLabel("End date", { exact: true }).fill("2026-12-31");
   await page.getByRole("button", { name: "Done", exact: true }).click();

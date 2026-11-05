@@ -1,5 +1,6 @@
-import { DateInput } from "@/components/ui";
-import { todayKey } from "@/features/notifications/dates";
+import { DateInput, SegmentedControl } from "@/components/ui";
+import { calendarWeek } from "@/features/review/periods";
+import { addDays, todayKey } from "@/features/notifications/dates";
 import { bootstrap } from "@/bootstrap";
 import { useMemo, useState, type FormEvent } from "react";
 import { faFileExport } from "@fortawesome/free-solid-svg-icons";
@@ -67,10 +68,10 @@ export default function ExportPage() {
   );
   const orderedContexts = useMemo(() => orderContexts(contexts.data ?? []), [contexts.data]);
 
-  const onSubmit = async (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent, chosen = form) => {
     event.preventDefault();
     if (busy) return;
-    const invalid = validateExport(form);
+    const invalid = validateExport(chosen);
     if (Object.keys(invalid).length) {
       setErrors(Object.fromEntries(Object.entries(invalid).map(([field, message]) => [field, [message]])));
       return;
@@ -78,8 +79,8 @@ export default function ExportPage() {
     setErrors({});
     setBusy(true);
     try {
-      const blob = await fetchExport(form);
-      const filename = exportFilename(form);
+      const blob = await fetchExport(chosen);
+      const filename = exportFilename(chosen);
       saveBlob(blob, filename);
       toast.success(`Exported ${filename}.`);
     } catch (error) {
@@ -114,15 +115,17 @@ export default function ExportPage() {
         </div>
       </div>
 
-      <section id="export_options">
+      <section className="slab export-lead"><h2>Your time, to keep.</h2><p>A complete JSON copy of your projects and journal, ready for Autumn or the CLI.</p><button className="btn btn--primary" type="button" disabled={busy} onClick={event => void onSubmit(event, EMPTY_EXPORT_FORM)}><Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export everything"}</button></section>
+      <details className="export-customize"><summary>Customize export</summary><section id="export_options">
         <form className="fields" onSubmit={onSubmit} noValidate>
           <div className="split">
             <div>
               <section className="slab slab-pad">
+                <SegmentedControl label="Export range" value={!form.startDate && !form.endDate ? "all" : "custom"} options={[{ value: "all", label: "All time" }, { value: "week", label: "This week" }, { value: "month", label: "30 days" }]} onChange={value => { const today = todayKey(bootstrap().profile.timezone); patch(value === "all" ? { startDate: "", endDate: "" } : value === "week" ? { startDate: calendarWeek(today).start, endDate: today } : { startDate: addDays(today,-29), endDate: today }); }} />
                 <div className="two-up">
                   <div className="field">
                     <label htmlFor="export-start-date">Start date</label>
-                    <DateInput
+                    <DateInput presets="none"
                       today={todayKey(bootstrap().profile.timezone)}
                       id="export-start-date"
                       value={form.startDate}
@@ -132,7 +135,7 @@ export default function ExportPage() {
                   </div>
                   <div className="field">
                     <label htmlFor="export-end-date">End date</label>
-                    <DateInput
+                    <DateInput presets="none"
                       today={todayKey(bootstrap().profile.timezone)}
                       id="export-end-date"
                       value={form.endDate}
@@ -268,13 +271,13 @@ export default function ExportPage() {
               </details>
               <div className="form-actions">
                 <button type="submit" className="btn btn--primary" disabled={busy}>
-                  <Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export"}
+                  <Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export selection"}
                 </button>
               </div>
             </section>
           </div>
         </form>
-      </section>
+      </section></details>
     </div>
   );
 }

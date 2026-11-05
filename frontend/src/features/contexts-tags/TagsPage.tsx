@@ -48,7 +48,7 @@ export default function TagsPage() {
   return (
     <>
       <DeskHead title="Tags" />
-      <div className="settings-create-action"><button className="btn btn--secondary" type="button" onClick={() => setCreating(true)}><Icon icon={faPlus} /> New tag</button></div>
+      <div className="settings-list-heading"><h2>Your tags</h2><button className="btn btn--primary" type="button" onClick={() => setCreating(true)}><Icon icon={faPlus} /> New tag</button></div>
       <div className="split">
         <section id="tags-list" className="slab" aria-label="Tags">
           {tags.isPending ? (
@@ -58,11 +58,9 @@ export default function TagsPage() {
           ) : tags.data.length ? (
             <ul className="band-list">
               {tags.data.map((tag) => (
-                <li key={tag.id} className="band band--tap u-row u-between u-gap-3">
-                  <AppLink className="tag-chip" href={urls.updateTag(tag.id)} style={tagStyle(tag.color)}>
-                    {tag.name}
-                  </AppLink>
-                  <span className="muted mono tnum">{pluralize(tag.project_count, "project")}</span>
+                <li key={tag.id} className="band settings-list-row">
+                  <AppLink className="chip-link" href={urls.updateTag(tag.id)}><span className="tag-chip" style={tagStyle(tag.color)}>{tag.name}</span></AppLink>
+                  <span className="muted mono tnum">{pluralize(tag.project_count, "project")}</span><AppLink className="settings-row-edit" href={urls.updateTag(tag.id)}>Edit</AppLink>
                 </li>
               ))}
             </ul>

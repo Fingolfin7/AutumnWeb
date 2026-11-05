@@ -41,3 +41,9 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="empty">{children}</p>;
 }
+
+/** Shared first-session canvas. Copy and optional ghost data belong to each destination. */
+export function EmptyState({ title, children, action, ghost, heading = "h2" }: { title: string; children: ReactNode; action: ReactNode; ghost?: ReactNode; heading?: "h1" | "h2" }) {
+  const Heading = heading;
+  return <section className="first-run-empty"><span className="ember-seal" aria-hidden="true" /><Heading>{title}</Heading>{ghost}<p>{children}</p>{action}</section>;
+}

@@ -1,3 +1,4 @@
+import { BrowserPush } from "./BrowserPush";
 import { DateInput, Input } from "@/components/ui";
 import { todayKey } from "./dates";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -249,6 +250,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
         </div>
         <p className="muted nx-timezone-note">Your profile timezone: {timezone}</p>
 
+        <BrowserPush compact />
         <div className="form-actions q-form-actions">
           {schedule ? (
             <AppLink className="btn btn--ghost" href={urls.notifications()}>
