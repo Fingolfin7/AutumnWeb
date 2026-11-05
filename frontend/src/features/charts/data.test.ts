@@ -37,9 +37,9 @@ describe("daily series", () => {
     expect(set.byDay["c"]).toBeUndefined();
     expect(set.days).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
   });
-  it("keeps every subproject series, sorted by name", () => {
+  it("keeps every subproject series, ranked by total", () => {
     const set = buildSeries(rows);
-    expect(set.names).toEqual(["a", "b", "c", "d"]);
+    expect(set.names).toEqual(["b", "a", "c", "d"]);
     expect(set.other).toBeNull();
   });
   it("sums repeated days", () => {
@@ -84,7 +84,7 @@ describe("treemap data", () => {
     const { leaves, colors } = flattenHierarchy(tree);
     expect(leaves).toEqual([
       { name: "Grammar", project: "Czech", value: 1.5 },
-      { name: "Unallocated", project: "Czech", value: .5 },
+      { name: "No subproject", project: "Czech", value: .5 },
       { name: "Solo", project: "Solo", value: 1 },
     ]);
     expect(Object.keys(colors)).toEqual(["Czech", "Solo"]);
@@ -116,11 +116,11 @@ describe("payload handling", () => {
   it("swaps in the subproject variants only for a project-name filter", () => {
     const rows = [{ date: "2026-10-01", series: "a", hours: 1 }];
     const titleOf = (subprojects: boolean) => {
-      const built = buildChart("stacked_area", rows, { projectLimit: 7, subprojects });
+      const built = buildChart("daily_bars", rows, { projectLimit: 7, subprojects });
       return built?.type === "chart" ? built.config.options?.plugins?.title?.text : undefined;
     };
-    expect(titleOf(false)).toBe("Daily Time by Project (Stacked)");
-    expect(titleOf(true)).toBe("Daily Time by Subproject (Stacked)");
+    expect(titleOf(false)).toBe("Daily time by project");
+    expect(titleOf(true)).toBe("Daily time by subproject");
   });
   it("builds every chart kind from a minimal payload", () => {
     const opts = { projectLimit: 7, subprojects: false };
@@ -131,8 +131,7 @@ describe("payload handling", () => {
       ["pie", tally],
       ["bar", tally],
       ["context", tally],
-      ["line", series],
-      ["stacked_area", series],
+            ["daily_bars", series],
       ["cumulative", daily],
       ["heatmap", [{ weekday: 1, hour: 9, average_hours: 1 }]],
       ["histogram", [{ label: "0-15m", count: 1 }]],
@@ -153,24 +152,35 @@ it("keeps chart pigments explicit and fills missing days with real zeroes", asyn
   expect(PALETTE.every(color => /^#[a-f0-9]{6}$/.test(color))).toBe(true);
   expect(PALETTE).not.toContain("#7896b8");
   expect(seriesColor("Garden")).toBe(seriesColor("Garden"));
-  for (const kind of ["line", "stacked_area"] as const) {
+  for (const kind of ["daily_bars"] as const) {
     const built = buildChart(kind, [{ date: "2026-10-02", series: "Garden", hours: 1 }], { projectLimit: 7, subprojects: false, start: "2026-10-01", end: "2026-10-03" });
     if (built?.type !== "chart") throw new Error("Missing chart");
     expect(built.config.data.datasets[0].data).toEqual([0,1,0]);
-    expect(built.config.data.datasets[0].tension).toBe(0);
+    expect(built.config.type).toBe("bar");
     const source = JSON.stringify(built.config);
     expect(source).not.toMatch(/hsl\(|rgb\(0,\s*128,\s*0|#36a2eb|#ff6384|#4bc0c0/i);
   }
-  for (const retired of ["scatter", "bubble", "radar", "status", "calendar"]) expect(parseKind(retired)).toBe("bar");
+  for (const retired of ["line", "stacked_area", "scatter", "bubble", "radar", "status", "calendar"]) expect(parseKind(retired)).toBe("bar");
 });
 
 it("includes unallocated project time in the treemap total", () => {
   const { leaves } = flattenHierarchy({ name: "All", children: [{ name: "Work", children: [{ name: "Garden", total_time: 270, children: [{ name: "Frontend", total_time: 80 }, { name: "Backend", total_time: 35 }] }] }] });
-  expect(leaves.find(leaf => leaf.name === "Unallocated")?.value).toBe(155 / 60);
+  expect(leaves.find(leaf => leaf.name === "No subproject")?.value).toBe(155 / 60);
   expect(leaves.reduce((sum, leaf) => sum + leaf.value * 60, 0)).toBeCloseTo(270);
 });
 
 it("blocks default and semantic chart colors in every chart builder", () => {
   const builders = import.meta.glob("./{basic,trends,analysis,time,hierarchy,wordcloud}.ts", { eager: true, query: "?raw", import: "default" });
   for (const source of Object.values(builders)) expect(source).not.toMatch(/#36a2eb|#ff6384|#4bc0c0|hsl\(\s*(?:120|210)|rgba?\(\s*0,\s*128,\s*0|yellowgreen/);
+});
+
+it("stops daily and cumulative plots at the account's today and keeps series distinct", async () => {
+  const { cumulativeConfig, dailyBarsConfig } = await import("./trends");
+  const options = { projectLimit: 7, start: "2026-11-02", end: "2026-11-08", today: "2026-11-05" };
+  const cumulative = cumulativeConfig([{ date: "2026-11-02", hours: 2 }], options);
+  expect(cumulative.data.labels).toHaveLength(4);
+  expect(cumulative.data.datasets[0].data).toEqual([2, 2, 2, 2]);
+  const daily = dailyBarsConfig(["Work", "Study", "Garden", "Czech"].map(series => ({ date: "2026-11-02", hours: 1, series })), options, false);
+  expect(daily.data.labels).toHaveLength(4);
+  expect(new Set(daily.data.datasets.map(row => row.backgroundColor)).size).toBe(4);
 });

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   faCheckCircle,
@@ -43,8 +43,10 @@ export function AiSection({
   luna,
   onLuna,
   errors,
+  footer,
 }: {
   prefs: Prefs;
+  footer?: ReactNode;
   keyDrafts: Record<KeyProvider, KeyDraft>;
   onKeyDraft: (provider: KeyProvider, patch: Partial<KeyDraft>) => void;
   luna: LunaEffort;
@@ -56,7 +58,7 @@ export function AiSection({
   const login = useChatGPTLogin(true);
   const configured = prefs.configured_api_keys;
 
-  const onConnected = useCallback(() => toast.success("Connected Codex login for Insights."), [toast]);
+  const onConnected = useCallback(() => toast.success("Connected Codex for Insights."), [toast]);
   useOnCodexConnected(login.data, onConnected);
 
   const setLogin = (data: unknown) => qc.setQueryData(meKeys.chatgpt(), data);
@@ -66,16 +68,16 @@ export function AiSection({
     mutationFn: startChatGPTLogin,
     onSuccess: (data) => {
       setLogin(data);
-      toast.success("Codex login started. Use the code shown below, then complete the login.");
+      toast.success("Use the code below to connect Codex.");
     },
-    onError: (error) => toast.error(`Could not start Codex login: ${errorMessage(error)}`),
+    onError: (error) => toast.error(`Could not connect Codex: ${errorMessage(error)}`),
   });
   const disconnect = useMutation({
     mutationFn: disconnectChatGPT,
     onSuccess: () => {
       setLogin({ status: "disconnected" });
       refreshPrefs();
-      toast.success("Disconnected OpenAI Codex login.");
+      toast.success("Disconnected Codex.");
     },
     onError: (error) => toast.error(errorMessage(error)),
   });
@@ -89,7 +91,7 @@ export function AiSection({
         toast.info("Still waiting for OpenAI authorization. Try Complete again after entering the code.");
       }
     },
-    onError: (error) => toast.error(`Could not complete Codex login: ${errorMessage(error)}`),
+    onError: (error) => toast.error(`Could not finish connecting Codex: ${errorMessage(error)}`),
   });
 
   const status = login.data?.status;
@@ -109,9 +111,10 @@ export function AiSection({
         }
       />
 
+      <ul className="profile-provider-status" aria-label="Provider status">{KEY_PROVIDERS.map(provider => <li key={provider}><strong>{KEY_LABELS[provider]}</strong><span>{configured[provider] ? "Key connected" : provider === "openai" && connected ? "Via Codex" : "Not connected"}</span></li>)}</ul>
       <div className="profile-codex-panel">
         <div>
-          <h3 className="disclose-title">Codex login</h3>
+          <h3 className="disclose-title">Connect Codex</h3>
           <p className="focus-lede">OpenAI models use Codex first, then the API key below.</p>
           {connected ? (
             <span className="context-chip">
@@ -142,7 +145,7 @@ export function AiSection({
               onClick={() => start.mutate()}
               disabled={start.isPending || login.isPending}
             >
-              <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Use Codex login"}
+              <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Connect Codex"}
             </button>
           )}
         </div>
@@ -173,7 +176,7 @@ export function AiSection({
               onClick={() => complete.mutate()}
               disabled={complete.isPending}
             >
-              <Icon icon={faSyncAlt} spin={complete.isPending} /> Complete Codex login
+              <Icon icon={faSyncAlt} spin={complete.isPending} /> Finish connecting
             </button>
           </div>
         </div>
@@ -262,6 +265,7 @@ export function AiSection({
         <FieldErrors lines={errors.luna_recommendation_effort} />
       </div>
     </details>
+    {footer}
     </section>
   );
 }

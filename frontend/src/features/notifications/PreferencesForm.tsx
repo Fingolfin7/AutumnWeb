@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui";
 import { useState, type FormEvent } from "react";
 import { useToast } from "@/app/toasts";
 import { FieldErrors, FormLevelErrors } from "@/features/contexts-tags/ui";
@@ -70,7 +71,7 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
       <div className="nx-schedule-fields">
         <div className="field">
           <label htmlFor="id_commitment_check_time">Commitment check time</label>
-          <input
+          <Input
             id="id_commitment_check_time"
             type="time"
             step={60}
@@ -94,7 +95,7 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
         </div>
         <div className="field">
           <label htmlFor="id_weekly_review_time">Weekly review time</label>
-          <input
+          <Input
             id="id_weekly_review_time"
             type="time"
             step={60}

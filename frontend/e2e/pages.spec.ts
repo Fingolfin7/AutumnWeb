@@ -3,7 +3,7 @@ import { trackErrors } from "./helpers";
 
 const PAGES = [
   "/", "/timers/", "/sessions/", "/projects/", "/review/", "/charts/", "/contexts/", "/tags/",
-  "/settings/", "/settings/account/", "/settings/ai/", "/notifications/", "/review/weekly/", "/import/", "/export/", "/profile/", "/insights/",
+  "/settings/", "/settings/account/", "/settings/appearance/", "/settings/defaults/", "/settings/search/", "/settings/ai/", "/notifications/", "/review/weekly/", "/import/", "/export/", "/profile/", "/insights/",
 ];
 
 test("every main page loads without page or console errors", async ({ page }) => {
@@ -46,8 +46,7 @@ test("Settings keeps bookmarks, swatches and import streaming usable", async ({ 
   await expect(page).toHaveURL(/\/settings\/account\/$/);
   const original = await (await page.request.get("/api/v2/me/preferences/")).json();
   const firstName = `Settings ${Date.now()}`;
-  // Invalid reporting edits must neither block Account nor be silently saved/reset by it.
-  await page.getByLabel("Projects per chart", { exact: true }).fill("0");
+  // A second account edit made during an in-flight save must survive.
   let delayedAccount = false;
   await page.route("**/api/v2/me/account/", async route => {
     if (route.request().method() === "PATCH" && !delayedAccount) { delayedAccount = true; const response = await route.fetch(); await new Promise(resolve => setTimeout(resolve,350)); await route.fulfill({ response }); }
@@ -58,7 +57,9 @@ test("Settings keeps bookmarks, swatches and import streaming usable", async ({ 
   await savingAccount;
   await page.getByLabel("First name", { exact: true }).fill(firstName);
   await expect.poll(async () => (await (await page.request.get("/api/v2/me/account/")).json()).first_name).toBe(firstName);
-  await expect(page.getByLabel("Projects per chart", { exact: true })).toHaveValue("0");
+  await page.goto("/settings/defaults/");
+  await page.getByLabel("Projects per chart", { exact: true }).fill("0");
+  await expect(page.getByText("Please fix the highlighted fields.")).toBeVisible();
   expect((await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count);
   await page.getByLabel("Projects per chart", { exact: true }).fill(String(original.default_chart_project_count + 1));
   await expect.poll(async () => (await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count + 1);

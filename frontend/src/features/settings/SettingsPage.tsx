@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router";
-import { faBell, faFileExport, faFileImport, faLayerGroup, faPlug, faTags, faUserCircle } from "@fortawesome/free-solid-svg-icons";
+import { faBell, faImage, faChartBar, faSearch, faFileExport, faFileImport, faLayerGroup, faPlug, faTags, faUserCircle } from "@fortawesome/free-solid-svg-icons";
 import { bootstrap } from "@/bootstrap";
 import { csrfToken } from "@/lib/csrf";
 import { clearPersistedQueries } from "@/app/persist";
@@ -14,7 +14,10 @@ import ImportPage from "@/features/import-export/ImportPage";
 import ExportPage from "@/features/import-export/ExportPage";
 
 const sections = [
-  { id: "account", title: "Account & appearance", description: "Your details, backdrop and everyday defaults", icon: faUserCircle },
+  { id: "account", title: "Account", description: "Your details, timezone and sign-in", icon: faUserCircle },
+  { id: "appearance", title: "Appearance", description: "Your backdrop, in your light", icon: faImage },
+  { id: "defaults", title: "Reporting defaults", description: "Your usual ranges and chart size", icon: faChartBar },
+  { id: "search", title: "Search preferences", description: "How closely related sessions should match", icon: faSearch },
   { id: "contexts", title: "Contexts", description: "Separate work, study and the rest of life", icon: faLayerGroup },
   { id: "tags", title: "Tags", description: "Connect projects with a shared theme", icon: faTags },
   { id: "notifications", title: "Reminders & notifications", description: "A nudge at the right time", icon: faBell },
@@ -42,7 +45,7 @@ export default function SettingsPage() {
         </AppLink>)}
       </nav>
       <div className="settings-content" key={id ?? "index"}>
-        {id === "account" ? <ProfilePage section="account" /> : id === "ai" ? <ProfilePage section="ai" /> : id === "contexts" ? <ContextsPage /> : id === "tags" ? <TagsPage /> : id === "notifications" ? <NotificationsPage /> : id === "import" ? <ImportPage /> : id === "export" ? <ExportPage /> : <section className="settings-overview slab slab-pad"><h2>Your workspace</h2><dl><div><dt>Signed in as</dt><dd>{account.data?.username ?? bootstrap().user.username}</dd></div><div><dt>Timezone</dt><dd>{prefs.data?.timezone ?? bootstrap().profile.timezone}</dd></div><div><dt>Backdrop</dt><dd>{prefs.data?.automatic_background ? "A new photo every day" : prefs.data?.background.image_url ? "Your uploaded photo" : "Night Ledger"}</dd></div><div><dt>Reporting range</dt><dd>{prefs.data ? prefs.data.default_filter_unit.endsWith("_to_date") ? prefs.data.default_filter_unit.replaceAll("_", " ") : `${prefs.data.default_filter_value} ${prefs.data.default_filter_value === 1 ? prefs.data.default_filter_unit.slice(0, -1) : prefs.data.default_filter_unit}` : "Loading…"}</dd></div></dl><AppLink className="btn btn--secondary" href="/settings/account/">Edit account & appearance</AppLink></section>}
+        {["account", "appearance", "defaults", "search"].includes(id ?? "") ? <ProfilePage section={id as "account" | "appearance" | "defaults" | "search"} /> : id === "ai" ? <ProfilePage section="ai" /> : id === "contexts" ? <ContextsPage /> : id === "tags" ? <TagsPage /> : id === "notifications" ? <NotificationsPage /> : id === "import" ? <ImportPage /> : id === "export" ? <ExportPage /> : <section className="settings-overview slab slab-pad"><h2>Your workspace</h2><dl><div><dt>Signed in as</dt><dd>{account.data?.username ?? bootstrap().user.username}</dd></div><div><dt>Timezone</dt><dd>{prefs.data?.timezone ?? bootstrap().profile.timezone}</dd></div><div><dt>Backdrop</dt><dd>{prefs.data?.automatic_background ? "A new photo every day" : prefs.data?.background.image_url ? "Your uploaded photo" : "Night Ledger"}</dd></div><div><dt>Reporting range</dt><dd>{prefs.data ? prefs.data.default_filter_unit.endsWith("_to_date") ? prefs.data.default_filter_unit.replaceAll("_", " ") : `${prefs.data.default_filter_value} ${prefs.data.default_filter_value === 1 ? prefs.data.default_filter_unit.slice(0, -1) : prefs.data.default_filter_unit}` : "Loading…"}</dd></div></dl><AppLink className="btn btn--secondary" href="/settings/account/">Edit account</AppLink></section>}
       </div>
     </div>
     <form className="settings-logout" method="POST" action="/logout/" onSubmit={clearPersistedQueries}><input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} /><button className="btn btn--quiet" type="submit">Log out</button></form>

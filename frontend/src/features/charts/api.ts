@@ -22,7 +22,7 @@ export function parseRelatedHeader(value: string | null): RelatedState {
 export async function fetchChart(query: ChartQuery): Promise<ChartResult> {
   let result;
   try {
-    result = await api.GET("/api/v2/reports/charts/", { params: { query: query as never } });
+    result = await api.GET("/api/v2/reports/charts/", { params: { query: { ...query, chart_type: query.chart_type === "daily_bars" ? "stacked_area" : query.chart_type } as never } });
   } catch (cause) {
     throw new ApiError(0, "network", "Can't reach Autumn. Check your connection.", cause);
   }

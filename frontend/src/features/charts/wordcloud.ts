@@ -17,7 +17,7 @@ export function fontSizer(words: [string, number][], canvasWidth: number): (weig
   const smallest = words[words.length - 1]![1];
   const range = largest - smallest;
   const max = Math.min(72, Math.max(36, canvasWidth / 10));
-  const min = Math.max(12, max / 4);
+  const min = Math.max(13, max / 4);
   return (weight) => (range ? min + ((weight - smallest) / range) * (max - min) : max);
 }
 
@@ -27,14 +27,14 @@ export function wordColor(weight: number, maxWeight: number): string {
 }
 
 export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width: number, height: number) {
-  const words = toWordList(rows);
+  const words = toWordList(rows).sort((a,b) => b[1] - a[1]).slice(0, 45);
   if (!words.length) return;
   canvas.width = width;
   canvas.height = height;
   const maxWeight = words[0]![1];
   WordCloud(canvas, {
     list: words,
-    gridSize: Math.max(8, Math.round(16 * width / 1024)),
+    gridSize: 12,
     weightFactor: fontSizer(words, width),
     fontFamily: "Manrope, system-ui, sans-serif",
     color: (_word, weight) => wordColor(weight, maxWeight),
@@ -42,7 +42,7 @@ export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width:
     rotationSteps: 2,
     backgroundColor: "transparent",
     drawOutOfBound: false,
-    shrinkToFit: true,
+    shrinkToFit: false,
   });
 }
 

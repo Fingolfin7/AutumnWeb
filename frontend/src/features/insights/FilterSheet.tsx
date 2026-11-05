@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { bootstrap } from "@/bootstrap";
 import { todayKey } from "@/features/notifications/dates";
 import { presetPeriod } from "@/features/review/periods";
-import { DateInput } from "@/components/ui";
+import { DateInput, SegmentedControl } from "@/components/ui";
 import { useInsightSelection } from "./api";
 import { selectionQuery } from "./logic";
 import { OptionPicker } from "@/components/OptionPicker";
@@ -64,8 +64,8 @@ export function FilterSheet({
   return (
     <Sheet className="filter-sheet insights-filter-sheet" open={open} onClose={onClose} title="Conversation context">
       <div className="fields">
-        <div className="review-presets" role="group" aria-label="Session dates">{([{ value: "week", label: "This week" }, { value: "last", label: "Last week" }, { value: "month", label: "30 days" }] as const).map(item => <button className="btn btn--quiet" type="button" key={item.value} onClick={() => { const period = presetPeriod(item.value,today); onDraft({ ...draft, start_date: period.start, end_date: period.end }); }}>{item.label}</button>)}</div>
-        <div className="two-up"><div className="field"><label htmlFor="start_date">Start date</label><DateInput today={today} id="start_date" value={draft.start_date} onValueChange={value => onDraft({ ...draft, start_date: value })} /></div><div className="field"><label htmlFor="end_date">End date</label><DateInput today={today} id="end_date" value={draft.end_date} onValueChange={value => onDraft({ ...draft, end_date: value })} /></div></div>
+        <SegmentedControl label="Session dates" value={["week", "last", "month"].find(value => { const range = presetPeriod(value as "week" | "last" | "month", today); return draft.start_date === range.start && draft.end_date === range.end; }) ?? "custom"} options={[{ value: "week", label: "This week" }, { value: "last", label: "Last week" }, { value: "month", label: "30 days" }]} onChange={value => { const range = presetPeriod(value as "week" | "last" | "month", today); onDraft({ ...draft, start_date: range.start, end_date: range.end }); }} />
+        <div className="two-up"><div className="field"><label htmlFor="start_date">Start date</label><DateInput presets="none" today={today} id="start_date" value={draft.start_date} onValueChange={value => onDraft({ ...draft, start_date: value })} /></div><div className="field"><label htmlFor="end_date">End date</label><DateInput presets="none" today={today} id="end_date" value={draft.end_date} onValueChange={value => onDraft({ ...draft, end_date: value })} /></div></div>
         <div className="field"><label htmlFor="content-search">Find sessions</label><div className="insights-search"><input id="content-search" type="search" placeholder="Search your time" value={draft[searchField]} onChange={event => onDraft({ ...draft, [searchField]: event.target.value })} /><select aria-label="Search in" value={searchField} onChange={event => setSearchField(event.target.value as typeof searchField)}><option value="search">Everything</option><option value="project_name">Project names</option><option value="note_snippet">Notes</option></select></div></div>
         {(["search", "project_name", "note_snippet"] as const).filter(key => key !== searchField && draft[key]).map(key => <button className="btn btn--quiet" type="button" key={key} onClick={() => onDraft({ ...draft, [key]: "" })}>{key === "project_name" ? "Project" : key === "note_snippet" ? "Note" : "Search"}: {draft[key]} - Clear</button>)}
         {semantic ? (
@@ -87,7 +87,7 @@ export function FilterSheet({
         <div className="field">
           <label htmlFor="context-filter">Context</label>
           <select id="context-filter" value={draft.context} onChange={(e) => onDraft({ ...draft, context: e.target.value })}>
-            <option value="">Active context (header)</option>
+            <option value="">Current context</option>
             <option value="all">All contexts</option>
             {contexts.map((ctx) => (
               <option key={ctx.id} value={ctx.id}>

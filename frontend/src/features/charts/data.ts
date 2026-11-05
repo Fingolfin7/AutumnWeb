@@ -5,7 +5,7 @@ import { format } from "date-fns";
    without a canvas. Ported from core/static/core/js/charts/core.js. */
 
 /* Muted pigments keep charts distinct from semantic project/subproject text. */
-export const PALETTE = ["#d6a36d", "#bd8179", "#a995b5", "#8faaa3", "#c1ae83", "#ab8d72", "#a08e9a", "#998f70"];
+export const PALETTE = ["#dfa15d", "#78aee0", "#bd93cc", "#78b9a0", "#e58e87", "#b3b56b", "#6dbbc6", "#9ca7d8"];
 export const EMBER_RAMP = ["#493329", "#79503a", "#ac6d43", "#d58a50", "#edb071", "#f4d3a4"];
 export const OTHER_COLOR = "#8e8981";
 export function paletteColor(index: number): string { return PALETTE[index % PALETTE.length]!; }
@@ -38,6 +38,7 @@ export interface ChartOptions {
   projectLimit: number;
   start?: string;
   end?: string;
+  today?: string;
   previous?: { date: string; hours: number | string }[];
 }
 
@@ -136,7 +137,7 @@ export function buildSeries(rows: DailySeriesRow[], topN?: number): SeriesSet {
   let other: string | null = null;
   let names: string[];
   if (topN === undefined) {
-    names = Object.keys(byDay).sort((a, b) => a.localeCompare(b));
+    names = Object.keys(byDay).sort((a, b) => totals[b]! - totals[a]!);
   } else {
     const ranked = Object.entries(totals).sort((a, b) => b[1] - a[1]);
     const folded = ranked.slice(topN);
@@ -162,3 +163,20 @@ export function periodDates(days: string[], options: Pick<ChartOptions, "start" 
   const start = options.start || sorted[0]; const end = options.end || sorted.at(-1);
   return start && end ? fillDates(parseDay(start), parseDay(end)).map(dayKey) : [];
 }
+
+/** Resolve name-hash collisions within a chart, keeping every displayed series distinct. */
+export function seriesColors(names: string[]): Map<string, string> {
+  const colors = new Map<string, string>();
+  const used = new Set<string>();
+  for (const name of [...new Set(names)].sort()) {
+    let color = seriesColor(name);
+    for (let index = 0; used.has(color) && index < PALETTE.length; index++) color = paletteColor(index);
+    if (used.has(color)) color = `hsl(${(colors.size * 137.508) % 360} 38% 65%)`;
+    used.add(color); colors.set(name, color);
+  }
+  return colors;
+}
+export const dayLabel = (day: string) => parseDay(day).toLocaleDateString("en", { weekday: "short", day: "numeric" }).replace(/^(\d+) (\w+)$/, "$2 $1");
+export const hourLabel = (value: string | number) => formatHours(Number(value));
+function formatHours(hours: number) { return hours === 0 ? "0" : hours < 1 ? `${Math.round(hours * 60)}m` : `${Number(hours.toFixed(1))}h`; }
+export const observedDates = (days: string[], options: ChartOptions) => periodDates(days, options).filter(day => day <= (options.today ?? dayKey(new Date())));

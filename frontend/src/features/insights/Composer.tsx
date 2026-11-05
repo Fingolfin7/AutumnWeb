@@ -37,8 +37,18 @@ export function Composer({
     const node = textarea.current;
     if (!node) return;
     node.style.height = "auto";
-    node.style.height = `${Math.min(node.scrollHeight, 176)}px`;
+    node.style.height = `${Math.max(72, Math.min(node.scrollHeight, 176))}px`;
   }, [prompt]);
+
+  // Toasts clear the complete composer, including a changing attachment tray.
+  useLayoutEffect(() => {
+    const form = textarea.current?.closest("form");
+    if (!form) return;
+    const place = () => document.documentElement.style.setProperty("--composer-clearance", `${Math.max(0, window.innerHeight - form.getBoundingClientRect().top) + 12}px`);
+    const observer = new ResizeObserver(place);
+    observer.observe(form); window.addEventListener("resize", place); window.visualViewport?.addEventListener("resize", place); place();
+    return () => { observer.disconnect(); window.removeEventListener("resize", place); window.visualViewport?.removeEventListener("resize", place); document.documentElement.style.removeProperty("--composer-clearance"); };
+  }, []);
 
   /* Hand the cursor back when an answer finishes. */
   const wasBusy = useRef(busy);
@@ -100,8 +110,8 @@ export function Composer({
           id="prompt"
           name="prompt"
           ref={textarea}
-          rows={1}
-          placeholder={drafts.length ? "Ask about these files and your sessions…" : "Ask a question about your sessions…"}
+          rows={2}
+          placeholder={drafts.length ? "Ask about these files…" : "Ask about your time…"}
           value={prompt}
           readOnly={busy}
           onChange={(e) => onPrompt(e.target.value)}

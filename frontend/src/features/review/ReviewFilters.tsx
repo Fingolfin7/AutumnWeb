@@ -29,7 +29,7 @@ export function ReviewFilters({ open, onClose, draft, onChange, onClear, control
   return <Sheet className="filter-sheet" open={open} onClose={onClose} title="Filter review">
     <div className="fields">
       <div className="review-filter-controls">{controls}</div>
-      <p className="muted">Changes update your review immediately.</p>
+      <p className="muted">Saved automatically</p>
           <div className="field">
             <label htmlFor="content-search">Search projects, subprojects, and session notes</label>
             <input
@@ -80,7 +80,7 @@ export function ReviewFilters({ open, onClose, draft, onChange, onClear, control
           <div className="field">
             <label htmlFor="context-filter">Context</label>
             <select id="context-filter" value={draft.context} onChange={(e) => onChange({ ...draft, context: e.target.value })}>
-              <option value="">Active context (header)</option>
+              <option value="">Current context</option>
               <option value="all">All contexts</option>
               {(contexts.data ?? []).map((ctx) => (
                 <option key={ctx.id} value={ctx.id}>

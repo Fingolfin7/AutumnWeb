@@ -42,7 +42,8 @@ Chart.register(
 );
 
 /* Night Ledger defaults (charts/core.js initUIElements). */
-Chart.defaults.color = "#d9dedb";
+Chart.defaults.font.size = 13;
+Chart.defaults.color = "#aaa69f";
 Chart.defaults.borderColor = "rgba(228, 232, 229, 0.06)";
 Chart.defaults.font.family = '"Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 Chart.defaults.plugins.legend.labels.usePointStyle = true;

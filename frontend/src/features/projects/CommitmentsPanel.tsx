@@ -122,7 +122,7 @@ export function CommitmentsPanel({
                     {commitment.banking_enabled ? (
                       <details className="commitment-bank-detail"><summary>Time carryover</summary><div className="bank-row">
                         <div className="bank-cell">
-                          <span className="bank-label">Carried balance</span>
+                          <span className="bank-label">Carried over</span>
                           <span className={`bank-value ${balance >= 0 ? "text-green" : "text-red"}`}>{formatSigned(balance, timeBased)}</span>
                         </div>
                         <div className="bank-cell">

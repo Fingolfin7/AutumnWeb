@@ -33,9 +33,9 @@ describe("URL <-> filters", () => {
   });
 
   it("round-trips, keeping the bar default out of the URL", () => {
-    const state = { ...EMPTY_FILTERS, chart_type: "line" as const, search: "x", related: true, tags: [1, 2], projects: [5], projectMode: "include" as const };
+    const state = { ...EMPTY_FILTERS, chart_type: "daily_bars" as const, search: "x", related: true, tags: [1, 2], projects: [5], projectMode: "include" as const };
     const text = writeFilters(state).toString();
-    expect(text).toContain("chart_type=line");
+    expect(text).toContain("chart_type=daily_bars");
     expect(text).toContain("include_projects=5");
     expect(readFilters(params(text))).toEqual(state);
     expect(writeFilters(EMPTY_FILTERS).toString()).toBe("");

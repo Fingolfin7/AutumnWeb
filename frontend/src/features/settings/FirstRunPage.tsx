@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/states";
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { AppLink, urls } from "@/app/links";
@@ -8,12 +9,7 @@ import { useCreateProject } from "@/features/projects/api";
 import { useStartTimer } from "@/features/timers/api";
 
 export function EmptyWorkspace({ projects = false }: { projects?: boolean }) {
-  return <section className="first-run-empty">
-    <span className="ember-seal" aria-hidden="true" />
-    <h1>{projects ? "Every project starts somewhere." : "Time for what matters."}</h1>
-    <p>{projects ? "Give something you care about a place to grow." : "Start with one project. Your time and the story behind it will find a home here."}</p>
-    <AppLink className="btn btn--primary btn--lg" href="/welcome/">Create your first project</AppLink>
-  </section>;
+  return <EmptyState heading="h1" title={projects ? "Every project starts somewhere." : "Time for what matters."} action={<AppLink className="btn btn--primary" href="/welcome/">Create your first project</AppLink>}>{projects ? "Give something you care about a place to grow." : "Start with one project. Your time and the story behind it will find a home here."}</EmptyState>;
 }
 
 export default function FirstRunPage() {

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, type ReactNode } from "react";
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   faChartPie,
   faPlus,
@@ -108,6 +108,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <ToastOutlet />
       <OfflineSync />
       <main id="main-content" className="screen screen-pad">
+        <ContextScope />
         {children}
       </main>
 
@@ -117,16 +118,16 @@ export function Shell({ children }: { children: ReactNode }) {
 
 function ContextSwitch() {
   const { contextId, contexts, setContextId } = useActiveContext();
-  if (!contexts.length) return null;
+  const navigate = useNavigate();
   return (
-    <div className="context-switch">
+    <div className={`context-switch${contextId !== null ? " is-filtered" : ""}`}>
       <label className="sr-only" htmlFor="context-switch">
         Active context
       </label>
       <select
         id="context-switch"
         value={contextId === null ? "all" : String(contextId)}
-        onChange={(event) => void setContextId(event.target.value === "all" ? null : Number(event.target.value))}
+        onChange={(event) => event.target.value === "manage" ? navigate("/settings/contexts/") : void setContextId(event.target.value === "all" ? null : Number(event.target.value))}
       >
         <option value="all">All contexts</option>
         {contexts.map((ctx) => (
@@ -134,8 +135,21 @@ function ContextSwitch() {
             {ctx.name}
           </option>
         ))}
+        <option value="manage">Manage contexts</option>
       </select>
     </div>
   );
 }
 
+
+function ContextScope() {
+  const { contextId, contexts, setContextId } = useActiveContext();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  const params = new URLSearchParams(search);
+  const selected = params.get("context");
+  const id = selected === "all" ? null : selected ? Number(selected) : contextId;
+  const name = contexts.find(item => item.id === id)?.name;
+  if (!name || !["/", "/projects/", "/sessions/", "/review/"].includes(pathname)) return null;
+  return <p className="context-scope">{name} only <span aria-hidden="true">·</span><button type="button" aria-label="Clear context filter" onClick={() => { if (selected) { params.set("context", "all"); navigate(`${pathname}?${params}`, { replace: true }); } else void setContextId(null); }}>Show all</button></p>;
+}

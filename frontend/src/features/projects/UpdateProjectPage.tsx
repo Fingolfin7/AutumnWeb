@@ -2,6 +2,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { useParams } from "react-router";
 import { faEllipsisH, faStop, faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { Select } from "@/components/ui";
 import { Sheet } from "@/components/Sheet";
 import { SessionBand } from "@/features/sessions/SessionBand";
 import { SessionNote } from "@/components/SessionNote";
@@ -55,7 +56,6 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const running = (timers.data ?? []).filter(timer => timer.project.id === project.id);
   const [selectedSub, setSelectedSub] = useState("");
   const [subMenu, setSubMenu] = useState<number | null>(null);
-  const selectedRunning = running.find(timer => timer.subproject_allocations.some(allocation => allocation.subproject_id === Number(selectedSub)));
   const recentRows = recent.data?.pages[0]?.sessions.slice(0,5) ?? [];
   const journalDays = [...new Set(recentRows.map(session => localDateKey(new Date(session.start))))];
   const update = useUpdateProject(project.id);
@@ -123,14 +123,13 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
           <PageHead title={project.name} titleClass="text-red" />
           <button type="button" className="btn btn--quiet" onClick={() => { reset(project); setEditing(true); }}><Icon icon={faPen} /> Edit project</button>
         </div>
-        <section className="slab slab-pad project-hero" aria-label="Project overview">
-          <button className="btn btn--primary" type="button" disabled={start.isPending} onClick={() => start.mutate({ project_id: project.id, optimistic: { projectName: project.name, subprojects: [] } }, { onSuccess: () => toast.success(`Started ${project.name}.`), onError: (error) => toast.error(failure("start the timer", error)) })}><Icon icon={faPlay} /> Start timer</button>
-          {running.length ? <AppLink className="btn btn--secondary" href={urls.stopTimer(running[0]!.id)}><span className="live-dot" /> Running <Icon icon={faStop} /> Stop</AppLink> : null}
-          <div className="project-stat"><span>This week</span><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong></div>
-          <div className="project-stat"><span>Total time</span><strong>{formatDurationWords(project.total_minutes)}</strong></div>
-          <span className="muted">{project.session_count} sessions</span>
-          {project.description ? <div className="project-description"><SessionNote text={project.description} /></div> : null}
-        </section>
+        <div className="project-properties" aria-label="Project properties"><span className="chip">{project.status}</span>{project.context ? <AppLink className="chip-link" href={urls.updateContext(project.context.id)}><span className="context-chip">{project.context.name}</span></AppLink> : null}{project.tags.map(tag => <AppLink className="chip-link" key={tag.id} href={urls.updateTag(tag.id)}><span className="tag-chip">{tag.name}</span></AppLink>)}<a href="#project-subprojects">{project.subprojects.length} subprojects</a>{ownCommitment ? <a href="#project-commitment">Commitment</a> : null}<span>{formatDurationWords(project.total_minutes)} total · {project.session_count} sessions</span></div>
+        <div className="project-start-control fields">
+          {project.subprojects.length && !running.length ? <><label className="sr-only" htmlFor="project-subproject-picker">Subproject</label><Select id="project-subproject-picker" value={selectedSub} onChange={event => setSelectedSub(event.target.value)}><option value="">No subproject</option>{project.subprojects.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}</Select></> : null}
+          {running.length ? <AppLink className="btn btn--stop" href={urls.stopTimer(running[0]!.id)}><span className="live-dot" /><Icon icon={faStop} /> Stop timer{running.length > 1 ? ` (${running.length} running)` : ""}</AppLink> : <button className="btn btn--primary" type="button" disabled={start.isPending} onClick={() => { const sub = project.subprojects.find(item => item.id === Number(selectedSub)); start.mutate({ project_id: project.id, subproject_ids: sub ? [sub.id] : [], optimistic: { projectName: project.name, subprojects: sub ? [{ id: sub.id, name: sub.name }] : [] } }, { onSuccess: () => toast.success(`Started ${sub?.name ?? project.name}.`), onError: error => toast.error(failure("start the timer", error)) }); }}><Icon icon={faPlay} /> Start timer</button>}
+        </div>
+        <div className="project-progress-row"><section className="project-week-summary"><h2>This week</h2><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong><p className="muted">{week.data && lastWeek.data ? `${week.data.total_minutes >= lastWeek.data.total_minutes ? "+" : "−"}${formatDurationWords(Math.abs(week.data.total_minutes-lastWeek.data.total_minutes))} from last week` : "Comparing weeks…"}</p>{trend.data ? <ProjectTrend rows={trend.data.data as DailyTotalRow[]} start={addDays(weekStart,-7)} /> : null}</section><section className="project-week-target" id="project-commitment">{ownCommitment ? <>{!ownCommitment.active ? <p className="muted">Commitment paused</p> : null}<h2>Commitment</h2><QuickTarget key={ownCommitment.version} commitment={ownCommitment} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}><Icon icon={faPlus} /> Add commitment</AppLink>}</section></div>
+        {project.description ? <details className="project-description"><summary>About this project</summary><SessionNote text={project.description} /></details> : null}
         <Sheet open={editing} onClose={() => setEditing(false)} title="Edit project" className="project-edit-sheet">
 
         {conflict || changedElsewhere ? (
@@ -164,18 +163,15 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         </Sheet>
 
 
-        {project.subprojects.length ? <div className="project-subproject-picker"><label className="sr-only" htmlFor="project-subproject-picker">Subproject</label><select id="project-subproject-picker" value={selectedSub} onChange={event => setSelectedSub(event.target.value)}><option value="">Choose a subproject</option>{project.subprojects.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}</select>{selectedRunning ? <AppLink className="btn-icon" aria-label="Stop selected subproject" href={urls.stopTimer(selectedRunning.id)}><Icon icon={faStop} /></AppLink> : <button className="btn-icon" type="button" disabled={!selectedSub || start.isPending} aria-label="Start selected subproject" onClick={() => { const sub = project.subprojects.find(item => item.id === Number(selectedSub)); if (sub) start.mutate({ project_id: project.id, subproject_ids: [sub.id], optimistic: { projectName: project.name, subprojects: [{ id: sub.id, name: sub.name }] } }, { onSuccess: () => toast.success(`Started ${sub.name}.`), onError: error => toast.error(failure("start the timer",error)) }); }}><Icon icon={faPlay} /></button>}</div> : null}
         <section className="slab session-list project-journal" aria-label="Recent journal entries">
           <header className="day-head"><h2 className="day-date">Recent journal entries</h2><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></header>
-          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(day => <section className="project-journal-day" key={day}><header className="day-head"><h3 className="day-date">{formatDate(day)}</h3><strong className="day-total">{formatDurationWords(recentRows.filter(session => localDateKey(new Date(session.start)) === day).reduce((sum,session) => sum + (session.duration_minutes ?? 0),0))}</strong></header><ul className="band-list">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).map(session => <SessionBand key={session.id} session={session} showDate />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
+          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(day => <section className="project-journal-day" key={day}><header className="day-head"><h3 className="day-date">{formatDate(day)}</h3><strong className="day-total">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).length > 1 ? formatDurationWords(recentRows.filter(session => localDateKey(new Date(session.start)) === day).reduce((sum,session) => sum + (session.duration_minutes ?? 0),0)) : null}</strong></header><ul className="band-list">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).map(session => <SessionBand key={session.id} session={session} hideProject />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
         </section>
         <aside className="project-rail">
-          <div className="project-week-target slab slab-pad">{ownCommitment ? <>{!ownCommitment.active ? <p className="muted">Commitment paused</p> : null}<h2>Commitment</h2><QuickTarget key={ownCommitment.version} commitment={ownCommitment} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}><Icon icon={faPlus} /> Add commitment</AppLink>}</div>
-          <section className="slab slab-pad project-week-comparison"><h2>Your weeks</h2><dl><div><dt>This week</dt><dd>{week.data ? formatDurationWords(week.data.total_minutes) : "Loading"}</dd></div><div><dt>Last week</dt><dd>{lastWeek.data ? formatDurationWords(lastWeek.data.total_minutes) : "Loading"}</dd></div></dl>{trend.data ? <ProjectTrend rows={trend.data.data as DailyTotalRow[]} start={addDays(weekStart,-7)} /> : null}</section>
         <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
           {project.subprojects.length ? (
             <ul className="band-list">
-              {project.subprojects.map((sub) => { const timer = running.find(item => item.subproject_allocations.some(allocation => allocation.subproject_id === sub.id)); return (
+              {project.subprojects.map((sub) => { return (
                 <li className="band project" id={`subproject-${sub.id}`} key={sub.id}>
                   <div className="u-grow">
                     <div className="project-top">
@@ -187,7 +183,6 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
                     {sub.last_activity ? <p className="project-dates">Last active {formatDate(sub.last_activity)}</p> : null}
                   </div>
                   <div className="u-row u-gap-2">
-                    {timer ? <AppLink className="btn-icon" href={urls.stopTimer(timer.id)} aria-label={`Stop ${sub.name}`}><Icon icon={faStop} /></AppLink> : <button className="btn-icon" aria-label={`Start ${sub.name}`} type="button" disabled={start.isPending} onClick={() => start.mutate({ project_id: project.id, subproject_ids: [sub.id], optimistic: { projectName: project.name, subprojects: [{ id: sub.id, name: sub.name }] } }, { onSuccess: () => toast.success(`Started ${sub.name}.`), onError: (error) => toast.error(failure("start the timer", error)) })}><Icon icon={faPlay} /></button>}
                     <button className="btn-icon" type="button" aria-label={`More actions for ${sub.name}`} onClick={() => setSubMenu(sub.id)}><Icon icon={faEllipsisH} /></button>
                     <Sheet open={subMenu === sub.id} onClose={() => setSubMenu(null)} title={sub.name}>
                     <AppLink className="btn btn--quiet" href={urls.updateSubproject(sub.id)} title="Edit subproject">

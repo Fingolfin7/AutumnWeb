@@ -382,20 +382,20 @@ export function openaiConnectionNote(source: InsightOptions["openai_source"], ha
       };
     case "codex_with_api_fallback":
       return {
-        text: "OpenAI via Codex login, API key fallback.",
-        title: "OpenAI models use your Codex login first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.",
+        text: "OpenAI via Codex, with an API key fallback.",
+        title: "OpenAI models use your Codex connection first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.",
         profileLink: false,
       };
     case "codex":
-      return { text: "OpenAI via Codex login.", title: "OpenAI models are available through your Codex login.", profileLink: false };
+      return { text: "OpenAI via Codex.", title: "OpenAI models are available through your Codex connection.", profileLink: false };
     case "profile":
       return { text: "OpenAI via your profile API key.", title: "OpenAI models are using your profile API key.", profileLink: false };
     default:
       return hasOpenaiProvider
         ? null
         : {
-            text: "OpenAI needs a key or Codex login — add one in",
-            title: "OpenAI models need an API key or Codex login.",
+            text: "OpenAI needs a key or a Codex connection — add one in",
+            title: "OpenAI models need an API key or a Codex connection.",
             profileLink: true,
           };
   }
