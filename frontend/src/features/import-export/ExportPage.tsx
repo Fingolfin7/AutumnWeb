@@ -183,7 +183,7 @@ export default function ExportPage() {
                   </div>
                 )}
 
-                <p className="muted export-scope-summary">{form.projects.length ? `${form.projects.length} selected projects` : "Everything"} · narrow by project, context or tag below</p>
+                <p className="muted export-scope-summary">{form.projects.length ? `${form.projects.length} selected projects` : "Everything"} · Use the project, context and tag filters to narrow it</p>
                 {allProjects.length ? (
                   <>
                     <OptionPicker

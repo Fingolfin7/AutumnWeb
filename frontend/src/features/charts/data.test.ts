@@ -169,3 +169,8 @@ it("includes unallocated project time in the treemap total", () => {
   expect(leaves.find(leaf => leaf.name === "Unallocated")?.value).toBe(155 / 60);
   expect(leaves.reduce((sum, leaf) => sum + leaf.value * 60, 0)).toBeCloseTo(270);
 });
+
+it("blocks default and semantic chart colors in every chart builder", () => {
+  const builders = import.meta.glob("./{basic,trends,analysis,time,hierarchy,wordcloud}.ts", { eager: true, query: "?raw", import: "default" });
+  for (const source of Object.values(builders)) expect(source).not.toMatch(/#36a2eb|#ff6384|#4bc0c0|hsl\(\s*(?:120|210)|rgba?\(\s*0,\s*128,\s*0|yellowgreen/);
+});

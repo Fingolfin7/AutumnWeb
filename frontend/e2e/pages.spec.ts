@@ -49,17 +49,16 @@ test("Settings keeps bookmarks, swatches and import streaming usable", async ({ 
   // Invalid reporting edits must neither block Account nor be silently saved/reset by it.
   await page.getByLabel("Projects per chart", { exact: true }).fill("0");
   await page.getByLabel("First name", { exact: true }).fill(firstName);
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Save changes", exact: true })).toBeDisabled();
+  await expect.poll(async () => (await (await page.request.get("/api/v2/me/account/")).json()).first_name).toBe(firstName);
   await expect(page.getByLabel("Projects per chart", { exact: true })).toHaveValue("0");
   expect((await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count);
   await page.getByLabel("Projects per chart", { exact: true }).fill(String(original.default_chart_project_count + 1));
-  await page.getByRole("button", { name: "Save defaults", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Save defaults", exact: true })).toBeDisabled();
+  await expect.poll(async () => (await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count + 1);
   expect((await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count + 1);
   expect((await (await page.request.get("/api/v2/me/account/")).json()).first_name).toBe(firstName);
   await page.goto("/tags/");
   await expect(page).toHaveURL(/\/settings\/tags\/$/);
+  await page.getByRole("button", { name: "New tag", exact: true }).click();
   const name = `Settings swatch ${Date.now()}`;
   await page.getByLabel("Name", { exact: true }).fill(name);
   await page.getByRole("radio", { name: "Lilac", exact: true }).check();

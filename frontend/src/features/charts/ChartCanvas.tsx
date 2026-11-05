@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ScaleOptions } from "chart.js";
 import { formatDuration } from "@/lib/format";
-import { paletteColor } from "./data";
+import { paletteColor, seriesColor } from "./data";
 import { Chart } from "./register";
 import { drawWordcloud, stopWordcloud } from "./wordcloud";
 import type { Built } from "./build";
@@ -73,10 +73,11 @@ export function ChartCanvas({ built }: { built: Built }) {
   }, [built]);
 
   const config = built.type === "chart" ? built.config : null;
+  const histogram = config?.options?.scales?.y?.title?.text === "Number of Sessions";
   const byLabel = config && ["doughnut", "bar"].includes(config.type) && config.data.datasets.length === 1;
   const series = !config || config.type === "matrix" ? [] : byLabel
     ? (config.data.labels ?? []).map((name, index) => ({ name: String(name), minutes: Number(config.data.datasets[0].data[index]) * 60, color: config.data.datasets[0].backgroundColor?.[index] ?? paletteColor(index) }))
-    : config.type === "treemap" ? [...new Set((config.data.datasets[0].tree ?? []).map((leaf: { project: string }) => leaf.project))].map(name => ({ name: String(name), minutes: (config.data.datasets[0].tree ?? []).filter((leaf: { project: string }) => leaf.project === name).reduce((sum: number, leaf: { value: number }) => sum + leaf.value * 60, 0), color: paletteColor(0) }))
+    : config.type === "treemap" ? [...new Set((config.data.datasets[0].tree ?? []).map((leaf: { project: string }) => leaf.project))].map(name => ({ name: String(name), minutes: (config.data.datasets[0].tree ?? []).filter((leaf: { project: string }) => leaf.project === name).reduce((sum: number, leaf: { value: number }) => sum + leaf.value * 60, 0), color: seriesColor(String(name)) }))
     : config.data.datasets.map(dataset => ({ name: dataset.label ?? "", minutes: (config.type === "line" && dataset.label?.includes("period") ? Number(dataset.data.at(-1)) : dataset.data.reduce((sum: number, value: number) => sum + Number(value), 0)) * 60, color: dataset.borderColor ?? dataset.backgroundColor }));
-  return <><div className="chart-plot"><canvas id="chart" ref={canvas} role="img" aria-label={built.type === "wordcloud" ? "Amber words from your session notes" : "Chart of tracked time; values listed below"} /></div>{series.length ? <ul className="chart-series" aria-label="Chart values">{series.map((row, index) => <li key={`${row.name}-${index}`}><button type="button" aria-pressed={!hidden.includes(index)} onClick={() => { const chart = canvas.current ? Chart.getChart(canvas.current) : undefined; if (!chart) return; if (byLabel) chart.toggleDataVisibility(index); else chart.setDatasetVisibility(index, hidden.includes(index)); chart.update(); setHidden(items => items.includes(index) ? items.filter(item => item !== index) : [...items, index]); }}><svg className="chart-series-dot" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={typeof row.color === "string" ? row.color : paletteColor(index)} /></svg><span>{row.name}</span><strong>{formatDuration(row.minutes)}</strong></button></li>)}</ul> : null}</>;
+  return <><div className="chart-plot"><canvas id="chart" ref={canvas} role="img" aria-label={built.type === "wordcloud" ? "Amber words from your session notes" : "Chart of tracked time; values listed below"} /></div>{series.length ? <ul className="chart-series" aria-label="Chart values">{series.map((row, index) => <li key={`${row.name}-${index}`}><button type="button" disabled={config?.type === "treemap" || histogram} aria-pressed={!hidden.includes(index)} onClick={() => { const chart = canvas.current ? Chart.getChart(canvas.current) : undefined; if (!chart) return; if (byLabel) chart.toggleDataVisibility(index); else chart.setDatasetVisibility(index, hidden.includes(index)); chart.update(); setHidden(items => items.includes(index) ? items.filter(item => item !== index) : [...items, index]); }}><svg className="chart-series-dot" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill={typeof row.color === "string" ? row.color : paletteColor(index)} /></svg><span>{row.name}</span><strong>{histogram ? `${Math.round(row.minutes / 60)} sessions` : formatDuration(row.minutes)}</strong></button></li>)}</ul> : null}</>;
 }

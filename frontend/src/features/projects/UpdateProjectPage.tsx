@@ -1,17 +1,22 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useParams } from "react-router";
-import { faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEllipsisH, faStop, faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Sheet } from "@/components/Sheet";
 import { SessionBand } from "@/features/sessions/SessionBand";
 import { SessionNote } from "@/components/SessionNote";
 import { useSessionList, useSessionTotals } from "@/features/sessions/api";
 
-import { useStartTimer } from "@/features/timers/api";
+import { useStartTimer, useTimers } from "@/features/timers/api";
+import { bootstrap } from "@/bootstrap";
+import { addDays, todayKey } from "@/features/notifications/dates";
+import { calendarWeek } from "@/features/review/periods";
+import { useChartData } from "@/features/charts/api";
+import type { DailyTotalRow } from "@/features/charts/payloads";
 import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
-import { formatDate, formatDurationWords } from "@/lib/format";
+import { formatDate, formatDurationWords, localDateKey } from "@/lib/format";
 import type { Project, ProjectDetail } from "@/api/types";
 import { useCommitmentsAppliedTo } from "@/features/commitments/api";
 import { failure, useProject, useUpdateProject } from "./api";
@@ -42,10 +47,17 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const [editing, setEditing] = useState(false);
   const start = useStartTimer();
   const recent = useSessionList({ project_ids: String(project.id) });
-  const monday = new Date();
-  monday.setDate(monday.getDate() - (monday.getDay() + 6) % 7);
-  const weekStart = `${monday.getFullYear()}-${String(monday.getMonth() + 1).padStart(2, "0")}-${String(monday.getDate()).padStart(2, "0")}`;
-  const week = useSessionTotals({ project_ids: String(project.id), start_date: weekStart });
+  const weekStart = calendarWeek(todayKey(bootstrap().profile.timezone)).start;
+  const week = useSessionTotals({ project_ids: String(project.id), start_date: weekStart, end_date: addDays(weekStart,6) });
+  const lastWeek = useSessionTotals({ project_ids: String(project.id), start_date: addDays(weekStart,-7), end_date: addDays(weekStart,-1) });
+  const trend = useChartData({ chart_type: "calendar", include_projects: [project.id], start_date: addDays(weekStart,-7), end_date: addDays(weekStart,6), context: "all" }, true);
+  const timers = useTimers();
+  const running = (timers.data ?? []).filter(timer => timer.project.id === project.id);
+  const [selectedSub, setSelectedSub] = useState("");
+  const [subMenu, setSubMenu] = useState<number | null>(null);
+  const selectedRunning = running.find(timer => timer.subproject_allocations.some(allocation => allocation.subproject_id === Number(selectedSub)));
+  const recentRows = recent.data?.pages[0]?.sessions.slice(0,5) ?? [];
+  const journalDays = [...new Set(recentRows.map(session => localDateKey(new Date(session.start))))];
   const update = useUpdateProject(project.id);
   const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
   const ownCommitment = related.find((item) => item.active && item.aggregation_type === "project" && item.target.id === project.id) ?? related.find((item) => item.aggregation_type === "project" && item.target.id === project.id);
@@ -113,10 +125,10 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         </div>
         <section className="slab slab-pad project-hero" aria-label="Project overview">
           <button className="btn btn--primary" type="button" disabled={start.isPending} onClick={() => start.mutate({ project_id: project.id, optimistic: { projectName: project.name, subprojects: [] } }, { onSuccess: () => toast.success(`Started ${project.name}.`), onError: (error) => toast.error(failure("start the timer", error)) })}><Icon icon={faPlay} /> Start timer</button>
+          {running.length ? <AppLink className="btn btn--secondary" href={urls.stopTimer(running[0]!.id)}><span className="live-dot" /> Running <Icon icon={faStop} /> Stop</AppLink> : null}
           <div className="project-stat"><span>This week</span><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong></div>
           <div className="project-stat"><span>Total time</span><strong>{formatDurationWords(project.total_minutes)}</strong></div>
           <span className="muted">{project.session_count} sessions</span>
-          <div className="project-week-target">{ownCommitment ? <>{!ownCommitment.active ? <p className="muted">Commitment paused</p> : null}<QuickTarget key={ownCommitment.version} commitment={ownCommitment} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}>Add commitment</AppLink>}</div>
           {project.description ? <div className="project-description"><SessionNote text={project.description} /></div> : null}
         </section>
         <Sheet open={editing} onClose={() => setEditing(false)} title="Edit project" className="project-edit-sheet">
@@ -152,14 +164,18 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         </Sheet>
 
 
+        {project.subprojects.length ? <div className="project-subproject-picker"><label className="sr-only" htmlFor="project-subproject-picker">Subproject</label><select id="project-subproject-picker" value={selectedSub} onChange={event => setSelectedSub(event.target.value)}><option value="">Choose a subproject</option>{project.subprojects.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}</select>{selectedRunning ? <AppLink className="btn-icon" aria-label="Stop selected subproject" href={urls.stopTimer(selectedRunning.id)}><Icon icon={faStop} /></AppLink> : <button className="btn-icon" type="button" disabled={!selectedSub || start.isPending} aria-label="Start selected subproject" onClick={() => { const sub = project.subprojects.find(item => item.id === Number(selectedSub)); if (sub) start.mutate({ project_id: project.id, subproject_ids: [sub.id], optimistic: { projectName: project.name, subprojects: [{ id: sub.id, name: sub.name }] } }, { onSuccess: () => toast.success(`Started ${sub.name}.`), onError: error => toast.error(failure("start the timer",error)) }); }}><Icon icon={faPlay} /></button>}</div> : null}
         <section className="slab session-list project-journal" aria-label="Recent journal entries">
           <header className="day-head"><h2 className="day-date">Recent journal entries</h2><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></header>
-          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <ul className="band-list">{recent.data.pages[0].sessions.slice(0, 5).map((session) => <SessionBand key={session.id} session={session} showDate />)}</ul> : <p className="empty">Your first session will appear here.</p>}
+          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(day => <section className="project-journal-day" key={day}><header className="day-head"><h3 className="day-date">{formatDate(day)}</h3><strong className="day-total">{formatDurationWords(recentRows.filter(session => localDateKey(new Date(session.start)) === day).reduce((sum,session) => sum + (session.duration_minutes ?? 0),0))}</strong></header><ul className="band-list">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).map(session => <SessionBand key={session.id} session={session} showDate />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
         </section>
+        <aside className="project-rail">
+          <div className="project-week-target slab slab-pad">{ownCommitment ? <>{!ownCommitment.active ? <p className="muted">Commitment paused</p> : null}<h2>Commitment</h2><QuickTarget key={ownCommitment.version} commitment={ownCommitment} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}><Icon icon={faPlus} /> Add commitment</AppLink>}</div>
+          <section className="slab slab-pad project-week-comparison"><h2>Your weeks</h2><dl><div><dt>This week</dt><dd>{week.data ? formatDurationWords(week.data.total_minutes) : "Loading"}</dd></div><div><dt>Last week</dt><dd>{lastWeek.data ? formatDurationWords(lastWeek.data.total_minutes) : "Loading"}</dd></div></dl>{trend.data ? <ProjectTrend rows={trend.data.data as DailyTotalRow[]} start={addDays(weekStart,-7)} /> : null}</section>
         <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
           {project.subprojects.length ? (
             <ul className="band-list">
-              {project.subprojects.map((sub) => (
+              {project.subprojects.map((sub) => { const timer = running.find(item => item.subproject_allocations.some(allocation => allocation.subproject_id === sub.id)); return (
                 <li className="band project" id={`subproject-${sub.id}`} key={sub.id}>
                   <div className="u-grow">
                     <div className="project-top">
@@ -168,22 +184,24 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
                       </AppLink>
                     </div>
                     <p className="project-total">{formatDurationWords(sub.total_minutes)}</p>
-                    <progress className="subproject-progress" max={Math.max(project.total_minutes, sub.total_minutes, 1)} value={sub.total_minutes} aria-label={`${sub.name} share of total time`} />
                     {sub.last_activity ? <p className="project-dates">Last active {formatDate(sub.last_activity)}</p> : null}
                   </div>
                   <div className="u-row u-gap-2">
-                    <button className="btn btn--secondary" type="button" disabled={start.isPending} onClick={() => start.mutate({ project_id: project.id, subproject_ids: [sub.id], optimistic: { projectName: project.name, subprojects: [{ id: sub.id, name: sub.name }] } }, { onSuccess: () => toast.success(`Started ${sub.name}.`), onError: (error) => toast.error(failure("start the timer", error)) })}><Icon icon={faPlay} /> Start<span className="sr-only"> {sub.name}</span></button>
-                    <AppLink className="btn-icon" href={urls.updateSubproject(sub.id)} title="Edit subproject">
+                    {timer ? <AppLink className="btn-icon" href={urls.stopTimer(timer.id)} aria-label={`Stop ${sub.name}`}><Icon icon={faStop} /></AppLink> : <button className="btn-icon" aria-label={`Start ${sub.name}`} type="button" disabled={start.isPending} onClick={() => start.mutate({ project_id: project.id, subproject_ids: [sub.id], optimistic: { projectName: project.name, subprojects: [{ id: sub.id, name: sub.name }] } }, { onSuccess: () => toast.success(`Started ${sub.name}.`), onError: (error) => toast.error(failure("start the timer", error)) })}><Icon icon={faPlay} /></button>}
+                    <button className="btn-icon" type="button" aria-label={`More actions for ${sub.name}`} onClick={() => setSubMenu(sub.id)}><Icon icon={faEllipsisH} /></button>
+                    <Sheet open={subMenu === sub.id} onClose={() => setSubMenu(null)} title={sub.name}>
+                    <AppLink className="btn btn--quiet" href={urls.updateSubproject(sub.id)} title="Edit subproject">
                       <Icon icon={faPen} />
-                      <span className="sr-only">Edit {sub.name}</span>
+                      <span>Edit subproject</span>
                     </AppLink>
-                    <AppLink className="btn-icon btn-icon--danger" href={urls.deleteSubproject(sub.id)} title="Delete subproject">
+                    <AppLink className="btn btn--quiet btn-icon--danger" href={urls.deleteSubproject(sub.id)} title="Delete subproject">
                       <Icon icon={faTrash} />
-                      <span className="sr-only">Delete {sub.name}</span>
+                      <span>Delete subproject</span>
                     </AppLink>
+                    </Sheet>
                   </div>
                 </li>
-              ))}
+              ); })}
             </ul>
           ) : (
             <p className="empty">No subprojects yet.</p>
@@ -202,7 +220,13 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         </Disclose>
         {related.some((item) => item.id !== ownCommitment?.id) ? <CommitmentsPanel commitments={related.filter((item) => item.id !== ownCommitment?.id)} addUrl={urls.createCommitment(project.id)} entityLabel="project" knownSubprojects={knownSubprojects} /> : null}
 
+        </aside>
       </div>
     </>
   );
+}
+
+function ProjectTrend({ rows, start }: { rows: DailyTotalRow[]; start: string }) {
+  const values = new Map(rows.map(row => [row.date, Number(row.hours)])); const max = Math.max(1,...values.values());
+  return <><svg className="project-trend" viewBox="0 0 280 72" role="img" aria-label="Daily time over the previous and current weeks">{Array.from({ length:14 },(_,index) => <rect key={index} x={index * 20} y={70 - (values.get(addDays(start,index)) ?? 0) / max * 64} width="13" height={(values.get(addDays(start,index)) ?? 0) / max * 64} rx="2" className={index < 7 ? "is-previous" : undefined}><title>{formatDate(addDays(start,index))}: {formatDurationWords((values.get(addDays(start,index)) ?? 0) * 60)}</title></rect>)}</svg><p className="muted">Last week / this week</p></>;
 }

@@ -67,7 +67,7 @@ export function SocialSection({ social }: { social: SocialAccounts }) {
                       </p>
                     ) : null}
                     <span
-                      className={`context-chip profile-auth-chip ${account.available ? "text-green" : "text-yellow"}`}
+                      className={`context-chip profile-auth-chip ${account.available ? "muted" : "text-yellow"}`}
                     >
                       <Icon icon={account.available ? faCheckCircle : faExclamationCircle} />
                       Connected

@@ -70,7 +70,7 @@ export default function ReviewPage() {
   const before = totalOf((priorDaily.data?.data ?? []) as DailyTotalRow[]);
   const loading = current.isPending || daily.isPending;
   const failed = current.isError || daily.isError;
-  const built = useMemo(() => chart.data ? buildChart(kind, chart.data.data, { projectLimit: profile.default_chart_project_count || 7, subprojects: !!applied.project_name, start: period.start, end: period.end, previous: (priorDaily.data?.data ?? []) as DailyTotalRow[] }) : null, [chart.data, kind, profile.default_chart_project_count, applied.project_name, period.start, period.end, priorDaily.data]);
+  const built = useMemo(() => chart.data ? buildChart(kind, chart.data.data, { projectLimit: profile.default_chart_project_count || 7, subprojects: !!applied.project_name, start: period.start, end: period.end, previous: (completePriorDaily.data?.data ?? priorDaily.data?.data ?? []) as DailyTotalRow[] }) : null, [chart.data, kind, profile.default_chart_project_count, applied.project_name, period.start, period.end, priorDaily.data, completePriorDaily.data]);
   const pills = describeFilters({ ...applied, start_date: "", end_date: "" }, { projects: projects.data ?? [], tags: tags.data ?? [], contexts: contexts.data ?? [] }, { available: semanticSearchAvailable(), state: current.data?.related ?? annual.data?.related ?? null });
 
   const update = (next: ChartFilters) => {
@@ -172,7 +172,7 @@ function ReviewCommitments({ start }: { start: string }) {
   const commitments = useCommitments();
   const [historyOpen, setHistoryOpen] = useState(false);
   const history = useQuery({ enabled: historyOpen && commitments.isSuccess, queryKey: keys.reports("weekly-review", { week: start }), queryFn: () => unwrap(api.GET("/api/v2/reports/weekly-review/", { params: { query: { week: start } } })) });
-  return <section className="review-commitments slab" aria-labelledby="review-commitments-title"><div className="review-section-heading"><div><h2 id="review-commitments-title">Commitments</h2><AppLink className="btn btn--secondary" href={urls.createCommitment()}><Icon icon={faPlus} /> Add commitment</AppLink><p className="muted">Current periods · all projects and contexts · independent of review filters</p></div></div>
+  return <section className="review-commitments slab" aria-labelledby="review-commitments-title"><div className="review-section-heading"><div><h2 id="review-commitments-title">Commitments</h2><p className="muted">Current periods · all projects and contexts · independent of review filters</p></div><AppLink className="btn btn--secondary" href={urls.createCommitment()}><Icon icon={faPlus} /> Add commitment</AppLink></div>
     {commitments.isPending ? <Skeleton lines={3} /> : commitments.isError ? <ErrorState error={commitments.error} onRetry={() => void commitments.refetch()} /> : !commitments.data?.some((item) => item.active) ? <p className="review-empty">A little structure for what matters. <AppLink href={urls.createCommitment()}>Set a commitment</AppLink>.</p> : commitments.data.filter((item) => item.active).map((item) => {
       const current = item.current_period;
       const amount = (value: number) => item.commitment_type === "time" ? formatDuration(value) : `${Math.round(value)} session${Math.round(value) === 1 ? "" : "s"}`;
@@ -185,7 +185,7 @@ function ReviewCommitments({ start }: { start: string }) {
 function DailyComparison({ period, rows, previousRows, previous }: { period: Period; rows: DailyTotalRow[]; previousRows: DailyTotalRow[]; previous: Period }) {
   const hours = (items: DailyTotalRow[], day: string) => Number(items.find((item) => item.date === day)?.hours ?? 0);
   const maximum = Math.max(1, ...rows.map((row) => Number(row.hours)), ...previousRows.map((row) => Number(row.hours)));
-  return <><p className="review-series-key">Filled: selected period <span>Outline: previous period, same elapsed days</span></p><div className="review-day-strip" aria-label="Daily time compared with previous period">{Array.from({ length: Math.min(periodDays(period), 62) }, (_, index) => {
+  return <><p className="review-series-key">Filled: selected period <span>Ghost: previous period, same elapsed days</span></p><div className="review-day-strip" aria-label="Daily time compared with previous period">{Array.from({ length: Math.min(periodDays(period), 62) }, (_, index) => {
     const day = addDays(period.start, index); const oldDay = addDays(previous.start, index);
     const value = hours(rows, day); const old = oldDay <= previous.end ? hours(previousRows, oldDay) : 0;
     return <div key={day}><b>{day > todayKey(bootstrap().profile.timezone) ? "\u2014" : value ? formatDuration(value * 60) : "\u2014"}</b><svg viewBox="0 0 32 100" preserveAspectRatio="none" role="img" aria-label={`${formatDate(day)}: ${formatDuration(value * 60)}; previous: ${formatDuration(old * 60)}`}><rect className="review-ghost-bar" x="3" y={98 - old / maximum * 94} width="26" height={Math.max(1, old / maximum * 94)} rx="1" /><rect x="8" y={98 - value / maximum * 94} width="16" height={Math.max(1, value / maximum * 94)} rx="1" /></svg><span>{periodDays(period) <= 7 ? new Date(`${day}T12:00Z`).toLocaleDateString("en", { weekday: "short", timeZone: "UTC" }) : index % 7 === 0 ? day.slice(-2) : ""}</span></div>;

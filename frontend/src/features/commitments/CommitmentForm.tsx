@@ -1,3 +1,4 @@
+import { CommitmentMeter } from "./CommitmentMeter";
 import { TargetInput } from "./TargetInput";
 import { hasPendingChange, liveDefinition } from "./QuickTarget";
 import { formatDate, formatDuration } from "@/lib/format";
@@ -709,16 +710,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
       <p className="field-label">
         <Icon icon={faChartLine} className="text-green" /> Current progress
       </p>
-      <p className="commit-figures">
-        <span className="commit-actual">{num(progress.actual)}</span>
-        <span className="commit-goal">
-          / {num(progress.target)}{time ? "" : " sessions"}
-        </span>
-        <span className="commit-pct">{progress.percentage.toFixed(1)}%</span>
-      </p>
-      <div className="meter">
-        <div className={`meter-fill ${progress.status}`} style={{ ["--progress" as string]: `${progress.percentage}%` }} />
-      </div>
+      <CommitmentMeter commitment={c} />
       <div className="meta-list u-mt-4">
         <div className="meta-row">
           <span className="meta-label">Period</span>

@@ -2,16 +2,17 @@ import { formatDuration } from "@/lib/format";
 import type { Chart } from "chart.js";
 import { emberColor } from "./data";
 import type { AnyConfig, HeatmapRow } from "./payloads";
+const HOURS = Array.from({ length:24 },(_,hour) => `${String(hour).padStart(2,"0")}:00`);
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
   const averages = new Map(data.map((row) => [`${row.weekday}:${row.hour}`, Number(row.average_hours)] as const));
   let maxAverage = 0;
-  const cells: { x: number; y: number; v: number }[] = [];
+  const cells: { x: string; y: string; v: number }[] = [];
   for (let weekday = 0; weekday < 7; weekday++) {
     for (let hour = 0; hour < 24; hour++) {
       const v = averages.get(`${weekday}:${hour}`) ?? 0;
       if (v > maxAverage) maxAverage = v;
-      cells.push({ x: weekday, y: hour, v });
+      cells.push({ x: WEEKDAYS[weekday]!, y: HOURS[hour]!, v });
     }
   }
   const fill = (chart: Chart, axis: "x" | "y", count: number) => {
@@ -43,9 +44,9 @@ export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
         tooltip: {
           callbacks: {
             title: () => "",
-            label: (context: { raw: { x: number; y: number; v: number } }) => {
+            label: (context: { raw: { x: string; y: string; v: number } }) => {
               const { x, y, v } = context.raw;
-              return `${WEEKDAYS[x]} ${y}:00 → ${formatDuration((v || 0) * 60)} avg`;
+              return `${x} ${y} → ${formatDuration((v || 0) * 60)} avg`;
             },
           },
         },
@@ -53,19 +54,14 @@ export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
       },
       scales: {
         x: {
-          type: "linear",
-          min: -.5,
-          max: 6.5,
-          ticks: { stepSize: 1, callback: (value: number | string) => Number.isInteger(Number(value)) ? WEEKDAYS[Number(value)] : "" },
+          type: "category", labels: WEEKDAYS, offset: true,
+          ticks: { autoSkip: false, maxRotation: 0 },
           title: { display: true, text: "Weekday" },
           grid: { display: false },
         },
         y: {
-          type: "linear",
-          min: -.5,
-          max: 23.5,
-          reverse: true,
-          ticks: { stepSize: 1, callback: (value: number | string) => Number.isInteger(Number(value)) ? `${String(value).padStart(2, "0")}:00` : "" },
+          type: "category", labels: HOURS, offset: true,
+          ticks: { autoSkip: true, maxTicksLimit: 8 },
           title: { display: true, text: "Time of Day" },
           grid: { display: false },
         },

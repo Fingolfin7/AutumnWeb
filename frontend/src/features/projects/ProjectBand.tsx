@@ -43,7 +43,7 @@ export function ProjectBand({
     <li className="band project project-directory-row" id={`project-${project.id}`}>
       <div className="u-grow">
         <div className="project-top">
-          <AppLink className="project-name" href={urls.updateProject(project.id)}>
+          <AppLink className="project-name text-red" href={urls.updateProject(project.id)}>
             {project.name}
           </AppLink>
           {running ? (
@@ -60,19 +60,19 @@ export function ProjectBand({
                 {project.context.name}
               </AppLink>
             ) : null}
-            {project.tags.map((tag) => {
+            {project.tags.map((tag, index) => {
               const color = tagColors.get(tag.id);
               return (
                 <AppLink
                   key={tag.id}
-                  className="tag-chip"
+                  className={`tag-chip${index > 1 ? " project-tag-extra" : ""}`}
                   href={urls.updateTag(tag.id)}
                   style={color ? ({ "--tag": color } as React.CSSProperties) : undefined}
                 >
                   {tag.name}
                 </AppLink>
               );
-            })}
+            })}{project.tags.length > 2 ? <span className="chip project-tag-count">+{project.tags.length - 2}</span> : null}
           </div>
         ) : null}
 
