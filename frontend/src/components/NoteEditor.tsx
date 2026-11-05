@@ -78,6 +78,7 @@ export function NoteEditor({
   persistVersion = 0,
   saveStatus,
   onRetry,
+  sessionTitle,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -96,7 +97,10 @@ export function NoteEditor({
   persistVersion?: number;
   saveStatus?: string;
   onRetry?: () => void;
+  sessionTitle?: string;
 }) {
+  const [edited, setEdited] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [writing, setWriting] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const baseline = useRef(value);
@@ -139,6 +143,7 @@ export function NoteEditor({
     };
   }, [writing]);
   const change = (next: string) => {
+    setEdited(true);
     if (persistKey) writeNoteDraft(persistKey, { text: next, version: persistVersion });
     onChange(next);
   };
@@ -228,8 +233,8 @@ export function NoteEditor({
   const errors = error ? (Array.isArray(error) ? error : [error]) : [];
 
   const field = (
-    <div className={`field note-editor-field${writing ? " is-writing" : ""}`}>
-      {writing ? <header className="note-writer-heading"><h2>{label || "Session note"}</h2><button className="btn btn--secondary" type="button" onClick={closeWriter}>Return to session</button></header> : null}
+    <div className={`field note-editor-field${writing ? " is-writing" : ""}${focused ? " is-focused" : ""}`} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false); }}>
+      {writing ? <header className="note-writer-heading"><div><h2>{sessionTitle || "Session note"}</h2><small>{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><button className="btn btn--secondary" type="button" onClick={closeWriter}>Return to session</button></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
         <div className="note-editor-toolbar" role="toolbar" aria-label="Note formatting">
@@ -281,7 +286,7 @@ export function NoteEditor({
         />
       </div>
       <div className="note-editor-status">
-        <small role="status">{saveStatus ?? (value === baseline.current ? "Saved" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
+        <small role="status">{saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes ? kept on this device" : "Unsaved changes")}</small>
         {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
       <small data-note-status="" aria-live="polite">{status}</small>
       </div>

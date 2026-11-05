@@ -1947,7 +1947,7 @@ img.brand-mark {
   border: 1px solid var(--hairline); border-radius: var(--r-sm);
   background: var(--sunken); overflow: hidden;
 }
-.note-editor-shell:focus-within { border-color: var(--brand-deep); box-shadow: var(--focus-ring); }
+.note-editor-shell:focus-within { border-color: var(--brand); box-shadow: none; }
 .note-editor-toolbar {
   display: flex; align-items: center; gap: .25rem;
   padding: .35rem .4rem;
@@ -1968,7 +1968,7 @@ img.brand-mark {
 .fields .note-editor-shell textarea {
   border: 0; border-radius: 0; background: transparent; min-height: 8rem;
 }
-.fields .note-editor-shell textarea:focus-visible { box-shadow: none; }
+.fields .note-editor-shell textarea:focus-visible { outline: none; box-shadow: none; }
 [data-note-status] {
   display: block; margin-top: .35rem; font-size: var(--fs-xs); color: var(--muted);
 }
@@ -3388,7 +3388,8 @@ input[type="file"]::file-selector-button { min-height: 44px; padding: var(--s2) 
 }
 
 @media (max-width: 999px) {
-  .note-editor-toolbar .note-tool-button { min-width: 44px; width: 44px; }
+  .note-editor-field:focus-within .note-editor-toolbar, .note-editor-field.is-writing .note-editor-toolbar { display: flex; }
+.note-editor-toolbar .note-tool-button { min-width: 44px; width: 44px; }
   a.context-chip, .page-eyebrow a, .fd-tl-empty a, .empty a { display: inline-flex; align-items: center; min-height: 44px; }
 }
 /* ==================================================== STREAM A: TODAY & CAPTURE === */
@@ -4139,12 +4140,13 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 :root { --font-reading: "Newsreader", Georgia, serif; }
 .note-editor-field { min-width: 0; width: 100%; max-width: 70ch; }
 .note-editor-shell { background: var(--sunken); }
-.note-editor-shell .note-editor-toolbar { flex-wrap: wrap; gap: var(--s1); padding: var(--s1); }
+.note-editor-shell .note-editor-toolbar { display: none; flex-wrap: wrap; gap: var(--s1); padding: var(--s1); }
+.note-editor-field:focus-within .note-editor-toolbar, .note-editor-field.is-writing .note-editor-toolbar { display: flex; }
 .note-editor-toolbar .note-tool-button { min-width: 44px; min-height: 44px; }
 .note-editor-toolbar .dictate-button { width: auto; }
 .note-editor-toolbar .note-writer-open { margin-left: auto; }
 .note-editor-shell textarea, .fields .note-editor-shell textarea, .ember-clock .note-editor-shell textarea {
-  display: block; width: 100%; min-height: 8rem; max-height: none; resize: vertical;
+  display: block; width: 100%; min-height: 8rem; max-height: none; resize: none;
   overflow: hidden; padding: var(--s4); border: 0; background: transparent;
   color: var(--note); font: 400 1.125rem/1.6 var(--font-reading);
 }
@@ -4154,6 +4156,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-editor-status [data-note-status] { margin-left: auto; }
 .note-writer-dialog { inset: 0; margin: 0; padding: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; border: 0; color: var(--ink); background: var(--surface-0); overflow-y: auto; }
 .note-writer-dialog::backdrop { background: var(--surface-0); }
+.note-writer-dialog:focus-visible { outline: none; }
+.note-writer-heading small { color: var(--muted); font-size: var(--fs-sm); }
+.note-editor-field.is-writing .note-editor-shell, .note-editor-field.is-writing .note-editor-shell:focus-within { border: 0; box-shadow: none; background: transparent; }
 .note-editor-field.is-writing { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; max-width: 76ch; margin-inline: auto; padding: var(--s5); }
 .note-writer-heading { position: sticky; top: 0; z-index: 1; display: flex; gap: var(--s3); align-items: center; justify-content: space-between; padding-block: var(--s3); background: var(--surface-0); }
 .note-writer-heading h2 { margin: 0; font: 600 var(--fs-lg)/1.4 var(--font-display); }
@@ -4436,3 +4441,37 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .capture-control .today-quick-pick small { display: block; margin-top: var(--s1); }
 .capture-control .today-log-past { margin-top: var(--s4); }
 @media (min-width: 1000px) { .capture-control--inline { max-width: 46rem; } }
+
+.ember-clock .focus-time { cursor: pointer; text-align: left; padding: 0; }
+.ember-clock .focus-time .num { font-size: clamp(2.4rem, 4vw, 4rem); }
+.ember-clock .focus-project { font-size: clamp(1.15rem, 2vw, 1.65rem); line-height: 1.4; }
+.ember-clock .focus-project a { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: break-word; }
+.ember-clock { overflow: clip; }
+.ember-clock .timer-overflow { position: absolute; top: var(--s3); right: var(--s3); }
+.ember-clock .focus-eyebrow { padding-right: 44px; }
+.timer-actions-menu { display: flex; flex-direction: column; align-items: stretch; gap: var(--s3); margin-top: var(--s4); }
+.timer-expanded-content[hidden] { display: none; }
+.ember-clock .timer-expanded-content { grid-column: 2; grid-row: 1 / 8; min-width: 0; display: flex; flex-direction: column; }
+.ember-clock .timer-note-editor { height: 100%; display: flex; flex-direction: column; }
+.ember-clock .timer-note-editor .note-editor-field { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.ember-clock .timer-note-editor .note-editor-shell { flex: 1; display: flex; flex-direction: column; }
+.ember-clock .timer-note-editor textarea { flex: 1; }
+.ember-clock.is-compact { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s2) var(--s5); padding: var(--s4) var(--s5); }
+.ember-clock.is-compact .focus-eyebrow { grid-column: 1; margin: 0; }
+.ember-clock.is-compact .focus-project { grid-column: 1; grid-row: 2; margin: 0; }
+.ember-clock.is-compact .focus-time { grid-column: 1; grid-row: 3; margin: 0; }
+.ember-clock.is-compact .focus-details { grid-column: 1; grid-row: 4; }
+.ember-clock.is-compact .focus-actions { grid-column: 2; grid-row: 2 / 5; align-self: center; margin: 0; }
+.ember-clock.is-compact .focus-autostop-bar { grid-column: 1 / -1; }
+.today-page .today-section-head h2, .today-page .today-commitments h2 { font: 600 var(--fs-lg)/1.35 var(--font-display); }
+.today-journal .journal-entry::before { content: none; }
+.offline-banner > .svg-inline--fa { opacity: .55; }
+@media (max-width: 999px) {
+  .ember-clock .timer-expanded-content { grid-column: 1 / -1; grid-row: auto; margin-top: var(--s4); }
+  .ember-clock .timer-note-editor { padding: 0; border: 0; }
+  .ember-clock .focus-time .num { font-size: clamp(2rem, 8vw, 3rem); }
+  .ember-clock.is-compact { padding: var(--s4); gap: var(--s2) var(--s3); }
+  .ember-clock .focus-project { padding-right: var(--s6); }
+  .note-editor-field:focus-within .note-editor-shell { overflow: visible; }
+  .note-editor-field:focus-within .note-editor-toolbar { position: sticky; bottom: 0; top: auto; z-index: 12; background: var(--surface-2); }
+}

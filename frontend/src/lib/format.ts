@@ -52,10 +52,10 @@ export function heroParts(totalSeconds: number): { value: number; unit: string }
   return pairs.map(([value, unit]) => ({ value, unit: plural(value, unit) }));
 }
 
-/** "HH:MM:SS" countdown. */
+/** Live clock: MM:SS, with hours only when needed. */
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
-  return `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+  return `${s >= 3600 ? `${pad(Math.floor(s / 3600))}:` : ""}${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
 }
 
 export function parseInstant(value: string | null | undefined): Date | null {

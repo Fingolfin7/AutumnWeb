@@ -1,8 +1,8 @@
 import { Fragment, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { faRedo, faStopwatch, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEllipsisH, faRedo, faStopwatch, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
-import { ConfirmDialog } from "@/components/Sheet";
+import { ConfirmDialog, Sheet } from "@/components/Sheet";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
@@ -19,10 +19,14 @@ export function FocusCard({
   now,
   children,
   beforeStop,
+  expanded = true,
+  onExpand,
 }: {
   timer: Timer;
   now: number;
   children?: ReactNode;
+  expanded?: boolean;
+  onExpand?: () => void;
   /** Runs before navigating to the stop page (e.g. stash an unsaved note). */
   beforeStop?: () => void;
 }) {
@@ -30,6 +34,7 @@ export function FocusCard({
   const navigate = useNavigate();
   const restart = useRestartTimer();
   const remove = useDeleteTimer();
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   /* In flight to the server; a queued offline timer is settled locally. */
   const pending = timer.id < 0 && !timer.pending_sync;
@@ -45,7 +50,7 @@ export function FocusCard({
 
   return (
     <article
-      className={`focus-card ember-clock${elapsed >= 3600 ? " ember-clock--deep" : elapsed >= 1200 ? " ember-clock--warm" : ""}`}
+      className={`focus-card ember-clock${!expanded ? " is-compact" : ""}${elapsed >= 3600 ? " ember-clock--deep" : elapsed >= 1200 ? " ember-clock--warm" : ""}`}
       id={`timer-${timer.id}`}
       data-timer-id={timer.id}
       data-ember-step={Math.min(6, Math.floor(elapsed / 900))}
@@ -58,15 +63,9 @@ export function FocusCard({
       <h2 className="focus-project">
         <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
       </h2>
-      <p className="focus-time" aria-live="off">
-        <span className="sr-only">{formatClock(elapsed)} elapsed</span>
-        {formatClock(elapsed).split(":").map((part, index) => (
-          <span className={`focus-time-part${index === 2 ? " focus-seconds" : ""}`} key={index} aria-hidden="true">
-            <span className="num">{index === 0 ? Number(part) : part}</span>
-            <span className="unit">{["h", "m", "s"][index]}</span>
-          </span>
-        ))}
-      </p>
+      <button className="focus-time" type="button" aria-label={`${expanded ? "Collapse" : "Open"} ${timer.project.name} timer`} aria-expanded={expanded} onClick={onExpand}>
+        <span className="num">{formatClock(elapsed)}</span>
+      </button>
       <div className="focus-details">
       {timer.subproject_allocations.length ? (
         <div className="focus-subs">
@@ -115,33 +114,19 @@ export function FocusCard({
         >
           <Icon icon={faStopwatch} /> Stop
         </AppLink>
-        <button
-          className="btn-icon"
-          type="button"
-          title="Restart this timer"
-          disabled={pending || timer.pending_sync || restart.isPending}
-          onClick={() =>
-            restart
-              .mutateAsync(timer)
-              .then(() => toast.success("Restarted timer"))
-              .catch((error) => toast.error(`Couldn't restart: ${errorMessage(error)}`))
-          }
-        >
-          <Icon icon={faRedo} />
-          <span className="sr-only">Restart timer</span>
-        </button>
-        <button
-          className="btn-icon btn-icon--danger"
-          type="button"
-          title="Remove without saving"
-          disabled={pending}
-          onClick={() => setConfirmRemove(true)}
-        >
-          <Icon icon={faTrash} />
-          <span className="sr-only">Remove timer</span>
-        </button>
       </div>
-      {children}
+      <button className="btn-icon timer-overflow" type="button" aria-label="Timer actions" aria-expanded={actionsOpen} onClick={() => setActionsOpen(true)}><Icon icon={faEllipsisH} /></button>
+      <div className="timer-expanded-content" hidden={!expanded}>{children}</div>
+      {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Timer actions">
+        <p className="text-red">{timer.project.name}</p>
+        <div className="timer-actions-menu">
+          <button className="btn btn--quiet" type="button" disabled={pending || timer.pending_sync || restart.isPending} onClick={() => {
+            setActionsOpen(false);
+            restart.mutateAsync(timer).then(() => toast.success("Restarted timer")).catch((error) => toast.error(`Couldn't restart: ${errorMessage(error)}`));
+          }}><Icon icon={faRedo} /> Restart timer</button>
+          <button className="btn btn--destructive" type="button" disabled={pending} onClick={() => { setActionsOpen(false); setConfirmRemove(true); }}><Icon icon={faTrash} /> Discard timer</button>
+        </div>
+      </Sheet> : null}
       <ConfirmDialog
         open={confirmRemove}
         title="Remove this timer?"

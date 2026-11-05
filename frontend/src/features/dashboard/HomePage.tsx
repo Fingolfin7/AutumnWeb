@@ -1,5 +1,4 @@
 import { CaptureForm } from "@/features/timers/CaptureForm";
-import { useNavigate } from "react-router";
 import { useRef, useState } from "react";
 import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { ErrorState, Skeleton } from "@/components/states";
@@ -7,12 +6,11 @@ import { AppLink, urls } from "@/app/links";
 import { useActiveContext } from "@/app/context";
 import { useAllProjects } from "@/api/meta";
 import type { Timer } from "@/api/types";
-import { elapsedSeconds, formatClock, formatDayDate, formatDuration, localDateKey } from "@/lib/format";
+import { formatDayDate, formatDuration, localDateKey } from "@/lib/format";
 import { FocusCard } from "@/features/timers/FocusCard";
 import { TimerNoteEditor } from "@/features/timers/TimerNoteEditor";
 import { TimerReminders } from "@/features/timers/TimerReminders";
 import { useNow, useOutsideContextTimerCount, useTimers } from "@/features/timers/api";
-import { Suggestions } from "@/features/timers/Suggestions";
 import { SessionBand } from "@/features/sessions/SessionBand";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { DayTimeline } from "./DayTimeline";
@@ -38,7 +36,6 @@ function HomeContent({ data }: { data: Dashboard }) {
   const timers = useTimers();
   const now = useNow();
   const running = [...(timers.data ?? data.active_timers)].sort((a, b) => Date.parse(b.start) - Date.parse(a.start));
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [range, setRange] = useState<TimelineRange>("today");
   const timeline = useTimeline(range, data.timeline);
   const outside = useOutsideContextTimerCount();
@@ -58,8 +55,8 @@ function HomeContent({ data }: { data: Dashboard }) {
       </header>
       {running.length ? (
         <section className="ember-deck" aria-label="Running timers">
-          {running.map((timer, index) => (
-            <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} primary={index === 0} />
+          {running.map((timer) => (
+            <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} />
           ))}
         </section>
       ) : (
@@ -124,31 +121,8 @@ function HomeContent({ data }: { data: Dashboard }) {
           </details>
         </section>
       ) : null}
-            {data.recent_sessions.some((day) => day.date !== localDateKey(new Date(now))) ? (
-              <details className="today-history">
-                <summary>Earlier journal entries</summary>
-                {data.recent_sessions
-                  .filter((day) => day.date !== localDateKey(new Date(now)))
-                  .map((day) => (
-                    <div className="day-group" key={day.date}>
-                      <header className="day-head">
-                        <span>{formatDayDate(day.date)}</span>
-                        <span className="day-total">{formatDuration(day.total_minutes)}</span>
-                      </header>
-                      <ul className="band-list">
-                        {day.sessions.map((session) => (
-                          <SessionBand key={session.id} session={session} />
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-              </details>
-            ) : null}
           </section>
-          <details className="today-suggestions" onToggle={(event) => setSuggestionsOpen(event.currentTarget.open)}>
-            <summary>Need a starting point?</summary>
-            {suggestionsOpen ? <Suggestions /> : null}
-          </details>
+
 
         </>
       ) : null}
@@ -156,28 +130,13 @@ function HomeContent({ data }: { data: Dashboard }) {
   );
 }
 
-function TimerCard({ timer, now, primary }: { timer: Timer; now: number; primary: boolean }) {
+function TimerCard({ timer, now }: { timer: Timer; now: number }) {
   const stash = useRef<() => void>(() => undefined);
   const [expanded, setExpanded] = useState(false);
-  if (!primary && !expanded) return <CompactTimer timer={timer} now={now} onExpand={() => setExpanded(true)} />;
-  const editor = <TimerNoteEditor timer={timer} registerStash={(fn) => { stash.current = fn; }} />;
-  return (
-    <FocusCard timer={timer} now={now} beforeStop={() => stash.current()}>
-      {editor}{!primary ? <button className="btn btn--quiet" type="button" onClick={() => setExpanded(false)}>Collapse timer</button> : null}
-      <TimerReminders timer={timer} />
-    </FocusCard>
-  );
-}
-
-function CompactTimer({ timer, now, onExpand }: { timer: Timer; now: number; onExpand: () => void }) {
-  const navigate = useNavigate();
-  return <article className="compact-timer" aria-label={`Running timer: ${timer.project.name}`} id={`timer-${timer.id}`} data-timer-id={timer.id}>
-    <button type="button" className="compact-timer-open" onClick={onExpand} aria-label={`Open ${timer.project.name} timer`}>
-      <span className="live-dot" /><span className="text-red">{timer.project.name}</span>
-      <span className="timer-dock-clock">{formatClock(elapsedSeconds(timer.start, now))}</span>
-    </button>
-    <AppLink className="btn btn--stop" href={urls.stopTimer(timer.id)} onClick={(event) => { if (event.button || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt: Date.now() } }); }}>Stop</AppLink>
-  </article>;
+  return <FocusCard timer={timer} now={now} expanded={expanded} onExpand={() => setExpanded((value) => !value)} beforeStop={() => stash.current()}>
+    <TimerNoteEditor timer={timer} registerStash={(fn) => { stash.current = fn; }} />
+    <TimerReminders timer={timer} />
+  </FocusCard>;
 }
 
 function StartCard() {
