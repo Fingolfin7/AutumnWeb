@@ -5293,3 +5293,45 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .commitment-pending-tick { stroke: var(--ink); stroke-width: 3; }
 .commitment-target-sheet .commitment-quick-target { display: flex; flex-direction: column; gap: var(--s3); }
 .commitment-target-sheet .form-actions { order: 10; margin-top: auto; }
+
+.review-main-controls .review-toolbar { display: block; }
+.review-toolbar .segmented { display: flex; overflow-x: auto; flex-wrap: nowrap; width: 100%; border: 0; background: transparent; padding: 0; gap: var(--s1); scrollbar-width: thin; }
+.review-toolbar .segmented > label { flex: 0 0 auto; white-space: nowrap; }
+.review-toolbar .segmented > label > span { padding-inline: var(--s4); }
+.review-desk .review-range { justify-content: flex-start; gap: var(--s2); }
+.review-desk .review-range h2 { order: -1; flex: 1; font-size: var(--fs-sm); text-align: left; }
+.review-desk .review-total { font-variant-numeric: tabular-nums; }
+.review-desk .review-total-row { align-items: flex-end; }
+.review-complete-comparison { display: inline; font-size: inherit; }
+.review-section-heading h2 { letter-spacing: -.015em; }
+.review-row-values { display: flex; align-items: baseline; gap: var(--s3); white-space: nowrap; }
+.review-project-row { min-height: 64px; padding: var(--s3) 0; grid-template-columns: minmax(0,1fr) auto; gap: var(--s2) var(--s4); }
+.review-project-row .review-row-values strong { font-size: var(--fs-md); }
+.review-project-row .review-row-values small { font-size: var(--fs-xs); }
+.review-project-bar { grid-column: 1 / -1; height: 4px; }
+.review-question input { font-family: var(--font-ui); }
+.review-ember-trail { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
+.review-ember-trail > div:first-child { display: flex; justify-content: space-between; gap: var(--s3); color: var(--muted); font-size: var(--fs-xs); }
+.review-ember-weeks { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: var(--s3); margin-top: var(--s3); }
+.review-ember-weeks button { display: grid; gap: var(--s2); min-height: 64px; min-width: 0; padding: var(--s2) 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.review-ember-weeks button:hover { color: var(--brand); background: var(--raised); }
+.review-ember-weeks svg { width: 100%; height: 40px; overflow: visible; filter: drop-shadow(0 0 6px #d58a5025); }
+.review-ember-weeks span { font-size: 13px; white-space: nowrap; }
+.review-ember-weeks .ember-cell--0 { fill: var(--hairline-2); }
+.chart-terms ol { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 var(--s6); padding: 0; list-style: none; }
+.chart-terms li { display: block; border: 0; padding: 0; }
+.chart-terms li a { display: grid; grid-template-columns: minmax(0,1fr) auto; align-content: center; min-height: 64px; gap: var(--s2); color: var(--ink); text-decoration: none; }
+.chart-terms li svg { width: 100%; height: 4px; grid-column: 1 / -1; fill: var(--brand); }
+.chart-terms li strong { color: var(--muted); font-size: var(--fs-sm); }
+@media (max-width:999px) {
+  .review-ember-weeks { gap: var(--s2); grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .review-ember-weeks svg { height: 24px; }
+  .review-ember-weeks button { min-height: 48px; }
+  .review-ember-weeks span { font-size: 13px; }
+  .review-ember-trail > div:first-child > span:last-child { display: none; }
+  .review-desk .review-total-row { display: block; }
+  .review-total-row .btn { margin-top: var(--s2); }
+  .review-row-values { gap: var(--s2); }
+  .review-project-row .review-row-values small { font-size: 13px; }
+  .chart-terms ol { grid-template-columns: 1fr; }
+}

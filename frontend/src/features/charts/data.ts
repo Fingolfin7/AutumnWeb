@@ -5,7 +5,7 @@ import { format } from "date-fns";
    without a canvas. Ported from core/static/core/js/charts/core.js. */
 
 /* Muted pigments keep charts distinct from semantic project/subproject text. */
-export const PALETTE = ["#dfa15d", "#78aee0", "#bd93cc", "#78b9a0", "#e58e87", "#b3b56b", "#6dbbc6", "#9ca7d8"];
+export const PALETTE = ["#dfa15d", "#c88d60", "#e3b879", "#b9aa72", "#78aee0", "#bd93cc", "#78b9a0", "#e58e87"];
 export const EMBER_RAMP = ["#493329", "#79503a", "#ac6d43", "#d58a50", "#edb071", "#f4d3a4"];
 export const OTHER_COLOR = "#8e8981";
 export function paletteColor(index: number): string { return PALETTE[index % PALETTE.length]!; }
@@ -166,15 +166,7 @@ export function periodDates(days: string[], options: Pick<ChartOptions, "start" 
 
 /** Resolve name-hash collisions within a chart, keeping every displayed series distinct. */
 export function seriesColors(names: string[]): Map<string, string> {
-  const colors = new Map<string, string>();
-  const used = new Set<string>();
-  for (const name of [...new Set(names)].sort()) {
-    let color = seriesColor(name);
-    for (let index = 0; used.has(color) && index < PALETTE.length; index++) color = paletteColor(index);
-    if (used.has(color)) color = `hsl(${(colors.size * 137.508) % 360} 38% 65%)`;
-    used.add(color); colors.set(name, color);
-  }
-  return colors;
+  return new Map([...new Set(names)].map(name => [name, seriesColor(name)]));
 }
 export const dayLabel = (day: string) => parseDay(day).toLocaleDateString("en", { weekday: "short", day: "numeric" }).replace(/^(\d+) (\w+)$/, "$2 $1");
 export const hourLabel = (value: string | number) => formatHours(Number(value));

@@ -6,10 +6,14 @@ const HOURS = Array.from({ length:24 },(_,hour) => `${String(hour).padStart(2,"0
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
   const averages = new Map(data.map((row) => [`${row.weekday}:${row.hour}`, Number(row.average_hours)] as const));
+  const activeHours = data.filter(row => Number(row.average_hours) > 0).map(row => Number(row.hour));
+  const firstHour = Math.max(0, Math.min(...activeHours, 9) - 1);
+  const lastHour = Math.min(23, Math.max(...activeHours, 17) + 1);
+  const hours = HOURS.slice(firstHour, lastHour + 1);
   let maxAverage = 0;
   const cells: { x: string; y: string; v: number }[] = [];
   for (let weekday = 0; weekday < 7; weekday++) {
-    for (let hour = 0; hour < 24; hour++) {
+    for (let hour = firstHour; hour <= lastHour; hour++) {
       const v = averages.get(`${(weekday + 1) % 7}:${hour}`) ?? 0;
       if (v > maxAverage) maxAverage = v;
       cells.push({ x: WEEKDAYS[weekday]!, y: HOURS[hour]!, v });
@@ -18,7 +22,7 @@ export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
   const fill = (chart: Chart, axis: "x" | "y", count: number) => {
     const area = chart.chartArea;
     const full = area ? (axis === "x" ? area.right - area.left : area.bottom - area.top) : axis === "x" ? chart.width : chart.height;
-    return Math.min(axis === "x" ? 26 : 18, full / count - 4);
+    return Math.max(1, full / count - 3);
   };
 
   return {
@@ -29,7 +33,7 @@ export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
           label: "Avg session length (hrs)",
           data: cells,
           width: ({ chart }: { chart: Chart }) => fill(chart, "x", 7),
-          height: ({ chart }: { chart: Chart }) => fill(chart, "y", 24),
+          height: ({ chart }: { chart: Chart }) => fill(chart, "y", hours.length),
           backgroundColor(context: { raw: { v: number } }) {
             return context.raw.v ? emberColor(context.raw.v, maxAverage) : "#292725";
           },
@@ -61,7 +65,7 @@ export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
           grid: { display: false },
         },
         y: {
-          type: "category", labels: HOURS, offset: true,
+          type: "category", labels: hours, offset: true, reverse: true,
           ticks: { autoSkip: true, maxTicksLimit: 8 },
 
           grid: { display: false },

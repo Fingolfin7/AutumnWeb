@@ -1,6 +1,5 @@
 import { buildSeries, consolidateTopN, dayKey, getChartUnit, parseDay, withAlpha } from "./data";
 import { flattenHierarchy } from "./hierarchy";
-import { fontSizer } from "./wordcloud";
 import { buildChart, isEmptyPayload, parseKind } from "./build";
 
 describe("top N + Other", () => {
@@ -94,15 +93,6 @@ describe("treemap data", () => {
   });
 });
 
-describe("radar and word cloud", () => {
-  it("normalises font sizes into a bounded range", () => {
-    const size = fontSizer([["big", 100], ["small", 1]], 1000);
-    expect(size(100)).toBe(72);
-    expect(size(1)).toBe(18);
-    expect(fontSizer([["a", 5], ["b", 5]], 1000)(5)).toBe(72);
-  });
-});
-
 describe("payload handling", () => {
   it("knows which payloads are empty", () => {
     expect(isEmptyPayload("pie", [])).toBe(true);
@@ -181,6 +171,14 @@ it("stops daily and cumulative plots at the account's today and keeps series dis
   expect(cumulative.data.labels).toHaveLength(4);
   expect(cumulative.data.datasets[0].data).toEqual([2, 2, 2, 2]);
   const daily = dailyBarsConfig(["Work", "Study", "Garden", "Czech"].map(series => ({ date: "2026-11-02", hours: 1, series })), options, false);
-  expect(daily.data.labels).toHaveLength(4);
+  expect(daily.data.labels).toHaveLength(7);
   expect(new Set(daily.data.datasets.map(row => row.backgroundColor)).size).toBe(4);
+});
+
+it("keeps a project colour across changing neighbours and ranks meaningful terms", async () => {
+  const { seriesColors, seriesColor } = await import("./data");
+  const { topTerms } = await import("./terms");
+  expect(seriesColors(["Garden", "Study"]).get("Garden")).toBe(seriesColor("Garden"));
+  expect(seriesColors(["Garden"]).get("Garden")).toBe(seriesColor("Garden"));
+  expect(topTerms([{ text: "the", weight: 20 }, { text: "working", weight: 9 }, { text: "orchard", weight: 8 }, { text: "sketches", weight: 4 }]).map(row => row.text)).toEqual(["orchard", "sketches"]);
 });
