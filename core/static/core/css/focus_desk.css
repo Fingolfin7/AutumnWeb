@@ -4997,3 +4997,17 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .note-writer-heading .btn { grid-column: 1; grid-row: 1; justify-self: start; }
   .note-writer-back { display: inline; margin-right: var(--s2); font-size: var(--fs-lg); }
 }
+
+/* A running journal can grow; keep the whole text scrollable before expanding. */
+.ember-clock.is-compact .timer-note-editor { height: auto; }
+.ember-clock.is-compact .timer-note-editor .note-editor-shell { flex: none; }
+.ember-clock.is-compact .timer-note-editor textarea { flex: none; max-height: 28rem; overflow-y: auto; }
+.note-reading-slot::after { content: ""; position: absolute; pointer-events: none; inset: 52px -20px auto; height: 12px; background: linear-gradient(var(--surface-0), transparent); }
+.project-journal .journal-entry { grid-template-columns: minmax(0, 1fr) 64px 100px 44px; }
+.project-journal .journal-heading .journal-duration { grid-column: 2; }
+.project-journal .journal-heading .journal-row-actions { grid-column: 3; }
+.project-journal .journal-heading .journal-overflow { grid-column: 4; }
+.project-journal .journal-entry :is(.session-note, .journal-note-edit, .journal-add-note) { grid-column: 1 / -1; grid-row: 2; }
+@media (max-width: 999px) {
+  .project-journal .journal-heading .journal-overflow { grid-column: 3; }
+}
