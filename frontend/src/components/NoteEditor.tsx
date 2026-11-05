@@ -121,7 +121,7 @@ export function NoteEditor({
       node.setSelectionRange(selection.current.start, selection.current.end);
     }
     wasWriting.current = writing;
-  }, [value, writing]);
+  }, [value, writing, preview]);
   useEffect(() => {
     if (!persistKey) return;
     const draft = readNoteDraft(persistKey);
