@@ -4229,7 +4229,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .project-journal .journal-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 var(--s3); }
 .project-journal .journal-heading { grid-column: 2; grid-row: 1; grid-template-columns: auto auto; }
 .project-journal .journal-meta { grid-column: 1; grid-row: 1; padding-right: 0; align-self: center; }
-.project-journal :is(.session-note, .journal-note-edit) { grid-column: 1 / -1; }
+.project-journal :is(.session-note, .journal-note-edit) { grid-column: 1 / -1; grid-row: 2; }
 .project-journal .day-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
 
 @media (max-width: 999px) {
