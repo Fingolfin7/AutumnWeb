@@ -4731,8 +4731,8 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 }
 .today-quick-pick > :first-child { flex: none; width: 1rem; color: var(--brand); }
 .today-quick-pick:hover { background: linear-gradient(90deg, #e9823c1f, transparent 70%); }
-.today-quick-pick.is-nested { min-height: 44px; padding-left: calc(1rem + var(--s3)); }
-.today-quick-pick.is-nested > :first-child { display: none; }
+.today-quick-pick.is-nested { min-height: 44px; }
+.today-quick-pick.is-nested > :first-child { opacity: .5; }
 :is(.today-something-else, .today-log-past) > :first-child { color: var(--muted); }
 .capture-pick-label { display: flex; flex: 1; align-items: baseline; gap: var(--s2); min-width: 0; }
 .capture-pick-label > * { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
