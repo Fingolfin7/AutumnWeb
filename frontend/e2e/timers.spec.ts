@@ -104,6 +104,11 @@ test.describe("offline", () => {
 
     await card.getByRole("button", { name: "Open Piano Practice timer", exact: true }).click();
     await card.getByRole("textbox", { name: "Session note" }).fill("A journal started offline.");
+    await card.getByRole("button", { name: "Expand note", exact: true }).click();
+    const offlineWriter = page.getByRole("dialog", { name: "Full-screen note writer" });
+    await expect(offlineWriter.getByRole("status")).toHaveText("Draft kept on this device");
+    await offlineWriter.getByRole("button", { name: "Done", exact: true }).click();
+    await expect(offlineWriter).toHaveCount(0);
     await context.setOffline(false);
     await expect(toasts(page).getByText(/Synced 1 offline change/)).toBeVisible({ timeout: 30_000 });
     await expect(card.getByText("Running · saved offline")).toHaveCount(0);

@@ -43,7 +43,7 @@ const numberOrNull = (value: string) => {
 /* New timer (start_timer.html + timer_search_projects.js + timer_reminders.js).
    ?project_id=&subproject_id= prefill it (notification action links use
    this). */
-export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; onComplete?: () => void }) {
+export function CaptureForm() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
@@ -63,7 +63,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
   const [savingPast, setSavingPast] = useState(false);
   const [newSub, setNewSub] = useState("");
   const [creatingSub, setCreatingSub] = useState(false);
-  const close = () => { onComplete?.(); if (!inline) navigate(urls.home()); };
+  const close = () => navigate(urls.home());
 
   const [project, setProject] = useState<Project | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
@@ -232,8 +232,8 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
   const zone = bootstrap().profile.timezone || "UTC";
 
   return (
-    <div className={`capture-control${inline ? " capture-control--inline" : ""}`}>
-        <div hidden={inline} className="capture-modes range-tabs" role="tablist" aria-label="Capture mode">
+    <div className="capture-control">
+        <div className="capture-modes range-tabs" role="tablist" aria-label="Capture mode">
           <button
             type="button"
             role="tab"
@@ -254,13 +254,13 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
           </button>
         </div>
         <form className="fields capture-form" onSubmit={submit}>
-          <div className={`desk-main${inline && !project ? " capture-awaiting-project" : ""}`}>
+          <div className="desk-main">
             <section className="slab slab-pad">
               <div className="field" id="search-projects">
-                <label htmlFor={inline ? "today-project-search" : "project-search"}>{inline ? "What are you working on?" : "Project"}</label>
+                <label htmlFor="project-search">Project</label>
                 <CapturePicker
-                  id={inline ? "today-project-search" : "project-search"}
-                  autoFocus={!inline}
+                  id="project-search"
+                  autoFocus
                   onStart={(next, ids) => { if (!past) void submit(undefined, next, ids); }}
                   value={project}
                   recent={dashboard.data?.quick_starts ?? []}
