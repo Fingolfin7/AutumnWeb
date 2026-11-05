@@ -142,7 +142,7 @@ export default function ReviewPage() {
         {kind === "bar" && periodDays(period) <= 62 ? <details className="review-daily-breakdown" open={window.matchMedia("(min-width: 1000px)").matches}><summary><span>Daily breakdown<small>Each day, beside the previous period</small></span><Icon icon={faChevronDown} /></summary>
           {!loading && !failed && periodDays(period) <= 62 ? <DailyComparison period={period} rows={(daily.data?.data ?? []) as DailyTotalRow[]} previousRows={(priorDaily.data?.data ?? []) as DailyTotalRow[]} previous={previous} /> : null}
         </details> : null}
-        {rows.length > 0 ? <div className="review-project-foot"><span className="muted">{rows.length} {applied.project_name ? "subproject" : "project"}{rows.length === 1 ? "" : "s"} · Choose a row to read its sessions</span><button className="btn btn--quiet" type="button" onClick={() => setCardOpen(true)}>Save a card</button></div> : null}
+        {rows.length > 0 ? <div className="review-project-foot"><span className="muted">{rows.length} {applied.project_name ? "subproject" : "project"}{rows.length === 1 ? "" : "s"} · {kind === "bar" ? "Choose a row to read its sessions" : "Completed sessions in this selection"}</span><button className="btn btn--quiet" type="button" onClick={() => setCardOpen(true)}>Save a card</button></div> : null}
       </section><ReviewCommitments start={period.start} /></div>
     </> : null}
 

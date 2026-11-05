@@ -4626,3 +4626,13 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .settings-content .profile-default-item { padding-block: var(--s3); }
   .settings-content .profile-background-tuning { margin-top: var(--s4); }
 }
+
+.project-journal .journal-entry { padding-inline: var(--s5); }
+.project-journal .journal-heading { grid-template-columns: 44px auto; }
+.project-journal .journal-row-actions { display: none; }
+.project-journal .journal-overflow { display: grid; grid-column: 1; grid-row: 1; }
+.project-journal .journal-duration { grid-column: 2; grid-row: 1; }
+.insights-context-apply { flex-wrap: wrap; }
+.insights-context-apply > .btn { min-height: 44px; white-space: nowrap; }
+.chat-layout .assistant-message .message-content > :first-child { margin-top: 0; }
+@media (max-width:999px) { .project-journal .journal-entry { padding-inline: var(--s4); } }
