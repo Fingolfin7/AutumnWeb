@@ -4107,6 +4107,14 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 }
 
 /* Stream N — writing notes, Today and capture. Keep this section together. */
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader-reading.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+:root { --font-reading: "Newsreader", Georgia, serif; }
 .note-editor-field { min-width: 0; width: 100%; max-width: 70ch; }
 .note-editor-shell { background: var(--sunken); }
 .note-editor-shell .note-editor-toolbar { flex-wrap: wrap; gap: var(--s1); padding: var(--s1); }
@@ -4116,7 +4124,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-editor-shell textarea, .fields .note-editor-shell textarea, .ember-clock .note-editor-shell textarea {
   display: block; width: 100%; min-height: 8rem; max-height: none; resize: vertical;
   overflow: hidden; padding: var(--s4); border: 0; background: transparent;
-  color: var(--note); font: 400 var(--fs-md)/1.6 var(--font-ui);
+  color: var(--note); font: 400 1.125rem/1.6 var(--font-reading);
 }
 .note-editor-status { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); min-height: 28px; color: var(--muted); font-size: var(--fs-xs); }
 .note-editor-status small { font-size: inherit; }
@@ -4134,7 +4142,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .session-edit-form > .slab { width: 100%; }
 .session-edit-form { max-width: 78ch; margin-inline: auto; }
 .session-edit-form .note-editor-field { margin-top: var(--s5); }
-.journal-entry .session-note { margin: var(--s3) 0 0; padding: 0; border: 0; max-width: 70ch; font: 400 var(--fs-md)/1.6 var(--font-ui); }
+.session-note, .journal-entry .session-note { margin: var(--s3) 0 0; padding: 0; border: 0; max-width: 70ch; font: 400 1.125rem/1.6 var(--font-reading); }
 .journal-meta { align-items: center; gap: 0 var(--s3); }
 .journal-meta > * { line-height: 1.5; }
 .journal-meta a { min-height: 44px; display: inline-flex; align-items: center; }
@@ -4162,7 +4170,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .note-writer-heading { gap: var(--s2); }
   .note-writer-heading h2 { font-size: var(--fs-md); }
   .note-writer-heading .btn { font-size: var(--fs-sm); }
-  .journal-entry .session-note { font-size: 1rem; }
+  .journal-entry .session-note { font-size: 1.125rem; }
   .ember-clock .focus-subs { display: flex; flex-wrap: wrap; gap: var(--s2); }
   .ember-clock .focus-subs .sub-chip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; height: auto; border-radius: var(--r-sm); padding: 0 var(--s2); line-height: 1.4; }
   body:has(.note-writer-dialog[open]) .timer-dock { display: none; }
