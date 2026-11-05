@@ -4668,7 +4668,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .journal-meta { grid-area: meta; }
 .journal-subs { display: flex; flex: 0 1 auto; gap: var(--s2); min-width: 0; margin-block: -10px; padding-block: 10px; overflow: hidden; }
 .journal-subproject {
-  flex: 0 1 auto; min-width: 44px; min-height: 44px; margin-block: -10px; padding-block: 10px; overflow: hidden;
+  flex: 0 1 auto; min-width: 0; min-height: 44px; margin-block: -10px; padding-block: 10px; overflow: hidden;
   color: var(--sub); white-space: nowrap; text-overflow: ellipsis; text-decoration: none;
 }
 .journal-subproject:not(:last-child)::after { content: ","; }
@@ -4679,7 +4679,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .journal-row-actions .journal-delete:hover { color: var(--danger); }
 .journal-action { display: none; }
 .journal-overflow { width: 44px; height: 44px; margin-top: 4px; }
-.journal-entry :is(.session-note, .journal-note-edit) { max-width: 68ch; margin: var(--s2) 0 0; padding: 0; border: 0; font: 400 1.125rem/1.7 var(--font-reading); }
+.journal-entry .session-note { max-width: 68ch; margin: var(--s2) 0 0; padding: 0; border: 0; font: 400 1.125rem/1.7 var(--font-reading); }
 .journal-entry .session-note-body { max-height: none; overflow: visible; }
 .journal-entry .session-note p, .journal-entry .session-note li { white-space: pre-line; }
 .journal-entry .session-note p + p { margin-top: .8em; }
@@ -4688,7 +4688,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .journal-entry .session-note .note-expand { color: var(--muted); font: 400 var(--fs-sm) var(--font-ui); }
 .journal-add-note { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 -10px; padding: 0; color: var(--muted); font: 400 max(13px, var(--fs-xs)) var(--font-ui); }
 .journal-day-split, .journal-match-reason { margin: var(--s1) 0 0; max-width: 68ch; color: var(--muted); font-size: 13px; line-height: 1.5; }
-.journal-note-edit { display: grid; gap: var(--s2); }
+.journal-note-edit { display: grid; gap: var(--s2); max-width: 68ch; margin-top: var(--s2); }
 .journal-edit-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
 .journal-edit-actions .btn { min-height: 44px; }
 .session-actions-sheet .sheet-panel { width: min(100%, 28rem); }
@@ -4703,6 +4703,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .day-total { grid-column: 2; margin: 0; color: var(--duration); text-align: right; white-space: nowrap; font: 650 var(--fs-md)/24px var(--font-display); font-variant-numeric: tabular-nums; }
 
 /* Rows need a surface over a photo, and only then. */
+body.bg-active .ledger-voice { display: none; }
 body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .today-rail > *, .session-edit-page) { padding: var(--s4); border-radius: var(--r-lg); background: var(--surface-1); backdrop-filter: blur(18px); }
 
 /* ---------------------------------------------------------------- Today -- */
@@ -4798,7 +4799,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .focus-eyebrow { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s1); padding-right: 44px; color: var(--time); font: 500 13px/1.5 var(--font-ui); text-transform: none; letter-spacing: 0; }
 .ember-clock .live-dot { background: var(--brand); box-shadow: 0 0 12px #df873566; }
 .focus-project { margin: 0; padding-right: 44px; font: 600 clamp(1.25rem, 2.2vw, 1.5rem)/1.3 var(--font-display); letter-spacing: -.01em; }
-.focus-project a { display: -webkit-box; position: relative; z-index: 1; min-height: 44px; margin-block: -8px; padding-block: 8px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; color: var(--project); text-decoration: none; }
+.focus-project a { display: block; position: relative; z-index: 1; min-height: 44px; margin-block: -8px; padding-block: 8px; overflow: hidden; color: var(--project); white-space: nowrap; text-overflow: ellipsis; text-decoration: none; }
 .timer-overflow { position: absolute; top: var(--s3); right: var(--s3); background: transparent; }
 .focus-meta { margin-top: var(--s1); }
 .focus-clockline { display: flex; align-items: center; gap: var(--s4); margin-top: var(--s3); min-width: 0; }
@@ -4879,7 +4880,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .timer-duration { flex: none; font: 650 var(--fs-lg)/1.4 var(--font-display); font-variant-numeric: tabular-nums; }
 .stop-sheet .note-editor-field { max-width: none; }
 .stop-sheet .note-editor-shell textarea { min-height: 280px; max-height: 50dvh; }
-.capture-footer { position: sticky; bottom: calc(-1 * var(--s5)); z-index: 3; display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s3); padding-block: var(--s3); border-top: 1px solid var(--hairline); background: var(--surface-2); }
+.capture-footer { position: sticky; bottom: calc(-1 * var(--s5)); margin-bottom: calc(-1 * var(--s3)); z-index: 3; display: flex; justify-content: space-between; gap: var(--s3); margin-top: var(--s3); padding-block: var(--s3); border-top: 1px solid var(--hairline); background: var(--surface-2); }
 
 /* ------------------------------------------------------------- Sessions -- */
 .sessions-page { width: 100%; max-width: var(--journal-col); margin-inline: auto; }
@@ -4930,8 +4931,8 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 /* ------------------------------------------------------------ breakpoints -- */
 @media (min-width: 1000px) {
   :root { --journal-duration: 5.5rem; }
-  .capture-sheet:not(.stop-sheet) .sheet-panel { top: var(--s4); right: var(--s4); bottom: auto; height: fit-content; max-height: calc(100dvh - 2 * var(--s4)); border-radius: var(--r-lg); }
-  .capture-sheet:not(.stop-sheet).is-open .sheet-panel { transform: none; }
+  .capture-sheet .sheet-panel { top: var(--s4); right: var(--s4); bottom: auto; height: fit-content; max-height: calc(100dvh - 2 * var(--s4)); border-radius: var(--r-lg); }
+  .capture-sheet.is-open .sheet-panel { transform: none; }
 }
 @media (min-width: 1000px) and (hover: hover) {
   :root { --journal-actions: 7.25rem; }
@@ -4959,6 +4960,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .ember-clock { padding: var(--s4); border-radius: var(--r-lg); }
   .ember-clock:not(.is-unsettled) .focus-eyebrow { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); }
   .ledger-voice { display: none; }
+  .journal-subproject { min-width: 44px; }
   .focus-time { font-size: clamp(3rem, 14vw, 4rem); }
   .focus-time.is-long { font-size: clamp(2.4rem, 11vw, 3rem); }
   .focus-clockline { justify-content: space-between; gap: var(--s3); }

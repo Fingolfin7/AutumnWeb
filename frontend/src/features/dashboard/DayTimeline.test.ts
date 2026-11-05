@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Timer } from "@/api/types";
 import type { Timeline } from "./api";
-import { ledgerEntries } from "./DayTimeline";
+import { hourAxis, ledgerEntries } from "./DayTimeline";
 
 const project = { id: 1, name: "Project" };
 const now = new Date("2026-11-04T12:00:00").getTime();
@@ -29,4 +29,13 @@ it("counts only the local-day portion of a saved midnight crossing", () => {
   const start = new Date(2026, 10, 3, 21, 53).toISOString(), end = new Date(2026, 10, 4, 0, 28).toISOString();
   const crossing = { ...report, lanes: [{ project, blocks: [{ ...block, start, end, minutes: 155, is_live: false }] }] } as Timeline;
   expect(ledgerEntries(crossing, [], now)[0]?.minutes).toBe(28);
+});
+
+it("rules the day on round local hours, never fractions of the window", () => {
+  const { from, to, ticks } = hourAxis(new Date(2026, 10, 5, 3, 15).getTime(), new Date(2026, 10, 5, 12, 40).getTime());
+  expect(ticks.every((tick) => new Date(tick).getMinutes() === 0)).toBe(true);
+  expect(new Date(ticks[1]!).getHours() - new Date(ticks[0]!).getHours()).toBe(2);
+  expect(ticks.length).toBeLessThanOrEqual(7);
+  expect(from).toBeLessThanOrEqual(new Date(2026, 10, 5, 3, 15).getTime());
+  expect(to).toBeGreaterThan(new Date(2026, 10, 5, 12, 40).getTime());
 });

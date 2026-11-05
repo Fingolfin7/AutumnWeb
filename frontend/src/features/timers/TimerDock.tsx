@@ -17,14 +17,15 @@ export function TimerDock() {
   useEffect(() => {
     setListOpen(false);
     setCardVisible(false);
-    if (pathname !== "/") return;
+    if (pathname !== "/" && !pathname.startsWith("/update_project/")) return;
     const seen = new Map<Element, boolean>();
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => seen.set(entry.target, entry.isIntersecting));
       setCardVisible([...seen.values()].some(Boolean));
     }, { rootMargin: "-68px 0px -80px 0px" });
-    // A long note can keep the card in view after its timer controls leave.
-    const attach = () => document.querySelectorAll(".ember-deck .focus-actions").forEach((card) => {
+    // A long note can keep the card in view after its timer controls leave. A
+    // project page's own Stop does the dock's job until it scrolls away.
+    const attach = () => document.querySelectorAll('.ember-deck .focus-actions, .project-start-control a[href^="/stop_timer/"]').forEach((card) => {
       if (!seen.has(card)) { seen.set(card, false); observer.observe(card); }
     });
     attach();
@@ -38,7 +39,7 @@ export function TimerDock() {
   const multiple = timers.data!.length > 1;
   const label = multiple ? <><span className="live-dot" /><span>{timers.data!.length} running</span></> : <><span className="live-dot" /><span className="timer-dock-project text-red">{timer.project.name}</span><span className="timer-dock-clock"><ClockDigits value={formatClock(elapsedSeconds(timer.start, now))} /></span></>;
   return (
-    <><div className={`timer-dock${cardVisible && pathname === "/" ? " timer-dock--card-visible" : ""}`} aria-label="Running timer dock">
+    <><div className={`timer-dock${cardVisible && (pathname === "/" || !multiple) ? " timer-dock--card-visible" : ""}`} aria-label="Running timer dock">
       {multiple ? <button type="button" className="timer-dock-open" aria-haspopup="dialog" onClick={() => setListOpen(true)}>{label}</button> :
       <AppLink
         className="timer-dock-open"
