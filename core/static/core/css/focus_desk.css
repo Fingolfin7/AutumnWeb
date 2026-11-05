@@ -1968,7 +1968,7 @@ img.brand-mark {
 .fields .note-editor-shell textarea {
   border: 0; border-radius: 0; background: transparent; min-height: 8rem;
 }
-.fields .note-editor-shell textarea:focus-visible { outline: none; box-shadow: none; }
+.note-editor-shell textarea:focus-visible { outline: none; box-shadow: none; }
 [data-note-status] {
   display: block; margin-top: .35rem; font-size: var(--fs-xs); color: var(--muted);
 }
@@ -4157,6 +4157,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-writer-dialog { inset: 0; margin: 0; padding: 0; width: 100%; max-width: none; height: 100dvh; max-height: none; border: 0; color: var(--ink); background: var(--surface-0); overflow-y: auto; }
 .note-writer-dialog::backdrop { background: var(--surface-0); }
 .note-writer-dialog:focus-visible { outline: none; }
+.note-writer-heading > div { flex: 1; min-width: 0; }
+.note-writer-heading h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note-writer-heading .btn { flex: none; }
 .note-writer-heading small { color: var(--muted); font-size: var(--fs-sm); }
 .note-editor-field.is-writing .note-editor-shell, .note-editor-field.is-writing .note-editor-shell:focus-within { border: 0; box-shadow: none; background: transparent; }
 .note-editor-field.is-writing { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; height: 100%; min-height: 0; max-width: 76ch; margin-inline: auto; padding: var(--s5); }
