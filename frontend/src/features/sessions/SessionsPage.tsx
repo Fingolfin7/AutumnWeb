@@ -73,6 +73,11 @@ export default function SessionsPage() {
   const [sheetOpen, setSheetOpen] = useState(false);
   /* Back/forward changes the URL under us: follow it. */
   useEffect(() => setSearchText(applied.search), [applied.search]);
+  useEffect(() => {
+    if (searchText.trim() === applied.search) return;
+    const timeout = setTimeout(() => setParams(writeFilters({ ...applied, search: searchText.trim() }), { replace: true }), 300);
+    return () => clearTimeout(timeout);
+  }, [searchText, applied, setParams]);
   const { contextIdsParam } = useActiveContext();
   const projects = useAllProjects();
   const tags = useTags();
@@ -140,7 +145,7 @@ export default function SessionsPage() {
   return (
     <>
       <div className="desk-head journal-title"><h1 className="page-title">Sessions</h1></div>
-      <form className="fields journal-search" onSubmit={onSearch} role="search">
+      {total > 0 || pills.length || applied.search || searchText ? <form className="fields journal-search" onSubmit={onSearch} role="search">
         <div className="searchbar">
           <Icon icon={faSearch} className="muted" />
           <label className="sr-only" htmlFor="content-search">
@@ -153,9 +158,7 @@ export default function SessionsPage() {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <button className="btn btn--secondary" type="submit" aria-label="Search">
-            <Icon icon={faSearch} /><span className="search-submit-label">Search</span>
-          </button>
+          {searchText ? <button className="search-clear btn btn--quiet" type="button" aria-label="Clear search" onClick={() => { setSearchText(""); setParams(writeFilters({ ...applied, search: "" })); }}>Clear</button> : null}
           <button
             className="filter-launcher"
             type="button"
@@ -170,15 +173,17 @@ export default function SessionsPage() {
           </button>
         </div>
 
-        <div className="journal-presets" aria-label="Date presets">
+        <div className="journal-presets range-tabs" aria-label="Date presets">
           {["This week", "Last week", "30 days"].map((label) => {
             const range = sessionRange(label);
-            return <button key={label} type="button" className="btn btn--quiet" aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
+            return <button key={label} type="button" className={`range-tab${applied.start_date === range.start_date && applied.end_date === range.end_date ? " is-active" : ""}`} aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
           })}
         </div>
         <p className="filter-summary">
           <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
           {totals.data ? <strong className="journal-filter-total">{formatDuration(totals.data.total_minutes)}</strong> : null}
+        </p>
+        <div className="journal-filter-chips">
           {pills.map((pill) => (
             <span key={pill.label} className="filter-pill">
               {pill.label} <b>{pill.value}</b>
@@ -196,15 +201,15 @@ export default function SessionsPage() {
               Clear
             </button>
           ) : null}
-        </p>
-      </form>
+        </div>
+      </form> : null}
 
       <Sheet className="filter-sheet" open={sheetOpen} onClose={() => setSheetOpen(false)} title="Filter sessions">
         <div className="fields">
         <div className="journal-presets journal-presets--sheet" aria-label="Date presets">
           {["This week", "Last week", "30 days"].map((label) => {
             const range = sessionRange(label);
-            return <button key={label} type="button" className="btn btn--quiet" aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
+            return <button key={label} type="button" className={`range-tab${applied.start_date === range.start_date && applied.end_date === range.end_date ? " is-active" : ""}`} aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
           })}
         </div>
 
@@ -286,7 +291,7 @@ export default function SessionsPage() {
               </header>
               <ul className="band-list">
                 {group.sessions.map((session) => (
-                  <SessionBand key={session.id} session={session} onEditNote={retainNote} onNoteSaved={retainNote} />
+                  <SessionBand key={session.id} session={session} day={group.date} search={applied.search} onEditNote={retainNote} onNoteSaved={retainNote} />
                 ))}
               </ul>
             </div>
@@ -295,11 +300,9 @@ export default function SessionsPage() {
       ) : !related.length ? (
         <section className="slab">
           {pills.length || applied.search ? (
-            <Empty>No sessions match these filters.</Empty>
+            <Empty>No sessions match{applied.search ? ` ?${applied.search}?` : " these filters"}. Try another search or clear the filters.</Empty>
           ) : (
-            <Empty>
-              No sessions yet. <AppLink href={urls.startTimer()}>Start a timer</AppLink> to begin tracking.
-            </Empty>
+            <div className="first-run-empty journal-empty"><span className="ember-seal" aria-hidden="true" /><h2>A little time, a place to keep it.</h2><p>Your sessions and the thoughts that go with them will gather here.</p><AppLink className="btn btn--primary" href={urls.startTimer()}>Start your first timer</AppLink></div>
           )}
         </section>
       ) : null}
@@ -320,7 +323,7 @@ export default function SessionsPage() {
           {related.length ? (
             <ul className="band-list">
               {related.map((session) => (
-                <SessionBand key={session.id} session={session} showDate onEditNote={retainNote} onNoteSaved={retainNote} />
+                <SessionBand key={session.id} session={session} search={applied.search} showDate onEditNote={retainNote} onNoteSaved={retainNote} />
               ))}
             </ul>
           ) : relatedSummary?.count && list.hasNextPage ? (

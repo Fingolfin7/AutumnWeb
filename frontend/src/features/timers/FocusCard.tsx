@@ -116,7 +116,7 @@ export function FocusCard({
         </AppLink>
       </div>
       <button className="btn-icon timer-overflow" type="button" aria-label="Timer actions" aria-expanded={actionsOpen} onClick={() => setActionsOpen(true)}><Icon icon={faEllipsisH} /></button>
-      <div className="timer-expanded-content" hidden={!expanded}>{children}</div>
+      <div className="timer-expanded-content">{children}</div>
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Timer actions">
         <p className="text-red">{timer.project.name}</p>
         <div className="timer-actions-menu">

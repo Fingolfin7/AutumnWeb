@@ -4475,3 +4475,68 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .note-editor-field:focus-within .note-editor-shell { overflow: visible; }
   .note-editor-field:focus-within .note-editor-toolbar { position: sticky; bottom: 0; top: auto; z-index: 12; background: var(--surface-2); }
 }
+
+/* The ledger shares one aligned heading, metadata rail and reading measure. */
+:is(.session-list, .today-journal, .project-journal) .journal-entry { display: grid; grid-template-columns: 12rem minmax(0, 1fr); grid-template-rows: auto auto; gap: 0 var(--s6); padding: var(--s5); }
+:is(.session-list, .today-journal, .project-journal) .journal-heading { grid-column: 1 / -1; grid-row: 1; display: grid; grid-template-columns: minmax(0, 1fr) 44px auto; gap: var(--s3); align-items: start; }
+.journal-heading .session-project { grid-column: 1; min-width: 0; font-size: var(--fs-md); line-height: 1.5; overflow-wrap: break-word; word-break: normal; }
+.journal-heading .journal-duration { grid-column: 3; grid-row: 1; padding-top: var(--s2); text-align: right; white-space: nowrap; }
+.journal-heading .journal-overflow { grid-column: 2; grid-row: 1; }
+:is(.session-list, .today-journal, .project-journal) .journal-meta { grid-column: 1; grid-row: 2; align-self: start; display: flex; flex-direction: column; align-items: flex-start; gap: 0; padding: 0; margin: 0; }
+:is(.session-list, .today-journal, .project-journal) :is(.session-note, .journal-note-edit, .journal-add-note) { grid-column: 2; grid-row: 2; max-width: 70ch; margin: 0; min-width: 0; }
+.journal-add-note { justify-self: start; }
+.journal-day-split { font-size: var(--fs-xs); color: var(--time); line-height: 1.6; }
+.journal-entry .session-note-body, .session-note-body { max-height: none; overflow: visible; }
+.session-note.has-overflow:not(.is-open) .session-note-body { mask-image: none; }
+.session-note .note-expand { color: var(--muted); text-decoration: none; border: 0; }
+.session-note .note-expand:hover { color: var(--ink); }
+.note-open-short { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.note-open-short:focus-visible { position: static; width: auto; height: auto; clip-path: none; min-height: 44px; }
+.session-note-body { cursor: pointer; }
+.session-note-body mark { color: var(--brand-hover); background: color-mix(in srgb, var(--brand) 13%, transparent); border-radius: 2px; }
+.note-reading-actions { display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
+.note-reading-slot { position: sticky; top: 72px; height: 0; z-index: 8; }
+.note-reading-slot .note-reading-head { position: relative; top: 0; height: 52px; min-height: 52px; margin: 0; flex-wrap: nowrap; padding: 0 var(--s2); border-radius: var(--r-xs); background: var(--surface-2); }
+.note-reading-identity { display: block; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.note-reading-identity > * + * { margin-left: var(--s2); }
+.note-reading-head .btn { min-width: 44px; min-height: 44px; flex: none; }
+.session-list { border-radius: var(--r-lg); background: transparent; }
+.session-list .day-group { border-radius: inherit; background: var(--surface-1); }
+.session-list .day-head { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.session-action-context { color: var(--project); overflow-wrap: break-word; }
+.journal-search .searchbar { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.journal-search .searchbar input { flex: 1; width: 0; min-width: 0; padding-inline: var(--s2); font-size: var(--fs-md); line-height: 1.5; }
+.journal-search .searchbar .search-clear { flex: none; }
+.journal-filter-chips { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
+.journal-search .filter-summary { display: flex; align-items: baseline; margin: var(--s4) 0 0; }
+.journal-search .journal-filter-total { margin-left: auto; text-align: right; }
+.journal-presets .range-tab { min-height: 44px; }
+.journal-empty { border: 0; margin-block: 0; background: transparent; }
+.journal-empty h2 { font: 600 clamp(1.6rem, 4vw, 2.8rem)/1.2 var(--font-display); margin-block: var(--s5) var(--s3); }
+.capture-pick-label { display: block; min-width: 0; overflow-wrap: break-word; text-align: left; }
+.capture-pick-label small { display: block; margin-top: 2px; }
+.capture-control .form-actions { position: static; }
+.capture-note > summary { display: flex; align-items: center; min-height: 44px; color: var(--muted); font-size: var(--fs-sm); cursor: pointer; }
+.capture-awaiting-project > .capture-note { display: none; }
+.ember-clock.is-compact .timer-expanded-content { grid-column: 1 / -1; grid-row: 5; margin: var(--s2) 0 0; }
+.ember-clock.is-compact .timer-note-editor { padding: 0; border: 0; }
+.note-compact-preview { display: flex; align-items: start; gap: var(--s4); padding-top: var(--s3); border-top: 1px solid var(--hairline); }
+.note-compact-preview p { flex: 1; min-width: 0; margin: 0; color: var(--note); font: 400 1.05rem/1.6 var(--font-reading); }
+.note-compact-preview .btn { flex: none; }
+@media (max-width: 999px) {
+  :is(.session-list, .today-journal, .project-journal) .journal-entry { display: block; padding: var(--s4); }
+  :is(.session-list, .today-journal, .project-journal) .journal-heading { grid-template-columns: minmax(0, 1fr) 44px auto; gap: var(--s2); }
+  .journal-heading .session-project { font-size: var(--fs-md); }
+  :is(.session-list, .today-journal, .project-journal) .journal-meta { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0 var(--s3); margin-bottom: var(--s2); }
+  .journal-day-split { flex-basis: 100%; }
+  .note-reading-slot { top: 56px; }
+  .note-reading-slot .note-reading-head { display: flex; gap: var(--s1); height: 52px; }
+  .note-reading-head .note-reading-identity { display: block; font-size: var(--fs-xs); }
+  .note-reading-head .btn { padding-inline: var(--s2); font-size: var(--fs-sm); }
+  .journal-search .searchbar { flex-wrap: nowrap; }
+  .journal-search .filter-launcher { font-size: 0; gap: 0; width: 44px; padding: 0; flex: none; }
+  .journal-search .filter-launcher > .svg-inline--fa { font-size: var(--fs-md); }
+  .today-journal .journal-entry { padding-inline: 0; }
+  .note-compact-preview { gap: var(--s3); }
+  .note-compact-preview p { font-size: var(--fs-md); }
+}

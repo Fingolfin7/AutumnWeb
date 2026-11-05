@@ -7,8 +7,9 @@ import { keys } from "@/api/keys";
 import type { Timer } from "@/api/types";
 import { saveTimerNote } from "./api";
 
-export function TimerNoteEditor({ timer, registerStash }: {
+export function TimerNoteEditor({ timer, registerStash, preview }: {
   timer: Timer;
+  preview?: boolean;
   registerStash?: (stash: () => void) => void;
 }) {
   const client = useQueryClient();
@@ -33,5 +34,5 @@ export function TimerNoteEditor({ timer, registerStash }: {
       if (timer.uuid) stashNoteDraft(timer.uuid, draft.value);
     });
   }, [registerStash, timer.id, timer.uuid, timer.version, draftKey, draft.value]);
-  return <div className="timer-note-editor"><NoteEditor id={`timer-note-${timer.id}`} label="Session note" sessionTitle={`${timer.project.name} ? ${formatDate(timer.start)} ? ${formatDuration(elapsedSeconds(timer.start, Date.now()) / 60)}`} disabled={timer.id < 0 && !timer.pending_sync} value={draft.value} onChange={draft.change} onBlur={() => void draft.flush()} saveStatus={draft.status} onRetry={() => void draft.flush()} rows={3} placeholder="Jot down progress while this timer runs." /></div>;
+  return <div className="timer-note-editor"><NoteEditor preview={preview} id={`timer-note-${timer.id}`} label="Session note" sessionTitle={`${timer.project.name} ? ${formatDate(timer.start)} ? ${formatDuration(elapsedSeconds(timer.start, Date.now()) / 60)}`} disabled={timer.id < 0 && !timer.pending_sync} value={draft.value} onChange={draft.change} onBlur={() => void draft.flush()} saveStatus={draft.status} onRetry={() => void draft.flush()} rows={3} placeholder="Jot down progress while this timer runs." /></div>;
 }

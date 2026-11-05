@@ -9,6 +9,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/Sheet";
+import { CapturePickLabel } from "@/features/timers/CapturePicker";
 import { rankProjects } from "@/components/ProjectCombobox";
 import { useAllProjects } from "@/api/meta";
 import { errorMessage } from "@/api/errors";
@@ -174,7 +175,7 @@ export function CommandPalette() {
                 onClick={() => command.run()}
               >
                 <Icon icon={command.icon} className="palette-icon" />
-                <span>{command.label}</span>
+                {command.id.startsWith("start-") ? <CapturePickLabel project={command.label} /> : <span>{command.label}</span>}
                 {command.hint ? <span className="palette-hint">{command.hint}</span> : null}
               </button>
             </li>

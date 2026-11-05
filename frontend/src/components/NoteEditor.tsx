@@ -79,6 +79,7 @@ export function NoteEditor({
   saveStatus,
   onRetry,
   sessionTitle,
+  preview = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -98,6 +99,7 @@ export function NoteEditor({
   saveStatus?: string;
   onRetry?: () => void;
   sessionTitle?: string;
+  preview?: boolean;
 }) {
   const [edited, setEdited] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -299,6 +301,7 @@ export function NoteEditor({
       ) : null}
     </div>
   );
+  if (preview && !writing) return <div className="note-compact-preview"><p>{value.split(/\n\s*\n|\n/)[0] || "A thought, a question, a small discovery."}</p><button className="btn btn--secondary" type="button" onClick={() => { selection.current = { start: value.length, end: value.length }; setWriting(true); }}>Write</button></div>;
   return writing ? createPortal(<dialog ref={dialog} className="note-writer-dialog" aria-label="Full-screen note writer" onCancel={(event) => { event.preventDefault(); closeWriter(); }} onKeyDown={(event) => event.stopPropagation()}>{field}</dialog>, document.body) : field;
 }
 

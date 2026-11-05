@@ -2,7 +2,7 @@ import { formatTime, formatDate, toDateTimeLocal } from "@/lib/format";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
-import { CapturePicker } from "./CapturePicker";
+import { CapturePicker, CapturePickLabel } from "./CapturePicker";
 import { urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { useAllProjects, useSubprojects } from "@/api/meta";
@@ -389,7 +389,20 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
                   </div>
                 </details></div>
               }
+            <div className="form-actions">
+              <span className="start-summary">{summary}</span>
+              <button
+                type="submit"
+                id="start-timer"
+                className="btn btn--primary btn--spacer"
+                disabled={!project || start.isPending || savingPast}
+              >
+                {past ? "Save session" : "Start timer"}
+              </button>
+            </div>
+            <details className="capture-note" open={past || undefined}><summary>Add a note (optional)</summary>
             <NoteEditor persistKey="capture" value={note} onChange={setNote} rows={3} placeholder="Optional notes to begin with..." />
+            </details>
             {!past ? (
               <details className="capture-options">
                 <summary>
@@ -575,17 +588,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
                 </section>
               </details>
             ) : null}
-            <div className="form-actions">
-              <span className="start-summary">{summary}</span>
-              <button
-                type="submit"
-                id="start-timer"
-                className="btn btn--primary btn--lg btn--spacer"
-                disabled={!project || start.isPending || savingPast}
-              >
-                {past ? "Save session" : "Start timer"}
-              </button>
-            </div>
+
           </div>
         </form>
         {!past && !project && dashboard.data?.quick_starts.length ? <div className="today-quick">
@@ -593,7 +596,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
           {[...new Map(dashboard.data.quick_starts.map((item) => [item.project.id, item])).values()].slice(0, 4).map((item) => <button className="today-quick-pick" type="button" key={item.project.id} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => {
             const next = projects.data?.find((p) => p.id === item.project.id);
             if (next) void submit(undefined, next, item.subprojects.map((sub) => sub.id));
-          }}><span aria-hidden="true">?</span><span><span className="text-red">{item.project.name}</span>{item.subprojects.length ? <small className="text-blue">{item.subprojects.map((sub) => sub.name).join(", ")}</small> : null}</span></button>)}
+          }}><span aria-hidden="true">?</span><CapturePickLabel project={item.project.name} sublabel={item.subprojects.map((sub) => sub.name).join(", ")} /></button>)}
         </div> : null}
         {inline ? <AppLink className="btn btn--secondary today-log-past" href="/start_timer/?mode=past">Log past time</AppLink> : null}
     </div>

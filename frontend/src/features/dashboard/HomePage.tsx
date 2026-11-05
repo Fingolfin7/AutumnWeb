@@ -11,6 +11,7 @@ import { FocusCard } from "@/features/timers/FocusCard";
 import { TimerNoteEditor } from "@/features/timers/TimerNoteEditor";
 import { TimerReminders } from "@/features/timers/TimerReminders";
 import { useNow, useOutsideContextTimerCount, useTimers } from "@/features/timers/api";
+import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "@/features/sessions/SessionBand";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { DayTimeline } from "./DayTimeline";
@@ -41,7 +42,7 @@ function HomeContent({ data }: { data: Dashboard }) {
   const outside = useOutsideContextTimerCount();
   const { setContextId } = useActiveContext();
   const firstRun = !running.length && !data.recent_sessions.length && !data.quick_starts.length;
-  const today = data.recent_sessions.filter((day) => day.date === localDateKey(new Date(now)));
+  const today = groupByDay(data.recent_sessions.flatMap((day) => day.sessions)).filter((day) => day.date === localDateKey(new Date(now)));
   return (
     <div className="today-page">
       <header className="today-heading">
@@ -75,6 +76,28 @@ function HomeContent({ data }: { data: Dashboard }) {
       ) : null}
       {!firstRun ? (
         <>
+      {data.commitments.length ? (
+        <section className="today-commitments" aria-label="Commitment summary">
+          <div className="today-section-head">
+            <h2>Commitments</h2>
+            <span className="muted today-scope">All contexts</span>
+          </div>
+          {data.commitments.map(({ commitment, progress }) => {
+            const time = progress.commitment_type === "time";
+            const amount = (value: number) => (time ? formatDuration(value) : `${Math.round(value)} sessions`);
+            return (
+              <div className="today-commitment" key={commitment.id}><AppLink className="today-commitment-row" href={urls.updateCommitment(commitment.id)}>
+                <span className="text-red">{commitment.target.name}</span>
+                <span>
+                  <span className="text-green">{amount(progress.actual)}</span> of {amount(progress.target)}{" "}
+                  <span className="muted">{progress.period}</span>
+                </span>
+              </AppLink><details className="today-history"><summary>Banking & details</summary><CommitmentsPanel items={data.commitments.filter((item) => item.commitment.id === commitment.id)} /></details></div>
+            );
+          })}
+
+        </section>
+      ) : null}
           <section className="today-journal" aria-label="Today's journal">
             <header className="today-section-head">
               <h2>Today's journal</h2>
@@ -86,41 +109,14 @@ function HomeContent({ data }: { data: Dashboard }) {
               today.map((day) => (
                 <ul className="band-list" key={day.date}>
                   {day.sessions.map((session) => (
-                    <SessionBand key={session.id} session={session} />
+                    <SessionBand key={session.id} session={session} day={day.date} />
                   ))}
                 </ul>
               ))
             ) : (
               <p className="empty">Your saved sessions and notes will gather here.</p>
             )}
-      {data.commitments.length ? (
-        <section className="today-commitments" aria-label="Commitment summary">
-          <div className="today-section-head">
-            <h2>Commitments</h2>
-            <span className="muted today-scope">All contexts</span>
-          </div>
-          {data.commitments.map(({ commitment, progress }) => {
-            const time = progress.commitment_type === "time";
-            const amount = (value: number) => (time ? formatDuration(value) : `${Math.round(value)} sessions`);
-            return (
-              <AppLink className="today-commitment-row" key={commitment.id} href={urls.updateCommitment(commitment.id)}>
-                <span className="text-red">{commitment.target.name}</span>
-                <span>
-                  <span className="text-green">{amount(progress.actual)}</span> of {amount(progress.target)}{" "}
-                  <span className="muted">{progress.period}</span>
-                </span>
-              </AppLink>
-            );
-          })}
-          <details className="today-history">
-            <summary>Banking & commitment details</summary>
-            <CommitmentsPanel items={data.commitments} />
-            <AppLink className="btn btn--quiet" href={urls.weeklyReview()}>
-              Open weekly review
-            </AppLink>
-          </details>
-        </section>
-      ) : null}
+
           </section>
 
 
@@ -134,8 +130,8 @@ function TimerCard({ timer, now }: { timer: Timer; now: number }) {
   const stash = useRef<() => void>(() => undefined);
   const [expanded, setExpanded] = useState(false);
   return <FocusCard timer={timer} now={now} expanded={expanded} onExpand={() => setExpanded((value) => !value)} beforeStop={() => stash.current()}>
-    <TimerNoteEditor timer={timer} registerStash={(fn) => { stash.current = fn; }} />
-    <TimerReminders timer={timer} />
+    <TimerNoteEditor preview={!expanded} timer={timer} registerStash={(fn) => { stash.current = fn; }} />
+    {expanded ? <TimerReminders timer={timer} /> : null}
   </FocusCard>;
 }
 

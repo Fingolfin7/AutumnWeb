@@ -10,7 +10,6 @@ test("searching sessions narrows the list and the filter survives a reload", asy
   expect(total).toBeGreaterThan(5);
 
   await page.getByRole("searchbox", { name: /Search projects, subprojects, and session notes/ }).fill("grammar");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
 
   await expect(page).toHaveURL(/[?&]search=grammar\b/);
   await expect(page.locator(".result-count")).not.toHaveText(String(total));
@@ -52,7 +51,8 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
     await touch.detach();
     await page.getByRole("dialog", { name: "Session actions" }).getByRole("button", { name: "Edit note", exact: true }).tap();
   } else {
-    await first.getByRole("button", { name: "Edit note", exact: true }).click();
+    await first.locator(".session-note-body").click();
+    await first.getByRole("button", { name: "Edit", exact: true }).click();
   }
 
   await expect(page).toHaveURL(/\/sessions\/\?search=Piano/);
@@ -66,7 +66,8 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   const id = (await first.getAttribute("id"))!.replace("session-", "");
   await page.goto(`/sessions/?search=${encodeURIComponent(note)}`);
   const retained = page.locator(`#session-${id}`);
-  await retained.getByRole("button", { name: "Edit this note in place", exact: true }).click();
+  await retained.locator(".session-note-body").click();
+  await retained.getByRole("button", { name: "Edit", exact: true }).click();
   const revised = `A different **reflection** for ${testInfo.project.name}, with the search word removed.`;
   await retained.getByRole("textbox", { name: "Note", exact: true }).fill(revised);
   await expect(retained.getByRole("status")).toHaveText("Saved");

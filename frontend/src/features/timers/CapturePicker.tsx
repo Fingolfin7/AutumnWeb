@@ -4,6 +4,10 @@ import type { Project } from "@/api/types";
 import { rankProjects } from "@/components/ProjectCombobox";
 import type { Dashboard } from "@/features/dashboard/api";
 
+export function CapturePickLabel({ project, sublabel }: { project: string; sublabel?: string }) {
+  return <span className="capture-pick-label"><span className="text-red">{project}</span>{sublabel ? <small className="text-blue">{sublabel}</small> : null}</span>;
+}
+
 type Pick = { project: Project; subprojectIds: number[]; label: string; sublabel: string };
 
 /** Recent project/subproject pairs and project search share one keyboard picker. */
@@ -119,8 +123,7 @@ export function CapturePicker({
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(pick)}
               >
-                {!pick.sublabel ? <span className="text-red">{pick.label}</span> : null}
-                {pick.sublabel ? <small className="text-blue">{pick.sublabel}</small> : null}
+                <CapturePickLabel project={pick.label} sublabel={pick.sublabel} />
               </li>
             ))
           ) : (
