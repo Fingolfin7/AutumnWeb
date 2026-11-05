@@ -314,7 +314,6 @@ function ProfileEditor({
         {saveFailed || saving || pendingScope || lastAttempt.current ? <div className="settings-autosave" role="status">{saveFailed ? "Not saved" : saving ? "Saving" : pendingScope ? "Waiting to save" : "Saved automatically"}{saveFailed || Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); setSaveFailed(false); setRetryVersion(value => value + 1); }}>Retry saving</button> : null}</div> : null}
         {section === "account" ? <>
         <form className="slab slab-pad" onSubmit={(event) => void onSubmit(event, "account")} noValidate>
-          <SlabHead title="Account" />
           <div className="profile-account-grid">
             <div className="profile-avatar-panel">
               {avatarPreview || customAvatar ? <img
@@ -457,7 +456,7 @@ function ProfileEditor({
         </form> : null}
 
         {section === "defaults" || (section === "search" && prefs.ai_features_enabled && prefs.configured_api_keys.openai) ? <Defaults className="slab slab-pad" onSubmit={(event: FormEvent) => { event.stopPropagation(); void onSubmit(event, section === "search" ? "search" : "defaults"); }}>
-          <SlabHead title={section === "search" ? "Related search" : "Reporting defaults"} />
+          {section === "search" ? <SlabHead title="Related search" /> : null}
           <div className="profile-defaults-grid">
             {section === "defaults" ? dateRanges.map((range) => {
               const unit = prefsD[range.unitKey];

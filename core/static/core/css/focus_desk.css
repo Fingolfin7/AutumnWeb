@@ -1625,7 +1625,7 @@ img.brand-mark {
 }
 /* …except beside a checkbox, where the label is the option's name. */
 .fields .check-row label, .fields .check-grid label {
-  display: inline; text-transform: none; letter-spacing: normal;
+  display: inline-flex; align-items: center; min-height: 44px; text-transform: none; letter-spacing: normal;
   font-size: var(--fs-sm); color: var(--ink); margin: 0;
 }
 /* A label that wraps its own checkbox, and the reminder mode faces, name an
@@ -5464,6 +5464,10 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .chart-terms ol { grid-template-columns: 1fr; }
 }
 /* Stream V2 */
+.settings-heading { margin-block: var(--s2) var(--s4); }
+.settings-heading p { margin-top: var(--s1); font-size: var(--fs-sm); }
+.settings-content .profile-avatar-panel .field { display: grid; justify-items: center; }
+.settings-content .profile-avatar-upload { text-align: center; }
 .profile-provider { border-bottom: 1px solid var(--hairline); }
 .profile-provider summary { display: flex; align-items: center; gap: var(--s3); min-height: 52px; cursor: pointer; list-style: none; }
 .profile-provider summary::-webkit-details-marker { display: none; }
@@ -5501,6 +5505,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .insights-workspace .composer textarea { background: transparent; border: 0; box-shadow: none; }
 .insights-workspace .composer:focus-within { box-shadow: var(--focus-ring); }
 @media (max-width: 600px) {
+  .settings-content .profile-avatar-monogram { width: 64px; height: 64px; margin: 0; }
+  .settings-content .profile-account-grid > div:last-child .field { display: grid; grid-template-columns: minmax(6rem, .8fr) minmax(0, 1fr); align-items: center; gap: var(--s2); }
+  .settings-content .profile-account-grid > div:last-child .field > :is(small, .profile-field-error) { grid-column: 1 / -1; }
   .review-heading-actions { display: flex; flex: none; }
   .review-heading-actions > button { scroll-margin-top: 80px; }
   .insights-workspace .chat-layout { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
