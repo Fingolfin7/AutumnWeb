@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
-import { faCheck, faCheckSquare, faChevronLeft, faCloudUploadAlt, faComments, faCopy, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faCheckSquare, faChevronLeft, faCloudUploadAlt, faComments, faCopy, faEllipsisH, faSlidersH, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "@/components/Icon";
 import { ConfirmDialog } from "@/components/Sheet";
@@ -381,8 +381,10 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             </div>
           ) : null}
           <div className="chat-header">
-            <div className="insights-conversation-heading"><AppLink className="btn btn--quiet insights-review-back" href={urls.review()}><Icon icon={faChevronLeft} /> Review</AppLink><h2>{chat?.title || "Insights"}</h2></div>
-            <div className="insights-conversation-scope"><span>{count === undefined ? "Counting sessions…" : `${count} ${sessionLabel}`}</span><button className="btn btn--quiet" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context</button><button type="button" id="toggle-sidebar-btn" className="btn btn--quiet" onClick={toggleSidebar} aria-expanded={!collapsed} aria-controls="chat-sidebar">History</button></div>
+            <div className="insights-conversation-heading"><AppLink className="btn btn--quiet insights-review-back" aria-label="Back to Review" href={urls.review()}><Icon icon={faChevronLeft} /></AppLink><h2 title={chat?.title || "Insights"}>{chat?.title || "Insights"}</h2></div>
+            <div className="insights-conversation-scope"><button className="btn btn--quiet" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context · {count === undefined ? "…" : `${count} ${sessionLabel}`}</button></div>
+            <details className="insights-actions-menu"><summary aria-label="Conversation actions"><Icon icon={faEllipsisH} /></summary><div className="insights-actions-list">
+              <button type="button" id="toggle-sidebar-btn" className="btn btn--quiet" onClick={toggleSidebar} aria-expanded={!collapsed} aria-controls="chat-sidebar">History</button>
                 {hasHistory ? (
                   <div className="chat-header-actions">
                     <button type="button" id="select-messages-btn" aria-label={selecting ? "Cancel message selection" : "Select messages to copy"} className="chat-action-btn" onClick={toggleSelecting} title="Select messages to copy">
@@ -404,6 +406,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                     </button>
                   </div>
                 ) : null}
+            </div></details>
           </div>
 
           {loadingBody ? (
