@@ -1,4 +1,4 @@
-import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from "react";
+import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode } from "react";
 import type { IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
 
@@ -34,4 +34,15 @@ export function Toggle({ label, id, ...props }: Omit<InputHTMLAttributes<HTMLInp
 export function SegmentedControl<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void }) {
   const name = useId();
   return <fieldset className="segmented"><legend className="sr-only">{label}</legend>{options.map((option) => <label key={option.value}><input type="radio" name={name} checked={value === option.value} onChange={() => onChange(option.value)} /><span>{option.label}</span></label>)}</fieldset>;
+}
+
+/** Date values stay ISO; presets use the account's local day supplied by the caller. */
+export function DateInput({ value, onValueChange, today, ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & { value: string; onValueChange: (value: string) => void; today: string }) {
+  const yesterday = new Date(`${today}T12:00Z`); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  return <div className="date-control"><Input {...props} type="date" value={value} onChange={event => onValueChange(event.target.value)} /><div className="date-presets"><Button variant="quiet" onClick={() => onValueChange(today)}>Today</Button><Button variant="quiet" onClick={() => onValueChange(yesterday.toISOString().slice(0,10))}>Yesterday</Button></div></div>;
+}
+/** One keyboard-accessible file picker with a drop target; browsers keep the native input. */
+export function FileDrop({ onFile, hint = "Choose a file or drop it here", ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> & { onFile: (file: File | null) => void; hint?: string }) {
+  const [dragging, setDragging] = useState(false);
+  return <div className={`file-drop${dragging ? " is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); onFile(event.dataTransfer.files[0] ?? null); }}><input {...props} type="file" onChange={event => onFile(event.target.files?.[0] ?? null)} /><span>{hint}</span></div>;
 }

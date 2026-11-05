@@ -19,9 +19,9 @@ describe("URL <-> filters", () => {
     });
   });
 
-  it("falls back to a pie for an unknown chart type and drops junk ids", () => {
+  it("falls back to ranked bars for an unknown chart type and drops junk ids", () => {
     const f = readFilters(params("chart_type=nonsense&tags=abc&tags=4&include_projects=-1"));
-    expect(f.chart_type).toBe("pie");
+    expect(f.chart_type).toBe("bar");
     expect(f.tags).toEqual([4]);
     expect(f.projects).toEqual([]);
   });
@@ -32,10 +32,10 @@ describe("URL <-> filters", () => {
     expect(f.projectMode).toBe("include");
   });
 
-  it("round-trips, keeping the pie default out of the URL", () => {
-    const state = { ...EMPTY_FILTERS, chart_type: "radar" as const, search: "x", related: true, tags: [1, 2], projects: [5], projectMode: "include" as const };
+  it("round-trips, keeping the bar default out of the URL", () => {
+    const state = { ...EMPTY_FILTERS, chart_type: "line" as const, search: "x", related: true, tags: [1, 2], projects: [5], projectMode: "include" as const };
     const text = writeFilters(state).toString();
-    expect(text).toContain("chart_type=radar");
+    expect(text).toContain("chart_type=line");
     expect(text).toContain("include_projects=5");
     expect(readFilters(params(text))).toEqual(state);
     expect(writeFilters(EMPTY_FILTERS).toString()).toBe("");

@@ -1,4 +1,4 @@
-import { Toggle } from "@/components/ui";
+import { FileDrop, Toggle } from "@/components/ui";
 import { useEffect, useMemo } from "react";
 import { faDownload, faExternalLinkAlt, faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -63,6 +63,11 @@ export function BackgroundSection({
         }
       />
 
+      <figure className="backdrop-preview" aria-label="Live backdrop preview">
+        {preview || prefs.background.image_url ? <img src={preview ?? prefs.background.image_url ?? ""} alt="" /> : null}
+        <svg className="backdrop-preview-dim" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><rect width="100" height="100" opacity={draft.dimming / 100} /></svg>
+        <figcaption><span>A little time, well spent.</span><strong>40m</strong><small>Your workspace, in your light.</small></figcaption>
+      </figure>
       {draft.automatic ? (
         <div id="automatic_background_options" className="profile-background-options">
           {choices.map((choice) => (
@@ -125,11 +130,6 @@ export function BackgroundSection({
               ) : null}
               {prefs.background.image_url ? (
                 <>
-                  <img
-                    className="profile-background-thumb u-mt-4"
-                    src={prefs.background.image_url}
-                    alt="Today's background"
-                  />
                   <div>
                     <button
                       type="button"
@@ -147,7 +147,7 @@ export function BackgroundSection({
             </>
           ) : (
             <p className="empty">
-              No automatic background source is selected. Choose Bing or NASA above, then save changes.
+              No automatic background source is selected. Choose Bing or NASA above, and your choice saves automatically.
             </p>
           )}
         </div>
@@ -157,12 +157,10 @@ export function BackgroundSection({
         <div className="uploaded_backgrounds profile-background-upload">
           <div className="field">
             <label htmlFor="background_image">Upload background</label>
-            <input
+            <FileDrop
               id="background_image"
-              type="file"
               accept="image/*"
-              onChange={(event) => {
-                const picked = event.target.files?.[0] ?? null;
+              onFile={(picked) => {
                 onFile(picked);
                 if (picked) onRemoveCurrent(false);
               }}
@@ -172,7 +170,6 @@ export function BackgroundSection({
 
           {preview || uploaded ? (
             <div className="profile-current-background">
-              <img src={preview ?? uploaded ?? ""} alt={preview ? "New background" : "Current background"} />
               <div>
                 {!preview && uploaded ? (
                   <>
@@ -195,7 +192,7 @@ export function BackgroundSection({
                     </button>
                   </>
                 ) : (
-                  <p className="muted">Preview only. Save changes to use this photo.</p>
+                  <p className="muted">Your photo saves automatically.</p>
                 )}
               </div>
             </div>

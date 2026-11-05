@@ -264,7 +264,7 @@ export default function ExportPage() {
 
               </details>
               <div className="form-actions">
-                <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
+                <button type="submit" className="btn btn--primary" disabled={busy}>
                   <Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export"}
                 </button>
               </div>

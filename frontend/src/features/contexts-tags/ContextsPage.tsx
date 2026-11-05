@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { Sheet } from "@/components/Sheet";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -16,6 +17,7 @@ export default function ContextsPage() {
   const create = useCreateContext();
   const toast = useToast();
   const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState<FormErrors>(NO_ERRORS);
 
@@ -31,6 +33,7 @@ export default function ContextsPage() {
       { name: name.trim(), description: description.trim() || null },
       {
         onSuccess: () => {
+          setCreating(false);
           toast.success("Context created successfully");
           setName("");
           setDescription("");
@@ -43,6 +46,7 @@ export default function ContextsPage() {
   return (
     <>
       <DeskHead title="Contexts" />
+      <div className="settings-create-action"><button className="btn btn--secondary" type="button" onClick={() => setCreating(true)}><Icon icon={faPlus} /> New context</button></div>
       <div className="split">
         <section id="contexts-list" className="slab" aria-label="Contexts">
           {contexts.isPending ? (
@@ -62,12 +66,12 @@ export default function ContextsPage() {
             </ul>
           ) : (
             <Empty>
-              No contexts yet. <a href="#create-context">Create one</a> to group projects by setting.
+              No contexts yet. <button className="btn btn--quiet" type="button" onClick={() => setCreating(true)}>Create one</button> to group projects by setting.
             </Empty>
           )}
         </section>
 
-        <form className="fields" id="create-context" onSubmit={submit} noValidate>
+        <Sheet open={creating} onClose={() => setCreating(false)} title="New context"><form className="fields" id="create-context" onSubmit={submit} noValidate>
           <FormLevelErrors errors={errors.general} />
           <section className="slab slab-pad">
             <h2 className="settings-form-title">New context</h2>
@@ -101,7 +105,7 @@ export default function ContextsPage() {
               </button>
             </div>
           </section>
-        </form>
+        </form></Sheet>
       </div>
     </>
   );
