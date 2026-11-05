@@ -94,16 +94,16 @@ export default function CreateProjectPage() {
             />
           </fieldset>
             <div className="field inline-subprojects">
-              {subprojects.map((name, index) => <div className="field" key={index}><label htmlFor={`new-subproject-${index}`}>{index === 0 ? "Subproject (optional)" : `Subproject ${index + 1}`}</label><input id={`new-subproject-${index}`} disabled={busy || index < savedSubs.length} value={name} maxLength={255} placeholder="e.g. Field research" onChange={(event) => setSubprojects((current) => current.map((value, i) => i === index ? event.target.value : value))} /></div>)}
+              {subprojects.map((name, index) => <div className="field" key={index}><label htmlFor={`new-subproject-${index}`}>{index === 0 ? "Subproject (optional)" : `Subproject ${index + 1}`}</label><input type="text" id={`new-subproject-${index}`} disabled={busy || index < savedSubs.length} value={name} maxLength={255} placeholder="e.g. Field research" onChange={(event) => setSubprojects((current) => current.map((value, i) => i === index ? event.target.value : value))} /></div>)}
               <button className="btn btn--quiet" type="button" disabled={busy} onClick={() => setSubprojects([...subprojects, ""])}>Add another subproject</button>
             </div>
         </section>
 
         <div className="form-actions q-form-actions">
-          <button className="btn btn--primary btn--spacer" type="submit" id="create-project" disabled={busy}>
+          <button className="btn btn--quiet" type="submit" id="create-project" disabled={busy}>
             <Icon icon={faCheckCircle} /> Create project
           </button>
-          <button className="btn btn--secondary" type="submit" name="start" disabled={busy}><Icon icon={faPlay} /> Create and start</button>
+          <button className="btn btn--primary" type="submit" name="start" disabled={busy}><Icon icon={faPlay} /> Create and start</button>
         </div>
       </form>
     </>
