@@ -10,6 +10,6 @@ export function pieConfig(data: TallyRow[], { projectLimit }: ChartOptions): Any
 export function barConfig(data: TallyRow[], { projectLimit }: ChartOptions): AnyConfig {
   const rows = consolidateTopN([...data].sort((a,b) => b.total_time-a.total_time), projectLimit);
   const colors = seriesColors(rows.map(row => row.name));
-  return { type: "bar", data: { labels: rows.map(row => row.name), datasets: [{ label: "Tracked time", data: rows.map(row => row.total_time / 60), backgroundColor: rows.map(row => "_isOther" in row ? OTHER_COLOR : colors.get(row.name)!), borderRadius: 4 }] }, options: { indexAxis: "y", scales: { x: { beginAtZero: true, ticks: { callback: hourLabel } } }, plugins: { tooltip: { callbacks: { label: (c: TT) => formatDuration(c.parsed.x! * 60) } } } } };
+  return { type: "bar", data: { labels: rows.map(row => row.name), datasets: [{ label: "Tracked time", data: rows.map(row => row.total_time / 60), backgroundColor: rows.map(row => "_isOther" in row ? OTHER_COLOR : colors.get(row.name)!), borderRadius: 3, maxBarThickness: 28 }] }, options: { indexAxis: "y", scales: { x: { beginAtZero: true, ticks: { callback: hourLabel } } }, plugins: { tooltip: { callbacks: { label: (c: TT) => formatDuration(c.parsed.x! * 60) } } } } };
 }
 export const contextConfig = (rows: TallyRow[]) => barConfig([...rows].sort((a,b) => b.total_time-a.total_time), { projectLimit: rows.length });

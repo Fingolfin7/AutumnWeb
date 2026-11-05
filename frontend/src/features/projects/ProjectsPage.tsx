@@ -81,6 +81,12 @@ export default function ProjectsPage() {
     apply({ ...applied, search: searchText.trim() });
   };
 
+  useEffect(() => {
+    if (searchText === applied.search) return;
+    const timer = window.setTimeout(() => setParams(writeFilters({ ...applied, search: searchText.trim() }), { replace: true }), 350);
+    return () => window.clearTimeout(timer);
+  }, [searchText, applied, setParams]);
+
   const groups = groupByStatus(lists.data?.direct ?? []);
   const related = lists.data?.related ?? [];
   const band = (project: (typeof related)[number]) => (
@@ -99,7 +105,7 @@ export default function ProjectsPage() {
 
   return (
     <>
-      <div className="desk-head project-directory-title"><h1 className="page-title">Projects</h1><AppLink className="btn btn--primary" href={urls.createProject()}><Icon icon={faPlus} /> New project</AppLink></div>
+      <div className="desk-head project-directory-title"><h1 className="page-title">Projects</h1><AppLink className="btn btn--primary" href={urls.createProject()}><Icon icon={faPlus} /> New<span className="sr-only"> project</span></AppLink></div>
       <form className="fields project-directory-search" onSubmit={onSearch} role="search">
         <div className="searchbar">
           <Icon icon={faSearch} className="muted" />
@@ -113,9 +119,7 @@ export default function ProjectsPage() {
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <button className="btn btn--secondary" type="submit" aria-label="Search">
-            <Icon icon={faSearch} /><span className="search-submit-label">Search</span>
-          </button>
+
           <button
             className="filter-launcher"
             type="button"

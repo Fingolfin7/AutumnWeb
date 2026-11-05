@@ -3309,8 +3309,13 @@ img.brand-mark {
 .calendar-days button:disabled { opacity: .35; }
 .date-presets { display: flex; gap: var(--s2); border-top: 1px solid var(--hairline); padding-top: var(--s2); }
 .date-presets .btn { flex: 1; font-size: var(--fs-sm); }
-.time-popover { display: flex; align-items: end; gap: var(--s2); }
-.time-popover label { flex: 1; }
+.time-chips { padding: var(--s3) 0; display: grid; gap: var(--s3); }
+.time-chips fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.time-chips legend { color: var(--muted); font-size: var(--fs-sm); margin-bottom: var(--s2); }
+.time-chips fieldset > div { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 2px; }
+.time-chips button { min-width: 0; min-height: 44px; border: 0; border-radius: var(--r-xs); background: var(--raised); color: var(--ink); font: 500 var(--fs-sm)/1 var(--font-display); }
+.time-chips button[aria-pressed="true"] { background: var(--brand); color: var(--ink-invert); }
+.time-chips fieldset:last-of-type > div { grid-template-columns: repeat(4,minmax(0,1fr)); }
 .file-drop { position: relative; display: grid; gap: var(--s2); padding: var(--s3); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); background: var(--sunken); }
 .file-drop:focus-within, .file-drop.is-dragging { border-color: var(--brand); box-shadow: var(--focus-ring); }
 .file-drop input[type="file"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
@@ -3333,7 +3338,7 @@ input[type="checkbox"]:not([role="switch"]):checked { background: var(--brand); 
 input[type="checkbox"]:not([role="switch"]):checked::after { content: ""; position: absolute; left: 7px; top: 3px; width: 6px; height: 11px; border: solid var(--ink-invert); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 .check-row { display: flex; align-items: center; gap: var(--s3); min-height: 44px; }
 .check-row > input { align-self: center; }
-.check-row > label { min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; }
+.check-row > label { margin: 0; min-height: 44px; display: inline-flex; align-items: center; cursor: pointer; }
 select { padding-right: 2.5rem; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23aaa69f' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; }
 input[type="file"] { max-width: 100%; color: var(--muted); font: inherit; }
 input[type="file"]::file-selector-button { min-height: 44px; padding: var(--s2) var(--s4); margin-right: var(--s3); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); color: var(--ink); background: var(--surface-2); font: inherit; cursor: pointer; }
@@ -3756,7 +3761,7 @@ a.tag-chip::after, a.context-chip::after, a.sub-chip::after { content: ""; posit
 .review-day-strip span { display: block; color: var(--muted); font-size: var(--fs-xs); min-height: 1.5em; }
 .review-body { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(19rem, 1fr); gap: var(--s5); align-items: start; }
 .review-section-heading { padding: var(--s5); }
-.review-section-heading h2 { font: 600 var(--fs-lg)/1.3 var(--font-display); letter-spacing: -.035em; margin: 0; }
+.review-section-heading h2 { font: 600 var(--fs-lg)/1.3 var(--font-display); letter-spacing: -.015em; margin: 0; }
 .review-projects { min-width: 0; }
 .review-rankings { padding: 0 var(--s5); }
 .review-project-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--s2) var(--s4); padding: var(--s4) 0; border-top: 1px solid var(--hairline); text-decoration: none; align-items: baseline; }
@@ -5369,3 +5374,92 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .note-rich-preview p { margin: 0 0 .8em; }
 .note-rich-preview p:last-child { margin: 0; }
 .note-editor-shell textarea[hidden] { display: none; }
+/* ================================================================= Stream V
+   Project journal, review and settings: fewer boxes, one line of controls. */
+.project-overview { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: var(--s5) var(--s7); }
+.project-overview > .project-page-head, .project-overview > .project-properties, .project-overview > .project-start-control, .project-overview > .project-progress-row, .project-overview > .project-description { grid-column: 1 / -1; }
+.project-overview .project-journal { grid-column: 1; grid-row: 6; background: transparent; border: 0; border-radius: 0; }
+.project-overview .project-rail { grid-column: 2; grid-row: 6; width: auto; }
+.project-rail .slab { background: transparent; box-shadow: none; border: 0; }
+.project-rail .band.project { padding: var(--s3) 0; }
+.project-rail .project-total { font-size: var(--fs-sm); margin: 0; }
+.project-rail .project-dates { font-size: var(--fs-xs); }
+.project-journal .session-note { max-width: 68ch; }
+.project-journal .band-time { display: none; }
+.project-journal-link { display: flex; justify-content: flex-end; }
+.project-page-head .desk-head { margin: 0; min-width: 0; }
+.project-page-head .page-title { overflow-wrap: anywhere; }
+.project-progress-row { border-block: 1px solid var(--hairline); padding-block: var(--s4); }
+.project-progress-row > section { background: transparent; border: 0; box-shadow: none; }
+.sheet .form-actions, .sheet .sheet-foot { position: sticky; bottom: -1px; z-index: 3; margin-top: var(--s4); padding-block: var(--s3); background: var(--surface-2); border-top: 1px solid var(--hairline); }
+.project-create-sheet .slab, .commitment-editor-sheet .slab { border: 0; padding: 0; box-shadow: none; background: transparent; }
+.project-create-sheet .project-create-fields { display: grid; gap: var(--s4); border: 0; padding: 0; min-width: 0; }
+.project-create-sheet .sheet-panel { display: block; }
+.project-create-sheet .sheet-panel > form { display: block; }
+.project-create-sheet .inline-subprojects { margin-top: var(--s4); }
+.project-create-sheet .field { margin-bottom: var(--s4); }
+.project-create-sheet .q-form-actions { display: flex; flex-wrap: wrap; }
+.project-create-sheet .q-form-actions .btn--primary { flex: 1; }
+.context-switch.is-filtered select { background-color: #3b2c21; color: var(--brand); border-color: #8a6443; }
+.avatar.is-active { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (max-width:999px) {
+  .project-overview { display: flex; gap: var(--s4); }
+  .project-overview .project-rail { order: 4; }
+  .project-overview .project-description { order: 5; }
+  .project-overview .project-journal { order: 6; }
+  .project-directory-columns { display: none; }
+  .project-directory-title .btn { font-size: var(--fs-sm); padding-inline: var(--s3); }
+  .project-directory-row .project-directory-preview .project-note-line { display: none; }
+  .project-directory-row .project-directory-preview { display: block; }
+  .project-directory-row .project-directory-preview > span + span { display: none; }
+  .project-directory-row .project-week-spark { width: 70px; }
+}
+
+.project-tag-options { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.project-tag-options .tag-chip { min-height: 44px; cursor: pointer; padding-inline: var(--s3); }
+.project-tag-options .tag-chip[aria-pressed="true"] { background: var(--raised-2); border-color: var(--brand); }
+.commitment-pending-tick { stroke: var(--ink); stroke-width: 3; }
+.commitment-target-sheet .commitment-quick-target { display: flex; flex-direction: column; gap: var(--s3); }
+.commitment-target-sheet .form-actions { order: 10; margin-top: auto; }
+
+.review-main-controls .review-toolbar { display: block; }
+.review-toolbar .segmented { display: flex; overflow-x: auto; flex-wrap: nowrap; width: 100%; border: 0; background: transparent; padding: 0; gap: var(--s1); scrollbar-width: thin; }
+.review-toolbar .segmented > label { flex: 0 0 auto; white-space: nowrap; }
+.review-toolbar .segmented > label > span { padding-inline: var(--s4); }
+.review-desk .review-range { justify-content: flex-start; gap: var(--s2); }
+.review-desk .review-range h2 { order: -1; flex: 1; font-size: var(--fs-sm); text-align: left; }
+.review-desk .review-total { font-variant-numeric: tabular-nums; }
+.review-desk .review-total-row { align-items: flex-end; }
+.review-complete-comparison { display: inline; font-size: inherit; }
+.review-section-heading h2 { letter-spacing: -.015em; }
+.review-row-values { display: flex; align-items: baseline; gap: var(--s3); white-space: nowrap; }
+.review-project-row { min-height: 64px; padding: var(--s3) 0; grid-template-columns: minmax(0,1fr) auto; gap: var(--s2) var(--s4); }
+.review-project-row .review-row-values strong { font-size: var(--fs-md); }
+.review-project-row .review-row-values small { font-size: var(--fs-xs); }
+.review-project-bar { grid-column: 1 / -1; height: 4px; }
+.review-question input { font-family: var(--font-ui); }
+.review-ember-trail { margin-top: var(--s5); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
+.review-ember-trail > div:first-child { display: flex; justify-content: space-between; gap: var(--s3); color: var(--muted); font-size: var(--fs-xs); }
+.review-ember-weeks { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: var(--s3); margin-top: var(--s3); }
+.review-ember-weeks button { display: grid; gap: var(--s2); min-height: 64px; min-width: 0; padding: var(--s2) 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.review-ember-weeks button:hover { color: var(--brand); background: var(--raised); }
+.review-ember-weeks svg { width: 100%; height: 40px; overflow: visible; filter: drop-shadow(0 0 6px #d58a5025); }
+.review-ember-weeks span { font-size: 13px; white-space: nowrap; }
+.review-ember-weeks .ember-cell--0 { fill: var(--hairline-2); }
+.chart-terms ol { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 var(--s6); padding: 0; list-style: none; }
+.chart-terms li { display: block; border: 0; padding: 0; }
+.chart-terms li a { display: grid; grid-template-columns: minmax(0,1fr) auto; align-content: center; min-height: 64px; gap: var(--s2); color: var(--ink); text-decoration: none; }
+.chart-terms li svg { width: 100%; height: 4px; grid-column: 1 / -1; fill: var(--brand); }
+.chart-terms li strong { color: var(--muted); font-size: var(--fs-sm); }
+@media (max-width:999px) {
+  .review-ember-weeks { gap: var(--s2); grid-template-columns: repeat(6,minmax(0,1fr)); }
+  .review-ember-weeks svg { height: 24px; }
+  .review-ember-weeks button { min-height: 48px; }
+  .review-ember-weeks span { font-size: 13px; }
+  .review-ember-trail > div:first-child > span:last-child { display: none; }
+  .review-desk .review-total-row { display: block; }
+  .review-total-row .btn { margin-top: var(--s2); }
+  .review-row-values { gap: var(--s2); }
+  .review-project-row .review-row-values small { font-size: 13px; }
+  .chart-terms ol { grid-template-columns: 1fr; }
+}

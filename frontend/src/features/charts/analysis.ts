@@ -4,7 +4,6 @@ import type { AnyConfig, TT, HistogramRow } from "./payloads";
 /* Session length distribution, in ember pigments. */
 
 export function histogramConfig(data: HistogramRow[]): AnyConfig {
-  data = data.filter(row => Number(row.count) > 0);
   const labels = data.map((row) => row.label);
   const counts = data.map((row) => Number(row.count));
   const total = counts.reduce((a, b) => a + b, 0);
@@ -20,16 +19,18 @@ export function histogramConfig(data: HistogramRow[]): AnyConfig {
           label: "Number of Sessions",
           data: counts,
           backgroundColor: colors,
-          borderWidth: 1,
+          maxBarThickness: 28,
+          borderWidth: 0,
           borderColor: colors.map((color) => color.replace("55%", "45%")),
         },
       ],
     },
     options: {
       responsive: true,
+      layout: { padding: { right: 36 } },
       indexAxis: "y",
       plugins: {
-        title: { display: true, text: "Session Duration Distribution" },
+        title: { display: false, text: "Session Duration Distribution" },
         legend: { display: false },
         tooltip: {
           callbacks: {

@@ -3,14 +3,16 @@ import type { ScaleOptions } from "chart.js";
 import { formatDuration } from "@/lib/format";
 import { paletteColor, seriesColors } from "./data";
 import { Chart } from "./register";
-import { drawWordcloud, stopWordcloud } from "./wordcloud";
+import { topTerms } from "./terms";
+import { AppLink, urls } from "@/app/links";
+import { useLocation } from "react-router";
 import type { Built } from "./build";
 
 /* Owns one canvas and the one Chart.js instance (or word cloud) drawn on it.
    The effect's cleanup destroys the chart, so a type change, new data or an
    unmount never leaves an instance behind or draws twice on a canvas. */
 export function ChartCanvas({ built }: { built: Built }) {
-  const [cloudOpen, setCloudOpen] = useState(false);
+  const location = useLocation();
   const [hidden, setHidden] = useState<number[]>([]);
   const canvas = useRef<HTMLCanvasElement>(null);
 
@@ -38,7 +40,7 @@ export function ChartCanvas({ built }: { built: Built }) {
         id: "donutTotal", afterDraw(chart) {
           if (config.type === "bar" && config.data.datasets[0]?.label === "Number of Sessions") {
             const { ctx } = chart; ctx.save(); ctx.font = "600 13px Manrope, sans-serif"; ctx.fillStyle = "#f0ece5"; ctx.textBaseline = "middle";
-            chart.getDatasetMeta(0).data.forEach((bar, index) => { ctx.textAlign = "left"; ctx.fillText(String(config.data.datasets[0].data[index]), Math.min(bar.x + 8, chart.chartArea.right - 24), bar.y); });
+            chart.getDatasetMeta(0).data.forEach((bar, index) => { ctx.textAlign = "left"; ctx.fillText(String(config.data.datasets[0].data[index]), bar.x + 8, bar.y); });
             ctx.restore(); return;
           }
           if (config.type !== "doughnut") return;
@@ -54,33 +56,15 @@ export function ChartCanvas({ built }: { built: Built }) {
       return () => chart.destroy();
     }
 
-    if (!cloudOpen) return;
-    /* The cloud has no responsive mode: draw at the container's size and
-       again, debounced, when it changes. */
-    const container = element.parentElement!;
-    const draw = () => {
-      const width = container.clientWidth || window.innerWidth * 0.8;
-      const height = container.clientHeight || window.innerHeight * 0.6;
-      drawWordcloud(element, built.words, width, height);
-    };
-    draw();
-    let timer: number | undefined;
-    let lastWidth = container.clientWidth;
-    const observer = new ResizeObserver(() => {
-      if (container.clientWidth === lastWidth) return;
-      lastWidth = container.clientWidth;
-      window.clearTimeout(timer);
-      timer = window.setTimeout(draw, 150);
-    });
-    observer.observe(container);
-    return () => {
-      window.clearTimeout(timer);
-      observer.disconnect();
-      stopWordcloud();
-    };
-  }, [built, cloudOpen]);
+  }, [built]);
 
-  if (built.type === "wordcloud") return <div className="chart-terms"><ol aria-label="Terms ranked by count">{[...built.words].sort((a,b) => Number(b.weight)-Number(a.weight)).map(row => <li key={row.text}><span>{row.text}</span><strong>{row.weight}</strong></li>)}</ol><details onToggle={event => setCloudOpen(event.currentTarget.open)}><summary>See the word cloud</summary>{cloudOpen ? <div className="chart-plot"><canvas id="chart" ref={canvas} role="img" aria-label="Words from your session notes" /></div> : null}</details></div>;
+  if (built.type === "wordcloud") {
+    const words = topTerms(built.words);
+    return <div className="chart-terms"><ol aria-label="Terms ranked by count">{words.map(row => {
+      const params = new URLSearchParams(location.search); params.delete("chart_type"); params.delete("view"); params.set("search", row.text);
+      return <li key={row.text}><AppLink href={`${urls.sessions()}?${params}`}><span>{row.text}</span><strong>{row.weight}</strong><svg viewBox="0 0 1000 4" preserveAspectRatio="none" aria-hidden="true"><rect width={Number(row.weight)/Math.max(Number(words[0]?.weight),1)*1000} height="4" rx="2" /></svg></AppLink></li>;
+    })}</ol>{!words.length ? <p className="muted">More words will appear as your journal grows.</p> : null}</div>;
+  }
   const config = built.type === "chart" ? built.config : null;
   const histogram = config?.data.datasets[0]?.label === "Number of Sessions";
   const byLabel = config && ["doughnut", "bar"].includes(config.type) && config.data.datasets.length === 1 && !config.options?.scales?.x?.stacked;

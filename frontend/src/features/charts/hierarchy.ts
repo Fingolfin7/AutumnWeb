@@ -79,10 +79,10 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
           tree: leaves,
           key: "value",
           groups: ["project", "name"],
-          spacing: 1,
+          spacing: 2,
           borderWidth: 0.75,
           borderColor: "rgba(240,236,229,.16)",
-          captions: { display: false, color: "#f0ece5", font: { size: 13, weight: "500" }, padding: 8 },
+          captions: { display: true, color: "#f0ece5", font: { size: 13, weight: "500" }, padding: 8 },
           backgroundColor(context: TreemapContext) {
             if (context.type !== "data") return "transparent";
             const project = projectOf(context.raw);
@@ -98,13 +98,11 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
               if (context.type !== "data") return "";
               const item = context.raw;
               const value = item.v || item.value || 0;
-              if (value < 0.5) return ""; // no labels on tiny boxes
               /* A leaf carries its record in _data; a project container only
                  has its group name in g. */
               if (item._data?.name) {
                 const amount = formatDuration(value * 60);
-                if ((item.w ?? 100) < 52 || (item.h ?? 60) < 26) return "";
-                if ((item.w ?? 100) < item._data.name.length * 7 + 16 || (item.h ?? 60) < 50) return amount;
+                if ((item.w ?? 100) < item._data.name.length * 7 + 16 || (item.h ?? 60) < 50) return item._data.name;
                 return [item._data.name, amount];
               }
               if (item.g) return item.g;
