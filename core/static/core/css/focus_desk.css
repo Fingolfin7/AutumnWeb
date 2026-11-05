@@ -4686,6 +4686,8 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .journal-entry .session-note :is(ul, ol) { margin: .65em 0; }
 .journal-entry .session-note li + li { margin-top: .35em; }
 .journal-entry .session-note .note-expand { color: var(--muted); font: 400 var(--fs-sm) var(--font-ui); }
+.journal-entry :is(.note-reading-actions, .note-reading-head) .btn { font: 500 var(--fs-sm) var(--font-ui); }
+.journal-entry .note-reading-actions .btn:first-child { padding-left: 0; }
 .journal-add-note { display: inline-flex; align-items: center; min-height: 44px; margin: 0 0 -10px; padding: 0; color: var(--muted); font: 400 max(13px, var(--fs-xs)) var(--font-ui); }
 .journal-day-split, .journal-match-reason { margin: var(--s1) 0 0; max-width: 68ch; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .journal-note-edit { display: grid; gap: var(--s2); max-width: 68ch; margin-top: var(--s2); }
@@ -4737,9 +4739,9 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .capture-pick-sub { flex: 0 2 auto; font: 400 var(--fs-sm)/1.4 var(--font-ui); }
 
 .day-ledger { min-width: 0; }
-.day-ledger .today-section-head { flex-wrap: nowrap; }
+.day-ledger .today-section-head { flex-wrap: nowrap; gap: var(--s2); }
 .day-ledger .range-tabs { flex: none; width: auto; }
-.day-ledger .range-tab { flex: none; padding-inline: var(--s2); font-size: 13px; }
+.day-ledger .range-tab { flex: none; padding-inline: 6px; font-size: 13px; }
 .ledger-range-total { margin: 0 0 var(--s3); color: var(--muted); font-size: 13px; }
 .ledger-total { color: var(--duration); font: 650 var(--fs-md) var(--font-display); font-variant-numeric: tabular-nums; }
 .day-ember-ribbon { display: none; }
