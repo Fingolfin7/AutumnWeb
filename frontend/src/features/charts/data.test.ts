@@ -1,7 +1,5 @@
 import { buildSeries, consolidateTopN, dayKey, getChartUnit, parseDay, withAlpha } from "./data";
-import { groupScatter } from "./basic";
 import { flattenHierarchy } from "./hierarchy";
-import { radarMetrics } from "./analysis";
 import { fontSizer } from "./wordcloud";
 import { buildChart, isEmptyPayload, parseKind } from "./build";
 
@@ -46,23 +44,6 @@ describe("daily series", () => {
   });
   it("sums repeated days", () => {
     expect(buildSeries([{ date: "2026-10-01", series: "a", hours: 1 }, { date: "2026-10-01", series: "a", hours: 2 }], 3).byDay["a"]).toEqual({ "2026-10-01": 3 });
-  });
-});
-
-describe("scatter grouping", () => {
-  const rows = [
-    { x: "2026-10-01T10:00:00Z", y: 1, series: "a" },
-    { x: "2026-10-02T10:00:00Z", y: 3, series: "b" },
-    { x: "2026-10-03T10:00:00Z", y: 0.5, series: "c" },
-  ];
-  it("ranks by total hours and folds the rest", () => {
-    const groups = groupScatter(rows, 1);
-    expect(groups.map((g) => g.name)).toEqual(["b", "Other (2)"]);
-    expect(groups[1]!.other).toBe(true);
-    expect(groups[1]!.points.every((p) => p.projectName === "Other (2)")).toBe(true);
-  });
-  it("sorts subproject series by name", () => {
-    expect(groupScatter(rows).map((g) => g.name)).toEqual(["a", "b", "c"]);
   });
 });
 
@@ -113,13 +94,6 @@ describe("treemap data", () => {
 });
 
 describe("radar and word cloud", () => {
-  it("takes the top six with time and inverts recency", () => {
-    const rows = Array.from({ length: 8 }, (_, i) => ({ name: `p${i}`, total_time: i * 60, session_count: 2, subproject_count: 1, days_since_update: i * 10 }));
-    const metrics = radarMetrics(rows);
-    expect(metrics).toHaveLength(6);
-    expect(metrics[0]).toMatchObject({ name: "p7", totalTime: 7, avgSessionLength: 3.5, recency: 0 });
-    expect(radarMetrics([{ name: "x", total_time: 60, session_count: 1, subproject_count: 0 }])[0]!.recency).toBe(15);
-  });
   it("normalises font sizes into a bounded range", () => {
     const size = fontSizer([["big", 100], ["small", 1]], 1000);
     expect(size(100)).toBe(72);
@@ -136,7 +110,6 @@ describe("payload handling", () => {
     expect(isEmptyPayload("histogram", [{ label: "0-15m", count: 2 }])).toBe(false);
   });
   it("returns null when a builder has nothing to draw", () => {
-    expect(buildChart("radar", [{ name: "a", total_time: 0, session_count: 0, subproject_count: 0 }], { projectLimit: 7, subprojects: false })).toBeNull();
     expect(buildChart("treemap", { name: "All", children: [] }, { projectLimit: 7, subprojects: false })).toBeNull();
   });
   it("swaps in the subproject variants only for a project-name filter", () => {
@@ -157,24 +130,35 @@ describe("payload handling", () => {
       ["pie", tally],
       ["bar", tally],
       ["context", tally],
-      ["status", [{ status: "active", count: 1, total_time: 60 }]],
-      ["scatter", [{ x: "2026-10-01T10:00:00Z", y: 1, series: "a" }]],
       ["line", series],
       ["stacked_area", series],
       ["cumulative", daily],
-      ["calendar", daily],
       ["heatmap", [{ weekday: 1, hour: 9, average_hours: 1 }]],
       ["histogram", [{ label: "0-15m", count: 1 }]],
-      ["radar", [{ name: "a", total_time: 60, session_count: 1, subproject_count: 0 }]],
-      ["bubble", [{ name: "t", tag_id: 1, total_time: 60, project_count: 1, color: "#aabbcc" }]],
       ["treemap", { name: "All", children: [{ name: "c", children: [{ name: "p", total_time: 60, children: [] }] }] }],
       ["wordcloud", [{ text: "word", weight: 3 }]],
     ];
     for (const [kind, data] of cases) expect(buildChart(kind, data, opts), kind).not.toBeNull();
   });
   it("parses chart kinds defensively", () => {
-    expect(parseKind("calendar")).toBe("calendar");
-    expect(parseKind(null)).toBe("pie");
-    expect(parseKind("sunburst")).toBe("pie");
+    expect(parseKind("calendar")).toBe("bar");
+    expect(parseKind(null)).toBe("bar");
+    expect(parseKind("sunburst")).toBe("bar");
   });
+});
+
+it("keeps chart pigments explicit and fills missing days with real zeroes", async () => {
+  const { PALETTE, seriesColor } = await import("./data");
+  expect(PALETTE.every(color => /^#[a-f0-9]{6}$/.test(color))).toBe(true);
+  expect(PALETTE).not.toContain("#7896b8");
+  expect(seriesColor("Garden")).toBe(seriesColor("Garden"));
+  for (const kind of ["line", "stacked_area"] as const) {
+    const built = buildChart(kind, [{ date: "2026-10-02", series: "Garden", hours: 1 }], { projectLimit: 7, subprojects: false, start: "2026-10-01", end: "2026-10-03" });
+    if (built?.type !== "chart") throw new Error("Missing chart");
+    expect(built.config.data.datasets[0].data).toEqual([0,1,0]);
+    expect(built.config.data.datasets[0].tension).toBe(0);
+    const source = JSON.stringify(built.config);
+    expect(source).not.toMatch(/hsl\(|rgb\(0,\s*128,\s*0|#36a2eb|#ff6384|#4bc0c0/i);
+  }
+  for (const retired of ["scatter", "bubble", "radar", "status", "calendar"]) expect(parseKind(retired)).toBe("bar");
 });

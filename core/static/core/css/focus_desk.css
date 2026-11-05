@@ -214,7 +214,7 @@ body.bg-active .app { position: relative; z-index: 2; }
 
 /* ------------------------------------------------------------- APP SHELL -- */
 .screen {
-  width: var(--col);
+  width: min(100%, 1240px);
   margin: 0 auto;
   padding: 0 var(--s4);
 }
@@ -222,7 +222,7 @@ body.bg-active .app { position: relative; z-index: 2; }
 
 /* Opaque chrome keeps scrolling text from bleeding through. */
 .app-header { position: sticky; top: 0; z-index: 45; height: var(--header-h); display: flex; align-items: center; background: var(--surface-0); border-bottom: 1px solid var(--hairline-2); }
-.app-header > .screen { display: flex; align-items: center; justify-content: space-between; gap: var(--s5); width: 100%; max-width: 90rem; }
+.app-header > .screen { display: flex; align-items: center; justify-content: space-between; gap: var(--s5); width: 100%; max-width: 1240px; }
 .brand { display: flex; align-items: center; gap: .55rem; min-height: 44px; }
 .brand-word { font-family: var(--font-display); font-weight: 750; font-size: 1.2rem; letter-spacing: -.04em; }
 .header-right { display: flex; align-items: center; gap: var(--s2); }
@@ -932,7 +932,7 @@ body.bg-active .dim-control { display: flex; }
   /* v1 pins .screen to `width: var(--col)` — a fixed single-column measure.
      The desk needs the real viewport, so release the width and cap with
      max-width instead. Overriding max-width alone does nothing here. */
-  .screen { width: 100%; max-width: 90rem; padding-left: var(--s5); padding-right: var(--s5); }
+  .screen { width: 100%; max-width: 1240px; padding-left: var(--s5); padding-right: var(--s5); }
   .screen-pad { padding-bottom: var(--s6); }
   /* ── page head: title and stats share the top line ─────────────────────*/
   .desk-head {
@@ -1067,7 +1067,7 @@ body.bg-active .dim-control { display: flex; }
 
 /* Very wide: let the ambient track breathe rather than stretching the rows. */
 @media (min-width: 1600px) {
-  .screen { max-width: 100rem; }
+  .screen { max-width: 1240px; }
   .desk { grid-template-columns: minmax(0, 2fr) minmax(22rem, .85fr); }
 }
 
@@ -4409,3 +4409,68 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 
 .import-preview li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(7rem, .45fr); }
 .import-preview > p:has(button) { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s3); }
+
+/* ========================================================================
+   Stream Q
+   ======================================================================== */
+.review-desk .review-period { display: block; padding: var(--s5); }
+.review-desk .review-range { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; gap: var(--s3); }
+.review-desk .review-range h2 { font: 550 var(--fs-sm)/1.4 var(--font-display); text-align: center; }
+.review-desk .review-total-row { display: flex; align-items: center; justify-content: space-between; margin-top: var(--s5); }
+.review-desk .review-total-row > div { display: block; }
+.review-desk .review-total { font: 650 clamp(2.8rem,6vw,4.2rem)/1.2 var(--font-display); font-variant-numeric: proportional-nums; letter-spacing: -.045em; }
+.review-summary { color: var(--ink-2); margin-top: var(--s3); }
+.review-question { width: 100%; max-width: none; padding: var(--s3); border: 1px solid var(--hairline-2); border-radius: var(--r-md); background: var(--slab); }
+.review-question .input { width: 100%; }
+.review-commitments .review-section-heading > div { display: grid; gap: var(--s3); }
+.review-desk .review-commitment { padding: var(--s4) var(--s5); }
+.review-desk .review-commitment > a { font: 600 var(--fs-md)/1.4 var(--font-display); }
+.review-desk .review-commitment > p { font-size: var(--fs-xs); }
+.review-project-name { color: var(--project); }
+.review-projects--subprojects .review-project-name { color: var(--sub); }
+.review-projects .review-section-heading .btn { border: 1px solid var(--hairline-2); border-radius: var(--r-pill); white-space: nowrap; }
+.review-project-foot { flex-wrap: wrap; }
+.review-desk .review-day-strip .review-ghost-bar { fill: var(--muted); stroke: none; opacity: .18; }
+.review-chart #canvas_container, .review-chart #canvas_container.chart-circular { height: auto; max-height: none; padding-bottom: 0; width: 100%; }
+.chart-plot { position: relative; width: 100%; height: 340px; }
+.chart-circular .chart-plot { height: 330px; }
+.chart-series { list-style: none; margin: var(--s4) 0 0; padding: 0; position: static; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 0 var(--s5); }
+.chart-series li { min-width: 0; border-bottom: 1px solid var(--hairline); }
+.chart-series button { display: flex; width: 100%; gap: var(--s3); align-items: center; min-height: 44px; padding: var(--s2) 0; text-align: left; border: 0; background: transparent; font-size: var(--fs-xs); }
+.chart-series button > span { min-width: 0; overflow-wrap: anywhere; }
+.chart-series button > strong { margin-left: auto; white-space: nowrap; color: var(--duration); }
+.chart-series button[aria-pressed="false"] { opacity: .5; }
+.chart-series-dot { width: 8px; flex: 0 0 8px; }
+.period-embers { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: var(--s2); margin-top: var(--s5); border-top: 1px solid var(--hairline); padding-top: var(--s4); }
+.period-embers button { display: grid; justify-items: center; gap: var(--s1); min-height: 52px; border: 0; padding: var(--s1); color: var(--muted); background: transparent; font-size: var(--fs-xs); }
+.period-embers svg { width: 40px; }
+.period-embers--long { grid-template-columns: repeat(auto-fit,minmax(44px,1fr)); }
+.period-embers--long button { min-height: 44px; }
+.period-embers--long svg { width: 32px; }
+.review-empty-embers { display: grid; grid-template-columns: repeat(14,1fr); gap: 6px; margin-block: var(--s5); opacity: .5; }
+.review-empty-embers span { aspect-ratio: 1; border-radius: 3px; background: var(--raised-2); }
+.commitment-meter { margin-block: var(--s3); }
+.commitment-meter-values { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); font-size: var(--fs-sm); color: var(--muted); }
+.commitment-meter-values strong { color: var(--duration); font: 650 var(--fs-lg)/1.4 var(--font-display); }
+.commitment-meter-values > :last-child { margin-left: auto; font-size: var(--fs-xs); color: var(--ink-2); }
+.commitment-meter-track { display: block; height: 8px; width: 100%; margin-top: var(--s3); fill: var(--raised-2); }
+.commitment-meter-track rect + rect { fill: var(--brand); }
+.commitment-meter-track rect.is-met { fill: var(--duration-deep); }
+@media (max-width:999px) {
+  .review-desk .review-period { padding: var(--s4); }
+  .review-desk .review-total-row { display: flex; margin-top: var(--s4); }
+  .review-desk .review-total-row > .btn { display: none; }
+  .review-desk .review-total-row > div { display: block; }
+  .review-desk .review-total { font-size: 3rem; }
+  .review-desk .review-range { gap: var(--s1); }
+  .review-desk .review-range h2 { font-size: var(--fs-xs); }
+  .review-heading { flex-wrap: wrap; }
+  .review-main-controls { display: block; }
+  .review-main-controls .review-toolbar { display: grid; gap: var(--s3); }
+  .review-main-controls .review-view-switch, .review-main-controls .review-presets { display: flex; overflow-x: auto; max-width: 100%; flex-wrap: nowrap; }
+  .review-main-controls button { white-space: nowrap; }
+  .chart-plot { height: 300px; }
+  .chart-series { grid-template-columns: minmax(0,1fr); }
+  .review-desk .review-section-heading { flex-wrap: wrap; gap: var(--s3); }
+  .review-desk .review-commitment { padding-inline: var(--s4); }
+}

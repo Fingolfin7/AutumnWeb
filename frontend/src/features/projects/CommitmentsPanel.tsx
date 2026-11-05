@@ -100,7 +100,6 @@ export function CommitmentsPanel({
     <Disclose id="commitments" icon={faBullseye} iconClass="text-cyan" title="Commitments" summary={commitments.length} className="commitment-section">
       <div className="band-list">
           {commitments.map((commitment) => {
-            const period = commitment.current_period;
             const timeBased = commitment.commitment_type === "time";
 
             const rules = commitmentRuleLines(commitment, names);
@@ -118,7 +117,7 @@ export function CommitmentsPanel({
                 {commitment.active ? (
                   <>
                     <QuickTarget key={commitment.version} commitment={commitment} />
-                    <progress className="subproject-progress commitment-progress" max={Math.max(period.target, period.accrued, 1)} value={period.accrued} aria-label="Commitment progress" />
+
 
                     {commitment.banking_enabled ? (
                       <details className="commitment-bank-detail"><summary>Time carryover</summary><div className="bank-row">

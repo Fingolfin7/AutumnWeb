@@ -1,4 +1,5 @@
 import WordCloud from "wordcloud";
+import { emberColor } from "./data";
 import type { WordRow } from "./payloads";
 
 /* Word cloud of session notes (core/static/core/js/charts/wordcloud.js).
@@ -22,7 +23,7 @@ export function fontSizer(words: [string, number][], canvasWidth: number): (weig
 
 /* Warmer for more frequent words: hue 200 (blue) down to 40 (orange). */
 export function wordColor(weight: number, maxWeight: number): string {
-  return `hsl(${200 - (weight / maxWeight) * 160}, 80%, 55%)`;
+  return emberColor(weight, maxWeight);
 }
 
 export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width: number, height: number) {
@@ -33,11 +34,11 @@ export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width:
   const maxWeight = words[0]![1];
   WordCloud(canvas, {
     list: words,
-    gridSize: Math.round(((words.length > 50 ? 8 : 16) * width) / 1024),
+    gridSize: Math.max(8, Math.round(16 * width / 1024)),
     weightFactor: fontSizer(words, width),
-    fontFamily: "Inter, system-ui, sans-serif",
+    fontFamily: "Manrope, system-ui, sans-serif",
     color: (_word, weight) => wordColor(weight, maxWeight),
-    rotateRatio: 0.4,
+    rotateRatio: 0,
     rotationSteps: 2,
     backgroundColor: "transparent",
     drawOutOfBound: false,
