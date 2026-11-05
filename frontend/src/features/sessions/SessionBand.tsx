@@ -6,6 +6,7 @@ import { ConfirmDialog, Sheet } from "@/components/Sheet";
 import { SessionNote } from "@/components/SessionNote";
 import { useNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
+import { api, unwrap } from "@/api/client";
 import { AppLink, urls } from "@/app/links";
 import { formatDuration, formatShortDate, formatTime, formatTimeRange } from "@/lib/format";
 import { useStartTimer } from "@/features/timers/api";
@@ -157,14 +158,29 @@ function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; o
       return saved;
     },
   });
+  const complete = async () => {
+    if (!(await draft.flush())) return;
+    if (onSaved) {
+      // PATCH returns plain text; retain the sanitized rendering as well when
+      // this entry no longer matches its list's search.
+      try {
+        const rendered = await unwrap(api.GET("/api/v2/sessions/{session_id}", {
+          params: { path: { session_id: session.id }, query: { include: "note_html" } },
+        }));
+        if (rendered.note === draft.value) onSaved(rendered);
+      } catch { /* The successfully saved plain note stays available. */ }
+    }
+    onDone();
+    toast.success("Note saved.");
+  };
   return <form className="journal-note-edit fields" onSubmit={(event) => {
     event.preventDefault();
-    void draft.flush().then((ok) => { if (ok) { onDone(); toast.success("Note saved."); } });
+    void complete();
   }}>
     <NoteEditor value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
     <div className="journal-edit-actions">
       <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
-      <button className="btn btn--quiet" type="button" onClick={() => { void draft.flush().then((ok) => { if (ok) onDone(); }); }}>Close editor</button>
+      <button className="btn btn--quiet" type="button" onClick={() => void complete()}>Close editor</button>
       {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}
       <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}>Time & allocation</AppLink>
     </div>

@@ -67,13 +67,14 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await page.goto(`/sessions/?search=${encodeURIComponent(note)}`);
   const retained = page.locator(`#session-${id}`);
   await retained.getByRole("button", { name: "Edit this note in place", exact: true }).click();
-  const revised = `A different reflection for ${testInfo.project.name}, with the search word removed.`;
+  const revised = `A different **reflection** for ${testInfo.project.name}, with the search word removed.`;
   await retained.getByRole("textbox", { name: "Note", exact: true }).fill(revised);
   await expect(retained.getByRole("status")).toHaveText("Saved");
   await expect(retained.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(revised);
   await retained.getByRole("button", { name: "Done", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`search=${encodeURIComponent(note)}`));
-  await expect(retained.getByText(revised, { exact: true })).toBeVisible();
+  await expect(retained.getByText(revised.replaceAll("**", ""), { exact: true })).toBeVisible();
+  await expect(retained.locator(".session-note strong")).toHaveText("reflection");
   const original = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
   // An edit must prefill from the session even when its lookup cache is stale.
   await page.route("**/api/v2/projects/?*", (route) => route.fulfill({ json: { projects: [], total: 0, count: 0 } }));

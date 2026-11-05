@@ -101,7 +101,10 @@ export default function SessionsPage() {
   useEffect(() => setRetained({ scope, rows: {} }), [scope]);
   const pinned = retained.scope === scope ? retained.rows : {};
   const fetched = list.data?.pages.flatMap((page) => page.sessions) ?? [];
-  const all: SessionRow[] = fetched.map((session) => pinned[session.id]?.session ?? session);
+  const all: SessionRow[] = fetched.map((session) => {
+    const saved = pinned[session.id]?.session;
+    return saved && (saved.version > session.version || (saved.version === session.version && saved.note_html && !session.note_html)) ? saved : session;
+  });
   for (const { session, index } of Object.values(pinned).sort((a, b) => a.index - b.index)) {
     if (!all.some((row) => row.id === session.id)) all.splice(Math.min(index, all.length), 0, session);
   }
