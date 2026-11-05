@@ -1,10 +1,8 @@
-import { faPlay } from "@fortawesome/free-solid-svg-icons";
-import { Icon } from "@/components/Icon";
 import { formatTime, formatDate, toDateTimeLocal } from "@/lib/format";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
-import { CapturePicker, CapturePickLabel } from "./CapturePicker";
+import { CapturePicker } from "./CapturePicker";
 import { urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { useAllProjects, useSubprojects } from "@/api/meta";
@@ -17,7 +15,6 @@ import { Suggestions } from "./Suggestions";
 import { PushPermission } from "./PushPermission";
 import { clearNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
-import { AppLink } from "@/app/links";
 import { parseDuration } from "./duration";
 import { SegmentedControl } from "@/components/ui";
 import { useDashboard } from "@/features/dashboard/api";
@@ -58,6 +55,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
   const [past, setPast] = useState(params.get("mode") === "past");
   const [pastAt, setPastAt] = useState(() => toDateTimeLocal(new Date()).slice(0, 16));
   const [pastDuration, setPastDuration] = useState("45");
+  const [customDuration, setCustomDuration] = useState(false);
   const [pastAnchor, setPastAnchor] = useState("start");
   const [note, setNote] = useState("");
   const pastTime = useLocalTime(pastAt);
@@ -169,7 +167,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
       }
       setSavingPast(true);
       try {
-        await unwrap(
+        const saved = await unwrap(
           api.POST("/api/v2/sessions/", {
             body: {
               project_id: project.id,
@@ -182,7 +180,7 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
         );
         clearNoteDraft("capture", note);
         invalidate("sessions");
-        toast.success("Saved past session.");
+        toast.success("Saved past session.", { action: { label: "View", run: () => navigate(`${urls.sessions()}?start_date=${pastAt.slice(0, 10)}&end_date=${pastAt.slice(0, 10)}#session-${saved.id}`) } });
         close();
       } catch (error) {
         toast.error(errorMessage(error));
@@ -255,11 +253,6 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
             Log past time
           </button>
         </div>
-        <div className="desk-head" hidden={inline}>
-          <div>
-            <h2 className="page-title">{past ? "A little time, remembered." : "What are you working on?"}</h2>
-          </div>
-        </div>
         <form className="fields capture-form" onSubmit={submit}>
           <div className={`desk-main${inline && !project ? " capture-awaiting-project" : ""}`}>
             <section className="slab slab-pad">
@@ -295,23 +288,32 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
                   <LocalTimeNotice field={pastTime} label="the session" />
                 </div>
                 <div className="field">
-                  <label htmlFor="past-duration">Duration</label>
+                  <span className="field-label">Duration</span>
                   <div className="preset-row" aria-label="Duration presets">
-                    {[15, 30, 45, 60].map((minutes) => <button key={minutes} type="button" className={`btn btn--quiet${parseDuration(pastDuration) === minutes ? " is-active" : ""}`} aria-pressed={parseDuration(pastDuration) === minutes} onClick={() => setPastDuration(`${minutes}m`)}>{minutes}m</button>)}
-                    <button className="btn btn--quiet" type="button" onClick={() => document.getElementById("past-duration")?.focus()}>Custom</button>
+                    {[15, 30, 45, 60].map((minutes) => <button key={minutes} type="button" className={`btn btn--quiet${!customDuration && parseDuration(pastDuration) === minutes ? " is-active" : ""}`} aria-pressed={!customDuration && parseDuration(pastDuration) === minutes} onClick={() => { setCustomDuration(false); setPastDuration(`${minutes}m`); }}>{minutes}m</button>)}
+                    <button className={`btn btn--quiet${customDuration ? " is-active" : ""}`} aria-pressed={customDuration} type="button" onClick={() => setCustomDuration(true)}>Custom</button>
                   </div>
-                  <input id="past-duration" type="text" required value={pastDuration} placeholder="45m or 1h 30" onChange={(e) => setPastDuration(e.target.value)} />
+                  {customDuration ? <><label className="sr-only" htmlFor="past-duration">Duration</label><input id="past-duration" autoFocus type="text" required value={pastDuration} placeholder="45m or 1h 30" onChange={(e) => setPastDuration(e.target.value)} /></> : null}
                 </div>
               </section>
             ) : null}
               {
-                <div id="pick-subprojects" className="field capture-subprojects">
+                <div id="pick-subprojects" className={`field capture-subprojects${!project ? " is-unavailable" : ""}`} inert={!project} aria-hidden={!project}>
                   <label htmlFor="capture-subproject">Subproject (optional)</label>
                   <select id="capture-subproject" disabled={!project} value={selected.length === 1 ? selected[0] : ""} onChange={(event) => setSelected(event.target.value ? [Number(event.target.value)] : [])}>
                     <option value="">{selected.length > 1 ? `${selected.length} selected` : "Whole project"}</option>
                     {subs.map((sub) => <option value={sub.id} key={sub.id}>{sub.name}</option>)}
                   </select>
-                  <details className="capture-multiple"><summary>Multiple subprojects & new subproject</summary>
+</div>
+              }
+            <details className="capture-note" open={past || undefined}><summary>Add a note (optional)</summary>
+            <NoteEditor persistKey="capture" value={note} onChange={setNote} rows={3} placeholder="Optional notes to begin with..." />
+            </details>
+              <details className="capture-options">
+                <summary>
+                  Options <span className="muted">Subprojects{!past ? ", auto-stop & reminders" : ""}</span>
+                </summary>
+                                  <details className="capture-multiple"><summary>Split across subprojects</summary>
                   <div className="field-head" id="select-all-block">
                     <span className="field-label">Subprojects</span>
                     {subs.length ? (
@@ -391,27 +393,8 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
                       Add
                     </button>
                   </div>
-                </details></div>
-              }
-            <div className="form-actions">
-              <span className="start-summary">{summary}</span>
-              <button
-                type="submit"
-                id="start-timer"
-                className="btn btn--primary btn--spacer"
-                disabled={!project || start.isPending || savingPast}
-              >
-                {past ? "Save session" : "Start timer"}
-              </button>
-            </div>
-            <details className="capture-note" open={past || undefined}><summary>Add a note (optional)</summary>
-            <NoteEditor persistKey="capture" value={note} onChange={setNote} rows={3} placeholder="Optional notes to begin with..." />
-            </details>
-            {!past ? (
-              <details className="capture-options">
-                <summary>
-                  Options <span className="muted">Auto-stop & reminders</span>
-                </summary>
+                </details>
+                {!past ? <>
                 <section className="slab slab-pad">
                   <label className="check-row">
                     <input
@@ -591,19 +574,23 @@ export function CaptureForm({ inline = false, onComplete }: { inline?: boolean; 
                   </fieldset>
                 </section>
                 <details className="capture-options" onToggle={(event) => setSuggestionsOpen(event.currentTarget.open)}><summary>Suggestions for what to work on</summary>{suggestionsOpen ? <Suggestions /> : null}</details>
+                </> : null}
               </details>
-            ) : null}
 
           </div>
+            <div className="form-actions">
+              <span className="start-summary">{summary}</span>
+              <button
+                type="submit"
+                id="start-timer"
+                className="btn btn--primary btn--spacer"
+                disabled={!project || start.isPending || savingPast}
+              >
+                {past ? "Save session" : "Start timer"}
+              </button>
+            </div>
         </form>
-        {!past && !project && dashboard.data?.quick_starts.length ? <div className="today-quick">
-          <h2>Pick up where you left off</h2>
-          {[...new Map(dashboard.data.quick_starts.map((item) => [item.project.id, item])).values()].slice(0, 4).map((item) => <button className="today-quick-pick" type="button" key={item.project.id} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => {
-            const next = projects.data?.find((p) => p.id === item.project.id);
-            if (next) void submit(undefined, next, item.subprojects.map((sub) => sub.id));
-          }}><Icon icon={faPlay} /><CapturePickLabel project={item.project.name} sublabel={item.subprojects.map((sub) => sub.name).join(", ")} /></button>)}
-        </div> : null}
-        {inline ? <AppLink className="btn btn--secondary today-log-past" href="/start_timer/?mode=past">Log past time</AppLink> : null}
+
     </div>
   );
 }

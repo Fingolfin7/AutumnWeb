@@ -124,6 +124,7 @@ export function CapturePicker({
                 aria-label={`${pick.label}${pick.sublabel ? ` / ${pick.sublabel}` : ""}`}
                 className={`${active === index ? "is-active" : ""}${pick.sublabel ? " capture-pick-sub" : ""}`}
                 onMouseDown={(event) => event.preventDefault()}
+                onPointerMove={() => setActive(index)}
                 onClick={() => choose(pick)}
               >
                 <CapturePickLabel project={pick.label} sublabel={pick.sublabel} />

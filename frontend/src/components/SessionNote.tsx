@@ -33,6 +33,27 @@ function highlight(html: string, query: string) {
   return root.innerHTML;
 }
 
+/** Mark only timestamp text, never touch the sanitized markup or saved journal. */
+function timestamps(html: string) {
+  const root = document.createElement("div"); root.innerHTML = html;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = []; while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+  for (const node of nodes) {
+    if (node.parentElement?.closest("a, code, pre")) continue;
+    const pattern = /(^|\n)(?:\u2014\s*)?(\d{1,2}:\d{2})\s*\u2014\s*/g;
+    const matches = [...node.data.matchAll(pattern)];
+    if (!matches.length) continue;
+    const fragment = document.createDocumentFragment(); let offset = 0;
+    for (const match of matches) {
+      fragment.append(document.createTextNode(node.data.slice(offset, match.index) + (match[1] ?? "")));
+      const label = document.createElement("span"); label.className = "note-timestamp"; label.textContent = match[0].slice((match[1] ?? "").length);
+      fragment.append(label); offset = match.index! + match[0].length;
+    }
+    fragment.append(document.createTextNode(node.data.slice(offset))); node.replaceWith(fragment);
+  }
+  return root.innerHTML;
+}
+
 /** Sanitized API markdown or plain text. Prose opens the complete note in place. */
 export function SessionNote({ html, text, id, identity, onEdit, search = "" }: { html?: string | null; text?: string | null; id?: string; identity?: ReactNode; onEdit?: () => void; search?: string }) {
   const generated = useId();
@@ -53,7 +74,7 @@ export function SessionNote({ html, text, id, identity, onEdit, search = "" }: {
     return previewHtml(matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 350 ? matched.outerHTML : full);
   }, [full, search]);
   const clipped = preview !== full;
-  const rendered = useMemo(() => highlight(open ? full : preview, search), [full, preview, open, search]);
+  const rendered = useMemo(() => timestamps(highlight(open ? full : preview, search)), [full, preview, open, search]);
   useEffect(() => {
     if (!open) { setStuck(false); return; }
     const heading = root.current?.closest(".journal-entry")?.querySelector(".journal-heading") ?? root.current;

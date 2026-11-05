@@ -41,7 +41,7 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   await runningCard.getByRole("button", { name: "Expand note" }).click();
   const writer = page.getByRole("dialog", { name: "Full-screen note writer" });
   await expect(writer.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
-  await writer.getByRole("button", { name: "Return to session" }).click();
+  await writer.getByRole("button", { name: "Done" }).click();
   await expect(runningCard.getByRole("textbox", { name: "Session note" })).toHaveValue(note);
   const stoppedId = await runningCard.getAttribute("data-timer-id");
   await runningCard.getByRole("link", { name: "Stop" }).click();

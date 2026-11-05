@@ -139,10 +139,10 @@ function TimerCard({ timer, now }: { timer: Timer; now: number }) {
 function StartCard({ items }: { items: Dashboard["quick_starts"] }) {
   const start = useStartTimer();
   const toast = useToast();
-  const recent = [...new Map(items.map((item) => [item.project.id, item])).values()].slice(0, 4);
+  const recent = items.slice(0, 4);
   return <section className="today-idle" aria-label="Start a new timer">
     <div className="today-section-head"><h2>Pick up where you left off</h2><AppLink className="btn btn--secondary today-log-past" href="/start_timer/?mode=past">Log past time</AppLink></div>
-    <div className="today-pickups">{recent.map((item) => <button className="today-quick-pick" type="button" key={item.project.id} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => start.mutate({
+    <div className="today-pickups">{recent.map((item) => <button className="today-quick-pick" type="button" key={`${item.project.id}-${item.subprojects.map((sub) => sub.id).join("-")}`} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => start.mutate({
       project_id: item.project.id, subproject_ids: item.subprojects.map((sub) => sub.id),
       optimistic: { projectName: item.project.name, subprojects: item.subprojects },
     }, { onSuccess: () => toast.success("Started timer"), onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`) })}>

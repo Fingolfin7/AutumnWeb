@@ -181,7 +181,7 @@ function InlineNoteWriter({ session, onDone, onSaved }: { session: SessionRow; o
     event.preventDefault();
     void complete();
   }}>
-    <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
+    <NoteEditor sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} value={draft.value} onChange={draft.change} autoFocus rows={4} onDone={draft.flush} saveStatus={draft.status} onRetry={() => void draft.flush()} onBlur={() => void draft.flush()} />
     <div className="journal-edit-actions">
       <button className="btn btn--primary" aria-busy={update.isPending}>Done</button>
       {draft.value !== (session.note ?? "") ? <button className="btn btn--quiet" type="button" onClick={() => { draft.change(session.note ?? ""); void draft.flush(); }}>Undo note edits</button> : null}

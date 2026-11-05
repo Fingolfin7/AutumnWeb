@@ -4876,3 +4876,36 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .today-pickups { grid-template-columns: minmax(0, 1fr); }
   .today-idle .today-section-head { flex-wrap: wrap; }
 }
+
+/* Capture keeps the decision and its action in view while the journal scrolls. */
+.capture-sheet .sheet-title { font: 600 20px/1.4 var(--font-display); margin: 0 44px var(--s3) 0; }
+.capture-sheet .sheet-panel { display: flex; flex-direction: column; overflow: hidden; }
+.capture-control { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.capture-control .capture-form { display: flex; flex-direction: column; flex: 1; min-height: 0; padding-bottom: 0; }
+.capture-control .capture-form .desk-main { flex: 1; min-height: 0; overflow-y: auto; padding: 0 var(--s1) var(--s4); }
+.capture-control .form-actions { flex: none; margin: 0; padding: var(--s3) 0 0; background: var(--surface-2); }
+.capture-control .form-actions .start-summary { display: none; }
+.capture-control .form-actions .btn { width: 100%; margin: 0; }
+.capture-control .capture-subprojects { min-height: 82px; }
+.capture-control .capture-subprojects.is-unavailable { visibility: hidden; }
+.capture-control .capture-multiple { margin-bottom: var(--s4); }
+.capture-picker { position: relative; }
+.capture-picker .capture-picks { position: absolute; z-index: 15; inset: calc(100% + 4px) 0 auto; max-height: min(34dvh, 280px); overflow-y: auto; margin: 0; padding: var(--s1); background: var(--surface-2); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); box-shadow: var(--e2); }
+.capture-picker .capture-picks > li { padding: var(--s2) var(--s3); border: 0; min-height: 44px; }
+.capture-picks .capture-pick-label > span { color: var(--ink-2); font-weight: 450; }
+.capture-picks .capture-pick-sub .capture-pick-label > span { font-size: var(--fs-xs); color: var(--muted); }
+.capture-picks .capture-pick-label small { color: var(--sub); }
+.capture-picker .capture-picks > li:hover:not(.is-active) { background: transparent; outline: none; }
+.capture-control .capture-modes { flex: none; margin-bottom: var(--s4); }
+/* The writer has one edge-to-edge toolbar, a quiet timestamp rail and a clear Done. */
+.note-editor-field.is-writing { width: 100%; max-width: none; padding: 0; }
+.note-writer-heading { padding: var(--s4) max(var(--s4), calc((100vw - 76ch) / 2)); z-index: 3; }
+.note-writer-heading h2, .note-writer-heading small { white-space: normal; overflow: visible; text-overflow: clip; }
+.note-writer-heading small { line-height: 1.6; }
+.note-writer-heading h2 { color: var(--project); }
+.is-writing .note-editor-shell textarea { width: min(100%, 76ch); margin-inline: auto; padding: var(--s4); }
+.is-writing .note-editor-toolbar { padding-inline: max(var(--s4), calc((100vw - 76ch) / 2)); border-radius: 0; background: var(--surface-2); position: relative; z-index: 2; }
+.is-writing .note-editor-toolbar::before { content: ""; position: absolute; pointer-events: none; inset: auto 0 100%; height: 12px; background: linear-gradient(transparent, var(--surface-0)); }
+.is-writing .note-editor-status { padding-inline: var(--s4); }
+.note-timestamp { color: var(--muted); font: 400 13px/1.7 var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.palette-input { box-sizing: border-box; min-height: 48px; height: auto; line-height: 1.5; padding-block: var(--s3); }
