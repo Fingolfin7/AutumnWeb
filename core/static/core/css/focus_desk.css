@@ -4651,3 +4651,6 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
     font-size: var(--fs-xs); margin-bottom: -16px;
   }
 }
+
+.review-projects:not([data-chart-kind="context"]):not([data-chart-kind="histogram"]):not([data-chart-kind="cumulative"]) .chart-series button > span { color: var(--project); }
+.review-projects--subprojects:not([data-chart-kind="histogram"]):not([data-chart-kind="cumulative"]) .chart-series button > span { color: var(--sub); }
