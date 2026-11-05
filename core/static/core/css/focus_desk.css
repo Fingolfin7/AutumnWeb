@@ -4468,7 +4468,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .ember-clock.is-compact .focus-autostop-bar { grid-column: 1 / -1; }
 .today-page .today-section-head h2, .today-page .today-commitments h2 { font: 600 var(--fs-lg)/1.35 var(--font-display); }
 .today-journal .journal-entry::before { content: none; }
-.offline-banner > .svg-inline--fa { opacity: .55; }
+.offline-banner > .icon { opacity: .55; }
 @media (max-width: 999px) {
   .ember-clock .timer-expanded-content { grid-column: 1 / -1; grid-row: auto; margin-top: var(--s4); }
   .ember-clock .timer-note-editor { padding: 0; border: 0; }
@@ -4538,7 +4538,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .note-reading-head .btn { padding-inline: var(--s2); font-size: var(--fs-sm); }
   .journal-search .searchbar { flex-wrap: nowrap; }
   .journal-search .filter-launcher { font-size: 0; gap: 0; width: 44px; padding: 0; flex: none; }
-  .journal-search .filter-launcher > .svg-inline--fa { font-size: var(--fs-md); }
+  .journal-search .filter-launcher > .icon { font-size: var(--fs-md); }
   .today-journal .journal-entry { padding-inline: 0; }
   .note-compact-preview { gap: var(--s3); }
   .note-compact-preview p { font-size: var(--fs-md); }
@@ -4549,7 +4549,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .capture-control .capture-form, .capture-control .desk-main > .slab, .capture-control #search-projects { margin: 0; }
 .capture-control .capture-form .desk-main { gap: var(--s4); }
 .capture-control--inline .today-quick { margin-top: 0; }
-.capture-control .today-quick-pick > .svg-inline--fa { color: var(--brand); flex: none; width: 20px; align-self: center; }
+.capture-control .today-quick-pick > .icon { color: var(--brand); flex: none; width: 20px; align-self: center; }
 @media (min-width: 1000px) {
   .capture-control--inline { display: grid; max-width: none; grid-template-columns: minmax(0, 1fr) minmax(0, .85fr); column-gap: var(--s7); }
   .capture-control--inline .capture-form { grid-column: 1; grid-row: 1 / 3; }
@@ -4580,4 +4580,8 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .capture-control .preset-row .btn { min-width: 44px; min-height: 44px; padding-inline: var(--s3); }
 @media (max-width: 999px) {
   .session-note-body { min-height: 44px; }
+}
+
+@media (max-width: 999px) {
+  .journal-search > .journal-presets { display: flex; }
 }
