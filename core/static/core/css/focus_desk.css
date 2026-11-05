@@ -4141,6 +4141,9 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .journal-meta .journal-time { min-height: 44px; display: inline-flex; align-items: center; }
 .session-note-body { position: relative; }
 .session-note-body::after { content: none; }
+.session-note-body, .journal-entry .session-note-body { display: block; -webkit-line-clamp: unset; max-height: 9.6em; }
+.session-note.has-overflow:not(.is-open) .session-note-body { mask-image: linear-gradient(to bottom, #000 calc(100% - 1.6em), transparent); }
+.session-note.is-open .session-note-body { max-height: none; mask-image: none; }
 .journal-entry .session-note p + p { margin-top: .8em; }
 .session-note .note-expand, .session-note .note-tap-edit { min-height: 44px; margin: 0 var(--s4) 0 0; padding: var(--s2) 0; border: 0; background: transparent; color: var(--brand); font: 500 var(--fs-sm)/1.4 var(--font-ui); }
 .session-note .note-tap-edit { color: var(--muted); }
@@ -4166,6 +4169,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 }
 .today-page { max-width: 1240px; margin-inline: auto; gap: var(--s6); }
 .ember-deck { display: flex; flex-direction: column; gap: var(--s3); }
+.ember-deck > * { flex: none; }
 .ember-clock { isolation: isolate; border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent); border-radius: var(--r-xl); background: linear-gradient(120deg, #2a1b149c, transparent 60%), var(--surface-1); box-shadow: var(--edge), 0 20px 65px #00000024; overflow: visible; }
 .ember-clock::before { pointer-events: none; z-index: -1; inset: 0; width: auto; height: auto; border-radius: inherit; background: radial-gradient(ellipse at 12% 74%, #ec883d80, #c95c2720 45%, transparent 75%); opacity: .18; transform: none; animation: none; transition: opacity 90s linear; }
 .ember-clock[data-ember-step="1"]::before { opacity: .30; }
@@ -4237,7 +4241,8 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .ember-clock .focus-time .focus-seconds .num { font-size: 1.2rem; }
   .ember-clock .focus-time .unit { font-size: var(--fs-xs); }
   .ember-clock .focus-details { align-items: center; }
-  .ember-clock .focus-subs .sub-chip { padding-left: 0; }
+  .ember-clock .focus-subs .sub-chip { position: relative; padding-inline: var(--s2); background: transparent; box-shadow: none; }
+  .ember-clock .focus-subs .sub-chip::before { content: ""; position: absolute; inset: 10px 0; border: 1px solid color-mix(in srgb, var(--sub) 24%, transparent); border-radius: var(--r-xs); pointer-events: none; }
   .compact-timer { padding: var(--s2) var(--s3); gap: var(--s2); }
   .compact-timer-open { gap: var(--s2); font-size: var(--fs-sm); }
   .compact-timer-open .live-dot { display: none; }

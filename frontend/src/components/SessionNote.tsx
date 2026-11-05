@@ -18,7 +18,7 @@ export function SessionNote({ html, text, id, identity, onEdit }: { html?: strin
   }, [html, text, open]);
   if (!html && !text) return null;
   return (
-    <div className={`session-note${open ? " is-open" : ""}`}>
+    <div className={`session-note${open ? " is-open" : ""}${overflows ? " has-overflow" : ""}`}>
       {open ? <div className="note-reading-head">
         <div className="note-reading-identity">{identity ?? "Session note"}</div>
         <button className="btn btn--quiet" type="button" onClick={() => { setOpen(false); body.current?.closest(".journal-entry, .session-note")?.scrollIntoView({ block: "start" }); }}>Collapse</button>
