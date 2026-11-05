@@ -1,5 +1,4 @@
-import { CaptureForm } from "@/features/timers/CaptureForm";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -14,7 +13,14 @@ import { useNow, useOutsideContextTimerCount, useTimers } from "@/features/timer
 import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "@/features/sessions/SessionBand";
 import { CommitmentsPanel } from "./CommitmentsPanel";
-import { DayTimeline } from "./DayTimeline";
+import { CommitmentMeter } from "@/features/commitments/CommitmentMeter";
+import { CapturePickLabel } from "@/features/timers/CapturePicker";
+import { useStartTimer } from "@/features/timers/api";
+import { useToast } from "@/app/toasts";
+import { errorMessage } from "@/api/errors";
+import { Icon } from "@/components/Icon";
+import { faPlay } from "@fortawesome/free-solid-svg-icons";
+import { DayTimeline, ledgerEntries } from "./DayTimeline";
 import { useDashboard, useRefreshOnRunningChange, useTimeline, type Dashboard, type TimelineRange } from "./api";
 
 export default function HomePage() {
@@ -39,6 +45,8 @@ function HomeContent({ data }: { data: Dashboard }) {
   const running = [...(timers.data ?? data.active_timers)].sort((a, b) => Date.parse(b.start) - Date.parse(a.start));
   const [range, setRange] = useState<TimelineRange>("today");
   const timeline = useTimeline(range, data.timeline);
+  const todayTimeline = useTimeline("today", data.timeline);
+  const total = ledgerEntries(todayTimeline.data ?? data.timeline, running, now).reduce((sum, block) => sum + block.minutes, 0);
   const outside = useOutsideContextTimerCount();
   const { setContextId } = useActiveContext();
   const firstRun = !running.length && !data.recent_sessions.length && !data.quick_starts.length;
@@ -47,22 +55,14 @@ function HomeContent({ data }: { data: Dashboard }) {
     <div className="today-page">
       <header className="today-heading">
         <h1 className="page-title">Today</h1>
-        <span>{formatDayDate(new Date(now))}</span>
+        <span className="today-date">{formatDayDate(new Date(now))}</span>
+        <strong className="today-total">{formatDuration(total)} <small>today{running.length ? " · including live time" : ""}</small></strong>
         {running.length ? (
           <AppLink className="btn btn--quiet" href={urls.startTimer()}>
             + New timer
           </AppLink>
         ) : null}
       </header>
-      {running.length ? (
-        <section className="ember-deck" aria-label="Running timers">
-          {running.map((timer) => (
-            <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} />
-          ))}
-        </section>
-      ) : (
-        <StartCard />
-      )}
       {firstRun ? <p className="muted">Pick a project and start. Your notes and time will make this day your own.</p> : null}
       {outside ? (
         <p className="muted timers-outside-context">
@@ -72,34 +72,27 @@ function HomeContent({ data }: { data: Dashboard }) {
           </button>
         </p>
       ) : null}
-      {timeline.data && !firstRun ? (
-        <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} />
-      ) : null}
-      {!firstRun ? (
-        <>
-      {data.commitments.length ? (
-        <section className="today-commitments" aria-label="Commitment summary">
-          <div className="today-section-head">
-            <h2>Commitments</h2>
-            <span className="muted today-scope">All contexts</span>
-          </div>
-          {data.commitments.map(({ commitment, progress }) => {
-            const time = progress.commitment_type === "time";
-            const amount = (value: number) => (time ? formatDuration(value) : `${Math.round(value)} sessions`);
-            return (
-              <div className="today-commitment" key={commitment.id}><AppLink className="today-commitment-row" href={urls.updateCommitment(commitment.id)}>
-                <span className="text-red">{commitment.target.name}</span>
-                <span>
-                  <span className="text-green">{amount(progress.actual)}</span> of {amount(progress.target)}{" "}
-                  <span className="muted">{progress.period}</span>
-                  <small className="today-commitment-status">{progress.actual > progress.target ? `${amount(progress.actual - progress.target)} over` : progress.actual === progress.target ? "Target met" : `${amount(progress.target - progress.actual)} left`}</small>
-                </span>
-              </AppLink><progress className="subproject-progress commitment-progress" max={Math.max(progress.target, progress.actual, 1)} value={progress.actual} aria-label={`${commitment.target.name} commitment progress`} /><details className="today-history"><summary>Banking & details</summary><CommitmentsPanel bare items={data.commitments.filter((item) => item.commitment.id === commitment.id)} /></details></div>
-            );
-          })}
-
+      {!firstRun ? <div className="today-picture">
+        {timeline.data ? <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} /> : null}
+        {data.commitments.length ? <section className="today-commitments" aria-label="Commitment summary">
+          <div className="today-section-head"><h2>Commitments</h2><span className="muted today-scope">All contexts</span></div>
+          {data.commitments.map(({ commitment }) => <div className="today-commitment" key={commitment.id}>
+            <AppLink className="today-commitment-name text-red" href={urls.updateCommitment(commitment.id)}>{commitment.target.name}</AppLink>
+            <CommitmentMeter commitment={commitment} />
+            <details className="today-history"><summary>Balance & details</summary><CommitmentsPanel bare items={data.commitments.filter((item) => item.commitment.id === commitment.id)} /></details>
+          </div>)}
+        </section> : null}
+      </div> : null}
+      {running.length ? (
+        <section className="ember-deck" aria-label="Running timers">
+          {running.map((timer) => (
+            <TimerCard key={timer.uuid ?? timer.id} timer={timer} now={now} />
+          ))}
         </section>
-      ) : null}
+      ) : (
+        <StartCard items={data.quick_starts} />
+      )}
+      {!firstRun ? (<>
           <section className="today-journal" aria-label="Today's journal">
             <header className="today-section-head">
               <h2>Today's journal</h2>
@@ -122,8 +115,7 @@ function HomeContent({ data }: { data: Dashboard }) {
           </section>
 
 
-        </>
-      ) : null}
+        </>) : null}
     </div>
   );
 }
@@ -131,12 +123,31 @@ function HomeContent({ data }: { data: Dashboard }) {
 function TimerCard({ timer, now }: { timer: Timer; now: number }) {
   const stash = useRef<() => void>(() => undefined);
   const [expanded, setExpanded] = useState(false);
+  const [desktop, setDesktop] = useState(() => window.matchMedia("(min-width: 1000px)").matches);
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1000px)");
+    const update = () => setDesktop(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
   return <FocusCard timer={timer} now={now} expanded={expanded} onExpand={() => setExpanded((value) => !value)} beforeStop={() => stash.current()}>
-    <TimerNoteEditor preview={!expanded} timer={timer} registerStash={(fn) => { stash.current = fn; }} />
+    <TimerNoteEditor preview={!desktop && !expanded} timer={timer} registerStash={(fn) => { stash.current = fn; }} />
     {expanded ? <TimerReminders timer={timer} /> : null}
   </FocusCard>;
 }
 
-function StartCard() {
-  return <section className="today-idle" aria-label="Start a new timer"><CaptureForm inline /></section>;
+function StartCard({ items }: { items: Dashboard["quick_starts"] }) {
+  const start = useStartTimer();
+  const toast = useToast();
+  const recent = items.slice(0, 4);
+  return <section className="today-idle" aria-label="Start a new timer">
+    <div className="today-section-head"><h2>Pick up where you left off</h2><AppLink className="btn btn--secondary today-log-past" href="/start_timer/?mode=past">Log past time</AppLink></div>
+    <div className="today-pickups">{recent.map((item) => <button className="today-quick-pick" type="button" key={`${item.project.id}-${item.subprojects.map((sub) => sub.id).join("-")}`} disabled={start.isPending} aria-label={`Start ${item.project.name}${item.subprojects.length ? ` / ${item.subprojects.map((sub) => sub.name).join(", ")}` : ""}`} onClick={() => start.mutate({
+      project_id: item.project.id, subproject_ids: item.subprojects.map((sub) => sub.id),
+      optimistic: { projectName: item.project.name, subprojects: item.subprojects },
+    }, { onSuccess: () => toast.success("Started timer"), onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`) })}>
+      <Icon icon={faPlay} /><CapturePickLabel project={item.project.name} sublabel={item.subprojects.map((sub) => sub.name).join(", ")} />
+    </button>)}</div>
+    <AppLink className="btn btn--quiet today-something-else" href={urls.startTimer()}>Something else</AppLink>
+  </section>;
 }

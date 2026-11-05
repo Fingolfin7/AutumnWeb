@@ -228,6 +228,7 @@ function StopSheet({ timer, requestedAt }: { timer: Timer; requestedAt: number }
           disabled={busy && (saved || offline)}
           value={note}
           onChange={draft.change}
+          onDone={saved ? draft.flush : undefined}
           saveStatus={draft.status}
           onRetry={() => void draft.flush()}
           onBlur={() => { if (saved) void draft.flush(); }}

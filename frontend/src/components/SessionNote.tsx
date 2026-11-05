@@ -33,8 +33,29 @@ function highlight(html: string, query: string) {
   return root.innerHTML;
 }
 
+/** Mark only timestamp text, never touch the sanitized markup or saved journal. */
+function timestamps(html: string) {
+  const root = document.createElement("div"); root.innerHTML = html;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = []; while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+  for (const node of nodes) {
+    if (node.parentElement?.closest("a, code, pre")) continue;
+    const pattern = /(^|\n)(?:\u2014\s*)?(\d{1,2}:\d{2})\s*\u2014\s*/g;
+    const matches = [...node.data.matchAll(pattern)];
+    if (!matches.length) continue;
+    const fragment = document.createDocumentFragment(); let offset = 0;
+    for (const match of matches) {
+      fragment.append(document.createTextNode(node.data.slice(offset, match.index) + (match[1] ?? "")));
+      const label = document.createElement("span"); label.className = "note-timestamp"; label.textContent = match[0].slice((match[1] ?? "").length);
+      fragment.append(label); offset = match.index! + match[0].length;
+    }
+    fragment.append(document.createTextNode(node.data.slice(offset))); node.replaceWith(fragment);
+  }
+  return root.innerHTML;
+}
+
 /** Sanitized API markdown or plain text. Prose opens the complete note in place. */
-export function SessionNote({ html, text, id, identity, onEdit, search = "" }: { html?: string | null; text?: string | null; id?: string; identity?: ReactNode; onEdit?: () => void; search?: string }) {
+export function SessionNote({ html, text, id, identity, onEdit, passage, search = "" }: { html?: string | null; text?: string | null; id?: string; identity?: ReactNode; onEdit?: () => void; passage?: string; search?: string }) {
   const generated = useId();
   const noteId = id ?? `journal-${generated}`;
   const [open, setOpen] = useState(false);
@@ -46,17 +67,21 @@ export function SessionNote({ html, text, id, identity, onEdit, search = "" }: {
     return node.innerHTML.replace(/\n/g, "<br>");
   }, [html, text]);
   const preview = useMemo(() => {
+    if (passage) {
+      const escaped = document.createElement("div"); escaped.textContent = passage;
+      return escaped.innerHTML.replace(/\n/g, "<br>");
+    }
     // A search result starts at the matching paragraph, preserving its markup.
     const node = document.createElement("div"); node.innerHTML = full;
     const needles = search.toLowerCase().match(/"[^"]+"|[^\s]+/g)?.map((word) => word.replace(/^"|"$/g, "")) ?? [];
     const matched = needles.length ? [...node.children].find((child) => needles.some((word) => child.textContent?.toLowerCase().includes(word))) : undefined;
     return previewHtml(matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 350 ? matched.outerHTML : full);
-  }, [full, search]);
+  }, [full, search, passage]);
   const clipped = preview !== full;
-  const rendered = useMemo(() => highlight(open ? full : preview, search), [full, preview, open, search]);
+  const rendered = useMemo(() => timestamps(highlight(open ? full : preview, search)), [full, preview, open, search]);
   useEffect(() => {
     if (!open) { setStuck(false); return; }
-    const heading = root.current?.closest(".journal-entry")?.querySelector(".journal-heading") ?? root.current;
+    const heading = root.current?.closest(".journal-entry")?.querySelector(".journal-identity") ?? root.current;
     if (!heading) return;
     const top = matchMedia("(max-width: 999px)").matches ? 56 : 72;
     const observer = new IntersectionObserver(([entry]) => setStuck(!!entry && !entry.isIntersecting && entry.boundingClientRect.bottom <= top), { rootMargin: `-${top}px 0px 0px 0px` });

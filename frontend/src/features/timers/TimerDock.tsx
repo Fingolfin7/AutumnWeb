@@ -22,7 +22,8 @@ export function TimerDock() {
       entries.forEach((entry) => seen.set(entry.target, entry.isIntersecting));
       setCardVisible([...seen.values()].some(Boolean));
     }, { rootMargin: "-68px 0px -80px 0px" });
-    const attach = () => document.querySelectorAll(".ember-deck article").forEach((card) => {
+    // A long note can keep the card in view after its timer controls leave.
+    const attach = () => document.querySelectorAll(".ember-deck .focus-actions").forEach((card) => {
       if (!seen.has(card)) { seen.set(card, false); observer.observe(card); }
     });
     attach();
@@ -34,7 +35,7 @@ export function TimerDock() {
   const timer = timers.data?.[0];
   if (!timer) return null;
   const multiple = timers.data!.length > 1;
-  const label = <><span className="live-dot" /><span className="timer-dock-project text-red">{timer.project.name}</span><span className="timer-dock-clock">{formatClock(elapsedSeconds(timer.start, now))}</span>{multiple ? <span>+{timers.data!.length - 1}</span> : null}</>;
+  const label = multiple ? <><span className="live-dot" /><span>{timers.data!.length} running</span></> : <><span className="live-dot" /><span className="timer-dock-project text-red">{timer.project.name}</span><span className="timer-dock-clock">{formatClock(elapsedSeconds(timer.start, now))}</span></>;
   return (
     <><div className={`timer-dock${cardVisible && pathname === "/" ? " timer-dock--card-visible" : ""}`} aria-label="Running timer dock">
       {multiple ? <button type="button" className="timer-dock-open" aria-haspopup="dialog" onClick={() => setListOpen(true)}>{label}</button> :
@@ -48,7 +49,7 @@ export function TimerDock() {
       >
         {label}
       </AppLink>}
-      <AppLink
+      {!multiple ? <AppLink
         className="btn btn--stop"
         href={urls.stopTimer(timer.id)}
         onClick={(event) => {
@@ -58,7 +59,7 @@ export function TimerDock() {
         }}
       >
         Stop
-      </AppLink>
+      </AppLink> : null}
     </div>
     <Sheet open={listOpen} onClose={() => setListOpen(false)} title="Running timers">
       <div className="dock-timer-list">{timers.data!.map((item) => <div key={item.id}>

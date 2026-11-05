@@ -2338,6 +2338,8 @@ export interface components {
             commitment_history_unaffected?: boolean;
             readonly active_reminders?: components["schemas"]["TimerReminder"][];
             readonly celebration?: components["schemas"]["Celebration"] | null;
+            /** @description The closest fresh note passage for a related match, when available. */
+            match_passage?: string;
             /**
              * @description With search: direct when the session's project, subproject or note contains the search text, related when it matches only by meaning.
              *

@@ -33,6 +33,7 @@ const plural = (n: number, word: string) => (n === 1 ? word : word + "s");
 export function formatDuration(minutes: number | null | undefined): string {
   const value = minutes ?? 0;
   const whole = Number.isFinite(value) ? Math.max(0, Math.floor(Math.round(value * 60_000) / 60_000)) : 0;
+  if (Number.isFinite(value) && value > 0 && whole === 0) return "<1m";
   const hours = Math.floor(whole / 60);
   return hours ? `${hours}h${whole % 60 ? ` ${whole % 60}m` : ""}` : `${whole}m`;
 }
