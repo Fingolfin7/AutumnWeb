@@ -114,7 +114,7 @@ export function AiSection({
           <h3 className="disclose-title">Codex login</h3>
           <p className="focus-lede">OpenAI models use Codex first, then the API key below.</p>
           {connected ? (
-            <span className="context-chip text-green">
+            <span className="context-chip">
               <Icon icon={faCheckCircle} /> Codex connected
               {login.data?.email ? ` as ${login.data.email}` : ""}
               {login.data?.plan ? ` (${login.data.plan})` : ""}
@@ -192,7 +192,7 @@ export function AiSection({
                   {provider === "openai" ? (
                     <span className={`text-${openaiBadge.tone}`}>{openaiBadge.label}</span>
                   ) : stored ? (
-                    <span className="text-green">Stored</span>
+                    <span className="muted">Stored</span>
                   ) : (
                     <span className="text-red">None</span>
                   )}

@@ -1,5 +1,5 @@
 import { formatDuration } from "@/lib/format";
-import { paletteColor, withAlpha } from "./data";
+import { seriesColor, withAlpha } from "./data";
 import type { AnyConfig, HierarchyNode, TallyRow } from "./payloads";
 
 /* Treemap (core/static/core/js/charts/hierarchy.js). The server sends
@@ -16,8 +16,7 @@ export interface TreemapLeaf {
 export function flattenHierarchy(data: HierarchyNode | TallyRow[]): { leaves: TreemapLeaf[]; colors: Record<string, string> } {
   const leaves: TreemapLeaf[] = [];
   const colors: Record<string, string> = {};
-  let colorIndex = 0;
-  const colorFor = (project: string) => (colors[project] ??= paletteColor(colorIndex++));
+  const colorFor = (project: string) => (colors[project] ??= seriesColor(project));
 
   if (!Array.isArray(data)) {
     for (const context of data.children ?? []) {
@@ -27,6 +26,8 @@ export function flattenHierarchy(data: HierarchyNode | TallyRow[]): { leaves: Tr
         const subprojects = (project.children ?? []).filter((child) => (child.total_time ?? 0) > 0);
         if (project.children?.length) {
           for (const child of subprojects) leaves.push({ name: child.name, project: project.name, value: child.total_time! / 60 });
+          const unallocated = (project.total_time ?? 0) - subprojects.reduce((sum, child) => sum + (child.total_time ?? 0), 0);
+          if (unallocated > 0.000001) leaves.push({ name: "Unallocated", project: project.name, value: unallocated / 60 });
         } else {
           leaves.push({ name: project.name, project: project.name, value: project.total_time! / 60 });
         }
@@ -36,10 +37,10 @@ export function flattenHierarchy(data: HierarchyNode | TallyRow[]): { leaves: Tr
 
   /* No hierarchy: fall back to flat project rows. */
   if (!leaves.length && Array.isArray(data)) {
-    data.forEach((row, index) => {
+    data.forEach((row) => {
       if (row.total_time > 0) {
         leaves.push({ name: row.name, project: row.name, value: row.total_time / 60 });
-        colors[row.name] ??= paletteColor(index);
+        colors[row.name] ??= seriesColor(row.name);
       }
     });
   }
@@ -84,7 +85,7 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
           backgroundColor(context: TreemapContext) {
             if (context.type !== "data") return "transparent";
             const project = projectOf(context.raw);
-            return project ? withAlpha(colors[project] ?? paletteColor(0), 0.32) : "transparent";
+            return project ? withAlpha(colors[project] ?? seriesColor(project), 0.32) : "transparent";
           },
           labels: {
             display: true,
@@ -101,7 +102,7 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
                  has its group name in g. */
               if (item._data?.name) {
                 const amount = formatDuration(value * 60);
-                if ((item.w ?? 100) < 85) return [amount];
+                if ((item.w ?? 100) < 85) return "";
                 const limit = Math.max(6, Math.floor(((item.w ?? 100) - 16) / 6.5));
                 const name = item._data.name.length > limit ? item._data.name.slice(0, limit - 1) + "…" : item._data.name;
                 return [name, amount];

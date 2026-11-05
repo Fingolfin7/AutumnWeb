@@ -4,16 +4,19 @@ import { format } from "date-fns";
    day parsing and the axis unit. Pure, so the data shaping is unit-tested
    without a canvas. Ported from core/static/core/js/charts/core.js. */
 
-/* The Night Ledger palette (charts/core.js generateRandomColor). */
-export const PALETTE = [
-  "#c98245", "#4e9a8e", "#b9a66a", "#7896b8",
-  "#7ca36a", "#be675f", "#9b83a7", "#8c7656",
-  "#66837f", "#a87854", "#6f8465", "#596d80",
-];
-export const OTHER_COLOR = "hsl(0, 0%, 70%)";
-
-export function paletteColor(index: number): string {
-  return PALETTE[index % PALETTE.length]!;
+/* Muted pigments keep charts distinct from semantic project/subproject text. */
+export const PALETTE = ["#d6a36d", "#bd8179", "#a995b5", "#8faaa3", "#c1ae83", "#ab8d72", "#a08e9a", "#998f70"];
+export const EMBER_RAMP = ["#493329", "#79503a", "#ac6d43", "#d58a50", "#edb071", "#f4d3a4"];
+export const OTHER_COLOR = "#8e8981";
+export function paletteColor(index: number): string { return PALETTE[index % PALETTE.length]!; }
+/** Name hashing keeps a project's pigment stable across sorting and filters. */
+export function seriesColor(name: string): string {
+  let hash = 0;
+  for (const char of name) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
+  return paletteColor(hash);
+}
+export function emberColor(value: number, max = 1): string {
+  return EMBER_RAMP[Math.min(5, Math.max(0, Math.ceil(value / Math.max(max, 1) * 5)))]!;
 }
 
 /* The same colour with an alpha channel. The old code did string surgery on
@@ -33,6 +36,9 @@ export function withAlpha(color: string, alpha: number): string {
 export interface ChartOptions {
   /** profile.default_chart_project_count: how many series before "Other". */
   projectLimit: number;
+  start?: string;
+  end?: string;
+  previous?: { date: string; hours: number | string }[];
 }
 
 export function otherLabel(count: number): string {
@@ -148,4 +154,11 @@ export function buildSeries(rows: DailySeriesRow[], topN?: number): SeriesSet {
   }
   const days = [...new Set(Object.values(byDay).flatMap((series) => Object.keys(series)))].sort();
   return { names, other, byDay, days };
+}
+
+/** Include every selected day, even when the server returns sparse rows. */
+export function periodDates(days: string[], options: Pick<ChartOptions, "start" | "end"> = {}): string[] {
+  const sorted = [...days].sort();
+  const start = options.start || sorted[0]; const end = options.end || sorted.at(-1);
+  return start && end ? fillDates(parseDay(start), parseDay(end)).map(dayKey) : [];
 }

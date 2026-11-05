@@ -15,7 +15,7 @@ export type SimilarityScale = {
 
 export const DEFAULT_MARKS: SimilarityMark[] = [
   { label: "Loose", value: 0.3 },
-  { label: "Moderate", value: 0.45 },
+  { label: "Balanced", value: 0.45 },
   { label: "Strict", value: 0.55 },
 ];
 

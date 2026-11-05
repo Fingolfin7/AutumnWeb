@@ -1,3 +1,5 @@
+import { DateInput } from "@/components/ui";
+import { CommitmentMeter } from "./CommitmentMeter";
 import { TargetInput } from "./TargetInput";
 import { hasPendingChange, liveDefinition } from "./QuickTarget";
 import { formatDate, formatDuration } from "@/lib/format";
@@ -321,7 +323,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                 </div>
                 <div className="field">
                   <label htmlFor="id_start_date">Start date</label>
-                  <input id="id_start_date" type="date" value={state.startDate} onChange={(e) => setField({ startDate: e.target.value })} />
+                  <DateInput today={todayIn(bootstrap().profile.timezone)} id="id_start_date" value={state.startDate} onValueChange={value => setField({ startDate: value })} />
                   <FieldErrors errors={shown.fields.start_date} />
                 </div>
 
@@ -709,16 +711,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
       <p className="field-label">
         <Icon icon={faChartLine} className="text-green" /> Current progress
       </p>
-      <p className="commit-figures">
-        <span className="commit-actual">{num(progress.actual)}</span>
-        <span className="commit-goal">
-          / {num(progress.target)}{time ? "" : " sessions"}
-        </span>
-        <span className="commit-pct">{progress.percentage.toFixed(1)}%</span>
-      </p>
-      <div className="meter">
-        <div className={`meter-fill ${progress.status}`} style={{ ["--progress" as string]: `${progress.percentage}%` }} />
-      </div>
+      <CommitmentMeter commitment={c} />
       <div className="meta-list u-mt-4">
         <div className="meta-row">
           <span className="meta-label">Period</span>

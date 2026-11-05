@@ -27,7 +27,7 @@ export default function SettingsPage() {
   const location = useLocation();
   const prefs = useProfilePreferences();
   const account = useAccount();
-  const id = location.pathname.split("/")[2];
+  const id = location.pathname.split("/")[2] || (window.matchMedia("(min-width: 1000px)").matches ? "account" : undefined);
   const section = sections.find((item) => item.id === id);
   return <div className={`settings-page${section ? " settings-page--section" : ""}`}>
     <header className="settings-heading">

@@ -1,3 +1,5 @@
+import { DateInput } from "@/components/ui";
+import { todayKey } from "./dates";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -118,16 +120,6 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
         </h2>
       </div>
       <form className="fields completing-form" onSubmit={submit} noValidate>
-        <div className="form-actions phone-savebar">
-          {schedule ? (
-            <AppLink className="btn btn--ghost" href={urls.notifications()}>
-              Cancel edit
-            </AppLink>
-          ) : null}
-          <button className="btn btn--primary" type="submit" disabled={busy}>
-            {schedule ? "Save reminder" : "Add reminder"}
-          </button>
-        </div>
         <FormLevelErrors errors={errors.general} />
         <div className="nx-form-grid">
           <div className="field">
@@ -208,12 +200,12 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
 
           <div className="field">
             <label htmlFor="id_local_date">Date</label>
-            <input
+            <DateInput
+              today={todayKey(timezone)}
               id="id_local_date"
-              type="date"
               value={form.date}
               aria-invalid={!!fieldError("local_date")}
-              onChange={(event) => set("date", event.target.value)}
+              onValueChange={(value) => set("date", value)}
             />
             <FieldErrors errors={fieldError("local_date")} />
           </div>
@@ -256,6 +248,16 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
         </div>
         <p className="muted nx-timezone-note">Your profile timezone: {timezone}</p>
 
+        <div className="form-actions q-form-actions">
+          {schedule ? (
+            <AppLink className="btn btn--ghost" href={urls.notifications()}>
+              Cancel edit
+            </AppLink>
+          ) : null}
+          <button className="btn btn--primary" type="submit" disabled={busy}>
+            {schedule ? "Save reminder" : "Add reminder"}
+          </button>
+        </div>
       </form>
     </section>
   );

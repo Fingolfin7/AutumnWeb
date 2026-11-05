@@ -106,7 +106,7 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
           <FieldErrors errors={errors.fields.weekly_review_time} />
         </div>
       </div>
-      <div className="form-actions">
+      <div className="form-actions q-form-actions">
         <button className="btn btn--secondary" type="submit" disabled={save.isPending}>
           Save settings
         </button>

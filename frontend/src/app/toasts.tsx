@@ -84,7 +84,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** A reserved lane beneath the header, clear of sheets' footers and chat input. */
+/** One queued overlay, with recovery beside the message. */
 export function ToastOutlet() {
   const display = useContext(ToastDisplay);
   return <section className="toast-region" aria-live="polite" aria-label="Notifications">
@@ -95,7 +95,7 @@ export function ToastOutlet() {
 function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
   const kind = toast.kind ?? "success";
   const ref = useRef<HTMLDivElement>(null);
-  const duration = toast.duration ?? (kind === "error" ? 8000 : toast.action ? 7000 : 4000);
+  const duration = toast.duration ?? (kind === "error" ? 8000 : toast.action ? 10000 : 4000);
 
   useEffect(() => {
     if (!duration) return;
@@ -116,7 +116,7 @@ function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   return (
     <div ref={ref} className={classes} role={kind === "error" || kind === "warning" ? "alert" : "status"}>
       <Icon icon={ICONS[kind]} className="msg-icon" />
-      <span>{toast.message}</span>
+      <span tabIndex={0}>{toast.message}</span>
       {toast.action ? (
         <button
           type="button"

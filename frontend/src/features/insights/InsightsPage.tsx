@@ -342,7 +342,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
     <>
       <h1 className="sr-only">Insights</h1>
       <div className="insights-context-bar">
-        <AppLink className="btn btn--quiet" href={urls.review()}>Review</AppLink>
+        <AppLink className="btn btn--quiet" href={urls.review()}><Icon icon={faChevronLeft} /> Review</AppLink>
         <div><strong>{chatId ? "Saved conversation" : "Insights"}</strong><span className="muted">{selection.start_date ? formatDayDate(selection.start_date) : "All time"}{selection.end_date ? ` – ${formatDayDate(selection.end_date)}` : ""}</span></div>
         <button className="btn btn--secondary" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context{pills.length ? ` (${pills.length})` : ""}</button>
       </div>
@@ -359,6 +359,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
         tags={tags.data ?? []}
         contexts={contexts.data ?? []}
         activeContextId={contextId}
+        defaults={defaults}
       >
         {model ? <details className="insights-model-settings"><summary>AI settings: {model.provider} · {model.model}</summary><ModelPicker options={options} selection={model} onSelection={setModel} busy={live} /></details> : null}
         {pills.length ? <div className="filter-summary">{pills.map((pill) => <span className="filter-pill" id={pill.label === "Including" || pill.label === "Related" ? "related-pill" : undefined} key={pill.label} title={pill.title}>{pill.label} <b>{pill.value}</b></span>)}</div> : null}

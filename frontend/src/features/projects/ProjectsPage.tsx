@@ -229,7 +229,7 @@ export default function ProjectsPage() {
             key={group.status}
             id={`projects-${group.status}`}
             icon={faFolderOpen}
-            iconClass="text-red"
+            iconClass="muted"
             title={group.label}
             summary={group.projects.length}
             defaultOpen={group.status === "active"}
@@ -259,7 +259,7 @@ export default function ProjectsPage() {
         <section className="slab" aria-label="Related projects">
           <header className="day-head">
             <span className="day-date">Related</span>
-            <span className="day-total">{related.length}</span>
+            <span className="muted">{related.length}</span>
           </header>
           {relatedSummary ? <RelatedSlider summary={relatedSummary} loading={lists.isFetching} /> : null}
           {related.length ? <ul className="band-list project-directory">{related.map(band)}</ul> : null}

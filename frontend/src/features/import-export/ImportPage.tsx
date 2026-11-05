@@ -1,5 +1,7 @@
+import { FileDrop } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { faFileImport } from "@fortawesome/free-solid-svg-icons";
+import { AppLink, urls } from "@/app/links";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/app/toasts";
 import { requestJson } from "@/api/client";
@@ -192,11 +194,10 @@ export default function ImportPage() {
           {!started ? <section id="import_options" className="slab slab-pad">
             <div className="field">
               <label htmlFor="import-file">JSON file</label>
-              <input
+              <FileDrop
                 id="import-file"
-                type="file"
                 accept=".json,application/json"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                onFile={setFile}
               />
               {fieldErrors("file")}
               <small className="muted">Choose an Autumn JSON export. Nothing changes until you import.</small>
@@ -208,7 +209,7 @@ export default function ImportPage() {
               <p><strong>{preview.names.length} projects</strong> and <strong>{preview.sessions} sessions</strong> in this file</p>
               <ul tabIndex={0} aria-label="Projects in the import file">{(showAll ? preview.names : preview.names.slice(0, 6)).map((name, index) => {
                 const exists = projects.data?.some((project) => project.name === name);
-                const action = !projects.isSuccess ? "Checking existing projects..." : !exists ? "Add project" : preview.portable ? (force ? "Merge: update conflicting sessions" : "Merge: check conflicts") : force ? "Replace existing project" : merge ? "Merge into existing project" : "Skip existing project";
+                const action = !projects.isSuccess ? "Checking existing projects..." : !exists ? "Add project" : preview.portable ? (force ? "Merge: update conflicting sessions" : "Existing project - conflicts checked during import") : force ? "Replace existing project" : merge ? "Merge into existing project" : "Skip existing project";
                 return <li key={index}><span>{name}</span><small className={exists && force ? "text-red" : "muted"}>{action}</small></li>;
               })}</ul>
               <p className="muted">Showing {showAll ? preview.names.length : Math.min(6, preview.names.length)} of {preview.names.length}{preview.names.length > 6 ? <button type="button" className="btn btn--quiet" onClick={() => setShowAll(!showAll)}>{showAll ? "Show fewer" : "Show all projects"}</button> : null}</p>
@@ -304,6 +305,7 @@ export default function ImportPage() {
 
             </div></details>
             {!preview ? <p className="muted">Choose a valid Autumn JSON file to enable Import.</p> : null}
+            <p className="import-policy">{force ? "Conflicts: replace from this file" : merge ? "Conflicts: merge projects, preserve existing sessions" : "Conflicts: skip existing projects"}</p>
             <div className="form-actions">
               <button type="submit" className="btn btn--primary btn--lg" disabled={busy || !preview}>
                 <Icon icon={faFileImport} /> {busy ? "Importing..." : "Import"}
@@ -336,15 +338,15 @@ export default function ImportPage() {
                   {percent === null ? "" : `${percent.toFixed(2)}%`}
                 </div>
               </div>
-              {done ? <><p className="muted">{failed ? "Review the details below before trying again." : "Your projects and sessions are ready."}</p><button className="btn btn--secondary" type="button" onClick={() => { setStarted(false); setDone(false); }}>Choose another file</button></> : null}
-              <div id="output-text" className="stream-log" tabIndex={0} aria-label="Import progress details">
+              {done ? <div className="import-result"><p className="muted">{failed ? "Review the details below before trying again." : "Your journal is ready."}</p><button className="btn btn--secondary" type="button" onClick={() => { setStarted(false); setDone(false); }}>Choose another file</button>{!failed ? <AppLink className="btn btn--primary" href={urls.sessions()}>Open your journal</AppLink> : null}</div> : null}
+              <details className="import-result-details" open={!done || failed}><summary>Import details</summary><div id="output-text" className="stream-log" tabIndex={0} aria-label="Import progress details">
                 {lines.map((line) => (
                   <div key={line.id} className={`log-entry${line.kind === "info" ? "" : ` ${line.kind}`}`}>
                     {line.text}
                   </div>
                 ))}
                 <div ref={logEnd} />
-              </div>
+              </div></details>
             </section>
           ) : null}
         </div>
