@@ -497,26 +497,16 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
                 </aside>
               ) : null}
 
-              <div className="form-actions commitment-editor-actions">
-                {onClose ? <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button> : <AppLink className="btn btn--ghost" href={urls.home()}>
-                  <Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}
-                </AppLink>}
-                {commitment ? (
-                  <AppLink className="btn btn--stop" href={urls.deleteCommitment(commitment.id)}>
-                    <Icon icon={faTrash} /> Delete
-                  </AppLink>
-                ) : null}
-                {commitment && changes?.nextPeriod.length ? <span className="muted">Applies from {formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}</span> : null}
-                {!showRestart ? (
-                  <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}>
-                    <Icon icon={faCheckCircle} /> {onClose ? "Save target" : commitment ? "Update commitment" : "Create commitment"}
-                  </button>
-                ) : null}
-              </div>
             </section>
           </div>
 
           {commitment && !onClose ? <ProgressPanel commitment={commitment} /> : null}
+        </div>
+        <div className="form-actions commitment-editor-actions">
+          {onClose ? <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button> : <AppLink className="btn btn--ghost" href={urls.home()}><Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}</AppLink>}
+          {commitment ? <AppLink className="btn btn--stop" href={urls.deleteCommitment(commitment.id)}><Icon icon={faTrash} /> Delete</AppLink> : null}
+          {commitment && changes?.nextPeriod.length ? <span className="muted">Applies from {formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}</span> : null}
+          {!showRestart ? <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}><Icon icon={faCheckCircle} /> {onClose ? "Save target" : commitment ? "Update commitment" : "Create commitment"}</button> : null}
         </div>
       </form>
     </>

@@ -5475,9 +5475,16 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .profile-provider summary > span { color: var(--muted); font-size: var(--fs-sm); }
 .profile-provider summary .profile-provider-action { color: var(--brand); }
 .profile-provider > .field { padding: var(--s2) 0 var(--s4); }
-.commitment-target-sheet .commitment-editor .split { display: block; }
+.profile-codex-row { display: flex; align-items: center; gap: var(--s3); min-height: 52px; border-bottom: 1px solid var(--hairline); }
+.profile-codex-row > strong { flex: 1; }
+.profile-codex-row > span, .profile-codex-hint { color: var(--muted); font-size: var(--fs-sm); }
+.profile-codex-row .btn { padding-inline: var(--s2); }
+.profile-codex-hint { margin: var(--s2) 0; }
+.commitment-target-sheet .sheet-panel { display: flex; flex-direction: column; overflow: hidden; }
+.commitment-target-sheet .commitment-editor { display: flex; flex: 1; min-height: 0; flex-direction: column; }
+.commitment-target-sheet .commitment-editor .split { display: block; flex: 1; min-height: 0; overflow-y: auto; }
 .commitment-target-sheet .commitment-editor .slab { background: transparent; box-shadow: none; border: 0; padding-inline: 0; }
-.commitment-target-sheet .commitment-editor-actions { position: sticky; bottom: 0; z-index: 2; padding: var(--s3) 0; background: var(--surface-2); border-top: 1px solid var(--hairline); }
+.commitment-target-sheet .commitment-editor-actions { flex: none; padding: var(--s3) 0; background: var(--surface-2); border-top: 1px solid var(--hairline); }
 .review-desk { grid-template-columns: minmax(0, 1fr); }
 .review-main-controls, .review-toolbar { min-width: 0; }
 .review-desk .review-range { grid-template-columns: minmax(0, 1fr) 44px 44px; }

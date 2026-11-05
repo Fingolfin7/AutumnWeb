@@ -1,8 +1,6 @@
 import { useCallback, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  faCheckCircle,
-  faCircle,
   faKey,
   faLock,
   faSignInAlt,
@@ -121,23 +119,9 @@ export function AiSection({
           {keyErrors[provider] ? <p role="alert" className="text-red">{keyErrors[provider]}</p> : null}
           <div className="form-actions"><button type="button" className="btn btn--secondary" disabled={!keyDrafts[provider].trim() || keyChange.isPending} onClick={() => keyChange.mutate({ provider, clear: false })}>Save key</button>{configured[provider] ? <button type="button" className="btn btn--quiet" disabled={keyChange.isPending} onClick={() => keyChange.mutate({ provider, clear: true })}>Remove key</button> : null}</div>
         </div></details>)}</div>
-      <div className="profile-codex-panel">
-        <div>
-          <h3 className="disclose-title">Codex</h3>
-          <p className="focus-lede">OpenAI models use Codex first, then the API key below.</p>
-          {connected ? (
-            <span className="context-chip">
-              <Icon icon={faCheckCircle} /> Codex connected
-              {login.data?.email ? ` as ${login.data.email}` : ""}
-              {login.data?.plan ? ` (${login.data.plan})` : ""}
-            </span>
-          ) : (
-            <span className="context-chip">
-              <Icon icon={faCircle} /> Codex not connected
-            </span>
-          )}
-        </div>
-        <div className="form-actions">
+      <div className="profile-codex-row">
+          <strong>Codex</strong>
+          <span>{connected ? `Connected${login.data?.email ? ` as ${login.data.email}` : ""}${login.data?.plan ? ` (${login.data.plan})` : ""}` : "Not connected"}</span>
           {connected ? (
             <button
               type="button"
@@ -157,8 +141,8 @@ export function AiSection({
               <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Connect Codex"}
             </button>
           )}
-        </div>
       </div>
+      <p className="muted profile-codex-hint">OpenAI models use Codex first, then your API key.</p>
 
       {login.isError && !pending ? (
         <div className="u-mt-4">
