@@ -17,7 +17,7 @@ export function CommitmentSummary({ commitment: c, showTarget = true, compact = 
   const toast = useToast();
   const pending = c.pending_revision;
   const amount = (value: number) => c.commitment_type === "time" ? formatDuration(value) : `${Math.round(value)} session${Math.round(value) === 1 ? "" : "s"}`;
-  const targetClass = c.target.kind === "project" ? "text-red" : c.target.kind === "subproject" ? "text-blue" : "text-orange";
+  const targetClass = c.target.kind === "project" ? "text-red" : c.target.kind === "subproject" ? "text-blue" : c.target.kind === "context" ? "text-orange" : undefined;
   const content = <>
     {showTarget && !compact ? <header className="commitment-summary-heading"><AppLink className={targetClass} href={urls.updateCommitment(c.id)}>{c.target.name}</AppLink><span>{c.period}</span></header> : null}
     {!c.active ? <p className="muted">Commitment paused</p> : null}
