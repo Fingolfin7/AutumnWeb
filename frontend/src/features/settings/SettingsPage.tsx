@@ -10,6 +10,7 @@ import ProfilePage from "@/features/profile/ProfilePage";
 import ContextsPage from "@/features/contexts-tags/ContextsPage";
 import TagsPage from "@/features/contexts-tags/TagsPage";
 import NotificationsPage from "@/features/notifications/NotificationsPage";
+import { useBrowserPushState } from "@/features/notifications/BrowserPush";
 import ImportPage from "@/features/import-export/ImportPage";
 import ExportPage from "@/features/import-export/ExportPage";
 
@@ -41,6 +42,15 @@ export default function SettingsPage() {
   const location = useLocation();
   const prefs = useProfilePreferences();
   const account = useAccount();
+  const push = useBrowserPushState();
+  const connected = prefs.data ? Object.values(prefs.data.configured_api_keys).filter(Boolean).length : null;
+  const stateText = (id: string) => {
+    if (id === "ai" && connected !== null) return `${connected} connected`;
+    if (id === "notifications" && push.data) return ({ denied: "Blocked", granted: "Allowed", default: "Not enabled", unavailable: "Unavailable", loading: "Checking" } as Record<string, string>)[push.data.state];
+    if (id === "account") return account.data?.username;
+    if (id === "appearance" && prefs.data) return prefs.data.automatic_background ? "Daily backdrop" : prefs.data.background.image_url ? "Custom backdrop" : "Night Ledger";
+    return undefined;
+  };
   const id = location.pathname.split("/")[2] || (window.matchMedia("(min-width: 1000px)").matches ? "account" : undefined);
   const section = sections.find((item) => item.id === id);
   const activeId = id === "search" ? "ai" : id === "export" ? "import" : id;
@@ -53,7 +63,7 @@ export default function SettingsPage() {
     <div className="settings-layout">
       <nav className="settings-sections" aria-label="Settings sections">
         {navigation.map((item) => <AppLink key={item.id} href={`/settings/${item.id}/`} aria-current={activeId === item.id ? "page" : undefined}>
-          <Icon icon={item.icon} /><span><strong>{item.title}</strong><small>{sections.find(section => section.id === item.id)?.description}</small></span><span className="settings-chevron" aria-hidden="true">&rsaquo;</span>
+          <Icon icon={item.icon} /><span><strong>{item.title}</strong><small>{stateText(item.id) ?? sections.find(section => section.id === item.id)?.description}</small></span><span className="settings-chevron" aria-hidden="true">&rsaquo;</span>
         </AppLink>)}
       </nav>
       <div className="settings-content" key={id ?? "index"}>
