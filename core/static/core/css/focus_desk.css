@@ -5090,8 +5090,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .brand { width: auto; gap: var(--s1); }
   .brand-word { position: static; width: auto; height: auto; overflow: visible; clip-path: none; font-size: var(--fs-sm); letter-spacing: -.015em; }
   .settings-page--section > .settings-heading { grid-template-columns: 44px minmax(0, 1fr); }
-  .settings-page--section .settings-back { grid-column: 1; font-size: 0; }
-  .settings-page--section .settings-back::first-letter { font-size: 1.5rem; }
+  .settings-page--section .settings-back { grid-column: 1; justify-content: center; color: var(--ink-2); font-size: 1.5rem; }
   .settings-page--section .settings-heading .page-title { grid-column: 2; }
   .insights-workspace .insights-conversation-heading { flex: 1 1 0; }
   .insights-workspace .insights-conversation-heading h2 { display: block; }

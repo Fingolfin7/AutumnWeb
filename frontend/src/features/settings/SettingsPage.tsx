@@ -46,7 +46,7 @@ export default function SettingsPage() {
   const activeId = id === "search" ? "ai" : id === "export" ? "import" : id;
   return <div className={`settings-page${section ? " settings-page--section" : ""}`}>
     <header className="settings-heading">
-      {section ? <AppLink className="settings-back" href="/settings/">‹ All settings</AppLink> : null}
+      {section ? <AppLink className="settings-back" href="/settings/" aria-label="All settings"><span aria-hidden="true">&lsaquo;</span></AppLink> : null}
       <h1 className="page-title">{section?.title ?? "Settings"}</h1>
       <p>{section?.description ?? "Your account and workspace."}</p>
     </header>
