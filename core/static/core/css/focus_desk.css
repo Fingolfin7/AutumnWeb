@@ -4967,6 +4967,53 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .settings-heading p { margin-top: var(--s1); font-size: var(--fs-sm); }
 .settings-content .profile-avatar-panel .field { display: grid; justify-items: center; }
 .settings-content .profile-avatar-upload { text-align: center; }
+
+/* ================================================================= Stream W
+   A journal aligned to its rule; embers connect the day and the week. */
+.journal-heading, .day-head { grid-template-columns: minmax(0, 1fr) var(--journal-duration); }
+.journal-heading { position: relative; grid-template-areas: "project duration" "meta meta"; row-gap: 2px; }
+.journal-entry--in-project .journal-heading, .project-journal .journal-heading { grid-template-areas: "meta duration"; }
+.journal-row-actions { position: absolute; top: -8px; right: calc(var(--journal-duration) + var(--s3)); z-index: 2; padding-left: var(--s2); background: var(--surface-2); border-radius: var(--r-sm); }
+.journal-heading .journal-meta { gap: var(--s2); }
+.journal-meta-overflow { display: none; }
+.journal-subs { flex-shrink: 1; }
+.journal-subs .journal-subproject { min-width: 0; flex: 0 1 auto; }
+.journal-entry .session-note { margin-top: var(--s1); }
+.day-group:has(> .band-list > .journal-entry:only-child) .journal-duration,
+.project-journal-day:has(> .band-list > .journal-entry:only-child) .journal-duration { display: none; }
+.journal-entry--continuation .session-project { display: none; }
+.journal-entry--continuation .journal-heading { grid-template-areas: "meta meta"; }
+.journal-entry--continuation .journal-meta { height: auto; min-height: 28px; flex-wrap: wrap; padding-right: 44px; }
+.journal-entry--continuation .journal-subs { display: none; }
+.journal-entry--continuation .journal-row-actions { right: 0; }
+.journal-note-origin { min-height: 44px; display: inline-flex; align-items: center; }
+.journal-title { align-items: center; gap: var(--s3); }
+.journal-density { margin-left: auto; }
+.journal-density .segmented { margin: 0; }
+.journal-density .segmented span { min-height: 44px; font-size: 13px; padding-inline: var(--s3); }
+.journal-entry .session-note.is-compact:not(.is-open) .session-note-body { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.session-note.is-compact:not(.is-open) .session-note-body > :first-child { margin-top: 0; }
+.quiet-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; border-radius: var(--r-xs); background: transparent; color: var(--ink-2); font: 500 var(--fs-sm)/1.4 var(--font-ui); text-decoration: underline; text-decoration-color: var(--hairline-2); text-underline-offset: 4px; cursor: pointer; }
+.quiet-link:hover { color: var(--ink); text-decoration-color: currentColor; }
+.quiet-link:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.journal-entry .session-note .note-expand { color: var(--ink-2); }
+.session-filter-miss { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s4); padding-block: var(--s4); border-block: 1px solid var(--hairline); }
+.session-filter-miss p { flex: 1 1 18rem; margin: 0; color: var(--ink-2); font-size: var(--fs-sm); line-height: 1.5; overflow-wrap: anywhere; }
+.session-related .day-head { display: block; }
+.journal-related-controls { width: 100%; }
+.journal-related-popover { position: static; width: 100%; margin-top: var(--s2); box-shadow: none; }
+@media (min-width: 1000px) and (hover: hover) {
+  .journal-row-actions { opacity: 0; pointer-events: none; }
+  .journal-entry:hover .journal-row-actions, .journal-entry:focus-within .journal-row-actions { opacity: 1; pointer-events: auto; }
+  .journal-row-actions .btn-icon { width: 44px; height: 44px; }
+}
+@media (max-width: 999px) {
+  .journal-row-actions { display: none; }
+  .journal-meta-overflow { display: grid; flex: none; margin: -10px 0 -10px auto; }
+  .journal-entry--continuation .journal-meta { padding-right: 0; }
+  .journal-title { flex-wrap: wrap; }
+  .journal-density .segmented span { padding-inline: var(--s2); }
+}
 .profile-provider { border-bottom: 1px solid var(--hairline); }
 .profile-provider summary { display: flex; align-items: center; gap: var(--s3); min-height: 52px; cursor: pointer; list-style: none; }
 .profile-provider summary::-webkit-details-marker { display: none; }

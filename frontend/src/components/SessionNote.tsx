@@ -1,4 +1,25 @@
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { SegmentedControl } from "./ui";
+
+const densityKey = "autumn:journal-density";
+const densityEvent = "autumn:journal-density";
+function readDensity(): "full" | "preview" {
+  try { return localStorage.getItem(densityKey) === "preview" ? "preview" : "full"; } catch { return "full"; }
+}
+function subscribeDensity(update: () => void) {
+  window.addEventListener("storage", update);
+  window.addEventListener(densityEvent, update);
+  return () => { window.removeEventListener("storage", update); window.removeEventListener(densityEvent, update); };
+}
+
+/** One browser preference, shared by Sessions and every project journal. */
+export function JournalDensityControl() {
+  const density = useSyncExternalStore(subscribeDensity, readDensity);
+  return <div className="journal-density"><SegmentedControl label="Journal density" value={density} options={[{ value: "full", label: "Full notes" }, { value: "preview", label: "2-line preview" }]} onChange={(value) => {
+    try { localStorage.setItem(densityKey, value); } catch { /* Reading remains available when browser storage is blocked. */ }
+    window.dispatchEvent(new Event(densityEvent));
+  }} /></div>;
+}
 
 /** Local draft preview. Escape first; saved notes still use the server's renderer. */
 export function renderNoteDraft(text: string): string {
@@ -13,20 +34,6 @@ export function renderNoteDraft(text: string): string {
     if (lines.every((line) => /^[-*]\s/.test(line))) return `<ul>${lines.map((line) => `<li>${inline(line.slice(2))}</li>`).join("")}</ul>`;
     return `<p>${inline(paragraph).replace(/\n/g, "<br>")}</p>`;
   }).join("");
-}
-
-/** Keep complete paragraphs/list items in previews; the full journal remains in place. */
-function previewHtml(html: string) {
-  const root = document.createElement("div");
-  root.innerHTML = html;
-  let count = 0;
-  const nodes = [...root.childNodes];
-  for (const node of nodes) {
-    count += node.textContent?.length ?? 0;
-    if (count > 350 && node !== nodes[0]) node.remove();
-  }
-  // A single long paragraph stays whole: never cut a sentence behind a mask.
-  return root.innerHTML;
 }
 
 function highlight(html: string, query: string) {
@@ -74,6 +81,9 @@ export function SessionNote({ html, text, id, identity, onEdit, passage, search 
   const generated = useId();
   const noteId = id ?? `journal-${generated}`;
   const [open, setOpen] = useState(false);
+  const density = useSyncExternalStore(subscribeDensity, readDensity);
+  const compact = density === "preview";
+  const [overflow, setOverflow] = useState(false);
   const [stuck, setStuck] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const full = useMemo(() => {
@@ -89,10 +99,18 @@ export function SessionNote({ html, text, id, identity, onEdit, passage, search 
     const node = document.createElement("div"); node.innerHTML = full;
     const needles = search.toLowerCase().match(/"[^"]+"|[^\s]+/g)?.map((word) => word.replace(/^"|"$/g, "")) ?? [];
     const matched = needles.length ? [...node.children].find((child) => needles.some((word) => child.textContent?.toLowerCase().includes(word))) : undefined;
-    return previewHtml(matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 350 ? matched.outerHTML : full);
+    return matched && (node.textContent?.indexOf(matched.textContent ?? "") ?? 0) > 350 ? matched.outerHTML : full;
   }, [full, search, passage]);
-  const clipped = preview !== full;
+  const clipped = preview !== full || (compact && overflow);
   const rendered = useMemo(() => markTimestamps(highlight(open ? full : preview, search)), [full, preview, open, search]);
+  useEffect(() => {
+    const body = root.current?.querySelector<HTMLElement>(".session-note-body");
+    if (!body || open) return;
+    const measure = () => setOverflow(body.scrollHeight > body.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure); observer.observe(body);
+    return () => observer.disconnect();
+  }, [rendered, compact, open]);
   useEffect(() => {
     if (!open) { setStuck(false); return; }
     const heading = root.current?.closest(".journal-entry")?.querySelector(".journal-heading") ?? root.current;
@@ -105,10 +123,10 @@ export function SessionNote({ html, text, id, identity, onEdit, passage, search 
   const collapse = () => { setOpen(false); root.current?.closest(".journal-entry, .session-note")?.scrollIntoView({ block: "start" }); };
   if (!html && !text) return null;
   const actions = <>{onEdit ? <button className="btn btn--quiet" type="button" onClick={onEdit}>Edit</button> : null}<button className="btn btn--quiet" type="button" onClick={collapse}>Collapse</button></>;
-  return <div ref={root} className={`session-note${open ? " is-open" : ""}${clipped ? " has-overflow" : ""}`}>
+  return <div ref={root} className={`session-note${open ? " is-open" : ""}${compact ? " is-compact" : ""}${clipped ? " has-overflow" : ""}`}>
     {open && stuck ? <div className="note-reading-slot"><div className="note-reading-head"><div className="note-reading-identity">{identity ?? "Session note"}</div>{actions}</div></div> : null}
     <div id={noteId} className="session-note-body" onClick={(event) => { if (!(event.target as Element).closest("a, button")) setOpen(true); }} dangerouslySetInnerHTML={{ __html: rendered }} />
     {open && !stuck ? <div className="note-reading-actions">{actions}</div> : null}
-    {!open ? <button type="button" className={clipped ? "note-expand" : "note-open-short"} aria-expanded={open} aria-controls={noteId} onClick={() => setOpen(true)}>{clipped ? "Read full note" : "Open note"}</button> : null}
+    {!open ? <button type="button" className={`${clipped ? "note-expand" : "note-open-short"} quiet-link`} aria-expanded={open} aria-controls={noteId} onClick={() => setOpen(true)}>{clipped ? "Read full note" : "Open note"}</button> : null}
   </div>;
 }

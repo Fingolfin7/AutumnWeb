@@ -16,6 +16,7 @@ import { semanticSearchAvailable } from "@/features/charts/api";
 import { SimilaritySlider } from "@/features/search/SimilaritySlider";
 import { summaryScale } from "@/features/search/api";
 import { SegmentedControl } from "@/components/ui";
+import { JournalDensityControl } from "@/components/SessionNote";
 import { useRelatedSummary } from "@/features/search/api";
 import { closenessLabel, fixed2, parseSimilarity, similarityParam, similarityScale } from "@/features/search/similarity";
 
@@ -35,12 +36,12 @@ interface FilterState {
 }
 
 function readFilters(params: URLSearchParams): FilterState {
-  const ids = (name: string) =>
+  const ids = (name: string) => [...new Set(
     params
       .getAll(name)
       .flatMap((value) => value.split(","))
       .map(Number)
-      .filter((n) => Number.isInteger(n) && n > 0);
+      .filter((n) => Number.isInteger(n) && n > 0))];
   const include = ids("include_projects");
   const exclude = ids("exclude_projects");
   return {
@@ -128,6 +129,8 @@ export default function SessionsPage() {
   const related = all.filter((s) => s.match === "related");
   const total = list.data?.pages[0]?.total ?? 0;
   const groups = groupByDay(direct);
+  const splitEntries = groups.reduce((count, group) => count + group.sessions.length, 0) - direct.length;
+  const singleProject = applied.projectMode === "include" && applied.projects.length === 1;
 
   const pills = describeFilters(applied, {
     projects: [...(projects.data ?? []), ...all.map((session) => session.project)],
@@ -174,7 +177,7 @@ export default function SessionsPage() {
 
   return (
     <div className="sessions-page">
-      <div className="desk-head journal-title"><h1 className="page-title">Sessions</h1></div>
+      <div className="desk-head journal-title"><h1 className="page-title">Sessions</h1>{all.length ? <JournalDensityControl /> : null}</div>
       {total > 0 || pills.length || applied.search || searchText ? <form className="fields journal-search" onSubmit={onSearch} role="search">
         <div className="journal-controls">
           <div className="searchbar">
@@ -200,6 +203,7 @@ export default function SessionsPage() {
         {filtered || pills.length ? <div className="journal-filter-line">
           {filtered ? <p className="filter-summary">
             <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
+            {splitEntries > 0 ? <> · {all.length + splitEntries} day entries shown</> : null}
             {totals.data ? <> · <strong className="journal-filter-total">{formatDuration(totals.data.total_minutes)}</strong></> : null}
           </p> : null}
           {pills.map((pill) => (
@@ -208,7 +212,7 @@ export default function SessionsPage() {
               <button className="btn btn--quiet" type="button" aria-label={`Clear ${pill.label} filter`} onClick={() => clearPill(pill.label)}>×</button>
             </span>
           ))}
-          {pills.length > 1 ? <button className="btn btn--quiet filter-clear-all" type="button" onClick={clearFilters}>Clear filters</button> : null}
+          {pills.length > 1 && total > 0 ? <button className="btn btn--quiet filter-clear-all" type="button" onClick={clearFilters}>Clear filters</button> : null}
         </div> : null}
       </form> : null}
 
@@ -287,24 +291,23 @@ export default function SessionsPage() {
           {groups.map((group) => (
             <JournalDay key={group.date} date={group.date} minutes={group.totalMinutes}>
               {group.sessions.map((session) => (
-                <SessionBand key={session.id} session={session} day={group.date} search={applied.search} onEditNote={retainNote} onNoteSaved={retainNote} />
+                <SessionBand key={session.id} session={session} day={group.date} hideProject={singleProject} hideDuration={group.sessions.length === 1} search={applied.search} onEditNote={retainNote} onNoteSaved={retainNote} />
               ))}
             </JournalDay>
           ))}
         </section>
       ) : !related.length ? (
-        <section className="session-empty">
+        filtered || applied.search ? <div className="session-filter-miss" role="status">
+          <p>No sessions{applied.search ? ` for “${applied.search}”` : ""}{pills.length ? ` with ${pills.map((pill) => `${pill.label.toLowerCase()} ${pill.value}`).join(", ")}` : contextIdsParam ? " in this context" : ""}.</p>
+          <button className="quiet-link" type="button" onClick={() => { setSearchText(""); setParams(new URLSearchParams()); }}>Clear filters</button>
+        </div> : <section className="session-empty">
           <div className="first-run-empty journal-empty">
             <span className="ember-seal" aria-hidden="true" />
-            {pills.length || applied.search ? <>
-              <h2>Nothing here{applied.search ? ` for “${applied.search}”` : ""} yet.</h2>
-              <p>Try other words, or look a little wider.</p>
-              {applied.search ? <button className="btn btn--primary" type="button" onClick={clearSearch}>Clear search</button> : <button className="btn btn--primary" type="button" onClick={clearFilters}>Clear filters</button>}
-            </> : <>
+            <>
               <h2>A little time, a place to keep it.</h2>
               <p>Your sessions and the thoughts that go with them will gather here.</p>
               <AppLink className="btn btn--primary" href={urls.startTimer()}>Start your first timer</AppLink>
-            </>}
+            </>
           </div>
         </section>
       ) : null}
@@ -312,7 +315,7 @@ export default function SessionsPage() {
       {related.length || relatedSummary ? (
         <section className="session-list session-related" aria-label="Related sessions">
           <header className="day-head">
-            <span className="day-date">Related</span>
+            {!relatedSummary ? <span className="day-date">Related</span> : null}
             {relatedSummary ? <RelatedTuning
               summary={relatedSummary}
               shown={related.length}
@@ -327,7 +330,7 @@ export default function SessionsPage() {
           {related.length ? (
             <ul className="band-list">
               {related.map((session) => (
-                <SessionBand key={session.id} session={session} search={applied.search} showDate onEditNote={retainNote} onNoteSaved={retainNote} />
+                <SessionBand key={session.id} session={session} hideProject={singleProject} search={applied.search} showDate onEditNote={retainNote} onNoteSaved={retainNote} />
               ))}
             </ul>
           ) : relatedSummary?.count && list.hasNextPage ? (

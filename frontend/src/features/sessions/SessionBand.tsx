@@ -45,7 +45,7 @@ function matchReason(session: SessionRow, search?: string) {
    `hideProject` drops the project line where the page already names it, and
    `day` shows a midnight-crossing session's share of that day. A left swipe is
    an optional shortcut to the same actions. */
-export function SessionBand({ session, showDate, hideProject = false, onEditNote, onNoteSaved, search, day }: { search?: string; day?: string; session: SessionRow; showDate?: boolean; hideProject?: boolean; onEditNote?: (session: SessionRow) => void; onNoteSaved?: (session: SessionRow) => void }) {
+export function SessionBand({ session, showDate, hideProject = false, hideDuration = false, onEditNote, onNoteSaved, search, day }: { search?: string; day?: string; session: SessionRow; showDate?: boolean; hideProject?: boolean; hideDuration?: boolean; onEditNote?: (session: SessionRow) => void; onNoteSaved?: (session: SessionRow) => void }) {
   const start = useStartTimer();
   const remove = useDeleteSession();
   const toast = useToast();
@@ -104,6 +104,9 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
   // latest portion, with distinct note/action IDs on its earlier appearances.
   const instance = `${session.id}${day && day !== portions[portions.length - 1]?.date ? `-${day}` : ""}`;
   const minutes = (day ? portions.find((part) => part.date === day)?.minutes : undefined) ?? session.duration_minutes ?? 0;
+  const continuation = !!day && day !== localDateKey(new Date(session.start));
+  const portionStart = day && day > localDateKey(new Date(session.start)) ? "00:00" : formatTime(session.start);
+  const portionEnd = day && session.end && day < localDateKey(new Date(session.end)) ? "24:00" : formatTime(session.end);
   const reason = matchReason(session, search);
 
   const restart = () => {
@@ -122,15 +125,17 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
   };
 
   return (
-    <li ref={row} className={`band journal-entry${hideProject ? " journal-entry--in-project" : ""}`} id={`session-${instance}`} data-session-id={session.id}>
+    <li ref={row} className={`band journal-entry${hideProject ? " journal-entry--in-project" : ""}${continuation ? " journal-entry--continuation" : ""}`} id={`session-${instance}`} data-session-id={session.id}>
       <div className="journal-heading">
         {!hideProject ? <AppLink className="session-project" title={session.project.name} href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink> : null}
-        <span className={`journal-duration${!Math.round(minutes) ? " is-zero" : ""}`}>{formatDuration(minutes)}</span>
+        {!hideDuration && !continuation ? <span className={`journal-duration${!Math.round(minutes) ? " is-zero" : ""}`}>{formatDuration(minutes)}</span> : null}
         <div className="journal-meta">
           {session.subproject_allocations.length ? <span className="journal-subs" title={session.subproject_allocations.map((sub) => sub.name).join(", ")}>{session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}</span> : null}
           {showDate ? <span className="journal-time">{formatShortDate(session.start)}</span> : null}
-          <span className="journal-time">{formatTimeRange(session.start, session.end)}</span>
+          <span className="journal-time">{day && portions.length > 1 ? `${portionStart}–${portionEnd}` : formatTimeRange(session.start, session.end)}</span>
+          {continuation ? <><span className="journal-time">{formatDuration(minutes)}</span><AppLink className="journal-note-origin quiet-link" href={`${urls.sessions()}?start_date=${portions[0]?.date}&end_date=${portions[0]?.date}#session-${session.id}-${portions[0]?.date}`}>note on {formatDayDate(session.start)}</AppLink></> : null}
           {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
+          <button className="btn-icon journal-overflow journal-meta-overflow" type="button" aria-label="Session actions" title="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${instance}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
         </div>
         <div className="journal-row-actions">
           <button className="btn-icon journal-action" type="button" aria-label="Edit note" title="Edit note" onClick={editNote}><Icon icon={faPen} /></button>
@@ -138,10 +143,10 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
           <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" title="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${instance}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
         </div>
       </div>
-      {dayPortions(session).length > 1 ? <p className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === localDateKey(new Date()) ? "today" : part.date === localDateKey(new Date(Date.now() - 86400000)) ? "yesterday" : formatShortDate(part.date)}`).join(" · ")}</p> : null}
+      {!continuation && portions.length > 1 ? <p className="journal-day-split">{portions.map((part) => `${formatDuration(part.minutes)} on ${formatDayDate(part.date)}`).join(" · ")}</p> : null}
       {reason ? <p className="journal-match-reason">{reason}</p> : null}
-      {!session.note && !session.note_html && !editing ? <button className="btn btn--quiet journal-add-note" type="button" onClick={editNote}>Add a note</button> : null}
-      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote search={search} id={`note-${instance}`} html={session.note_html} text={session.note} onEdit={editNote} passage={session.match_passage} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
+      {!continuation && !session.note && !session.note_html && !editing ? <button className="btn btn--quiet journal-add-note" type="button" onClick={editNote}>Add a note</button> : null}
+      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : !continuation ? <SessionNote search={search} id={`note-${instance}`} html={session.note_html} text={session.note} onEdit={editNote} passage={session.match_passage} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} /> : null}
 
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Session actions" className="session-actions-sheet">
         <p className="session-action-context">{session.project.name} · {formatDuration(session.duration_minutes)}</p>
