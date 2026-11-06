@@ -3,7 +3,7 @@ import { useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { keys } from "@/api/keys";
-import { faEllipsisH, faStop, faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEllipsisH, faStop, faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Select } from "@/components/ui";
 import { Sheet } from "@/components/Sheet";
@@ -178,7 +178,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         </div>
         <div className="project-progress-row"><section className="project-week-summary"><h2>This week</h2><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong><p className="muted">{week.data && lastWeek.data ? week.data.total_minutes === lastWeek.data.total_minutes ? "Same as last week" : `${week.data.total_minutes > lastWeek.data.total_minutes ? "+" : "−"}${formatDurationWords(Math.abs(week.data.total_minutes-lastWeek.data.total_minutes))} from last week` : "Comparing weeks…"}</p>{trend.data ? <ProjectTrend rows={trend.data.data as DailyTotalRow[]} start={addDays(weekStart,-7)} /> : null}</section><section className="project-week-target" id="project-commitment">{ownCommitment ? <><h2>Commitment</h2><CommitmentSummary commitment={ownCommitment} showTarget={false} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}><Icon icon={faPlus} /> Add commitment</AppLink>}</section></div>
         <aside className="project-rail">
-        <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
+        <Disclose id="project-subprojects" title="Subprojects" summary={project.subprojects.length}>
           {project.subprojects.length ? (
             <ul className="band-list">
               {project.subprojects.map((sub) => { return (
