@@ -250,5 +250,10 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
 function ProjectTrend({ rows, start }: { rows: DailyTotalRow[]; start: string }) {
   if (rows.filter(row => Number(row.hours) > 0).length < 2) return null;
   const values = new Map(rows.map(row => [row.date, Number(row.hours)])); const max = Math.max(1,...values.values());
-  return <><svg className="project-trend" viewBox="0 0 280 72" role="img" aria-label="Daily time over the previous and current weeks">{Array.from({ length:14 },(_,index) => <rect key={index} x={index * 20} y={70 - (values.get(addDays(start,index)) ?? 0) / max * 64} width="13" height={(values.get(addDays(start,index)) ?? 0) / max * 64} rx="2" className={index < 7 ? "is-previous" : undefined}><title>{formatDate(addDays(start,index))}: {formatDurationWords((values.get(addDays(start,index)) ?? 0) * 60)}</title></rect>)}</svg><p className="muted">Last week / this week</p></>;
+  const today = todayKey(bootstrap().profile.timezone);
+  return <><svg className="project-trend" viewBox="0 0 280 90" role="img" aria-label="Daily time over the previous and current weeks">{Array.from({ length: 14 }, (_, index) => {
+    const day = addDays(start, index); const hours = values.get(day) ?? 0;
+    const initial = new Date(`${day}T12:00Z`).toLocaleDateString("en", { weekday: "short", timeZone: "UTC" }).slice(0, 1);
+    return <g key={day}><rect x={index * 20} y={70 - hours / max * 64} width="13" height={hours / max * 64} rx="2" className={index < 7 ? "is-previous" : undefined}><title>{formatDate(day)}: {formatDurationWords(hours * 60)}</title></rect><text x={index * 20 + 6.5} y="85" textAnchor="middle" className={day === today ? "is-today" : undefined}>{initial}</text></g>;
+  })}</svg><p className="muted">Last week / this week</p></>;
 }

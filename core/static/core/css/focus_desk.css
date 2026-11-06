@@ -5177,3 +5177,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 
 .project-menu-actions { display: grid; gap: var(--s1); }
 .project-menu-actions .btn { justify-content: flex-start; }
+
+.project-trend text { fill: var(--muted); font: 8px var(--font-ui); }
+.project-trend text.is-today { fill: var(--brand); font-weight: 700; }
