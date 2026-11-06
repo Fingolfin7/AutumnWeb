@@ -331,9 +331,10 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
             </section>
 
             {commitment && hasPendingChange(commitment) ? <div className="slab slab-pad"><PendingNotice commitment={commitment} nameOf={nameOf} /><button className="btn btn--quiet" type="button" disabled={busy} onClick={() => update.mutate({ body: liveDefinition(commitment), version: commitment.version }, { onSuccess: (saved) => { toast.success("Pending changes cancelled."); finish(saved); }, onError: onFailure })}>Cancel pending change</button></div> : null}
+            <details className="commitment-advanced" open={mode === "create" || (submitted && !!shown.fields.scope) || undefined}><summary>Advanced scope and rules</summary>
             <section className="slab slab-pad">
               <div className="field">
-                <label htmlFor="id_aggregation_type">Applies to</label>
+                <label htmlFor="id_aggregation_type">Type</label>
                 <select id="id_aggregation_type" value={state.aggregation} onChange={(e) => chooseAggregation(e.target.value as Aggregation)}>
                   {AGGREGATIONS.map((a) => (
                     <option key={a.value} value={a.value}>
@@ -399,7 +400,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
               )}
               <FieldErrors errors={shown.fields.rules} />
             </details>
-
+            </details>
 
             <section className="slab slab-pad">
               <div className="check-row">
@@ -504,7 +505,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
         <div className="form-actions commitment-editor-actions">
           {onClose ? <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button> : <AppLink className="btn btn--ghost" href={urls.home()}><Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}</AppLink>}
           {commitment ? <AppLink className="btn btn--danger" href={urls.deleteCommitment(commitment.id)}><Icon icon={faTrash} /> Delete</AppLink> : null}
-          {commitment && changes?.nextPeriod.length ? <span className="muted">Applies from {formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}</span> : null}
+          {commitment && !showRestart ? <span className="muted">{changes?.nextPeriod.length ? `Applies from ${formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}` : "Changes apply when saved"}</span> : null}
           {!showRestart ? <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}><Icon icon={faCheckCircle} /> {onClose ? "Save commitment" : commitment ? "Update commitment" : "Create commitment"}</button> : null}
         </div>
       </form>

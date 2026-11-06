@@ -1,6 +1,5 @@
 import { FileDrop } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { faFileImport } from "@fortawesome/free-solid-svg-icons";
 import { AppLink, urls } from "@/app/links";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/app/toasts";
@@ -203,7 +202,7 @@ export default function ImportPage() {
               {file && !preview && !previewError ? <p role="status">Reading file...</p> : null}
             </div>
             {preview ? <section className="import-preview" aria-label="Import preview">
-              <div className="import-decision"><div><h2 className="settings-form-title">Ready to bring over</h2><p><strong>{projects.isSuccess ? `${preview.names.filter(name => projects.data.some(project => project.name === name)).length} name matches, ${preview.names.filter(name => !projects.data.some(project => project.name === name)).length} new` : `${preview.names.length} projects`}</strong> · {preview.sessions} sessions</p><p className="muted">{preview.conflicts ? `${preview.conflicts} conflicting session IDs in this file. ` : ""}{preview.repeated ? `${preview.repeated} repeated session IDs in this file. ` : ""}Autumn checks contexts and existing sessions during import.</p><p className="import-policy">{force ? "Conflicts: replace from this file" : merge ? "Conflicts: merge projects, preserve existing sessions" : "Conflicts: skip existing projects"}</p></div><button type="submit" className="btn btn--primary" disabled={busy}><Icon icon={faFileImport} /> {busy ? "Importing..." : "Import"}</button></div>
+              <div className="import-decision"><div><h2 className="settings-form-title">Ready to bring over</h2><p><strong>{projects.isSuccess ? `${preview.names.filter(name => projects.data.some(project => project.name === name)).length} name matches, ${preview.names.filter(name => !projects.data.some(project => project.name === name)).length} new` : `${preview.names.length} projects`}</strong> · {preview.sessions} sessions</p><p className="muted">{preview.conflicts ? `${preview.conflicts} conflicting session IDs in this file. ` : ""}{preview.repeated ? `${preview.repeated} repeated session IDs in this file. ` : ""}Autumn checks contexts and existing sessions during import.</p><p className="import-policy">{force ? "Conflicts: replace from this file" : merge ? "Conflicts: merge projects, preserve existing sessions" : "Conflicts: skip existing projects"}</p></div></div>
               <details className="import-inventory"><summary>Project inventory ({preview.names.length})</summary><ul aria-label="Projects in the import file">{preview.projects.map((project, index) => { const exists = projects.data?.some(item => item.name === project.name); return <li key={index}><span>{project.name}<small>{project.sessions} {project.sessions === 1 ? "session" : "sessions"}</small></span><small className="muted">{exists ? "Name matches" : "New name"}</small></li>; })}</ul></details>
             </section> : null}
             <details className="import-advanced"><summary>Advanced options</summary><div className="fields">
@@ -295,7 +294,7 @@ export default function ImportPage() {
             </div>
 
             </div></details>
-            {!preview ? <p className="muted">Choose a valid Autumn JSON file to enable Import.</p> : null}
+            {preview ? <div className="import-final"><p>{preview.sessions} sessions in {preview.names.length} projects</p><button type="submit" className="btn btn--primary" disabled={busy}>{busy ? "Importing..." : "Import"}</button></div> : <p className="muted">Choose a valid Autumn JSON file to enable Import.</p>}
           </section> : null}
 
           {started ? (
