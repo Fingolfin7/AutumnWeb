@@ -1,6 +1,10 @@
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
-import { faLink, faMicrophone } from "@fortawesome/free-solid-svg-icons";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
+import { formatTime } from "@/lib/format";
+import { readNoteDraft, writeNoteDraft } from "@/lib/noteDraft";
+import { faClock, faExpand, faLink, faListOl, faListUl, faMicrophone } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
+import { markTimestamps, renderNoteDraft } from "./SessionNote";
 
 /* The session note editor (session_note_editor.js + the markup the edit-
    session and stop-timer templates wrap around it): a markdown toolbar
@@ -71,6 +75,15 @@ export function NoteEditor({
   onBlur,
   error,
   draftKey,
+  persistKey,
+  persistVersion = 0,
+  saveStatus,
+  onRetry,
+  sessionTitle,
+  onDone,
+  initiallyWriting = false,
+  richPreview = false,
+  writerOnly = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -85,19 +98,100 @@ export function NoteEditor({
   onBlur?: () => void;
   error?: string | string[] | null;
   draftKey?: string | number;
+  persistKey?: string;
+  persistVersion?: number;
+  saveStatus?: string;
+  onRetry?: () => void;
+  sessionTitle?: string;
+  onDone?: () => boolean | void | Promise<boolean | void>;
+  initiallyWriting?: boolean;
+  /** Show the rendered note until it is opened for editing. */
+  richPreview?: boolean;
+  /** Opening the preview goes straight to the full-screen writer (always on phones). */
+  writerOnly?: boolean;
 }) {
+  const [edited, setEdited] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [writing, setWriting] = useState(initiallyWriting);
+  const [richEditing, setRichEditing] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const baseline = useRef(value);
+  const selection = useRef({ start: 0, end: 0 });
   const generated = useId();
   const textareaId = id ?? `note-${generated}`;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLButtonElement>(null);
+  const [previewClipped, setPreviewClipped] = useState(false);
+  useLayoutEffect(() => {
+    const node = previewRef.current;
+    if (!node) return;
+    const measure = () => setPreviewClipped(node.scrollHeight > node.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    if (node.firstElementChild) observer.observe(node.firstElementChild);
+    return () => observer.disconnect();
+  }, [value, writing, richEditing]);
+  const wasWriting = useRef(false);
+  useLayoutEffect(() => {
+    const node = textareaRef.current;
+    if (!node) return;
+    node.style.height = "auto";
+    node.style.height = `${node.scrollHeight}px`;
+    if (!writing && wasWriting.current) {
+      node.focus();
+      node.setSelectionRange(selection.current.start, selection.current.end);
+    }
+    wasWriting.current = writing;
+  }, [value, writing, richEditing]);
+  useEffect(() => {
+    if (!persistKey) return;
+    const draft = readNoteDraft(persistKey);
+    if (draft) onChangeRef.current(draft.text);
+  }, [persistKey]);
+  useEffect(() => {
+    if (!writing) return;
+    const node = dialog.current;
+    node?.showModal();
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    textareaRef.current?.focus();
+    textareaRef.current?.setSelectionRange(selection.current.start, selection.current.end);
+    return () => {
+      node?.close();
+      document.body.style.overflow = overflow;
+    };
+  }, [writing]);
+  const change = (next: string) => {
+    setEdited(true);
+    if (persistKey) writeNoteDraft(persistKey, { text: next, version: persistVersion });
+    onChange(next);
+  };
+  const closeWriter = async () => {
+    if (finishing) return;
+    setFinishing(true);
+    try {
+      if (onDone && navigator.onLine && await onDone() === false) return;
+      if (!onDone || !navigator.onLine) onBlur?.();
+      const node = textareaRef.current;
+      if (node) selection.current = { start: node.selectionStart, end: node.selectionEnd };
+      setWriting(false);
+    } finally { setFinishing(false); }
+  };
   const supported = dictationSupported();
   const [status, setStatus] = useState(supported ? "" : "Dictation unavailable in this browser.");
   const [dictating, setDictating] = useState(false);
 
   /* Latest callbacks for the dictation session, which outlives renders. */
-  const onChangeRef = useRef(onChange);
+  const onChangeRef = useRef(change);
   const langRef = useRef(lang);
   useEffect(() => {
-    onChangeRef.current = onChange;
+    onChangeRef.current = change;
     langRef.current = lang;
   });
 
@@ -130,7 +224,9 @@ export function NoteEditor({
     const textarea = textareaRef.current;
     if (!textarea || disabled) return;
     edit(textarea);
-    onChange(textarea.value);
+    change(textarea.value);
+    setRichEditing(true);
+    requestAnimationFrame(() => textarea.focus());
     textarea.focus();
   };
 
@@ -143,6 +239,28 @@ export function NoteEditor({
       if (!selected) textarea.setSelectionRange(start + before.length, start + before.length);
     });
 
+  const list = (numbered: boolean) => apply((textarea) => {
+    const start = textarea.value.lastIndexOf("\n", textarea.selectionStart - 1) + 1;
+    const nextBreak = textarea.value.indexOf("\n", textarea.selectionEnd);
+    const end = nextBreak < 0 ? textarea.value.length : nextBreak;
+    const lines = textarea.value.slice(start, end).split("\n");
+    const pattern = numbered ? /^\d+[.)]\s/ : /^[-*]\s/;
+    const remove = lines.every((line) => pattern.test(line));
+    const replacement = lines.map((line, index) => remove ? line.replace(pattern, "") : `${numbered ? `${index + 1}.` : "-"} ${line.replace(/^(?:[-*]|\d+[.)])\s/, "")}`).join("\n");
+    textarea.setRangeText(replacement, start, end, "end");
+  });
+
+  const openWriter = () => {
+    selection.current = { start: value.length, end: value.length };
+    setWriting(true);
+  };
+  const appendTimestamp = () => {
+    const next = `${value}${value && !value.endsWith("\n") ? "\n" : ""}— ${formatTime(new Date())} — `;
+    change(next);
+    selection.current = { start: next.length, end: next.length };
+    setWriting(true);
+  };
+
   const insertLink = () => {
     const textarea = textareaRef.current;
     if (!textarea || disabled) return;
@@ -152,7 +270,7 @@ export function NoteEditor({
     const url = window.prompt("Enter URL", "https://");
     if (!url) return;
     textarea.setRangeText(`[${selected}](${url})`, start, end, "end");
-    onChange(textarea.value);
+    change(textarea.value);
     textarea.focus();
   };
 
@@ -168,18 +286,27 @@ export function NoteEditor({
   };
 
   const errors = error ? (Array.isArray(error) ? error : [error]) : [];
+  const writerStatus = saveStatus === "Saved" ? "Saved to session" : saveStatus?.startsWith("Unsaved changes") || (!saveStatus && persistKey) ? "Draft kept on this device" : saveStatus ?? "";
 
-  return (
-    <div className="field note-editor-field">
+  const field = (
+    <div className={`field note-editor-field${writing ? " is-writing" : ""}${focused ? " is-focused" : ""}`} onFocus={(event) => { if (!(event.target as Element).closest(".note-rich-preview")) setFocused(true); }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget) && !(event.relatedTarget instanceof Element && event.relatedTarget.closest("button, a, summary"))) setFocused(false); }}>
+      {writing ? <header className="note-writer-heading"><div className="note-writer-identity"><h2>{sessionTitle?.split(" · ")[0] || "Session note"}</h2><small>{sessionTitle?.includes(" · ") ? `${sessionTitle.split(" · ").slice(1).join(" · ")} · ` : ""}{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><div className="note-writer-completion"><small role="status">{writerStatus}</small>{onRetry && saveStatus?.includes("retry") ? <button className="quiet-link" type="button" onClick={onRetry}>Retry</button> : null}<button className="btn btn--quiet" type="button" aria-label="Done" disabled={finishing} onClick={() => void closeWriter()}>{finishing ? "Saving..." : "Done"}</button></div></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
         <div className="note-editor-toolbar" role="toolbar" aria-label="Note formatting">
+          <button type="button" className="note-tool-button" title="Insert timestamp" aria-label="Insert timestamp" disabled={disabled} onClick={() => apply((node) => {
+            const start = node.selectionStart;
+            const prefix = start && !node.value.slice(0, start).endsWith("\n") ? "\n" : "";
+            node.setRangeText(`${prefix}— ${formatTime(new Date())} — `, start, start, "end");
+          })}><Icon icon={faClock} /></button>
           <button type="button" className="note-tool-button" title="Bold (Ctrl+B)" aria-label="Bold" disabled={disabled} onClick={() => wrap("**", "**")}>
             <b>B</b>
           </button>
           <button type="button" className="note-tool-button" title="Italic (Ctrl+I)" aria-label="Italic" disabled={disabled} onClick={() => wrap("*", "*")}>
             <i>I</i>
           </button>
+          <button type="button" className="note-tool-button" title="Bulleted list" aria-label="Bulleted list" disabled={disabled} onClick={() => list(false)}><Icon icon={faListUl} /></button>
+          <button type="button" className="note-tool-button" title="Numbered list" aria-label="Numbered list" disabled={disabled} onClick={() => list(true)}><Icon icon={faListOl} /></button>
           <button type="button" className="note-tool-button" title="Link" aria-label="Link" disabled={disabled} onClick={insertLink}>
             <Icon icon={faLink} />
           </button>
@@ -187,6 +314,7 @@ export function NoteEditor({
           <button
             type="button"
             className={`note-tool-button dictate-button${dictating ? " listening" : ""}`}
+            aria-label={!supported ? "Dictation unavailable" : dictating ? "Stop dictation" : "Dictate"}
             disabled={disabled || !supported}
             aria-pressed={supported ? dictating : undefined}
             onClick={() => dictation.current?.toggle()}
@@ -194,8 +322,18 @@ export function NoteEditor({
             <Icon icon={faMicrophone} />
             <span>{!supported ? "Unavailable" : dictating ? "Stop" : "Dictate"}</span>
           </button>
+          {!writing ? <button type="button" className="note-tool-button note-writer-open" aria-label="Expand note" title="Full-screen writer" onClick={() => {
+            selection.current = { start: textareaRef.current?.selectionStart ?? value.length, end: textareaRef.current?.selectionEnd ?? value.length };
+            setWriting(true);
+          }}><Icon icon={faExpand} /></button> : null}
         </div>
+        {richPreview && !richEditing && !writing ? <button ref={previewRef} className={`note-rich-preview${previewClipped ? " has-overflow" : ""}${value.trim() ? "" : " is-empty"}`} type="button" aria-label="Edit session note" disabled={disabled} onClick={() => {
+          if (writerOnly || window.matchMedia("(max-width: 999px)").matches) { selection.current = { start: value.length, end: value.length }; setWriting(true); return; }
+          setRichEditing(true);
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }}>{value.trim() ? <span className="session-note-body" dangerouslySetInnerHTML={{ __html: markTimestamps(renderNoteDraft(value)) }} /> : placeholder}</button> : null}
         <textarea
+          hidden={richPreview && !richEditing && !writing}
           ref={textareaRef}
           id={textareaId}
           name={name}
@@ -204,15 +342,20 @@ export function NoteEditor({
           placeholder={placeholder}
           disabled={disabled}
           autoFocus={autoFocus}
+          data-autofocus={autoFocus || undefined}
           lang={lang}
-          onChange={(event) => onChange(event.target.value)}
-          onBlur={onBlur}
+          onChange={(event) => change(event.target.value)}
+          onBlur={(event) => { onBlur?.(); if (!event.currentTarget.closest(".note-editor-field")?.contains(event.relatedTarget)) setRichEditing(false); }}
           onKeyDown={onKeyDown}
         />
       </div>
-      <small data-note-status="" aria-live="polite">
-        {status}
-      </small>
+      {richPreview && value.trim() && !richEditing && !writing ? <div className="note-preview-actions"><button className="quiet-link" type="button" disabled={disabled} onClick={openWriter}>Edit note</button><button className="quiet-link" type="button" disabled={disabled} onClick={appendTimestamp}>Append timestamp</button></div> : null}
+      <div className="note-editor-status">
+        {!writing ? <small role="status">{saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small> : null}
+        {!writing && onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
+      {writing && (!onDone || !navigator.onLine) ? <small className="writer-done-help">{!navigator.onLine ? "Done keeps your draft on this device." : "Done keeps your note in the session form."}</small> : null}
+      <small data-note-status="" aria-live="polite">{status}</small>
+      </div>
       {errors.length ? (
         <ul className="errorlist">
           {errors.map((message) => (
@@ -222,6 +365,7 @@ export function NoteEditor({
       ) : null}
     </div>
   );
+  return writing ? createPortal(<dialog ref={dialog} className="note-writer-dialog" aria-label="Full-screen note writer" onCancel={(event) => { event.preventDefault(); closeWriter(); }} onKeyDown={(event) => event.stopPropagation()}>{field}</dialog>, document.body) : field;
 }
 
 /* ----- Dictation ---------------------------------------------------------

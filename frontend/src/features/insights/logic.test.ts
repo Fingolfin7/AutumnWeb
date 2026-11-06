@@ -129,7 +129,7 @@ describe("describeSelection", () => {
   it("resolves ids to names and flips the related pill when meaning search is unavailable", () => {
     const f = { ...EMPTY_SELECTION, search: "x", related: true, context: "3", tags: [2], projects: [1], projectMode: "include" as const };
     const pills = describeSelection(f, lookup, defaults, { available: true, state: "included" });
-    expect(pills.map((p) => `${p.label}=${p.value}`)).toEqual(["Search=x", "Including=related", "Closeness=0.45", "Context=Work", "Tags=deep", "Only=Writing"]);
+    expect(pills.map((p) => `${p.label}=${p.value}`)).toEqual(["Search=x", "Including=related", "Closeness=Balanced", "Context=Work", "Tags=deep", "Only=Writing"]);
     const unavailable = describeSelection(f, lookup, defaults, { available: true, state: "unavailable" });
     expect(unavailable[1]).toMatchObject({ label: "Related", value: "unavailable" });
     expect(unavailable[1]!.title).toBeTruthy();
@@ -212,10 +212,10 @@ describe("chat list", () => {
 
   it("stamps today and yesterday with a time, older chats with a date", () => {
     const now = new Date(2026, 9, 14, 15, 0);
-    expect(chatStamp(new Date(2026, 9, 14, 14, 14).toISOString(), now)).toMatch(/^2:14\s?PM$/i);
-    expect(chatStamp(new Date(2026, 9, 13, 9, 5).toISOString(), now)).toMatch(/^9:05\s?AM$/i);
-    expect(chatStamp(new Date(2026, 7, 13, 9, 5).toISOString(), now)).toBe("13 Aug");
-    expect(chatStamp(new Date(2025, 7, 13, 9, 5).toISOString(), now)).toBe("13 Aug 2025");
+    expect(chatStamp(new Date(2026, 9, 14, 14, 14).toISOString(), now)).toBe("14:14");
+    expect(chatStamp(new Date(2026, 9, 13, 9, 5).toISOString(), now)).toBe("09:05");
+    expect(chatStamp(new Date(2026, 7, 13, 9, 5).toISOString(), now)).toBe("Thu 13 Aug");
+    expect(chatStamp(new Date(2025, 7, 13, 9, 5).toISOString(), now)).toBe("Wed 13 Aug 2025");
   });
 });
 
@@ -280,8 +280,8 @@ describe("transcript", () => {
 describe("OpenAI connection note", () => {
   it("names the source of the key", () => {
     expect(openaiConnectionNote("server", true)).toMatchObject({ text: expect.stringContaining("server key"), profileLink: true });
-    expect(openaiConnectionNote("codex_with_api_fallback", true)?.text).toBe("OpenAI via Codex login, API key fallback.");
-    expect(openaiConnectionNote("codex", true)?.text).toBe("OpenAI via Codex login.");
+    expect(openaiConnectionNote("codex_with_api_fallback", true)?.text).toBe("OpenAI via Codex, with an API key fallback.");
+    expect(openaiConnectionNote("codex", true)?.text).toBe("OpenAI via Codex.");
     expect(openaiConnectionNote("profile", true)?.text).toBe("OpenAI via your profile API key.");
   });
 

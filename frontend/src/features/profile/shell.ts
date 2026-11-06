@@ -1,7 +1,7 @@
 import { api, unwrap } from "@/api/client";
 import type { components } from "@/api/schema";
 import { bootstrap, type Bootstrap } from "@/bootstrap";
-import type { Prefs } from "./model";
+import { hasCustomAvatar, type Prefs } from "./model";
 
 /* The app shell (header avatar, page backdrop, header dimming slider) is
    rendered from the bootstrap blob at page load. When the profile changes
@@ -37,7 +37,9 @@ export async function refreshBootstrapProfile(): Promise<void> {
 export function applyAvatar(url: string) {
   bootstrap().profile.avatar_url = url;
   const img = document.querySelector<HTMLImageElement>(".app-header .avatar img");
-  if (img) img.src = url;
+  if (img) { img.src = url; img.hidden = !hasCustomAvatar(url); }
+  const monogram = document.querySelector<HTMLElement>(".app-header .avatar-monogram");
+  if (monogram) monogram.hidden = hasCustomAvatar(url);
 }
 
 export function applyDimming(value: number) {

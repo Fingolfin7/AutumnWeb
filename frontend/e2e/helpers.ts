@@ -18,9 +18,9 @@ export const toasts = (page: Page): Locator => page.getByRole("region", { name: 
 
 /** Pick a project in the "Project" combobox (start timer, edit session). */
 export async function pickProject(page: Page, name: string): Promise<void> {
-  const combobox = page.getByRole("combobox", { name: "Project" });
+  const combobox = page.getByRole("combobox", { name: "Project", exact: true });
   await combobox.fill(name);
-  await page.getByRole("option", { name }).click();
+  await page.getByRole("option", { name, exact: true }).click();
   await expect(combobox).toHaveValue(name);
 }
 

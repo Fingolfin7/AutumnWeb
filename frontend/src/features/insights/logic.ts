@@ -1,5 +1,6 @@
+import { formatTime, formatShortDate } from "@/lib/format";
 import type { paths } from "@/api/schema";
-import { accountSimilarity, fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
+import { closenessLabel, accountSimilarity, parseSimilarity, similarityScale } from "@/features/search/similarity";
 import type { AttachmentView } from "./attachments";
 import type { ChatFiltersStored, ChatGroup, ChatMessage, InsightOptions, StreamRequest, Usage } from "./types";
 
@@ -167,7 +168,7 @@ export function describeSelection(
         : { label: "Including", value: "related" },
     );
     // The cutoff decides which sessions are included, so it is always on show.
-    pills.push({ label: "Closeness", value: fixed2(filters.similarity ?? accountSimilarity()) });
+    pills.push({ label: "Closeness", value: closenessLabel(filters.similarity ?? accountSimilarity()) });
   }
   if (filters.project_name) pills.push({ label: "Project", value: filters.project_name });
   if (filters.start_date && filters.start_date !== defaults.start) pills.push({ label: "From", value: filters.start_date });
@@ -292,10 +293,9 @@ export function chatStamp(value: string, now = new Date()): string {
   const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   const days = Math.round((startOf(now) - startOf(date)) / 86_400_000);
   if (days <= 1) {
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return formatTime(date);
   }
-  const base = `${String(date.getDate()).padStart(2, "0")} ${date.toLocaleDateString("en-GB", { month: "short" })}`;
-  return date.getFullYear() === now.getFullYear() ? base : `${base} ${date.getFullYear()}`;
+  return formatShortDate(date, now);
 }
 
 /* ---- transcript ----------------------------------------------------------- */
@@ -382,20 +382,20 @@ export function openaiConnectionNote(source: InsightOptions["openai_source"], ha
       };
     case "codex_with_api_fallback":
       return {
-        text: "OpenAI via Codex login, API key fallback.",
-        title: "OpenAI models use your Codex login first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.",
+        text: "OpenAI via Codex, with an API key fallback.",
+        title: "OpenAI models use your Codex connection first. Your OpenAI API key is the fallback if Codex is unavailable or out of usage.",
         profileLink: false,
       };
     case "codex":
-      return { text: "OpenAI via Codex login.", title: "OpenAI models are available through your Codex login.", profileLink: false };
+      return { text: "OpenAI via Codex.", title: "OpenAI models are available through your Codex connection.", profileLink: false };
     case "profile":
       return { text: "OpenAI via your profile API key.", title: "OpenAI models are using your profile API key.", profileLink: false };
     default:
       return hasOpenaiProvider
         ? null
         : {
-            text: "OpenAI needs a key or Codex login — add one in",
-            title: "OpenAI models need an API key or Codex login.",
+            text: "OpenAI needs a key or a Codex connection — add one in",
+            title: "OpenAI models need an API key or a Codex connection.",
             profileLink: true,
           };
   }

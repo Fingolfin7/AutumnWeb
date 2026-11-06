@@ -1,6 +1,8 @@
+import { ColorPicker } from "./ColorPicker";
 import { useState, type FormEvent } from "react";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { Sheet } from "@/components/Sheet";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -17,6 +19,7 @@ export default function TagsPage() {
   const create = useCreateTag();
   const toast = useToast();
   const [name, setName] = useState("");
+  const [creating, setCreating] = useState(false);
   const [color, setColor] = useState("");
   const [errors, setErrors] = useState<FormErrors>(NO_ERRORS);
 
@@ -32,6 +35,7 @@ export default function TagsPage() {
       { name: name.trim(), color: color.trim() || null },
       {
         onSuccess: () => {
+          setCreating(false);
           toast.success("Tag created successfully");
           setName("");
           setColor("");
@@ -44,6 +48,7 @@ export default function TagsPage() {
   return (
     <>
       <DeskHead title="Tags" />
+      <div className="settings-list-heading"><h2>Your tags</h2><button className="btn btn--primary" type="button" onClick={() => setCreating(true)}><Icon icon={faPlus} /> New tag</button></div>
       <div className="split">
         <section id="tags-list" className="slab" aria-label="Tags">
           {tags.isPending ? (
@@ -53,24 +58,23 @@ export default function TagsPage() {
           ) : tags.data.length ? (
             <ul className="band-list">
               {tags.data.map((tag) => (
-                <li key={tag.id} className="band band--tap u-row u-between u-gap-3">
-                  <AppLink className="tag-chip" href={urls.updateTag(tag.id)} style={tagStyle(tag.color)}>
-                    {tag.name}
-                  </AppLink>
-                  <span className="muted mono tnum">{pluralize(tag.project_count, "project")}</span>
+                <li key={tag.id} className="band settings-list-row">
+                  <AppLink className="chip-link" href={urls.updateTag(tag.id)}><span className="tag-chip" style={tagStyle(tag.color)}>{tag.name}</span></AppLink>
+                  <span className="muted mono tnum">{pluralize(tag.project_count, "project")}</span><AppLink className="settings-row-edit" href={urls.updateTag(tag.id)}>Edit</AppLink>
                 </li>
               ))}
             </ul>
           ) : (
             <Empty>
-              No tags yet. <a href="#create-tag">Create one</a> to label related projects.
+              No tags yet. <button className="btn btn--quiet" type="button" onClick={() => setCreating(true)}>Create one</button> to label related projects.
             </Empty>
           )}
         </section>
 
-        <form className="fields" id="create-tag" onSubmit={submit} noValidate>
+        <Sheet open={creating} onClose={() => setCreating(false)} title="New tag"><form className="fields" id="create-tag" onSubmit={submit} noValidate>
           <FormLevelErrors errors={errors.general} />
           <section className="slab slab-pad">
+            <h2 className="settings-form-title">New tag</h2>
             <div className="field">
               <label htmlFor="id_name">Name</label>
               <input
@@ -86,14 +90,7 @@ export default function TagsPage() {
             </div>
             <div className="field">
               <label htmlFor="id_color">Color</label>
-              <input
-                id="id_color"
-                type="text"
-                placeholder="Optional color (e.g. #ff0000 or label)"
-                maxLength={20}
-                value={color}
-                onChange={(event) => setColor(event.target.value)}
-              />
+              <ColorPicker value={color} onChange={setColor} />
               <FieldErrors errors={errors.fields.color} />
               {name.trim() ? (
                 <p className="u-mt-4">
@@ -109,7 +106,7 @@ export default function TagsPage() {
               </button>
             </div>
           </section>
-        </form>
+        </form></Sheet>
       </div>
     </>
   );

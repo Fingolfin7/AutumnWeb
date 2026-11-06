@@ -1,3 +1,7 @@
+import { BrowserPush } from "./BrowserPush";
+import { OptionPicker } from "@/components/OptionPicker";
+import { DateInput, Input } from "@/components/ui";
+import { todayKey } from "./dates";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -9,12 +13,10 @@ import { useCreateSchedule, useUpdateSchedule } from "./api";
 import { defaultSlot } from "./dates";
 import {
   CADENCE_OPTIONS,
-  TARGET_OPTIONS,
   emptyForm,
   formFromSchedule,
   keepSubprojects,
   toPayload,
-  toggleId,
   validateForm,
   type Cadence,
   type Schedule,
@@ -65,9 +67,6 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
 
   const set = <K extends keyof ScheduleForm>(key: K, value: ScheduleForm[K]) => setForm((current) => ({ ...current, [key]: value }));
 
-  const pickProject = (value: string) =>
-    setForm((current) => ({ ...current, project: value, subprojects: [] }));
-
   const available = subprojects.data ?? [];
   /* Subprojects loaded for the project: forget any that do not belong. */
   useEffect(() => {
@@ -117,99 +116,46 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
           {schedule ? "Edit reminder" : "New reminder"}
         </h2>
       </div>
-      <form className="fields" onSubmit={submit} noValidate>
+      <form className="fields completing-form" onSubmit={submit} noValidate>
+        <BrowserPush compact />
         <FormLevelErrors errors={errors.general} />
         <div className="nx-form-grid">
           <div className="field">
             <label htmlFor="id_target">Remind me about</label>
-            <select id="id_target" ref={first} value={form.target} onChange={(event) => set("target", event.target.value as Target)}>
-              {TARGET_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
+            <select id="id_target" ref={first} value={form[form.target] ? `${form.target}:${form[form.target]}` : ""} aria-invalid={!!fieldError(form.target)} onChange={(event) => {
+              const [kind, id] = event.target.value.split(":") as [Target, string];
+              if (id) setForm(current => ({ ...current, target: kind, [kind]: id, subprojects: kind === "project" && current.project === id ? current.subprojects : [] }));
+            }}>
+              <option value="">Choose a project, context or tag</option>
+              <optgroup label="Projects">{projectOptions.map(item => <option key={item.id} value={`project:${item.id}`}>{item.name}</option>)}</optgroup>
+              <optgroup label="Contexts">{(contexts.data ?? []).map(item => <option key={item.id} value={`context:${item.id}`}>{item.name}</option>)}</optgroup>
+              <optgroup label="Tags">{(tags.data ?? []).map(item => <option key={item.id} value={`tag:${item.id}`}>{item.name}</option>)}</optgroup>
             </select>
-            <FieldErrors errors={fieldError("target")} />
+            <FieldErrors errors={fieldError(form.target)} />
           </div>
-
-          {form.target === "project" ? (
-            <div className="field">
-              <label htmlFor="id_project">Project</label>
-              <select id="id_project" value={form.project} aria-invalid={!!fieldError("project")} onChange={(event) => pickProject(event.target.value)}>
-                <option value="">---------</option>
-                {projectOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-              <FieldErrors errors={fieldError("project")} />
-            </div>
-          ) : null}
-          {form.target === "context" ? (
-            <div className="field">
-              <label htmlFor="id_context">Context</label>
-              <select id="id_context" value={form.context} aria-invalid={!!fieldError("context")} onChange={(event) => set("context", event.target.value)}>
-                <option value="">---------</option>
-                {(contexts.data ?? []).map((context) => (
-                  <option key={context.id} value={context.id}>
-                    {context.name}
-                  </option>
-                ))}
-              </select>
-              <FieldErrors errors={fieldError("context")} />
-            </div>
-          ) : null}
-          {form.target === "tag" ? (
-            <div className="field">
-              <label htmlFor="id_tag">Tag</label>
-              <select id="id_tag" value={form.tag} aria-invalid={!!fieldError("tag")} onChange={(event) => set("tag", event.target.value)}>
-                <option value="">---------</option>
-                {(tags.data ?? []).map((tag) => (
-                  <option key={tag.id} value={tag.id}>
-                    {tag.name}
-                  </option>
-                ))}
-              </select>
-              <FieldErrors errors={fieldError("tag")} />
-            </div>
-          ) : null}
 
           {form.target === "project" && available.length > 0 ? (
             <div className="field nx-subprojects-field">
-              <label id="id_subprojects_label">Subprojects (optional)</label>
-              <div className="nx-subproject-options" role="group" aria-labelledby="id_subprojects_label">
-                {available.map((sub) => (
-                  <div key={sub.id}>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={form.subprojects.includes(sub.id)}
-                        onChange={() => set("subprojects", toggleId(form.subprojects, sub.id))}
-                      />{" "}
-                      {sub.name}
-                    </label>
-                  </div>
-                ))}
-              </div>
+              <OptionPicker label="Subprojects (optional)" options={available.map(sub => ({ id: sub.id, label: sub.name }))} selected={form.subprojects} onChange={ids => set("subprojects", ids)} />
               <FieldErrors errors={fieldError("subprojects")} />
             </div>
           ) : null}
 
           <div className="field">
             <label htmlFor="id_local_date">Date</label>
-            <input
+            <DateInput
+              today={todayKey(timezone)}
+              presets="future"
               id="id_local_date"
-              type="date"
               value={form.date}
               aria-invalid={!!fieldError("local_date")}
-              onChange={(event) => set("date", event.target.value)}
+              onValueChange={(value) => set("date", value)}
             />
             <FieldErrors errors={fieldError("local_date")} />
           </div>
           <div className="field">
             <label htmlFor="id_local_time">Time</label>
-            <input
+            <Input
               id="id_local_time"
               type="time"
               step={60}
@@ -245,14 +191,15 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
           </div>
         </div>
         <p className="muted nx-timezone-note">Your profile timezone: {timezone}</p>
-        <div className="form-actions">
+
+        <div className="form-actions q-form-actions">
           {schedule ? (
             <AppLink className="btn btn--ghost" href={urls.notifications()}>
               Cancel edit
             </AppLink>
           ) : null}
           <button className="btn btn--primary" type="submit" disabled={busy}>
-            {schedule ? "Save reminder" : "Add reminder"}
+            Save
           </button>
         </div>
       </form>

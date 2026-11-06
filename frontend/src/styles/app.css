@@ -34,25 +34,12 @@
 @keyframes icon-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .icon--spin { animation: none; } }
 
-/* Toasts replace Django messages. Same .msg look, pinned above the content
-   so they never push the page around when they arrive or leave. */
-.toast-region {
-  position: fixed;
-  z-index: 80;
-  left: 50%;
-  top: calc(env(safe-area-inset-top, 0px) + var(--s3, .75rem));
-  transform: translateX(-50%);
-  width: min(32rem, calc(100vw - 1.5rem));
-  display: grid;
-  gap: var(--s2, .5rem);
-  pointer-events: none;
-}
-.toast-region .msg {
-  pointer-events: auto;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
-  animation: toast-in .18s var(--ease, ease-out);
-}
-.toast-region .msg > span { flex: 1; }
+/* A single opaque snackbar overlays the page without moving its content. */
+.toast-region { position: fixed; bottom: var(--s5); right: var(--s4); z-index: 65; width: min(420px,calc(100% - 24px)); pointer-events: none; }
+.toast-region .msg { display: flex; align-items: center; gap: var(--s2); min-height: 48px; width: 100%; pointer-events: auto; background: var(--surface-2); border: 1px solid var(--hairline-2); margin: 0; padding: 0 var(--s2) 0 var(--s3); box-shadow: var(--e3); animation: toast-in .18s var(--ease); font-size: var(--fs-sm); }
+.toast-region .msg > span { display: block; flex: 1; min-width: 0; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; padding-block: var(--s2); }
+.toast-region .msg-icon { flex: 0 0 16px; }
+@media (max-width:999px) { .toast-region { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom,0px) + 12px); } }
 .toast-action {
   background: none;
   border: 0;
@@ -60,14 +47,18 @@
   font: inherit;
   font-weight: 650;
   cursor: pointer;
-  padding: 0 .25rem;
+  padding: .25rem .5rem;
+  min-width: 44px;
+  min-height: 44px;
 }
 .toast-close {
   background: none;
   border: 0;
   color: var(--muted);
   cursor: pointer;
-  padding: 0 .25rem;
+  padding: .25rem .5rem;
+  min-width: 44px;
+  min-height: 44px;
 }
 @keyframes toast-in { from { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .toast-region .msg { animation: none; } }
@@ -162,20 +153,21 @@
 .palette-hint { margin-left: auto; font-size: .85em; color: var(--muted); }
 .palette-group { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: .6rem .7rem .2rem; }
 
+.app:has(.offline-banner) { --offline-height: 40px; }
 .offline-banner {
-  position: fixed;
-  z-index: 85;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.5rem);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: .4rem .8rem;
-  border-radius: 999px;
-  background: var(--raised-2, #22262a);
-  border: 1px solid var(--hairline, #2a2e33);
-  color: var(--muted);
-  font-size: .85rem;
+  position: sticky;
+  top: calc(var(--header-h) + var(--feedback-height, 0px));
+  z-index: 43;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--hairline-2);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
 }
-@media (min-width: 1000px) { .offline-banner { bottom: 1rem; } }
 
 /* Which occurrence of a repeated wall time (components/LocalTimeNotice). */
 .local-time-notice { display: grid; gap: var(--s2); margin-top: var(--s2); }
@@ -201,3 +193,32 @@
 }
 .timers-outside-context-show:hover,
 .timers-outside-context-show:focus-visible { color: var(--ink); }
+
+.dialog-panel--wide { width: min(46rem, calc(100vw - 1.5rem)); }
+@media (max-width: 999px) {
+  .dialog-panel { top: auto; bottom: 0; left: 0; transform: none; width: 100%; max-height: 90dvh; border-radius: var(--r-xl) var(--r-xl) 0 0; padding-bottom: calc(var(--s5) + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Commitment form additions. focus_desk.css draws the <details> chevrons with
+   the Font Awesome webfont, which the React app does not load (icons are
+   inlined SVG), so the glyph is swapped for an <Icon> with the same look. */
+.commitment-rules > summary::after,
+.commitment-rule-dropdown > summary::after { content: none; }
+
+.rule-chevron {
+  font-size: .625rem;
+  color: var(--muted);
+  transition: transform .18s var(--ease);
+}
+.commitment-rules > summary > .rule-chevron { margin-left: auto; }
+.commitment-rules[open] > summary > .rule-chevron,
+.commitment-rule-dropdown[open] > summary > .rule-chevron { transform: rotate(180deg); }
+
+/* Scope-target search: the datalist field is a plain text input. */
+.commitment-scope-note { display: block; margin-top: .35rem; }
+
+/* A queued or required change the user should read before saving. */
+.commitment-notice { margin-top: var(--s4); }
+.commitment-notice p + p { margin-top: var(--s2); }
+.commitment-notice ul { margin: var(--s2) 0 0; padding-left: 1.1rem; }
+.commitment-notice .form-actions { margin-top: var(--s3); }

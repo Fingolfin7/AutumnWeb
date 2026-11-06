@@ -7,6 +7,7 @@ chips must not offer to start a timer that is already running.
 """
 
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 from django.contrib.auth.models import User
 from django.test import TestCase
@@ -15,6 +16,7 @@ from django.utils import timezone
 from core.models import Context, Projects, Sessions, SubProjects
 from core.services.dashboard import (
     build_quick_starts,
+    build_dashboard,
     get_recent_dashboard_sessions,
 )
 
@@ -61,6 +63,26 @@ class DashboardTestCase(TestCase):
 
 
 class RecentDashboardSessionSelectionTests(DashboardTestCase):
+    def test_context_scopes_journal_quick_starts_totals_and_timeline(self):
+        now = timezone.localtime().replace(hour=15, minute=0, second=0, microsecond=0)
+        other_context = Context.objects.create(user=self.user, name="Study")
+        other = Projects.objects.create(user=self.user, name="Reading", context=other_context)
+        selected = Sessions.objects.create(
+            user=self.user, project=self.atlas, start_time=now - timedelta(hours=2),
+            end_time=now - timedelta(hours=1),
+        )
+        Sessions.objects.create(
+            user=self.user, project=other, start_time=now - timedelta(minutes=40),
+            end_time=now - timedelta(minutes=10),
+        )
+        scope = SimpleNamespace(user=self.user, session={"active_context_id": str(self.context.id)})
+        data = build_dashboard(self.user, context=scope, now=now)
+        self.assertEqual([row.id for row in data["recent_sessions"]], [selected.id])
+        self.assertEqual([row.id for row in data["quick_starts"]], [selected.id])
+        self.assertEqual(data["today_total"], 60)
+        self.assertEqual(data["week_total"], 60)
+        self.assertNotIn("Reading", str(data["timeline"]))
+
     def _session_at(self, project, day, hour, minute=0, second=0):
         end = timezone.make_aware(
             datetime(2026, 7, day, hour, minute, second),

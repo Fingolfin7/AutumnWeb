@@ -42,7 +42,7 @@ export function ProjectCombobox({
   invalid,
 }: {
   id: string;
-  value: Project | null;
+  value: Pick<Project, "id" | "name"> | null;
   /* Also given the typed text, for forms that validate unmatched input. */
   onChange: (project: Project | null, text: string) => void;
   placeholder?: string;

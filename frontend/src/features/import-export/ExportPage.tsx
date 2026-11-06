@@ -1,3 +1,7 @@
+import { DateInput, SegmentedControl } from "@/components/ui";
+import { calendarWeek } from "@/features/review/periods";
+import { addDays, todayKey } from "@/features/notifications/dates";
+import { bootstrap } from "@/bootstrap";
 import { useMemo, useState, type FormEvent } from "react";
 import { faFileExport } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -64,10 +68,10 @@ export default function ExportPage() {
   );
   const orderedContexts = useMemo(() => orderContexts(contexts.data ?? []), [contexts.data]);
 
-  const onSubmit = async (event: FormEvent) => {
+  const onSubmit = async (event: FormEvent, chosen = form) => {
     event.preventDefault();
     if (busy) return;
-    const invalid = validateExport(form);
+    const invalid = validateExport(chosen);
     if (Object.keys(invalid).length) {
       setErrors(Object.fromEntries(Object.entries(invalid).map(([field, message]) => [field, [message]])));
       return;
@@ -75,8 +79,8 @@ export default function ExportPage() {
     setErrors({});
     setBusy(true);
     try {
-      const blob = await fetchExport(form);
-      const filename = exportFilename(form);
+      const blob = await fetchExport(chosen);
+      const filename = exportFilename(chosen);
       saveBlob(blob, filename);
       toast.success(`Exported ${filename}.`);
     } catch (error) {
@@ -111,29 +115,31 @@ export default function ExportPage() {
         </div>
       </div>
 
-      <section id="export_options">
+      <section className="slab export-lead"><h2>Your time, to keep.</h2><p>A complete JSON copy of your projects and journal, ready for Autumn or the CLI.</p><button className="btn btn--primary" type="button" disabled={busy} onClick={event => void onSubmit(event, EMPTY_EXPORT_FORM)}><Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export everything"}</button></section>
+      <details className="export-customize"><summary><span>Customize export<small>Choose dates, projects, tags and format</small></span></summary><section id="export_options">
         <form className="fields" onSubmit={onSubmit} noValidate>
           <div className="split">
             <div>
               <section className="slab slab-pad">
+                <SegmentedControl label="Export range" value={!form.startDate && !form.endDate ? "all" : "custom"} options={[{ value: "all", label: "All time" }, { value: "week", label: "This week" }, { value: "month", label: "30 days" }]} onChange={value => { const today = todayKey(bootstrap().profile.timezone); patch(value === "all" ? { startDate: "", endDate: "" } : value === "week" ? { startDate: calendarWeek(today).start, endDate: today } : { startDate: addDays(today,-29), endDate: today }); }} />
                 <div className="two-up">
                   <div className="field">
                     <label htmlFor="export-start-date">Start date</label>
-                    <input
+                    <DateInput presets="none"
+                      today={todayKey(bootstrap().profile.timezone)}
                       id="export-start-date"
-                      type="date"
                       value={form.startDate}
-                      onChange={(event) => patch({ startDate: event.target.value })}
+                      onValueChange={value => patch({ startDate: value })}
                     />
                     {fieldErrors("start_date")}
                   </div>
                   <div className="field">
                     <label htmlFor="export-end-date">End date</label>
-                    <input
+                    <DateInput presets="none"
+                      today={todayKey(bootstrap().profile.timezone)}
                       id="export-end-date"
-                      type="date"
                       value={form.endDate}
-                      onChange={(event) => patch({ endDate: event.target.value })}
+                      onValueChange={value => patch({ endDate: value })}
                     />
                     {fieldErrors("end_date")}
                   </div>
@@ -183,25 +189,7 @@ export default function ExportPage() {
                   </div>
                 )}
 
-                <div id="search_projects" className="field">
-                  <label htmlFor="project-search">Project name</label>
-                  <input
-                    id="project-search"
-                    type="text"
-                    list="export-project-names"
-                    autoComplete="off"
-                    placeholder="Projects (leave blank to export all)"
-                    value={form.projectName}
-                    onChange={(event) => patch({ projectName: event.target.value })}
-                  />
-                  <datalist id="export-project-names">
-                    {allProjects.map((project) => (
-                      <option key={project.id} value={project.name} />
-                    ))}
-                  </datalist>
-                  {fieldErrors("project_name")}
-                </div>
-
+                <p className="muted export-scope-summary">{form.projects.length ? `${form.projects.length} selected projects` : "Everything"} · Use the project, context and tag filters to narrow it</p>
                 {allProjects.length ? (
                   <>
                     <OptionPicker
@@ -209,7 +197,7 @@ export default function ExportPage() {
                       options={offered.map((project) => ({ id: project.id, label: project.name }))}
                       selected={form.projects}
                       onChange={(ids) => patch({ projects: ids })}
-                      searchPlaceholder="Search projects..."
+                      searchPlaceholder="Find a project"
                       emptyText="No projects match that search."
                       mode={form.projectMode}
                       onModeChange={(projectMode) => patch({ projectMode })}
@@ -235,6 +223,7 @@ export default function ExportPage() {
             </div>
 
             <section className="slab slab-pad">
+              <details className="export-format-options"><summary>Format & file options</summary><p className="muted">Standard JSON keeps your complete journal. Use legacy format for older Autumn tools; compression makes a smaller file.</p>
               <div className="field">
                 <label htmlFor="export-output-file">Output file</label>
                 <input
@@ -279,15 +268,16 @@ export default function ExportPage() {
                 <label htmlFor="export-compress">Compress</label>
               </div>
 
+              </details>
               <div className="form-actions">
-                <button type="submit" className="btn btn--primary btn--lg btn--block" disabled={busy}>
-                  <Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export"}
+                <button type="submit" className="btn btn--primary" disabled={busy}>
+                  <Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export selection"}
                 </button>
               </div>
             </section>
           </div>
         </form>
-      </section>
+      </section></details>
     </div>
   );
 }

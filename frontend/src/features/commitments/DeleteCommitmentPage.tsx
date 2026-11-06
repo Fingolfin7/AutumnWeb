@@ -1,3 +1,4 @@
+import { formatDuration } from "@/lib/format";
 import { useNavigate, useParams } from "react-router";
 import { faArrowLeft, faExclamationTriangle, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -7,7 +8,7 @@ import { useToast } from "@/app/toasts";
 import { ApiError, errorMessage } from "@/api/errors";
 import { DeskHead } from "@/features/contexts-tags/ui";
 import { useCommitment, useDeleteCommitment } from "./api";
-import { dayMonthYear, redirectFor, signed } from "./display";
+import { dayMonthYear, redirectFor } from "./display";
 import { aggregationLabel } from "./scope";
 import { measureLabel, periodLabel } from "./formModel";
 
@@ -70,8 +71,7 @@ export default function DeleteCommitmentPage() {
           <div className="meta-row">
             <span className="meta-label">Target</span>
             <span className="meta-value text-green">
-              {c.target_value}
-              {time ? "m" : " sessions"}
+              {time ? formatDuration(c.target_value) : `${c.target_value} sessions`}
             </span>
           </div>
           <div className="meta-row">
@@ -80,7 +80,7 @@ export default function DeleteCommitmentPage() {
           </div>
           <div className="meta-row">
             <span className="meta-label">Bank balance</span>
-            <span className={`meta-value ${c.balance >= 0 ? "text-green" : "text-red"}`}>{signed(c.balance)}</span>
+            <span className={`meta-value ${c.balance >= 0 ? "text-green" : "text-red"}`}>{`${c.balance >= 0 ? "+" : "-"}${time ? formatDuration(Math.abs(c.balance)) : Math.abs(c.balance)}`}</span>
           </div>
           <div className="meta-row">
             <span className="meta-label">Tracking since</span>
@@ -90,7 +90,7 @@ export default function DeleteCommitmentPage() {
       </section>
 
       <p className="confirm-warn">
-        <Icon icon={faExclamationTriangle} /> This deletes the commitment and its banking history. Your sessions are untouched, but the
+        <Icon icon={faExclamationTriangle} /> This deletes the commitment and its carryover history. Your sessions are untouched, but the
         streak and balance are gone for good.
       </p>
 
@@ -106,7 +106,7 @@ export default function DeleteCommitmentPage() {
         <AppLink className="btn btn--ghost" href={urls.home()}>
           <Icon icon={faArrowLeft} /> Back
         </AppLink>
-        <button className="btn btn--stop btn--spacer" type="button" id="delete-commitment" onClick={confirm} disabled={remove.isPending}>
+        <button className="btn btn--danger btn--spacer" type="button" id="delete-commitment" onClick={confirm} disabled={remove.isPending}>
           <Icon icon={faTrash} /> Delete commitment
         </button>
       </div>

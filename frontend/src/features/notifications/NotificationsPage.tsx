@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { bootstrap } from "@/bootstrap";
-import { Dialog, ConfirmDialog } from "@/components/Sheet";
+import { Dialog, ConfirmDialog, Sheet } from "@/components/Sheet";
 import { ErrorState, Skeleton } from "@/components/states";
 import {
   useCancelSchedule,
@@ -33,6 +33,7 @@ export default function NotificationsPage() {
   const [snoozing, setSnoozing] = useState<Schedule | null>(null);
   const [cancelling, setCancelling] = useState<Schedule | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const [newOpen, setNewOpen] = useState(false);
   const toast = useToast();
 
   /* An ?edit= for a reminder that no longer exists (cancelled elsewhere). */
@@ -71,13 +72,12 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <section className="slab slab-pad nx-rail-slab" aria-labelledby="next-week-title">
+      <div className="settings-reminder-action"><button className="btn btn--primary" type="button" onClick={() => setNewOpen(true)}>New reminder</button></div>
+      <section className="slab slab-pad" aria-labelledby="delivery-title">
         <div className="nx-section-head">
-          <h2 className="nx-title" id="next-week-title">
-            Next 7 days
-          </h2>
+          <h2 className="nx-title" id="delivery-title">This browser</h2>
         </div>
-        <Rail schedules={schedules} preferences={preferences} timezone={timezone} />
+        <BrowserPush />
       </section>
 
       <div className="nx-columns">
@@ -113,6 +113,7 @@ export default function NotificationsPage() {
           )}
         </section>
 
+        <Sheet className="settings-reminder-sheet" open={newOpen || !!editId} title={editId ? "Edit reminder" : "New reminder"} onClose={() => { setNewOpen(false); if (editId) navigate(urls.notifications()); }}>
         <div ref={editorRef}>
           {editId && !editing ? (
             <section className="slab slab-pad nx-schedule-editor" aria-label="Edit reminder">
@@ -125,22 +126,15 @@ export default function NotificationsPage() {
               onSaved={() => {
                 if (editing) navigate(urls.notifications());
                 else setFormKey((key) => key + 1);
+                setNewOpen(false);
               }}
             />
           )}
         </div>
+        </Sheet>
       </div>
 
       <div className="nx-columns">
-        <section className="slab slab-pad" aria-labelledby="delivery-title">
-          <div className="nx-section-head">
-            <h2 className="nx-title" id="delivery-title">
-              This browser
-            </h2>
-          </div>
-          <BrowserPush />
-        </section>
-
         {preferences.isPending ? (
           <section className="slab slab-pad" aria-label="Send me">
             <Skeleton lines={5} />
@@ -153,6 +147,11 @@ export default function NotificationsPage() {
           <PreferencesForm key={preferences.data.version} preference={preferences.data} />
         )}
       </div>
+
+      {schedules.data?.upcoming.length || preferences.data?.commitment_checks_enabled || preferences.data?.weekly_review_enabled ? <details className="slab slab-pad settings-upcoming">
+        <summary>Coming up in the next 7 days</summary>
+        <Rail schedules={schedules} preferences={preferences} timezone={timezone} />
+      </details> : null}
 
       <p className="nx-footer-link">
         <AppLink href={urls.weeklyReview()}>Open your weekly review</AppLink> <span aria-hidden="true">→</span>
@@ -202,7 +201,7 @@ function Rail({
                 <time className="mono" dateTime={schedule.next_fire_at ?? undefined}>
                   {formatInstant(schedule.next_fire_at, schedule.timezone || timezone)}
                 </time>
-                <strong>{schedule.target_resource.name}</strong>
+                <strong className={schedule.target === "project" ? "text-red" : schedule.target === "subproject" ? "text-blue" : undefined}>{schedule.target_resource.name}</strong>
                 <TargetKind schedule={schedule} />
                 {schedule.subprojects.map((sub) => (
                   <span key={sub.id}>{sub.name}</span>
@@ -275,7 +274,7 @@ function ScheduleRow({
     <article className="band nx-schedule-row" aria-current={editing ? "true" : undefined}>
       <div className="nx-schedule-copy">
         <div className="nx-schedule-name">
-          <strong>{schedule.target_resource.name}</strong>
+          <strong className={schedule.target === "project" ? "text-red" : schedule.target === "subproject" ? "text-blue" : undefined}>{schedule.target_resource.name}</strong>
           <TargetKind schedule={schedule} />
           {schedule.subprojects.map((sub) => (
             <span key={sub.id} className="text-blue">
@@ -314,7 +313,7 @@ const SNOOZE_OPTIONS: { value: SnoozeChoice; label: string; hint: string }[] = [
 function ScheduleSummary({ schedule }: { schedule: Schedule }) {
   return (
     <p className="nx-lede">
-      <strong>{schedule.target_resource.name}</strong>
+      <strong className={schedule.target === "project" ? "text-red" : schedule.target === "subproject" ? "text-blue" : undefined}>{schedule.target_resource.name}</strong>
       {schedule.target !== "project" ? <span className="muted nx-target-kind"> {schedule.target}</span> : null}
       {schedule.subprojects.map((sub) => ` · ${sub.name}`).join("")} · <span className="mono">{clockText(schedule.local_time)}</span>
     </p>

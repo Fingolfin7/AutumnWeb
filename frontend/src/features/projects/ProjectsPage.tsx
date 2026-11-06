@@ -1,14 +1,19 @@
+import { bootstrap } from "@/bootstrap";
+import { calendarWeek } from "@/features/review/periods";
+import { todayKey } from "@/features/notifications/dates";
+import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import {
   faCodeBranch,
-  faFolderOpen,
   faLayerGroup,
   faPlus,
   faSearch,
   faSlidersH,
   faTags,
 } from "@fortawesome/free-solid-svg-icons";
+import { DateInput, SegmentedControl } from "@/components/ui";
+import { presetPeriod } from "@/features/review/periods";
 import { Icon } from "@/components/Icon";
 import { Sheet } from "@/components/Sheet";
 import { Disclose } from "@/components/Disclose";
@@ -19,7 +24,7 @@ import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import type { Commitment } from "@/api/types";
 import { useTimers } from "@/features/timers/api";
 import { ProjectBand } from "./ProjectBand";
-import { useCommitments, useProjectLists } from "./api";
+import { useCommitments, useDirectoryActivity, useProjectLists, useProjectWeek } from "./api";
 import { describeFilters, emptyFilters, groupByStatus, readFilters, serverQuery, writeFilters, type ProjectFilters } from "./logic";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { useActiveContext } from "@/app/context";
@@ -44,10 +49,11 @@ export default function ProjectsPage() {
   const tags = useTags();
   const contexts = useContexts();
   const commitments = useCommitments();
+  const week = useProjectWeek(calendarWeek(todayKey(bootstrap().profile.timezone)).start);
   const timers = useTimers();
+  const activity = useDirectoryActivity(calendarWeek(todayKey(bootstrap().profile.timezone)).start);
 
   const runningIds = useMemo(() => new Set((timers.data ?? []).map((timer) => timer.project.id)), [timers.data]);
-  const tagColors = useMemo(() => new Map((tags.data ?? []).map((tag) => [tag.id, tag.color] as const)), [tags.data]);
   /* A project's own active commitment drives the meter on its row. */
   const commitmentByProject = useMemo(() => {
     const map = new Map<number, Commitment>();
@@ -74,6 +80,12 @@ export default function ProjectsPage() {
     apply({ ...applied, search: searchText.trim() });
   };
 
+  useEffect(() => {
+    if (searchText === applied.search) return;
+    const timer = window.setTimeout(() => setParams(writeFilters({ ...applied, search: searchText.trim() }), { replace: true }), 350);
+    return () => window.clearTimeout(timer);
+  }, [searchText, applied, setParams]);
+
   const groups = groupByStatus(lists.data?.direct ?? []);
   const related = lists.data?.related ?? [];
   const band = (project: (typeof related)[number]) => (
@@ -82,14 +94,18 @@ export default function ProjectsPage() {
       project={project}
       running={runningIds.has(project.id)}
       commitment={commitmentByProject.get(project.id)}
-      tagColors={tagColors}
+      weekMinutes={week.data ? week.data.entries.find((row) => row.id === project.id)?.total_minutes ?? 0 : undefined}
+      trend={activity.trend(project.id)}
+      latestNote={activity.note(project.id)}
     />
   );
 
+  if (allProjects.isSuccess && !allProjects.data.length && !filtered) return <EmptyWorkspace projects />;
+
   return (
     <>
-      <h1 className="sr-only">Projects</h1>
-      <form className="fields" onSubmit={onSearch} role="search">
+      <div className="desk-head project-directory-title"><h1 className="page-title">Projects</h1><AppLink className="btn btn--primary" href={urls.createProject()}><Icon icon={faPlus} /> New<span className="sr-only"> project</span></AppLink></div>
+      <form className="fields project-directory-search" onSubmit={onSearch} role="search">
         <div className="searchbar">
           <Icon icon={faSearch} className="muted" />
           <label className="sr-only" htmlFor="content-search">
@@ -98,13 +114,11 @@ export default function ProjectsPage() {
           <input
             id="content-search"
             type="search"
-            placeholder="Names, descriptions, or notes"
+            placeholder="Search projects"
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
           />
-          <button className="btn btn--primary" type="submit">
-            Search
-          </button>
+
           <button
             className="filter-launcher"
             type="button"
@@ -142,20 +156,21 @@ export default function ProjectsPage() {
 
       <Sheet className="filter-sheet" open={sheetOpen} onClose={() => setSheetOpen(false)} title="Filter projects">
         <div className="fields">
+          <SegmentedControl label="Active range" value="custom" options={[{ value: "week", label: "This week" }, { value: "last", label: "Last week" }, { value: "month", label: "30 days" }]} onChange={value => { const period = presetPeriod(value as "week" | "last" | "month", todayKey(bootstrap().profile.timezone)); setDraft({ ...draft, start_date: period.start, end_date: period.end }); }} />
           <div className="two-up">
             <div className="field">
               <label htmlFor="start_date">Active since</label>
-              <input id="start_date" type="date" value={draft.start_date} onChange={(e) => setDraft({ ...draft, start_date: e.target.value })} />
+              <DateInput today={todayKey(bootstrap().profile.timezone)} presets="none" id="start_date" value={draft.start_date} onValueChange={value => setDraft({ ...draft, start_date: value })} />
             </div>
             <div className="field">
               <label htmlFor="end_date">Active until</label>
-              <input id="end_date" type="date" value={draft.end_date} onChange={(e) => setDraft({ ...draft, end_date: e.target.value })} />
+              <DateInput today={todayKey(bootstrap().profile.timezone)} presets="none" id="end_date" value={draft.end_date} onValueChange={value => setDraft({ ...draft, end_date: value })} />
             </div>
           </div>
           <div className="field">
             <label htmlFor="context-filter">Context</label>
             <select id="context-filter" value={draft.context} onChange={(e) => setDraft({ ...draft, context: e.target.value })}>
-              <option value="">Active context (header)</option>
+              <option value="">Current context</option>
               <option value="all">All contexts</option>
               {(contexts.data ?? []).map((ctx) => (
                 <option key={ctx.id} value={ctx.id}>
@@ -185,6 +200,17 @@ export default function ProjectsPage() {
               emptyText="No projects match that search."
             />
           ) : null}
+      <div className="action-row">
+        <AppLink className="btn btn--ghost" href={urls.mergeProjects()}>
+          <Icon icon={faCodeBranch} /> Merge
+        </AppLink>
+        <AppLink className="btn btn--quiet" href={urls.contexts()}>
+          <Icon icon={faLayerGroup} /> Contexts
+        </AppLink>
+        <AppLink className="btn btn--quiet" href={urls.tags()}>
+          <Icon icon={faTags} /> Tags
+        </AppLink>
+      </div>
           <div className="sheet-foot">
             <button className="btn btn--ghost" type="button" onClick={() => setDraft({ ...emptyFilters, search: applied.search })}>
               Clear all
@@ -196,20 +222,7 @@ export default function ProjectsPage() {
         </div>
       </Sheet>
 
-      <div className="action-row">
-        <AppLink className="btn btn--primary" href={urls.createProject()}>
-          <Icon icon={faPlus} /> New project
-        </AppLink>
-        <AppLink className="btn btn--ghost" href={urls.mergeProjects()}>
-          <Icon icon={faCodeBranch} /> Merge
-        </AppLink>
-        <AppLink className="btn btn--quiet" href={urls.contexts()}>
-          <Icon icon={faLayerGroup} /> Contexts
-        </AppLink>
-        <AppLink className="btn btn--quiet" href={urls.tags()}>
-          <Icon icon={faTags} /> Tags
-        </AppLink>
-      </div>
+
 
       {lists.isPending ? (
         <section className="slab">
@@ -222,13 +235,11 @@ export default function ProjectsPage() {
           <Disclose
             key={group.status}
             id={`projects-${group.status}`}
-            icon={faFolderOpen}
-            iconClass="text-red"
             title={group.label}
             summary={group.projects.length}
             defaultOpen={group.status === "active"}
           >
-            <ul className="band-list band-list--grid">{group.projects.map(band)}</ul>
+            <div className="project-directory-columns" aria-hidden="true"><span>Project / last worked</span><span>8 weeks</span><span>This week</span></div><ul className="band-list project-directory">{group.projects.map(band)}</ul>
           </Disclose>
         ))
       ) : (
@@ -253,10 +264,10 @@ export default function ProjectsPage() {
         <section className="slab" aria-label="Related projects">
           <header className="day-head">
             <span className="day-date">Related</span>
-            <span className="day-total">{related.length}</span>
+            <span className="muted">{related.length}</span>
           </header>
           {relatedSummary ? <RelatedSlider summary={relatedSummary} loading={lists.isFetching} /> : null}
-          {related.length ? <ul className="band-list band-list--grid">{related.map(band)}</ul> : null}
+          {related.length ? <ul className="band-list project-directory">{related.map(band)}</ul> : null}
         </section>
       ) : null}
     </>

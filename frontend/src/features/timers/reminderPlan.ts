@@ -1,3 +1,4 @@
+import { formatTime } from "@/lib/format";
 /* What a timer's reminder settings will do, for the "When this fires" rail on
    the start page (timer_reminders.js updateRail). Pure, so it is testable. */
 
@@ -34,7 +35,7 @@ export function minutesOf(value: { amount: number | null; unit: DurationUnit } |
   return value.amount * (value.unit === "hours" ? 60 : 1);
 }
 
-const clock = (date: Date) => new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(date);
+const clock = (date: Date) => formatTime(date);
 
 export function planReminders(inputs: ReminderInputs, now = new Date()): ReminderPlan {
   const stopMinutes = minutesOf(inputs.stopAfter);

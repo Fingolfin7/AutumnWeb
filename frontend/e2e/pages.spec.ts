@@ -2,8 +2,8 @@ import { expect, test } from "@playwright/test";
 import { trackErrors } from "./helpers";
 
 const PAGES = [
-  "/", "/timers/", "/sessions/", "/projects/", "/charts/", "/contexts/", "/tags/",
-  "/notifications/", "/review/weekly/", "/import/", "/export/", "/profile/", "/insights/",
+  "/", "/timers/", "/sessions/", "/projects/", "/review/", "/charts/", "/contexts/", "/tags/",
+  "/settings/", "/settings/account/", "/settings/appearance/", "/settings/defaults/", "/settings/search/", "/settings/ai/", "/notifications/", "/review/weekly/", "/import/", "/export/", "/profile/", "/insights/",
 ];
 
 test("every main page loads without page or console errors", async ({ page }) => {
@@ -14,5 +14,80 @@ test("every main page loads without page or console errors", async ({ page }) =>
     await expect(page.locator(".error-state"), path).toHaveCount(0);
     await page.waitForLoadState("networkidle");
   }
+  expect(problems()).toEqual([]);
+});
+
+test("the shell keeps navigation, scroll and palette usable on both sizes", async ({ page }) => {
+  await page.goto("/sessions/");
+  const nav = page.getByRole("navigation", { name: "Primary", exact: true });
+  await expect(nav.getByRole("link", { name: "Sessions", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "New timer", exact: true }).filter({ visible: true })).toHaveCount(1);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await nav.getByRole("link", { name: "Projects", exact: true }).click();
+  await expect(page).toHaveURL(/\/projects\/$/);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/$/);
+  await expect(page.locator(".settings-sections a[href='/settings/account/']")).toBeVisible();
+  await page.getByRole("button", { name: "Go anywhere", exact: true }).click();
+  const palette = page.getByRole("dialog", { name: "Go anywhere" });
+  await palette.getByRole("textbox", { name: "Command" }).fill("Review");
+  await palette.getByRole("button", { name: "Review", exact: true }).click();
+  await expect(nav.getByRole("link", { name: "Review", exact: true })).toHaveAttribute("aria-current", "page");
+  await page.goto("/insights/");
+  await expect(nav.getByRole("link", { name: "Review", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.locator('[aria-current="page"]')).toHaveCount(1);
+  await expect(nav.getByRole("link", { name: "Sessions", exact: true })).not.toHaveClass(/is-active/);
+});
+
+test("Settings keeps bookmarks, swatches and import streaming usable", async ({ page }) => {
+  const problems = trackErrors(page);
+  await page.goto("/profile/");
+  await expect(page).toHaveURL(/\/settings\/account\/$/);
+  const original = await (await page.request.get("/api/v2/me/preferences/")).json();
+  const firstName = `Settings ${Date.now()}`;
+  // A second account edit made during an in-flight save must survive.
+  let delayedAccount = false;
+  await page.route("**/api/v2/me/account/", async route => {
+    if (route.request().method() === "PATCH" && !delayedAccount) { delayedAccount = true; const response = await route.fetch(); await new Promise(resolve => setTimeout(resolve,350)); await route.fulfill({ response }); }
+    else await route.continue();
+  });
+  const savingAccount = page.waitForRequest(request => request.url().endsWith("/api/v2/me/account/") && request.method() === "PATCH");
+  await page.getByLabel("First name", { exact: true }).fill(`${firstName} initial`);
+  await savingAccount;
+  await page.getByLabel("First name", { exact: true }).fill(firstName);
+  await expect.poll(async () => (await (await page.request.get("/api/v2/me/account/")).json()).first_name).toBe(firstName);
+  await page.goto("/settings/defaults/");
+  await page.getByLabel("Projects per chart", { exact: true }).fill("0");
+  await expect(page.getByText("Please fix the highlighted fields.")).toBeVisible();
+  expect((await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count);
+  await page.getByLabel("Projects per chart", { exact: true }).fill(String(original.default_chart_project_count + 1));
+  await expect.poll(async () => (await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count + 1);
+  expect((await (await page.request.get("/api/v2/me/preferences/")).json()).default_chart_project_count).toBe(original.default_chart_project_count + 1);
+  expect((await (await page.request.get("/api/v2/me/account/")).json()).first_name).toBe(firstName);
+  await page.goto("/tags/");
+  await expect(page).toHaveURL(/\/settings\/tags\/$/);
+  await page.getByRole("button", { name: "New tag", exact: true }).click();
+  const name = `Settings swatch ${Date.now()}`;
+  await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByRole("radio", { name: "Lilac", exact: true }).check();
+  await page.getByRole("button", { name: "Create tag", exact: true }).click();
+  const tagLink = page.getByRole("link", { name, exact: true });
+  await expect(tagLink).toBeVisible();
+  await tagLink.click();
+  await expect(page.getByLabel("Color", { exact: true })).toHaveValue("#a78bca");
+
+  // Export the fictional fixture and re-import it: duplicates must remain safe.
+  const exported = await page.request.get("/api/v2/export/?export_format=2");
+  expect(exported.ok()).toBeTruthy();
+  await page.goto("/import/");
+  await expect(page).toHaveURL(/\/settings\/import\/$/);
+  await page.getByLabel("JSON file", { exact: true }).setInputFiles({ name: "autumn.json", mimeType: "application/json", buffer: Buffer.from(await exported.text()) });
+  await expect(page.getByRole("region", { name: "Import preview" })).toBeVisible();
+  await expect(page.getByText("Add project", { exact: true })).toHaveCount(0);
+  const stream = page.waitForResponse((response) => response.url().includes("/stream/") && response.ok());
+  await page.getByRole("button", { name: "Import", exact: true }).click();
+  await stream;
+  await expect(page.getByRole("progressbar", { name: "Import progress" })).toHaveAttribute("aria-valuenow", "100");
   expect(problems()).toEqual([]);
 });

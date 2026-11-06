@@ -1,4 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { bootstrap } from "@/bootstrap";
+import { todayKey } from "@/features/notifications/dates";
+import { presetPeriod } from "@/features/review/periods";
+import { DateInput, SegmentedControl } from "@/components/ui";
+import { useInsightSelection } from "./api";
+import { selectionQuery } from "./logic";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Sheet } from "@/components/Sheet";
 import type { Context, Project, Tag } from "@/api/types";
@@ -6,8 +12,7 @@ import { SimilaritySlider } from "@/features/search/SimilaritySlider";
 import { accountSimilarity, sameCutoff, similarityScale } from "@/features/search/similarity";
 import type { SelectionFilters } from "./logic";
 
-/* The narrowing controls that do not live on the page itself (the date range
-   does): search, related, project name, context, note, tags and projects. */
+/* One place for the conversation's dates, model and session filters. */
 export function FilterSheet({
   open,
   onClose,
@@ -20,6 +25,8 @@ export function FilterSheet({
   tags,
   contexts,
   activeContextId,
+  children,
+  defaults,
 }: {
   open: boolean;
   onClose: () => void;
@@ -32,7 +39,14 @@ export function FilterSheet({
   tags: Tag[];
   contexts: Context[];
   activeContextId: number | null;
+  children?: ReactNode;
+  defaults: { start: string; end: string };
 }) {
+  const [searchField, setSearchField] = useState<"search" | "project_name" | "note_snippet">("search");
+  const [countDraft, setCountDraft] = useState(draft);
+  useEffect(() => { const timer = window.setTimeout(() => setCountDraft(draft), 350); return () => window.clearTimeout(timer); }, [draft]);
+  const matches = useInsightSelection(selectionQuery(countDraft, defaults, activeContextId), open);
+  const today = todayKey(bootstrap().profile.timezone);
   /* The project picker narrows itself to the context and tags chosen beside
      it; a ticked project always stays visible. */
   const projectOptions = useMemo(() => {
@@ -48,13 +62,12 @@ export function FilterSheet({
   }, [projects, draft.context, draft.tags, draft.projects, activeContextId]);
 
   return (
-    <Sheet className="filter-sheet" open={open} onClose={onClose} title="Filter sessions">
+    <Sheet className="filter-sheet insights-filter-sheet" open={open} onClose={onClose} title="Conversation context">
       <div className="fields">
-        <div className="field">
-          <label htmlFor="content-search">Search projects, subprojects, and session notes</label>
-          <input id="content-search" type="search" placeholder="Projects, subprojects, or notes" value={draft.search} onChange={(e) => onDraft({ ...draft, search: e.target.value })} />
-        </div>
-
+        <SegmentedControl label="Session dates" value={["week", "last", "month"].find(value => { const range = presetPeriod(value as "week" | "last" | "month", today); return draft.start_date === range.start && draft.end_date === range.end; }) ?? "custom"} options={[{ value: "week", label: "This week" }, { value: "last", label: "Last week" }, { value: "month", label: "30 days" }]} onChange={value => { const range = presetPeriod(value as "week" | "last" | "month", today); onDraft({ ...draft, start_date: range.start, end_date: range.end }); }} />
+        <div className="two-up"><div className="field"><label htmlFor="start_date">Start date</label><DateInput presets="none" today={today} id="start_date" value={draft.start_date} onValueChange={value => onDraft({ ...draft, start_date: value })} /></div><div className="field"><label htmlFor="end_date">End date</label><DateInput presets="none" today={today} id="end_date" value={draft.end_date} onValueChange={value => onDraft({ ...draft, end_date: value })} /></div></div>
+        <div className="field"><label htmlFor="content-search">Find sessions</label><div className="insights-search"><input id="content-search" type="search" placeholder="Search your time" value={draft[searchField]} onChange={event => onDraft({ ...draft, [searchField]: event.target.value })} /><select aria-label="Search in" value={searchField} onChange={event => setSearchField(event.target.value as typeof searchField)}><option value="search">Everything</option><option value="project_name">Project names</option><option value="note_snippet">Notes</option></select></div></div>
+        {(["search", "project_name", "note_snippet"] as const).filter(key => key !== searchField && draft[key]).map(key => <button className="btn btn--quiet" type="button" key={key} onClick={() => onDraft({ ...draft, [key]: "" })}>{key === "project_name" ? "Project" : key === "note_snippet" ? "Note" : "Search"}: {draft[key]} - Clear</button>)}
         {semantic ? (
           <div className="check-row">
             <input id="related-search" type="checkbox" checked={draft.related} onChange={(e) => onDraft({ ...draft, related: e.target.checked })} />
@@ -72,27 +85,9 @@ export function FilterSheet({
         ) : null}
 
         <div className="field">
-          <label htmlFor="project-search">Project name</label>
-          <input
-            id="project-search"
-            type="text"
-            placeholder="Projects"
-            autoComplete="off"
-            list="insights-project-names"
-            value={draft.project_name}
-            onChange={(e) => onDraft({ ...draft, project_name: e.target.value })}
-          />
-          <datalist id="insights-project-names">
-            {projects.map((project) => (
-              <option key={project.id} value={project.name} />
-            ))}
-          </datalist>
-        </div>
-
-        <div className="field">
           <label htmlFor="context-filter">Context</label>
           <select id="context-filter" value={draft.context} onChange={(e) => onDraft({ ...draft, context: e.target.value })}>
-            <option value="">Active context (header)</option>
+            <option value="">Current context</option>
             <option value="all">All contexts</option>
             {contexts.map((ctx) => (
               <option key={ctx.id} value={ctx.id}>
@@ -100,11 +95,6 @@ export function FilterSheet({
               </option>
             ))}
           </select>
-        </div>
-
-        <div className="field">
-          <label htmlFor="note_snippet">Note contains</label>
-          <input id="note_snippet" type="text" placeholder="Note Snippet" value={draft.note_snippet} onChange={(e) => onDraft({ ...draft, note_snippet: e.target.value })} />
         </div>
 
         {tags.length ? (
@@ -130,12 +120,13 @@ export function FilterSheet({
           />
         ) : null}
 
-        <div className="sheet-foot">
+        {children}
+        <div className="sheet-foot insights-context-apply"><span role="status">{matches.isFetching || JSON.stringify(countDraft) !== JSON.stringify(draft) ? "Counting sessions" : matches.isError ? "Count unavailable" : `${matches.data?.count ?? 0} matching sessions`}</span>
           <button className="btn btn--ghost" type="button" onClick={onClear}>
             Clear all
           </button>
           <button className="btn btn--primary" type="button" onClick={onApply}>
-            Apply filters
+            Use context
           </button>
         </div>
       </div>

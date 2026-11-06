@@ -101,11 +101,13 @@ export function ProjectFields({
   onChange,
   errors,
   showStatus,
+  compact,
 }: {
   values: ProjectValues;
   onChange: (next: ProjectValues) => void;
   errors: SplitErrors;
   showStatus?: boolean;
+  compact?: boolean;
 }) {
   const contexts = useContexts();
   const tags = useTags();
@@ -132,11 +134,15 @@ export function ProjectFields({
         </div>
       ) : null}
 
-      <div className="field">
+      {compact ? <details className="project-description"><summary>Description (optional)</summary>      <div className="field">
         <label htmlFor="id_description">Description</label>
         <textarea id="id_description" placeholder="Description" rows={3} value={values.description} onChange={(e) => set("description", e.target.value)} />
         <FieldError message={errors.fields.description} />
-      </div>
+      </div></details> : <>      <div className="field">
+        <label htmlFor="id_description">Description</label>
+        <textarea id="id_description" placeholder="Description" rows={3} value={values.description} onChange={(e) => set("description", e.target.value)} />
+        <FieldError message={errors.fields.description} />
+      </div></>}
 
       <div className="field">
         <label htmlFor="id_context">Context</label>
@@ -153,12 +159,12 @@ export function ProjectFields({
 
       {tags.data?.length ? (
         <>
-          <OptionPicker
+          {compact ? <div className="field"><span className="field-label">Tags</span><div className="project-tag-options">{tags.data.map(tag => <button key={tag.id} type="button" className="tag-chip" aria-pressed={values.tag_ids.includes(tag.id)} onClick={() => set("tag_ids", values.tag_ids.includes(tag.id) ? values.tag_ids.filter(id => id !== tag.id) : [...values.tag_ids,tag.id])}>{tag.name}</button>)}</div></div> : <OptionPicker
             label="Tags"
             options={tags.data.map((tag) => ({ id: tag.id, label: tag.name, color: tag.color }))}
             selected={values.tag_ids}
             onChange={(ids) => set("tag_ids", ids)}
-          />
+          />}
           <FieldError message={errors.fields.tag_ids} />
         </>
       ) : (

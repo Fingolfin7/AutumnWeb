@@ -10,10 +10,10 @@ test("the command palette opens with Ctrl+K and navigates", async ({ page, isMob
   await page.keyboard.press("Control+k");
   const palette = page.getByRole("dialog", { name: "Go anywhere" });
   await expect(palette).toBeVisible();
-  await palette.getByRole("textbox", { name: "Command" }).fill("charts");
-  await palette.getByRole("option", { name: /Charts/ }).first().click();
+  await palette.getByRole("textbox", { name: "Command" }).fill("review");
+  await palette.getByRole("button", { name: /Review/ }).first().click();
 
-  await expect(page).toHaveURL(/\/charts\/$/);
+  await expect(page).toHaveURL(/\/review\/$/);
   await expect(palette).toBeHidden();
   expect(problems()).toEqual([]);
 });

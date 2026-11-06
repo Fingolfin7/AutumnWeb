@@ -1,8 +1,8 @@
 import { groupByDay } from "./sessions";
 
-const at = (iso: string, minutes: number) => ({ end: iso, duration_minutes: minutes });
+const at = (iso: string, minutes: number) => ({ start: new Date(Date.parse(iso) - minutes * 60000).toISOString(), end: iso, duration_minutes: minutes });
 
-it("groups by local end date, newest day first, summing durations", () => {
+it("groups by local calendar overlap, newest day first, summing durations", () => {
   const a = at(new Date(2026, 9, 14, 18, 0).toISOString(), 30);
   const b = at(new Date(2026, 9, 14, 9, 0).toISOString(), 15);
   const c = at(new Date(2026, 9, 12, 23, 59).toISOString(), 60);
@@ -13,5 +13,19 @@ it("groups by local end date, newest day first, summing durations", () => {
 });
 
 it("skips sessions that have not ended", () => {
-  expect(groupByDay([{ end: null, duration_minutes: null }])).toEqual([]);
+  expect(groupByDay([{ start: new Date().toISOString(), end: null, duration_minutes: null }])).toEqual([]);
+});
+
+it("orders a day by start time even when a longer session ends later", () => {
+  const early = at(new Date(2026, 9, 14, 18).toISOString(), 180);
+  const late = at(new Date(2026, 9, 14, 17).toISOString(), 30);
+  expect(groupByDay([early, late])[0]!.sessions).toEqual([late, early]);
+});
+
+it("splits a midnight crossing while preserving the exact saved duration", () => {
+  const row = { start: new Date(2026, 10, 4, 21, 53).toISOString(), end: new Date(2026, 10, 5, 0, 28).toISOString(), duration_minutes: 155 };
+  const groups = groupByDay([row]);
+  expect(groups.map((group) => [group.date, group.totalMinutes])).toEqual([["2026-11-05", 28], ["2026-11-04", 127]]);
+  expect(groups.reduce((sum, group) => sum + group.totalMinutes, 0)).toBe(row.duration_minutes);
+  expect(groups[0]!.sessions[0]).toBe(row);
 });

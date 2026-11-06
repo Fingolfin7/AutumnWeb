@@ -287,6 +287,13 @@ else:
             }
         }
 
+if DATABASES["default"]["ENGINE"] == "django.db.backends.sqlite3":
+    # A deferred transaction that reads, then writes, fails at once with
+    # "database is locked" if another request is writing. Queue for the lock instead.
+    DATABASES["default"].setdefault("OPTIONS", {}).update(
+        {"transaction_mode": "IMMEDIATE", "timeout": 20}
+    )
+
 if os.environ.get("AUTUMN_CHZ_DB"):
     DATABASES["default"].setdefault("TEST", {})["NAME"] = os.environ["AUTUMN_CHZ_DB"]
 

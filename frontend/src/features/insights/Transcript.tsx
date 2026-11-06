@@ -92,7 +92,7 @@ function Message({ item, selecting, selected, onToggle }: { item: Item; selectin
   let body: ReactNode;
   if (item.plain !== null) {
     body = (
-      <div className="message-content" style={{ whiteSpace: "pre-wrap" }}>
+      <div className="message-content message-content--plain">
         {item.plain}
       </div>
     );
@@ -138,28 +138,20 @@ export function Transcript({
   empty: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const stick = useRef(true);
-  const last = items[items.length - 1];
-  const signature = `${items.length}:${last?.plain?.length ?? last?.html.length ?? 0}:${last?.streaming}`;
+  const latestAnswer = [...items].reverse().find((item) => item.role === "assistant")?.key;
 
-  /* Follow the answer as it grows, unless you scrolled up to read. */
+  // Start at the latest answer; a growing answer stays readable from its start.
   useLayoutEffect(() => {
     const node = ref.current;
-    /* Sending a question always brings you to the bottom. */
-    if (last?.streaming && !last.plain) stick.current = true;
-    if (node && stick.current) node.scrollTop = node.scrollHeight;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature]);
+    const answer = node?.querySelector(".assistant-message:last-child");
+    if (node && answer) node.scrollTop += answer.getBoundingClientRect().top - node.getBoundingClientRect().top;
+  }, [latestAnswer]);
 
   return (
     <div
       id="conversation-container"
       ref={ref}
       className={`conversation-container${selecting ? " selecting" : ""}`}
-      onScroll={(event) => {
-        const node = event.currentTarget;
-        stick.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80;
-      }}
     >
       {items.length ? (
         items.map((item) => <Message key={item.key} item={item} selecting={selecting} selected={selected.has(item.key)} onToggle={() => onToggle(item.key)} />)

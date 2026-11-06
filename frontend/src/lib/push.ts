@@ -105,7 +105,8 @@ export async function permissionState(): Promise<{ state: PermissionState; detai
   if (!pushSupported()) return { state: "unavailable", detail: "This browser does not support background notifications." };
   const [status, local] = await Promise.all([
     pushStatus(),
-    navigator.serviceWorker.ready.then((r) => r.pushManager.getSubscription()).catch(() => null),
+    // Reading status must also finish when no worker has registered yet.
+    navigator.serviceWorker.getRegistration().then((r) => r?.pushManager.getSubscription()).catch(() => null),
   ]);
   if (!status.available) {
     return { state: "unavailable", detail: status.configuration_error || "This deployment has not configured browser push yet." };

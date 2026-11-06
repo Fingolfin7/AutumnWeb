@@ -52,7 +52,7 @@ def rounded_session_minutes(end_field="end_time", start_field="start_time"):
     return _RoundedSessionMinutes(F(end_field), F(start_field))
 
 
-def session_minute_totals_since(user, **windows):
+def session_minute_totals_since(user, *, context=None, **windows):
     """Return completed-session minute totals for named lower bounds.
 
     All windows are folded into one conditional aggregate. This keeps summary
@@ -74,11 +74,16 @@ def session_minute_totals_since(user, **windows):
         )
         for name, lower_bound in windows.items()
     }
-    return Sessions.objects.filter(
+    sessions = Sessions.objects.filter(
         user=user,
         end_time__isnull=False,
         end_time__gte=oldest_lower_bound,
-    ).aggregate(**aggregates)
+    )
+    if context is not None:
+        from core.utils import filter_by_active_context
+
+        sessions = filter_by_active_context(sessions, context)
+    return sessions.aggregate(**aggregates)
 
 
 def _project_total_subquery(*, project_ref="pk"):

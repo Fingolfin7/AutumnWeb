@@ -315,6 +315,7 @@ class ResourceIncludeQuerySerializer(serializers.Serializer):
 
 
 class SessionListItemSerializer(SessionResourceSerializer):
+    match_passage = serializers.CharField(required=False, help_text="The closest fresh note passage for a related match, when available.")
     match = serializers.ChoiceField(
         choices=("direct", "related"),
         required=False,

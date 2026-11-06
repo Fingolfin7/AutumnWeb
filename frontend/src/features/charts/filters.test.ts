@@ -4,9 +4,9 @@ const params = (query: string) => new URLSearchParams(query);
 
 describe("URL <-> filters", () => {
   it("reads the old page's query string", () => {
-    const f = readFilters(params("chart_type=treemap&start_date=2026-01-01&end_date=2026-02-01&search=oauth&related=on&project_name=Czech&context=3&tags=1&tags=2&exclude_projects=7"));
+    const f = readFilters(params("chart_type=pie&start_date=2026-01-01&end_date=2026-02-01&search=oauth&related=on&project_name=Czech&context=3&tags=1&tags=2&exclude_projects=7"));
     expect(f).toMatchObject({
-      chart_type: "treemap",
+      chart_type: "pie",
       start_date: "2026-01-01",
       end_date: "2026-02-01",
       search: "oauth",
@@ -19,9 +19,9 @@ describe("URL <-> filters", () => {
     });
   });
 
-  it("falls back to a pie for an unknown chart type and drops junk ids", () => {
+  it("falls back to ranked bars for an unknown chart type and drops junk ids", () => {
     const f = readFilters(params("chart_type=nonsense&tags=abc&tags=4&include_projects=-1"));
-    expect(f.chart_type).toBe("pie");
+    expect(f.chart_type).toBe("bar");
     expect(f.tags).toEqual([4]);
     expect(f.projects).toEqual([]);
   });
@@ -32,10 +32,10 @@ describe("URL <-> filters", () => {
     expect(f.projectMode).toBe("include");
   });
 
-  it("round-trips, keeping the pie default out of the URL", () => {
-    const state = { ...EMPTY_FILTERS, chart_type: "radar" as const, search: "x", related: true, tags: [1, 2], projects: [5], projectMode: "include" as const };
+  it("round-trips, keeping the bar default out of the URL", () => {
+    const state = { ...EMPTY_FILTERS, chart_type: "daily_bars" as const, search: "x", related: true, tags: [1, 2], projects: [5], projectMode: "include" as const };
     const text = writeFilters(state).toString();
-    expect(text).toContain("chart_type=radar");
+    expect(text).toContain("chart_type=daily_bars");
     expect(text).toContain("include_projects=5");
     expect(readFilters(params(text))).toEqual(state);
     expect(writeFilters(EMPTY_FILTERS).toString()).toBe("");
@@ -93,16 +93,16 @@ describe("summary pills", () => {
       lookup,
       { available: false, state: null },
     );
-    expect(pills.map((p) => `${p.label}:${p.value}`)).toEqual(["From:2026-01-01", "Context:Study", "Tags:Language", "Only:Czech"]);
+    expect(pills.map((p) => `${p.label}:${p.value}`)).toEqual(["From:Thu 1 Jan", "Context:Study", "Tags:Language", "Only:Czech"]);
   });
 
   it("shows the related pill only for a related search, and flips it when unavailable", () => {
     const filters = { ...EMPTY_FILTERS, search: "oauth", related: true };
     const on = describeFilters(filters, lookup, { available: true, state: "included" });
     expect(on.find((p) => p.value === "related")).toMatchObject({ label: "Including" });
-    expect(on.find((p) => p.label === "Closeness")).toMatchObject({ value: "0.45" });
+    expect(on.find((p) => p.label === "Closeness")).toMatchObject({ value: "Balanced" });
     const strict = describeFilters({ ...filters, similarity: 0.52 }, lookup, { available: true, state: "included" });
-    expect(strict.find((p) => p.label === "Closeness")).toMatchObject({ value: "0.52" });
+    expect(strict.find((p) => p.label === "Closeness")).toMatchObject({ value: "Strict" });
     const off = describeFilters(filters, lookup, { available: true, state: "unavailable" });
     expect(off.find((p) => p.label === "Related")).toMatchObject({ value: "unavailable" });
     expect(describeFilters({ ...filters, related: false }, lookup, { available: true, state: null }).map((p) => p.label)).toEqual(["Search"]);

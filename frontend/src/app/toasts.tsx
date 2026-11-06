@@ -35,6 +35,7 @@ interface ToastApi {
 }
 
 const ToastContext = createContext<ToastApi | null>(null);
+const ToastDisplay = createContext<{ toasts: Toast[]; dismiss: (id: number) => void } | null>(null);
 
 export function useToast(): ToastApi {
   const value = useContext(ToastContext);
@@ -61,7 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback((input: ToastInput) => {
     const id = nextId.current++;
-    setToasts((current) => [...current.slice(-3), { ...input, id }]);
+    setToasts((current) => [...current, { ...input, id }]);
     return id;
   }, []);
 
@@ -78,20 +79,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   return (
     <ToastContext.Provider value={api}>
-      {children}
-      <section className="toast-region" aria-live="polite" aria-label="Notifications">
-        {toasts.map((toast) => (
-          <ToastView key={toast.id} toast={toast} onDismiss={() => dismiss(toast.id)} />
-        ))}
-      </section>
+      <ToastDisplay.Provider value={{ toasts, dismiss }}>{children}</ToastDisplay.Provider>
     </ToastContext.Provider>
   );
+}
+
+/** One queued overlay, with recovery beside the message. */
+export function ToastOutlet() {
+  const display = useContext(ToastDisplay);
+  return <section className="toast-region" aria-live="polite" aria-label="Notifications">
+    {display?.toasts.slice(0, 1).map((toast) => <ToastView key={toast.id} toast={toast} onDismiss={() => display.dismiss(toast.id)} />)}
+  </section>;
 }
 
 function ToastView({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }) {
   const kind = toast.kind ?? "success";
   const ref = useRef<HTMLDivElement>(null);
-  const duration = toast.duration ?? (kind === "error" ? 8000 : toast.action ? 7000 : 4000);
+  const duration = toast.duration ?? (kind === "error" ? 8000 : toast.action ? 10000 : 4000);
 
   useEffect(() => {
     if (!duration) return;

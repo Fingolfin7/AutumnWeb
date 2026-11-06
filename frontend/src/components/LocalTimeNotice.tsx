@@ -36,9 +36,12 @@ export function useLocalTime(value: string, original?: string | null): LocalTime
   const defaultIndex = useMemo(() => {
     if (candidates.kind !== "ambiguous" || !original) return 0;
     const date = parseInstant(original);
-    if (!date || toDateTimeLocal(date, true) !== value) return 0;
-    const second = Math.floor(date.getTime() / 1000);
-    const found = candidates.instants.findIndex((iso) => Math.floor(new Date(iso).getTime() / 1000) === second);
+    // A minute-precision field still counts as untouched within its saved minute.
+    const seconds = value.length > 16;
+    if (!date || toDateTimeLocal(date, seconds) !== value) return 0;
+    const unit = seconds ? 1000 : 60_000;
+    const saved = Math.floor(date.getTime() / unit);
+    const found = candidates.instants.findIndex((iso) => Math.floor(new Date(iso).getTime() / unit) === saved);
     return found < 0 ? 0 : found;
   }, [candidates, original, value]);
 

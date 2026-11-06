@@ -28,11 +28,11 @@ describe("formatStatusCounts", () => {
 
 describe("formatMinutesFull", () => {
   it("names every non-zero unit", () => {
-    expect(formatMinutesFull(9 * 60 + 23)).toBe("9 hours 23 minutes");
-    expect(formatMinutesFull(62.55)).toBe("1 hour 2 minutes 33 seconds");
-    expect(formatMinutesFull(60)).toBe("1 hour");
-    expect(formatMinutesFull(0)).toBe("0 seconds");
-    expect(formatMinutesFull(48)).toBe("48 minutes");
+    expect(formatMinutesFull(9 * 60 + 23)).toBe("9h 23m");
+    expect(formatMinutesFull(62.55)).toBe("1h 2m");
+    expect(formatMinutesFull(60)).toBe("1h");
+    expect(formatMinutesFull(0)).toBe("0m");
+    expect(formatMinutesFull(48)).toBe("48m");
   });
 });
 

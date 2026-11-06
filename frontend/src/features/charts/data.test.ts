@@ -1,8 +1,4 @@
 import { buildSeries, consolidateTopN, dayKey, getChartUnit, parseDay, withAlpha } from "./data";
-import { groupScatter } from "./basic";
-import { flattenHierarchy } from "./hierarchy";
-import { radarMetrics } from "./analysis";
-import { fontSizer } from "./wordcloud";
 import { buildChart, isEmptyPayload, parseKind } from "./build";
 
 describe("top N + Other", () => {
@@ -39,30 +35,13 @@ describe("daily series", () => {
     expect(set.byDay["c"]).toBeUndefined();
     expect(set.days).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
   });
-  it("keeps every subproject series, sorted by name", () => {
+  it("keeps every subproject series, ranked by total", () => {
     const set = buildSeries(rows);
-    expect(set.names).toEqual(["a", "b", "c", "d"]);
+    expect(set.names).toEqual(["b", "a", "c", "d"]);
     expect(set.other).toBeNull();
   });
   it("sums repeated days", () => {
     expect(buildSeries([{ date: "2026-10-01", series: "a", hours: 1 }, { date: "2026-10-01", series: "a", hours: 2 }], 3).byDay["a"]).toEqual({ "2026-10-01": 3 });
-  });
-});
-
-describe("scatter grouping", () => {
-  const rows = [
-    { x: "2026-10-01T10:00:00Z", y: 1, series: "a" },
-    { x: "2026-10-02T10:00:00Z", y: 3, series: "b" },
-    { x: "2026-10-03T10:00:00Z", y: 0.5, series: "c" },
-  ];
-  it("ranks by total hours and folds the rest", () => {
-    const groups = groupScatter(rows, 1);
-    expect(groups.map((g) => g.name)).toEqual(["b", "Other (2)"]);
-    expect(groups[1]!.other).toBe(true);
-    expect(groups[1]!.points.every((p) => p.projectName === "Other (2)")).toBe(true);
-  });
-  it("sorts subproject series by name", () => {
-    expect(groupScatter(rows).map((g) => g.name)).toEqual(["a", "b", "c"]);
   });
 });
 
@@ -85,49 +64,6 @@ describe("dates", () => {
   });
 });
 
-describe("treemap data", () => {
-  const tree = {
-    name: "All",
-    children: [
-      {
-        name: "Study",
-        children: [
-          { name: "Czech", total_time: 120, children: [{ name: "Grammar", total_time: 90 }, { name: "Empty", total_time: 0 }] },
-          { name: "Solo", total_time: 60, children: [] },
-          { name: "Idle", total_time: 0, children: [] },
-        ],
-      },
-    ],
-  };
-  it("flattens to subproject leaves, falling back to the project itself", () => {
-    const { leaves, colors } = flattenHierarchy(tree);
-    expect(leaves).toEqual([
-      { name: "Grammar", project: "Czech", value: 1.5 },
-      { name: "Solo", project: "Solo", value: 1 },
-    ]);
-    expect(Object.keys(colors)).toEqual(["Czech", "Solo"]);
-  });
-  it("falls back to flat rows", () => {
-    expect(flattenHierarchy([{ name: "a", total_time: 60 }]).leaves).toEqual([{ name: "a", project: "a", value: 1 }]);
-  });
-});
-
-describe("radar and word cloud", () => {
-  it("takes the top six with time and inverts recency", () => {
-    const rows = Array.from({ length: 8 }, (_, i) => ({ name: `p${i}`, total_time: i * 60, session_count: 2, subproject_count: 1, days_since_update: i * 10 }));
-    const metrics = radarMetrics(rows);
-    expect(metrics).toHaveLength(6);
-    expect(metrics[0]).toMatchObject({ name: "p7", totalTime: 7, avgSessionLength: 3.5, recency: 0 });
-    expect(radarMetrics([{ name: "x", total_time: 60, session_count: 1, subproject_count: 0 }])[0]!.recency).toBe(15);
-  });
-  it("normalises font sizes into a bounded range", () => {
-    const size = fontSizer([["big", 100], ["small", 1]], 1000);
-    expect(size(100)).toBe(72);
-    expect(size(1)).toBe(18);
-    expect(fontSizer([["a", 5], ["b", 5]], 1000)(5)).toBe(72);
-  });
-});
-
 describe("payload handling", () => {
   it("knows which payloads are empty", () => {
     expect(isEmptyPayload("pie", [])).toBe(true);
@@ -136,17 +72,16 @@ describe("payload handling", () => {
     expect(isEmptyPayload("histogram", [{ label: "0-15m", count: 2 }])).toBe(false);
   });
   it("returns null when a builder has nothing to draw", () => {
-    expect(buildChart("radar", [{ name: "a", total_time: 0, session_count: 0, subproject_count: 0 }], { projectLimit: 7, subprojects: false })).toBeNull();
-    expect(buildChart("treemap", { name: "All", children: [] }, { projectLimit: 7, subprojects: false })).toBeNull();
+    expect(buildChart("pie", [], { projectLimit: 7, subprojects: false })).toBeNull();
   });
   it("swaps in the subproject variants only for a project-name filter", () => {
     const rows = [{ date: "2026-10-01", series: "a", hours: 1 }];
     const titleOf = (subprojects: boolean) => {
-      const built = buildChart("stacked_area", rows, { projectLimit: 7, subprojects });
+      const built = buildChart("daily_bars", rows, { projectLimit: 7, subprojects });
       return built?.type === "chart" ? built.config.options?.plugins?.title?.text : undefined;
     };
-    expect(titleOf(false)).toBe("Daily Time by Project (Stacked)");
-    expect(titleOf(true)).toBe("Daily Time by Subproject (Stacked)");
+    expect(titleOf(false)).toBe("Daily time by project");
+    expect(titleOf(true)).toBe("Daily time by subproject");
   });
   it("builds every chart kind from a minimal payload", () => {
     const opts = { projectLimit: 7, subprojects: false };
@@ -157,24 +92,65 @@ describe("payload handling", () => {
       ["pie", tally],
       ["bar", tally],
       ["context", tally],
-      ["status", [{ status: "active", count: 1, total_time: 60 }]],
-      ["scatter", [{ x: "2026-10-01T10:00:00Z", y: 1, series: "a" }]],
-      ["line", series],
-      ["stacked_area", series],
+            ["daily_bars", series],
       ["cumulative", daily],
-      ["calendar", daily],
       ["heatmap", [{ weekday: 1, hour: 9, average_hours: 1 }]],
       ["histogram", [{ label: "0-15m", count: 1 }]],
-      ["radar", [{ name: "a", total_time: 60, session_count: 1, subproject_count: 0 }]],
-      ["bubble", [{ name: "t", tag_id: 1, total_time: 60, project_count: 1, color: "#aabbcc" }]],
-      ["treemap", { name: "All", children: [{ name: "c", children: [{ name: "p", total_time: 60, children: [] }] }] }],
       ["wordcloud", [{ text: "word", weight: 3 }]],
     ];
     for (const [kind, data] of cases) expect(buildChart(kind, data, opts), kind).not.toBeNull();
   });
   it("parses chart kinds defensively", () => {
-    expect(parseKind("calendar")).toBe("calendar");
-    expect(parseKind(null)).toBe("pie");
-    expect(parseKind("sunburst")).toBe("pie");
+    expect(parseKind("calendar")).toBe("bar");
+    expect(parseKind("treemap")).toBe("bar");
+    expect(parseKind(null)).toBe("bar");
+    expect(parseKind("sunburst")).toBe("bar");
   });
+});
+
+it("keeps chart pigments explicit and fills missing days with real zeroes", async () => {
+  const { PALETTE, seriesColor } = await import("./data");
+  expect(PALETTE.every(color => /^#[a-f0-9]{6}$/.test(color))).toBe(true);
+  expect(PALETTE).not.toContain("#7896b8");
+  expect(seriesColor("Garden")).toBe(seriesColor("Garden"));
+  for (const kind of ["daily_bars"] as const) {
+    const built = buildChart(kind, [{ date: "2026-10-02", series: "Garden", hours: 1 }], { projectLimit: 7, subprojects: false, start: "2026-10-01", end: "2026-10-03" });
+    if (built?.type !== "chart") throw new Error("Missing chart");
+    expect(built.config.data.datasets[0].data).toEqual([0,1,0]);
+    expect(built.config.type).toBe("bar");
+    const source = JSON.stringify(built.config);
+    expect(source).not.toMatch(/hsl\(|rgb\(0,\s*128,\s*0|#36a2eb|#ff6384|#4bc0c0/i);
+  }
+  for (const retired of ["line", "stacked_area", "scatter", "bubble", "radar", "status", "calendar"]) expect(parseKind(retired)).toBe("bar");
+});
+
+it("blocks default and semantic chart colors in every chart builder", () => {
+  const builders = import.meta.glob("./{basic,trends,analysis,time,wordcloud}.ts", { eager: true, query: "?raw", import: "default" });
+  for (const source of Object.values(builders)) expect(source).not.toMatch(/#36a2eb|#ff6384|#4bc0c0|hsl\(\s*(?:120|210)|rgba?\(\s*0,\s*128,\s*0|yellowgreen/);
+});
+
+it("stops daily and cumulative plots at the account's today and keeps series distinct", async () => {
+  const { cumulativeConfig, dailyBarsConfig } = await import("./trends");
+  const options = { projectLimit: 7, start: "2026-11-02", end: "2026-11-08", today: "2026-11-05" };
+  const cumulative = cumulativeConfig([{ date: "2026-11-02", hours: 2 }], options);
+  expect(cumulative.data.labels).toHaveLength(4);
+  expect(cumulative.data.datasets[0].data).toEqual([2, 2, 2, 2]);
+  const daily = dailyBarsConfig(["Work", "Study", "Garden", "Czech"].map(series => ({ date: "2026-11-02", hours: 1, series })), options, false);
+  expect(daily.data.labels).toHaveLength(7);
+  expect(new Set(daily.data.datasets.map(row => row.backgroundColor)).size).toBe(4);
+});
+
+it("keeps a project colour across changing neighbours and ranks meaningful terms", async () => {
+  const { seriesColors, seriesColor } = await import("./data");
+  const { topTerms } = await import("./terms");
+  expect(seriesColors(["Garden", "Study"]).get("Garden")).toBe(seriesColor("Garden"));
+  expect(seriesColors(["Garden"]).get("Garden")).toBe(seriesColor("Garden"));
+  expect(topTerms([{ text: "the", weight: 20 }, { text: "working", weight: 9 }, { text: "first", weight: 9 }, { text: "part", weight: 9 }, { text: "orchard", weight: 8 }, { text: "sketches", weight: 4 }]).map(row => row.text)).toEqual(["orchard", "sketches"]);
+});
+
+it("crops the heatmap to active hours with earlier hours above later ones", async () => {
+  const { heatmapConfig } = await import("./time");
+  const chart = heatmapConfig([{ weekday: 1, hour: 21, average_hours: 1 }]);
+  expect(chart.options.scales.y.labels).toEqual(["20:00", "21:00", "22:00"]);
+  expect(chart.options.scales.y.reverse).toBe(false);
 });

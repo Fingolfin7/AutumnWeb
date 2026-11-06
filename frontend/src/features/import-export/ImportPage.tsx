@@ -1,10 +1,11 @@
+﻿import { FileDrop } from "@/components/ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { faFileImport } from "@fortawesome/free-solid-svg-icons";
-import { Icon } from "@/components/Icon";
+import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { requestJson } from "@/api/client";
 import { errorMessage } from "@/api/errors";
-import { useContexts } from "@/api/meta";
+import { previewImport, type ImportPreview } from "./preview";
+import { useAllProjects, useContexts } from "@/api/meta";
 import { useInvalidate } from "@/api/sync";
 import { classifyMessage, isFinal, parseSseBuffer, projectProgress, succeeded, type LogKind } from "./importStream";
 import "./import.css";
@@ -21,6 +22,9 @@ export default function ImportPage() {
   const toast = useToast();
   const invalidate = useInvalidate();
   const contexts = useContexts();
+  const projects = useAllProjects();
+  const [preview, setPreview] = useState<ImportPreview | null>(null);
+  const [previewError, setPreviewError] = useState("");
 
   const [file, setFile] = useState<File | null>(null);
   const [contextId, setContextId] = useState("");
@@ -39,6 +43,18 @@ export default function ImportPage() {
   const [percent, setPercent] = useState<number | null>(null);
   const [done, setDone] = useState(false);
 
+  useEffect(() => {
+    let current = true;
+    setPreview(null);
+    setPreviewError("");
+    if (file) void file.text().then((text) => {
+      const inventory = previewImport(JSON.parse(text));
+      if (current) setPreview(inventory);
+    }).catch((failure: unknown) => {
+      if (current) setPreviewError(failure instanceof SyntaxError ? "This file is not valid JSON." : errorMessage(failure));
+    });
+    return () => { current = false; };
+  }, [file]);
   const source = useRef<AbortController | null>(null);
   const logEnd = useRef<HTMLDivElement>(null);
   const nextId = useRef(1);
@@ -53,7 +69,6 @@ export default function ImportPage() {
     setLines((current) => [...current, { id: nextId.current++, text, kind: kind ?? classifyMessage(text) }]);
 
   const finish = (ok: boolean) => {
-    source.current?.abort();
     source.current = null;
     setBusy(false);
     setDone(true);
@@ -107,7 +122,7 @@ export default function ImportPage() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !preview) return;
     const found: Record<string, string[]> = {};
     if (!file) found.file = ["Choose a JSON file to import."];
     const tol = Number(tolerance);
@@ -172,22 +187,29 @@ export default function ImportPage() {
 
       <form className="fields" onSubmit={onSubmit} noValidate>
         <div className="split">
-          <section id="import_options" className="slab slab-pad">
+          {!started ? <section id="import_options" className="slab slab-pad">
             <div className="field">
               <label htmlFor="import-file">JSON file</label>
-              <input
+              <FileDrop
                 id="import-file"
-                type="file"
                 accept=".json,application/json"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                onFile={setFile}
               />
               {fieldErrors("file")}
+              <small className="muted">Choose an Autumn JSON export. Nothing changes until you import.</small>
+              {previewError ? <p className="io-field-error" role="alert">{previewError}</p> : null}
+              {file && !preview && !previewError ? <p role="status">Reading file...</p> : null}
             </div>
+            {preview ? <section className="import-preview" aria-label="Import preview">
+              <div className="import-decision"><div><h2 className="settings-form-title">Ready to bring over</h2><p><strong>{preview.sessions} sessions</strong> in {preview.names.length} projects{projects.isSuccess ? ` · ${preview.names.filter(name => projects.data.some(project => project.name === name)).length} matching existing project names` : ""}</p><p className="muted">{preview.conflicts ? `${preview.conflicts} conflicting session IDs in this file. ` : ""}{preview.repeated ? `${preview.repeated} repeated session IDs in this file. ` : ""}Autumn checks contexts and existing sessions during import.</p><p className="import-policy">{force ? "Conflicts: replace from this file" : merge ? "Conflicts: merge projects, preserve existing sessions" : "Conflicts: skip existing projects"}</p></div></div>
+              <details className="import-inventory"><summary>Project inventory ({preview.names.length})</summary><ul aria-label="Projects in the import file">{preview.projects.map((project, index) => { const exists = projects.data?.some(item => item.name === project.name); return <li key={index}><span>{project.name}<small>{project.sessions} {project.sessions === 1 ? "session" : "sessions"}</small></span><small className="muted">{exists ? "Name matches" : "New name"}</small></li>; })}</ul></details>
+            </section> : null}
+            <details className="import-advanced"><summary>Advanced options</summary><div className="fields">
 
             <div className="field">
               <label htmlFor="import-context">Import under context</label>
               <select id="import-context" value={contextId} onChange={(event) => setContextId(event.target.value)}>
-                <option value="">(Use file context / default)</option>
+                <option value="">Use the file context</option>
                 {(contexts.data ?? []).map((context) => (
                   <option key={context.id} value={context.id}>
                     {context.name}
@@ -219,7 +241,7 @@ export default function ImportPage() {
                 checked={autumnImport}
                 onChange={(event) => setAutumnImport(event.target.checked)}
               />
-              <label htmlFor="import-autumn">Autumn import</label>
+              <label htmlFor="import-autumn">Import an Autumn CLI legacy file</label>
             </div>
             {fieldErrors("autumn_import")}
 
@@ -230,9 +252,10 @@ export default function ImportPage() {
                 checked={force}
                 onChange={(event) => setForce(event.target.checked)}
               />
-              <label htmlFor="import-force">Force</label>
+              <label htmlFor="import-force">{preview?.portable ? "Update conflicting sessions" : "Replace matching projects"}</label>
             </div>
             {fieldErrors("force")}
+            {force ? <p className="io-field-error">{preview?.portable ? "Conflicting sessions with the same ID will be updated from the file." : "Matching projects and their existing sessions will be deleted before importing."}</p> : null}
 
             <div className="check-row">
               <input
@@ -241,7 +264,7 @@ export default function ImportPage() {
                 checked={merge}
                 onChange={(event) => setMerge(event.target.checked)}
               />
-              <label htmlFor="import-merge">Merge</label>
+              <label htmlFor="import-merge">Merge matching projects</label>
             </div>
             {fieldErrors("merge")}
 
@@ -252,12 +275,12 @@ export default function ImportPage() {
                 checked={verbose}
                 onChange={(event) => setVerbose(event.target.checked)}
               />
-              <label htmlFor="import-verbose">Verbose</label>
+              <label htmlFor="import-verbose">Show detailed progress</label>
             </div>
             {fieldErrors("verbose")}
 
             <div className="field u-mt-4">
-              <label htmlFor="import-tolerance">Tolerance (minutes)</label>
+              <label htmlFor="import-tolerance">Allow time overlap up to (minutes)</label>
               <input
                 id="import-tolerance"
                 type="number"
@@ -269,17 +292,14 @@ export default function ImportPage() {
               {fieldErrors("tolerance")}
             </div>
 
-            <div className="form-actions">
-              <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
-                <Icon icon={faFileImport} /> {busy ? "Importing..." : "Import"}
-              </button>
-            </div>
-          </section>
+            </div></details>
+            {preview ? <div className="import-final"><p>{preview.sessions} sessions in {preview.names.length} projects</p><button type="submit" className="btn btn--primary" disabled={busy}>{busy ? "Importing..." : "Import"}</button></div> : <p className="muted">Choose a valid Autumn JSON file to enable Import.</p>}
+          </section> : null}
 
           {started ? (
             <section className="slab slab-pad stream-output" id="output-section" aria-live="polite">
               <h2 className="disclose-title">
-                Importing{" "}
+                {done ? failed ? "Import needs attention: " : "Import complete: " : "Importing "}
                 <span id="output-title" className="text-orange">
                   {title}
                 </span>
@@ -301,14 +321,15 @@ export default function ImportPage() {
                   {percent === null ? "" : `${percent.toFixed(2)}%`}
                 </div>
               </div>
-              <div id="output-text" className="stream-log">
+              {done ? <div className="import-result"><p className="muted">{failed ? "Review the details below before trying again." : "Your journal is ready."}</p><button className="btn btn--secondary" type="button" onClick={() => { setStarted(false); setDone(false); }}>Choose another file</button>{!failed ? <AppLink className="btn btn--primary" href={urls.sessions()}>Open your journal</AppLink> : null}</div> : null}
+              <details className="import-result-details" open={!done || failed}><summary>Import details</summary><div id="output-text" className="stream-log" tabIndex={0} aria-label="Import progress details">
                 {lines.map((line) => (
                   <div key={line.id} className={`log-entry${line.kind === "info" ? "" : ` ${line.kind}`}`}>
                     {line.text}
                   </div>
                 ))}
                 <div ref={logEnd} />
-              </div>
+              </div></details>
             </section>
           ) : null}
         </div>

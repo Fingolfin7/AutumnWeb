@@ -13,7 +13,7 @@ import { useCrossTabSync } from "@/api/sync";
 import { setPageTitle } from "./title";
 import { LiveTitle } from "./LiveTitle";
 import { CommandPalette } from "./CommandPalette";
-import { OfflineSync } from "./OfflineSync";
+import { CaptureLayer } from "@/features/timers/CaptureLayer";
 import { MAX_AGE, persistOptions } from "./persist";
 
 export function makeQueryClient() {
@@ -52,7 +52,7 @@ function Layout() {
       <ProgressBar />
       <LiveTitle />
       <CommandPalette />
-      <OfflineSync />
+      <CaptureLayer />
       <Shell>
         <Suspense fallback={<Skeleton lines={5} />}>
           <Outlet />

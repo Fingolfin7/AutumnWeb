@@ -1,37 +1,33 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { faRedo, faStopwatch, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { faEllipsisH, faRedo, faStopwatch, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
-import { ConfirmDialog } from "@/components/Sheet";
+import { ConfirmDialog, Sheet } from "@/components/Sheet";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
 import type { Timer } from "@/api/types";
-import { elapsedSeconds, formatClock, formatTime, heroParts, parseInstant } from "@/lib/format";
+import { elapsedSeconds, formatClock, formatTime, parseInstant } from "@/lib/format";
 import { useDeleteTimer, useRestartTimer } from "./api";
+import { ClockDigits } from "./ClockDigits";
+import { TimerReminders } from "./TimerReminders";
 
-export const NOTE_DRAFT_KEY_PREFIX = "autumn:timer-note-draft:";
-
-/* A running timer as a .focus-card (partials/active_timers_*.html). Live
-   figures are computed from `now`, which the parent ticks once a second, so
-   every card on the page shares one clock. `children` slot in above the
-   actions (the Timers page puts reminders and the note editor there). */
-export function FocusCard({
-  timer,
-  now,
-  children,
-  beforeStop,
-}: {
+/* A running timer: the journal row's project and metadata lines, the clock with
+   Stop beside it, then the live note. Live figures come from `now`, which the
+   parent ticks once a second, so every card on the page shares one clock. */
+export function FocusCard({ timer, now, children, beforeStop, compact = false }: {
   timer: Timer;
   now: number;
   children?: ReactNode;
   /** Runs before navigating to the stop page (e.g. stash an unsaved note). */
   beforeStop?: () => void;
+  compact?: boolean;
 }) {
   const toast = useToast();
   const navigate = useNavigate();
   const restart = useRestartTimer();
   const remove = useDeleteTimer();
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   /* In flight to the server; a queued offline timer is settled locally. */
   const pending = timer.id < 0 && !timer.pending_sync;
@@ -40,106 +36,72 @@ export function FocusCard({
   const start = parseInstant(timer.start);
   const stopAt = parseInstant(timer.auto_stop_at);
   const countdown = stopAt ? Math.max(0, Math.floor((stopAt.getTime() - now) / 1000)) : null;
-  const fill =
-    stopAt && start && stopAt > start
-      ? Math.max(0, Math.min(100, ((now - start.getTime()) / (stopAt.getTime() - start.getTime())) * 100))
-      : 0;
+  const fill = stopAt && start && stopAt > start
+    ? Math.max(0, Math.min(100, ((now - start.getTime()) / (stopAt.getTime() - start.getTime())) * 100))
+    : 0;
 
   return (
     <article
-      className="focus-card"
+      className={`focus-card ember-clock${compact ? " ember-clock--compact" : ""}${pending || timer.pending_sync ? " is-unsettled" : ""}`}
       id={`timer-${timer.id}`}
       data-timer-id={timer.id}
+      data-ember-step={Math.min(6, Math.floor(elapsed / 900))}
       aria-label={`Running timer: ${timer.project.name}`}
       aria-busy={pending || undefined}
     >
       <p className="focus-eyebrow">
-        <span className="live-dot" /> {pending ? "Starting…" : timer.pending_sync ? "Running · saved offline" : "Running"}
+        <span className="live-dot" /> <span>{pending ? "Starting…" : timer.pending_sync ? "Running · saved offline" : "Running"}</span>
       </p>
       <h2 className="focus-project">
-        <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
+        <AppLink href={urls.updateProject(timer.project.id)} title={timer.project.name}>{timer.project.name}</AppLink>
       </h2>
-      {timer.subproject_allocations.length ? (
-        <div className="focus-subs">
-          {timer.subproject_allocations.map((sub) => (
-            <Fragment key={sub.subproject_id}>
-              <AppLink className="sub-chip" href={urls.updateSubproject(sub.subproject_id)}>
-                {sub.name}
-              </AppLink>{" "}
-            </Fragment>
-          ))}
+      <button className="btn-icon timer-overflow" type="button" aria-label="Timer actions" aria-expanded={actionsOpen} onClick={() => setActionsOpen(true)}><Icon icon={faEllipsisH} /></button>
+      <div className="focus-meta">
+        {timer.subproject_allocations.length ? <span className="journal-subs">{timer.subproject_allocations.map((sub) => (
+          <AppLink className="journal-subproject" key={sub.subproject_id} href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>
+        ))}</span> : null}
+        <span className="journal-time">started {formatTime(timer.start)}</span>
+        {countdown !== null ? <span className="journal-time">stops in {formatClock(countdown)}</span> : null}
+      </div>
+      <div className="focus-clockline">
+        <span className={`focus-time${elapsed >= 36000 ? " is-long" : ""}`}><span className="num"><ClockDigits value={formatClock(elapsed)} /></span></span>
+        <div className="focus-actions">
+          <AppLink
+            className="btn btn--stop btn--lg focus-stop"
+            href={urls.stopTimer(timer.id)}
+            onClick={(event) => {
+              if (pending) {
+                event.preventDefault();
+                return;
+              }
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              const stopRequestedAt = Date.now();
+              beforeStop?.();
+              navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt } });
+            }}
+          >
+            <Icon icon={faStopwatch} /> Stop
+          </AppLink>
         </div>
-      ) : null}
-      <p className="focus-time" aria-live="off">
-        {heroParts(elapsed).map((part) => (
-          <span className="focus-time-part" key={part.unit}>
-            <span className="num">{part.value}</span>
-            <span className="unit">{part.unit}</span>
-          </span>
-        ))}
-      </p>
-      <div className="focus-autostop">
-        <span>
-          started <span className="mono">{formatTime(timer.start)}</span>
-        </span>
-        {countdown !== null ? (
-          <span>
-            stops in <span className="mono">{formatClock(countdown)}</span>
-          </span>
-        ) : (
-          <span className="muted">no auto-stop</span>
-        )}
       </div>
       {stopAt ? (
         <div className="focus-autostop-bar">
-          <div className="focus-autostop-fill" style={{ width: `${fill.toFixed(1)}%` }} />
+          <progress className="focus-autostop-fill" max={100} value={fill} aria-label="Auto-stop progress" />
         </div>
       ) : null}
-      {children}
-      <div className="focus-actions">
-        <AppLink
-          className="btn btn--stop btn--lg focus-stop"
-          href={urls.stopTimer(timer.id)}
-          onClick={(event) => {
-            if (pending) {
-              event.preventDefault();
-              return;
-            }
-            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-            event.preventDefault();
-            const stopRequestedAt = Date.now();
-            beforeStop?.();
-            navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt } });
-          }}
-        >
-          <Icon icon={faStopwatch} /> Stop
-        </AppLink>
-        <button
-          className="btn-icon"
-          type="button"
-          title="Restart this timer"
-          disabled={pending || timer.pending_sync || restart.isPending}
-          onClick={() =>
-            restart
-              .mutateAsync(timer)
-              .then(() => toast.success("Restarted timer"))
-              .catch((error) => toast.error(`Couldn't restart: ${errorMessage(error)}`))
-          }
-        >
-          <Icon icon={faRedo} />
-          <span className="sr-only">Restart timer</span>
-        </button>
-        <button
-          className="btn-icon btn-icon--danger"
-          type="button"
-          title="Remove without saving"
-          disabled={pending}
-          onClick={() => setConfirmRemove(true)}
-        >
-          <Icon icon={faTrash} />
-          <span className="sr-only">Remove timer</span>
-        </button>
-      </div>
+      <div className="timer-expanded-content">{compact ? <details className="compact-timer-note"><summary><span>{timer.note || "Add a note"}</span><span className="quiet-link">Edit note</span></summary>{children}</details> : children}</div>
+      {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Timer actions">
+        <p className="text-red">{timer.project.name}</p>
+        <TimerReminders timer={timer} />
+        <div className="timer-actions-menu">
+          <button className="btn btn--quiet" type="button" disabled={pending || timer.pending_sync || restart.isPending} onClick={() => {
+            setActionsOpen(false);
+            restart.mutateAsync(timer).then(() => toast.success("Restarted timer")).catch((error) => toast.error(`Couldn't restart: ${errorMessage(error)}`));
+          }}><Icon icon={faRedo} /> Restart timer</button>
+          <button className="btn btn--destructive" type="button" disabled={pending} onClick={() => { setActionsOpen(false); setConfirmRemove(true); }}><Icon icon={faTrash} /> Discard timer</button>
+        </div>
+      </Sheet> : null}
       <ConfirmDialog
         open={confirmRemove}
         title="Remove this timer?"
@@ -160,17 +122,5 @@ export function FocusCard({
         }}
       />
     </article>
-  );
-}
-
-/* Phone carousel position dots (.focus-dots). Inert on the desk, where CSS
-   turns the track into a grid and hides them. */
-export function FocusDots({ count, active, onPick }: { count: number; active: number; onPick: (index: number) => void }) {
-  return (
-    <div className="focus-dots" aria-hidden="true">
-      {Array.from({ length: count }, (_, index) => (
-        <span key={index} className={`focus-dot${index === active ? " is-active" : ""}`} onClick={() => onPick(index)} />
-      ))}
-    </div>
   );
 }

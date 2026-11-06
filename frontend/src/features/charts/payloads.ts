@@ -11,25 +11,6 @@ export interface TallyRow {
   /** Minutes. */
   total_time: number;
 }
-export interface StatusRow {
-  status: string;
-  count: number;
-  total_time: number;
-}
-export interface BubbleRow {
-  name: string;
-  tag_id: number;
-  total_time: number;
-  project_count: number;
-  color: string | null;
-}
-export interface ScatterRow {
-  /** End-of-session instant, ISO 8601. */
-  x: string;
-  /** Hours. */
-  y: number;
-  series: string;
-}
 export interface DailyTotalRow {
   date: string;
   hours: number | string;
@@ -47,13 +28,6 @@ export interface WordRow {
   text: string;
   weight: number | string;
 }
-export interface RadarRow {
-  name: string;
-  total_time: number;
-  session_count: number;
-  subproject_count: number;
-  days_since_update?: number;
-}
 export interface HierarchyNode {
   name: string;
   total_time?: number;
@@ -66,6 +40,7 @@ export interface HierarchyNode {
 export type AnyConfig = ChartConfiguration<any, any, any>;
 
 export type ChartKind =
+  | "daily_bars"
   | "pie"
   | "bar"
   | "scatter"

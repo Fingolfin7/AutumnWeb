@@ -1,3 +1,7 @@
+import { DateInput } from "@/components/ui";
+import { CommitmentMeter } from "./CommitmentMeter";
+import { TargetInput } from "./TargetInput";
+import { formatDate, formatDuration } from "@/lib/format";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -22,7 +26,7 @@ import type { Commitment } from "@/api/types";
 import { DeskHead, FieldErrors, FormLevelErrors } from "@/features/contexts-tags/ui";
 import { hasErrors, NO_ERRORS, parseFormErrors, type FormErrors } from "@/features/contexts-tags/formErrors";
 import { useAllSubprojects, useCommitments, useCreateCommitment, useRestartCommitment, useUpdateCommitment } from "./api";
-import { floatText, monthDay, monthDayYear, progressOf, redirectFor, signed, todayIn } from "./display";
+import { hasPendingChange, liveDefinition, monthDay, monthDayYear, progressOf, redirectFor, todayIn } from "./display";
 import {
   API_FIELD_MAP,
   classifyChanges,
@@ -57,7 +61,6 @@ import {
   type Dimension,
   type ScopeMeta,
 } from "./scope";
-import "./commitments.css";
 
 const FORM_FIELDS = new Set(["scope", "target", "start_date", "max_balance", "min_balance", "commitment_type", "period", "rules"]);
 
@@ -67,12 +70,13 @@ export interface CommitmentFormProps {
   commitment?: Commitment;
   /** Create: a scope to start from (a project page's "Add commitment"). */
   prefill?: { aggregation: Aggregation; targetId: number };
+  onClose?: () => void;
 }
 
 /* One form for creating and editing a commitment (create_commitment.html and
    update_commitment.html). The scope metadata the old pages had injected is
    derived from the projects, subprojects, contexts and tags lists. */
-export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProps) {
+export function CommitmentForm({ mode, commitment, prefill, onClose }: CommitmentFormProps) {
   const navigate = useNavigate();
   const toast = useToast();
   const projects = useAllProjects();
@@ -82,6 +86,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
   const create = useCreateCommitment();
   const update = useUpdateCommitment(commitment?.id ?? 0);
   const restart = useRestartCommitment(commitment?.id ?? 0);
+  const finish = (saved: Commitment) => onClose ? onClose() : navigate(redirectFor(saved));
 
   /* The scope-target label of an existing commitment is its target's name. */
   const [base, setBase] = useState<FormState>(() => {
@@ -95,6 +100,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
   const [errors, setErrors] = useState<FormErrors>(NO_ERRORS);
   const [restartRequested, setRestartRequested] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(mode === "create");
 
   const needSubprojects = state.aggregation === "subproject" || (rulesOpen && RULE_DIMENSIONS[state.aggregation].includes("subproject"));
   const subs = useAllSubprojects(needSubprojects);
@@ -191,6 +197,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
     event.preventDefault();
     setSubmitted(true);
     if (hasErrors(live)) {
+      if (live.fields.scope || live.fields.aggregation || live.fields.rules) setAdvancedOpen(true);
       setErrors(NO_ERRORS);
       return;
     }
@@ -200,7 +207,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
       create.mutate(createPayload(current), {
         onSuccess: (created) => {
           toast.success("Commitment added successfully");
-          navigate(redirectFor(created));
+          finish(created);
         },
         onError: onFailure,
       });
@@ -224,7 +231,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               ? `Commitment updated. Changes to ${changes.nextPeriod.join(", ")} apply from ${monthDayYear(queued.effective_from)}.`
               : "Commitment updated successfully",
           );
-          navigate(redirectFor(saved));
+          finish(saved);
         },
         onError: onFailure,
       },
@@ -240,7 +247,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
           toast.success(
             `Commitment restarted. ${keepBalance ? "The existing bank balance was carried forward." : "The bank balance was reset to zero."}`,
           );
-          navigate(redirectFor(saved));
+          finish(saved);
         },
         onError: onFailure,
       },
@@ -263,9 +270,9 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
 
   return (
     <>
-      <DeskHead title={commitment ? commitment.target.name : "New commitment"} />
+      {!onClose ? <DeskHead title={commitment ? <span className={commitment.target.kind === "project" ? "text-red" : commitment.target.kind === "subproject" ? "text-blue" : undefined}>{commitment.target.name}</span> : "New commitment"} /> : null}
 
-      <form className="fields" onSubmit={submit} noValidate>
+      <form className="fields commitment-editor" onSubmit={submit} noValidate>
         <div className="split">
           <div id="input-fields">
             {stale ? (
@@ -282,9 +289,54 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               </aside>
             ) : null}
 
+            <section className="slab slab-pad commitment-target-first">
+              <div className="two-up">
+                <div className="field">
+                  <label htmlFor="id_target">Target</label>
+                  <TargetInput id="id_target" time={state.commitmentType === "time"} value={state.target} invalid={!!shown.fields.target} onChange={(target) => setField({ target })} />
+                  <small className="help-text muted" id="id_target-help">{state.commitmentType === "time" ? "Hours and minutes, e.g. 3h 30m. Plain numbers are minutes." : "Number of sessions"}</small>
+                  <FieldErrors errors={shown.fields.target} />
+                </div>
+                <div className="field">
+                  <label htmlFor="id_commitment_type">Measure</label>
+                  <select
+                    id="id_commitment_type"
+                    value={state.commitmentType}
+                    onChange={(e) => setField({ commitmentType: e.target.value as CommitmentType })}
+                  >
+                    {MEASURES.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldErrors errors={shown.fields.commitment_type} />
+                </div>
+                <div className="field">
+                  <label htmlFor="id_period">Period</label>
+                  <select id="id_period" value={state.period} onChange={(e) => setField({ period: e.target.value as Period })}>
+                    {PERIODS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                  <FieldErrors errors={shown.fields.period} />
+                </div>
+                <div className="field">
+                  <label htmlFor="id_start_date">Start date</label>
+                  <DateInput today={todayIn(bootstrap().profile.timezone)} id="id_start_date" value={state.startDate} onValueChange={value => setField({ startDate: value })} />
+                  <FieldErrors errors={shown.fields.start_date} />
+                </div>
+
+              </div>
+            </section>
+
+            {commitment && hasPendingChange(commitment) ? <div className="slab slab-pad"><PendingNotice commitment={commitment} nameOf={nameOf} /><button className="btn btn--quiet" type="button" disabled={busy} onClick={() => update.mutate({ body: liveDefinition(commitment), version: commitment.version }, { onSuccess: (saved) => { toast.success("Pending changes cancelled."); finish(saved); }, onError: onFailure })}>Cancel pending change</button></div> : null}
+            <details className="commitment-advanced" open={advancedOpen} onToggle={event => setAdvancedOpen(event.currentTarget.open)}><summary>Advanced scope and rules</summary>
             <section className="slab slab-pad">
               <div className="field">
-                <label htmlFor="id_aggregation_type">Applies to</label>
+                <label htmlFor="id_aggregation_type">Type</label>
                 <select id="id_aggregation_type" value={state.aggregation} onChange={(e) => chooseAggregation(e.target.value as Aggregation)}>
                   {AGGREGATIONS.map((a) => (
                     <option key={a.value} value={a.value}>
@@ -296,7 +348,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               </div>
 
               <div className="field">
-                <label htmlFor="scope-target-search">Scope target</label>
+                <label htmlFor="scope-target-search">Applies to</label>
                 <input
                   type="text"
                   id="scope-target-search"
@@ -350,65 +402,12 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
               )}
               <FieldErrors errors={shown.fields.rules} />
             </details>
-
-            <section className="slab slab-pad">
-              <div className="two-up">
-                <div className="field">
-                  <label htmlFor="id_commitment_type">Measure</label>
-                  <select
-                    id="id_commitment_type"
-                    value={state.commitmentType}
-                    onChange={(e) => setField({ commitmentType: e.target.value as CommitmentType })}
-                  >
-                    {MEASURES.map((m) => (
-                      <option key={m.value} value={m.value}>
-                        {m.label}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldErrors errors={shown.fields.commitment_type} />
-                </div>
-                <div className="field">
-                  <label htmlFor="id_period">Period</label>
-                  <select id="id_period" value={state.period} onChange={(e) => setField({ period: e.target.value as Period })}>
-                    {PERIODS.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldErrors errors={shown.fields.period} />
-                </div>
-                <div className="field">
-                  <label htmlFor="id_start_date">Start date</label>
-                  <input id="id_start_date" type="date" value={state.startDate} onChange={(e) => setField({ startDate: e.target.value })} />
-                  <FieldErrors errors={shown.fields.start_date} />
-                </div>
-                <div className="field">
-                  <label htmlFor="id_target">Target</label>
-                  <input
-                    id="id_target"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    step={1}
-                    placeholder="Target amount"
-                    value={state.target}
-                    aria-invalid={!!shown.fields.target}
-                    onChange={(e) => setField({ target: e.target.value })}
-                  />
-                  <small className="help-text muted">
-                    {state.commitmentType === "time" ? "Minutes for time-based commitments" : "Count for session-based commitments"}
-                  </small>
-                  <FieldErrors errors={shown.fields.target} />
-                </div>
-              </div>
-            </section>
+            </details>
 
             <section className="slab slab-pad">
               <div className="check-row">
                 <input id="id_banking_enabled" type="checkbox" checked={state.banking} onChange={(e) => setField({ banking: e.target.checked })} />
-                <label htmlFor="id_banking_enabled">Enable time banking</label>
+                <label htmlFor="id_banking_enabled">Carry extra time into the next period</label>
               </div>
 
               <div className="two-up u-mt-4">
@@ -456,7 +455,7 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                 </>
               ) : null}
 
-              {commitment?.pending_revision ? <PendingNotice commitment={commitment} nameOf={nameOf} /> : null}
+
 
               {changes && !showRestart ? <PolicyHints changes={changes} commitment={commitment!} /> : null}
 
@@ -500,25 +499,16 @@ export function CommitmentForm({ mode, commitment, prefill }: CommitmentFormProp
                 </aside>
               ) : null}
 
-              <div className="form-actions">
-                <AppLink className="btn btn--ghost" href={urls.home()}>
-                  <Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}
-                </AppLink>
-                {commitment ? (
-                  <AppLink className="btn btn--stop" href={urls.deleteCommitment(commitment.id)}>
-                    <Icon icon={faTrash} /> Delete
-                  </AppLink>
-                ) : null}
-                {!showRestart ? (
-                  <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}>
-                    <Icon icon={faCheckCircle} /> {commitment ? "Update commitment" : "Create commitment"}
-                  </button>
-                ) : null}
-              </div>
             </section>
           </div>
 
-          {commitment ? <ProgressPanel commitment={commitment} /> : null}
+          {commitment && !onClose ? <ProgressPanel commitment={commitment} /> : null}
+        </div>
+        <div className="form-actions commitment-editor-actions">
+          {onClose ? <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button> : <AppLink className="btn btn--ghost" href={urls.home()}><Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}</AppLink>}
+          {commitment ? <AppLink className="btn btn--danger" href={urls.deleteCommitment(commitment.id)}><Icon icon={faTrash} /> Delete</AppLink> : null}
+          {commitment && !showRestart ? <span className="muted">{changes?.nextPeriod.length ? `Applies from ${formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}` : "Changes apply when saved"}</span> : null}
+          {!showRestart ? <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}><Icon icon={faCheckCircle} /> {onClose ? "Save commitment" : commitment ? "Update commitment" : "Create commitment"}</button> : null}
         </div>
       </form>
     </>
@@ -641,7 +631,7 @@ function PendingNotice({ commitment, nameOf }: { commitment: Commitment; nameOf:
   const lines: string[] = [];
   for (const [key, value] of Object.entries(pending.changes as Record<string, unknown>)) {
     if (key === "target_value") lines.push(`Target: ${value}${unit}`);
-    else if (key === "banking_enabled") lines.push(`Time banking: ${value ? "on" : "off"}`);
+    else if (key === "banking_enabled") lines.push(`Time carryover: ${value ? "on" : "off"}`);
     else if (key === "max_balance") lines.push(`Surplus cap: ${value}`);
     else if (key === "min_balance") lines.push(`Deficit cap: ${value}`);
     else {
@@ -707,24 +697,14 @@ function PolicyHints({ changes, commitment }: { changes: ReturnType<typeof class
 function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
   const progress = progressOf(c);
   const time = c.commitment_type === "time";
-  const num = (value: number) => (time ? floatText(value) : String(value));
+  const num = (value: number) => (time ? formatDuration(Math.abs(value)) : String(Math.abs(value)));
   const period = c.current_period;
   return (
     <section id="progress-info" className="slab slab-pad">
       <p className="field-label">
         <Icon icon={faChartLine} className="text-green" /> Current progress
       </p>
-      <p className="commit-figures">
-        <span className="commit-actual">{num(progress.actual)}</span>
-        <span className="commit-goal">
-          / {progress.target}
-          {time ? " min" : " sessions"}
-        </span>
-        <span className="commit-pct">{progress.percentage.toFixed(1)}%</span>
-      </p>
-      <div className="meter">
-        <div className={`meter-fill ${progress.status}`} style={{ ["--progress" as string]: `${progress.percentage}%` }} />
-      </div>
+      <CommitmentMeter commitment={c} />
       <div className="meta-list u-mt-4">
         <div className="meta-row">
           <span className="meta-label">Period</span>
@@ -739,17 +719,15 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
         {c.banking_enabled ? (
           <>
             <div className="meta-row">
-              <span className="meta-label">Bank balance</span>
-              <span className={`meta-value ${c.balance >= 0 ? "text-green" : "text-red"}`}>
-                {signed(c.balance)}
-                {time ? " min" : ""}
+              <span className="meta-label">Carried over</span>
+              <span className={`meta-value ${time ? c.balance >= 0 ? "text-green" : "text-red" : ""}`}>
+                {`${c.balance >= 0 ? "+" : "-"}${num(c.balance)}`}
               </span>
             </div>
             <div className="meta-row">
-              <span className="meta-label">This period, unbanked</span>
-              <span className={`meta-value ${progress.surplus >= 0 ? "text-green" : "text-red"}`}>
-                {signed(progress.surplus, num(progress.surplus))}
-                {time ? " min" : ""}
+              <span className="meta-label">This period’s progress</span>
+              <span className={`meta-value ${time ? progress.surplus >= 0 ? "text-green" : "text-red" : ""}`}>
+                {`${progress.surplus >= 0 ? "+" : "-"}${num(progress.surplus)}`}
               </span>
             </div>
           </>

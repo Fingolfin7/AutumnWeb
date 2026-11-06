@@ -85,7 +85,7 @@ export default function DeleteTagPage() {
         <AppLink className="btn btn--ghost" href={urls.tags()}>
           <Icon icon={faArrowLeft} /> Back
         </AppLink>
-        <button type="button" className="btn btn--stop btn--spacer" onClick={confirm} disabled={remove.isPending}>
+        <button type="button" className="btn btn--danger btn--spacer" onClick={confirm} disabled={remove.isPending}>
           <Icon icon={faTrash} /> Delete tag
         </button>
       </div>

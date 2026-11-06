@@ -1,4 +1,4 @@
-import { splitMinutes } from "@/lib/format";
+import { formatDuration } from "@/lib/format";
 
 /* Edit-page sidebar numbers (views/contexts_tags.py _sidebar_project_stats),
    worked out from the project list instead of a server-side aggregate. */
@@ -40,17 +40,11 @@ export function formatStatusCounts(counts: ProjectSummary["statusCounts"]): stri
   return parts.length ? `(${parts.join(", ")})` : "";
 }
 
-/** Every non-zero unit: "1 hour 2 minutes 33 seconds" (`min_formatter`). */
-export function formatMinutesFull(minutes: number): string {
-  const { days, hours, minutes: m, seconds } = splitMinutes(minutes);
-  const unit = (n: number, word: string) => (n > 0 ? [`${n} ${word}${n === 1 ? "" : "s"}`] : []);
-  const parts = [...unit(days, "day"), ...unit(hours, "hour"), ...unit(m, "minute"), ...unit(seconds, "second")];
-  return parts.length ? parts.join(" ") : "0 seconds";
-}
+/** Sidebar totals share the saved-duration display contract. */
+export const formatMinutesFull = formatDuration;
 
 export const NAME_MAX = 100;
 
-/** The context/tag name rules, checked before the request goes out. */
 export function validateName(
   raw: string,
   kind: "context" | "tag",

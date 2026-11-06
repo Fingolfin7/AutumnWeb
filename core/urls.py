@@ -9,9 +9,22 @@ def healthz(request):
     return JsonResponse({"status": "ok"})
 
 from core.spa import reminder_action, spa
+from core.settings_pages import settings_redirect
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
+    path("welcome/", spa, name="welcome"),
+    path("settings/", spa, name="settings"),
+    path("settings/appearance/", spa, name="settings_appearance"),
+    path("settings/defaults/", spa, name="settings_defaults"),
+    path("settings/search/", spa, name="settings_search"),
+    path("settings/account/", spa, name="settings_account"),
+    path("settings/contexts/", spa, name="settings_contexts"),
+    path("settings/tags/", spa, name="settings_tags"),
+    path("settings/notifications/", spa, name="settings_notifications"),
+    path("settings/ai/", spa, name="settings_ai"),
+    path("settings/import/", spa, name="settings_import"),
+    path("settings/export/", spa, name="settings_export"),
     # pages
     path("", spa, name="home"),
     path("projects/", spa, name="projects"),
@@ -20,7 +33,8 @@ urlpatterns = [
     path("timers/recommendation-usage/", recommendation_usage, name="recommendation_usage"),
     path("stop_timer/<int:session_id>/", spa, name="stop_timer"),
     path("remove_timer/<int:session_id>/", spa, name="remove_timer"),
-    path("notifications/", spa, name="notifications"),
+    path("notifications/", settings_redirect, {"section": "notifications"}, name="notifications"),
+    path("review/", spa, name="review"),
     path("review/weekly/", spa, name="weekly_review"),
     path(
         "notifications/schedules/<int:reminder_id>/edit/",
@@ -54,12 +68,12 @@ urlpatterns = [
     path("update_session/<uuid:session_uuid>/", spa, name="update_session"),
     path("delete_session/<int:session_id>/", spa, name="delete_session"),
     path("charts/", spa, name="charts"),
-    path("export/", spa, name="export"),
-    path("import/", spa, name="import"),
+    path("export/", settings_redirect, {"section": "export"}, name="export"),
+    path("import/", settings_redirect, {"section": "import"}, name="import"),
     path("merge_projects/", spa, name="merge_projects"),
     path("merge_subprojects/<int:project_id>/", spa, name="merge_subprojects"),
-    path("contexts/", spa, name="contexts"),
-    path("tags/", spa, name="tags"),
+    path("contexts/", settings_redirect, {"section": "contexts"}, name="contexts"),
+    path("tags/", settings_redirect, {"section": "tags"}, name="tags"),
     path("set-context/", switch_context, name="set_active_context"),
     # context/tag update/delete
     path("update_context/<int:pk>/", spa, name="update_context"),

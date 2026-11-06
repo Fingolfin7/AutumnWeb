@@ -5,6 +5,7 @@ import { AllocationEditor } from "@/components/AllocationEditor";
 import { Icon } from "@/components/Icon";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
+import { clearNoteDraft, readNoteDraft } from "@/lib/noteDraft";
 import { NoteEditor } from "@/components/NoteEditor";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -13,13 +14,14 @@ import { useAllProjects, useSubprojects } from "@/api/meta";
 import { ApiError, errorMessage } from "@/api/errors";
 import type { Project, SessionPatch } from "@/api/types";
 import { sameAllocations, type AllocationItem, type AllocationWrite } from "@/lib/allocation";
-import { toDateTimeLocal } from "@/lib/format";
+import { formatDate, formatDuration, toDateTimeLocal } from "@/lib/format";
 import { parseSessionParam, useSession, useUpdateSession, type SessionRow } from "./api";
+import { DateInput, Input } from "@/components/ui";
 
 /* /update_session/<id or uuid>/ (update_session.html). Three slabs' worth of
    fields in two: what it was (project), when it ran, the note, then how the
-   time splits across subprojects. Only fields the user changed are sent, so
-   an untouched start/end keeps its sub-second precision, and the PATCH
+   time splits across subprojects. Times show minutes; only fields the user
+   changed are sent, so an untouched start/end keeps its seconds, and the PATCH
    carries the version the form was opened on (If-Match). */
 export default function UpdateSessionPage() {
   const { sessionId } = useParams();
@@ -69,8 +71,8 @@ function initialState(session: SessionRow): FormState {
   return {
     projectId: session.project.id,
     projectText: session.project.name,
-    start: toDateTimeLocal(session.start, true),
-    end: toDateTimeLocal(session.end, true),
+    start: toDateTimeLocal(session.start, false),
+    end: toDateTimeLocal(session.end, false),
     note: session.note ?? "",
     subprojectIds: session.subproject_allocations.map((a) => a.subproject_id).sort((a, b) => a - b),
   };
@@ -83,8 +85,9 @@ function SessionForm({ session }: { session: SessionRow }) {
   const projects = useAllProjects();
 
   /* The session as the form was opened (or last saved/reloaded). */
-  const [baseline, setBaseline] = useState(session);
-  const [form, setForm] = useState(() => initialState(session));
+  const draftKey = `session:${session.uuid ?? session.id}`;
+  const [baseline, setBaseline] = useState(() => ({ ...session, version: readNoteDraft(draftKey)?.version || session.version }));
+  const [form, setForm] = useState(() => ({ ...initialState(session), note: readNoteDraft(draftKey)?.text ?? session.note ?? "" }));
   const [allocations, setAllocations] = useState<AllocationWrite[] | null>(null);
   const [conflict, setConflict] = useState<SessionRow | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -157,7 +160,7 @@ function SessionForm({ session }: { session: SessionRow }) {
     if (start && end && new Date(end) < new Date(start)) errors.end = ["End time cannot be earlier than start time."];
     /* Picking the other occurrence of a repeated time changes the instant
        without changing the field's text. */
-    const moved = (instant: string, was: string | null) => !was || Math.floor(Date.parse(instant) / 1000) !== Math.floor(Date.parse(was) / 1000);
+    const moved = (instant: string, was: string | null) => !was || Math.floor(Date.parse(instant) / 60_000) !== Math.floor(Date.parse(was) / 60_000);
     if (start && (form.start !== initial.start || moved(start, baseline.start))) body.start = start;
     if (end && (form.end !== initial.end || moved(end, baseline.end))) body.end = end;
 
@@ -181,6 +184,7 @@ function SessionForm({ session }: { session: SessionRow }) {
       { session: baseline, body, version },
       {
         onSuccess: (saved) => {
+          clearNoteDraft(draftKey, saved.note ?? "");
           toast.success("Updated session");
           reset(saved);
           /* Where the old view redirected: the numeric URL of this session. */
@@ -227,15 +231,11 @@ function SessionForm({ session }: { session: SessionRow }) {
   };
 
   return (
-    <>
-      <div className="desk-head">
-        <div>
-          <h1 className="page-title">{baseline.project.name || "Session"}</h1>
-        </div>
-      </div>
+    <div className="session-edit-page">
+      <h1 className="page-title session-edit-title">Edit session</h1>
 
       {conflict || changedElsewhere ? (
-        <div ref={bannerRef} className="msg msg--warning" role="alert" style={{ marginBottom: "var(--s4)" }}>
+        <div ref={bannerRef} className="msg msg--warning" role="alert">
           <Icon icon={faExclamationTriangle} className="msg-icon" />
           <span>
             This session was changed somewhere else (another tab, the CLI or an assistant) after you opened it.
@@ -260,14 +260,14 @@ function SessionForm({ session }: { session: SessionRow }) {
         </div>
       ) : null}
       {banner ? (
-        <div ref={bannerRef} className="msg msg--error" role="alert" style={{ marginBottom: "var(--s4)" }}>
+        <div ref={bannerRef} className="msg msg--error" role="alert">
           <Icon icon={faExclamationTriangle} className="msg-icon" />
           <span>{banner}</span>
         </div>
       ) : null}
 
-      <form className="fields" onSubmit={submit} noValidate>
-        <section className="slab slab-pad">
+      <form className="fields session-edit-form" onSubmit={submit} noValidate>
+        <section className="session-edit-section">
           <ProjectField
             projects={projects.data ?? []}
             loading={projects.isPending}
@@ -277,47 +277,49 @@ function SessionForm({ session }: { session: SessionRow }) {
             errors={fieldErrors.project}
           />
 
-          <div className="two-up">
+          <div className="two-up session-edit-times">
             <div className="field">
               <label htmlFor={startId}>Started</label>
-              <input
+              <Input
                 id={startId}
-                type="datetime-local"
-                step={1}
-                value={form.start}
-                onChange={(event) => setForm({ ...form, start: event.target.value })}
+                type="time"
+                step={60}
+                value={form.start.slice(11, 16)}
+                onChange={(event) => setForm({ ...form, start: `${form.start.slice(0, 10)}T${event.target.value}` })}
               />
+              <details className="session-edit-date"><summary>{formatDate(form.start.slice(0, 10))}</summary><DateInput aria-label="Start date" value={form.start.slice(0, 10)} today={toDateTimeLocal(new Date()).slice(0, 10)} onValueChange={(day) => setForm({ ...form, start: `${day}T${form.start.slice(11, 16)}` })} /></details>
               <FieldErrors messages={fieldErrors.start?.filter((message) => message !== startTime.error)} />
               <LocalTimeNotice field={startTime} label="the start" />
             </div>
             <div className="field">
               <label htmlFor={endId}>Ended</label>
-              <input
+              <Input
                 id={endId}
-                type="datetime-local"
-                step={1}
-                value={form.end}
-                onChange={(event) => setForm({ ...form, end: event.target.value })}
+                type="time"
+                step={60}
+                value={form.end.slice(11, 16)}
+                onChange={(event) => setForm({ ...form, end: `${form.end.slice(0, 10)}T${event.target.value}` })}
               />
+              <details className="session-edit-date"><summary>{formatDate(form.end.slice(0, 10))}</summary><DateInput aria-label="End date" value={form.end.slice(0, 10)} today={toDateTimeLocal(new Date()).slice(0, 10)} onValueChange={(day) => setForm({ ...form, end: `${day}T${form.end.slice(11, 16)}` })} /></details>
               <FieldErrors messages={fieldErrors.end?.filter((message) => message !== endTime.error)} />
               <LocalTimeNotice field={endTime} label="the end" />
             </div>
           </div>
 
-          <NoteEditor rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
+          <NoteEditor richPreview writerOnly placeholder="Add a note" sessionTitle={`${session.project.name} · ${formatDate(session.end)} · ${formatDuration(session.duration_minutes)}`} disabled={update.isPending} persistKey={draftKey} persistVersion={baseline.version} saveStatus={update.isPending ? "Saving…" : form.note === (baseline.note ?? "") ? "Saved" : "Unsaved changes · kept on this device"} rows={10} value={form.note} onChange={(note) => setForm((current) => ({ ...current, note }))} error={fieldErrors.note} />
         </section>
 
-        <section className="slab slab-pad">
+        <section className="session-edit-section">
           <p className="field-label">Subprojects</p>
           <div className="check-grid" id="subproject_options">
             {form.projectId === null ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>Choose a project to pick its subprojects.</span>
+              <span className="subproject-empty-state">Choose a project to pick its subprojects.</span>
             ) : subprojects.isPending ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>Loading...</span>
+              <span className="subproject-empty-state">Loading...</span>
             ) : subprojects.isError ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>Could not load subprojects.</span>
+              <span className="subproject-empty-state">Could not load subprojects.</span>
             ) : subprojects.data.length === 0 ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>This project has no subprojects.</span>
+              <span className="subproject-empty-state">This project has no subprojects.</span>
             ) : (
               [...subprojects.data].sort((a, b) => a.id - b.id).map((sub) => (
                 <span key={sub.id}>
@@ -345,7 +347,7 @@ function SessionForm({ session }: { session: SessionRow }) {
           </button>
         </div>
       </form>
-    </>
+    </div>
   );
 }
 
@@ -399,7 +401,8 @@ function ProjectField({
   errors?: string[];
 }) {
   const [focused, setFocused] = useState(false);
-  const selected = projects.find((p) => p.id === selectedId) ?? null;
+  // The session is authoritative even while lookup data is loading or stale.
+  const selected = projects.find((p) => p.id === selectedId) ?? (selectedId !== null ? { id: selectedId, name: text } : null);
   const unmatched = !focused && text.trim() !== "" && selectedId === null && !loading;
   return (
     <div className="field" onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}>

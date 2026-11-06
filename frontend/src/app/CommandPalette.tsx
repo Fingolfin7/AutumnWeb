@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   faArrowRight,
+  faHistory,
   faPlay,
   faSearch,
   faStopwatch,
@@ -9,6 +10,8 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/Sheet";
+import { useOpenCapture } from "@/features/timers/CaptureLayer";
+import { CapturePickLabel } from "@/features/timers/CapturePicker";
 import { rankProjects } from "@/components/ProjectCombobox";
 import { useAllProjects } from "@/api/meta";
 import { errorMessage } from "@/api/errors";
@@ -36,6 +39,7 @@ export function CommandPalette() {
   const projects = useAllProjects();
   const timers = useTimers();
   const start = useStartTimer();
+  const openCapture = useOpenCapture();
   const toast = useToast();
   const list = useRef<HTMLUListElement>(null);
 
@@ -48,8 +52,10 @@ export function CommandPalette() {
         setOpen((value) => !value);
       }
     };
+    const show = () => { setQuery(""); setActive(0); setOpen(true); };
+    window.addEventListener("autumn:palette", show);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("autumn:palette", show); };
   }, []);
 
   const go = (href: string) => {
@@ -75,7 +81,7 @@ export function CommandPalette() {
         });
       }
     }
-    for (const project of rankProjects(projects.data ?? [], q, q ? 6 : 4)) {
+    for (const project of (q ? rankProjects(projects.data ?? [], q, 6) : [...(projects.data ?? [])].sort((a, b) => (Date.parse(b.last_activity ?? "") || 0) - (Date.parse(a.last_activity ?? "") || 0) || a.name.localeCompare(b.name)).slice(0, 4))) {
       out.push({
         id: `start-${project.id}`,
         group: "Start a timer",
@@ -94,22 +100,21 @@ export function CommandPalette() {
         },
       });
     }
+    if (!q || "new timer".includes(q)) out.push({ id: "capture", group: "Go to", label: "New timer", icon: faPlay, run: () => { setOpen(false); openCapture(); } });
+    if (!q || "log past time".includes(q)) out.push({ id: "capture-past", group: "Go to", label: "Log past time", icon: faHistory, run: () => { setOpen(false); openCapture("past"); } });
     const pages: [string, string][] = [
-      ["Home", urls.home()],
-      ["Timers", urls.timers()],
-      ["New timer", urls.startTimer()],
+      ["Today", urls.home()],
       ["Sessions", urls.sessions()],
       ["Projects", urls.projects()],
-      ["Charts", urls.charts()],
+      ["Review", urls.review()],
       ...(bootstrap().profile.insights_access_enabled ? ([["Insights", urls.insights()]] as [string, string][]) : []),
-      ["Weekly review", urls.weeklyReview()],
       ["Notifications", urls.notifications()],
       ["Contexts", urls.contexts()],
       ["Tags", urls.tags()],
       ["New commitment", urls.createCommitment()],
       ["Import", urls.import()],
       ["Export", urls.export()],
-      ["Profile", urls.profile()],
+      ["Settings", urls.profile()],
     ];
     for (const [label, href] of pages) {
       if (!q || label.toLowerCase().includes(q)) {
@@ -127,7 +132,7 @@ export function CommandPalette() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, projects.data, timers.data]);
+  }, [query, projects.data, timers.data, openCapture]);
 
   useEffect(() => {
     list.current?.querySelector(".is-active")?.scrollIntoView({ block: "nearest" });
@@ -139,7 +144,7 @@ export function CommandPalette() {
       <input
         className="palette-input"
         data-autofocus
-        placeholder="Start a timer, open a page, search sessions…"
+        placeholder="Search commands or projects"
         aria-label="Command"
         value={query}
         onChange={(event) => {
@@ -159,21 +164,22 @@ export function CommandPalette() {
           }
         }}
       />
-      <ul className="palette-list" ref={list} role="listbox">
+      <ul className="palette-list" ref={list} aria-label="Commands">
         {commands.map((command, index) => {
           const header = command.group !== lastGroup ? command.group : null;
           lastGroup = command.group;
           return (
-            <li key={command.id} role="option" aria-selected={index === active}>
+            <li key={command.id}>
               {header ? <div className="palette-group">{header}</div> : null}
               <button
                 type="button"
+                aria-current={index === active ? "true" : undefined}
                 className={`palette-item${index === active ? " is-active" : ""}`}
                 onMouseEnter={() => setActive(index)}
                 onClick={() => command.run()}
               >
                 <Icon icon={command.icon} className="palette-icon" />
-                <span>{command.label}</span>
+                {command.id.startsWith("start-") ? <CapturePickLabel project={command.label} /> : <span>{command.label}</span>}
                 {command.hint ? <span className="palette-hint">{command.hint}</span> : null}
               </button>
             </li>

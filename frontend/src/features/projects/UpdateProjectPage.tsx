@@ -1,14 +1,31 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useParams } from "react-router";
-import { faCheckCircle, faCodeBranch, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
+import { useQuery } from "@tanstack/react-query";
+import { api, unwrap } from "@/api/client";
+import { keys } from "@/api/keys";
+import { faEllipsisH, faStop, faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { Select } from "@/components/ui";
+import { Sheet } from "@/components/Sheet";
+import { SessionBand } from "@/features/sessions/SessionBand";
+import { SessionNote } from "@/components/SessionNote";
+import { useSessionList, useSessionTotals } from "@/features/sessions/api";
+
+import { useNow, useStartTimer, useTimers } from "@/features/timers/api";
+import { bootstrap } from "@/bootstrap";
+import { addDays, todayKey } from "@/features/notifications/dates";
+import { calendarWeek } from "@/features/review/periods";
+import { useChartData } from "@/features/charts/api";
+import type { DailyTotalRow } from "@/features/charts/payloads";
 import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
-import { formatDate, formatDurationWords } from "@/lib/format";
+import { elapsedSeconds, formatClock, formatDate, formatDurationWords } from "@/lib/format";
+import { groupByDay } from "@/lib/sessions";
 import type { Project, ProjectDetail } from "@/api/types";
 import { useCommitmentsAppliedTo } from "@/features/commitments/api";
 import { failure, useProject, useUpdateProject } from "./api";
+import { CommitmentSummary } from "@/features/commitments/CommitmentSummary";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { conflictCurrent, splitErrors } from "./forms";
 import { changedFields, type ProjectValues } from "./logic";
@@ -32,8 +49,32 @@ export default function UpdateProjectPage() {
 
 function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const toast = useToast();
+  const [editing, setEditing] = useState(false);
+  const [projectMenu, setProjectMenu] = useState(false);
+  const start = useStartTimer();
+  const recent = useSessionList({ project_ids: String(project.id) });
+  const [journalSub, setJournalSub] = useState<number | null>(null);
+  const filteredJournal = useQuery({
+    queryKey: keys.sessions({ projectJournal: project.id, subproject: journalSub }),
+    enabled: journalSub !== null,
+    queryFn: () => unwrap(api.GET("/api/v2/sessions/", { params: { query: { active: false, project_ids: String(project.id), subproject_ids: String(journalSub), include: "note,note_html", limit: 5, ordering: "newest" } } })),
+  });
+  const weekStart = calendarWeek(todayKey(bootstrap().profile.timezone)).start;
+  const week = useSessionTotals({ project_ids: String(project.id), start_date: weekStart, end_date: addDays(weekStart,6) });
+  const lastWeek = useSessionTotals({ project_ids: String(project.id), start_date: addDays(weekStart,-7), end_date: addDays(weekStart,-1) });
+  const trend = useChartData({ chart_type: "calendar", include_projects: [project.id], start_date: addDays(weekStart,-7), end_date: addDays(weekStart,6), context: "all" }, true);
+  const timers = useTimers();
+  const now = useNow();
+  const running = (timers.data ?? []).filter(timer => timer.project.id === project.id);
+  const [selectedSub, setSelectedSub] = useState("");
+  const [subMenu, setSubMenu] = useState<number | null>(null);
+  const recentRows = journalSub === null ? recent.data?.pages[0]?.sessions.slice(0,5) ?? [] : filteredJournal.data?.sessions ?? [];
+  const journalPending = journalSub === null ? recent.isPending : filteredJournal.isPending;
+  const journalError = journalSub === null ? recent.isError : filteredJournal.isError;
+  const journalDays = groupByDay(recentRows);
   const update = useUpdateProject(project.id);
   const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
+  const ownCommitment = related.find((item) => item.active && item.aggregation_type === "project" && item.target.id === project.id) ?? related.find((item) => item.aggregation_type === "project" && item.target.id === project.id);
   /* The project as the form was opened (or last saved/reloaded): the edit is
      diffed against it and the PATCH carries its version (If-Match). */
   const [baseline, setBaseline] = useState(project);
@@ -58,6 +99,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         onSuccess: (saved) => {
           setBaseline((current) => ({ ...current, ...saved }));
           setConflict(null);
+          setEditing(false);
           setValues((current) => ({ ...current, name: saved.name }));
           /* The server words it (core/services/celebrations.py), the same as
              the CLI and MCP see. */
@@ -88,113 +130,130 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
     save(patch, baseline.version);
   };
 
-  const average = project.session_count > 0 ? project.total_minutes / project.session_count : 0;
-
   return (
     <>
-      <PageHead title={project.name} titleClass="text-red" />
-
-      {conflict || changedElsewhere ? (
-        <ConflictBanner
-          noun="project"
-          outcome={conflict ? "Your changes were not saved." : undefined}
-          onLoadLatest={() => reset(conflict ? { ...project, ...conflict } : project)}
-          onSaveAnyway={conflict ? () => save(changes(), conflict.version) : undefined}
-          busy={update.isPending}
-        />
-      ) : null}
-
-      <div className="split">
-        <form className="fields" onSubmit={onSubmit}>
-          <FormErrors errors={errors} />
-          <section className="slab slab-pad">
-            <ProjectFields values={values} onChange={setValues} errors={errors} showStatus />
-            <div className="form-actions">
-              <button className="btn btn--primary" type="submit" id="update-project" disabled={update.isPending}>
-                <Icon icon={faCheckCircle} /> Save changes
-              </button>
-              <AppLink className="btn btn--ghost btn--spacer" href={urls.deleteProject(project.id)}>
-                <Icon icon={faTrash} /> Delete project
-              </AppLink>
-            </div>
-          </section>
-        </form>
-
-        <section className="slab slab-pad">
-          <div className="meta-list">
-            <div className="meta-row">
-              <span className="meta-label">Total time</span>
-              <span className="meta-value text-green">{formatDurationWords(project.total_minutes)}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Sessions</span>
-              <span className="meta-value">{project.session_count}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Average session</span>
-              <span className="meta-value text-green">{formatDurationWords(average)}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Created</span>
-              <span className="meta-value text-cyan">{formatDate(project.start_date)}</span>
-            </div>
-            <div className="meta-row">
-              <span className="meta-label">Last updated</span>
-              <span className="meta-value text-cyan">{formatDate(project.last_activity)}</span>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <CommitmentsPanel
-        commitments={related}
-        addUrl={urls.createCommitment(project.id)}
-        entityLabel="project"
-        knownSubprojects={knownSubprojects}
-      />
-
-      <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
-        {project.subprojects.length ? (
-          <ul className="band-list">
-            {project.subprojects.map((sub) => (
-              <li className="band project" id={`subproject-${sub.id}`} key={sub.id}>
-                <div className="u-grow">
-                  <div className="project-top">
-                    <AppLink className="project-name text-blue" href={urls.updateSubproject(sub.id)}>
-                      {sub.name}
-                    </AppLink>
-                  </div>
-                  <p className="project-total">{formatDurationWords(sub.total_minutes)}</p>
-                  {sub.last_activity ? <p className="project-dates">Last active {formatDate(sub.last_activity)}</p> : null}
-                </div>
-                <div className="u-row u-gap-2">
-                  <AppLink className="btn-icon" href={urls.updateSubproject(sub.id)} title="Edit subproject">
-                    <Icon icon={faPen} />
-                    <span className="sr-only">Edit {sub.name}</span>
-                  </AppLink>
-                  <AppLink className="btn-icon btn-icon--danger" href={urls.deleteSubproject(sub.id)} title="Delete subproject">
-                    <Icon icon={faTrash} />
-                    <span className="sr-only">Delete {sub.name}</span>
-                  </AppLink>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="empty">No subprojects yet.</p>
-        )}
-
-        <div className="slab-foot action-row">
-          <AppLink className="btn btn--primary" href={urls.createSubproject(project.id)}>
-            <Icon icon={faPlus} /> New subproject
-          </AppLink>
-          {project.subprojects.length ? (
-            <AppLink className="btn btn--ghost" href={urls.mergeSubprojects(project.id)}>
-              <Icon icon={faCodeBranch} /> Merge
-            </AppLink>
-          ) : null}
+      <div className="project-overview">
+        <div className="desk-head project-page-head">
+          <PageHead title={project.name} titleClass="text-red" />
+          <button type="button" className="btn-icon" aria-label="Project actions" onClick={() => setProjectMenu(true)}><Icon icon={faEllipsisH} /></button>
         </div>
-      </Disclose>
+        <div className="project-properties" aria-label="Project properties"><span className="chip">{project.status}</span>{project.context ? <AppLink className="chip-link" href={urls.updateContext(project.context.id)}><span className="context-chip">{project.context.name}</span></AppLink> : null}{project.tags.map(tag => <AppLink className="chip-link" key={tag.id} href={urls.updateTag(tag.id)}><span className="tag-chip">{tag.name}</span></AppLink>)}<a href="#project-subprojects">{project.subprojects.length} subproject{project.subprojects.length === 1 ? "" : "s"}</a>{ownCommitment ? <a href="#project-commitment">Commitment</a> : null}<span>{formatDurationWords(project.total_minutes)} total · {project.session_count} sessions</span></div>
+        {project.description ? <details className="project-description" id="project-about"><summary>About this project</summary><SessionNote text={project.description} /></details> : null}
+        <Sheet open={projectMenu} onClose={() => setProjectMenu(false)} title="Project actions">
+          <div className="project-menu-actions">
+            <button type="button" className="btn btn--quiet" onClick={() => { setProjectMenu(false); reset(project); setEditing(true); }}><Icon icon={faPen} /> Edit project</button>
+            <AppLink className="btn btn--quiet" href={urls.mergeProjects()}><Icon icon={faCodeBranch} /> Merge projects</AppLink>
+            <AppLink className="btn btn--quiet" href={urls.createSubproject(project.id)}><Icon icon={faPlus} /> New subproject</AppLink>
+            {project.description ? <a className="btn btn--quiet" href="#project-about" onClick={() => setProjectMenu(false)}>About this project</a> : null}
+          </div>
+        </Sheet>
+        <Sheet open={editing} onClose={() => setEditing(false)} title="Edit project" className="project-edit-sheet">
+
+        {conflict || changedElsewhere ? (
+          <ConflictBanner
+            noun="project"
+            outcome={conflict ? "Your changes were not saved." : undefined}
+            onLoadLatest={() => reset(conflict ? { ...project, ...conflict } : project)}
+            onSaveAnyway={conflict ? () => save(changes(), conflict.version) : undefined}
+            busy={update.isPending}
+          />
+        ) : null}
+
+
+          <form className="fields" onSubmit={onSubmit}>
+            <FormErrors errors={errors} />
+            <section>
+              <p className="muted project-history">Created {formatDate(project.start_date)}. Last active {formatDate(project.last_activity) || "never"}. Average session {formatDurationWords(project.session_count ? project.total_minutes / project.session_count : 0)}.</p>
+              <ProjectFields values={values} onChange={setValues} errors={errors} showStatus />
+              <div className="form-actions">
+                <button className="btn btn--primary" type="submit" id="update-project" disabled={update.isPending}>
+                  <Icon icon={faCheckCircle} /> Save changes
+                </button>
+                <AppLink className="btn btn--danger btn--spacer" href={urls.deleteProject(project.id)}>
+                  <Icon icon={faTrash} /> Delete project
+                </AppLink>
+                <AppLink className="btn btn--quiet" href={urls.mergeProjects()}><Icon icon={faCodeBranch} /> Merge projects</AppLink>
+              </div>
+            </section>
+          </form>
+
+        </Sheet>
+
+
+        <div className="project-side-rail">
+        <div className="project-start-control fields">
+          {project.subprojects.length && !running.length ? <><label className="sr-only" htmlFor="project-subproject-picker">Subproject</label><Select id="project-subproject-picker" value={selectedSub} onChange={event => setSelectedSub(event.target.value)}><option value="">No subproject</option>{project.subprojects.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}</Select></> : null}
+          {running.length ? <div className="project-live-card"><span className="live-dot" /><strong>{formatClock(elapsedSeconds(running[0]!.start, now))}</strong>{running[0]!.note ? <span className="project-running-note">{running[0]!.note}</span> : null}<AppLink className="btn btn--stop" href={urls.stopTimer(running[0]!.id)}><Icon icon={faStop} /> Stop{running.length > 1 ? ` (${running.length})` : ""}</AppLink></div> : <button className="btn btn--primary" type="button" disabled={start.isPending} onClick={() => { const sub = project.subprojects.find(item => item.id === Number(selectedSub)); start.mutate({ project_id: project.id, subproject_ids: sub ? [sub.id] : [], optimistic: { projectName: project.name, subprojects: sub ? [{ id: sub.id, name: sub.name }] : [] } }, { onSuccess: () => toast.success(`Started ${sub?.name ?? project.name}.`), onError: error => toast.error(failure("start the timer", error)) }); }}><Icon icon={faPlay} /> Start timer</button>}
+        </div>
+        <div className="project-progress-row"><section className="project-week-summary"><h2>This week</h2><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong><p className="muted">{week.data && lastWeek.data ? week.data.total_minutes === lastWeek.data.total_minutes ? "Same as last week" : `${week.data.total_minutes > lastWeek.data.total_minutes ? "+" : "−"}${formatDurationWords(Math.abs(week.data.total_minutes-lastWeek.data.total_minutes))} from last week` : "Comparing weeks…"}</p>{trend.data ? <ProjectTrend rows={trend.data.data as DailyTotalRow[]} start={addDays(weekStart,-7)} /> : null}</section><section className="project-week-target" id="project-commitment">{ownCommitment ? <><h2>Commitment</h2><CommitmentSummary commitment={ownCommitment} showTarget={false} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}><Icon icon={faPlus} /> Add commitment</AppLink>}</section></div>
+        <aside className="project-rail">
+        <Disclose id="project-subprojects" title="Subprojects" summary={project.subprojects.length}>
+          {project.subprojects.length ? (
+            <ul className="band-list">
+              {project.subprojects.map((sub) => { return (
+                <li className="band project" id={`subproject-${sub.id}`} key={sub.id}>
+                  <div className="u-grow">
+                    <div className="project-top">
+                      <AppLink className="project-name text-blue" href={urls.updateSubproject(sub.id)}>
+                        {sub.name}
+                      </AppLink>
+                    </div>
+                    <p className="project-total">{formatDurationWords(sub.total_minutes)}</p>
+                    {sub.total_minutes > 0 && sub.last_activity ? <p className="project-dates">Last active {formatDate(sub.last_activity)}</p> : null}
+                  </div>
+                  <div className="u-row u-gap-2">
+                    <button className="btn-icon" type="button" aria-label={`More actions for ${sub.name}`} onClick={() => setSubMenu(sub.id)}><Icon icon={faEllipsisH} /></button>
+                    <Sheet open={subMenu === sub.id} onClose={() => setSubMenu(null)} title={sub.name}>
+                    <AppLink className="btn btn--quiet" href={urls.updateSubproject(sub.id)} title="Edit subproject">
+                      <Icon icon={faPen} />
+                      <span>Edit subproject</span>
+                    </AppLink>
+                    <AppLink className="btn btn--quiet btn-icon--danger" href={urls.deleteSubproject(sub.id)} title="Delete subproject">
+                      <Icon icon={faTrash} />
+                      <span>Delete subproject</span>
+                    </AppLink>
+                    </Sheet>
+                  </div>
+                </li>
+              ); })}
+            </ul>
+          ) : (
+            <p className="empty">No subprojects yet.</p>
+          )}
+
+          <div className="slab-foot action-row">
+            <AppLink className="btn btn--secondary" href={urls.createSubproject(project.id)}>
+              <Icon icon={faPlus} /> New subproject
+            </AppLink>
+            {project.subprojects.length ? (
+              <AppLink className="btn btn--ghost" href={urls.mergeSubprojects(project.id)}>
+                <Icon icon={faCodeBranch} /> Merge
+              </AppLink>
+            ) : null}
+          </div>
+        </Disclose>
+        {related.some((item) => item.id !== ownCommitment?.id) ? <CommitmentsPanel commitments={related.filter((item) => item.id !== ownCommitment?.id)} addUrl={urls.createCommitment(project.id)} entityLabel="project" knownSubprojects={knownSubprojects} /> : null}
+
+        </aside>
+        </div>
+        <section className="session-list project-journal" aria-label="Recent journal entries">
+          <div className="project-journal-link"><h2>Journal</h2><AppLink className="text-link" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></div>
+          {project.subprojects.length ? <div className="project-journal-filters" role="group" aria-label="Filter journal by subproject"><button type="button" aria-pressed={journalSub === null} onClick={() => setJournalSub(null)}>All</button>{project.subprojects.map(sub => <button type="button" key={sub.id} aria-pressed={journalSub === sub.id} onClick={() => setJournalSub(sub.id)}>{sub.name} <span>{formatDurationWords(sub.total_minutes)}</span></button>)}</div> : null}
+          {journalError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void (journalSub === null ? recent.refetch() : filteredJournal.refetch())}>Try again</button></p> : journalPending ? <p className="slab-pad muted">Loading entries…</p> : recentRows.length ? <>{journalDays.map(group => <section className="project-journal-day" key={group.date}><header className="day-head"><h3 className="day-date">{formatDate(group.date)}</h3><strong className="day-total">{formatDurationWords(group.totalMinutes)}</strong></header><ul className="band-list">{group.sessions.map(session => <SessionBand key={session.id} session={session} day={group.date} hideProject />)}</ul></section>)}</> : <p className="empty">{journalSub === null ? "Your first session will appear here." : "No sessions for this subproject yet."}</p>}
+        </section>
+
+      </div>
     </>
   );
+}
+
+function ProjectTrend({ rows, start }: { rows: DailyTotalRow[]; start: string }) {
+  if (rows.filter(row => Number(row.hours) > 0).length < 2) return null;
+  const values = new Map(rows.map(row => [row.date, Number(row.hours)])); const max = Math.max(1,...values.values());
+  const today = todayKey(bootstrap().profile.timezone);
+  return <><svg className="project-trend" viewBox="0 0 280 90" role="img" aria-label="Daily time over the previous and current weeks">{Array.from({ length: 14 }, (_, index) => {
+    const day = addDays(start, index); const hours = values.get(day) ?? 0;
+    const initial = new Date(`${day}T12:00Z`).toLocaleDateString("en", { weekday: "short", timeZone: "UTC" }).slice(0, 1);
+    return <g key={day}><rect x={index * 20} y={70 - hours / max * 64} width="13" height={hours / max * 64} rx="2" className={index < 7 ? "is-previous" : undefined}><title>{formatDate(day)}: {formatDurationWords(hours * 60)}</title></rect><text x={index * 20 + 6.5} y="85" textAnchor="middle" className={day === today ? "is-today" : undefined}>{initial}</text></g>;
+  })}</svg><p className="muted">Last week / this week</p></>;
 }

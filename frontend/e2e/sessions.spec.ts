@@ -10,7 +10,6 @@ test("searching sessions narrows the list and the filter survives a reload", asy
   expect(total).toBeGreaterThan(5);
 
   await page.getByRole("searchbox", { name: /Search projects, subprojects, and session notes/ }).fill("grammar");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
 
   await expect(page).toHaveURL(/[?&]search=grammar\b/);
   await expect(page.locator(".result-count")).not.toHaveText(String(total));
@@ -32,24 +31,86 @@ test("searching sessions narrows the list and the filter survives a reload", asy
   expect(problems()).toEqual([]);
 });
 
+test("a session's actions stay reachable with a mouse or a finger", async ({ page }, testInfo) => {
+  await page.goto("/sessions/?search=Piano");
+  const first = page.getByRole("region", { name: "Sessions" }).getByRole("listitem").first();
+  if (testInfo.project.name === "phone") {
+    await first.getByRole("button", { name: "Session actions" }).tap();
+    await page.getByRole("dialog", { name: "Session actions" }).getByRole("button", { name: "Delete session" }).tap();
+  } else {
+    await first.hover();
+    await first.getByRole("button", { name: "Delete session" }).click();
+  }
+  await expect(page.getByRole("dialog", { name: "Delete this session?" })).toBeVisible();
+});
+
 test("editing a session note saves it", async ({ page }, testInfo) => {
   const problems = trackErrors(page);
   // Each attempt writes a new note, or a retry would have nothing to save.
   const note = `Edited by the ${testInfo.project.name} e2e run ${testInfo.retry}.${testInfo.repeatEachIndex}`;
 
   await page.goto("/sessions/?search=Piano");
-  const first = page.getByRole("region", { name: "Sessions" }).getByRole("listitem").first();
+  const seedNote = testInfo.project.name === "phone" ? "First page of the waltz" : "Major scales at a slower tempo";
+  const firstId = await page.getByRole("region", { name: "Sessions" }).getByRole("listitem").filter({ hasText: seedNote }).first().getAttribute("id");
+  const first = page.locator(`#${firstId}`);
   await expect(first).toContainText("Piano Practice");
-  await first.hover(); // desktop reveals the row actions on hover
-  await first.getByRole("link", { name: "Edit session" }).click();
+  if (testInfo.project.name === "phone") {
+    const heading = first.locator(".journal-heading");
+    // The full suite adds/edits earlier Piano rows. Center this one above the
+    // fixed phone navigation; CDP's scrollIntoViewIfNeeded ignores that overlay.
+    await heading.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    const box = (await heading.boundingBox())!;
+    expect(await heading.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), { x: box.x + box.width - 30, y: box.y + 22 })).toBe(true);
+    const touch = await page.context().newCDPSession(page);
+    const y = box.y + 22;
+    await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x + box.width - 30, y }] });
+    for (let i = 1; i <= 8; i++) await touch.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: box.x + box.width - 30 - i * 20, y }] });
+    await touch.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await touch.detach();
+    await page.getByRole("dialog", { name: "Session actions" }).getByRole("button", { name: "Edit note", exact: true }).tap();
+  } else {
+    await first.locator(".session-note-body").click();
+    await first.getByRole("button", { name: "Edit", exact: true }).click();
+  }
 
-  await expect(page).toHaveURL(/\/update_session\/\d+\/$/);
+  await expect(page).toHaveURL(/\/sessions\/\?search=Piano/);
   const field = page.getByRole("textbox", { name: "Note", exact: true });
   await field.fill(note);
-  await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(toasts(page).getByText("Updated session")).toBeVisible();
+  if (testInfo.project.name === "phone") await page.getByRole("dialog", { name: "Full-screen note writer" }).getByRole("button", { name: "Done", exact: true }).click();
+  else await first.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(toasts(page).getByText("Note saved.", { exact: true })).toBeVisible();
 
-  await page.goto("/sessions/?search=Piano");
+  await page.reload();
   await expect(page.getByRole("region", { name: "Sessions" }).getByText(note)).toBeVisible();
+  const id = (await first.getAttribute("id"))!.replace("session-", "");
+  await page.goto(`/sessions/?search=${encodeURIComponent(note)}`);
+  const retained = page.locator(`#session-${id}`);
+  await retained.locator(".session-note-body").click();
+  await retained.getByRole("button", { name: "Edit", exact: true }).click();
+  const revised = `A different **reflection** for ${testInfo.project.name}, with the search word removed.`;
+  // A phone edits in the full-screen writer; a desktop edits in the row.
+  const surface = testInfo.project.name === "phone" ? page.getByRole("dialog", { name: "Full-screen note writer" }) : retained;
+  await surface.getByRole("textbox", { name: "Note", exact: true }).fill(revised);
+  await expect(surface.getByRole("status")).toHaveText(/^Saved/);
+  await expect(surface.getByRole("textbox", { name: "Note", exact: true })).toHaveValue(revised);
+  await surface.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`search=${encodeURIComponent(note)}`));
+  await expect(retained.getByText(revised.replaceAll("**", ""), { exact: true })).toBeVisible();
+  await expect(retained.locator(".session-note strong")).toHaveText("reflection");
+  const original = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
+  // An edit must prefill from the session even when its lookup cache is stale.
+  await page.route("**/api/v2/projects/?*", (route) => route.fulfill({ json: { projects: [], total: 0, count: 0 } }));
+  await page.goto(`/update_session/${id}/`);
+  await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveValue(original.project.name);
+  await page.getByRole("button", { name: "Edit session note", exact: true }).click();
+  const writer = page.getByRole("dialog", { name: "Full-screen note writer" });
+  await writer.getByRole("textbox", { name: "Note", exact: true }).fill(`${note} (metadata unavailable)`);
+  await writer.getByRole("button", { name: "Done", exact: true }).click();
+  const patched = page.waitForRequest((request) => request.url().endsWith(`/api/v2/sessions/${id}`) && request.method() === "PATCH");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  expect((await patched).postDataJSON()).not.toHaveProperty("project_id");
+  await expect(toasts(page).getByText("Updated session", { exact: true })).toBeVisible({ timeout: 15_000 });
+  const saved = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
+  expect(saved.project.id).toBe(original.project.id);
   expect(problems()).toEqual([]);
 });

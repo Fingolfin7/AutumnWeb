@@ -15,7 +15,7 @@ export type SimilarityScale = {
 
 export const DEFAULT_MARKS: SimilarityMark[] = [
   { label: "Loose", value: 0.3 },
-  { label: "Moderate", value: 0.45 },
+  { label: "Balanced", value: 0.45 },
   { label: "Strict", value: 0.55 },
 ];
 
@@ -71,3 +71,5 @@ export function loosenTo(best: number | null | undefined, value: number, scale: 
   if (best == null || best >= value) return null;
   return Math.max(scale.floor, Math.floor(best * 100 + 1e-9) / 100);
 }
+
+export const closenessLabel = (value: number) => value < 0.38 ? "Loose" : value < 0.52 ? "Balanced" : "Strict";

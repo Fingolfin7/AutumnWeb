@@ -12,12 +12,16 @@ const COPY: Record<PermissionState, { title: string; detail: string; action?: st
 
 const PUSH_KEY = ["push", "state"] as const;
 
+export function useBrowserPushState() {
+  return useQuery({ queryKey: PUSH_KEY, queryFn: permissionState, retry: false, refetchOnWindowFocus: true });
+}
+
 /* "This browser": enable, test and turn off Web Push here (the .nx-perm block
    and notifications_desk.js). */
-export function BrowserPush() {
+export function BrowserPush({ compact = false }: { compact?: boolean }) {
   const client = useQueryClient();
   const [status, setStatus] = useState("");
-  const state = useQuery({ queryKey: PUSH_KEY, queryFn: permissionState, retry: false, refetchOnWindowFocus: true });
+  const state = useBrowserPushState();
 
   /* Blocking or allowing the site in browser settings changes the answer
      without any request, so follow the permission itself. */
@@ -59,6 +63,7 @@ export function BrowserPush() {
   const devices = state.data?.devices ?? 0;
   const detail = state.data?.detail ?? (current === "granted" && devices > 1 ? `${devices} devices receive notifications.` : copy.detail);
 
+  if (compact) return <div className="reminder-delivery" role="status"><p>{copy.title} {detail}</p>{current === "default" && !failed ? <button type="button" className="btn btn--quiet" disabled={act.isPending} onClick={() => act.mutate("enable")}>Enable notifications</button> : null}{status ? <p>{status}</p> : null}</div>;
   return (
     <div className="rm-perm nx-perm" data-perm-state={failed ? "unavailable" : current}>
       <div className="rm-perm-row">

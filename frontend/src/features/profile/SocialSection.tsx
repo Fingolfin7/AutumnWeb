@@ -14,7 +14,7 @@ import { disconnectSocial, meKeys, type SocialAccount, type SocialAccounts } fro
 import { brandIcons } from "./brands";
 import { SlabHead } from "./Parts";
 
-/* Connected Google / GitHub logins. Changes apply immediately, as before.
+/* Connected Google / GitHub logins. Saved automatically, as before.
    Connecting is a real form POST to the provider's login URL with
    process=connect (allauth refuses GET), which leaves the app for the
    provider's consent screen. Without an Autumn password the last connected
@@ -38,7 +38,7 @@ export function SocialSection({ social }: { social: SocialAccounts }) {
   if (!accounts.length) return null;
   return (
     <section className="slab slab-pad">
-      <SlabHead title="Connected accounts" aside={<span className="muted">Changes apply immediately</span>} />
+      <SlabHead title="Connected accounts" />
       {!hasPassword ? (
         <div className="msg msg--warning u-mt-4">
           <Icon icon={faExclamationTriangle} className="msg-icon" />
@@ -67,7 +67,7 @@ export function SocialSection({ social }: { social: SocialAccounts }) {
                       </p>
                     ) : null}
                     <span
-                      className={`context-chip profile-auth-chip ${account.available ? "text-green" : "text-yellow"}`}
+                      className={`context-chip profile-auth-chip ${account.available ? "muted" : "text-yellow"}`}
                     >
                       <Icon icon={account.available ? faCheckCircle : faExclamationCircle} />
                       Connected

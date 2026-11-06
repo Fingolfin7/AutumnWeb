@@ -35,7 +35,7 @@ export function Sidebar({
 
   return (
     <aside className={`chat-sidebar${collapsed ? " collapsed" : ""}`} id="chat-sidebar" aria-label="Chats">
-      <AppLink href={chatPath()} className="btn btn--primary btn--block new-chat-btn">
+      <AppLink href={chatPath()} className="btn btn--secondary btn--block new-chat-btn">
         <Icon icon={faPlus} /> New chat
       </AppLink>
       <div className="chat-list">

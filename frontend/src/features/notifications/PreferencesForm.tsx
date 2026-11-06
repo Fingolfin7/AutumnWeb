@@ -1,3 +1,4 @@
+import { Input } from "@/components/ui";
 import { useState, type FormEvent } from "react";
 import { useToast } from "@/app/toasts";
 import { FieldErrors, FormLevelErrors } from "@/features/contexts-tags/ui";
@@ -51,26 +52,26 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
         <span>
           <strong>Scheduled reminders</strong>
         </span>
-        <input type="checkbox" checked={reminders} onChange={(event) => setReminders(event.target.checked)} />
+        <input type="checkbox" role="switch" checked={reminders} onChange={(event) => setReminders(event.target.checked)} />
       </label>
       <label className="nx-switch">
         <span>
           <strong>Commitment checks</strong>
           <small>When a period is about to close short of its target</small>
         </span>
-        <input type="checkbox" checked={checks} onChange={(event) => setChecks(event.target.checked)} />
+        <input type="checkbox" role="switch" checked={checks} onChange={(event) => setChecks(event.target.checked)} />
       </label>
       <label className="nx-switch">
         <span>
           <strong>Weekly review</strong>
           <small>A summary of last week</small>
         </span>
-        <input type="checkbox" checked={review} onChange={(event) => setReview(event.target.checked)} />
+        <input type="checkbox" role="switch" checked={review} onChange={(event) => setReview(event.target.checked)} />
       </label>
       <div className="nx-schedule-fields">
         <div className="field">
           <label htmlFor="id_commitment_check_time">Commitment check time</label>
-          <input
+          <Input
             id="id_commitment_check_time"
             type="time"
             step={60}
@@ -94,7 +95,7 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
         </div>
         <div className="field">
           <label htmlFor="id_weekly_review_time">Weekly review time</label>
-          <input
+          <Input
             id="id_weekly_review_time"
             type="time"
             step={60}
@@ -106,8 +107,8 @@ export function PreferencesForm({ preference }: { preference: NotificationPrefer
           <FieldErrors errors={errors.fields.weekly_review_time} />
         </div>
       </div>
-      <div className="form-actions">
-        <button className="btn btn--primary" type="submit" disabled={save.isPending}>
+      <div className="form-actions q-form-actions">
+        <button className="btn btn--secondary" type="submit" disabled={save.isPending}>
           Save settings
         </button>
       </div>

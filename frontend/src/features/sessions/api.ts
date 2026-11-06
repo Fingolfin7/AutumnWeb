@@ -166,6 +166,11 @@ export function useSession(param: string | undefined) {
 function writeSessionCache(client: ReturnType<typeof useQueryClient>, session: SessionRow) {
   client.setQueryData(keys.session(session.id), session);
   if (session.uuid) client.setQueryData(uuidKey(session.uuid), session);
+  client.setQueriesData<{ pages: { sessions: SessionRow[] }[] }>({ queryKey: keys.sessions() }, (data) =>
+    data && Array.isArray(data.pages)
+      ? { ...data, pages: data.pages.map((page) => ({ ...page, sessions: page.sessions.map((row) => row.id === session.id ? { ...row, ...session, note_html: session.note_html ?? undefined } : row) })) }
+      : data,
+  );
 }
 
 /* PATCH with the version the form was opened on (If-Match): the server
@@ -175,6 +180,7 @@ export function useUpdateSession() {
   const client = useQueryClient();
   const invalidate = useInvalidate();
   return useMutation({
+    networkMode: "always",
     mutationFn: async ({ session, body, version }: { session: SessionRow; body: SessionPatch; version?: number }) =>
       unwrap(
         api.PATCH("/api/v2/sessions/{session_id}", {
@@ -188,4 +194,11 @@ export function useUpdateSession() {
     },
   });
 }
-
+/** Exact filtered total, independent of list pagination. */
+export function useSessionTotals(filters: SessionFilters) {
+  const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as SessionFilters;
+  return useQuery({
+    queryKey: keys.reports("totals", { ...query, active: "false", related: !!query.search }),
+    queryFn: () => unwrap(api.GET("/api/v2/reports/totals/", { params: { query: { ...query, active: "false", related: !!query.search } } })),
+  });
+}

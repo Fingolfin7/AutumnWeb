@@ -1,3 +1,4 @@
+import { formatDate, formatTime } from "@/lib/format";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { faBell, faStopwatch, faTimes } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -11,12 +12,7 @@ import type { Timer } from "@/api/types";
 const MODE_LABEL: Record<string, string> = { after: "Once after", interval: "Every", at: "At" };
 
 function nextLabel(iso: string) {
-  const date = new Date(iso);
-  return `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}, ${date.toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })}`;
+  return `${formatDate(iso)}, ${formatTime(iso)}`;
 }
 
 /* A running timer's pending reminders with Cancel (.rm-live). They come
