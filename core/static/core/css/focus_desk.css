@@ -5193,3 +5193,5 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .export-customize > summary small { display: block; color: var(--muted); font-size: var(--fs-xs); }
 .export-customize > summary::after { content: ""; width: 7px; height: 7px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 .export-customize[open] > summary::after { transform: rotate(225deg); }
+
+.project-journal-link .text-link { display: inline-flex; align-items: center; min-height: 44px; }
