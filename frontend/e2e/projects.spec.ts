@@ -20,6 +20,7 @@ test("create a project, rename it, then delete it", async ({ page }, testInfo) =
   await expect(page).toHaveURL(/\/update_project\/\d+\/$/);
   /* The URL changes before the page renders: while its code loads, React
      Router keeps the list on screen. Wait for the form itself. */
+  await page.getByRole("button", { name: "Project actions", exact: true }).click();
   await page.getByRole("button", { name: "Edit project", exact: true }).click();
   const nameField = page.getByLabel("Name", { exact: true });
   await expect(nameField).toHaveValue(name);
@@ -28,6 +29,7 @@ test("create a project, rename it, then delete it", async ({ page }, testInfo) =
   await expect(toasts(page).getByText("Project updated successfully")).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(renamed);
 
+  await page.getByRole("button", { name: "Project actions", exact: true }).click();
   await page.getByRole("button", { name: "Edit project", exact: true }).click();
   await page.getByRole("link", { name: "Delete project" }).click();
   await expect(page).toHaveURL(/\/delete_project\/\d+\/$/);
