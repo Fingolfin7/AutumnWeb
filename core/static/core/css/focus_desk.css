@@ -5174,7 +5174,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .compact-timer-note > summary > :first-child { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--note); font: 400 1rem/1.5 var(--font-reading); }
 .compact-timer-note > summary .quiet-link { flex: none; }
 .compact-timer-note[open] > summary { margin-bottom: var(--s3); }
-.capture-pick-sub:not(.text-blue) { color: var(--muted); }
 @media (min-width: 1280px) {
   .today-layout { grid-template-rows: auto auto 1fr; }
   .today-day { grid-column: 1; grid-row: 1; }

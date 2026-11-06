@@ -148,7 +148,7 @@ function StartCard({ items }: { items: Dashboard["quick_starts"] }) {
           }, { onSuccess: () => toast.success("Started timer"), onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`) })}
         >
           <Icon icon={faPlay} />
-          {sublabel ? nested ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{sublabel}</span></span> : <CapturePickLabel project={item.project.name} sublabel={sublabel} /> : <CapturePickLabel project={item.project.name} sublabel="no subproject" noSubproject />}
+          {sublabel ? nested ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{sublabel}</span></span> : <CapturePickLabel project={item.project.name} sublabel={sublabel} /> : <CapturePickLabel project={item.project.name} />}
         </button>;
       })}
       <CaptureLink className="today-quick-pick today-something-else"><Icon icon={faSearch} /><span>Another project</span></CaptureLink>
