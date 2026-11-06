@@ -5241,3 +5241,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .capture-when-row .temporal-popover, .session-edit-date .temporal-popover { position: static; inset: auto; width: 100%; max-height: none; margin-top: var(--s2); overflow: visible; box-shadow: none; }
 .capture-when-row .temporal-popover, .session-edit-date .temporal-popover { padding-inline: 0; border: 0; background: transparent; }
 .session-edit-times:has(.session-edit-date[open]) { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 999px) {
+  .journal-meta .journal-subs, .focus-meta .journal-subs { flex: 0 1 auto; max-width: 100%; }
+  .journal-meta .journal-subs .journal-subproject, .focus-meta .journal-subs .journal-subproject { min-width: 44px; }
+}
