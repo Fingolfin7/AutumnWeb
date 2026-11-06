@@ -67,6 +67,9 @@ function usePopover() {
 export function DateInput({ value, onValueChange, today, presets = "past", ...props }: Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "value" | "onChange"> & { value: string; onValueChange: (value: string) => void; today: string; presets?: "past" | "future" | "none" }) {
   const { open, setOpen, ref } = usePopover();
   const [month, setMonth] = useState((value || today).slice(0, 7));
+  useEffect(() => {
+    if (open) ref.current?.querySelector(".temporal-popover")?.scrollIntoView({ block: "nearest" });
+  }, [open, ref]);
   const shift = (amount: number) => { const date = new Date(`${month}-01T12:00Z`); date.setUTCMonth(date.getUTCMonth() + amount); setMonth(date.toISOString().slice(0, 7)); };
   const first = new Date(`${month}-01T12:00Z`);
   const offset = (first.getUTCDay() + 6) % 7;
