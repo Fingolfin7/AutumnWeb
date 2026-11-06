@@ -165,7 +165,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
 
 
         <section className="session-list project-journal" aria-label="Recent journal entries">
-          <div className="project-journal-link"><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></div>
+          <div className="project-journal-link"><h2>Journal</h2><AppLink className="text-link" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></div>
           {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(group => <section className="project-journal-day" key={group.date}><header className="day-head"><h3 className="day-date">{formatDate(group.date)}</h3><strong className="day-total">{formatDurationWords(group.totalMinutes)}</strong></header><ul className="band-list">{group.sessions.map(session => <SessionBand key={session.id} session={session} day={group.date} hideProject />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
         </section>
         <aside className="project-rail">
@@ -223,6 +223,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
 }
 
 function ProjectTrend({ rows, start }: { rows: DailyTotalRow[]; start: string }) {
+  if (rows.filter(row => Number(row.hours) > 0).length < 2) return null;
   const values = new Map(rows.map(row => [row.date, Number(row.hours)])); const max = Math.max(1,...values.values());
   return <><svg className="project-trend" viewBox="0 0 280 72" role="img" aria-label="Daily time over the previous and current weeks">{Array.from({ length:14 },(_,index) => <rect key={index} x={index * 20} y={70 - (values.get(addDays(start,index)) ?? 0) / max * 64} width="13" height={(values.get(addDays(start,index)) ?? 0) / max * 64} rx="2" className={index < 7 ? "is-previous" : undefined}><title>{formatDate(addDays(start,index))}: {formatDurationWords((values.get(addDays(start,index)) ?? 0) * 60)}</title></rect>)}</svg><p className="muted">Last week / this week</p></>;
 }
