@@ -56,8 +56,11 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await expect(first).toContainText("Piano Practice");
   if (testInfo.project.name === "phone") {
     const heading = first.locator(".journal-heading");
-    await heading.scrollIntoViewIfNeeded();
+    // The full suite adds/edits earlier Piano rows. Center this one above the
+    // fixed phone navigation; CDP's scrollIntoViewIfNeeded ignores that overlay.
+    await heading.evaluate(element => element.scrollIntoView({ block: "center", behavior: "instant" }));
     const box = (await heading.boundingBox())!;
+    expect(await heading.evaluate((element, point) => element.contains(document.elementFromPoint(point.x, point.y)), { x: box.x + box.width - 30, y: box.y + 22 })).toBe(true);
     const touch = await page.context().newCDPSession(page);
     const y = box.y + 22;
     await touch.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: box.x + box.width - 30, y }] });

@@ -99,7 +99,11 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
     };
   }, []);
 
-  const minutes = (day ? dayPortions(session).find((part) => part.date === day)?.minutes : undefined) ?? session.duration_minutes ?? 0;
+  const portions = dayPortions(session);
+  // A midnight session appears in both days. Keep the public anchor on the
+  // latest portion, with distinct note/action IDs on its earlier appearances.
+  const instance = `${session.id}${day && day !== portions[portions.length - 1]?.date ? `-${day}` : ""}`;
+  const minutes = (day ? portions.find((part) => part.date === day)?.minutes : undefined) ?? session.duration_minutes ?? 0;
   const reason = matchReason(session, search);
 
   const restart = () => {
@@ -118,7 +122,7 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
   };
 
   return (
-    <li ref={row} className={`band journal-entry${hideProject ? " journal-entry--in-project" : ""}`} id={`session-${session.id}`}>
+    <li ref={row} className={`band journal-entry${hideProject ? " journal-entry--in-project" : ""}`} id={`session-${instance}`} data-session-id={session.id}>
       <div className="journal-heading">
         {!hideProject ? <AppLink className="session-project" title={session.project.name} href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink> : null}
         <span className={`journal-duration${!Math.round(minutes) ? " is-zero" : ""}`}>{formatDuration(minutes)}</span>
@@ -131,17 +135,17 @@ export function SessionBand({ session, showDate, hideProject = false, onEditNote
         <div className="journal-row-actions">
           <button className="btn-icon journal-action" type="button" aria-label="Edit note" title="Edit note" onClick={editNote}><Icon icon={faPen} /></button>
           <button className="btn-icon journal-action journal-delete" type="button" aria-label="Delete session" title="Delete session" onClick={() => setConfirming(true)}><Icon icon={faTrash} /></button>
-          <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" title="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${session.id}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
+          <button className="btn-icon journal-overflow" type="button" aria-label="Session actions" title="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${instance}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
         </div>
       </div>
       {dayPortions(session).length > 1 ? <p className="journal-day-split">{dayPortions(session).map((part) => `${formatDuration(part.minutes)} ${part.date === localDateKey(new Date()) ? "today" : part.date === localDateKey(new Date(Date.now() - 86400000)) ? "yesterday" : formatShortDate(part.date)}`).join(" · ")}</p> : null}
       {reason ? <p className="journal-match-reason">{reason}</p> : null}
       {!session.note && !session.note_html && !editing ? <button className="btn btn--quiet journal-add-note" type="button" onClick={editNote}>Add a note</button> : null}
-      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote search={search} id={`note-${session.id}`} html={session.note_html} text={session.note} onEdit={editNote} passage={session.match_passage} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
+      {editing ? <InlineNoteWriter session={editing} onDone={() => setEditing(null)} onSaved={onNoteSaved} /> : <SessionNote search={search} id={`note-${instance}`} html={session.note_html} text={session.note} onEdit={editNote} passage={session.match_passage} identity={<><span>{formatShortDate(session.end)}</span>{!hideProject ? <span className="text-red">{session.project.name}</span> : null}</>} />}
 
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Session actions" className="session-actions-sheet">
         <p className="session-action-context">{session.project.name} · {formatDuration(session.duration_minutes)}</p>
-        <div className="journal-actions" id={`actions-${session.id}`}>
+        <div className="journal-actions" id={`actions-${instance}`}>
         <button className="btn btn--quiet" type="button" onClick={editNote}><Icon icon={faPen} /> Edit note</button>
         <AppLink className="btn btn--quiet" href={urls.updateSession(session.id)}><Icon icon={faSlidersH} /> Edit session</AppLink>
         <button className="btn btn--quiet" type="button" onClick={restart} disabled={start.isPending}><Icon icon={faRedo} /> Restart</button>
