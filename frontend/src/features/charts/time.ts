@@ -65,7 +65,7 @@ export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
           grid: { display: false },
         },
         y: {
-          type: "category", labels: hours, offset: true, reverse: true,
+          type: "category", labels: hours, offset: true, reverse: false,
           ticks: { autoSkip: true, maxTicksLimit: 8 },
 
           grid: { display: false },

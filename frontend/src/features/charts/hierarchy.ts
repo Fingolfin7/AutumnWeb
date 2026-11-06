@@ -92,7 +92,7 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
             display: true,
             align: "center",
             position: "middle",
-            overflow: "fit",
+            overflow: "cut",
             padding: 8,
             formatter(context: TreemapContext) {
               if (context.type !== "data") return "";
@@ -102,8 +102,9 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
                  has its group name in g. */
               if (item._data?.name) {
                 const amount = formatDuration(value * 60);
-                if ((item.w ?? 100) < item._data.name.length * 7 + 16 || (item.h ?? 60) < 50) return item._data.name;
-                return [item._data.name, amount];
+                const limit = Math.max(3, Math.floor(((item.w ?? 100) - 16) / 7));
+                const name = item._data.name.length > limit ? `${item._data.name.slice(0, limit - 1)}…` : item._data.name;
+                return (item.h ?? 60) < 50 ? name : [name, amount];
               }
               if (item.g) return item.g;
               return "";

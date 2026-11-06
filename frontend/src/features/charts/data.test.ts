@@ -180,12 +180,12 @@ it("keeps a project colour across changing neighbours and ranks meaningful terms
   const { topTerms } = await import("./terms");
   expect(seriesColors(["Garden", "Study"]).get("Garden")).toBe(seriesColor("Garden"));
   expect(seriesColors(["Garden"]).get("Garden")).toBe(seriesColor("Garden"));
-  expect(topTerms([{ text: "the", weight: 20 }, { text: "working", weight: 9 }, { text: "orchard", weight: 8 }, { text: "sketches", weight: 4 }]).map(row => row.text)).toEqual(["orchard", "sketches"]);
+  expect(topTerms([{ text: "the", weight: 20 }, { text: "working", weight: 9 }, { text: "first", weight: 9 }, { text: "part", weight: 9 }, { text: "orchard", weight: 8 }, { text: "sketches", weight: 4 }]).map(row => row.text)).toEqual(["orchard", "sketches"]);
 });
 
-it("crops the heatmap to the active hours even for an evening-only schedule", async () => {
+it("crops the heatmap to active hours with earlier hours above later ones", async () => {
   const { heatmapConfig } = await import("./time");
   const chart = heatmapConfig([{ weekday: 1, hour: 21, average_hours: 1 }]);
   expect(chart.options.scales.y.labels).toEqual(["20:00", "21:00", "22:00"]);
-  expect(chart.options.scales.y.reverse).toBe(true);
+  expect(chart.options.scales.y.reverse).toBe(false);
 });
