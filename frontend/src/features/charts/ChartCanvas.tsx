@@ -69,7 +69,7 @@ export function ChartCanvas({ built }: { built: Built }) {
   const histogram = config?.data.datasets[0]?.label === "Number of Sessions";
   const byLabel = config && ["doughnut", "bar"].includes(config.type) && config.data.datasets.length === 1 && !config.options?.scales?.x?.stacked;
   const series = !config || config.type === "matrix" ? [] : byLabel
-    ? (config.data.labels ?? []).map((name, index) => ({ name: String(name), minutes: Number(config.data.datasets[0].data[index]) * 60, color: config.data.datasets[0].backgroundColor?.[index] ?? paletteColor(index) }))
+    ? (config.data.labels ?? []).map((name, index) => ({ name: String(name), minutes: Number(config.data.datasets[0].data[index]) * 60, color: (Array.isArray(config.data.datasets[0].backgroundColor) ? config.data.datasets[0].backgroundColor[index] : config.data.datasets[0].backgroundColor) ?? paletteColor(index) }))
     : config.data.datasets.map(dataset => ({ name: dataset.label ?? "", minutes: (config.type === "line" && dataset.label?.includes("period") ? Number(dataset.data.at(-1)) : dataset.data.reduce((sum: number, value: number) => sum + Number(value), 0)) * 60, color: dataset.borderColor ?? dataset.backgroundColor }));
   const totalMinutes = series.reduce((sum, row) => sum + row.minutes, 0);
   const sortedSeries = series.map((row, index) => ({ ...row, index })).sort((a,b) => b.minutes - a.minutes);

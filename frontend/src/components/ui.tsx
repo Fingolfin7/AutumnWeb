@@ -68,7 +68,7 @@ export function DateInput({ value, onValueChange, today, presets = "past", ...pr
   const { open, setOpen, ref } = usePopover();
   const [month, setMonth] = useState((value || today).slice(0, 7));
   useEffect(() => {
-    if (open) ref.current?.querySelector(".temporal-popover")?.scrollIntoView({ block: "nearest" });
+    if (open) ref.current?.querySelector(".temporal-popover")?.scrollIntoView?.({ block: "nearest" });
   }, [open, ref]);
   const shift = (amount: number) => { const date = new Date(`${month}-01T12:00Z`); date.setUTCMonth(date.getUTCMonth() + amount); setMonth(date.toISOString().slice(0, 7)); };
   const first = new Date(`${month}-01T12:00Z`);

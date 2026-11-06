@@ -3251,7 +3251,7 @@ a.tag-chip::after, a.context-chip::after, a.sub-chip::after { content: ""; posit
 .toggle input { appearance: none; flex: none; width: 44px; height: 26px; border-radius: 999px; background: #555552; border: 1px solid var(--hairline-2); position: relative; cursor: pointer; }
 .toggle input::before { content: ""; position: absolute; width: 18px; height: 18px; top: 3px; left: 3px; border-radius: 50%; background: var(--ink); transition: transform .15s var(--ease); }
 .toggle input:checked { background: var(--brand-deep); }
-.toggle input:checked::before { transform: translateX(18px); background: var(--ink-invert); }
+.toggle input:checked::before { transform: translateX(18px); background: var(--ink); }
 .segmented { min-width: 0; max-width: 100%; display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; margin: 0; border: 1px solid var(--hairline-2); border-radius: var(--r-sm); background: var(--sunken); }
 .segmented label, .fields .segmented label { position: relative; display: flex; cursor: pointer; margin: 0; }
 .segmented input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; }
@@ -3309,7 +3309,7 @@ a.tag-chip::after, a.context-chip::after, a.sub-chip::after { content: ""; posit
 .toggle input::before, .nx-switch input::before { content: ""; position: absolute; width: 18px; height: 18px; left: 4px; top: 13px; border-radius: 50%; background: var(--ink); z-index: 1; transition: transform .15s var(--ease); }
 .toggle input:checked, .nx-switch input:checked { background: transparent; }
 .toggle input:checked::after, .nx-switch input:checked::after { background: var(--brand-deep); }
-.toggle input:checked::before, .nx-switch input:checked::before { transform: translateX(18px); background: var(--ink-invert); }
+.toggle input:checked::before, .nx-switch input:checked::before { transform: translateX(18px); background: var(--ink); }
 @media (max-width: 999px) {
   .fd-tl-name, .commit-target { display: inline-flex; align-items: center; min-height: 44px; }
   /* The visual checkbox stays 20px; its transparent border owns the hit area. */
@@ -3920,7 +3920,8 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .review-series-key span { color: var(--muted); }
 .review-chart-previews { display: grid; gap: var(--s3); }
 .review-preview-tile { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: var(--s4); align-items: center; text-align: left; border: 1px solid var(--hairline-2); border-radius: var(--r-md); padding: var(--s3); background: var(--raised); }
-.review-preview-tile:hover { border-color: var(--brand); }
+.review-preview-tile:hover { background: var(--raised-2); }
+.review-preview-tile[aria-pressed="true"] { border-color: var(--brand); }
 .review-preview-tile svg { width: 88px; height: 70px; fill: var(--brand-deep); }
 .review-preview-tile--line svg { fill: none; stroke: var(--sub); stroke-width: 3; stroke-linejoin: round; }
 .review-preview-tile--year svg { fill: var(--brand); }
@@ -4736,7 +4737,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .capture-pick-label { display: flex; flex: 1; align-items: baseline; gap: var(--s2); min-width: 0; }
 .capture-pick-label > * { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .capture-pick-label > .text-red { flex: 0 1 auto; }
-.capture-pick-sub { flex: 0 2 auto; font: 400 var(--fs-sm)/1.4 var(--font-ui); }
+.capture-pick-sub { flex: none; font: 400 var(--fs-sm)/1.4 var(--font-ui); }
 
 .day-ledger { min-width: 0; }
 .day-ledger .today-section-head { flex-wrap: nowrap; gap: var(--s2); }
@@ -4960,7 +4961,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .journal-subproject { display: block; min-width: 44px; flex-shrink: 0; }
   .focus-time { font-size: clamp(3rem, 14vw, 4rem); }
   .focus-time.is-long { font-size: clamp(2.4rem, 11vw, 3rem); }
-  .focus-clockline { justify-content: space-between; gap: var(--s3); }
+  .focus-clockline { justify-content: space-between; gap: var(--s2); }
   .focus-stop { min-width: 5rem; padding-inline: var(--s3); }
   .timer-expanded-content { margin-top: var(--s3); padding-top: var(--s3); }
   .capture-sheet .sheet-panel { max-height: 94dvh; padding: var(--s4) var(--s4) calc(var(--s4) + env(safe-area-inset-bottom, 0px)); }
@@ -5369,3 +5370,18 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 
 .project-page-head { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: start; gap: var(--s2); }
 .project-page-head > .desk-head { display: block; }
+
+/* Round 11: keep existing controls readable within their available space. */
+.review-filter-controls { gap: var(--s3); }
+.review-filter-controls > .btn { padding-inline: var(--s3); border: 1px solid var(--hairline); }
+.review-filter-status { font-size: var(--fs-xs); margin: var(--s3) 0; }
+.filter-sheet .filter-picker > .picker { position: relative; top: auto; width: 100%; margin-top: var(--s2); }
+.review-desk .review-total-row { flex-wrap: wrap; }
+.review-desk .review-total-row > div { flex: 1 0 100%; min-width: 0; }
+.review-desk .review-total { white-space: nowrap; }
+.settings-data-links a[aria-current="page"] { color: var(--brand); box-shadow: inset 0 -2px var(--brand); }
+@media (max-width: 999px) {
+  .review-filter-controls { display: flex; flex-wrap: wrap; }
+  .review-filter-controls .review-toolbar { flex-basis: 100%; }
+  .settings-content .profile-account-grid > div:last-child .field:has(#email) { display: block; }
+}

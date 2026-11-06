@@ -29,7 +29,7 @@ export function ReviewFilters({ open, onClose, draft, onChange, onClear, control
   return <Sheet className="filter-sheet" open={open} onClose={onClose} title="Filter review">
     <div className="fields">
       <div className="review-filter-controls">{controls}</div>
-      <p className="muted">Saved automatically</p>
+      <p className="muted review-filter-status">Filters save automatically</p>
           <div className="field">
             <label htmlFor="content-search">Search projects, subprojects, and session notes</label>
             <input
