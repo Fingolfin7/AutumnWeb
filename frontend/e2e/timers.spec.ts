@@ -79,7 +79,7 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   expect(problems()).toEqual([]);
 });
 
-test("capture opens over the current page and Back closes it", async ({ page }) => {
+test("capture preserves the current page and starts the highlighted project", async ({ page }) => {
   await page.goto("/sessions/?search=Piano");
   const list = page.getByRole("region", { name: "Sessions" });
   await expect(list).toBeVisible();
@@ -91,6 +91,13 @@ test("capture opens over the current page and Back closes it", async ({ page }) 
   await page.goBack();
   await expect(sheet).toHaveCount(0);
   await expect(list).toBeVisible();
+  await page.getByRole("link", { name: "New timer", exact: true }).filter({ visible: true }).click();
+  await sheet.getByRole("combobox", { name: "Project", exact: true }).fill("Garden Planner App");
+  await expect(sheet.getByRole("option").first()).toBeVisible();
+  expect(await sheet.getByRole("option").count()).toBeLessThanOrEqual(5);
+  await expect(sheet.getByRole("button", { name: "Start timer", exact: true })).toBeEnabled();
+  await sheet.getByRole("button", { name: "Start timer", exact: true }).click();
+  await expect(page.getByRole("article", { name: "Running timer: Garden Planner App" })).toBeVisible();
 });
 
 test.describe("offline", () => {

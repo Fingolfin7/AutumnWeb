@@ -63,7 +63,7 @@ export function CapturePicker({
   const highlight = open ? picks[active] : undefined;
   const highlightedKey = highlight ? `${highlight.project.id}:${highlight.subprojectIds.join(",")}` : "";
   const onHighlightRef = useRef(onHighlight); onHighlightRef.current = onHighlight;
-  useEffect(() => { onHighlightRef.current?.(highlight?.project ?? null, highlight?.subprojectIds ?? []); }, [highlightedKey]);
+  useEffect(() => { if (open) onHighlightRef.current?.(highlight?.project ?? null, highlight?.subprojectIds ?? []); }, [highlightedKey, open]);
   const choose = (pick: Pick) => {
     onChange(pick.project, pick.subprojectIds);
     setText(pick.project.name);

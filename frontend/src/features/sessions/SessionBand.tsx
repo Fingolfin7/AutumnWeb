@@ -127,8 +127,8 @@ export function SessionBand({ session, showDate, hideProject = false, hideDurati
   return (
     <li ref={row} className={`band journal-entry${hideProject ? " journal-entry--in-project" : ""}${continuation ? " journal-entry--continuation" : ""}`} id={`session-${instance}`} data-session-id={session.id}>
       <div className="journal-heading">
+        <div className="journal-identity">
         {!hideProject ? <AppLink className="session-project" title={session.project.name} href={urls.updateProject(session.project.id)}>{session.project.name}</AppLink> : null}
-        {!hideDuration && !continuation ? <span className={`journal-duration${!Math.round(minutes) ? " is-zero" : ""}`}>{formatDuration(minutes)}</span> : null}
         <div className="journal-meta">
           {session.subproject_allocations.length ? <span className="journal-subs" title={session.subproject_allocations.map((sub) => sub.name).join(", ")}>{session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}</span> : null}
           {showDate ? <span className="journal-time">{formatShortDate(session.start)}</span> : null}
@@ -137,6 +137,8 @@ export function SessionBand({ session, showDate, hideProject = false, hideDurati
           {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
           <button className="btn-icon journal-overflow journal-meta-overflow" type="button" aria-label="Session actions" title="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${instance}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
         </div>
+        </div>
+        {!hideDuration && !continuation ? <span className={`journal-duration${!Math.round(minutes) ? " is-zero" : ""}`}>{formatDuration(minutes)}</span> : null}
         <div className="journal-row-actions">
           <button className="btn-icon journal-action" type="button" aria-label="Edit note" title="Edit note" onClick={editNote}><Icon icon={faPen} /></button>
           <button className="btn-icon journal-action journal-delete" type="button" aria-label="Delete session" title="Delete session" onClick={() => setConfirming(true)}><Icon icon={faTrash} /></button>

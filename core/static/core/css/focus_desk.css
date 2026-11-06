@@ -5126,7 +5126,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 }
 .today-day { min-width: 0; }
 .today-total-scope { color: var(--muted); font: 400 13px/1.5 var(--font-ui); }
-:is(.today-day, .today-idle, .today-journal, .today-commitments, .sessions-page .session-list, .session-edit-page) { padding: var(--s4); border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--surface-1); }
+:is(.today-day, .today-idle, .today-journal, .today-commitments, .sessions-page .session-list, .session-edit-page) { padding: var(--s4); border: 0; border-radius: var(--r-lg); background: var(--surface-1); }
 .today-day .day-ledger-chart { display: none; }
 .today-day .day-ember-ribbon { display: block; }
 .today-day .ledger-track { height: 44px; background: transparent; }
@@ -5227,4 +5227,13 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .session-edit-form .form-actions { position: fixed; inset-inline: 0; bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); padding: var(--s3) var(--s4); background: var(--surface-2); }
   body:has(.session-edit-page) .toast-region { bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom, 0px)); }
   body:has(.session-edit-page):has(.timer-dock:not(.timer-dock--card-visible)) .toast-region { bottom: calc(var(--tabbar-h) + 152px + env(safe-area-inset-bottom, 0px)); }
+}
+.journal-related-popover .similarity-readout { display: none; }
+.journal-identity { display: contents; }
+@media (min-width: 1000px) {
+  .journal-heading, .journal-entry--in-project .journal-heading, .project-journal .journal-heading { grid-template-areas: "identity duration"; }
+  .journal-identity { grid-area: identity; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--s3); min-width: 0; }
+  .journal-identity .session-project { flex: 0 1 auto; min-width: 0; }
+  .journal-identity .journal-meta { flex: 0 1 auto; max-width: 100%; }
+  .journal-entry--continuation .journal-heading { grid-template-areas: "identity identity"; }
 }

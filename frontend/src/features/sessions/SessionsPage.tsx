@@ -82,7 +82,7 @@ export default function SessionsPage() {
     const timeout = setTimeout(() => setParams(writeFilters({ ...applied, search: searchText.trim() }), { replace: true }), 300);
     return () => clearTimeout(timeout);
   }, [searchText, applied, setParams]);
-  const { contextIdsParam } = useActiveContext();
+  const { contextIdsParam, setContextId } = useActiveContext();
   const projects = useAllProjects();
   const tags = useTags();
   const contexts = useContexts();
@@ -299,7 +299,7 @@ export default function SessionsPage() {
       ) : !related.length ? (
         filtered || applied.search ? <div className="session-filter-miss" role="status">
           <p>No sessions{applied.search ? ` for “${applied.search}”` : ""}{pills.length ? ` with ${pills.map((pill) => `${pill.label.toLowerCase()} ${pill.value}`).join(", ")}` : contextIdsParam ? " in this context" : ""}.</p>
-          <button className="quiet-link" type="button" onClick={() => { setSearchText(""); setParams(new URLSearchParams()); }}>Clear filters</button>
+          <button className="quiet-link" type="button" onClick={() => { setSearchText(""); setParams(new URLSearchParams()); if (contextIdsParam) void setContextId(null); }}>Clear filters</button>
         </div> : <section className="session-empty">
           <div className="first-run-empty journal-empty">
             <span className="ember-seal" aria-hidden="true" />
