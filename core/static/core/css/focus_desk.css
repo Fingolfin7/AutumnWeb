@@ -5163,3 +5163,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 }
 .first-run-empty h2, .empty-state h2 { text-wrap: balance; }
 .first-run-empty p, .empty-state p { line-height: 1.5; }
+
+.chart-series-dot { background: transparent; }
+.review-projects .chart-series .chart-series-previous button > span { color: var(--ink-2); }
