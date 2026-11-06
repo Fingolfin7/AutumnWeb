@@ -48,46 +48,108 @@ export interface FlushReport {
 
 const storageKey = () => `autumn:offline-queue:${bootstrap().user.id}`;
 
-function read(): QueueState {
-  try {
-    const raw = window.localStorage.getItem(storageKey());
-    if (raw) {
-      const parsed = JSON.parse(raw) as QueueState;
-      if (Array.isArray(parsed.ops)) return { ops: parsed.ops, synced: parsed.synced ?? {} };
-    }
-  } catch {
-    /* storage unavailable or corrupt: start empty */
-  }
-  return { ops: [], synced: {} };
-}
-
+// Each operation has its own key: concurrent tabs never replace a shared
+// array when enqueueing. Failed writes stay overlaid in memory until saved.
+const entryPrefix = () => `${storageKey()}:entry:`;
+const pendingWrites = new Map<string, string | null>();
+let storageFailed = false;
+let migratedLegacy: string | null = null;
 let state: QueueState | null = null;
 const listeners = new Set<() => void>();
+
+function persist(key: string, value: string | null) {
+  pendingWrites.set(key, value);
+  try {
+    if (value === null) window.localStorage.removeItem(key);
+    else window.localStorage.setItem(key, value);
+    pendingWrites.delete(key);
+  } catch {
+    storageFailed = true;
+  }
+}
+
+function entries(s: QueueState): Map<string, string> {
+  return new Map([
+    ...s.ops.map((op): [string, string] => [`${entryPrefix()}op:${op.key}`, JSON.stringify(op)]),
+    ...Object.entries(s.synced).map(([uuid, id]): [string, string] => [`${entryPrefix()}id:${uuid}`, JSON.stringify(id)]),
+  ]);
+}
+
+function read(): QueueState {
+  const values = new Map<string, string>();
+  try {
+    // Upgrade existing queues without changing operation keys. Delete the old
+    // value only after every new entry was durably written.
+    const legacy = window.localStorage.getItem(storageKey());
+    if (legacy && legacy !== migratedLegacy) {
+      const parsed = JSON.parse(legacy) as QueueState;
+      if (Array.isArray(parsed.ops)) {
+        for (const [key, value] of entries({ ops: parsed.ops, synced: parsed.synced ?? {} })) {
+          if (window.localStorage.getItem(key) === null) persist(key, value);
+        }
+        migratedLegacy = legacy;
+      }
+    }
+    for (const [key, value] of pendingWrites) persist(key, value);
+    if (legacy && migratedLegacy === legacy && !pendingWrites.size) persist(storageKey(), null);
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key?.startsWith(entryPrefix())) {
+        const value = window.localStorage.getItem(key);
+        if (value !== null) values.set(key, value);
+      }
+    }
+    storageFailed = pendingWrites.size > 0;
+  } catch {
+    storageFailed = true;
+    // Keep the last known queue if even reading storage is unavailable.
+    if (state) for (const [key, value] of entries(state)) values.set(key, value);
+  }
+  for (const [key, value] of pendingWrites) {
+    if (value === null) values.delete(key);
+    else values.set(key, value);
+  }
+  const result: QueueState = { ops: [], synced: {} };
+  for (const [key, value] of values) {
+    try {
+      if (key.startsWith(`${entryPrefix()}op:`)) result.ops.push(JSON.parse(value) as QueuedOp);
+      else if (key.startsWith(`${entryPrefix()}id:`)) result.synced[key.slice(`${entryPrefix()}id:`.length)] = JSON.parse(value) as number;
+    } catch { /* Ignore an individually corrupt entry, preserving the rest. */ }
+  }
+  result.ops.sort((a, b) => a.queuedAt.localeCompare(b.queuedAt) ||
+    (a.kind === b.kind ? a.key.localeCompare(b.key) : a.kind === "start" ? -1 : 1));
+  return result;
+}
 
 function current(): QueueState {
   if (!state) state = read();
   return state;
 }
 
+function refresh(): QueueState {
+  state = read();
+  return state;
+}
+
 function write(next: QueueState) {
+  const before = entries(current());
+  const after = entries(next);
+  // Write only changed entries. Never remove another tab's newly added op.
+  for (const [key, value] of after) if (before.get(key) !== value) persist(key, value);
+  for (const key of before.keys()) if (!after.has(key)) persist(key, null);
   state = next;
-  try {
-    if (next.ops.length || Object.keys(next.synced).length) {
-      window.localStorage.setItem(storageKey(), JSON.stringify(next));
-    } else {
-      window.localStorage.removeItem(storageKey());
-    }
-  } catch {
-    /* quota or private mode: the queue still lives for this page */
-  }
+  storageFailed = pendingWrites.size > 0;
   for (const listener of listeners) listener();
 }
 
-/* Another tab changed the queue (it enqueued, or flushed it). */
+export function hasUnsavedChanges(): boolean {
+  return storageFailed && current().ops.length > 0;
+}
+
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
-    if (event.key === storageKey()) {
-      state = null;
+    if (event.key === null || event.key === storageKey() || event.key.startsWith(entryPrefix())) {
+      refresh();
       for (const listener of listeners) listener();
     }
   });
@@ -106,14 +168,14 @@ const newKey = () => crypto.randomUUID();
 
 export function enqueueStart(op: Omit<QueuedStart, "kind" | "key" | "queuedAt">): QueuedStart {
   const item: QueuedStart = { ...op, kind: "start", key: newKey(), queuedAt: new Date().toISOString() };
-  const s = current();
+  const s = refresh();
   write({ ...s, ops: [...s.ops, item] });
   return item;
 }
 
 export function enqueueStop(op: Omit<QueuedStop, "kind" | "key" | "queuedAt">): QueuedStop {
   const item: QueuedStop = { ...op, kind: "stop", key: newKey(), queuedAt: new Date().toISOString() };
-  const s = current();
+  const s = refresh();
   write({ ...s, ops: [...s.ops, item] });
   return item;
 }
@@ -121,7 +183,7 @@ export function enqueueStop(op: Omit<QueuedStop, "kind" | "key" | "queuedAt">): 
 /** Drop a start that never reached the server (the user removed the timer),
     with any stop queued for it. */
 export function cancelStart(uuid: string) {
-  const s = current();
+  const s = refresh();
   write({
     ...s,
     ops: s.ops.filter((op) => !(op.kind === "start" && op.uuid === uuid) && !(op.kind === "stop" && "uuid" in op.target && op.target.uuid === uuid)),
@@ -130,7 +192,7 @@ export function cancelStart(uuid: string) {
 
 /** Correct the start instant of a start that hasn't synced yet. */
 export function updateQueuedStart(uuid: string, start: string) {
-  const s = current();
+  const s = refresh();
   write({
     ...s,
     ops: s.ops.map((op) => (op.kind === "start" && op.uuid === uuid ? { ...op, body: { ...op.body, start } } : op)),
@@ -163,10 +225,12 @@ export function overlayTimers<T extends { id: number; uuid?: string | null }>(
 }
 
 export function isNetworkFailure(status: number) {
-  return status === 0 || status === 502 || status === 503 || status === 504;
+  return status === 0 || status === 408 || status === 429 || (status >= 500 && status < 600);
 }
 
-async function post(url: string, body: unknown): Promise<{ status: number; data: unknown }> {
+interface PostResult { status: number; data: unknown; retryAt?: number }
+
+async function post(url: string, body: unknown): Promise<PostResult> {
   let response: Response;
   try {
     response = await fetch(url, {
@@ -184,7 +248,11 @@ async function post(url: string, body: unknown): Promise<{ status: number; data:
     return { status: 0, data: undefined };
   }
   const data = await response.json().catch(() => undefined);
-  return { status: response.status, data };
+  const retryAfter = response.headers.get("Retry-After");
+  const seconds = retryAfter === null ? NaN : Number(retryAfter);
+  const retryAt = retryAfter === null ? undefined :
+    Number.isFinite(seconds) ? Date.now() + Math.max(0, seconds) * 1000 : Date.parse(retryAfter);
+  return { status: response.status, data, retryAt };
 }
 
 function messageOf(data: unknown): string {
@@ -193,6 +261,7 @@ function messageOf(data: unknown): string {
 }
 
 let flushing: Promise<FlushReport> | null = null;
+let retryAt = 0;
 
 export function isFlushing(): boolean {
   return flushing !== null;
@@ -205,11 +274,11 @@ export function flushQueue(): Promise<FlushReport> {
     const run = async (): Promise<FlushReport> => {
       const report: FlushReport = { synced: 0, dropped: [], remaining: 0 };
       for (;;) {
-        state = null; /* another tab may have flushed part of it */
-        const s = current();
+        const s = refresh();
+        if (Date.now() < retryAt) break;
         const op = s.ops[0];
         if (!op) break;
-        let result: { status: number; data: unknown };
+        let result: PostResult;
         let syncedId: number | undefined;
         if (op.kind === "start") {
           result = await post("/api/v2/timers/", op.body);
@@ -228,10 +297,11 @@ export function flushQueue(): Promise<FlushReport> {
           });
         }
         if (isNetworkFailure(result.status) || result.status === 401 || result.status === 403) {
-          /* Offline, asleep, or signed out: keep everything for later. */
+          /* Offline, temporary server failure, or signed out: keep everything. */
+          if (result.retryAt && Number.isFinite(result.retryAt)) retryAt = result.retryAt;
           break;
         }
-        const after = current();
+        const after = refresh();
         const synced = { ...after.synced };
         if (result.status >= 200 && result.status < 300) {
           report.synced += 1;
@@ -246,6 +316,7 @@ export function flushQueue(): Promise<FlushReport> {
         write({ ops, synced });
       }
       report.remaining = current().ops.length;
+      for (const listener of listeners) listener();
       return report;
     };
     /* One tab replays at a time; the others wait, then find it empty. */
@@ -262,5 +333,9 @@ export function flushQueue(): Promise<FlushReport> {
 /** Test hook: forget the in-memory copy. */
 export function resetQueueForTests() {
   state = null;
+  pendingWrites.clear();
+  storageFailed = false;
+  migratedLegacy = null;
+  retryAt = 0;
   listeners.clear();
 }
