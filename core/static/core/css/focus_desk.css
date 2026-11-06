@@ -5052,9 +5052,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .project-week-target .commitment-summary { padding: 0; }
 @media (max-width: 999px) {
   .review-commitments > .commitment-summary { padding-inline: var(--s4); }
-  .app-header--settings .brand { width: auto; gap: var(--s1); }
-  .app-header--settings .brand-mark { width: 20px; height: 20px; }
-  .app-header--settings .brand-word { position: static; width: auto; height: auto; overflow: visible; clip-path: none; font-size: var(--fs-sm); letter-spacing: -.015em; }
   .app-header--settings .context-switch select { max-width: min(32vw, 8rem); white-space: nowrap; }
   .settings-page--section > .settings-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s2); }
   .settings-page--section .settings-back { grid-column: 2; grid-row: 1; margin: 0; font-size: var(--fs-xs); }
