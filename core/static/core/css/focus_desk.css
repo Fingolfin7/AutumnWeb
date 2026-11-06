@@ -3451,17 +3451,6 @@ a.tag-chip::after, a.context-chip::after, a.sub-chip::after { content: ""; posit
 .review-project-bar { width: 100%; height: 4px; fill: var(--duration); align-self: center; }
 .review-project-bar .review-bar-track { fill: var(--raised); }
 .review-project-foot { padding: var(--s3) var(--s5); border-top: 1px solid var(--hairline); font-size: var(--fs-xs); }
-.review-commitment { padding: var(--s4) var(--s5); border-top: 1px solid var(--hairline); }
-.review-commitment > a { color: var(--project); font-weight: 600; display: inline-flex; align-items: center; min-height: 44px; }
-.review-commitment p { font-size: var(--fs-sm); margin: .25rem 0; }
-.review-commitment p b { color: var(--duration); font-weight: 600; }
-.review-commitment progress { display: block; width: 100%; height: 5px; margin: var(--s3) 0; appearance: none; border: 0; border-radius: var(--r-pill); background: var(--raised); overflow: hidden; }
-.review-commitment progress::-webkit-progress-bar { background: var(--raised); }
-.review-commitment progress::-webkit-progress-value { background: var(--duration); border-radius: var(--r-pill); }
-.review-commitment progress::-moz-progress-bar { background: var(--duration); }
-.review-commitment summary, .review-closed-periods summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--muted); font-size: var(--fs-xs); }
-.review-commitment summary::before, .review-closed-periods summary::before { content: "+"; margin-right: var(--s2); font-size: 1rem; }
-.review-commitment details[open] summary::before, .review-closed-periods[open] summary::before { content: "−"; }
 .review-closed-periods { padding: var(--s2) var(--s5); border-top: 1px solid var(--hairline); font-size: var(--fs-sm); }
 .review-closed-periods p { margin: var(--s3) 0; }
 .review-empty { padding: var(--s5); color: var(--muted); line-height: 1.7; }
@@ -3542,7 +3531,7 @@ a.tag-chip::after, a.context-chip::after, a.sub-chip::after { content: ""; posit
   .review-project-foot { align-items: flex-start; padding: var(--s3) var(--s4); }
   .review-project-foot > span { max-width: 60%; }
   .review-project-foot > .btn { flex: none; }
-  .review-commitment, .review-closed-periods { padding-inline: var(--s4); }
+  .review-closed-periods { padding-inline: var(--s4); }
   .ember-intro { flex-direction: column; gap: var(--s2); padding: 0 var(--s4) var(--s4); }
   .ember-intro p { font-size: var(--fs-md); }
   .ember-year, .review-embers--hero .ember-year { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4) var(--s5); padding: 0 var(--s4); }
@@ -3581,7 +3570,7 @@ a.tag-chip::after, a.context-chip::after, a.sub-chip::after { content: ""; posit
 .review-welcome { max-width: 45rem; padding: var(--s7); margin-top: var(--s4); }
 .review-welcome h2 { font: 600 clamp(1.6rem, 4vw, 2.5rem)/1.3 var(--font-display); letter-spacing: -.04em; }
 .review-welcome p { color: var(--ink-2); line-height: 1.7; max-width: 45ch; margin: var(--s4) 0 var(--s6); }
-.review-empty a, .review-commitment details a, .review-closed-periods a { display: inline-flex; align-items: center; min-height: 44px; }
+.review-empty a, .review-closed-periods a { display: inline-flex; align-items: center; min-height: 44px; }
 @media (max-width: 600px) {
   .review-welcome { padding: var(--s5); }
   .chat-action-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -4076,9 +4065,6 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .review-question { width: 100%; max-width: none; padding: var(--s3); border: 1px solid var(--hairline-2); border-radius: var(--r-md); background: var(--slab); }
 .review-question .input { width: 100%; }
 .review-commitments .review-section-heading > div { display: grid; gap: var(--s3); }
-.review-desk .review-commitment { padding: var(--s4) var(--s5); }
-.review-desk .review-commitment > a { font: 600 var(--fs-md)/1.4 var(--font-display); }
-.review-desk .review-commitment > p { font-size: var(--fs-xs); }
 .review-project-name { color: var(--project); }
 .review-projects--subprojects .review-project-name { color: var(--sub); }
 .review-projects .review-section-heading .btn { border: 1px solid var(--hairline-2); border-radius: var(--r-pill); white-space: nowrap; }
@@ -4125,7 +4111,6 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
   .chart-plot { height: 300px; }
   .chart-series { grid-template-columns: minmax(0,1fr); }
   .review-desk .review-section-heading { flex-wrap: wrap; gap: var(--s3); }
-  .review-desk .review-commitment { padding-inline: var(--s4); }
 }
 
 .review-daily-breakdown > summary { display: flex; justify-content: space-between; gap: var(--s3); list-style: none; border-top: 1px solid var(--hairline); padding-block: var(--s3); }
@@ -4203,7 +4188,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .project-week-comparison > p { font-size: var(--fs-xs); margin-top: var(--s2); }
 .project-subproject-picker { display: none; }
 .project-tag-count { display: none; }
-.project-journal { border-radius: var(--r-lg); overflow: hidden; }
+.project-journal { border-radius: 0; overflow: visible; }
 
 .insights-context-bar { gap: var(--s3); }
 .chat-layout .user-message { align-self: flex-end; width: min(85%,70ch); margin-left: auto; border: 0; border-bottom: 1px solid var(--hairline-2); border-radius: var(--r-sm) var(--r-sm) 0 var(--r-sm); background: var(--raised); color: var(--ink-2); }
@@ -4772,13 +4757,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 @keyframes ember-pulse { 50% { box-shadow: 0 0 20px 7px #ffaa5a8c; } }
 @media (prefers-reduced-motion: reduce) { .ledger-block.is-live::after { animation: none; } }
 
-.today-commitment { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--s3); border-top: 1px solid var(--hairline); }
-.today-commitment .commitment-meter { display: contents; }
-.today-commitment-name { display: flex; align-items: center; min-height: 44px; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: var(--fs-sm); }
-.today-commitment .commitment-meter-values { grid-column: 2; gap: var(--s2); font-size: 13px; }
-.today-commitment .commitment-meter-values strong { font: 650 var(--fs-sm) var(--font-display); font-variant-numeric: tabular-nums; }
-.today-commitment .commitment-meter-values > span:last-child { display: none; }
-.today-commitment .commitment-meter-track { grid-column: 1 / -1; height: 4px; margin: 0 0 var(--s2); }
 .today-history { border-top: 1px solid var(--hairline); }
 .today-history > summary { display: flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 13px; cursor: pointer; }
 
@@ -5038,10 +5016,19 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .insights-actions-list { position: absolute; z-index: 5; top: 100%; right: 0; min-width: 190px; padding: var(--s2); background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-md); box-shadow: 0 12px 30px #0008; }
 .insights-actions-list .chat-header-actions { display: flex; flex-direction: column; align-items: stretch; }
 .insights-actions-list button { width: 100%; min-height: 44px; justify-content: flex-start; }
+.insights-actions-list .chat-action-label { display: inline; }
 .insights-workspace .composer textarea { background: transparent; border: 0; box-shadow: none; }
 .insights-workspace .composer:focus-within { box-shadow: var(--focus-ring); }
 .commitment-summary { min-width: 0; padding-block: var(--s3); border-bottom: 1px solid var(--hairline); }
 .commitment-summary:last-child { border-bottom: 0; }
+.review-commitments > .commitment-summary { padding-inline: var(--s5); }
+.commitment-summary--compact > summary { display: flex; align-items: center; gap: var(--s2); min-height: 44px; cursor: pointer; list-style: none; font-size: var(--fs-sm); }
+.commitment-summary--compact > summary::-webkit-details-marker { display: none; }
+.commitment-summary--compact > summary > span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.commitment-summary--compact > summary > strong { flex: none; color: var(--duration); font-weight: 600; white-space: nowrap; }
+.commitment-summary--compact > summary > strong > span { color: var(--muted); font-weight: 400; }
+.commitment-summary--compact > summary::after { content: ""; flex: none; width: 6px; height: 6px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.commitment-summary--compact[open] > summary::after { transform: rotate(225deg); }
 .commitment-summary-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); }
 .commitment-summary-heading a { min-width: 44px; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
 .commitment-summary-heading > span, .commitment-summary-actions > span { color: var(--muted); font-size: var(--fs-xs); }
@@ -5056,6 +5043,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .today-commitments .commitment-summary-actions > span { display: none; }
 .project-week-target .commitment-summary { padding: 0; }
 @media (max-width: 999px) {
+  .review-commitments > .commitment-summary { padding-inline: var(--s4); }
   body:has(.insights-workspace) { padding-bottom: 0; }
   .app:has(.insights-workspace) #main-content { width: 100%; max-width: none; padding: 0; }
   .insights-workspace .chat-layout { --chat-h: calc(100dvh - var(--header-h) - var(--tabbar-h) - env(safe-area-inset-bottom, 0px)); margin: 0; border: 0; border-radius: 0; }

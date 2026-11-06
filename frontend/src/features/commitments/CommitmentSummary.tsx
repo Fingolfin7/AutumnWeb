@@ -11,14 +11,15 @@ import { CommitmentMeter } from "./CommitmentMeter";
 import { hasPendingChange, liveDefinition } from "./display";
 
 /** The same quiet row, disclosure and complete editor on Today, Review and projects. */
-export function CommitmentSummary({ commitment: c, showTarget = true, children }: { commitment: Commitment; showTarget?: boolean; children?: ReactNode }) {
+export function CommitmentSummary({ commitment: c, showTarget = true, compact = false, children }: { commitment: Commitment; showTarget?: boolean; compact?: boolean; children?: ReactNode }) {
   const [editing, setEditing] = useState(false);
   const update = useUpdateCommitment(c.id);
   const toast = useToast();
   const pending = c.pending_revision;
   const amount = (value: number) => c.commitment_type === "time" ? formatDuration(value) : `${Math.round(value)} session${Math.round(value) === 1 ? "" : "s"}`;
-  return <article className="commitment-summary">
-    {showTarget ? <header className="commitment-summary-heading"><AppLink className={c.target.kind === "project" ? "text-red" : c.target.kind === "subproject" ? "text-blue" : "text-orange"} href={urls.updateCommitment(c.id)}>{c.target.name}</AppLink><span>{c.period}</span></header> : null}
+  const targetClass = c.target.kind === "project" ? "text-red" : c.target.kind === "subproject" ? "text-blue" : "text-orange";
+  const content = <>
+    {showTarget && !compact ? <header className="commitment-summary-heading"><AppLink className={targetClass} href={urls.updateCommitment(c.id)}>{c.target.name}</AppLink><span>{c.period}</span></header> : null}
     {!c.active ? <p className="muted">Commitment paused</p> : null}
     <CommitmentMeter commitment={c} />
     <div className="commitment-summary-actions"><button className="btn btn--quiet" type="button" onClick={() => setEditing(true)}>Edit commitment</button><span>Resets {formatDate(c.current_period.end)}</span></div>
@@ -29,5 +30,6 @@ export function CommitmentSummary({ commitment: c, showTarget = true, children }
       {children}
       <AppLink className="btn btn--quiet" href={urls.updateCommitment(c.id)}>Full commitment page</AppLink>
     </details>
-  </article>;
+  </>;
+  return compact ? <details className="commitment-summary commitment-summary--compact"><summary><span className={targetClass} title={c.target.name}>{c.target.name}</span><strong>{amount(c.current_period.accrued)} <span>/ {amount(c.current_period.target)}</span></strong></summary>{content}</details> : <article className="commitment-summary">{content}</article>;
 }

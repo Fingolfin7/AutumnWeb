@@ -61,7 +61,6 @@ import {
   type Dimension,
   type ScopeMeta,
 } from "./scope";
-import "./commitments.css";
 
 const FORM_FIELDS = new Set(["scope", "target", "start_date", "max_balance", "min_balance", "commitment_type", "period", "rules"]);
 
@@ -504,7 +503,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
         </div>
         <div className="form-actions commitment-editor-actions">
           {onClose ? <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button> : <AppLink className="btn btn--ghost" href={urls.home()}><Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}</AppLink>}
-          {commitment ? <AppLink className="btn btn--stop" href={urls.deleteCommitment(commitment.id)}><Icon icon={faTrash} /> Delete</AppLink> : null}
+          {commitment ? <AppLink className="btn btn--danger" href={urls.deleteCommitment(commitment.id)}><Icon icon={faTrash} /> Delete</AppLink> : null}
           {commitment && changes?.nextPeriod.length ? <span className="muted">Applies from {formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}</span> : null}
           {!showRestart ? <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}><Icon icon={faCheckCircle} /> {onClose ? "Save commitment" : commitment ? "Update commitment" : "Create commitment"}</button> : null}
         </div>

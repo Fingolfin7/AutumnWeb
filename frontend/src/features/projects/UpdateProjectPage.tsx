@@ -163,7 +163,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         </Sheet>
 
 
-        <section className="slab session-list project-journal" aria-label="Recent journal entries">
+        <section className="session-list project-journal" aria-label="Recent journal entries">
           <div className="project-journal-link"><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></div>
           {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(day => <section className="project-journal-day" key={day}><header className="day-head"><h3 className="day-date">{formatDate(day)}</h3><strong className="day-total">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).length > 0 ? formatDurationWords(recentRows.filter(session => localDateKey(new Date(session.start)) === day).reduce((sum,session) => sum + (session.duration_minutes ?? 0),0)) : null}</strong></header><ul className="band-list">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).map(session => <SessionBand key={session.id} session={session} hideProject />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
         </section>

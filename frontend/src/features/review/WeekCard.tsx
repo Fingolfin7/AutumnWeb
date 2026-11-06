@@ -63,7 +63,7 @@ export function WeekCard({ open, onClose, period, minutes, rows, daily }: { open
       <label className="check-row"><input type="checkbox" checked={showTotal} onChange={(event) => setShowTotal(event.target.checked)} /> Total time</label>
       <label className="check-row"><input type="checkbox" checked={showProjects} onChange={(event) => setShowProjects(event.target.checked)} /> Project names and time</label>
       <div className="review-card-preview"><span className="review-card-brand">Autumn</span><h3>{range}</h3>{showTotal ? <strong>{formatDuration(minutes)}</strong> : null}<p className="review-card-days">{active} {active === 1 ? "day" : "days"} with time remembered</p><div className="review-card-embers" aria-label={`${active} active days in this period`}>{days.map((day) => <span key={day.date} className={`card-ember card-ember--${level(day.hours)}`} title={`${formatDate(day.date)}: ${formatDuration(day.hours * 60)}`} />)}</div>{showProjects ? rows.map((row) => <p className="review-card-project" key={row.name}><span>{row.name}</span><b>{formatDuration(row.total_time)}</b></p>) : null}<footer>A little light left by the things you did.</footer></div>
-      <div className="review-card-actions"><button className="btn btn--primary" type="button" onClick={() => void save()}>Save image</button></div>
+      <div className="review-card-actions sheet-foot"><button className="btn btn--primary" type="button" onClick={() => void save()}>Save image</button></div>
     </div>
   </Sheet>;
 }

@@ -85,7 +85,7 @@ function HomeContent({ data }: { data: Dashboard }) {
           {timeline.data ? <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} /> : null}
           {data.commitments.length ? <section className="today-commitments" aria-label="Commitment summary">
             <header className="today-section-head"><h2>Commitments</h2><span className="today-scope">All contexts</span></header>
-            {data.commitments.map(item => <CommitmentSummary key={item.commitment.id} commitment={item.commitment}><CommitmentHistory item={item} /></CommitmentSummary>)}
+            {data.commitments.map(item => <CommitmentSummary key={item.commitment.id} commitment={item.commitment} compact><CommitmentHistory item={item} /></CommitmentSummary>)}
             </section> : null}
         </aside> : null}
         {!firstRun ? <section className="today-journal" aria-label="Today's journal">
