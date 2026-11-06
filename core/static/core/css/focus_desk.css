@@ -5124,3 +5124,55 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .profile-codex-row { flex-wrap: wrap; gap: var(--s2); padding-block: var(--s2); }
   .profile-codex-row > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 }
+.today-day { min-width: 0; }
+.today-total-scope { color: var(--muted); font: 400 13px/1.5 var(--font-ui); }
+:is(.today-day, .today-idle, .today-journal, .today-commitments, .sessions-page .session-list, .session-edit-page) { padding: var(--s4); border: 1px solid var(--hairline); border-radius: var(--r-lg); background: var(--surface-1); }
+.today-day .day-ledger-chart { display: none; }
+.today-day .day-ember-ribbon { display: block; }
+.today-day .ledger-track { height: 44px; background: transparent; }
+.today-day .ledger-grid, .today-day .ledger-now { inset-block: 13px; }
+.today-day .ledger-block { display: block; min-width: 44px; border: 0; border-radius: var(--r-xs); background: transparent; box-shadow: none; }
+.today-day .ledger-block::before { content: ""; position: absolute; inset: 16px 0; border-radius: var(--r-pill); background: linear-gradient(90deg, #7e3518, #d96f2c 60%, #f7b266); box-shadow: 0 0 10px #e6783280, 0 0 26px #e678322e, inset 0 1px 0 #ffe1be4d; }
+.today-day .ledger-block.is-live::after { right: 0; width: 8px; height: 8px; }
+.today-day .ledger-block:hover::before { filter: brightness(1.3); }
+.today-day .ledger-block:focus-visible { outline: 2px solid var(--brand); outline-offset: 0; }
+.today-week { display: flex; align-items: center; gap: var(--s4); min-height: 64px; padding-top: var(--s3); border-top: 1px solid var(--hairline); color: var(--ink-2); font: 500 13px/1.4 var(--font-ui); text-decoration: none; }
+.today-week:hover { color: var(--ink); }
+.week-embers { flex: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--s2); max-width: 28rem; margin-left: auto; }
+.week-ember-day { display: grid; gap: var(--s1); text-align: center; }
+.week-ember-day i { display: block; height: 12px; border-radius: var(--r-xs); background: var(--raised-2); }
+.week-ember-day i[data-level="1"] { background: #723b23; }
+.week-ember-day i[data-level="2"] { background: #a85329; }
+.week-ember-day i[data-level="3"] { background: #d77a39; box-shadow: 0 0 9px #d77a3933; }
+.week-ember-day i[data-level="4"] { background: #efb16d; box-shadow: 0 0 12px #df87354d; }
+.week-ember-day small { color: var(--muted); font: 500 11px/1.3 var(--font-ui); }
+.week-ember-day[data-today] small { color: var(--brand); }
+.ember-deck:has(> :nth-child(2)) { grid-auto-rows: auto; }
+.ember-deck:has(> :nth-child(2)) .note-rich-preview { max-height: 320px; mask-image: none; }
+.timer-note-editor .note-editor-field:not(.is-writing) .note-rich-preview { max-height: 17em; mask-image: none; }
+.ember-clock--compact { padding: var(--s3) var(--s4); border-radius: var(--r-md); }
+.ember-clock--compact .focus-eyebrow { margin-bottom: 0; }
+.ember-clock--compact .focus-project { font-size: var(--fs-md); }
+.ember-clock--compact .focus-clockline { justify-content: space-between; margin-top: var(--s2); }
+.ember-clock--compact .focus-time, .ember-clock--compact .focus-time.is-long { font-size: 1.75rem; }
+.ember-clock--compact .focus-stop { min-height: 44px; font-size: var(--fs-sm); }
+.ember-clock--compact .timer-expanded-content { flex: none; margin-top: var(--s2); padding-top: var(--s2); }
+.compact-timer-note > summary { display: flex; align-items: center; gap: var(--s3); min-height: 44px; cursor: pointer; list-style: none; }
+.compact-timer-note > summary::-webkit-details-marker { display: none; }
+.compact-timer-note > summary > :first-child { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--note); font: 400 1rem/1.5 var(--font-reading); }
+.compact-timer-note > summary .quiet-link { flex: none; }
+.compact-timer-note[open] > summary { margin-bottom: var(--s3); }
+.capture-pick-sub:not(.text-blue) { color: var(--muted); }
+@media (min-width: 1280px) {
+  .today-layout { grid-template-rows: auto auto 1fr; }
+  .today-day { grid-column: 1; grid-row: 1; }
+  .today-lead { grid-column: 1; grid-row: 2; }
+  .today-journal { grid-column: 1; grid-row: 3; }
+  .today-rail { grid-column: 2; grid-row: 1 / 4; }
+}
+@media (max-width: 999px) {
+  .today-summary { white-space: normal; }
+  .today-total-scope { display: inline; }
+  .today-week { gap: var(--s3); }
+  .week-embers { gap: var(--s1); }
+}

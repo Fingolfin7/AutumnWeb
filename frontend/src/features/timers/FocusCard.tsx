@@ -15,12 +15,13 @@ import { TimerReminders } from "./TimerReminders";
 /* A running timer: the journal row's project and metadata lines, the clock with
    Stop beside it, then the live note. Live figures come from `now`, which the
    parent ticks once a second, so every card on the page shares one clock. */
-export function FocusCard({ timer, now, children, beforeStop }: {
+export function FocusCard({ timer, now, children, beforeStop, compact = false }: {
   timer: Timer;
   now: number;
   children?: ReactNode;
   /** Runs before navigating to the stop page (e.g. stash an unsaved note). */
   beforeStop?: () => void;
+  compact?: boolean;
 }) {
   const toast = useToast();
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export function FocusCard({ timer, now, children, beforeStop }: {
 
   return (
     <article
-      className={`focus-card ember-clock${pending || timer.pending_sync ? " is-unsettled" : ""}`}
+      className={`focus-card ember-clock${compact ? " ember-clock--compact" : ""}${pending || timer.pending_sync ? " is-unsettled" : ""}`}
       id={`timer-${timer.id}`}
       data-timer-id={timer.id}
       data-ember-step={Math.min(6, Math.floor(elapsed / 900))}
@@ -89,7 +90,7 @@ export function FocusCard({ timer, now, children, beforeStop }: {
           <progress className="focus-autostop-fill" max={100} value={fill} aria-label="Auto-stop progress" />
         </div>
       ) : null}
-      <div className="timer-expanded-content">{children}</div>
+      <div className="timer-expanded-content">{compact ? <details className="compact-timer-note"><summary><span>{timer.note || "Add a note"}</span><span className="quiet-link">Edit note</span></summary>{children}</details> : children}</div>
       {actionsOpen ? <Sheet open onClose={() => setActionsOpen(false)} title="Timer actions">
         <p className="text-red">{timer.project.name}</p>
         <TimerReminders timer={timer} />

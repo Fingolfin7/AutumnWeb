@@ -3,6 +3,7 @@ import { formatDuration, formatTime, formatDayDate } from "@/lib/format";
 import { useNow } from "@/features/timers/api";
 import type { Timer } from "@/api/types";
 import type { Timeline, TimelineRange } from "./api";
+import { AppLink, urls } from "@/app/links";
 
 const RANGES: { key: TimelineRange; label: string }[] = [
   { key: "today", label: "Today" },
@@ -118,10 +119,12 @@ export function DayTimeline({ timeline, running, range, onRange }: {
       {rules}
       {items.map((block) => {
         const start = Date.parse(block.start);
-        return <span
+        return <AppLink
           key={`${block.session_id}-${block.start}`}
           className={`ledger-block${block.is_live ? " is-live" : ""}`}
           style={place(at(start), at(endOf(block)) - at(start))}
+          href={block.is_live ? `/#timer-${block.session_id}` : urls.updateSession(block.session_id)}
+          aria-label={`Open ${block.project.name} session, ${formatTime(block.start)}${block.is_live ? ", running" : ` to ${formatTime(block.end)}`}`}
           title={`${block.project.name}${block.label ? ` / ${block.label}` : ""}: ${formatTime(block.start)}–${block.is_live ? "now" : formatTime(block.end)}`}
         />;
       })}
@@ -151,7 +154,7 @@ export function DayTimeline({ timeline, running, range, onRange }: {
       {blocks.length ? (
         <>
           {timeline.is_multi_day ? <p className="ledger-range-total"><span className="ledger-total">{formatDuration(total)}</span> in this range</p> : null}
-          <div className="day-ledger-chart" role="img" aria-label={label}>
+          <div className="day-ledger-chart" role="group" aria-label={label}>
             {axis}
             <div className="ledger-field">
               {lanes.map((lane) => (
@@ -165,7 +168,7 @@ export function DayTimeline({ timeline, running, range, onRange }: {
               ))}
             </div>
           </div>
-          <div className="day-ember-ribbon" role="img" aria-label={label}>
+          <div className="day-ember-ribbon" role="group" aria-label={label}>
             {axis}
             {track(blocks)}
           </div>
