@@ -50,9 +50,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Create .env file
+      # Fork PRs cannot read repository secrets. Tests use only local services
+      # and a disposable key, so they need no deployment configuration.
+      - name: Create test .env file
+        shell: bash
         run: |
-          echo "${{ secrets.ENV_FILE_CONTENTS }}" > AutumnWeb/.env
+          printf '%s\n' \
+            'SECRET_KEY=ci-only-secret-key-not-for-deployment' \
+            'DEBUG=FALSE' \
+            'USE_S3=FALSE' \
+            'SEMANTIC_SYNC_ON_WRITE=FALSE' > AutumnWeb/.env
 
       # Appended (not set as an env var) because settings.py reads .env with
       # overwrite=True, so the file wins over OS environment variables.
