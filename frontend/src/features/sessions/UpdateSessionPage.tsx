@@ -16,6 +16,7 @@ import type { Project, SessionPatch } from "@/api/types";
 import { sameAllocations, type AllocationItem, type AllocationWrite } from "@/lib/allocation";
 import { formatDate, formatDuration, toDateTimeLocal } from "@/lib/format";
 import { parseSessionParam, useSession, useUpdateSession, type SessionRow } from "./api";
+import { DateInput, Input } from "@/components/ui";
 
 /* /update_session/<id or uuid>/ (update_session.html). Three slabs' worth of
    fields in two: what it was (project), when it ran, the note, then how the
@@ -231,10 +232,10 @@ function SessionForm({ session }: { session: SessionRow }) {
 
   return (
     <div className="session-edit-page">
-      <h1 className="page-title session-edit-title text-red" title={baseline.project.name}>{baseline.project.name || "Session"}</h1>
+      <h1 className="page-title session-edit-title">Edit session</h1>
 
       {conflict || changedElsewhere ? (
-        <div ref={bannerRef} className="msg msg--warning" role="alert" style={{ marginBottom: "var(--s4)" }}>
+        <div ref={bannerRef} className="msg msg--warning" role="alert">
           <Icon icon={faExclamationTriangle} className="msg-icon" />
           <span>
             This session was changed somewhere else (another tab, the CLI or an assistant) after you opened it.
@@ -259,7 +260,7 @@ function SessionForm({ session }: { session: SessionRow }) {
         </div>
       ) : null}
       {banner ? (
-        <div ref={bannerRef} className="msg msg--error" role="alert" style={{ marginBottom: "var(--s4)" }}>
+        <div ref={bannerRef} className="msg msg--error" role="alert">
           <Icon icon={faExclamationTriangle} className="msg-icon" />
           <span>{banner}</span>
         </div>
@@ -276,28 +277,30 @@ function SessionForm({ session }: { session: SessionRow }) {
             errors={fieldErrors.project}
           />
 
-          <div className="two-up">
+          <div className="two-up session-edit-times">
             <div className="field">
               <label htmlFor={startId}>Started</label>
-              <input
+              <Input
                 id={startId}
-                type="datetime-local"
+                type="time"
                 step={60}
-                value={form.start}
-                onChange={(event) => setForm({ ...form, start: event.target.value })}
+                value={form.start.slice(11, 16)}
+                onChange={(event) => setForm({ ...form, start: `${form.start.slice(0, 10)}T${event.target.value}` })}
               />
+              <details className="session-edit-date"><summary>{formatDate(form.start.slice(0, 10))}</summary><DateInput aria-label="Start date" value={form.start.slice(0, 10)} today={toDateTimeLocal(new Date()).slice(0, 10)} onValueChange={(day) => setForm({ ...form, start: `${day}T${form.start.slice(11, 16)}` })} /></details>
               <FieldErrors messages={fieldErrors.start?.filter((message) => message !== startTime.error)} />
               <LocalTimeNotice field={startTime} label="the start" />
             </div>
             <div className="field">
               <label htmlFor={endId}>Ended</label>
-              <input
+              <Input
                 id={endId}
-                type="datetime-local"
+                type="time"
                 step={60}
-                value={form.end}
-                onChange={(event) => setForm({ ...form, end: event.target.value })}
+                value={form.end.slice(11, 16)}
+                onChange={(event) => setForm({ ...form, end: `${form.end.slice(0, 10)}T${event.target.value}` })}
               />
+              <details className="session-edit-date"><summary>{formatDate(form.end.slice(0, 10))}</summary><DateInput aria-label="End date" value={form.end.slice(0, 10)} today={toDateTimeLocal(new Date()).slice(0, 10)} onValueChange={(day) => setForm({ ...form, end: `${day}T${form.end.slice(11, 16)}` })} /></details>
               <FieldErrors messages={fieldErrors.end?.filter((message) => message !== endTime.error)} />
               <LocalTimeNotice field={endTime} label="the end" />
             </div>
@@ -310,13 +313,13 @@ function SessionForm({ session }: { session: SessionRow }) {
           <p className="field-label">Subprojects</p>
           <div className="check-grid" id="subproject_options">
             {form.projectId === null ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>Choose a project to pick its subprojects.</span>
+              <span className="subproject-empty-state">Choose a project to pick its subprojects.</span>
             ) : subprojects.isPending ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>Loading...</span>
+              <span className="subproject-empty-state">Loading...</span>
             ) : subprojects.isError ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>Could not load subprojects.</span>
+              <span className="subproject-empty-state">Could not load subprojects.</span>
             ) : subprojects.data.length === 0 ? (
-              <span className="subproject-empty-state" style={{ gridColumn: "1 / -1" }}>This project has no subprojects.</span>
+              <span className="subproject-empty-state">This project has no subprojects.</span>
             ) : (
               [...subprojects.data].sort((a, b) => a.id - b.id).map((sub) => (
                 <span key={sub.id}>
