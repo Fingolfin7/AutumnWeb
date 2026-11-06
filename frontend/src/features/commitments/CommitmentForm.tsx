@@ -100,6 +100,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
   const [errors, setErrors] = useState<FormErrors>(NO_ERRORS);
   const [restartRequested, setRestartRequested] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(mode === "create");
 
   const needSubprojects = state.aggregation === "subproject" || (rulesOpen && RULE_DIMENSIONS[state.aggregation].includes("subproject"));
   const subs = useAllSubprojects(needSubprojects);
@@ -196,6 +197,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
     event.preventDefault();
     setSubmitted(true);
     if (hasErrors(live)) {
+      if (live.fields.scope || live.fields.aggregation || live.fields.rules) setAdvancedOpen(true);
       setErrors(NO_ERRORS);
       return;
     }
@@ -331,7 +333,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
             </section>
 
             {commitment && hasPendingChange(commitment) ? <div className="slab slab-pad"><PendingNotice commitment={commitment} nameOf={nameOf} /><button className="btn btn--quiet" type="button" disabled={busy} onClick={() => update.mutate({ body: liveDefinition(commitment), version: commitment.version }, { onSuccess: (saved) => { toast.success("Pending changes cancelled."); finish(saved); }, onError: onFailure })}>Cancel pending change</button></div> : null}
-            <details className="commitment-advanced" open={mode === "create" || (submitted && !!shown.fields.scope) || undefined}><summary>Advanced scope and rules</summary>
+            <details className="commitment-advanced" open={advancedOpen} onToggle={event => setAdvancedOpen(event.currentTarget.open)}><summary>Advanced scope and rules</summary>
             <section className="slab slab-pad">
               <div className="field">
                 <label htmlFor="id_aggregation_type">Type</label>
