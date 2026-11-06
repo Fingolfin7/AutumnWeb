@@ -5198,3 +5198,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 
 .related-commitment { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline); }
 .related-commitment > .commit-target { display: inline-flex; align-items: center; min-height: 44px; }
+
+.project-page-head { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: start; gap: var(--s2); }
+.project-page-head > .desk-head { display: block; }
