@@ -40,7 +40,8 @@ export function SegmentedControl<T extends string>({ label, value, options, onCh
     const container = group.current;
     const selected = container?.querySelector<HTMLInputElement>("input:checked")?.parentElement;
     if (!container || !selected || container.scrollWidth <= container.clientWidth) return;
-    const left = selected.offsetLeft, right = left + selected.offsetWidth;
+    const left = selected.getBoundingClientRect().left - container.getBoundingClientRect().left + container.scrollLeft;
+    const right = left + selected.getBoundingClientRect().width;
     if (left < container.scrollLeft) container.scrollLeft = left;
     else if (right > container.scrollLeft + container.clientWidth) container.scrollLeft = right - container.clientWidth;
   }, [value]);
