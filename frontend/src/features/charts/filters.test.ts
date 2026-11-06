@@ -4,9 +4,9 @@ const params = (query: string) => new URLSearchParams(query);
 
 describe("URL <-> filters", () => {
   it("reads the old page's query string", () => {
-    const f = readFilters(params("chart_type=treemap&start_date=2026-01-01&end_date=2026-02-01&search=oauth&related=on&project_name=Czech&context=3&tags=1&tags=2&exclude_projects=7"));
+    const f = readFilters(params("chart_type=pie&start_date=2026-01-01&end_date=2026-02-01&search=oauth&related=on&project_name=Czech&context=3&tags=1&tags=2&exclude_projects=7"));
     expect(f).toMatchObject({
-      chart_type: "treemap",
+      chart_type: "pie",
       start_date: "2026-01-01",
       end_date: "2026-02-01",
       search: "oauth",

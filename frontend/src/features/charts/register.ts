@@ -17,7 +17,6 @@ import {
 } from "chart.js";
 import "chartjs-adapter-date-fns";
 import { MatrixController, MatrixElement } from "chartjs-chart-matrix";
-import { TreemapController, TreemapElement } from "chartjs-chart-treemap";
 
 /* Only what the charts use, so the rest of Chart.js is tree-shaken away. */
 Chart.register(
@@ -37,8 +36,6 @@ Chart.register(
   TimeScale,
   Title,
   Tooltip,
-  TreemapController,
-  TreemapElement,
 );
 
 /* Night Ledger defaults (charts/core.js initUIElements). */
