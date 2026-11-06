@@ -345,7 +345,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
               </div>
 
               <div className="field">
-                <label htmlFor="scope-target-search">Scope target</label>
+                <label htmlFor="scope-target-search">Applies to</label>
                 <input
                   type="text"
                   id="scope-target-search"
@@ -722,7 +722,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
               </span>
             </div>
             <div className="meta-row">
-              <span className="meta-label">This period, before carryover</span>
+              <span className="meta-label">This period?s progress</span>
               <span className={`meta-value ${time ? progress.surplus >= 0 ? "text-green" : "text-red" : ""}`}>
                 {`${progress.surplus >= 0 ? "+" : "-"}${num(progress.surplus)}`}
               </span>
