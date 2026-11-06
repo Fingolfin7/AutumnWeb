@@ -116,7 +116,7 @@ export default function ExportPage() {
       </div>
 
       <section className="slab export-lead"><h2>Your time, to keep.</h2><p>A complete JSON copy of your projects and journal, ready for Autumn or the CLI.</p><button className="btn btn--primary" type="button" disabled={busy} onClick={event => void onSubmit(event, EMPTY_EXPORT_FORM)}><Icon icon={faFileExport} /> {busy ? "Exporting..." : "Export everything"}</button></section>
-      <details className="export-customize"><summary>Customize export</summary><section id="export_options">
+      <details className="export-customize"><summary><span>Customize export<small>Choose dates, projects, tags and format</small></span></summary><section id="export_options">
         <form className="fields" onSubmit={onSubmit} noValidate>
           <div className="split">
             <div>

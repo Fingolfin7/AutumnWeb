@@ -5180,3 +5180,9 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 
 .project-trend text { fill: var(--muted); font: 8px var(--font-ui); }
 .project-trend text.is-today { fill: var(--brand); font-weight: 700; }
+
+.export-page:has(.export-customize[open]) .export-lead > .btn--primary { display: none; }
+.export-customize > summary { justify-content: space-between; gap: var(--s3); cursor: pointer; list-style: none; }
+.export-customize > summary small { display: block; color: var(--muted); font-size: var(--fs-xs); }
+.export-customize > summary::after { content: ""; width: 7px; height: 7px; border: solid var(--muted); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
+.export-customize[open] > summary::after { transform: rotate(225deg); }
