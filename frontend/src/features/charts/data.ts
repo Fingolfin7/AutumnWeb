@@ -5,7 +5,7 @@ import { format } from "date-fns";
    without a canvas. Ported from core/static/core/js/charts/core.js. */
 
 /* Muted pigments keep charts distinct from semantic project/subproject text. */
-export const PALETTE = ["#dfa15d", "#c88d60", "#e3b879", "#b9aa72", "#78aee0", "#bd93cc", "#78b9a0", "#e58e87"];
+export const PALETTE = ["#e5a45c", "#dd8173", "#cf81a7", "#a18dd7", "#78a7d8", "#63b4bd", "#82b997", "#d2ae75"];
 export const EMBER_RAMP = ["#493329", "#79503a", "#ac6d43", "#d58a50", "#edb071", "#f4d3a4"];
 export const OTHER_COLOR = "#8e8981";
 export function paletteColor(index: number): string { return PALETTE[index % PALETTE.length]!; }
