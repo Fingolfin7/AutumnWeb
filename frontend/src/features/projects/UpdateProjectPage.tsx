@@ -1,5 +1,8 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useParams } from "react-router";
+import { useQuery } from "@tanstack/react-query";
+import { api, unwrap } from "@/api/client";
+import { keys } from "@/api/keys";
 import { faEllipsisH, faStop, faCheckCircle, faCodeBranch, faPlay, faPen, faPlus, faSitemap, faTrash } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Select } from "@/components/ui";
@@ -49,6 +52,12 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const [editing, setEditing] = useState(false);
   const start = useStartTimer();
   const recent = useSessionList({ project_ids: String(project.id) });
+  const [journalSub, setJournalSub] = useState<number | null>(null);
+  const filteredJournal = useQuery({
+    queryKey: keys.sessions({ projectJournal: project.id, subproject: journalSub }),
+    enabled: journalSub !== null,
+    queryFn: () => unwrap(api.GET("/api/v2/sessions/", { params: { query: { active: false, project_ids: String(project.id), subproject_ids: String(journalSub), include: "note,note_html", limit: 5, ordering: "newest" } } })),
+  });
   const weekStart = calendarWeek(todayKey(bootstrap().profile.timezone)).start;
   const week = useSessionTotals({ project_ids: String(project.id), start_date: weekStart, end_date: addDays(weekStart,6) });
   const lastWeek = useSessionTotals({ project_ids: String(project.id), start_date: addDays(weekStart,-7), end_date: addDays(weekStart,-1) });
@@ -58,7 +67,9 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const running = (timers.data ?? []).filter(timer => timer.project.id === project.id);
   const [selectedSub, setSelectedSub] = useState("");
   const [subMenu, setSubMenu] = useState<number | null>(null);
-  const recentRows = recent.data?.pages[0]?.sessions.slice(0,5) ?? [];
+  const recentRows = journalSub === null ? recent.data?.pages[0]?.sessions.slice(0,5) ?? [] : filteredJournal.data?.sessions ?? [];
+  const journalPending = journalSub === null ? recent.isPending : filteredJournal.isPending;
+  const journalError = journalSub === null ? recent.isError : filteredJournal.isError;
   const journalDays = groupByDay(recentRows);
   const update = useUpdateProject(project.id);
   const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
@@ -218,7 +229,8 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         </div>
         <section className="session-list project-journal" aria-label="Recent journal entries">
           <div className="project-journal-link"><h2>Journal</h2><AppLink className="text-link" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></div>
-          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(group => <section className="project-journal-day" key={group.date}><header className="day-head"><h3 className="day-date">{formatDate(group.date)}</h3><strong className="day-total">{formatDurationWords(group.totalMinutes)}</strong></header><ul className="band-list">{group.sessions.map(session => <SessionBand key={session.id} session={session} day={group.date} hideProject />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
+          {project.subprojects.length ? <div className="project-journal-filters" role="group" aria-label="Filter journal by subproject"><button type="button" aria-pressed={journalSub === null} onClick={() => setJournalSub(null)}>All</button>{project.subprojects.map(sub => <button type="button" key={sub.id} aria-pressed={journalSub === sub.id} onClick={() => setJournalSub(sub.id)}>{sub.name} <span>{formatDurationWords(sub.total_minutes)}</span></button>)}</div> : null}
+          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(group => <section className="project-journal-day" key={group.date}><header className="day-head"><h3 className="day-date">{formatDate(group.date)}</h3><strong className="day-total">{formatDurationWords(group.totalMinutes)}</strong></header><ul className="band-list">{group.sessions.map(session => <SessionBand key={session.id} session={session} day={group.date} hideProject />)}</ul></section>)}</> : <p className="empty">{journalSub === null ? "Your first session will appear here." : "No sessions for this subproject yet."}</p>}
         </section>
 
       </div>
