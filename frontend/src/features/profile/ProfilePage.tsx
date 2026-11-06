@@ -113,6 +113,7 @@ function ProfileEditor({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [removeBg, setRemoveBg] = useState(false);
+  const [customRanges, setCustomRanges] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -459,12 +460,30 @@ function ProfileEditor({
           <div className="profile-defaults-grid">
             {section === "defaults" ? dateRanges.map((range) => {
               const unit = prefsD[range.unitKey];
+              const value = prefsD[range.valueKey];
+              const presets = [
+                { key: "1:weeks", label: "Past week", unit: "weeks", value: "1" },
+                { key: "1:months", label: "Past month", unit: "months", value: "1" },
+                { key: "3:months", label: "Past 3 months", unit: "months", value: "3" },
+                { key: "1:years", label: "Past year", unit: "years", value: "1" },
+                ...["month_to_date", "quarter_to_date", "year_to_date"].map(unit => ({ key: unit, label: unit.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase()), unit, value: "1" })),
+              ];
+              const match = presets.find(preset => preset.unit === unit && (isToDate(unit) || preset.value === value));
+              const custom = customRanges.includes(range.id) || !match;
               return (
                 <div key={range.id} className="profile-default-item">
-                  <label htmlFor={`${range.id}_value`}>{range.label}</label>
-                  <div className={`profile-default-control${isToDate(unit) ? " to-date-range" : ""}`}>
+                  <label htmlFor={`${range.id}_preset`}>{range.label}</label>
+                  <select id={`${range.id}_preset`} value={custom ? "custom" : match!.key} onChange={event => {
+                    const preset = presets.find(item => item.key === event.target.value);
+                    setCustomRanges(current => preset ? current.filter(id => id !== range.id) : [...current.filter(id => id !== range.id), range.id]);
+                    if (preset) patchPrefsDraft({ [range.unitKey]: preset.unit, [range.valueKey]: preset.value } as Partial<PrefsDraft>);
+                  }}>
+                    {presets.map(preset => <option key={preset.key} value={preset.key}>{preset.label}</option>)}<option value="custom">Custom</option>
+                  </select>
+                  {custom ? <div className={`profile-default-control${isToDate(unit) ? " to-date-range" : ""}`}>
                     <input
                       id={`${range.id}_value`}
+                      aria-label={`${range.label} amount`}
                       type="number"
                       min={1}
                       max={1000}
@@ -493,7 +512,7 @@ function ProfileEditor({
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </div> : null}
                   {"hint" in range ? <p className="muted">{range.hint}</p> : null}
                   <FieldErrors lines={[...(errors[range.error] ?? []), ...(errors[`${range.id}_unit`] ?? [])]} />
                 </div>
