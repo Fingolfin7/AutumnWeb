@@ -5237,3 +5237,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .journal-identity .journal-meta { flex: 0 1 auto; max-width: 100%; }
   .journal-entry--continuation .journal-heading { grid-template-areas: "identity identity"; }
 }
+.capture-when-row .time-control > #past-at { width: 100%; }
+.capture-when-row .temporal-popover, .session-edit-date .temporal-popover { position: static; inset: auto; width: 100%; max-height: none; margin-top: var(--s2); overflow: visible; box-shadow: none; }
+.capture-when-row .temporal-popover, .session-edit-date .temporal-popover { padding-inline: 0; border: 0; background: transparent; }
+.session-edit-times:has(.session-edit-date[open]) { grid-template-columns: minmax(0, 1fr); }

@@ -71,12 +71,7 @@ export function CapturePicker({
     setActive(0);
   };
   return (
-    <div
-      className="capture-picker"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-    >
+    <div className="capture-picker">
       <input
         id={id}
         type="text"
