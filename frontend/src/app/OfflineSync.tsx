@@ -2,7 +2,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { faCloudUploadAlt, faWifi } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { useInvalidate } from "@/api/sync";
-import { flushQueue, isFlushing, queuedOps, subscribe } from "@/lib/offlineQueue";
+import { flushQueue, hasUnsavedChanges, isFlushing, queuedOps, subscribe } from "@/lib/offlineQueue";
 import { pluralize } from "@/lib/format";
 import { useOnline } from "@/lib/useOnline";
 import { useToast } from "./toasts";
@@ -15,6 +15,7 @@ const RETRY_MS = 20_000;
 export function OfflineSync() {
   const ops = useSyncExternalStore(subscribe, queuedOps);
   const online = useOnline();
+  const unsaved = useSyncExternalStore(subscribe, hasUnsavedChanges);
   const invalidate = useInvalidate();
   const toast = useToast();
   const waiting = ops.length;
@@ -59,7 +60,9 @@ export function OfflineSync() {
   if (online && !waiting) return null;
   return (
     <div className="offline-banner" role="status">
-      {online ? (
+      {unsaved ? (
+        <>Offline timer changes are only saved in this tab. Keep it open until they sync; reloading or closing it may lose them.</>
+      ) : online ? (
         <>
           <Icon icon={faCloudUploadAlt} /> {pluralize(waiting, "change")} waiting to sync
         </>
