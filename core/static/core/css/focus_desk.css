@@ -5048,6 +5048,10 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .app-header--settings .brand-mark { width: 20px; height: 20px; }
   .app-header--settings .brand-word { position: static; width: auto; height: auto; overflow: visible; clip-path: none; font-size: var(--fs-sm); letter-spacing: -.015em; }
   .app-header--settings .context-switch select { max-width: min(32vw, 8rem); }
+  .settings-page--section > .settings-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s2); }
+  .settings-page--section .settings-back { grid-column: 2; grid-row: 1; margin: 0; font-size: var(--fs-xs); }
+  .settings-page--section .settings-heading .page-title { grid-column: 1; grid-row: 1; min-width: 0; font-size: 1.5rem; }
+  .settings-page--section .settings-heading p { display: none; }
   body:has(.insights-workspace) { padding-bottom: 0; }
   .app:has(.insights-workspace) #main-content { width: 100%; max-width: none; padding: 0; }
   .insights-workspace .chat-layout { --chat-h: calc(100dvh - var(--header-h) - var(--tabbar-h) - env(safe-area-inset-bottom, 0px)); margin: 0; border: 0; border-radius: 0; }
