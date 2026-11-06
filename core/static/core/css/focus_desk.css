@@ -5101,10 +5101,10 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .insights-workspace .insights-conversation-scope { flex: none; }
 }
 
-.project-running { display: flex; align-items: center; gap: var(--s3); min-width: 0; width: 100%; padding: var(--s3); border-radius: var(--r-md); background: var(--module-surface); }
-.project-running strong { font: 650 var(--fs-lg)/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.project-live-card { display: flex; align-items: center; gap: var(--s3); min-width: 0; width: 100%; padding: var(--s3); border-radius: var(--r-md); background: var(--module-surface); }
+.project-live-card strong { font: 650 var(--fs-lg)/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .project-running-note { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--note); }
-.project-running .btn { flex: none; margin-left: auto; }
+.project-live-card .btn { flex: none; margin-left: auto; }
 
 @media (min-width: 1000px) {
   .review-period-layout { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 1.25fr); gap: var(--s5); align-items: start; }
@@ -5123,3 +5123,12 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .settings-reminder-sheet .nx-form-grid > .field:has(#id_local_time) { grid-column: auto; }
   .settings-reminder-sheet .time-chips { padding-bottom: var(--s5); }
 }
+
+@media (max-width: 999px) {
+  .project-overview .project-journal { order: 4; }
+  .project-overview .project-rail { order: 6; }
+  .project-directory-columns { display: flex; justify-content: flex-end; padding: 0 56px var(--s1) 0; color: var(--muted); font-size: var(--fs-xs); }
+  .project-directory-columns > span:not(:last-child) { display: none; }
+  .project-directory-row { padding-block: var(--s2); }
+}
+.insights-workspace .assistant-message { max-width: 72ch; }
