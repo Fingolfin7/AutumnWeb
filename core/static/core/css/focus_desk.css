@@ -5137,3 +5137,8 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .commitment-advanced > summary::after, .import-inventory > summary::after { content: ""; width: 7px; height: 7px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(45deg); }
 .commitment-advanced[open] > summary::after, .import-inventory[open] > summary::after { transform: rotate(225deg); }
 .import-final { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-top: var(--s4); }
+
+@media (max-width: 999px) {
+  .review-toolbar .segmented { scrollbar-width: thin; scrollbar-color: var(--muted) transparent; }
+  .review-chart .chart-plot { max-height: 230px; }
+}

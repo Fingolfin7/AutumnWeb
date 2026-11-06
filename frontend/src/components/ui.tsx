@@ -35,7 +35,16 @@ export function Toggle({ label, id, ...props }: Omit<InputHTMLAttributes<HTMLInp
 /** A native radio group: Tab enters, arrow keys select. Values must be unique. */
 export function SegmentedControl<T extends string>({ label, value, options, onChange, onReselect }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; onReselect?: (value: T) => void }) {
   const name = useId();
-  return <fieldset className="segmented"><legend className="sr-only">{label}</legend>{options.map((option) => <label key={option.value}><input type="radio" name={name} checked={value === option.value} onClick={() => { if (value === option.value) onReselect?.(option.value); }} onChange={() => onChange(option.value)} /><span>{option.label}</span></label>)}</fieldset>;
+  const group = useRef<HTMLFieldSetElement>(null);
+  useEffect(() => {
+    const container = group.current;
+    const selected = container?.querySelector<HTMLInputElement>("input:checked")?.parentElement;
+    if (!container || !selected || container.scrollWidth <= container.clientWidth) return;
+    const left = selected.offsetLeft, right = left + selected.offsetWidth;
+    if (left < container.scrollLeft) container.scrollLeft = left;
+    else if (right > container.scrollLeft + container.clientWidth) container.scrollLeft = right - container.clientWidth;
+  }, [value]);
+  return <fieldset ref={group} className="segmented"><legend className="sr-only">{label}</legend>{options.map((option) => <label key={option.value}><input type="radio" name={name} checked={value === option.value} onClick={() => { if (value === option.value) onReselect?.(option.value); }} onChange={() => onChange(option.value)} /><span>{option.label}</span></label>)}</fieldset>;
 }
 
 function usePopover() {
