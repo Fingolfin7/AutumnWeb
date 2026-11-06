@@ -5157,3 +5157,9 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .project-overview .project-journal { order: 4; }
   .project-overview .project-rail { order: 6; }
 }
+
+@media (max-width: 999px) {
+  .settings-reminder-sheet .nx-form-grid > .field:has(.temporal-popover) { grid-column: 1 / -1; }
+}
+.first-run-empty h2, .empty-state h2 { text-wrap: balance; }
+.first-run-empty p, .empty-state p { line-height: 1.5; }
