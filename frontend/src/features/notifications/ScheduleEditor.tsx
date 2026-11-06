@@ -121,6 +121,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
         </h2>
       </div>
       <form className="fields completing-form" onSubmit={submit} noValidate>
+        <BrowserPush compact />
         <FormLevelErrors errors={errors.general} />
         <div className="nx-form-grid">
           <div className="field">
@@ -236,7 +237,6 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
         </div>
         <p className="muted nx-timezone-note">Your profile timezone: {timezone}</p>
 
-        <BrowserPush compact />
         <div className="form-actions q-form-actions">
           {schedule ? (
             <AppLink className="btn btn--ghost" href={urls.notifications()}>
