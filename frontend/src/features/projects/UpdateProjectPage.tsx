@@ -8,7 +8,7 @@ import { SessionBand } from "@/features/sessions/SessionBand";
 import { SessionNote } from "@/components/SessionNote";
 import { useSessionList, useSessionTotals } from "@/features/sessions/api";
 
-import { useStartTimer, useTimers } from "@/features/timers/api";
+import { useNow, useStartTimer, useTimers } from "@/features/timers/api";
 import { bootstrap } from "@/bootstrap";
 import { addDays, todayKey } from "@/features/notifications/dates";
 import { calendarWeek } from "@/features/review/periods";
@@ -17,7 +17,7 @@ import type { DailyTotalRow } from "@/features/charts/payloads";
 import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
-import { formatDate, formatDurationWords } from "@/lib/format";
+import { elapsedSeconds, formatClock, formatDate, formatDurationWords } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
 import type { Project, ProjectDetail } from "@/api/types";
 import { useCommitmentsAppliedTo } from "@/features/commitments/api";
@@ -54,6 +54,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const lastWeek = useSessionTotals({ project_ids: String(project.id), start_date: addDays(weekStart,-7), end_date: addDays(weekStart,-1) });
   const trend = useChartData({ chart_type: "calendar", include_projects: [project.id], start_date: addDays(weekStart,-7), end_date: addDays(weekStart,6), context: "all" }, true);
   const timers = useTimers();
+  const now = useNow();
   const running = (timers.data ?? []).filter(timer => timer.project.id === project.id);
   const [selectedSub, setSelectedSub] = useState("");
   const [subMenu, setSubMenu] = useState<number | null>(null);
@@ -127,7 +128,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
         <div className="project-properties" aria-label="Project properties"><span className="chip">{project.status}</span>{project.context ? <AppLink className="chip-link" href={urls.updateContext(project.context.id)}><span className="context-chip">{project.context.name}</span></AppLink> : null}{project.tags.map(tag => <AppLink className="chip-link" key={tag.id} href={urls.updateTag(tag.id)}><span className="tag-chip">{tag.name}</span></AppLink>)}<a href="#project-subprojects">{project.subprojects.length} subproject{project.subprojects.length === 1 ? "" : "s"}</a>{ownCommitment ? <a href="#project-commitment">Commitment</a> : null}<span>{formatDurationWords(project.total_minutes)} total · {project.session_count} sessions</span></div>
         <div className="project-start-control fields">
           {project.subprojects.length && !running.length ? <><label className="sr-only" htmlFor="project-subproject-picker">Subproject</label><Select id="project-subproject-picker" value={selectedSub} onChange={event => setSelectedSub(event.target.value)}><option value="">No subproject</option>{project.subprojects.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}</Select></> : null}
-          {running.length ? <AppLink className="btn btn--stop" href={urls.stopTimer(running[0]!.id)}><span className="live-dot" /><Icon icon={faStop} /> Stop timer{running.length > 1 ? ` (${running.length} running)` : ""}</AppLink> : <button className="btn btn--primary" type="button" disabled={start.isPending} onClick={() => { const sub = project.subprojects.find(item => item.id === Number(selectedSub)); start.mutate({ project_id: project.id, subproject_ids: sub ? [sub.id] : [], optimistic: { projectName: project.name, subprojects: sub ? [{ id: sub.id, name: sub.name }] : [] } }, { onSuccess: () => toast.success(`Started ${sub?.name ?? project.name}.`), onError: error => toast.error(failure("start the timer", error)) }); }}><Icon icon={faPlay} /> Start timer</button>}
+          {running.length ? <div className="project-running"><span className="live-dot" /><strong>{formatClock(elapsedSeconds(running[0]!.start, now))}</strong>{running[0]!.note ? <span className="project-running-note">{running[0]!.note}</span> : null}<AppLink className="btn btn--stop" href={urls.stopTimer(running[0]!.id)}><Icon icon={faStop} /> Stop{running.length > 1 ? ` (${running.length})` : ""}</AppLink></div> : <button className="btn btn--primary" type="button" disabled={start.isPending} onClick={() => { const sub = project.subprojects.find(item => item.id === Number(selectedSub)); start.mutate({ project_id: project.id, subproject_ids: sub ? [sub.id] : [], optimistic: { projectName: project.name, subprojects: sub ? [{ id: sub.id, name: sub.name }] : [] } }, { onSuccess: () => toast.success(`Started ${sub?.name ?? project.name}.`), onError: error => toast.error(failure("start the timer", error)) }); }}><Icon icon={faPlay} /> Start timer</button>}
         </div>
         <div className="project-progress-row"><section className="project-week-summary"><h2>This week</h2><strong>{week.data ? formatDurationWords(week.data.total_minutes) : "…"}</strong><p className="muted">{week.data && lastWeek.data ? week.data.total_minutes === lastWeek.data.total_minutes ? "Same as last week" : `${week.data.total_minutes > lastWeek.data.total_minutes ? "+" : "−"}${formatDurationWords(Math.abs(week.data.total_minutes-lastWeek.data.total_minutes))} from last week` : "Comparing weeks…"}</p>{trend.data ? <ProjectTrend rows={trend.data.data as DailyTotalRow[]} start={addDays(weekStart,-7)} /> : null}</section><section className="project-week-target" id="project-commitment">{ownCommitment ? <><h2>Commitment</h2><CommitmentSummary commitment={ownCommitment} showTarget={false} /></> : <AppLink className="btn btn--quiet" href={urls.createCommitment(project.id)}><Icon icon={faPlus} /> Add commitment</AppLink>}</section></div>
         {project.description ? <details className="project-description"><summary>About this project</summary><SessionNote text={project.description} /></details> : null}
