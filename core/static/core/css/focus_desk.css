@@ -3181,7 +3181,7 @@ img.brand-mark {
 .temporal-control > input { width: 100%; padding-right: 44px; color-scheme: dark; }
 .temporal-control input::-webkit-calendar-picker-indicator { display: none; }
 .temporal-trigger { position: absolute; right: 0; top: 0; background: transparent; box-shadow: none; color: var(--muted); }
-.temporal-popover { position: absolute; z-index: 30; top: calc(100% + 6px); left: 0; width: min(340px, calc(100vw - 32px)); padding: var(--s2); background: var(--surface-2); border: 1px solid var(--hairline-2); border-radius: var(--r-md); box-shadow: var(--e3); }
+.temporal-popover { position: relative; z-index: 1; margin-top: 6px; width: min(340px, calc(100vw - 32px)); padding: var(--s2); background: var(--surface-2); border: 1px solid var(--hairline-2); border-radius: var(--r-md); box-shadow: var(--e3); }
 .calendar-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 .calendar-heading strong { font-size: var(--fs-sm); }
 .calendar-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
@@ -4501,7 +4501,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 .review-closed-periods .field { max-width: 300px; margin-block: var(--s3); }
 
 @media (max-width: 599px) {
-  .temporal-popover { position: fixed; left: 16px; right: 16px; top: auto; bottom: 90px; width: auto; max-height: calc(100dvh - 140px); overflow: auto; }
+  .temporal-popover { width: 100%; max-height: none; }
 }
 
 .project-directory .project-directory-row { min-height: 72px; }
