@@ -53,7 +53,7 @@ export default function SettingsPage() {
     <div className="settings-layout">
       <nav className="settings-sections" aria-label="Settings sections">
         {navigation.map((item) => <AppLink key={item.id} href={`/settings/${item.id}/`} aria-current={activeId === item.id ? "page" : undefined}>
-          <Icon icon={item.icon} /><span><strong>{item.title}</strong><small>{sections.find(section => section.id === item.id)?.description}</small></span><span className="settings-chevron" aria-hidden="true">?</span>
+          <Icon icon={item.icon} /><span><strong>{item.title}</strong><small>{sections.find(section => section.id === item.id)?.description}</small></span><span className="settings-chevron" aria-hidden="true">&rsaquo;</span>
         </AppLink>)}
       </nav>
       <div className="settings-content" key={id ?? "index"}>

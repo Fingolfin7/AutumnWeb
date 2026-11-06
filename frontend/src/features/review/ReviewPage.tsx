@@ -200,7 +200,7 @@ function EmberTrail({ start, today, rows, onWeek }: { start: string; today: stri
   const totals = weeks.map(week => week.hours.reduce((sum, hours) => sum + hours, 0));
   const max = Math.max(1, ...totals);
   const peak = totals.indexOf(Math.max(...totals));
-  return <div className="review-ember-trail"><div><span>Your last 12 weeks</span><span>{formatDate(start)} ? {formatDate(today)}</span></div><div className="review-ember-weeks">{weeks.map((week, index) => {
+  return <div className="review-ember-trail"><div><span>Your last 12 weeks</span><span>{formatDate(start)} – {formatDate(today)}</span></div><div className="review-ember-weeks">{weeks.map((week, index) => {
     const total = totals[index]!;
     const detail = week.hours.map((hours, day) => `${formatDate(addDays(week.day, day))}: ${formatDuration(hours * 60)}`).join("\n");
     return <button type="button" key={week.day} title={detail} aria-label={`Week of ${formatDate(week.day)}: ${formatDuration(total * 60)}. ${detail}`} onClick={() => onWeek({start:week.day,end:addDays(week.day,6)})}><svg viewBox="0 0 70 34" preserveAspectRatio="none" aria-hidden="true"><rect className={`ember-cell ember-cell--${total ? Math.max(1, Math.ceil(total / max * 5)) : 0}`} x="4" y={32 - Math.max(3, total / max * 29)} width="62" height={Math.max(3, total / max * 29)} rx="3" /></svg><span>{index === 11 ? "This week" : index === 0 ? formatDate(week.day).replace(/^\w+ /, "") : index === peak ? "Peak" : ""}</span></button>;
