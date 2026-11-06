@@ -1,6 +1,5 @@
-import { formatDuration } from "@/lib/format";
 import { useMemo } from "react";
-import { faBullseye, faPen, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faBullseye, faPlus } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Disclose } from "@/components/Disclose";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
@@ -10,9 +9,7 @@ import type { Commitment } from "@/api/types";
 import { tagStyle } from "@/features/contexts-tags/ui";
 import { useAllSubprojects, useCommitmentsAppliedTo } from "./api";
 import { needsSubprojects, ruleLines, type EntityKind } from "./applies";
-import { progressOf } from "./display";
-import { aggregationLabel } from "./scope";
-import { periodLabel } from "./formModel";
+import { CommitmentSummary } from "./CommitmentSummary";
 
 /* The "Commitments" slab on the context and tag edit pages
    (partials/commitments_panel.html): every commitment that reaches this
@@ -51,7 +48,12 @@ export function RelatedCommitments({ kind, id }: { kind: EntityKind; id: number 
       ) : items.length ? (
         <div className="band-list">
           {items.map((c) => (
-            <CommitmentCard key={c.id} commitment={c} lines={ruleLines(c, names)} tagColor={tags.data?.find((t) => t.id === c.target.id)?.color} />
+            <div key={c.id} className="related-commitment">
+              <CommitmentTarget c={c} tagColor={tags.data?.find((t) => t.id === c.target.id)?.color} />
+              <CommitmentSummary commitment={c} showTarget={false}>
+              <div className="commit-rules">{ruleLines(c, names).map(line => <p key={line} className="commit-rule-line">{line}</p>)}</div>
+              </CommitmentSummary>
+            </div>
           ))}
         </div>
       ) : (
@@ -95,68 +97,3 @@ function CommitmentTarget({ c, tagColor }: { c: Commitment; tagColor?: string | 
   }
 }
 
-function CommitmentCard({ commitment: c, lines, tagColor }: { commitment: Commitment; lines: string[]; tagColor?: string | null }) {
-  const progress = progressOf(c);
-  const time = c.commitment_type === "time";
-  const num = (v: number) => time ? formatDuration(Math.abs(v)) : String(Math.abs(v));
-  const signedValue = (v: number) => `${v >= 0 ? "+" : "-"}${num(v)}`;
-  const pct = Math.round(progress.percentage);
-  const balance = c.balance;
-  return (
-    <article className={`band commit${time ? "" : " commit--count"}`}>
-      <header className="commit-head">
-        <CommitmentTarget c={c} tagColor={tagColor} />
-        <span className="commit-kind">({aggregationLabel(c.aggregation_type)})</span>
-        {!c.active ? <span className="badge-paused">paused</span> : null}
-        <span className="commit-period">{periodLabel(c.period)}</span>
-      </header>
-
-      {c.active ? (
-        <>
-          <p className="commit-figures">
-            <span className="commit-actual">{num(progress.actual)}</span>
-            <span className="commit-goal">
-              / {num(progress.target)}{time ? "" : " sessions"}
-            </span>
-            <span className="commit-pct">{pct}%</span>
-          </p>
-          <div className="meter">
-            <div className={`meter-fill ${progress.status}`} style={{ width: `${pct}%` }} />
-          </div>
-          {c.banking_enabled ? (
-            <div className="bank-row">
-              <div className="bank-cell">
-                <span className="bank-label">Carried over</span>
-                <span className={`bank-value ${time ? balance >= 0 ? "text-green" : "text-red" : ""}`}>
-                  {signedValue(balance)}
-                </span>
-              </div>
-              <div className="bank-cell">
-                <span className="bank-label">Before carryover</span>
-                <span className={`bank-value ${time ? progress.surplus >= 0 ? "text-green" : "text-red" : ""}`}>
-                  {signedValue(progress.surplus)}
-                </span>
-              </div>
-            </div>
-          ) : null}
-        </>
-      ) : null}
-
-      {lines.length ? (
-        <div className="commit-rules">
-          {lines.map((line) => (
-            <p key={line} className="commit-rule-line">
-              {line}
-            </p>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="commit-foot">
-        <AppLink className="btn btn--ghost" href={urls.updateCommitment(c.id)}>
-          <Icon icon={faPen} /> Edit commitment
-        </AppLink>
-      </div>
-    </article>
-  );
-}

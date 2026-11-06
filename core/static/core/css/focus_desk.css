@@ -5195,3 +5195,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .export-customize[open] > summary::after { transform: rotate(225deg); }
 
 .project-journal-link .text-link { display: inline-flex; align-items: center; min-height: 44px; }
+
+.related-commitment { padding: var(--s3) var(--s4); border-bottom: 1px solid var(--hairline); }
+.related-commitment > .commit-target { display: inline-flex; align-items: center; min-height: 44px; }
