@@ -7,6 +7,15 @@ export const monthDay = (value: string | Date) => formatDate(value);
 export const monthDayYear = (value: string | Date) => formatDate(value, true);
 export const dayMonthYear = monthDayYear;
 
+export function hasPendingChange(commitment: Commitment) {
+  return !!commitment.pending_revision && Object.keys(commitment.pending_revision.changes).length > 0;
+}
+
+/** Restoring the live definition cancels queued edits through the existing API. */
+export function liveDefinition(commitment: Commitment) {
+  return { target_value: commitment.target_value, banking_enabled: commitment.banking_enabled, max_balance: commitment.max_balance, min_balance: commitment.min_balance, ...commitment.filters };
+}
+
 export function progressOf(c: Commitment) {
   const period = c.current_period;
   return {

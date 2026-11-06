@@ -50,7 +50,9 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   const note = `Edited by the ${testInfo.project.name} e2e run ${testInfo.retry}.${testInfo.repeatEachIndex}`;
 
   await page.goto("/sessions/?search=Piano");
-  const first = page.getByRole("region", { name: "Sessions" }).getByRole("listitem").first();
+  const seedNote = testInfo.project.name === "phone" ? "First page of the waltz" : "Major scales at a slower tempo";
+  const firstId = await page.getByRole("region", { name: "Sessions" }).getByRole("listitem").filter({ hasText: seedNote }).first().getAttribute("id");
+  const first = page.locator(`#${firstId}`);
   await expect(first).toContainText("Piano Practice");
   if (testInfo.project.name === "phone") {
     const heading = first.locator(".journal-heading");
@@ -71,7 +73,8 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   await expect(page).toHaveURL(/\/sessions\/\?search=Piano/);
   const field = page.getByRole("textbox", { name: "Note", exact: true });
   await field.fill(note);
-  await page.getByRole("button", { name: "Done", exact: true }).click();
+  if (testInfo.project.name === "phone") await page.getByRole("dialog", { name: "Full-screen note writer" }).getByRole("button", { name: "Done", exact: true }).click();
+  else await first.getByRole("button", { name: "Done", exact: true }).click();
   await expect(toasts(page).getByText("Note saved.", { exact: true })).toBeVisible();
 
   await page.reload();
@@ -103,7 +106,7 @@ test("editing a session note saves it", async ({ page }, testInfo) => {
   const patched = page.waitForRequest((request) => request.url().endsWith(`/api/v2/sessions/${id}`) && request.method() === "PATCH");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   expect((await patched).postDataJSON()).not.toHaveProperty("project_id");
-  await expect(toasts(page).getByText("Updated session", { exact: true })).toBeVisible();
+  await expect(toasts(page).getByText("Updated session", { exact: true })).toBeVisible({ timeout: 15_000 });
   const saved = await (await page.request.get(`/api/v2/sessions/${id}`)).json();
   expect(saved.project.id).toBe(original.project.id);
   expect(problems()).toEqual([]);

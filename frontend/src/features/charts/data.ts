@@ -13,7 +13,9 @@ export function paletteColor(index: number): string { return PALETTE[index % PAL
 export function seriesColor(name: string): string {
   let hash = 0;
   for (const char of name) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
-  return paletteColor(hash);
+  const base = paletteColor(hash);
+  const offset = ((hash >>> 3) % 17) - 8;
+  return `#${[1, 3, 5].map(index => Math.max(0, Math.min(255, parseInt(base.slice(index, index + 2), 16) + offset)).toString(16).padStart(2, "0")).join("")}`;
 }
 export function emberColor(value: number, max = 1): string {
   return EMBER_RAMP[Math.min(5, Math.max(0, Math.ceil(value / Math.max(max, 1) * 5)))]!;
@@ -164,7 +166,7 @@ export function periodDates(days: string[], options: Pick<ChartOptions, "start" 
   return start && end ? fillDates(parseDay(start), parseDay(end)).map(dayKey) : [];
 }
 
-/** Resolve name-hash collisions within a chart, keeping every displayed series distinct. */
+/** Use the same name-derived colour regardless of the other displayed series. */
 export function seriesColors(names: string[]): Map<string, string> {
   return new Map([...new Set(names)].map(name => [name, seriesColor(name)]));
 }

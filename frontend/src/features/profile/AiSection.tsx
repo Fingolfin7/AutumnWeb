@@ -1,8 +1,6 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  faCheckCircle,
-  faCircle,
   faKey,
   faLock,
   faSignInAlt,
@@ -14,13 +12,12 @@ import { ErrorState } from "@/components/states";
 import { useToast } from "@/app/toasts";
 import { keys } from "@/api/keys";
 import { errorMessage } from "@/api/errors";
-import { disconnectChatGPT, meKeys, startChatGPTLogin, useChatGPTLogin, useOnCodexConnected } from "./api";
+import { deleteApiKey, disconnectChatGPT, meKeys, putApiKey, startChatGPTLogin, useChatGPTLogin, useOnCodexConnected } from "./api";
 import {
   KEY_PROVIDERS,
   LUNA_EFFORTS,
   openaiKeyBadge,
   openaiKeyNote,
-  type KeyDraft,
   type KeyProvider,
   type LunaEffort,
   type Prefs,
@@ -33,22 +30,14 @@ const KEY_LABELS: Record<KeyProvider, string> = {
   claude: "Claude",
 };
 
-/* "LLM connections": the Codex device login and write-only API keys. Keys are
-   never shown, only whether one is stored. They are sent with Update profile;
-   the Codex buttons act immediately, as they did. */
+/* Keys are write-only and each provider has its own explicit action. */
 export function AiSection({
   prefs,
-  keyDrafts,
-  onKeyDraft,
   luna,
   onLuna,
   errors,
-  footer,
 }: {
   prefs: Prefs;
-  footer?: ReactNode;
-  keyDrafts: Record<KeyProvider, KeyDraft>;
-  onKeyDraft: (provider: KeyProvider, patch: Partial<KeyDraft>) => void;
   luna: LunaEffort;
   onLuna: (value: LunaEffort) => void;
   errors: Record<string, string[]>;
@@ -57,6 +46,18 @@ export function AiSection({
   const qc = useQueryClient();
   const login = useChatGPTLogin(true);
   const configured = prefs.configured_api_keys;
+  const [keyDrafts, setKeyDrafts] = useState<Record<KeyProvider, string>>({ gemini: "", openai: "", claude: "" });
+  const [keyErrors, setKeyErrors] = useState<Partial<Record<KeyProvider, string>>>({});
+  const keyChange = useMutation({
+    mutationFn: ({ provider, clear }: { provider: KeyProvider; clear: boolean }) => clear ? deleteApiKey(provider) : putApiKey(provider, keyDrafts[provider].trim()),
+    onSuccess: (_result, { provider, clear }) => {
+      setKeyDrafts(current => ({ ...current, [provider]: "" }));
+      setKeyErrors(current => ({ ...current, [provider]: undefined }));
+      void qc.invalidateQueries({ queryKey: keys.preferences() });
+      toast.success(clear ? `${KEY_LABELS[provider]} removed.` : `${KEY_LABELS[provider]} connected.`);
+    },
+    onError: (error, { provider }) => setKeyErrors(current => ({ ...current, [provider]: errorMessage(error) })),
+  });
 
   const onConnected = useCallback(() => toast.success("Connected Codex for Insights."), [toast]);
   useOnCodexConnected(login.data, onConnected);
@@ -111,24 +112,16 @@ export function AiSection({
         }
       />
 
-      <ul className="profile-provider-status" aria-label="Provider status">{KEY_PROVIDERS.map(provider => <li key={provider}><strong>{KEY_LABELS[provider]}</strong><span>{configured[provider] ? "Key connected" : provider === "openai" && connected ? "Via Codex" : "Not connected"}</span></li>)}</ul>
-      <div className="profile-codex-panel">
-        <div>
-          <h3 className="disclose-title">Connect Codex</h3>
-          <p className="focus-lede">OpenAI models use Codex first, then the API key below.</p>
-          {connected ? (
-            <span className="context-chip">
-              <Icon icon={faCheckCircle} /> Codex connected
-              {login.data?.email ? ` as ${login.data.email}` : ""}
-              {login.data?.plan ? ` (${login.data.plan})` : ""}
-            </span>
-          ) : (
-            <span className="context-chip">
-              <Icon icon={faCircle} /> Codex not connected
-            </span>
-          )}
-        </div>
-        <div className="form-actions">
+      <div className="profile-provider-list" aria-label="Provider connections">{KEY_PROVIDERS.map(provider => <details className="profile-provider" key={provider}>
+        <summary><strong>{KEY_LABELS[provider]}</strong><span>{configured[provider] ? "Connected" : provider === "openai" && connected ? "Via Codex" : "Not connected"}</span><span className="profile-provider-action">{configured[provider] ? "Manage" : "Connect"}</span></summary>
+        <div className="field"><label htmlFor={`${provider}_api_key`}>API key</label><input type="password" id={`${provider}_api_key`} autoComplete="new-password" value={keyDrafts[provider]} onChange={event => setKeyDrafts(current => ({ ...current, [provider]: event.target.value }))} placeholder={`Paste ${KEY_LABELS[provider]} key`} />
+          {provider === "openai" ? <small className="muted">{openaiNote === "after-codex" ? "Used after Codex if its quota is unavailable." : openaiNote === "server-needs-profile" ? "The server key is available, but Insights needs a profile key or Codex login." : openaiNote === "server-available" ? "Insights can use the server key; your own key overrides it." : "A profile key can be used for Insights and related search."} {openaiBadge.label}</small> : null}
+          {keyErrors[provider] ? <p role="alert" className="text-red">{keyErrors[provider]}</p> : null}
+          <div className="form-actions"><button type="button" className="btn btn--secondary" disabled={!keyDrafts[provider].trim() || keyChange.isPending} onClick={() => keyChange.mutate({ provider, clear: false })}>Save key</button>{configured[provider] ? <button type="button" className="btn btn--quiet" disabled={keyChange.isPending} onClick={() => keyChange.mutate({ provider, clear: true })}>Remove key</button> : null}</div>
+        </div></details>)}</div>
+      <div className="profile-codex-row">
+          <strong>Codex</strong>
+          <span>{connected ? `Connected${login.data?.email ? ` as ${login.data.email}` : ""}${login.data?.plan ? ` (${login.data.plan})` : ""}` : "Not connected"}</span>
           {connected ? (
             <button
               type="button"
@@ -148,8 +141,8 @@ export function AiSection({
               <Icon icon={faSignInAlt} /> {pending ? "Start over" : "Connect Codex"}
             </button>
           )}
-        </div>
       </div>
+      <p className="muted profile-codex-hint">OpenAI models use Codex first, then your API key.</p>
 
       {login.isError && !pending ? (
         <div className="u-mt-4">
@@ -182,72 +175,7 @@ export function AiSection({
         </div>
       ) : null}
 
-      <details className="profile-ai-advanced"><summary>Advanced: API keys & model effort</summary>
-      <div className="profile-keys-grid">
-        {KEY_PROVIDERS.map((provider) => {
-          const stored = configured[provider];
-          const draft = keyDrafts[provider];
-          return (
-            <div key={provider} className="profile-key-item">
-              <div className="u-between u-gap-3">
-                <label htmlFor={`${provider}_api_key`}>{KEY_LABELS[provider]}</label>
-                <span>
-                  {provider === "openai" ? (
-                    <span className={`text-${openaiBadge.tone}`}>{openaiBadge.label}</span>
-                  ) : stored ? (
-                    <span className="muted">Stored</span>
-                  ) : (
-                    <span className="text-red">None</span>
-                  )}
-                </span>
-              </div>
-              <input
-                type="password"
-                id={`${provider}_api_key`}
-                autoComplete="new-password"
-                placeholder={`${provider === "openai" ? "OpenAI" : provider === "gemini" ? "Gemini" : "Claude"} API Key`}
-                value={draft.value}
-                disabled={draft.clear}
-                onChange={(event) => onKeyDraft(provider, { value: event.target.value })}
-              />
-              {provider === "openai" ? (
-                <small className="muted">
-                  {openaiNote === "after-codex" ? (
-                    "Used after Codex if the Codex bucket is unavailable."
-                  ) : openaiNote === "server-needs-profile" ? (
-                    <>
-                      The server <code>OPENAI_API_KEY</code> is available, but Insights requires a profile key or Codex
-                      login.
-                    </>
-                  ) : openaiNote === "server-available" ? (
-                    <>
-                      Insights can use the server <code>OPENAI_API_KEY</code>. Add your own key to override it.
-                    </>
-                  ) : (
-                    "Paste an OpenAI API key to enable OpenAI models."
-                  )}
-                </small>
-              ) : null}
-              <div className="check-row">
-                <input
-                  type="checkbox"
-                  id={`clear_${provider}_api_key`}
-                  checked={draft.clear}
-                  onChange={(event) =>
-                    onKeyDraft(provider, {
-                      clear: event.target.checked,
-                      value: "",
-                    })
-                  }
-                />
-                <label htmlFor={`clear_${provider}_api_key`}>Clear key</label>
-              </div>
-              <FieldErrors lines={errors[`key_${provider}`]} />
-            </div>
-          );
-        })}
-      </div>
-
+      <details className="profile-ai-advanced"><summary>Model effort</summary>
       <div className="profile-default-item profile-luna">
         <label htmlFor="luna_recommendation_effort">Luna recommendation effort</label>
         <select
@@ -265,7 +193,6 @@ export function AiSection({
         <FieldErrors lines={errors.luna_recommendation_effort} />
       </div>
     </details>
-    {footer}
     </section>
   );
 }

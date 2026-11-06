@@ -26,12 +26,21 @@ const sections = [
   { id: "export", title: "Export", description: "Take your projects and journal with you", icon: faFileExport },
 ] as const;
 
+const groups = [
+  { title: "Account", icon: faUserCircle, ids: ["account"] },
+  { title: "Appearance", icon: faImage, ids: ["appearance"] },
+  { title: "Tracking", icon: faChartBar, ids: ["defaults", "contexts", "tags", "notifications"] },
+  { title: "AI and search", icon: faPlug, ids: ["ai", "search"] },
+  { title: "Data", icon: faFileExport, ids: ["import", "export"] },
+] as const;
+
 export default function SettingsPage() {
   const location = useLocation();
   const prefs = useProfilePreferences();
   const account = useAccount();
   const id = location.pathname.split("/")[2] || (window.matchMedia("(min-width: 1000px)").matches ? "account" : undefined);
   const section = sections.find((item) => item.id === id);
+  const group = groups.find((item) => item.ids.some((child) => child === id));
   return <div className={`settings-page${section ? " settings-page--section" : ""}`}>
     <header className="settings-heading">
       {section ? <AppLink className="settings-back" href="/settings/">‹ All settings</AppLink> : null}
@@ -40,15 +49,16 @@ export default function SettingsPage() {
     </header>
     <div className="settings-layout">
       <nav className="settings-sections" aria-label="Settings sections">
-        {sections.map((item) => <AppLink key={item.id} href={`/settings/${item.id}/`} aria-current={id === item.id ? "page" : undefined}>
-          <Icon icon={item.icon} /><span><strong>{item.title}</strong><small>{item.description}</small></span><span className="settings-chevron" aria-hidden="true">›</span>
+        {groups.map((item) => <AppLink key={item.title} href={`/settings/${item.ids[0]}/`} aria-current={group === item ? "page" : undefined}>
+          <Icon icon={item.icon} /><span><strong>{item.title}</strong></span><span className="settings-chevron" aria-hidden="true">›</span>
         </AppLink>)}
       </nav>
       <div className="settings-content" key={id ?? "index"}>
+        {group && group.ids.length > 1 ? <nav className="settings-group-links" aria-label={`${group.title} settings`}>{group.ids.map((child) => { const item = sections.find((entry) => entry.id === child)!; return <AppLink key={child} href={`/settings/${child}/`} aria-current={id === child ? "page" : undefined}>{item.title}</AppLink>; })}</nav> : null}
         {["account", "appearance", "defaults", "search"].includes(id ?? "") ? <ProfilePage section={id as "account" | "appearance" | "defaults" | "search"} /> : id === "ai" ? <ProfilePage section="ai" /> : id === "contexts" ? <ContextsPage /> : id === "tags" ? <TagsPage /> : id === "notifications" ? <NotificationsPage /> : id === "import" ? <ImportPage /> : id === "export" ? <ExportPage /> : <section className="settings-overview slab slab-pad"><h2>Your workspace</h2><dl><div><dt>Signed in as</dt><dd>{account.data?.username ?? bootstrap().user.username}</dd></div><div><dt>Timezone</dt><dd>{prefs.data?.timezone ?? bootstrap().profile.timezone}</dd></div><div><dt>Backdrop</dt><dd>{prefs.data?.automatic_background ? "A new photo every day" : prefs.data?.background.image_url ? "Your uploaded photo" : "Night Ledger"}</dd></div><div><dt>Reporting range</dt><dd>{prefs.data ? prefs.data.default_filter_unit.endsWith("_to_date") ? prefs.data.default_filter_unit.replaceAll("_", " ") : `${prefs.data.default_filter_value} ${prefs.data.default_filter_value === 1 ? prefs.data.default_filter_unit.slice(0, -1) : prefs.data.default_filter_unit}` : "Loading…"}</dd></div></dl><AppLink className="btn btn--secondary" href="/settings/account/">Edit account</AppLink></section>}
       </div>
     </div>
-    <form className="settings-logout" method="POST" action="/logout/" onSubmit={clearPersistedQueries}><input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} /><button className="btn btn--quiet" type="submit">Log out</button></form>
+    {location.pathname === "/settings/" ? <form className="settings-logout" method="POST" action="/logout/" onSubmit={clearPersistedQueries}><input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} /><button className="btn btn--quiet" type="submit">Log out</button></form> : null}
   </div>;
 }
 

@@ -7,8 +7,8 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
   const averages = new Map(data.map((row) => [`${row.weekday}:${row.hour}`, Number(row.average_hours)] as const));
   const activeHours = data.filter(row => Number(row.average_hours) > 0).map(row => Number(row.hour));
-  const firstHour = Math.max(0, Math.min(...activeHours, 9) - 1);
-  const lastHour = Math.min(23, Math.max(...activeHours, 17) + 1);
+  const firstHour = activeHours.length ? Math.max(0, Math.min(...activeHours) - 1) : 9;
+  const lastHour = activeHours.length ? Math.min(23, Math.max(...activeHours) + 1) : 17;
   const hours = HOURS.slice(firstHour, lastHour + 1);
   let maxAverage = 0;
   const cells: { x: string; y: string; v: number }[] = [];

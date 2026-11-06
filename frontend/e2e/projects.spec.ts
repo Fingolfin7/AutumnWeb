@@ -9,9 +9,10 @@ test("create a project, rename it, then delete it", async ({ page }, testInfo) =
 
   await page.goto("/create_project/");
   await page.getByLabel("Name", { exact: true }).fill(name);
+  await page.getByText("Description (optional)", { exact: true }).click();
   await page.getByLabel("Description", { exact: true }).fill("Created by the e2e suite");
   await page.getByRole("button", { name: "Create project" }).click();
-  await expect(toasts(page).getByText("Project created successfully")).toBeVisible();
+  await expect(toasts(page).getByText("Project created.", { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/update_project\/\d+\/$/);
 
   await page.goto(`/projects/?search=${encodeURIComponent(name)}`);
