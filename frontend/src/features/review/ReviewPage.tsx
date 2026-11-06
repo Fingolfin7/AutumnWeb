@@ -148,7 +148,7 @@ export default function ReviewPage() {
         {["daily_bars", "cumulative"].includes(kind) ? <p className="review-section-caption">Days shown in UTC.</p> : null}
       {questionForm}
         {selectedPreset !== "custom" ? <EmberTrail start={trailStart} today={today} rows={(trail.data?.data ?? []) as DailyTotalRow[]} onWeek={setPeriod} /> : null}
-      {selectedPreset !== "custom" && period.start <= today && period.end >= today ? <ReviewCommitments start={period.start} projectIds={projectFiltered ? commitmentProjectIds : null} /> : null}
+      {selectedPreset !== "custom" && period.start <= today && period.end >= today ? <ReviewCommitments start={period.start} projectIds={projectFiltered ? commitmentProjectIds : null} context={query.context} /> : null}
     </> : null}
 
     {view === "year" ? <section className={`review-embers slab${view === "year" ? " review-embers--hero" : ""}`} aria-labelledby="ember-title"><div className="review-section-heading"><div><h2 id="ember-title">A year of embers</h2><p className="muted">{scope}{pills.length ? " · current filters" : ""} · Full year · Days shown in UTC</p></div><div className="review-year-stepper"><button className="btn-icon" aria-label="Previous year" type="button" onClick={() => setYear(year - 1)}><Icon icon={faChevronLeft} /></button><strong>{year}</strong><button className="btn-icon" aria-label="Next year" type="button" disabled={year >= Number(today.slice(0, 4))} onClick={() => setYear(year + 1)}><Icon icon={faChevronRight} /></button></div></div>{annual.isPending ? <Skeleton lines={4} /> : annual.isError ? <ErrorState error={annual.error} onRetry={() => void annual.refetch()} /> : <YearOfEmbers year={year} rows={(annual.data?.data ?? []) as DailyTotalRow[]} onMonth={setPeriod} />}</section> : null}
@@ -167,19 +167,22 @@ export default function ReviewPage() {
   </div>;
 }
 
-function ReviewCommitments({ start, projectIds }: { start: string; projectIds: number[] | null }) {
+function ReviewCommitments({ start, projectIds, context }: { start: string; projectIds: number[] | null; context: string }) {
   const commitments = useCommitments();
   const matching = useQueries({ queries: (projectIds ?? []).map(id => ({ queryKey: [...keys.commitments(), "applies", "project", id], queryFn: async () => (await unwrap(api.GET("/api/v2/commitments/", { params: { query: { applies_to: `project:${id}` } } }))).commitments, staleTime: 30_000 })) });
-  const matchingError = matching.find(query => query.isError)?.error;
-  const matchingPending = matching.some(query => query.isPending);
+  const scoped = useQuery({ queryKey: [...keys.commitments(), "applies", "context", context], enabled: context !== "all", queryFn: async () => (await unwrap(api.GET("/api/v2/commitments/", { params: { query: { applies_to: `context:${context}` } } }))).commitments, staleTime: 30_000 });
+  const matchingError = matching.find(query => query.isError)?.error ?? (context !== "all" ? scoped.error : null);
+  const matchingPending = matching.some(query => query.isPending) || (context !== "all" && scoped.isPending);
   const matchingIds = new Set(matching.flatMap(query => query.data ?? []).map(item => item.id));
-  const visible = (commitments.data ?? []).filter(item => item.active && (projectIds === null || matchingIds.has(item.id)));
+  const contextIds = new Set((scoped.data ?? []).map(item => item.id));
+  const matchesFilters = (id: number) => (projectIds === null || matchingIds.has(id)) && (context === "all" || contextIds.has(id));
+  const visible = (commitments.data ?? []).filter(item => item.active && matchesFilters(item.id));
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyStart, setHistoryStart] = useState(start);
   const history = useQuery({ enabled: historyOpen && commitments.isSuccess, queryKey: keys.reports("weekly-review", { week: historyStart }), queryFn: () => unwrap(api.GET("/api/v2/reports/weekly-review/", { params: { query: { week: historyStart } } })) });
   return <section className="review-commitments slab" aria-labelledby="review-commitments-title"><div className="review-section-heading"><div><h2 id="review-commitments-title">Commitments</h2><p className="muted">Follows the selected context and project filters.</p></div><AppLink className="btn btn--secondary" href={urls.createCommitment()}><Icon icon={faPlus} /> Add commitment</AppLink></div>
-    {commitments.isPending || matchingPending ? <Skeleton lines={3} /> : commitments.isError || matchingError ? <ErrorState error={commitments.error ?? matchingError} onRetry={() => { void commitments.refetch(); matching.forEach(query => void query.refetch()); }} /> : !visible.length ? <p className="review-empty">A little structure for what matters. <AppLink href={urls.createCommitment()}>Set a commitment</AppLink>.</p> : visible.map((item) => <CommitmentSummary key={item.id} commitment={item} />)}
-    <details className="review-closed-periods" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary>Closed commitment periods</summary><div className="field fields"><label htmlFor="history-week">Week beginning</label><DateInput id="history-week" today={todayKey(bootstrap().profile.timezone)} value={historyStart} onValueChange={value => { if (value) setHistoryStart(presetPeriod("week", value).start); }} /></div><p className="muted">{formatDate(historyStart)} – {formatDate(addDays(historyStart, 6))}</p>{history.isPending ? <p>Loading closed periods…</p> : history.isError ? <ErrorState error={history.error} onRetry={() => void history.refetch()} /> : <>{history.data.details.filter(item => projectIds === null || matchingIds.has(item.commitment_id)).map((item) => <p key={item.commitment_id}><AppLink href={urls.updateCommitment(item.commitment_id)}>{item.target_name}</AppLink> · {item.met_period_count} of {item.period_count} periods met</p>)}</>}</details>
+    {commitments.isPending || matchingPending ? <Skeleton lines={3} /> : commitments.isError || matchingError ? <ErrorState error={commitments.error ?? matchingError} onRetry={() => { void commitments.refetch(); if (context !== "all") void scoped.refetch(); matching.forEach(query => void query.refetch()); }} /> : !visible.length ? <p className="review-empty">A little structure for what matters. <AppLink href={urls.createCommitment()}>Set a commitment</AppLink>.</p> : visible.map((item) => <CommitmentSummary key={item.id} commitment={item} />)}
+    <details className="review-closed-periods" onToggle={(event) => setHistoryOpen(event.currentTarget.open)}><summary>Closed commitment periods</summary><div className="field fields"><label htmlFor="history-week">Week beginning</label><DateInput id="history-week" today={todayKey(bootstrap().profile.timezone)} value={historyStart} onValueChange={value => { if (value) setHistoryStart(presetPeriod("week", value).start); }} /></div><p className="muted">{formatDate(historyStart)} – {formatDate(addDays(historyStart, 6))}</p>{history.isPending ? <p>Loading closed periods…</p> : history.isError ? <ErrorState error={history.error} onRetry={() => void history.refetch()} /> : <>{history.data.details.filter(item => matchesFilters(item.commitment_id)).map((item) => <p key={item.commitment_id}><AppLink href={urls.updateCommitment(item.commitment_id)}>{item.target_name}</AppLink> · {item.met_period_count} of {item.period_count} periods met</p>)}</>}</details>
   </section>;
 }
 
