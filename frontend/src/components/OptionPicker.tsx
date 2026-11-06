@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { faSearch, type IconDefinition } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
 
@@ -40,6 +40,14 @@ export function OptionPicker({
   modeLabels?: { include: string; exclude: string };
 }) {
   const [query, setQuery] = useState("");
+  const popover = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => { if (popover.current?.open && !popover.current.contains(event.target as Node)) popover.current.open = false; };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape" && popover.current?.open) { event.stopPropagation(); popover.current.open = false; popover.current.querySelector<HTMLElement>("summary")?.focus(); } };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape, true);
+    return () => { document.removeEventListener("pointerdown", closeOutside); document.removeEventListener("keydown", closeOnEscape, true); };
+  }, []);
   const labelId = useId();
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
@@ -83,21 +91,23 @@ export function OptionPicker({
           ) : null}
         </span>
       </div>
+      <details className="filter-picker" ref={popover}>
+        <summary aria-label={`${label}: ${selected.length ? `${selected.length} selected` : "all"}`}>{selected.length ? `${selected.length} selected` : `Choose ${label.toLowerCase()}`}</summary>
       <div className="picker">
-        {searchPlaceholder ? (
+        {(
           <div className="picker-search">
             <Icon icon={faSearch} />
             <input
               type="text"
               className="picker-search-input"
-              placeholder={searchPlaceholder}
-              aria-label={searchPlaceholder}
+              placeholder={searchPlaceholder ?? `Search ${label.toLowerCase()}`}
+              aria-label={searchPlaceholder ?? `Search ${label.toLowerCase()}`}
               autoComplete="off"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-        ) : null}
+        )}
         <div className="picker-options">
           {visible.map((option) => (
             <button type="button" aria-pressed={selectedSet.has(option.id)} onClick={() => toggle(option.id)} key={option.id} title={option.label} className="option-chip" style={option.color ? ({ "--tag": option.color } as React.CSSProperties) : undefined}>
@@ -107,6 +117,7 @@ export function OptionPicker({
         </div>
         {visible.length === 0 ? <p className="picker-empty">{emptyText}</p> : null}
       </div>
+      </details>
     </div>
   );
 }
