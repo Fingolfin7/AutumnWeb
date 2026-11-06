@@ -23,6 +23,20 @@ it("bold wraps the selection and leaves the caret after it", async () => {
   expect(box().value).toBe("hello **world**");
 });
 
+it("formats every selected line as a list and can change the list type without losing text", async () => {
+  const user = userEvent.setup();
+  render(<Harness initial={"measure the bed\nleave a path"} />);
+  box().setSelectionRange(0, box().value.length);
+  await user.click(screen.getByRole("button", { name: "Bulleted list" }));
+  expect(box().value).toBe("- measure the bed\n- leave a path");
+  box().setSelectionRange(0, box().value.length);
+  await user.click(screen.getByRole("button", { name: "Numbered list" }));
+  expect(box().value).toBe("1. measure the bed\n2. leave a path");
+  box().setSelectionRange(0, box().value.length);
+  await user.click(screen.getByRole("button", { name: "Numbered list" }));
+  expect(box().value).toBe("measure the bed\nleave a path");
+});
+
 it("with nothing selected the caret lands between the markers", async () => {
   const user = userEvent.setup();
   render(<Harness />);

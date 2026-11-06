@@ -100,9 +100,9 @@ export function SessionBand({ session, showDate, hideProject = false, hideDurati
   }, []);
 
   const portions = dayPortions(session);
-  // A midnight session appears in both days. Keep the public anchor on the
-  // latest portion, with distinct note/action IDs on its earlier appearances.
-  const instance = `${session.id}${day && day !== portions[portions.length - 1]?.date ? `-${day}` : ""}`;
+  // The public anchor belongs to the start day, where the note lives.
+  // Continuations have their own unique action IDs and point back to it.
+  const instance = `${session.id}${day && day !== portions[0]?.date ? `-${day}` : ""}`;
   const minutes = (day ? portions.find((part) => part.date === day)?.minutes : undefined) ?? session.duration_minutes ?? 0;
   const continuation = !!day && day !== localDateKey(new Date(session.start));
   const portionStart = day && day > localDateKey(new Date(session.start)) ? "00:00" : formatTime(session.start);
@@ -133,7 +133,7 @@ export function SessionBand({ session, showDate, hideProject = false, hideDurati
           {session.subproject_allocations.length ? <span className="journal-subs" title={session.subproject_allocations.map((sub) => sub.name).join(", ")}>{session.subproject_allocations.map((sub) => <AppLink key={sub.subproject_id} className="journal-subproject" href={urls.updateSubproject(sub.subproject_id)}>{sub.name}</AppLink>)}</span> : null}
           {showDate ? <span className="journal-time">{formatShortDate(session.start)}</span> : null}
           <span className="journal-time">{day && portions.length > 1 ? `${portionStart}–${portionEnd}` : formatTimeRange(session.start, session.end)}</span>
-          {continuation ? <><span className="journal-time">{formatDuration(minutes)}</span><AppLink className="journal-note-origin quiet-link" href={`${urls.sessions()}?start_date=${portions[0]?.date}&end_date=${portions[0]?.date}#session-${session.id}-${portions[0]?.date}`}>note on {formatDayDate(session.start)}</AppLink></> : null}
+          {continuation ? <><span className="journal-time">{formatDuration(minutes)}</span><AppLink className="journal-note-origin quiet-link" href={`${urls.sessions()}?start_date=${portions[0]?.date}&end_date=${portions[0]?.date}#session-${session.id}`}>continued from {formatDayDate(session.start)} · read note</AppLink></> : null}
           {crossesDst(session) ? <span className="badge-dst" title="Session crosses a daylight savings transition">DST</span> : null}
           <button className="btn-icon journal-overflow journal-meta-overflow" type="button" aria-label="Session actions" title="Session actions" aria-expanded={actionsOpen} aria-controls={`actions-${instance}`} onClick={() => setActionsOpen(!actionsOpen)}><Icon icon={faEllipsisH} /></button>
         </div>

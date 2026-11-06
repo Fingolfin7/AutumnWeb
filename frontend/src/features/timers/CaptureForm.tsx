@@ -21,6 +21,7 @@ import { api, unwrap } from "@/api/client";
 import { useInvalidate } from "@/api/sync";
 import { useQueryClient } from "@tanstack/react-query";
 import { keys } from "@/api/keys";
+import { DateInput, Input } from "@/components/ui";
 
 const PRESETS: Record<DurationUnit, { value: number; label: string }[]> = {
   minutes: [15, 25, 30, 45, 60].map((value) => ({ value, label: `${value}m` })),
@@ -54,9 +55,10 @@ export function CaptureForm({ mode: initialMode, onSaved }: { mode: CaptureMode;
   const invalidate = useInvalidate();
   const client = useQueryClient();
   const [past, setPast] = useState(initialMode === "past");
-  const [pastAt, setPastAt] = useState(() => toDateTimeLocal(new Date()).slice(0, 16));
+  const [pastAt, setPastAt] = useState(() => { const date = new Date(); if (initialMode === "past") date.setDate(date.getDate() - 1); return toDateTimeLocal(date).slice(0, 16); });
   const [pastDuration, setPastDuration] = useState("45");
   const [customDuration, setCustomDuration] = useState(false);
+  const [customDate, setCustomDate] = useState(false);
   const [pastAnchor, setPastAnchor] = useState("end");
   const [note, setNote] = useState("");
   const pastTime = useLocalTime(pastAt);
@@ -66,6 +68,7 @@ export function CaptureForm({ mode: initialMode, onSaved }: { mode: CaptureMode;
   const [creatingSub, setCreatingSub] = useState(false);
 
   const [project, setProject] = useState<Project | null>(null);
+  const [highlighted, setHighlighted] = useState<{ project: Project; ids: number[] } | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const subprojects = useSubprojects(project?.id);
 
@@ -144,7 +147,7 @@ export function CaptureForm({ mode: initialMode, onSaved }: { mode: CaptureMode;
   const allChecked = subs.length > 0 && subs.every((s) => selected.includes(s.id));
   const stopMinutes = minutesOf(stopAfter);
 
-  const submit = async (event?: FormEvent, chosenProject = project, chosenIds = selected) => {
+  const submit = async (event?: FormEvent, chosenProject = project ?? highlighted?.project ?? null, chosenIds = project ? selected : highlighted?.ids ?? []) => {
     event?.preventDefault();
     const project = chosenProject;
     const selected = chosenIds;
@@ -259,6 +262,7 @@ export function CaptureForm({ mode: initialMode, onSaved }: { mode: CaptureMode;
                   autoFocus
                   onStart={(next, ids) => { if (!past) void submit(undefined, next, ids); }}
                   value={project}
+                  onHighlight={(next, ids) => setHighlighted((previous) => next ? previous?.project.id === next.id && previous.ids.join(",") === ids.join(",") ? previous : { project: next, ids } : null)}
                   recent={dashboard.data?.quick_starts ?? []}
                   onChange={(next, ids) => {
                     pickProject(next);
@@ -269,7 +273,7 @@ export function CaptureForm({ mode: initialMode, onSaved }: { mode: CaptureMode;
               {project && subs.length ? <div id="pick-subprojects" className="field capture-subprojects">
                 <label htmlFor="capture-subproject">Subproject (optional)</label>
                 <select id="capture-subproject" value={selected.length === 1 ? selected[0] : ""} onChange={(event) => setSelected(event.target.value ? [Number(event.target.value)] : [])}>
-                  <option value="">{selected.length > 1 ? `${selected.length} selected` : "Whole project"}</option>
+                  <option value="">{selected.length > 1 ? `${selected.length} selected` : "No subproject"}</option>
                   {subs.map((sub) => <option value={sub.id} key={sub.id}>{sub.name}</option>)}
                 </select>
               </div> : null}
@@ -283,15 +287,17 @@ export function CaptureForm({ mode: initialMode, onSaved }: { mode: CaptureMode;
                       {["Today", "Yesterday"].map((label, index) => {
                         const date = new Date(); date.setDate(date.getDate() - index);
                         const day = toDateTimeLocal(date).slice(0, 10);
-                        return <button className={`btn btn--quiet${pastAt.startsWith(day) ? " is-active" : ""}`} aria-pressed={pastAt.startsWith(day)} type="button" key={label} onClick={() => setPastAt(`${day}T${pastAt.slice(11, 16)}`)}>{label}</button>;
+                        return <button className={`btn btn--quiet${!customDate && pastAt.startsWith(day) ? " is-active" : ""}`} aria-pressed={!customDate && pastAt.startsWith(day)} type="button" key={label} onClick={() => { setCustomDate(false); setPastAt(`${day}T${pastAt.slice(11, 16)}`); }}>{label}</button>;
                       })}
+                      <button className={`btn btn--quiet${customDate ? " is-active" : ""}`} type="button" aria-pressed={customDate} onClick={() => setCustomDate(true)}>Another date</button>
                     </div>
+                    {customDate ? <DateInput id="past-date" aria-label="Session date" value={pastAt.slice(0, 10)} today={toDateTimeLocal(now).slice(0, 10)} max={toDateTimeLocal(now).slice(0, 10)} onValueChange={(day) => setPastAt(`${day}T${pastAt.slice(11, 16)}`)} /> : null}
                     <label className="sr-only" htmlFor="past-anchor">This time is when the session</label>
                     <select id="past-anchor" value={pastAnchor} onChange={(event) => setPastAnchor(event.target.value)}>
                       <option value="end">Ended</option>
                       <option value="start">Started</option>
                     </select>
-                    <input id="past-at" type="datetime-local" step={60} value={pastAt} onChange={(e) => setPastAt(e.target.value)} required />
+                    <Input id="past-at" aria-label="Session time" type="time" step={60} value={pastAt.slice(11, 16)} onChange={(e) => setPastAt(`${pastAt.slice(0, 10)}T${e.target.value}`)} required />
                   </div>
                   <LocalTimeNotice field={pastTime} label="the session" />
                 </div>
@@ -582,7 +588,7 @@ export function CaptureForm({ mode: initialMode, onSaved }: { mode: CaptureMode;
                 type="submit"
                 id="start-timer"
                 className="btn btn--primary btn--spacer"
-                disabled={!project || start.isPending || savingPast}
+                disabled={!(project || highlighted) || start.isPending || savingPast}
               >
                 {past ? "Save session" : "Start timer"}
               </button>

@@ -154,6 +154,12 @@ export function DayTimeline({ timeline, running, range, onRange }: {
       {blocks.length ? (
         <>
           {timeline.is_multi_day ? <p className="ledger-range-total"><span className="ledger-total">{formatDuration(total)}</span> in this range</p> : null}
+          <div className="day-ember-ribbon" role="group" aria-label={label}>
+            {axis}
+            {track(blocks)}
+          </div>
+          <div className="ledger-project-totals">{lanes.map((lane) => <p key={lane.project.id}><span>{lane.project.name}</span><strong>{formatDuration(lane.blocks.reduce((sum, block) => sum + block.minutes, 0))}</strong></p>)}</div>
+          <details className="ledger-day-view"><summary>Session by session</summary>
           <div className="day-ledger-chart" role="group" aria-label={label}>
             {axis}
             <div className="ledger-field">
@@ -168,10 +174,7 @@ export function DayTimeline({ timeline, running, range, onRange }: {
               ))}
             </div>
           </div>
-          <div className="day-ember-ribbon" role="group" aria-label={label}>
-            {axis}
-            {track(blocks)}
-          </div>
+          </details>
         </>
       ) : (
         <p className="empty">An open day. Start a timer and see it take shape.</p>

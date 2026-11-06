@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent
 import { createPortal } from "react-dom";
 import { formatTime } from "@/lib/format";
 import { readNoteDraft, writeNoteDraft } from "@/lib/noteDraft";
-import { faClock, faExpand, faLink, faMicrophone } from "@fortawesome/free-solid-svg-icons";
+import { faClock, faExpand, faLink, faListOl, faListUl, faMicrophone } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
 import { markTimestamps, renderNoteDraft } from "./SessionNote";
 
@@ -227,6 +227,28 @@ export function NoteEditor({
       if (!selected) textarea.setSelectionRange(start + before.length, start + before.length);
     });
 
+  const list = (numbered: boolean) => apply((textarea) => {
+    const start = textarea.value.lastIndexOf("\n", textarea.selectionStart - 1) + 1;
+    const nextBreak = textarea.value.indexOf("\n", textarea.selectionEnd);
+    const end = nextBreak < 0 ? textarea.value.length : nextBreak;
+    const lines = textarea.value.slice(start, end).split("\n");
+    const pattern = numbered ? /^\d+[.)]\s/ : /^[-*]\s/;
+    const remove = lines.every((line) => pattern.test(line));
+    const replacement = lines.map((line, index) => remove ? line.replace(pattern, "") : `${numbered ? `${index + 1}.` : "-"} ${line.replace(/^(?:[-*]|\d+[.)])\s/, "")}`).join("\n");
+    textarea.setRangeText(replacement, start, end, "end");
+  });
+
+  const openWriter = () => {
+    selection.current = { start: value.length, end: value.length };
+    setWriting(true);
+  };
+  const appendTimestamp = () => {
+    const next = `${value}${value && !value.endsWith("\n") ? "\n" : ""}— ${formatTime(new Date())} — `;
+    change(next);
+    selection.current = { start: next.length, end: next.length };
+    setWriting(true);
+  };
+
   const insertLink = () => {
     const textarea = textareaRef.current;
     if (!textarea || disabled) return;
@@ -252,10 +274,11 @@ export function NoteEditor({
   };
 
   const errors = error ? (Array.isArray(error) ? error : [error]) : [];
+  const writerStatus = saveStatus === "Saved" ? "Saved to session" : saveStatus?.startsWith("Unsaved changes") || (!saveStatus && persistKey) ? "Draft kept on this device" : saveStatus ?? "";
 
   const field = (
     <div className={`field note-editor-field${writing ? " is-writing" : ""}${focused ? " is-focused" : ""}`} onFocus={(event) => { if (!(event.target as Element).closest(".note-rich-preview")) setFocused(true); }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget) && !(event.relatedTarget instanceof Element && event.relatedTarget.closest("button, a, summary"))) setFocused(false); }}>
-      {writing ? <header className="note-writer-heading"><div><h2>{sessionTitle?.split(" · ")[0] || "Session note"}</h2><small>{sessionTitle?.includes(" · ") ? `${sessionTitle.split(" · ").slice(1).join(" · ")} · ` : ""}{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><button className="btn btn--secondary" type="button" aria-label="Done" disabled={finishing} onClick={() => void closeWriter()}><span className="note-writer-back" aria-hidden="true">&lsaquo;</span>{finishing ? "Saving..." : "Done"}</button></header> : null}
+      {writing ? <header className="note-writer-heading"><div className="note-writer-identity"><h2>{sessionTitle?.split(" · ")[0] || "Session note"}</h2><small>{sessionTitle?.includes(" · ") ? `${sessionTitle.split(" · ").slice(1).join(" · ")} · ` : ""}{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><div className="note-writer-completion"><small role="status">{writerStatus}</small>{onRetry && saveStatus?.includes("retry") ? <button className="quiet-link" type="button" onClick={onRetry}>Retry</button> : null}<button className="btn btn--quiet" type="button" aria-label="Done" disabled={finishing} onClick={() => void closeWriter()}>{finishing ? "Saving..." : "Done"}</button></div></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
         <div className="note-editor-toolbar" role="toolbar" aria-label="Note formatting">
@@ -270,6 +293,8 @@ export function NoteEditor({
           <button type="button" className="note-tool-button" title="Italic (Ctrl+I)" aria-label="Italic" disabled={disabled} onClick={() => wrap("*", "*")}>
             <i>I</i>
           </button>
+          <button type="button" className="note-tool-button" title="Bulleted list" aria-label="Bulleted list" disabled={disabled} onClick={() => list(false)}><Icon icon={faListUl} /></button>
+          <button type="button" className="note-tool-button" title="Numbered list" aria-label="Numbered list" disabled={disabled} onClick={() => list(true)}><Icon icon={faListOl} /></button>
           <button type="button" className="note-tool-button" title="Link" aria-label="Link" disabled={disabled} onClick={insertLink}>
             <Icon icon={faLink} />
           </button>
@@ -312,9 +337,10 @@ export function NoteEditor({
           onKeyDown={onKeyDown}
         />
       </div>
+      {richPreview && value.trim() && !richEditing && !writing ? <div className="note-preview-actions"><button className="quiet-link" type="button" disabled={disabled} onClick={openWriter}>Edit note</button><button className="quiet-link" type="button" disabled={disabled} onClick={appendTimestamp}>Append timestamp</button></div> : null}
       <div className="note-editor-status">
-        <small role="status">{writing && saveStatus === "Saved" ? "Saved to session" : writing && (saveStatus?.startsWith("Unsaved changes") || (!saveStatus && persistKey)) ? "Draft kept on this device" : saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
-        {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
+        {!writing ? <small role="status">{saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small> : null}
+        {!writing && onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
       {writing && (!onDone || !navigator.onLine) ? <small className="writer-done-help">{!navigator.onLine ? "Done keeps your draft on this device." : "Done keeps your note in the session form."}</small> : null}
       <small data-note-status="" aria-live="polite">{status}</small>
       </div>

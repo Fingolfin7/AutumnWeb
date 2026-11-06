@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useAllProjects, useSubprojects } from "@/api/meta";
 import type { Project } from "@/api/types";
 import { rankProjects } from "@/components/ProjectCombobox";
@@ -15,6 +15,7 @@ export function CapturePicker({
   value,
   onChange,
   onStart,
+  onHighlight,
   recent,
   id = "project-search",
   autoFocus = true,
@@ -23,6 +24,7 @@ export function CapturePicker({
   value: Project | null;
   onChange: (project: Project | null, subprojectIds: number[]) => void;
   onStart?: (project: Project, subprojectIds: number[]) => void;
+  onHighlight?: (project: Project | null, subprojectIds: number[]) => void;
   recent: Dashboard["quick_starts"];
   id?: string;
   autoFocus?: boolean;
@@ -54,8 +56,14 @@ export function CapturePicker({
     const unique = [...new Map(pairs.map((pair) => [`${pair.project.id}:${[...pair.subprojectIds].sort().join(",")}`, pair])).values()];
     const plain = new Set(unique.filter((pair) => !pair.subprojectIds.length).map((pair) => pair.project.id));
     const others = [...new Map([...unique.map((pair) => pair.project), ...rankProjects(all, text, 12)].map((project) => [project.id, project])).values()].filter((project) => !plain.has(project.id));
-    return [...unique, ...others.map((project) => ({ project, subprojectIds: [], label: project.name, sublabel: "" }))];
+    const groups = new Map<number, Pick[]>();
+    for (const pick of [...unique, ...others.map((project) => ({ project, subprojectIds: [], label: project.name, sublabel: "" }))]) groups.set(pick.project.id, [...(groups.get(pick.project.id) ?? []), pick]);
+    return [...groups.values()].flatMap((group) => group.sort((a, b) => Number(!!a.sublabel) - Number(!!b.sublabel))).slice(0, 5);
   }, [projects.data, recent, text, exactProject, searchedSubs.data]);
+  const highlight = open ? picks[active] : undefined;
+  const highlightedKey = highlight ? `${highlight.project.id}:${highlight.subprojectIds.join(",")}` : "";
+  const onHighlightRef = useRef(onHighlight); onHighlightRef.current = onHighlight;
+  useEffect(() => { onHighlightRef.current?.(highlight?.project ?? null, highlight?.subprojectIds ?? []); }, [highlightedKey]);
   const choose = (pick: Pick) => {
     onChange(pick.project, pick.subprojectIds);
     setText(pick.project.name);
@@ -118,12 +126,12 @@ export function CapturePicker({
                 id={`${listId}-${index}`}
                 aria-selected={active === index}
                 aria-label={`${pick.label}${pick.sublabel ? ` / ${pick.sublabel}` : ""}`}
-                className={active === index ? "is-active" : undefined}
+                className={`${active === index ? "is-active" : ""}${pick.sublabel && picks[index - 1]?.project.id === pick.project.id ? " capture-pick-nested" : ""}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onPointerMove={() => setActive(index)}
                 onClick={() => choose(pick)}
               >
-                <CapturePickLabel project={pick.label} sublabel={pick.sublabel} />
+                {pick.sublabel && picks[index - 1]?.project.id === pick.project.id ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{pick.sublabel}</span></span> : <CapturePickLabel project={pick.label} sublabel={pick.sublabel || "no subproject"} />}
               </li>
             ))
           ) : (
