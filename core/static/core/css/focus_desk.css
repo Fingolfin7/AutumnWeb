@@ -5044,6 +5044,10 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .project-week-target .commitment-summary { padding: 0; }
 @media (max-width: 999px) {
   .review-commitments > .commitment-summary { padding-inline: var(--s4); }
+  .app-header--settings .brand { width: auto; gap: var(--s1); }
+  .app-header--settings .brand-mark { width: 20px; height: 20px; }
+  .app-header--settings .brand-word { position: static; width: auto; height: auto; overflow: visible; clip-path: none; font-size: var(--fs-sm); letter-spacing: -.015em; }
+  .app-header--settings .context-switch select { max-width: min(32vw, 8rem); }
   body:has(.insights-workspace) { padding-bottom: 0; }
   .app:has(.insights-workspace) #main-content { width: 100%; max-width: none; padding: 0; }
   .insights-workspace .chat-layout { --chat-h: calc(100dvh - var(--header-h) - var(--tabbar-h) - env(safe-area-inset-bottom, 0px)); margin: 0; border: 0; border-radius: 0; }

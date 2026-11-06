@@ -77,7 +77,7 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="app">
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <header className="app-header app-header--auth">
+      <header className={`app-header app-header--auth${settingsActive ? " app-header--settings" : ""}`}>
         <div className="screen app-header-screen--auth">
           <AppLink className="brand" href={urls.home()} aria-label="Autumn">
             <img className="brand-mark" src={boot.static.leaf} alt="" />
