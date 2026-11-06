@@ -68,7 +68,7 @@ export function OfflineSync() {
         </>
       ) : (
         <>
-          <Icon icon={faWifi} /> Offline{waiting ? ` Â· ${pluralize(waiting, "change")} to sync` : " Â· saved data"}
+          <Icon icon={faWifi} /> Offline{waiting ? ` · ${pluralize(waiting, "change")} to sync` : " · saved data"}
         </>
       )}
     </div>
