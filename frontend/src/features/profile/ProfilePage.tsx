@@ -455,8 +455,8 @@ function ProfileEditor({
         />
         </form> : null}
 
-        {section === "defaults" || (section === "search" && prefs.ai_features_enabled && prefs.configured_api_keys.openai) ? <Defaults className="slab slab-pad" onSubmit={(event: FormEvent) => { event.stopPropagation(); void onSubmit(event, section === "search" ? "search" : "defaults"); }}>
-          {section === "search" ? <SlabHead title="Related search" /> : null}
+        {section === "defaults" || ((section === "search" || section === "ai") && prefs.ai_features_enabled && prefs.configured_api_keys.openai) ? <Defaults className="slab slab-pad" onSubmit={(event: FormEvent) => { event.stopPropagation(); void onSubmit(event, section === "defaults" ? "defaults" : "search"); }}>
+          {section !== "defaults" ? <SlabHead title="Related search" /> : null}
           <div className="profile-defaults-grid">
             {section === "defaults" ? dateRanges.map((range) => {
               const unit = prefsD[range.unitKey];
@@ -537,7 +537,7 @@ function ProfileEditor({
               <FieldErrors lines={errors.default_chart_project_count} />
             </div> : null}
 
-            {section === "search" && prefs.ai_features_enabled && prefs.configured_api_keys.openai ? (
+            {(section === "search" || section === "ai") && prefs.ai_features_enabled && prefs.configured_api_keys.openai ? (
               <div className="profile-default-item profile-default-item--wide">
                 <SimilaritySlider
                   title="Related search closeness"
@@ -562,7 +562,7 @@ function ProfileEditor({
           </div>
         </Defaults> : null}
 
-        {section === "search" && (!prefs.ai_features_enabled || !prefs.configured_api_keys.openai) ? <p className="slab slab-pad">Connect an OpenAI API key in <AppLink className="btn btn--quiet" href="/settings/ai/">AI connections</AppLink> to find related sessions by meaning.</p> : null}
+        {(section === "search" || section === "ai") && (!prefs.ai_features_enabled || !prefs.configured_api_keys.openai) ? <p className="slab slab-pad">Connect an OpenAI API key in <AppLink className="btn btn--quiet" href="/settings/ai/">AI connections</AppLink> to find related sessions by meaning.</p> : null}
         {section === "ai" && !prefs.ai_features_enabled ? <p className="slab slab-pad">AI features are turned off on this Autumn instance. Connected apps can still be managed below.</p> : null}
         {section === "ai" && prefs.ai_features_enabled ? (
           <AiSection
