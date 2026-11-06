@@ -289,7 +289,6 @@ function ProfileEditor({
     return () => window.clearTimeout(timer);
   }, [section, saving, fingerprint, pendingScope, retryVersion]);
   const Defaults = "form";
-  const Root = section === "ai" ? "form" : "div";
   const dateRanges = [
     {
       id: "default_filter",
@@ -310,7 +309,7 @@ function ProfileEditor({
 
   return (
     <>
-      <Root className="fields profile-page" onSubmit={section === "ai" ? (event: FormEvent) => void onSubmit(event, "ai") : undefined}>
+      <div className="fields profile-page">
         {saveFailed || saving || pendingScope || lastAttempt.current ? <div className="settings-autosave" role="status">{saveFailed ? "Not saved" : saving ? "Saving" : pendingScope ? "Waiting to save" : "Saved automatically"}{saveFailed || Object.keys(errors).length ? <button className="btn btn--quiet" type="button" onClick={() => { lastAttempt.current = ""; setErrors({}); setSaveFailed(false); setRetryVersion(value => value + 1); }}>Retry saving</button> : null}</div> : null}
         {section === "account" ? <>
         <form className="slab slab-pad" onSubmit={(event) => void onSubmit(event, "account")} noValidate>
@@ -555,7 +554,7 @@ function ProfileEditor({
           />
         ) : null}
 
-      </Root>
+      </div>
 
       {section === "ai" ? <section className="slab slab-pad">
         <div className="profile-codex-panel">

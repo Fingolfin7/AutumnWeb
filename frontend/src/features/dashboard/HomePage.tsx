@@ -11,8 +11,8 @@ import { TimerNoteEditor } from "@/features/timers/TimerNoteEditor";
 import { useNow, useOutsideContextTimerCount, useStartTimer, useTimers } from "@/features/timers/api";
 import { groupByDay } from "@/lib/sessions";
 import { JournalDay, SessionBand } from "@/features/sessions/SessionBand";
-import { CommitmentsPanel } from "./CommitmentsPanel";
-import { CommitmentMeter } from "@/features/commitments/CommitmentMeter";
+import { CommitmentHistory } from "./CommitmentsPanel";
+import { CommitmentSummary } from "@/features/commitments/CommitmentSummary";
 import { CaptureLink } from "@/features/timers/CaptureLayer";
 import { CapturePickLabel } from "@/features/timers/CapturePicker";
 import { useToast } from "@/app/toasts";
@@ -85,12 +85,8 @@ function HomeContent({ data }: { data: Dashboard }) {
           {timeline.data ? <DayTimeline timeline={timeline.data} running={running} range={range} onRange={setRange} /> : null}
           {data.commitments.length ? <section className="today-commitments" aria-label="Commitment summary">
             <header className="today-section-head"><h2>Commitments</h2><span className="today-scope">All contexts</span></header>
-            {data.commitments.map(({ commitment }) => <div className="today-commitment" key={commitment.id}>
-              <AppLink className="today-commitment-name text-red" href={urls.updateCommitment(commitment.id)}>{commitment.target.name}</AppLink>
-              <CommitmentMeter commitment={commitment} />
-            </div>)}
-            <details className="today-history"><summary>Streaks & balance</summary><CommitmentsPanel items={data.commitments} /></details>
-          </section> : null}
+            {data.commitments.map(item => <CommitmentSummary key={item.commitment.id} commitment={item.commitment}><CommitmentHistory item={item} /></CommitmentSummary>)}
+            </section> : null}
         </aside> : null}
         {!firstRun ? <section className="today-journal" aria-label="Today's journal">
           <JournalDay label="Today's journal" minutes={today?.totalMinutes}>
