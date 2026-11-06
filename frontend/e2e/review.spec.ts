@@ -32,3 +32,16 @@ test("Review preserves old links, applies filters immediately and offers every c
   await expect(page).toHaveURL(/\/review\/\?start_date=2026-10-05&end_date=2026-10-11/);
   expect(problems()).toEqual([]);
 });
+
+
+test("Review commitments follow the active context", async ({ page }) => {
+  await page.goto("/review/");
+  const context = page.getByRole("combobox", { name: "Active context" });
+  const commitments = page.locator(".review-commitments");
+  await context.selectOption({ label: "Study" });
+  await expect(commitments.getByText("Czech Language", { exact: true })).toBeVisible();
+  await expect(commitments).toContainText("full scope");
+  await context.selectOption({ label: "Work" });
+  await expect(commitments.getByText("Czech Language", { exact: true })).toHaveCount(0);
+  await context.selectOption("all");
+});
