@@ -17,7 +17,8 @@ import type { DailyTotalRow } from "@/features/charts/payloads";
 import { Disclose } from "@/components/Disclose";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
-import { formatDate, formatDurationWords, localDateKey } from "@/lib/format";
+import { formatDate, formatDurationWords } from "@/lib/format";
+import { groupByDay } from "@/lib/sessions";
 import type { Project, ProjectDetail } from "@/api/types";
 import { useCommitmentsAppliedTo } from "@/features/commitments/api";
 import { failure, useProject, useUpdateProject } from "./api";
@@ -57,7 +58,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const [selectedSub, setSelectedSub] = useState("");
   const [subMenu, setSubMenu] = useState<number | null>(null);
   const recentRows = recent.data?.pages[0]?.sessions.slice(0,5) ?? [];
-  const journalDays = [...new Set(recentRows.map(session => localDateKey(new Date(session.start))))];
+  const journalDays = groupByDay(recentRows);
   const update = useUpdateProject(project.id);
   const related = useCommitmentsAppliedTo("project", project.id).data ?? [];
   const ownCommitment = related.find((item) => item.active && item.aggregation_type === "project" && item.target.id === project.id) ?? related.find((item) => item.aggregation_type === "project" && item.target.id === project.id);
@@ -165,7 +166,7 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
 
         <section className="session-list project-journal" aria-label="Recent journal entries">
           <div className="project-journal-link"><AppLink className="btn btn--quiet" href={`${urls.sessions()}?include_projects=${project.id}`}>All sessions</AppLink></div>
-          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(day => <section className="project-journal-day" key={day}><header className="day-head"><h3 className="day-date">{formatDate(day)}</h3><strong className="day-total">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).length > 0 ? formatDurationWords(recentRows.filter(session => localDateKey(new Date(session.start)) === day).reduce((sum,session) => sum + (session.duration_minutes ?? 0),0)) : null}</strong></header><ul className="band-list">{recentRows.filter(session => localDateKey(new Date(session.start)) === day).map(session => <SessionBand key={session.id} session={session} hideProject />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
+          {recent.isError ? <p className="slab-pad muted">Could not load journal entries. <button type="button" className="btn btn--quiet" onClick={() => void recent.refetch()}>Try again</button></p> : recent.isPending ? <p className="slab-pad muted">Loading entries…</p> : recent.data?.pages[0]?.sessions.length ? <>{journalDays.map(group => <section className="project-journal-day" key={group.date}><header className="day-head"><h3 className="day-date">{formatDate(group.date)}</h3><strong className="day-total">{formatDurationWords(group.totalMinutes)}</strong></header><ul className="band-list">{group.sessions.map(session => <SessionBand key={session.id} session={session} day={group.date} hideProject />)}</ul></section>)}</> : <p className="empty">Your first session will appear here.</p>}
         </section>
         <aside className="project-rail">
         <Disclose id="project-subprojects" icon={faSitemap} iconClass="text-blue" title="Subprojects" summary={project.subprojects.length}>
