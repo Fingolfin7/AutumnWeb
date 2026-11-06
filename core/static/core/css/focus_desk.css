@@ -5105,3 +5105,13 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .project-running strong { font: 650 var(--fs-lg)/1 var(--font-display); font-variant-numeric: tabular-nums; }
 .project-running-note { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--note); }
 .project-running .btn { flex: none; margin-left: auto; }
+
+@media (min-width: 1000px) {
+  .review-period-layout { display: grid; grid-template-columns: minmax(280px, .75fr) minmax(0, 1.25fr); gap: var(--s5); align-items: start; }
+  .review-period-layout .review-body { display: contents; }
+  .review-period-layout .review-commitments { grid-column: 1 / -1; }
+  .review-period-layout .review-period { min-width: 0; }
+  .review-period-layout .review-projects { min-width: 0; }
+  .review-period-layout .review-ember-weeks { gap: 2px; }
+  .review-period-layout .review-ember-weeks button { min-width: 0; padding-inline: 1px; }
+}
