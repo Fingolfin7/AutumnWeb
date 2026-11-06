@@ -38,10 +38,15 @@ test("Review commitments follow the active context", async ({ page }) => {
   await page.goto("/review/");
   const context = page.getByRole("combobox", { name: "Active context" });
   const commitments = page.locator(".review-commitments");
-  await context.selectOption({ label: "Study" });
+  const selectContext = async (value: string | { label: string }) => {
+    const persisted = page.waitForResponse(response => response.url().endsWith("/api/v2/me/preferences/") && response.request().method() === "PATCH");
+    await context.selectOption(value);
+    expect((await persisted).ok()).toBeTruthy();
+  };
+  await selectContext({ label: "Study" });
   await expect(commitments.getByText("Czech Language", { exact: true })).toBeVisible();
   await expect(commitments).toContainText("full scope");
-  await context.selectOption({ label: "Work" });
+  await selectContext({ label: "Work" });
   await expect(commitments.getByText("Czech Language", { exact: true })).toHaveCount(0);
-  await context.selectOption("all");
+  await selectContext("all");
 });
