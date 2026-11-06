@@ -5166,3 +5166,5 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 
 .chart-series-dot { background: transparent; }
 .review-projects .chart-series .chart-series-previous button > span { color: var(--ink-2); }
+
+.chart-series.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
