@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router";
 import { EmptyWorkspace } from "@/features/settings/FirstRunPage";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -42,6 +43,11 @@ function HomeContent({ data }: { data: Dashboard }) {
   const timers = useTimers();
   const now = useNow();
   const running = [...(timers.data ?? data.active_timers)].sort((a, b) => Date.parse(b.start) - Date.parse(a.start));
+  const { hash } = useLocation();
+  const runningIds = running.map((timer) => timer.id).join(",");
+  useEffect(() => {
+    if (hash.startsWith("#timer-")) document.getElementById(hash.slice(1))?.scrollIntoView({ block: "center" });
+  }, [hash, runningIds]);
   const [range, setRange] = useState<TimelineRange>("today");
   const timeline = useTimeline(range, data.timeline);
   const todayTimeline = useTimeline("today", data.timeline);
@@ -142,7 +148,7 @@ function StartCard({ items }: { items: Dashboard["quick_starts"] }) {
           }, { onSuccess: () => toast.success("Started timer"), onError: (error) => toast.error(`Couldn't start the timer: ${errorMessage(error)}`) })}
         >
           <Icon icon={faPlay} />
-          {sublabel ? nested ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{sublabel}</span></span> : <CapturePickLabel project={item.project.name} sublabel={sublabel} /> : <CapturePickLabel project={item.project.name} sublabel="no subproject" />}
+          {sublabel ? nested ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{sublabel}</span></span> : <CapturePickLabel project={item.project.name} sublabel={sublabel} /> : <CapturePickLabel project={item.project.name} sublabel="no subproject" noSubproject />}
         </button>;
       })}
       <CaptureLink className="today-quick-pick today-something-else"><Icon icon={faSearch} /><span>Another project</span></CaptureLink>

@@ -4,8 +4,8 @@ import type { Project } from "@/api/types";
 import { rankProjects } from "@/components/ProjectCombobox";
 import type { Dashboard } from "@/features/dashboard/api";
 
-export function CapturePickLabel({ project, sublabel }: { project: string; sublabel?: string }) {
-  return <span className="capture-pick-label"><span className="text-red">{project}</span>{sublabel ? <span className="capture-pick-sub text-blue">{sublabel}</span> : null}</span>;
+export function CapturePickLabel({ project, sublabel, noSubproject = false }: { project: string; sublabel?: string; noSubproject?: boolean }) {
+  return <span className="capture-pick-label"><span className="text-red">{project}</span>{sublabel ? <span className={`capture-pick-sub${noSubproject ? "" : " text-blue"}`}>{noSubproject ? "· " : ""}{sublabel}</span> : null}</span>;
 }
 
 type Pick = { project: Project; subprojectIds: number[]; label: string; sublabel: string };
@@ -131,7 +131,7 @@ export function CapturePicker({
                 onPointerMove={() => setActive(index)}
                 onClick={() => choose(pick)}
               >
-                {pick.sublabel && picks[index - 1]?.project.id === pick.project.id ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{pick.sublabel}</span></span> : <CapturePickLabel project={pick.label} sublabel={pick.sublabel || "no subproject"} />}
+                {pick.sublabel && picks[index - 1]?.project.id === pick.project.id ? <span className="capture-pick-label"><span className="capture-pick-sub text-blue">{pick.sublabel}</span></span> : <CapturePickLabel project={pick.label} sublabel={pick.sublabel || "no subproject"} noSubproject={!pick.sublabel} />}
               </li>
             ))
           ) : (

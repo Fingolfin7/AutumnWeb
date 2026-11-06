@@ -5208,7 +5208,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .journal-meta .journal-subs, .focus-meta .journal-subs { flex: 1 0 100%; flex-wrap: wrap; overflow: visible; padding-block: 0; margin-block: 0; }
   .journal-meta .journal-subproject, .focus-meta .journal-subproject { flex: 0 1 auto; max-width: 100%; white-space: normal; overflow: visible; overflow-wrap: anywhere; margin-block: -8px; padding-block: 8px; line-height: 28px; }
   .journal-entry .session-note { margin-top: var(--s2); }
-  .journal-entry--in-project .journal-heading, .project-journal .journal-heading { grid-template-areas: "duration duration" "meta meta"; }
+  .journal-entry--in-project .journal-heading, .project-journal .journal-heading { grid-template-areas: "meta duration"; }
   .journal-entry--in-project .journal-duration, .project-journal .journal-duration { grid-column: 2; grid-row: 1; }
   .journal-entry--in-project .journal-heading:not(:has(.journal-duration)), .project-journal .journal-heading:not(:has(.journal-duration)) { grid-template-areas: "meta meta"; }
   .note-writer-heading > .note-writer-identity { display: block; grid-column: 1 / -1; grid-row: 2; }
