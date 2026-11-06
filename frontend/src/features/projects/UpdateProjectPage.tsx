@@ -50,6 +50,7 @@ export default function UpdateProjectPage() {
 function ProjectDetailView({ project }: { project: ProjectDetail }) {
   const toast = useToast();
   const [editing, setEditing] = useState(false);
+  const [projectMenu, setProjectMenu] = useState(false);
   const start = useStartTimer();
   const recent = useSessionList({ project_ids: String(project.id) });
   const [journalSub, setJournalSub] = useState<number | null>(null);
@@ -134,10 +135,18 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
       <div className="project-overview">
         <div className="desk-head project-page-head">
           <PageHead title={project.name} titleClass="text-red" />
-          <button type="button" className="btn btn--quiet" onClick={() => { reset(project); setEditing(true); }}><Icon icon={faPen} /> Edit project</button>
+          <button type="button" className="btn-icon" aria-label="Project actions" onClick={() => setProjectMenu(true)}><Icon icon={faEllipsisH} /></button>
         </div>
         <div className="project-properties" aria-label="Project properties"><span className="chip">{project.status}</span>{project.context ? <AppLink className="chip-link" href={urls.updateContext(project.context.id)}><span className="context-chip">{project.context.name}</span></AppLink> : null}{project.tags.map(tag => <AppLink className="chip-link" key={tag.id} href={urls.updateTag(tag.id)}><span className="tag-chip">{tag.name}</span></AppLink>)}<a href="#project-subprojects">{project.subprojects.length} subproject{project.subprojects.length === 1 ? "" : "s"}</a>{ownCommitment ? <a href="#project-commitment">Commitment</a> : null}<span>{formatDurationWords(project.total_minutes)} total · {project.session_count} sessions</span></div>
-        {project.description ? <details className="project-description"><summary>About this project</summary><SessionNote text={project.description} /></details> : null}
+        {project.description ? <details className="project-description" id="project-about"><summary>About this project</summary><SessionNote text={project.description} /></details> : null}
+        <Sheet open={projectMenu} onClose={() => setProjectMenu(false)} title="Project actions">
+          <div className="project-menu-actions">
+            <button type="button" className="btn btn--quiet" onClick={() => { setProjectMenu(false); reset(project); setEditing(true); }}><Icon icon={faPen} /> Edit project</button>
+            <AppLink className="btn btn--quiet" href={urls.mergeProjects()}><Icon icon={faCodeBranch} /> Merge projects</AppLink>
+            <AppLink className="btn btn--quiet" href={urls.createSubproject(project.id)}><Icon icon={faPlus} /> New subproject</AppLink>
+            {project.description ? <a className="btn btn--quiet" href="#project-about" onClick={() => setProjectMenu(false)}>About this project</a> : null}
+          </div>
+        </Sheet>
         <Sheet open={editing} onClose={() => setEditing(false)} title="Edit project" className="project-edit-sheet">
 
         {conflict || changedElsewhere ? (

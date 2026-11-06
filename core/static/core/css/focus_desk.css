@@ -5174,3 +5174,6 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .project-side-rail > *, .project-overview .project-side-rail .project-rail { grid-column: 1; grid-row: auto; }
   .project-side-rail .project-live-card { flex-wrap: wrap; }
 }
+
+.project-menu-actions { display: grid; gap: var(--s1); }
+.project-menu-actions .btn { justify-content: flex-start; }
