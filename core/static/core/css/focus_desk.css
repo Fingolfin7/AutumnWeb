@@ -4266,6 +4266,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 
 
 .settings-reminder-sheet .nx-schedule-editor { overflow: visible; }
+.settings-reminder-sheet .sheet-panel { scroll-padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 .review-desk .review-projects .review-section-heading { min-height: 72px; padding-block: var(--s4); align-items: center; }
 .field > small, .profile-default-item > p, .nx-timezone-note { font-size: var(--fs-xs); }
 @media (max-width:999px) { .review-desk .review-projects .review-section-heading { padding-inline: var(--s4); } }
@@ -4343,7 +4344,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 
 /* A running journal can grow; keep the whole text scrollable before expanding. */
 
-.note-reading-slot::after { content: ""; position: absolute; pointer-events: none; inset: 52px -20px auto; height: 12px; background: var(--surface-0); }
+.note-reading-slot::after { content: ""; position: absolute; pointer-events: none; inset: 52px -20px auto; height: var(--s6); background: var(--surface-0); }
 
 /* The phone ribbon owns its paint; desktop SVG definitions may be hidden. */
 
@@ -5331,7 +5332,8 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .project-overview .project-rail { order: 6; }
 }
 
-.settings-reminder-sheet .nx-form-grid > .field:has(#id_local_date):has(.temporal-popover) { grid-column: 1 / -1; }
+.settings-reminder-sheet .nx-form-grid > .field:has(#id_local_date):has(.temporal-popover),
+.settings-reminder-sheet .nx-form-grid > .field:has(#id_local_time):has(.time-chips) { grid-column: 1 / -1; }
 .first-run-empty h2, .empty-state h2 { text-wrap: balance; }
 .first-run-empty p, .empty-state p { line-height: 1.5; }
 
