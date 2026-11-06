@@ -6,7 +6,6 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router";
 import {
   faCodeBranch,
-  faFolderOpen,
   faLayerGroup,
   faPlus,
   faSearch,
@@ -236,8 +235,6 @@ export default function ProjectsPage() {
           <Disclose
             key={group.status}
             id={`projects-${group.status}`}
-            icon={faFolderOpen}
-            iconClass="muted"
             title={group.label}
             summary={group.projects.length}
             defaultOpen={group.status === "active"}

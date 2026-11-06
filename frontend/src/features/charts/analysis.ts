@@ -37,7 +37,7 @@ export function histogramConfig(data: HistogramRow[]): AnyConfig {
             label(context: TT) {
               const count = context.parsed.x!;
               const pct = total > 0 ? ((count / total) * 100).toFixed(1) : "0";
-              return `${count} sessions (${pct}%)`;
+              return `${count} ${count === 1 ? "session" : "sessions"} (${pct}%)`;
             },
           },
         },

@@ -382,7 +382,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
           ) : null}
           <div className="chat-header">
             <div className="insights-conversation-heading"><AppLink className="btn btn--quiet insights-review-back" aria-label="Back to Review" href={urls.review()}><Icon icon={faChevronLeft} /></AppLink><h2 title={chat?.title || "Insights"}>{chat?.title || "Insights"}</h2></div>
-            <div className="insights-conversation-scope"><button className="btn btn--quiet" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> Context · {count === undefined ? "…" : `${count} ${sessionLabel}`}</button></div>
+            <div className="insights-conversation-scope"><button className="btn btn--quiet" type="button" aria-haspopup="dialog" onClick={() => { setDraft(selection); setSheetOpen(true); }}><Icon icon={faSlidersH} /> {count === undefined ? "Sessions" : `${count} ${sessionLabel}`}</button></div>
             <details className="insights-actions-menu"><summary aria-label="Conversation actions"><Icon icon={faEllipsisH} /></summary><div className="insights-actions-list">
               <button type="button" id="toggle-sidebar-btn" className="btn btn--quiet" onClick={toggleSidebar} aria-expanded={!collapsed} aria-controls="chat-sidebar">History</button>
                 {hasHistory ? (

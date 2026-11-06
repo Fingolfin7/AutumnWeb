@@ -16,7 +16,7 @@ test("Review preserves old links, applies filters immediately and offers every c
   await page.getByRole("button", { name: "Choose chart" }).click();
   const chooser = page.getByRole("dialog", { name: "Choose a chart" });
   await chooser.getByText("More ways to look", { exact: true }).click();
-  await expect(chooser.locator(".review-chart-choice")).toHaveCount(9);
+  await expect(chooser.locator(".review-chart-choice")).toHaveCount(8);
   await chooser.getByRole("button", { name: /Ranked project bars/ }).click();
   await expect(page.locator(".review-project-row").first()).toBeVisible();
   await page.getByRole("radio", { name: "Custom", exact: true }).click();
@@ -31,4 +31,17 @@ test("Review preserves old links, applies filters immediately and offers every c
   await page.goto("/review/weekly/?week=2026-10-05");
   await expect(page).toHaveURL(/\/review\/\?start_date=2026-10-05&end_date=2026-10-11/);
   expect(problems()).toEqual([]);
+});
+
+
+test("Review commitments follow the active context", async ({ page }) => {
+  await page.goto("/review/");
+  const context = page.getByRole("combobox", { name: "Active context" });
+  const commitments = page.locator(".review-commitments");
+  await context.selectOption({ label: "Study" });
+  await expect(commitments.getByText("Czech Language", { exact: true })).toBeVisible();
+  await expect(commitments).toContainText("full scope");
+  await context.selectOption({ label: "Work" });
+  await expect(commitments.getByText("Czech Language", { exact: true })).toHaveCount(0);
+  await context.selectOption("all");
 });

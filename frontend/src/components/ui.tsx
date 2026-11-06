@@ -35,7 +35,17 @@ export function Toggle({ label, id, ...props }: Omit<InputHTMLAttributes<HTMLInp
 /** A native radio group: Tab enters, arrow keys select. Values must be unique. */
 export function SegmentedControl<T extends string>({ label, value, options, onChange, onReselect }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: T) => void; onReselect?: (value: T) => void }) {
   const name = useId();
-  return <fieldset className="segmented"><legend className="sr-only">{label}</legend>{options.map((option) => <label key={option.value}><input type="radio" name={name} checked={value === option.value} onClick={() => { if (value === option.value) onReselect?.(option.value); }} onChange={() => onChange(option.value)} /><span>{option.label}</span></label>)}</fieldset>;
+  const group = useRef<HTMLFieldSetElement>(null);
+  useEffect(() => {
+    const container = group.current;
+    const selected = container?.querySelector<HTMLInputElement>("input:checked")?.parentElement;
+    if (!container || !selected || container.scrollWidth <= container.clientWidth) return;
+    const left = selected.getBoundingClientRect().left - container.getBoundingClientRect().left + container.scrollLeft;
+    const right = left + selected.getBoundingClientRect().width;
+    if (left < container.scrollLeft) container.scrollLeft = left;
+    else if (right > container.scrollLeft + container.clientWidth) container.scrollLeft = right - container.clientWidth;
+  }, [value]);
+  return <fieldset ref={group} className="segmented"><legend className="sr-only">{label}</legend>{options.map((option) => <label key={option.value}><input type="radio" name={name} checked={value === option.value} onClick={() => { if (value === option.value) onReselect?.(option.value); }} onChange={() => onChange(option.value)} /><span>{option.label}</span></label>)}</fieldset>;
 }
 
 function usePopover() {
@@ -95,5 +105,5 @@ export function FileDrop({ onFile, hint, ...props }: Omit<InputHTMLAttributes<HT
   const [dragging, setDragging] = useState(false);
   const [name, setName] = useState("");
   const pick = (file: File | null) => { setName(file?.name ?? ""); onFile(file); };
-  return <div className={`file-drop${dragging ? " is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!props.disabled) pick(event.dataTransfer.files[0] ?? null); }}><input {...props} type="file" onChange={event => pick(event.target.files?.[0] ?? null)} /><span className="file-drop-action">Choose file</span><span className="file-drop-name">{name || hint || "No file chosen"}</span></div>;
+  return <div className={`file-drop${dragging ? " is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!props.disabled) pick(event.dataTransfer.files[0] ?? null); }}><input {...props} type="file" onChange={event => pick(event.target.files?.[0] ?? null)} /><span className="file-drop-action">{name || "Choose file"}</span>{!name && hint ? <span className="file-drop-name">{hint}</span> : null}</div>;
 }

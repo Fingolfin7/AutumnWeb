@@ -113,6 +113,7 @@ function ProfileEditor({
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null);
   const [removeBg, setRemoveBg] = useState(false);
+  const [customRanges, setCustomRanges] = useState<string[]>([]);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -454,17 +455,35 @@ function ProfileEditor({
         />
         </form> : null}
 
-        {section === "defaults" || (section === "search" && prefs.ai_features_enabled && prefs.configured_api_keys.openai) ? <Defaults className="slab slab-pad" onSubmit={(event: FormEvent) => { event.stopPropagation(); void onSubmit(event, section === "search" ? "search" : "defaults"); }}>
-          {section === "search" ? <SlabHead title="Related search" /> : null}
+        {section === "defaults" || ((section === "search" || section === "ai") && prefs.ai_features_enabled && prefs.configured_api_keys.openai) ? <Defaults className="slab slab-pad" onSubmit={(event: FormEvent) => { event.stopPropagation(); void onSubmit(event, section === "defaults" ? "defaults" : "search"); }}>
+          {section !== "defaults" ? <SlabHead title="Related search" /> : null}
           <div className="profile-defaults-grid">
             {section === "defaults" ? dateRanges.map((range) => {
               const unit = prefsD[range.unitKey];
+              const value = prefsD[range.valueKey];
+              const presets = [
+                { key: "1:weeks", label: "Past week", unit: "weeks", value: "1" },
+                { key: "1:months", label: "Past month", unit: "months", value: "1" },
+                { key: "3:months", label: "Past 3 months", unit: "months", value: "3" },
+                { key: "1:years", label: "Past year", unit: "years", value: "1" },
+                ...["month_to_date", "quarter_to_date", "year_to_date"].map(unit => ({ key: unit, label: unit.replaceAll("_", " ").replace(/^./, letter => letter.toUpperCase()), unit, value: "1" })),
+              ];
+              const match = presets.find(preset => preset.unit === unit && (isToDate(unit) || preset.value === value));
+              const custom = customRanges.includes(range.id) || !match;
               return (
                 <div key={range.id} className="profile-default-item">
-                  <label htmlFor={`${range.id}_value`}>{range.label}</label>
-                  <div className={`profile-default-control${isToDate(unit) ? " to-date-range" : ""}`}>
+                  <label htmlFor={`${range.id}_preset`}>{range.label}</label>
+                  <select id={`${range.id}_preset`} value={custom ? "custom" : match!.key} onChange={event => {
+                    const preset = presets.find(item => item.key === event.target.value);
+                    setCustomRanges(current => preset ? current.filter(id => id !== range.id) : [...current.filter(id => id !== range.id), range.id]);
+                    if (preset) patchPrefsDraft({ [range.unitKey]: preset.unit, [range.valueKey]: preset.value } as Partial<PrefsDraft>);
+                  }}>
+                    {presets.map(preset => <option key={preset.key} value={preset.key}>{preset.label}</option>)}<option value="custom">Custom</option>
+                  </select>
+                  {custom ? <div className={`profile-default-control${isToDate(unit) ? " to-date-range" : ""}`}>
                     <input
                       id={`${range.id}_value`}
+                      aria-label={`${range.label} amount`}
                       type="number"
                       min={1}
                       max={1000}
@@ -493,7 +512,7 @@ function ProfileEditor({
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </div> : null}
                   {"hint" in range ? <p className="muted">{range.hint}</p> : null}
                   <FieldErrors lines={[...(errors[range.error] ?? []), ...(errors[`${range.id}_unit`] ?? [])]} />
                 </div>
@@ -518,7 +537,7 @@ function ProfileEditor({
               <FieldErrors lines={errors.default_chart_project_count} />
             </div> : null}
 
-            {section === "search" && prefs.ai_features_enabled && prefs.configured_api_keys.openai ? (
+            {(section === "search" || section === "ai") && prefs.ai_features_enabled && prefs.configured_api_keys.openai ? (
               <div className="profile-default-item profile-default-item--wide">
                 <SimilaritySlider
                   title="Related search closeness"
@@ -543,7 +562,7 @@ function ProfileEditor({
           </div>
         </Defaults> : null}
 
-        {section === "search" && (!prefs.ai_features_enabled || !prefs.configured_api_keys.openai) ? <p className="slab slab-pad">Connect an OpenAI API key in <AppLink className="btn btn--quiet" href="/settings/ai/">AI connections</AppLink> to find related sessions by meaning.</p> : null}
+        {(section === "search" || section === "ai") && (!prefs.ai_features_enabled || !prefs.configured_api_keys.openai) ? <p className="slab slab-pad">Connect an OpenAI API key in <AppLink className="btn btn--quiet" href="/settings/ai/">AI connections</AppLink> to find related sessions by meaning.</p> : null}
         {section === "ai" && !prefs.ai_features_enabled ? <p className="slab slab-pad">AI features are turned off on this Autumn instance. Connected apps can still be managed below.</p> : null}
         {section === "ai" && prefs.ai_features_enabled ? (
           <AiSection

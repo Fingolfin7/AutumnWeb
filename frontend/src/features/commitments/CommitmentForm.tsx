@@ -100,6 +100,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
   const [errors, setErrors] = useState<FormErrors>(NO_ERRORS);
   const [restartRequested, setRestartRequested] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(mode === "create");
 
   const needSubprojects = state.aggregation === "subproject" || (rulesOpen && RULE_DIMENSIONS[state.aggregation].includes("subproject"));
   const subs = useAllSubprojects(needSubprojects);
@@ -196,6 +197,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
     event.preventDefault();
     setSubmitted(true);
     if (hasErrors(live)) {
+      if (live.fields.scope || live.fields.aggregation || live.fields.rules) setAdvancedOpen(true);
       setErrors(NO_ERRORS);
       return;
     }
@@ -331,9 +333,10 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
             </section>
 
             {commitment && hasPendingChange(commitment) ? <div className="slab slab-pad"><PendingNotice commitment={commitment} nameOf={nameOf} /><button className="btn btn--quiet" type="button" disabled={busy} onClick={() => update.mutate({ body: liveDefinition(commitment), version: commitment.version }, { onSuccess: (saved) => { toast.success("Pending changes cancelled."); finish(saved); }, onError: onFailure })}>Cancel pending change</button></div> : null}
+            <details className="commitment-advanced" open={advancedOpen} onToggle={event => setAdvancedOpen(event.currentTarget.open)}><summary>Advanced scope and rules</summary>
             <section className="slab slab-pad">
               <div className="field">
-                <label htmlFor="id_aggregation_type">Applies to</label>
+                <label htmlFor="id_aggregation_type">Type</label>
                 <select id="id_aggregation_type" value={state.aggregation} onChange={(e) => chooseAggregation(e.target.value as Aggregation)}>
                   {AGGREGATIONS.map((a) => (
                     <option key={a.value} value={a.value}>
@@ -345,7 +348,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
               </div>
 
               <div className="field">
-                <label htmlFor="scope-target-search">Scope target</label>
+                <label htmlFor="scope-target-search">Applies to</label>
                 <input
                   type="text"
                   id="scope-target-search"
@@ -399,7 +402,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
               )}
               <FieldErrors errors={shown.fields.rules} />
             </details>
-
+            </details>
 
             <section className="slab slab-pad">
               <div className="check-row">
@@ -504,7 +507,7 @@ export function CommitmentForm({ mode, commitment, prefill, onClose }: Commitmen
         <div className="form-actions commitment-editor-actions">
           {onClose ? <button type="button" className="btn btn--ghost" onClick={onClose}>Cancel</button> : <AppLink className="btn btn--ghost" href={urls.home()}><Icon icon={faArrowLeft} /> {commitment ? "Back" : "Cancel"}</AppLink>}
           {commitment ? <AppLink className="btn btn--danger" href={urls.deleteCommitment(commitment.id)}><Icon icon={faTrash} /> Delete</AppLink> : null}
-          {commitment && changes?.nextPeriod.length ? <span className="muted">Applies from {formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}</span> : null}
+          {commitment && !showRestart ? <span className="muted">{changes?.nextPeriod.length ? `Applies from ${formatDate(commitment.pending_revision?.effective_from ?? commitment.current_period.end)}` : "Changes apply when saved"}</span> : null}
           {!showRestart ? <button type="submit" className="btn btn--primary btn--spacer" disabled={busy}><Icon icon={faCheckCircle} /> {onClose ? "Save commitment" : commitment ? "Update commitment" : "Create commitment"}</button> : null}
         </div>
       </form>
@@ -722,7 +725,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
               </span>
             </div>
             <div className="meta-row">
-              <span className="meta-label">This period, before carryover</span>
+              <span className="meta-label">This period’s progress</span>
               <span className={`meta-value ${time ? progress.surplus >= 0 ? "text-green" : "text-red" : ""}`}>
                 {`${progress.surplus >= 0 ? "+" : "-"}${num(progress.surplus)}`}
               </span>

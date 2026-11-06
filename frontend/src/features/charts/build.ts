@@ -1,20 +1,19 @@
 import { barConfig, contextConfig, pieConfig } from "./basic";
 import { heatmapConfig } from "./time";
 import { cumulativeConfig, dailyBarsConfig } from "./trends";
-import { treemapConfig } from "./hierarchy";
 import { histogramConfig } from "./analysis";
 import type { ChartOptions } from "./data";
-import type { AnyConfig, ChartKind, DailyTotalRow, HeatmapRow, HierarchyNode, HistogramRow, TallyRow, WordRow } from "./payloads";
+import type { AnyConfig, ChartKind, DailyTotalRow, HeatmapRow, HistogramRow, TallyRow, WordRow } from "./payloads";
 import type { DailySeriesRow } from "./data";
 
 /* Questions first; legacy reports stay available through the API. */
 export const CHART_GROUPS: { label: string; kinds: { value: ChartKind; label: string }[] }[] = [
-  { label: "Where", kinds: [{ value: "bar", label: "Ranked bars" }, { value: "pie", label: "Donut" }, { value: "treemap", label: "Treemap" }, { value: "context", label: "Contexts" }] },
+  { label: "Where", kinds: [{ value: "bar", label: "Ranked bars" }, { value: "pie", label: "Donut" }, { value: "context", label: "Contexts" }] },
   { label: "Over time", kinds: [{ value: "daily_bars", label: "Daily bars" }, { value: "cumulative", label: "Cumulative" }] },
   { label: "Patterns", kinds: [{ value: "histogram", label: "Session lengths" }, { value: "heatmap", label: "Work hours" }, { value: "wordcloud", label: "Words in your notes" }] },
 ];
 export const CHART_QUESTIONS: Partial<Record<ChartKind, string>> = {
-  bar: "Where did the time go?", pie: "How did you divide your time?", daily_bars: "How is it changing?", cumulative: "How does your time add up?", treemap: "What makes up your time?",
+  bar: "Where did the time go?", pie: "How did you divide your time?", daily_bars: "How is it changing?", cumulative: "How does your time add up?",
   context: "Which parts of life got your time?", histogram: "How long are your sessions?", heatmap: "When do you work?", wordcloud: "What is in your notes?",
 };
 
@@ -43,7 +42,7 @@ export function isEmptyPayload(kind: ChartKind, data: unknown): boolean {
    stacked area for their subproject breakdowns. */
 export function buildChart(kind: ChartKind, data: unknown, options: ChartOptions & { subprojects: boolean }): Built | null {
   if (isEmptyPayload(kind, data)) return null;
-  const chart = (config: AnyConfig | null): Built | null => (config ? { type: "chart", config, labels: ["context", "histogram", "heatmap", "cumulative"].includes(kind) ? "neutral" : options.subprojects && kind !== "treemap" ? "subprojects" : "projects" } : null);
+  const chart = (config: AnyConfig | null): Built | null => (config ? { type: "chart", config, labels: ["context", "histogram", "heatmap", "cumulative"].includes(kind) ? "neutral" : options.subprojects ? "subprojects" : "projects" } : null);
   switch (kind) {
     case "pie":
       return chart(pieConfig(data as TallyRow[], options));
@@ -55,8 +54,6 @@ export function buildChart(kind: ChartKind, data: unknown, options: ChartOptions
       return chart(heatmapConfig(data as HeatmapRow[]));
     case "cumulative":
       return chart(cumulativeConfig(data as DailyTotalRow[], options));
-    case "treemap":
-      return chart(treemapConfig(data as HierarchyNode | TallyRow[]));
     case "context":
       return chart(contextConfig(data as TallyRow[]));
     case "histogram":

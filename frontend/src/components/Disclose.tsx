@@ -18,7 +18,7 @@ export function Disclose({
   headClassName,
 }: {
   id: string;
-  icon: IconDefinition;
+  icon?: IconDefinition;
   iconClass?: string;
   title: ReactNode;
   summary?: ReactNode;
@@ -53,7 +53,7 @@ export function Disclose({
   return (
     <section className={`${slab ? "slab " : ""}disclose${open ? "" : " is-closed"}${className ? " " + className : ""}`}>
       <button className={`disclose-head${headClassName ? " " + headClassName : ""}`} type="button" aria-expanded={open} onClick={toggle}>
-        <Icon icon={icon} className={`disclose-icon${iconClass ? " " + iconClass : ""}`} />
+        {icon ? <Icon icon={icon} className={`disclose-icon${iconClass ? " " + iconClass : ""}`} /> : null}
         <span className="disclose-title">{title}</span>
         {summary !== undefined ? <span className="disclose-summary">{summary}</span> : null}
         <Icon icon={faChevronDown} className="disclose-chevron" />

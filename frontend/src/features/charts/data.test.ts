@@ -1,5 +1,4 @@
 import { buildSeries, consolidateTopN, dayKey, getChartUnit, parseDay, withAlpha } from "./data";
-import { flattenHierarchy } from "./hierarchy";
 import { buildChart, isEmptyPayload, parseKind } from "./build";
 
 describe("top N + Other", () => {
@@ -65,34 +64,6 @@ describe("dates", () => {
   });
 });
 
-describe("treemap data", () => {
-  const tree = {
-    name: "All",
-    children: [
-      {
-        name: "Study",
-        children: [
-          { name: "Czech", total_time: 120, children: [{ name: "Grammar", total_time: 90 }, { name: "Empty", total_time: 0 }] },
-          { name: "Solo", total_time: 60, children: [] },
-          { name: "Idle", total_time: 0, children: [] },
-        ],
-      },
-    ],
-  };
-  it("flattens to subproject leaves, falling back to the project itself", () => {
-    const { leaves, colors } = flattenHierarchy(tree);
-    expect(leaves).toEqual([
-      { name: "Grammar", project: "Czech", value: 1.5 },
-      { name: "No subproject", project: "Czech", value: .5 },
-      { name: "Solo", project: "Solo", value: 1 },
-    ]);
-    expect(Object.keys(colors)).toEqual(["Czech", "Solo"]);
-  });
-  it("falls back to flat rows", () => {
-    expect(flattenHierarchy([{ name: "a", total_time: 60 }]).leaves).toEqual([{ name: "a", project: "a", value: 1 }]);
-  });
-});
-
 describe("payload handling", () => {
   it("knows which payloads are empty", () => {
     expect(isEmptyPayload("pie", [])).toBe(true);
@@ -101,7 +72,7 @@ describe("payload handling", () => {
     expect(isEmptyPayload("histogram", [{ label: "0-15m", count: 2 }])).toBe(false);
   });
   it("returns null when a builder has nothing to draw", () => {
-    expect(buildChart("treemap", { name: "All", children: [] }, { projectLimit: 7, subprojects: false })).toBeNull();
+    expect(buildChart("pie", [], { projectLimit: 7, subprojects: false })).toBeNull();
   });
   it("swaps in the subproject variants only for a project-name filter", () => {
     const rows = [{ date: "2026-10-01", series: "a", hours: 1 }];
@@ -125,13 +96,13 @@ describe("payload handling", () => {
       ["cumulative", daily],
       ["heatmap", [{ weekday: 1, hour: 9, average_hours: 1 }]],
       ["histogram", [{ label: "0-15m", count: 1 }]],
-      ["treemap", { name: "All", children: [{ name: "c", children: [{ name: "p", total_time: 60, children: [] }] }] }],
       ["wordcloud", [{ text: "word", weight: 3 }]],
     ];
     for (const [kind, data] of cases) expect(buildChart(kind, data, opts), kind).not.toBeNull();
   });
   it("parses chart kinds defensively", () => {
     expect(parseKind("calendar")).toBe("bar");
+    expect(parseKind("treemap")).toBe("bar");
     expect(parseKind(null)).toBe("bar");
     expect(parseKind("sunburst")).toBe("bar");
   });
@@ -153,14 +124,8 @@ it("keeps chart pigments explicit and fills missing days with real zeroes", asyn
   for (const retired of ["line", "stacked_area", "scatter", "bubble", "radar", "status", "calendar"]) expect(parseKind(retired)).toBe("bar");
 });
 
-it("includes unallocated project time in the treemap total", () => {
-  const { leaves } = flattenHierarchy({ name: "All", children: [{ name: "Work", children: [{ name: "Garden", total_time: 270, children: [{ name: "Frontend", total_time: 80 }, { name: "Backend", total_time: 35 }] }] }] });
-  expect(leaves.find(leaf => leaf.name === "No subproject")?.value).toBe(155 / 60);
-  expect(leaves.reduce((sum, leaf) => sum + leaf.value * 60, 0)).toBeCloseTo(270);
-});
-
 it("blocks default and semantic chart colors in every chart builder", () => {
-  const builders = import.meta.glob("./{basic,trends,analysis,time,hierarchy,wordcloud}.ts", { eager: true, query: "?raw", import: "default" });
+  const builders = import.meta.glob("./{basic,trends,analysis,time,wordcloud}.ts", { eager: true, query: "?raw", import: "default" });
   for (const source of Object.values(builders)) expect(source).not.toMatch(/#36a2eb|#ff6384|#4bc0c0|hsl\(\s*(?:120|210)|rgba?\(\s*0,\s*128,\s*0|yellowgreen/);
 });
 
