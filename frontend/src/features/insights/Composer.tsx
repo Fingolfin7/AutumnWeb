@@ -44,10 +44,16 @@ export function Composer({
   useLayoutEffect(() => {
     const form = textarea.current?.closest("form");
     if (!form) return;
-    const place = () => document.documentElement.style.setProperty("--composer-clearance", `${Math.max(0, window.innerHeight - form.getBoundingClientRect().top) + 12}px`);
+    const toast = document.querySelector(".toast-region");
+    const place = () => {
+      document.documentElement.style.setProperty("--composer-clearance", `${Math.max(0, window.innerHeight - form.getBoundingClientRect().top) + 12}px`);
+      const height = toast?.getBoundingClientRect().height ?? 0;
+      document.documentElement.style.setProperty("--insights-toast-clearance", `${height ? height + 24 : 0}px`);
+    };
     const observer = new ResizeObserver(place);
+    if (toast) observer.observe(toast);
     observer.observe(form); window.addEventListener("resize", place); window.visualViewport?.addEventListener("resize", place); place();
-    return () => { observer.disconnect(); window.removeEventListener("resize", place); window.visualViewport?.removeEventListener("resize", place); document.documentElement.style.removeProperty("--composer-clearance"); };
+    return () => { observer.disconnect(); window.removeEventListener("resize", place); window.visualViewport?.removeEventListener("resize", place); document.documentElement.style.removeProperty("--composer-clearance"); document.documentElement.style.removeProperty("--insights-toast-clearance"); };
   }, []);
 
   /* Hand the cursor back when an answer finishes. */

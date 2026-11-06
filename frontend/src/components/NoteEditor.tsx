@@ -121,6 +121,18 @@ export function NoteEditor({
   const generated = useId();
   const textareaId = id ?? `note-${generated}`;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLButtonElement>(null);
+  const [previewClipped, setPreviewClipped] = useState(false);
+  useLayoutEffect(() => {
+    const node = previewRef.current;
+    if (!node) return;
+    const measure = () => setPreviewClipped(node.scrollHeight > node.clientHeight + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    if (node.firstElementChild) observer.observe(node.firstElementChild);
+    return () => observer.disconnect();
+  }, [value, writing, richEditing]);
   const wasWriting = useRef(false);
   useLayoutEffect(() => {
     const node = textareaRef.current;
@@ -315,7 +327,7 @@ export function NoteEditor({
             setWriting(true);
           }}><Icon icon={faExpand} /></button> : null}
         </div>
-        {richPreview && !richEditing && !writing ? <button className={`note-rich-preview${value.trim() ? "" : " is-empty"}`} type="button" aria-label="Edit session note" disabled={disabled} onClick={() => {
+        {richPreview && !richEditing && !writing ? <button ref={previewRef} className={`note-rich-preview${previewClipped ? " has-overflow" : ""}${value.trim() ? "" : " is-empty"}`} type="button" aria-label="Edit session note" disabled={disabled} onClick={() => {
           if (writerOnly || window.matchMedia("(max-width: 999px)").matches) { selection.current = { start: value.length, end: value.length }; setWriting(true); return; }
           setRichEditing(true);
           requestAnimationFrame(() => textareaRef.current?.focus());

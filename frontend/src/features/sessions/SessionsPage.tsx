@@ -9,7 +9,7 @@ import { AppLink, urls } from "@/app/links";
 import { useActiveContext } from "@/app/context";
 import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import { formatDate, formatDuration } from "@/lib/format";
-import { groupByDay } from "@/lib/sessions";
+import { dayPortions, groupByDay } from "@/lib/sessions";
 import { JournalDay, SessionBand } from "./SessionBand";
 import { useSessionList, useSessionTotals, type SessionFilters, type SessionRow } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
@@ -129,7 +129,7 @@ export default function SessionsPage() {
   const related = all.filter((s) => s.match === "related");
   const total = list.data?.pages[0]?.total ?? 0;
   const groups = groupByDay(direct);
-  const splitEntries = groups.reduce((count, group) => count + group.sessions.length, 0) - direct.length;
+  const midnightSessions = direct.filter(session => dayPortions(session).length > 1).length;
   const singleProject = applied.projectMode === "include" && applied.projects.length === 1;
 
   const pills = describeFilters(applied, {
@@ -203,7 +203,7 @@ export default function SessionsPage() {
         {filtered || pills.length ? <div className="journal-filter-line">
           {filtered ? <p className="filter-summary">
             <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
-            {splitEntries > 0 ? <> · {all.length + splitEntries} day entries shown</> : null}
+            {midnightSessions > 0 ? <>, {midnightSessions === 1 ? "one crosses" : `${midnightSessions} cross`} midnight</> : null}
             {totals.data ? <> · <strong className="journal-filter-total">{formatDuration(totals.data.total_minutes)}</strong></> : null}
           </p> : null}
           {pills.map((pill) => (

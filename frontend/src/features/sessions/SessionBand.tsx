@@ -106,7 +106,7 @@ export function SessionBand({ session, showDate, hideProject = false, hideDurati
   const minutes = (day ? portions.find((part) => part.date === day)?.minutes : undefined) ?? session.duration_minutes ?? 0;
   const continuation = !!day && day !== localDateKey(new Date(session.start));
   const portionStart = day && day > localDateKey(new Date(session.start)) ? "00:00" : formatTime(session.start);
-  const portionEnd = day && session.end && day < localDateKey(new Date(session.end)) ? "24:00" : formatTime(session.end);
+  const portionEnd = day && session.end && day < localDateKey(new Date(session.end)) ? "00:00 next day" : formatTime(session.end);
   const reason = matchReason(session, search);
 
   const restart = () => {

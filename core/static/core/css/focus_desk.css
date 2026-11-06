@@ -4343,7 +4343,7 @@ button.timer-dock-open { background: transparent; border: 0; color: var(--ink); 
 
 /* A running journal can grow; keep the whole text scrollable before expanding. */
 
-.note-reading-slot::after { content: ""; position: absolute; pointer-events: none; inset: 52px -20px auto; height: 12px; background: linear-gradient(var(--surface-0), transparent); }
+.note-reading-slot::after { content: ""; position: absolute; pointer-events: none; inset: 52px -20px auto; height: 12px; background: var(--surface-0); }
 
 /* The phone ribbon owns its paint; desktop SVG definitions may be hidden. */
 
@@ -5070,7 +5070,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .insights-workspace .assistant-message .message-content { font-family: var(--font-reading); }
 .insights-workspace .chat-header { flex-wrap: nowrap; align-items: center; gap: var(--s2); }
 .insights-workspace .insights-conversation-heading { flex: 1 1 0; min-width: 0; }
-.insights-conversation-heading h2 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.insights-conversation-heading h2 { white-space: normal; overflow-wrap: anywhere; }
 .insights-review-back { min-width: 44px; padding-inline: 0; }
 .insights-conversation-scope { flex: none; }
 .insights-conversation-scope .btn { white-space: nowrap; min-height: 44px; }
@@ -5081,7 +5081,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .insights-actions-list { position: absolute; z-index: 5; top: 100%; right: 0; min-width: 190px; padding: var(--s2); background: var(--surface-2); border: 1px solid var(--hairline); border-radius: var(--r-md); box-shadow: 0 12px 30px #0008; }
 .insights-actions-list .chat-header-actions { display: flex; flex-direction: column; align-items: stretch; }
 .insights-actions-list button { width: 100%; min-height: 44px; justify-content: flex-start; }
-.insights-actions-list .chat-action-label { display: inline; }
+.insights-actions-list .chat-action-label { display: inline; position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
 .insights-workspace .composer textarea { background: transparent; border: 0; box-shadow: none; }
 .insights-workspace .composer:focus-within { box-shadow: var(--focus-ring); }
 .commitment-summary { min-width: 0; padding-block: var(--s3); border-bottom: 1px solid var(--hairline); }
@@ -5385,3 +5385,19 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .review-filter-controls .review-toolbar { flex-basis: 100%; }
   .settings-content .profile-account-grid > div:last-child .field:has(#email) { display: block; }
 }
+
+/* Conversation actions and feedback occupy space instead of covering the journal. */
+.insights-workspace .chat-header:has(.insights-actions-menu[open]) { flex-wrap: wrap; }
+.insights-actions-menu[open] { flex-basis: 100%; }
+.insights-actions-menu[open] > summary { width: 44px; margin-left: auto; }
+.insights-actions-menu[open] .insights-actions-list { position: static; min-width: 0; }
+.insights-workspace .insights-actions-list .chat-action-btn { width: 100%; min-height: 44px; padding-inline: var(--s3); justify-content: flex-start; gap: var(--s2); border-radius: var(--r-sm); }
+.insights-actions-list .chat-header-actions { margin-left: 0; }
+.insights-workspace .conversation-container { margin-bottom: var(--insights-toast-clearance, 0px); }
+.insights-workspace .attach-tray .attach-chip { display: grid; grid-template-columns: auto minmax(0, 1fr) 44px; padding: var(--s2); gap: var(--s2); max-width: 100%; }
+.insights-workspace .attach-tray .attach-text { max-width: none; }
+.insights-workspace .attach-tray .attach-remove { position: static; width: 44px; height: 44px; }
+.insights-workspace .attach-tray .attach-chip--image { width: auto; height: auto; grid-template-columns: 52px 44px; }
+
+.timer-note-editor .note-editor-field:not(.is-writing) .note-rich-preview.has-overflow { mask-image: linear-gradient(#000 calc(100% - 1.7em), transparent); }
+.is-writing .note-editor-shell textarea { padding-bottom: var(--s6); scroll-padding-block: var(--s4); }
