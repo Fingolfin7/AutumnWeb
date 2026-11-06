@@ -79,9 +79,9 @@ export function Shell({ children }: { children: ReactNode }) {
       <a className="skip-link" href="#main-content">Skip to content</a>
       <header className={`app-header app-header--auth${settingsActive ? " app-header--settings" : ""}`}>
         <div className="screen app-header-screen--auth">
-          <AppLink className="brand" href={settingsActive ? "/settings/" : urls.home()} aria-label={settingsActive ? "Settings" : "Autumn"}>
+          <AppLink className="brand" href={settingsActive ? "/settings/" : urls.home()} aria-label={settingsActive ? "Autumn, settings home" : "Autumn"}>
             <img className="brand-mark" src={boot.static.leaf} alt="" />
-            <span className="brand-word">{settingsActive ? "Settings" : "Autumn"}</span>
+            <span className="brand-word">Autumn</span>
           </AppLink>
           <nav className="primary-nav" aria-label="Primary">
             {tabs.map((tab, index) => {
