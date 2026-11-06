@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useLocation, useSearchParams } from "react-router";
 import { faSearch, faSlidersH } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Sheet } from "@/components/Sheet";
 import { OptionPicker } from "@/components/OptionPicker";
-import { Empty, ErrorState, Skeleton } from "@/components/states";
+import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { useActiveContext } from "@/app/context";
 import { useAllProjects, useContexts, useTags } from "@/api/meta";
-import { formatDayDate, formatDate, formatDuration } from "@/lib/format";
+import { formatDate, formatDuration } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
-import { SessionBand } from "./SessionBand";
+import { JournalDay, SessionBand } from "./SessionBand";
 import { useSessionList, useSessionTotals, type SessionFilters, type SessionRow } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { SimilaritySlider } from "@/features/search/SimilaritySlider";
@@ -159,6 +159,9 @@ export default function SessionsPage() {
     setParams(writeFilters(next));
   };
 
+  const clearSearch = () => { setSearchText(""); setParams(writeFilters({ ...applied, search: "" })); };
+  const clearFilters = () => setParams(writeFilters({ ...readFilters(new URLSearchParams()), search: applied.search }));
+
   const apply = (state: FilterState) => {
     setParams(writeFilters(state));
     setSheetOpen(false);
@@ -170,53 +173,47 @@ export default function SessionsPage() {
   };
 
   return (
-    <>
+    <div className="sessions-page">
       <div className="desk-head journal-title"><h1 className="page-title">Sessions</h1></div>
       {total > 0 || pills.length || applied.search || searchText ? <form className="fields journal-search" onSubmit={onSearch} role="search">
-        <div className="searchbar">
-          <Icon icon={faSearch} className="muted" />
-          <label className="sr-only" htmlFor="content-search">
-            Search projects, subprojects, and session notes
-          </label>
-          <input
-            id="content-search"
-            type="search"
-            placeholder="Search sessions"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-          />
-          {searchText ? <button className="search-clear btn btn--quiet" type="button" aria-label="Clear search" onClick={() => { setSearchText(""); setParams(writeFilters({ ...applied, search: "" })); }}>Clear</button> : null}
+        <div className="journal-controls">
+          <div className="searchbar">
+            <Icon icon={faSearch} className="muted" />
+            <label className="sr-only" htmlFor="content-search">
+              Search projects, subprojects, and session notes
+            </label>
+            <input
+              id="content-search"
+              type="search"
+              placeholder="Search sessions"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+            />
+            {searchText ? <button className="search-clear btn-icon" type="button" aria-label="Clear search" onClick={clearSearch}>&times;</button> : null}
+          </div>
+          <button className="filter-launcher" aria-label={`Filters${pills.length ? `, ${pills.length} active` : ""}`} type="button" aria-haspopup="dialog" onClick={() => { setDraft(applied); setSheetOpen(true); }}><Icon icon={faSlidersH} /><span>Filters</span>{pills.length ? <span className="filter-count">{pills.length}</span> : null}</button>
+          <SegmentedControl label="Session dates" value={preset} options={["All", "This week", "Last week", "30 days", ...(preset === "Custom" ? ["Custom"] : [])].map((label) => ({ value: label, label }))} onChange={(value) => {
+            if (value === "Custom") { setDraft(applied); setSheetOpen(true); }
+            else apply({ ...applied, ...(value === "All" ? { start_date: "", end_date: "" } : sessionRange(value)) });
+          }} />
         </div>
-        <SegmentedControl label="Session dates" value={preset} options={["All", "This week", "Last week", "30 days", ...(preset === "Custom" ? ["Custom"] : [])].map((label) => ({ value: label, label }))} onChange={(value) => {
-          if (value === "Custom") { setDraft(applied); setSheetOpen(true); }
-          else apply({ ...applied, ...(value === "All" ? { start_date: "", end_date: "" } : sessionRange(value)) });
-        }} />
-        <button className="filter-launcher" aria-label={`Filters${pills.length ? `, ${pills.length} active` : ""}`} type="button" aria-haspopup="dialog" onClick={() => { setDraft(applied); setSheetOpen(true); }}><Icon icon={faSlidersH} /><span>Filters</span>{pills.length ? <span className="filter-count">{pills.length}</span> : null}</button>
-        {filtered ? <p className="filter-summary">
-
-          <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
-          {totals.data ? <strong className="journal-filter-total">{formatDuration(totals.data.total_minutes)}</strong> : null}
-        </p> : null}
-        <div className="journal-filter-chips">
+        {filtered || pills.length ? <div className="journal-filter-line">
+          {filtered ? <p className="filter-summary">
+            <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
+            {totals.data ? <> · <strong className="journal-filter-total">{formatDuration(totals.data.total_minutes)}</strong></> : null}
+          </p> : null}
           {pills.map((pill) => (
-            <span key={pill.label} className={pill.value.length > 85 ? "filter-selection-summary" : "filter-pill"}>
+            <span key={pill.label} className="filter-pill">
               <span title={`${pill.label}: ${pill.value}`}><span>{pill.label}</span> <b>{pill.value}</b></span>
               <button className="btn btn--quiet" type="button" aria-label={`Clear ${pill.label} filter`} onClick={() => clearPill(pill.label)}>×</button>
             </span>
           ))}
-          {pills.length ? <span className="filter-pill filter-clear-all"><button className="btn btn--quiet" type="button" onClick={() => setParams(writeFilters({ ...readFilters(new URLSearchParams()), search: applied.search }))}>Clear filters</button></span> : null}
-        </div>
+          {pills.length > 1 ? <button className="btn btn--quiet filter-clear-all" type="button" onClick={clearFilters}>Clear filters</button> : null}
+        </div> : null}
       </form> : null}
 
       <Sheet className="filter-sheet" open={sheetOpen} onClose={() => setSheetOpen(false)} title="Filter sessions">
         <div className="fields">
-        <div className="journal-presets journal-presets--sheet" aria-label="Date presets">
-          {["This week", "Last week", "30 days"].map((label) => {
-            const range = sessionRange(label);
-            return <button key={label} type="button" className={`range-tab${applied.start_date === range.start_date && applied.end_date === range.end_date ? " is-active" : ""}`} aria-pressed={applied.start_date === range.start_date && applied.end_date === range.end_date} onClick={() => apply({ ...applied, ...range })}>{label}</button>;
-          })}
-        </div>
-
           <div className="two-up">
             <div className="field">
               <label htmlFor="start_date">Start date</label>
@@ -286,52 +283,47 @@ export default function SessionsPage() {
       ) : list.isError ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
       ) : groups.length ? (
-        <section className="slab session-list" aria-label="Sessions">
+        <section className="session-list" aria-label="Sessions">
           {groups.map((group) => (
-            <div className="day-group" key={group.date}>
-              <header className="day-head">
-                <span className="day-date">{formatDayDate(group.date)}</span>
-                <span className={`day-total${!group.totalMinutes ? " is-zero" : ""}`}>{formatDuration(group.totalMinutes)}</span>
-              </header>
-              <ul className="band-list">
-                {group.sessions.map((session) => (
-                  <SessionBand key={session.id} session={session} day={group.date} search={applied.search} onEditNote={retainNote} onNoteSaved={retainNote} />
-                ))}
-              </ul>
-            </div>
+            <JournalDay key={group.date} date={group.date} minutes={group.totalMinutes}>
+              {group.sessions.map((session) => (
+                <SessionBand key={session.id} session={session} day={group.date} search={applied.search} onEditNote={retainNote} onNoteSaved={retainNote} />
+              ))}
+            </JournalDay>
           ))}
         </section>
       ) : !related.length ? (
-        <section className="slab">
-          {pills.length || applied.search ? (
-            <Empty>No sessions match{applied.search ? ` “${applied.search}”` : " these filters"}. Try another search or clear the filters.</Empty>
-          ) : (
-            <div className="first-run-empty journal-empty"><span className="ember-seal" aria-hidden="true" /><h2>A little time, a place to keep it.</h2><p>Your sessions and the thoughts that go with them will gather here.</p><AppLink className="btn btn--primary" href={urls.startTimer()}>Start your first timer</AppLink></div>
-          )}
+        <section className="session-empty">
+          <div className="first-run-empty journal-empty">
+            <span className="ember-seal" aria-hidden="true" />
+            {pills.length || applied.search ? <>
+              <h2>Nothing here{applied.search ? ` for “${applied.search}”` : ""} yet.</h2>
+              <p>Try other words, or look a little wider.</p>
+              {applied.search ? <button className="btn btn--primary" type="button" onClick={clearSearch}>Clear search</button> : <button className="btn btn--primary" type="button" onClick={clearFilters}>Clear filters</button>}
+            </> : <>
+              <h2>A little time, a place to keep it.</h2>
+              <p>Your sessions and the thoughts that go with them will gather here.</p>
+              <AppLink className="btn btn--primary" href={urls.startTimer()}>Start your first timer</AppLink>
+            </>}
+          </div>
         </section>
       ) : null}
 
       {related.length || relatedSummary ? (
-        <section className="slab session-list" aria-label="Related sessions">
+        <section className="session-list session-related" aria-label="Related sessions">
           <header className="day-head">
             <span className="day-date">Related</span>
-            {relatedSummary ? (
-              <span className="day-total">
-                {related.length < relatedSummary.count ? `${related.length} of ${relatedSummary.count}` : relatedSummary.count}
-              </span>
-            ) : null}
-          </header>
-          {relatedSummary ? (
-            <details className="journal-related-controls">
-              <summary>{closenessLabel(relatedSummary.similarity)} · {relatedSummary.count} related</summary>
-              <p className="muted">These sessions match the meaning of your search. Open a note to read it in full.</p>
-              <SimilaritySlider value={relatedSummary.similarity} defaultValue={relatedSummary.default} scale={summaryScale(relatedSummary)} counts={relatedSummary.counts} best={relatedSummary.best} loading={list.isFetching && !list.isFetchingNextPage} onCommit={(value) => {
+            {relatedSummary ? <RelatedTuning
+              summary={relatedSummary}
+              shown={related.length}
+              loading={list.isFetching && !list.isFetchingNextPage}
+              onCommit={(value) => {
                 const next = new URLSearchParams(params); const param = similarityParam(value, relatedSummary.default);
                 if (param === null) next.delete("similarity"); else next.set("similarity", param);
                 setParams(next);
-              }} />
-            </details>
-          ) : null}
+              }}
+            /> : null}
+          </header>
           {related.length ? (
             <ul className="band-list">
               {related.map((session) => (
@@ -340,7 +332,7 @@ export default function SessionsPage() {
             </ul>
           ) : relatedSummary?.count && list.hasNextPage ? (
             /* One ranked list: related matches follow every direct one. */
-            <p className="muted slab-pad">They follow the direct matches. Show more below to reach them.</p>
+            <p className="muted session-related-note">They follow the direct matches. Show more below to reach them.</p>
           ) : null}
         </section>
       ) : null}
@@ -352,8 +344,27 @@ export default function SessionsPage() {
           </button>
         </div>
       ) : null}
-    </>
+    </div>
   );
+}
+
+/* "1 related · Balanced", opening the closeness slider in a popover. */
+function RelatedTuning({ summary, shown, loading, onCommit }: { summary: NonNullable<ReturnType<typeof useRelatedSummary>["data"]>; shown: number; loading: boolean; onCommit: (value: number) => void }) {
+  const details = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const dismiss = (event: PointerEvent) => {
+      if (details.current?.open && !details.current.contains(event.target as Node)) details.current.open = false;
+    };
+    document.addEventListener("pointerdown", dismiss);
+    return () => document.removeEventListener("pointerdown", dismiss);
+  }, []);
+  return <details className="journal-related-controls" ref={details}>
+    <summary>{shown < summary.count ? `${shown} of ${summary.count}` : summary.count} related · {closenessLabel(summary.similarity)}</summary>
+    <div className="journal-related-popover">
+      <p className="muted">These sessions match the meaning of your search. Open a note to read it in full.</p>
+      <SimilaritySlider value={summary.similarity} defaultValue={summary.default} scale={summaryScale(summary)} counts={summary.counts} best={summary.best} loading={loading} onCommit={onCommit} />
+    </div>
+  </details>;
 }
 
 function describeFilters(

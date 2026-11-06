@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   faArrowRight,
+  faHistory,
   faPlay,
   faSearch,
   faStopwatch,
@@ -9,6 +10,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Dialog } from "@/components/Sheet";
+import { useOpenCapture } from "@/features/timers/CaptureLayer";
 import { CapturePickLabel } from "@/features/timers/CapturePicker";
 import { rankProjects } from "@/components/ProjectCombobox";
 import { useAllProjects } from "@/api/meta";
@@ -37,6 +39,7 @@ export function CommandPalette() {
   const projects = useAllProjects();
   const timers = useTimers();
   const start = useStartTimer();
+  const openCapture = useOpenCapture();
   const toast = useToast();
   const list = useRef<HTMLUListElement>(null);
 
@@ -97,9 +100,10 @@ export function CommandPalette() {
         },
       });
     }
+    if (!q || "new timer".includes(q)) out.push({ id: "capture", group: "Go to", label: "New timer", icon: faPlay, run: () => { setOpen(false); openCapture(); } });
+    if (!q || "log past time".includes(q)) out.push({ id: "capture-past", group: "Go to", label: "Log past time", icon: faHistory, run: () => { setOpen(false); openCapture("past"); } });
     const pages: [string, string][] = [
       ["Today", urls.home()],
-      ["New timer", urls.startTimer()],
       ["Sessions", urls.sessions()],
       ["Projects", urls.projects()],
       ["Review", urls.review()],
@@ -128,7 +132,7 @@ export function CommandPalette() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, projects.data, timers.data]);
+  }, [query, projects.data, timers.data, openCapture]);
 
   useEffect(() => {
     list.current?.querySelector(".is-active")?.scrollIntoView({ block: "nearest" });

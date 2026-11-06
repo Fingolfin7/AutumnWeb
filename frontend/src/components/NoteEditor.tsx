@@ -4,7 +4,7 @@ import { formatTime } from "@/lib/format";
 import { readNoteDraft, writeNoteDraft } from "@/lib/noteDraft";
 import { faClock, faExpand, faLink, faMicrophone } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "./Icon";
-import { renderNoteDraft } from "./SessionNote";
+import { markTimestamps, renderNoteDraft } from "./SessionNote";
 
 /* The session note editor (session_note_editor.js + the markup the edit-
    session and stop-timer templates wrap around it): a markdown toolbar
@@ -80,10 +80,10 @@ export function NoteEditor({
   saveStatus,
   onRetry,
   sessionTitle,
-  preview = false,
   onDone,
   initiallyWriting = false,
   richPreview = false,
+  writerOnly = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -103,10 +103,12 @@ export function NoteEditor({
   saveStatus?: string;
   onRetry?: () => void;
   sessionTitle?: string;
-  preview?: boolean;
   onDone?: () => boolean | void | Promise<boolean | void>;
   initiallyWriting?: boolean;
+  /** Show the rendered note until it is opened for editing. */
   richPreview?: boolean;
+  /** Opening the preview goes straight to the full-screen writer (always on phones). */
+  writerOnly?: boolean;
 }) {
   const [edited, setEdited] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -130,7 +132,7 @@ export function NoteEditor({
       node.setSelectionRange(selection.current.start, selection.current.end);
     }
     wasWriting.current = writing;
-  }, [value, writing, preview, richEditing]);
+  }, [value, writing, richEditing]);
   useEffect(() => {
     if (!persistKey) return;
     const draft = readNoteDraft(persistKey);
@@ -252,7 +254,7 @@ export function NoteEditor({
   const errors = error ? (Array.isArray(error) ? error : [error]) : [];
 
   const field = (
-    <div className={`field note-editor-field${writing ? " is-writing" : ""}${focused ? " is-focused" : ""}`} onFocus={() => setFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget) && !(event.relatedTarget instanceof Element && event.relatedTarget.closest("button, a, summary"))) setFocused(false); }}>
+    <div className={`field note-editor-field${writing ? " is-writing" : ""}${focused ? " is-focused" : ""}`} onFocus={(event) => { if (!(event.target as Element).closest(".note-rich-preview")) setFocused(true); }} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget) && !(event.relatedTarget instanceof Element && event.relatedTarget.closest("button, a, summary"))) setFocused(false); }}>
       {writing ? <header className="note-writer-heading"><div><h2>{sessionTitle?.split(" · ")[0] || "Session note"}</h2><small>{sessionTitle?.includes(" · ") ? `${sessionTitle.split(" · ").slice(1).join(" · ")} · ` : ""}{value.trim() ? value.trim().split(/\s+/).length : 0} words</small></div><button className="btn btn--secondary" type="button" aria-label="Done" disabled={finishing} onClick={() => void closeWriter()}><span className="note-writer-back" aria-hidden="true">&lsaquo;</span>{finishing ? "Saving..." : "Done"}</button></header> : null}
       {label ? <label htmlFor={textareaId}>{label}</label> : null}
       <div className="note-editor-shell">
@@ -288,7 +290,11 @@ export function NoteEditor({
             setWriting(true);
           }}><Icon icon={faExpand} /></button> : null}
         </div>
-        {richPreview && !richEditing && !writing ? <button className="note-rich-preview" type="button" aria-label="Edit session note" onClick={() => { setRichEditing(true); requestAnimationFrame(() => textareaRef.current?.focus()); }}><span className="session-note-body" dangerouslySetInnerHTML={{ __html: renderNoteDraft(value || placeholder) }} /></button> : null}
+        {richPreview && !richEditing && !writing ? <button className={`note-rich-preview${value.trim() ? "" : " is-empty"}`} type="button" aria-label="Edit session note" disabled={disabled} onClick={() => {
+          if (writerOnly || window.matchMedia("(max-width: 999px)").matches) { selection.current = { start: value.length, end: value.length }; setWriting(true); return; }
+          setRichEditing(true);
+          requestAnimationFrame(() => textareaRef.current?.focus());
+        }}>{value.trim() ? <span className="session-note-body" dangerouslySetInnerHTML={{ __html: markTimestamps(renderNoteDraft(value)) }} /> : placeholder}</button> : null}
         <textarea
           hidden={richPreview && !richEditing && !writing}
           ref={textareaRef}
@@ -309,7 +315,7 @@ export function NoteEditor({
       <div className="note-editor-status">
         <small role="status">{writing && saveStatus === "Saved" ? "Saved to session" : writing && (saveStatus?.startsWith("Unsaved changes") || (!saveStatus && persistKey)) ? "Draft kept on this device" : saveStatus === "Saved" && !edited ? "" : saveStatus ?? (value === baseline.current ? edited ? "Saved" : "" : persistKey ? "Unsaved changes · kept on this device" : "Unsaved changes")}</small>
         {onRetry && saveStatus?.includes("retry") ? <button className="btn btn--quiet" type="button" onClick={onRetry}>Retry</button> : null}
-      {writing ? <small className="writer-done-help">{!navigator.onLine ? "Done keeps your draft on this device." : onDone ? "Done saves to this session." : "Done keeps your note in the session form."}</small> : null}
+      {writing && (!onDone || !navigator.onLine) ? <small className="writer-done-help">{!navigator.onLine ? "Done keeps your draft on this device." : "Done keeps your note in the session form."}</small> : null}
       <small data-note-status="" aria-live="polite">{status}</small>
       </div>
       {errors.length ? (
@@ -321,7 +327,6 @@ export function NoteEditor({
       ) : null}
     </div>
   );
-  if (preview && !writing) return <div className="note-compact-preview"><p>{value.split(/\n\s*\n|\n/)[0] || "A thought, a question, a small discovery."}</p><button className="btn btn--secondary" type="button" onClick={() => { selection.current = { start: value.length, end: value.length }; setWriting(true); }}>Write</button></div>;
   return writing ? createPortal(<dialog ref={dialog} className="note-writer-dialog" aria-label="Full-screen note writer" onCancel={(event) => { event.preventDefault(); closeWriter(); }} onKeyDown={(event) => event.stopPropagation()}>{field}</dialog>, document.body) : field;
 }
 

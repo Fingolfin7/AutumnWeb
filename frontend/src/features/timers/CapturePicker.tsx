@@ -5,7 +5,7 @@ import { rankProjects } from "@/components/ProjectCombobox";
 import type { Dashboard } from "@/features/dashboard/api";
 
 export function CapturePickLabel({ project, sublabel }: { project: string; sublabel?: string }) {
-  return <span className="capture-pick-label"><span className="text-red">{project}</span>{sublabel ? <small className="text-blue">{sublabel}</small> : null}</span>;
+  return <span className="capture-pick-label"><span className="text-red">{project}</span>{sublabel ? <span className="capture-pick-sub text-blue">{sublabel}</span> : null}</span>;
 }
 
 type Pick = { project: Project; subprojectIds: number[]; label: string; sublabel: string };
@@ -18,7 +18,7 @@ export function CapturePicker({
   recent,
   id = "project-search",
   autoFocus = true,
-  placeholder = "Search projects or recent subprojects",
+  placeholder = "Search projects",
 }: {
   value: Project | null;
   onChange: (project: Project | null, subprojectIds: number[]) => void;
@@ -50,15 +50,11 @@ export function CapturePicker({
       return [{ project, subprojectIds: quick.subprojects.map((s) => s.id), label: project.name, sublabel }];
     });
     if (exactProject) pairs.push(...(searchedSubs.data ?? []).map((sub) => ({ project: exactProject, subprojectIds: [sub.id], label: exactProject.name, sublabel: sub.name })));
+    // Recents first, exactly as they were used; then every other project once.
     const unique = [...new Map(pairs.map((pair) => [`${pair.project.id}:${[...pair.subprojectIds].sort().join(",")}`, pair])).values()];
-    const ranked = rankProjects(all, text, 12);
-    const ordered = [...new Map([...unique.map((pair) => pair.project), ...ranked].map((project) => [project.id, project])).values()];
-    // Each project appears once, followed by its visibly named recent subprojects.
-    return ordered.flatMap((project) => [
-      { project, subprojectIds: [], label: project.name, sublabel: "" },
-      ...unique.filter((pair) => pair.project.id === project.id && pair.subprojectIds.length),
-    ]);
-
+    const plain = new Set(unique.filter((pair) => !pair.subprojectIds.length).map((pair) => pair.project.id));
+    const others = [...new Map([...unique.map((pair) => pair.project), ...rankProjects(all, text, 12)].map((project) => [project.id, project])).values()].filter((project) => !plain.has(project.id));
+    return [...unique, ...others.map((project) => ({ project, subprojectIds: [], label: project.name, sublabel: "" }))];
   }, [projects.data, recent, text, exactProject, searchedSubs.data]);
   const choose = (pick: Pick) => {
     onChange(pick.project, pick.subprojectIds);
@@ -122,7 +118,7 @@ export function CapturePicker({
                 id={`${listId}-${index}`}
                 aria-selected={active === index}
                 aria-label={`${pick.label}${pick.sublabel ? ` / ${pick.sublabel}` : ""}`}
-                className={`${active === index ? "is-active" : ""}${pick.sublabel ? " capture-pick-sub" : ""}`}
+                className={active === index ? "is-active" : undefined}
                 onMouseDown={(event) => event.preventDefault()}
                 onPointerMove={() => setActive(index)}
                 onClick={() => choose(pick)}

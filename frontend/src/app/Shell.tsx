@@ -18,6 +18,7 @@ import { useActiveContext } from "./context";
 import { ToastOutlet } from "./toasts";
 import { OfflineSync } from "./OfflineSync";
 import { fetchPreferences } from "@/features/profile/api";
+import { CaptureLink } from "@/features/timers/CaptureLayer";
 import { TimerDock } from "@/features/timers/TimerDock";
 import { applyBackground } from "@/features/profile/shell";
 
@@ -86,7 +87,7 @@ export function Shell({ children }: { children: ReactNode }) {
             {tabs.map((tab, index) => {
               const active = isActive(tab, pathname);
               return <div className="nav-slot" key={tab.href}>
-                {index === 2 ? <AppLink className="nav-capture btn-icon" href={urls.startTimer()} aria-label="New timer" title="New timer"><Icon icon={faPlus} /></AppLink> : null}
+                {index === 2 ? <CaptureLink className="nav-capture btn-icon" aria-label="New timer" title="New timer"><Icon icon={faPlus} /></CaptureLink> : null}
                 <AppLink className={`nav-link${active ? " is-active" : ""}`} href={tab.href} aria-current={active ? "page" : undefined}>
                   <Icon icon={tab.icon} /><span>{tab.label}</span>
                 </AppLink>
@@ -97,7 +98,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="header-right">
             <ContextSwitch />
             <IconButton icon={faSearch} label="Go anywhere" onClick={() => window.dispatchEvent(new Event("autumn:palette"))} />
-            <AppLink className="header-capture btn-icon" href={urls.startTimer()} aria-label="New timer" title="New timer"><Icon icon={faPlus} /></AppLink>
+            <CaptureLink className="header-capture btn-icon" aria-label="New timer" title="New timer"><Icon icon={faPlus} /></CaptureLink>
             <AppLink className={`avatar${settingsActive ? " is-active" : ""}`} href="/settings/" aria-label="Settings" title="Settings">
               <img src={boot.profile.avatar_url} alt="" hidden={!hasCustomAvatar(boot.profile.avatar_url)} />
               <span className="avatar-monogram" hidden={hasCustomAvatar(boot.profile.avatar_url)}>{boot.user.username.slice(0, 1).toUpperCase() || "A"}</span>

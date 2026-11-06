@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { formatDuration, formatTime, formatDayDate } from "@/lib/format";
 import { useNow } from "@/features/timers/api";
 import type { Timer } from "@/api/types";
@@ -8,6 +9,8 @@ const RANGES: { key: TimelineRange; label: string }[] = [
   { key: "d3", label: "3 days" },
   { key: "wk", label: "Week" },
 ];
+
+const HOUR = 3_600_000;
 
 /** The timer query owns live state; a persisted report must never resurrect
  * a stopped timer or omit one just started offline. Saved blocks stay intact. */
@@ -48,12 +51,35 @@ export function ledgerEntries(timeline: Timeline, running: Timer[], now: number)
   return [...saved, ...live];
 }
 
-export function DayTimeline({
-  timeline,
-  running,
-  range,
-  onRange,
-}: {
+/** A window that starts and ends on round local hours, with at most six ticks. */
+export function hourAxis(earliest: number, latest: number) {
+  const step = [1, 2, 3, 4, 6, 12].find((hours) => Math.max(4, (latest - earliest) / HOUR) / hours <= 5) ?? 24;
+  const round = (at: number) => {
+    const date = new Date(at);
+    date.setHours(date.getHours() - date.getHours() % step, 0, 0, 0);
+    return date.getTime();
+  };
+  const from = round(earliest);
+  let to = round(latest) + step * HOUR;
+  while (to - from < 4 * HOUR) to += step * HOUR;
+  const ticks: number[] = [];
+  for (let at = from; at <= to; at += step * HOUR) ticks.push(at);
+  return { from, to, ticks };
+}
+
+function midnights(from: number, to: number) {
+  const ticks: number[] = [];
+  const date = new Date(from);
+  date.setHours(0, 0, 0, 0);
+  if (date.getTime() < from) date.setDate(date.getDate() + 1);
+  for (; date.getTime() <= to; date.setDate(date.getDate() + 1)) ticks.push(date.getTime());
+  return ticks;
+}
+
+type Block = ReturnType<typeof ledgerEntries>[number];
+const place = (at: number, span = 0) => ({ "--at": at, "--span": span }) as CSSProperties;
+
+export function DayTimeline({ timeline, running, range, onRange }: {
   timeline: Timeline;
   running: Timer[];
   range: TimelineRange;
@@ -65,34 +91,48 @@ export function DayTimeline({
     project,
     blocks: blocks.filter((block) => block.project.id === project.id),
   }));
-  const liveMinutes = blocks.filter((block) => block.is_live).reduce((sum, block) => sum + block.minutes, 0);
   const total = blocks.reduce((sum, block) => sum + block.minutes, 0);
-  const hour = 3600000;
-  const earliest = Math.min(now, ...blocks.map((b) => Date.parse(b.start)));
-  const latest = Math.max(now, ...blocks.map((b) => (b.is_live ? now : Date.parse(b.end ?? b.start))));
-  const from = range === "today" ? Math.floor(earliest / hour) * hour : Date.parse(timeline.window_start);
-  const to =
-    range === "today"
-      ? Math.max(from + 4 * hour, Math.ceil(latest / hour) * hour + hour)
-      : Date.parse(timeline.window_end);
-  const x = (at: number) => 240 + Math.max(0, Math.min(1, (at - from) / (to - from))) * 740;
-  const tickHours = Math.max(1, Math.ceil((to - from) / hour / 4));
-  const ticks = range === "today"
-    ? Array.from({ length: Math.floor((to - from) / (tickHours * hour)) + 1 }, (_, i) => from + i * tickHours * hour)
-    : Array.from({ length: 5 }, (_, i) => from + ((to - from) * i) / 4);
+  const endOf = (block: Block) => block.is_live ? now : Date.parse(block.end ?? block.start);
+  const { from, to, ticks } = range === "today"
+    ? hourAxis(Math.min(now, ...blocks.map((block) => Date.parse(block.start))), Math.max(now, ...blocks.map(endOf)))
+    : { from: Date.parse(timeline.window_start), to: Date.parse(timeline.window_end), ticks: midnights(Date.parse(timeline.window_start), Date.parse(timeline.window_end)) };
+  const at = (time: number) => Math.max(0, Math.min(1, (time - from) / (to - from))) * 100;
+  const nowVisible = now >= from && now <= to;
+
+  const axis = (
+    <div className="ledger-axis" aria-hidden="true">
+      {ticks.filter((tick) => !nowVisible || Math.abs(at(tick) - at(now)) >= 14).map((tick) => (
+        <span key={tick} className={at(tick) < 8 ? "is-start" : at(tick) > 92 ? "is-end" : undefined} style={place(at(tick))}>
+          {range === "today" ? formatTime(new Date(tick)) : formatDayDate(new Date(tick)).split(" ")[0]}
+        </span>
+      ))}
+      {nowVisible ? <span className={`ledger-now-label${at(now) < 8 ? " is-start" : at(now) > 92 ? " is-end" : ""}`} style={place(at(now))}>Now</span> : null}
+    </div>
+  );
+  const rules = <>
+    {ticks.map((tick) => <i className="ledger-grid" key={tick} style={place(at(tick))} />)}
+    {nowVisible ? <i className="ledger-now" style={place(at(now))} /> : null}
+  </>;
+  const track = (items: Block[]) => (
+    <div className="ledger-track">
+      {rules}
+      {items.map((block) => {
+        const start = Date.parse(block.start);
+        return <span
+          key={`${block.session_id}-${block.start}`}
+          className={`ledger-block${block.is_live ? " is-live" : ""}`}
+          style={place(at(start), at(endOf(block)) - at(start))}
+          title={`${block.project.name}${block.label ? ` / ${block.label}` : ""}: ${formatTime(block.start)}–${block.is_live ? "now" : formatTime(block.end)}`}
+        />;
+      })}
+    </div>
+  );
+  const label = `${timeline.range_title}: ${formatDuration(total)}. Session details are in the journal.`;
+
   return (
     <section className="day-ledger" id="day-timeline" aria-label="Timeline">
       <header className="today-section-head">
-        <div>
-          <h2>Your day, taking shape</h2>
-          <p>
-            <span className="text-green ledger-total">{formatDuration(total)}</span>{" "}
-            <span className="muted">
-              {timeline.is_multi_day ? "in this range" : "today"}
-              {liveMinutes > 0 ? ", including live time" : ""}
-            </span>
-          </p>
-        </div>
+        <h2>Your day<span className="ledger-voice">, taking shape</span></h2>
         <div className="range-tabs" role="tablist" aria-label="Timeline range">
           {RANGES.map((option) => (
             <button
@@ -110,73 +150,24 @@ export function DayTimeline({
       </header>
       {blocks.length ? (
         <>
-          <svg
-            className="day-ledger-chart"
-            viewBox={`0 0 1000 ${76 + lanes.length * 82}`}
-            role="img"
-            aria-label={`${timeline.range_title}: ${formatDuration(total)}. Session details are in the journal below.`}
-          >
-            <defs>
-              <linearGradient id="ledger-ember">
-                <stop stopColor="#ad5734" />
-                <stop offset="1" stopColor="#eda45d" />
-              </linearGradient>
-            </defs>
-            {ticks.map((at) => (
-              <g key={at}>
-                <text x={x(at)} y={24} textAnchor="middle" className="ledger-axis">
-                  {range === "today" ? formatTime(new Date(at)) : formatDayDate(new Date(at))}
-                </text>
-                <line x1={x(at)} x2={x(at)} y1={40} y2={60 + lanes.length * 82} className="ledger-grid" />
-              </g>
-            ))}
-            {lanes.map((lane, index) => (
-              <g key={lane.project.id}>
-                <text x={0} y={72 + index * 82} className="ledger-project">
-                  {lane.project.name.length > 27 ? `${lane.project.name.slice(0, 26)}...` : lane.project.name}
-                  <title>{lane.project.name}</title>
-                </text>
-                <text x={0} y={95 + index * 82} className="ledger-duration">
-                  {formatDuration(
-                    lane.blocks.reduce(
-                      (sum, b) =>
-                        sum + (b.is_live ? Math.max(0, now - Math.max(from, Date.parse(b.start))) / 60000 : b.minutes),
-                      0,
-                    ),
-                  )}
-                </text>
-                {lane.blocks.map((b) => (
-                  <g key={`${b.session_id}-${b.start}`}>
-                    <rect
-                      x={x(Date.parse(b.start))}
-                      y={66 + index * 82}
-                      width={Math.max(5, x(b.is_live ? now : Date.parse(b.end ?? b.start)) - x(Date.parse(b.start)))}
-                      height={20}
-                      rx={5}
-                      className={b.is_live ? "ledger-block is-live" : "ledger-block"}
-                    >
-                      <title>
-                        {lane.project.name}
-                        {b.label ? ` / ${b.label}` : ""}: {formatTime(b.start)}â€“{b.is_live ? "now" : formatTime(b.end)}
-                      </title>
-                    </rect>
-                  </g>
-                ))}
-              </g>
-            ))}
-            {now >= from && now <= to ? (
-              <g>
-                <line x1={x(now)} x2={x(now)} y1={38} y2={65 + lanes.length * 82} className="ledger-now" />
-                <circle cx={x(now)} cy={38} r={4} className="ledger-now-dot" /><text x={x(now)} y={58 + lanes.length * 82} textAnchor="middle" className="ledger-axis ledger-now-label">Now</text>
-              </g>
-            ) : null}
-          </svg>
-          <div className="day-ledger-phone" aria-label="Day's blocks">
-            <svg viewBox="0 0 1000 52" preserveAspectRatio="none" className="day-ember-ribbon" role="img" aria-label={`${formatDuration(total)} across ${blocks.length} blocks`}>
-              {blocks.map((block) => <rect key={`${block.session_id}-${block.start}`} x={(x(Date.parse(block.start)) - 240) / 740 * 1000} y="4" width={Math.max(3, (x(block.is_live ? now : Date.parse(block.end!)) - x(Date.parse(block.start))) / 740 * 1000)} height="16" rx="4" className={`ledger-block${block.is_live ? " is-live" : ""}`}><title>{block.project.name}: {formatTime(block.start)} · {formatDuration(block.minutes)}</title></rect>)}
-              {now >= from && now <= to ? <g><circle cx={(x(now) - 240) / 740 * 1000} cy="12" r="5" className="ledger-now-dot" /><text x={Math.max(55, Math.min(945, (x(now) - 240) / 740 * 1000))} y="48" textAnchor="middle" className="ribbon-now-label">Now</text></g> : null}
-            </svg>
-            <div className="day-ribbon-labels"><span>{formatTime(new Date(from))}</span><span>{formatTime(new Date(to))}</span></div>
+          {timeline.is_multi_day ? <p className="ledger-range-total"><span className="ledger-total">{formatDuration(total)}</span> in this range</p> : null}
+          <div className="day-ledger-chart" role="img" aria-label={label}>
+            {axis}
+            <div className="ledger-field">
+              {lanes.map((lane) => (
+                <div className="ledger-lane" key={lane.project.id}>
+                  <p className="ledger-lane-label">
+                    <span className="ledger-project" title={lane.project.name}>{lane.project.name}</span>
+                    <span className="ledger-duration">{formatDuration(lane.blocks.reduce((sum, block) => sum + block.minutes, 0))}</span>
+                  </p>
+                  {track(lane.blocks)}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="day-ember-ribbon" role="img" aria-label={label}>
+            {axis}
+            {track(blocks)}
           </div>
         </>
       ) : (
