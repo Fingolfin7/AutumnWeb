@@ -4983,6 +4983,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .journal-controls .segmented span { justify-content: center; padding-inline: var(--s2); }
   .session-edit-form .form-actions { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); }
   body:has(.timer-dock:not(.timer-dock--card-visible)) .session-edit-form .form-actions { bottom: calc(var(--tabbar-h) + 68px + env(safe-area-inset-bottom, 0px)); }
+}
 /* Stream V2 */
 .settings-heading { margin-block: var(--s2) var(--s4); }
 .settings-heading p { margin-top: var(--s1); font-size: var(--fs-sm); }
