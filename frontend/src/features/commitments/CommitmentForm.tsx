@@ -723,7 +723,7 @@ function ProgressPanel({ commitment: c }: { commitment: Commitment }) {
               </span>
             </div>
             <div className="meta-row">
-              <span className="meta-label">This period?s progress</span>
+              <span className="meta-label">This period’s progress</span>
               <span className={`meta-value ${time ? progress.surplus >= 0 ? "text-green" : "text-red" : ""}`}>
                 {`${progress.surplus >= 0 ? "+" : "-"}${num(progress.surplus)}`}
               </span>
