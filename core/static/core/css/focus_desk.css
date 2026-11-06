@@ -4987,6 +4987,9 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
 .settings-content .profile-default-control { grid-template-columns: minmax(4rem, .5fr) minmax(7rem, 1fr); }
 .settings-content .profile-defaults-grid { gap: 0; margin-top: 0; }
 .settings-content .profile-codex-panel { margin: 0; padding: 0; background: transparent; }
+.settings-content .profile-auth-panel { grid-template-columns: minmax(0, 1fr) auto; gap: var(--s2); padding: var(--s3) 0; background: transparent; border-bottom: 1px solid var(--hairline); }
+.settings-content .profile-auth-panel:last-child { border-bottom: 0; }
+.settings-content .profile-auth-list { gap: 0; }
 .commitment-target-sheet .sheet-panel { display: flex; flex-direction: column; overflow: hidden; }
 .commitment-target-sheet .commitment-editor { display: flex; flex: 1; min-height: 0; flex-direction: column; }
 .commitment-target-sheet .commitment-editor .split { display: block; flex: 1; min-height: 0; overflow-y: auto; }
@@ -5047,7 +5050,7 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .app-header--settings .brand { width: auto; gap: var(--s1); }
   .app-header--settings .brand-mark { width: 20px; height: 20px; }
   .app-header--settings .brand-word { position: static; width: auto; height: auto; overflow: visible; clip-path: none; font-size: var(--fs-sm); letter-spacing: -.015em; }
-  .app-header--settings .context-switch select { max-width: min(32vw, 8rem); }
+  .app-header--settings .context-switch select { max-width: min(32vw, 8rem); white-space: nowrap; }
   .settings-page--section > .settings-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s2); }
   .settings-page--section .settings-back { grid-column: 2; grid-row: 1; margin: 0; font-size: var(--fs-xs); }
   .settings-page--section .settings-heading .page-title { grid-column: 1; grid-row: 1; min-width: 0; font-size: 1.5rem; }

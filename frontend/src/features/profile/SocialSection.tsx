@@ -38,7 +38,7 @@ export function SocialSection({ social }: { social: SocialAccounts }) {
   if (!accounts.length) return null;
   return (
     <section className="slab slab-pad">
-      <SlabHead title="Connected accounts" aside={<span className="muted">Saved automatically</span>} />
+      <SlabHead title="Connected accounts" />
       {!hasPassword ? (
         <div className="msg msg--warning u-mt-4">
           <Icon icon={faExclamationTriangle} className="msg-icon" />
