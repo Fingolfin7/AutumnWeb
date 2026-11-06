@@ -5115,3 +5115,11 @@ body.bg-active :is(.sessions-page .session-list, .today-journal, .today-idle, .t
   .review-period-layout .review-ember-weeks { gap: 2px; }
   .review-period-layout .review-ember-weeks button { min-width: 0; padding-inline: 1px; }
 }
+
+@media (max-width: 999px) {
+  .settings-reminder-sheet .nx-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-reminder-sheet .nx-form-grid > .field { grid-column: 1 / -1; }
+  .settings-reminder-sheet .nx-form-grid > .field:has(#id_local_date),
+  .settings-reminder-sheet .nx-form-grid > .field:has(#id_local_time) { grid-column: auto; }
+  .settings-reminder-sheet .time-chips { padding-bottom: var(--s5); }
+}

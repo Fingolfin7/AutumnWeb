@@ -1,4 +1,4 @@
-import { BrowserPush, useBrowserPushState } from "./BrowserPush";
+import { BrowserPush } from "./BrowserPush";
 import { OptionPicker } from "@/components/OptionPicker";
 import { DateInput, Input } from "@/components/ui";
 import { todayKey } from "./dates";
@@ -35,7 +35,6 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
   const create = useCreateSchedule();
   const update = useUpdateSchedule(schedule?.id ?? 0);
   const busy = create.isPending || update.isPending;
-  const push = useBrowserPushState();
 
   const projects = useAllProjects();
   const contexts = useContexts();
@@ -245,7 +244,7 @@ export function ScheduleEditor({ schedule, onSaved }: { schedule?: Schedule; onS
             </AppLink>
           ) : null}
           <button className="btn btn--primary" type="submit" disabled={busy}>
-            {push.data?.state === "denied" ? "Save reminder (browser blocked)" : schedule ? "Save reminder" : "Add reminder"}
+            Save
           </button>
         </div>
       </form>
