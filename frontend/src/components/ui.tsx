@@ -105,5 +105,5 @@ export function FileDrop({ onFile, hint, ...props }: Omit<InputHTMLAttributes<HT
   const [dragging, setDragging] = useState(false);
   const [name, setName] = useState("");
   const pick = (file: File | null) => { setName(file?.name ?? ""); onFile(file); };
-  return <div className={`file-drop${dragging ? " is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!props.disabled) pick(event.dataTransfer.files[0] ?? null); }}><input {...props} type="file" onChange={event => pick(event.target.files?.[0] ?? null)} /><span className="file-drop-action">Choose file</span><span className="file-drop-name">{name || hint || "No file chosen"}</span></div>;
+  return <div className={`file-drop${dragging ? " is-dragging" : ""}`} onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={event => { event.preventDefault(); setDragging(false); if (!props.disabled) pick(event.dataTransfer.files[0] ?? null); }}><input {...props} type="file" onChange={event => pick(event.target.files?.[0] ?? null)} /><span className="file-drop-action">{name || "Choose file"}</span>{!name && hint ? <span className="file-drop-name">{hint}</span> : null}</div>;
 }
