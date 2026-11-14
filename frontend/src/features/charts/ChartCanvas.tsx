@@ -6,7 +6,7 @@ import type { Built } from "./build";
 /* Owns one canvas and the one Chart.js instance (or word cloud) drawn on it.
    The effect's cleanup destroys the chart, so a type change, new data or an
    unmount never leaves an instance behind or draws twice on a canvas. */
-export function ChartCanvas({ built }: { built: Built }) {
+export function ChartCanvas({ built, label }: { built: Built; label?: string }) {
   const canvas = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -24,7 +24,7 @@ export function ChartCanvas({ built }: { built: Built }) {
     const draw = () => {
       const width = container.clientWidth || window.innerWidth * 0.8;
       const height = container.clientHeight || window.innerHeight * 0.6;
-      drawWordcloud(element, built.words, width, height);
+      drawWordcloud(element, built.words, width, height, built.extent);
     };
     draw();
     let timer: number | undefined;
@@ -43,5 +43,6 @@ export function ChartCanvas({ built }: { built: Built }) {
     };
   }, [built]);
 
-  return <canvas id="chart" ref={canvas} role="img" aria-label={built.type === "wordcloud" ? "Word cloud of session notes" : "Chart of tracked time"} />;
+  const name = built.type === "wordcloud" ? "Word cloud of session notes" : "Chart of tracked time";
+  return <canvas id={label ? undefined : "chart"} ref={canvas} role="img" aria-label={label ? `${name}, ${label}` : name} />;
 }

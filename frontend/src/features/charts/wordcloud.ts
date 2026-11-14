@@ -12,9 +12,8 @@ export function toWordList(rows: WordRow[]): [string, number][] {
 /* Normalise frequencies into bounded font sizes. Multiplying raw counts made
    uniformly frequent words hundreds of pixels tall, so WordCloud could fail
    to place any of them and leave a blank canvas. */
-export function fontSizer(words: [string, number][], canvasWidth: number): (weight: number) => number {
-  const largest = words[0]![1];
-  const smallest = words[words.length - 1]![1];
+export function fontSizer(words: [string, number][], canvasWidth: number, extent?: [number, number]): (weight: number) => number {
+  const [smallest, largest] = extent ?? [words[words.length - 1]![1], words[0]![1]];
   const range = largest - smallest;
   const max = Math.min(72, Math.max(36, canvasWidth / 10));
   const min = Math.max(12, max / 4);
@@ -28,16 +27,18 @@ export function wordColor(weight: number, maxWeight: number): string {
   return token(share > 0.6 ? "--brand" : share > 0.3 ? "--note" : "--ink-2");
 }
 
-export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width: number, height: number) {
+/* `extent` ([fewest, most] uses across both periods' clouds) sizes and
+   colours the words on one scale. */
+export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width: number, height: number, extent?: [number, number]) {
   const words = toWordList(rows);
   if (!words.length) return;
   canvas.width = width;
   canvas.height = height;
-  const maxWeight = words[0]![1];
+  const maxWeight = extent?.[1] ?? words[0]![1];
   WordCloud(canvas, {
     list: words,
     gridSize: Math.round(((words.length > 50 ? 8 : 16) * width) / 1024),
-    weightFactor: fontSizer(words, width),
+    weightFactor: fontSizer(words, width, extent),
     fontFamily: token("--font-ui"),
     fontWeight: "600",
     color: (_word, weight) => wordColor(weight, maxWeight),

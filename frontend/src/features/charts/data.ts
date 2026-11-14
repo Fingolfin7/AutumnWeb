@@ -45,8 +45,10 @@ export interface ChartOptions {
   projectLimit: number;
   /** The selected range (inclusive days), when known: it pins the time axis. */
   range?: Range;
-  /** The previous period's payload, for the kinds that draw it. */
+  /** The previous period's payload, for the kinds that draw it in the same chart. */
   previous?: unknown;
+  /** [smallest, largest] value across both periods' panels, so they share a scale. */
+  extent?: [number, number];
 }
 
 /* ---- periods ------------------------------------------------------------ */

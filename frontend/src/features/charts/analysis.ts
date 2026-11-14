@@ -30,7 +30,7 @@ export function histogramConfig(data: HistogramRow[], { previous }: ChartOptions
               const count = context.parsed.y!;
               if (context.datasetIndex) return `Previous period: ${count} sessions`;
               const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-              return `${count} sessions (${pct}%)`;
+              return `${previous ? "This period: " : ""}${count} sessions (${pct}%)`;
             },
           },
         },

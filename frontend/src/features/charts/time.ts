@@ -6,7 +6,8 @@ import type { AnyConfig, DailyTotalRow, HeatmapRow } from "./payloads";
 
 /* Calendar and weekday x hour heatmap: matrix charts
    (core/static/core/js/charts/time.js). Both run Monday to Sunday and
-   share one ramp: more time, more of the app's duration green. */
+   share one ramp: more time, more of the app's duration green. A shared
+   `extent` tops the ramp, so two periods' panels colour alike. */
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const mondayFirst = (sundayFirst: number) => (sundayFirst + 6) % 7;
@@ -29,7 +30,7 @@ const CELL = { borderRadius: 3, borderWidth: 0, hoverBorderWidth: 1.5 };
 /* One cell per day of the selected range (at most its last year), in week
    columns. The canvas keeps the grid's own proportions, so the squares fill
    the width instead of floating in a fixed-height box. */
-export function calendarConfig(data: DailyTotalRow[], { range }: ChartOptions): AnyConfig {
+export function calendarConfig(data: DailyTotalRow[], { range, extent: shared }: ChartOptions): AnyConfig {
   const totals = new Map<string, number>();
   for (const row of data) totals.set(row.date, (totals.get(row.date) ?? 0) + Number(row.hours));
   const extent = range ? { min: parseDay(range.start), max: parseDay(range.end) } : dateExtent([...totals.keys()].map(parseDay));
@@ -39,7 +40,7 @@ export function calendarConfig(data: DailyTotalRow[], { range }: ChartOptions): 
     const key = dayKey(date);
     return { x: weekOf(date).getTime(), y: mondayFirst(date.getDay()), d: key, v: totals.get(key) ?? 0 };
   });
-  const color = ramp(Math.max(...cells.map((cell) => cell.v)));
+  const color = ramp(shared?.[1] ?? Math.max(...cells.map((cell) => cell.v)));
   const weeks = differenceInCalendarWeeks(extent.max, first, { weekStartsOn: 1 }) + 1;
   const side = ({ chart }: { chart: Chart }) => Math.min(slot(chart, "x", weeks), slot(chart, "y", 7));
 
@@ -93,13 +94,13 @@ export function calendarConfig(data: DailyTotalRow[], { range }: ChartOptions): 
   };
 }
 
-export function heatmapConfig(data: HeatmapRow[]): AnyConfig {
+export function heatmapConfig(data: HeatmapRow[], { extent }: Pick<ChartOptions, "extent"> = {}): AnyConfig {
   const averages = new Map(data.map((row) => [`${mondayFirst(row.weekday)}:${row.hour}`, Number(row.average_hours)] as const));
   const cells: { x: number; y: number; v: number }[] = [];
   for (let weekday = 0; weekday < 7; weekday++) {
     for (let hour = 0; hour < 24; hour++) cells.push({ x: weekday, y: hour, v: averages.get(`${weekday}:${hour}`) ?? 0 });
   }
-  const color = ramp(Math.max(...cells.map((cell) => cell.v)));
+  const color = ramp(extent?.[1] ?? Math.max(...cells.map((cell) => cell.v)));
 
   return {
     type: "matrix",

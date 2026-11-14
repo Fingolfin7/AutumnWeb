@@ -12,9 +12,9 @@ import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import { bootstrap } from "@/bootstrap";
 import { ChartCanvas } from "./ChartCanvas";
 import { semanticSearchAvailable, useChartData } from "./api";
-import { buildChart, CHART_GROUPS, CIRCULAR_KINDS, COMPARE_SERIES_KINDS, parseKind } from "./build";
-import { CompareSummary, totalHours } from "./CompareSummary";
-import { previousRange } from "./data";
+import { buildChart, CHART_GROUPS, CIRCULAR_KINDS, COMPARE, NO_COMPARE, parseKind, valueExtent } from "./build";
+import { CompareSummary, rangeLabel, totalHours } from "./CompareSummary";
+import { periodDays, previousRange } from "./data";
 import { buildChartQuery, describeFilters, EMPTY_FILTERS, readFilters, writeFilters, type ChartFilters, type ChartQuery } from "./filters";
 import { SimilaritySlider } from "@/features/search/SimilaritySlider";
 import { accountSimilarity, sameCutoff, similarityScale } from "@/features/search/similarity";
@@ -53,29 +53,34 @@ export default function ChartsPage() {
 
   /* Comparing asks the same endpoint again for the window of equal length
      just before, every other filter unchanged: daily totals of both windows
-     for the summary, and the chart's own payload for the kinds that draw the
-     previous period as a second series. */
+     for the summary, and the chart's own payload for the previous window.
+     Kinds without a comparison keep ?compare=on in the URL but ignore it. */
   const range = query.start_date && query.end_date ? { start: query.start_date, end: query.end_date } : undefined;
-  const before = applied.compare && range ? previousRange(range) : null;
-  const drawsPrevious = !!before && COMPARE_SERIES_KINDS.includes(kind);
+  const compare = COMPARE[kind];
+  const before = applied.compare && range && compare ? previousRange(range) : null;
   const shifted = (base: ChartQuery) => ({ ...base, start_date: before?.start, end_date: before?.end });
   const totalsQuery: ChartQuery = { ...query, chart_type: "calendar", aggregate: undefined };
-  const previousChart = useChartData(shifted(query), drawsPrevious);
+  const previousChart = useChartData(shifted(query), !!before);
   const totals = useChartData(totalsQuery, !!before);
   const previousTotals = useChartData(shifted(totalsQuery), !!before);
 
-  const built = useMemo(
-    () =>
-      chart.data
-        ? buildChart(kind, chart.data.data, {
-            projectLimit: bootstrap().profile.default_chart_project_count || 7,
-            subprojects: !!applied.project_name,
-            range,
-            previous: drawsPrevious ? previousChart.data?.data : undefined,
-          })
-        : null,
-    [chart.data, kind, applied.project_name, range?.start, range?.end, drawsPrevious, previousChart.data], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  /* One chart, or with a "panels" comparison one per period, on one shared
+     scale (an empty previous period still gets its panel, drawn empty). */
+  const panels = useMemo((): { built: ReturnType<typeof buildChart>; label?: string }[] | null => {
+    if (!chart.data) return null;
+    const options = { projectLimit: bootstrap().profile.default_chart_project_count || 7, subprojects: !!applied.project_name, range };
+    const previous = before ? previousChart.data?.data : undefined;
+    if (compare?.draw !== "panels" || !before || !range) return [{ built: buildChart(kind, chart.data.data, { ...options, previous }) }];
+    if (previous === undefined) return [];
+    const [lo1, hi1] = valueExtent(kind, chart.data.data);
+    const [lo2, hi2] = valueExtent(kind, previous);
+    const extent: [number, number] = [Math.min(lo1, lo2), Math.max(hi1, hi2)];
+    return [
+      { built: buildChart(kind, chart.data.data, { ...options, extent }), label: `This period · ${rangeLabel(range)}` },
+      { built: buildChart(kind, previous, { ...options, range: before, extent }), label: `Previous period · ${rangeLabel(before)}` },
+    ];
+  }, [chart.data, kind, applied.project_name, range?.start, range?.end, before?.start, previousChart.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const built = panels?.[0]?.built ?? null;
 
   const pills = describeFilters(
     applied,
@@ -117,7 +122,7 @@ export default function ChartsPage() {
       .map((project) => ({ id: project.id, label: project.name }));
   }, [projects.data, draft.context, draft.tags, draft.projects, contextId]);
 
-  const loading = chart.isPending || chart.isFetching || (drawsPrevious && previousChart.isPending);
+  const loading = chart.isPending || chart.isFetching || (!!before && previousChart.isPending);
   const empty = !loading && !chart.isError && !built;
 
   return (
@@ -194,9 +199,10 @@ export default function ChartsPage() {
             <Icon icon={faSyncAlt} spin={chart.isFetching} />
             <span className="sr-only">Refresh</span>
           </button>
-          <label className="check-row chart-compare-toggle" title={range ? undefined : "Pick a start and end date to compare"}>
-            <input type="checkbox" checked={applied.compare} disabled={!range} onChange={(e) => toggleCompare(e.target.checked)} />
+          <label className="check-row chart-compare-toggle" title={!range ? "Pick a start and end date to compare" : NO_COMPARE[kind]}>
+            <input type="checkbox" checked={applied.compare && !!compare} disabled={!range || !compare} onChange={(e) => toggleCompare(e.target.checked)} />
             Compare to previous period
+            {compare ? null : <span className="muted">(not for this chart)</span>}
           </label>
         </div>
       </form>
@@ -321,7 +327,7 @@ export default function ChartsPage() {
             now={totals.data ? totalHours(totals.data.data) : null}
             previous={previousTotals.data ? totalHours(previousTotals.data.data) : null}
             previousRange={before}
-            note={drawsPrevious ? `the previous period is the ${kind === "stacked_area" || kind === "cumulative" ? "dashed line" : "faded bars"}` : undefined}
+            note={compare?.key}
           />
         ) : null}
 
@@ -333,7 +339,18 @@ export default function ChartsPage() {
           </p>
         ) : null}
 
-        {!chart.isError && !empty ? (
+        {!chart.isError && !empty && panels && panels.length > 1 ? (
+          <div id="canvas_container" className={`chart-panels chart-panels--${kind}${kind === "calendar" && range && periodDays(range) > 140 ? " chart-panels--stack" : ""}`}>
+            {panels.map(({ built: panel, label }) => (
+              <figure key={label} className="chart-panel">
+                <figcaption>{label}</figcaption>
+                <div className="chart-panel-box">
+                  {panel ? <ChartCanvas built={panel} label={label} /> : <p className="empty">Nothing tracked.</p>}
+                </div>
+              </figure>
+            ))}
+          </div>
+        ) : !chart.isError && !empty ? (
           <div id="canvas_container" className={CIRCULAR_KINDS.includes(kind) ? "chart-circular" : kind === "calendar" ? "chart-calendar" : undefined}>
             {built ? <ChartCanvas key={built.type} built={built} /> : null}
           </div>
