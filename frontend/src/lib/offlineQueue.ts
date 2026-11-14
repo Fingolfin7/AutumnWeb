@@ -66,7 +66,7 @@ export interface QueuedSession {
   key: string;
   queuedAt: string;
   body: { uuid: string; project_id: number; start: string; end: string; [field: string]: unknown };
-  display: { projectName: string };
+  display: { projectName: string; subprojects?: { id: number; name: string }[] };
 }
 
 export type QueuedOp = QueuedStart | QueuedStop | QueuedProject | QueuedSubproject | QueuedSession;

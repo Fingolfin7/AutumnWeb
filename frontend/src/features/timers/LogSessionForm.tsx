@@ -63,7 +63,7 @@ export function LogSessionForm({ pick, autoFocus }: { pick: ProjectPick; autoFoc
       note: note.trim() ? note : null,
       ...(allocations ? { subproject_allocations: allocations } : { subproject_ids: chosen.map((s) => s.id) }),
     };
-    log.mutate({ ...input, projectName: project.name }, {
+    log.mutate({ ...input, projectName: project.name, subprojects: chosen.map((s) => ({ id: s.id, name: s.name })) }, {
       onSuccess: (result) => {
         if (result === "queued") {
           toast.info(`Saved ${formatDurationWords(minutes)} of ${project.name} on this device. It syncs when Autumn can be reached.`);

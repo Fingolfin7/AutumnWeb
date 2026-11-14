@@ -112,7 +112,13 @@ test.describe("offline", () => {
     await page.goto("/create_project/");
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
-    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+    // Going offline before the service worker has saved the pages visited
+    // below would leave them unable to load.
+    await page.waitForFunction(async () => {
+      if (!navigator.serviceWorker.controller) return false;
+      const urls = (await Promise.all((await caches.keys()).map(async (name) => (await (await caches.open(name)).keys()).map((r) => r.url)))).flat();
+      return ["ProjectsPage-", "TimersPage-"].every((chunk) => urls.some((url) => url.includes(`/assets/${chunk}`)));
+    });
     await page.waitForLoadState("networkidle");
 
     await context.setOffline(true);
@@ -136,6 +142,40 @@ test.describe("offline", () => {
     expect(created).toHaveLength(1);
     const timers = (await (await page.request.get("/api/v2/timers/")).json()) as { timers: { project: { id: number } }[] };
     expect(timers.timers.map((timer) => timer.project.id)).toEqual([created[0]!.id]);
+  });
+  test("a session logged offline is listed on Sessions as waiting, then syncs", async ({ page, context }, testInfo) => {
+    const note = `Logged with no signal ${testInfo.project.name} ${testInfo.retry}.${testInfo.repeatEachIndex}`;
+    // Online first, so the pages used below, the timers and the session list are saved on the device.
+    await page.goto("/timers/");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await page.waitForFunction(async () => {
+      if (!navigator.serviceWorker.controller) return false;
+      const urls = (await Promise.all((await caches.keys()).map(async (name) => (await (await caches.open(name)).keys()).map((r) => r.url)))).flat();
+      return ["SessionsPage-", "StartTimerPage-"].every((chunk) => urls.some((url) => url.includes(`/assets/${chunk}`)));
+    });
+    await page.getByRole("link", { name: "Sessions" }).first().click();
+    await expect(page.getByRole("region", { name: "Sessions" })).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2_500); // the query cache is persisted on a throttle
+
+    await context.setOffline(true);
+    await page.getByRole("link", { name: "Timers" }).first().click();
+    await page.getByRole("link", { name: "Log past session" }).click();
+    await pickProject(page, "Piano Practice");
+    await page.getByRole("button", { name: "45m" }).click();
+    await page.getByRole("textbox", { name: "Note", exact: true }).fill(note);
+    await page.getByRole("button", { name: "Log session" }).click();
+    await expect(toasts(page).getByText(/Saved 45 minutes of Piano Practice on this device/)).toBeVisible();
+
+    await page.getByRole("link", { name: "Sessions" }).first().click();
+    const row = page.locator(".band", { hasText: note });
+    await expect(row.getByText("Saved offline · waiting to sync")).toBeVisible();
+
+    await context.setOffline(false);
+    await expect(toasts(page).getByText(/Synced 1 offline change/)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Saved offline · waiting to sync")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Sessions" }).getByText(note).first()).toBeVisible();
   });
 });
 
