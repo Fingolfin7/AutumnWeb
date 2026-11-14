@@ -127,6 +127,7 @@ DATABASE_URL=postgres://...  # Falls back to SQLite
 SERVE_MEDIA=TRUE  # For PaaS deployments
 VITE_DEV_SERVER=http://localhost:5173  # Dev only: load the UI from Vite instead of the built bundle
 ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *
+SECURE_COOKIES=FALSE  # Only for a deployment served over plain HTTP; defaults to on when DEBUG is off (HTTPS-only login/CSRF cookies, 30-day HSTS via SECURE_HSTS_SECONDS)
 ALLOW_REGISTRATION=FALSE  # Registration is closed unless explicitly enabled
 GOOGLE_OAUTH_CLIENT_ID=<google-web-client-id>
 GOOGLE_OAUTH_CLIENT_SECRET=<google-web-client-secret>

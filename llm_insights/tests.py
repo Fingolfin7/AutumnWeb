@@ -98,7 +98,7 @@ class InsightsViewProviderModelsTests(TestCase):
                 ("claude-haiku-5-5", "Claude Haiku 5.5"),
                 ("claude-sonnet-5-5", "Claude Sonnet 5.5"),
                 ("claude-opus-5-5", "Claude Opus 5.5"),
-                ("claude-fable-5-1", "Claude Fable 5.1"),
+                ("claude-fable-5-2", "Claude Fable 5.2"),
             ],
         )
 
@@ -115,7 +115,8 @@ class InsightsViewProviderModelsTests(TestCase):
             ("claude", "claude-haiku-4-5", "claude-haiku-5-5"),
             ("claude", "claude-sonnet-5", "claude-sonnet-5-5"),
             ("claude", "claude-opus-5", "claude-opus-5-5"),
-            ("claude", "claude-fable-5", "claude-fable-5-1"),
+            ("claude", "claude-fable-5", "claude-fable-5-2"),
+            ("claude", "claude-fable-5-1", "claude-fable-5-2"),
         ):
             with self.subTest(model=old):
                 self.assertEqual(insight_handlers.validate_selection(models, provider, old), (provider, new))
@@ -124,12 +125,11 @@ class InsightsViewProviderModelsTests(TestCase):
 
 
 class ClaudeOutputLimitTests(SimpleTestCase):
-    def test_current_models_use_their_streaming_ceiling_and_bounded_nonstreaming_limit(self):
-        for model in ("claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1"):
+    def test_current_models_use_their_output_ceiling(self):
+        for model in ("claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"):
             with self.subTest(model=model):
                 handler = ClaudeHandler(model=model, api_key="test-key")
-                self.assertEqual(handler._max_tokens(streaming=True), 128000)
-                self.assertEqual(handler._max_tokens(streaming=False), 16000)
+                self.assertEqual(handler._max_tokens(), 128000)
 
 
 class InsightsAccessAndUsageApiTests(TestCase):
@@ -210,43 +210,25 @@ class GeminiHandlerUsageTests(SimpleTestCase):
 PAYLOAD = "SESSION-PAYLOAD-MARKER"
 
 
-class FakeClaudeMessages:
-    def __init__(self):
-        self.kwargs = None
-
-    async def create(self, **kwargs):
-        self.kwargs = kwargs
-        return SimpleNamespace(
-            content=[SimpleNamespace(text="ok")],
-            usage=SimpleNamespace(input_tokens=1, output_tokens=2),
-        )
-
-
 class ClaudeHandlerRequestShapeTests(SimpleTestCase):
-    def build_handler(self, history=None):
+    def build_handler(self):
         handler = ClaudeHandler(model="claude-sonnet-5", api_key="test-key")
-        messages = FakeClaudeMessages()
-        handler.client = SimpleNamespace(messages=messages)
-        if history is None:
-            handler.username = "kuda"
-            handler.session_data = PAYLOAD
-        else:
-            handler.set_conversation_history(history)
-        return handler, messages
+        handler.username = "kuda"
+        handler.session_data = PAYLOAD
+        return handler
 
     def test_session_payload_rides_in_system_with_a_cache_breakpoint(self):
-        handler, messages = self.build_handler()
+        handler = self.build_handler()
 
-        async_to_sync(handler.send_message)("what did I work on?")
+        system = handler._system_param(handler._active_system_text())
 
-        system = messages.kwargs["system"]
         self.assertEqual(len(system), 1)
         self.assertIn(PAYLOAD, system[0]["text"])
         self.assertEqual(system[0]["cache_control"], {"type": "ephemeral"})
 
 
     def test_safety_refusals_surface_as_readable_text(self):
-        handler, _ = self.build_handler()
+        handler = self.build_handler()
 
         text = handler._refusal_text(
             SimpleNamespace(
@@ -347,41 +329,24 @@ class CachedTokenAccountingTests(SimpleTestCase):
 
 
 class GeminiFailurePathTests(SimpleTestCase):
-    def build_handler(self, raise_on_create=False, raise_on_send=False):
+    def build_handler(self):
         handler = GeminiHandler(model="gemini-3.1-flash-lite", api_key="k")
         handler.username = "kuda"
         handler.session_data = "PAYLOAD_V1"
 
         class FakeChat:
-            async def send_message(self, msg):
-                if raise_on_send:
-                    raise RuntimeError("provider exploded")
-                return SimpleNamespace(text="ok", usage_metadata=None, candidates=None)
+            async def send_message_stream(self, msg):
+                raise RuntimeError("provider exploded")
 
         class FakeChats:
             def create(self, **kwargs):
-                if raise_on_create:
-                    raise RuntimeError("chat creation failed")
                 return FakeChat()
 
         handler.client = SimpleNamespace(aio=SimpleNamespace(chats=FakeChats()))
         return handler
 
-
-    def test_failure_mid_send_stores_exactly_one_turn(self):
-        handler = self.build_handler(raise_on_send=True)
-
-        async_to_sync(handler.send_message)("q1")
-        before = len(handler.get_conversation_history())
-        async_to_sync(handler.send_message)("q2")
-
-        delta = handler.get_conversation_history()[before:]
-        self.assertEqual([m["role"] for m in delta], ["user", "assistant"])
-
     def test_streaming_failure_stores_exactly_one_turn(self):
-        # Streaming is the production path, so it gets the same guarantee as
-        # the non-streaming one.
-        handler = self.build_handler(raise_on_send=True)
+        handler = self.build_handler()
 
         async def drain():
             chunks = []
@@ -435,10 +400,7 @@ class FakeStreamingHandler(BaseLLMHandler):
     def initialize_chat(self, username, sessions):
         self.initialized = True
 
-    async def send_message(self, message):
-        raise NotImplementedError
-
-    async def update_session_data(self, sessions_data, user_prompt):
+    def stream_update_session_data(self, sessions_data, user_prompt, attachments=None):
         raise NotImplementedError
 
     async def stream_message(self, message, attachments=None):

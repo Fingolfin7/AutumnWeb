@@ -213,15 +213,6 @@ class OpenAIHandler(BaseLLMHandler):
             )
         return items
 
-    async def _send_api(self, messages) -> dict[str, Any]:
-        resp = await self._api_client().responses.create(
-            **self._api_response_kwargs(messages)
-        )
-        text = self._response_text(resp)
-        sources = self._extract_sources(resp)
-        usage = self._usage_from_api_response(resp)
-        return {"text": text, "sources": sources, "usage": usage, "source": "api_key"}
-
     def _api_client(self):
         if self.api_client is None:
             self.api_client = (
@@ -230,28 +221,6 @@ class OpenAIHandler(BaseLLMHandler):
                 else AsyncOpenAI()
             )
         return self.api_client
-
-    async def _send_codex(self, messages) -> dict[str, Any]:
-        if self.codex_client is None:
-            raise RuntimeError("Codex auth is not configured.")
-
-        kwargs = self._codex_response_kwargs(messages, include_web_search=True)
-        try:
-            return await self._stream_codex(kwargs)
-        except Exception as exc:
-            msg = str(exc).lower()
-            fallback = dict(kwargs)
-            if "unsupported parameter: tools" in msg or "unsupported parameter: include" in msg:
-                fallback.pop("tools", None)
-                fallback.pop("include", None)
-                return await self._stream_codex(fallback)
-            if "unsupported parameter: max_output_tokens" in msg:
-                fallback.pop("max_output_tokens", None)
-                return await self._stream_codex(fallback)
-            if "unsupported parameter: reasoning" in msg:
-                fallback.pop("reasoning", None)
-                return await self._stream_codex(fallback)
-            raise
 
     async def _create_openai_response_with_fallback(self, client, kwargs):
         try:
@@ -269,31 +238,6 @@ class OpenAIHandler(BaseLLMHandler):
             if changed:
                 return await client.responses.create(**fallback)
             raise
-
-    async def _stream_codex(self, kwargs):
-        request = dict(kwargs)
-        request["stream"] = True
-        event_stream = await self.codex_client.responses.create(**request)
-        chunks = []
-        usage = {"prompt": 0, "response": 0, "cached": 0}
-        sources = []
-        async for event in event_stream:
-            event_type = getattr(event, "type", "")
-            if event_type == "response.output_text.delta":
-                delta = getattr(event, "delta", "")
-                if isinstance(delta, str) and delta:
-                    chunks.append(delta)
-            elif event_type in {"response.completed", "response.incomplete", "response.failed"}:
-                usage = self._usage_from_codex_event(event)
-                event_sources = self._extract_sources(getattr(event, "response", None))
-                if event_sources:
-                    sources = event_sources
-        return {
-            "text": "".join(chunks).strip(),
-            "sources": sources,
-            "usage": usage,
-            "source": "codex",
-        }
 
     async def _stream_api_events(self, messages) -> AsyncIterator[dict[str, Any]]:
         request = self._api_response_kwargs(messages)
@@ -417,24 +361,6 @@ class OpenAIHandler(BaseLLMHandler):
                 self.last_auth_source = "api_key"
             yield event
 
-    async def _send_with_priority(self, messages) -> dict[str, Any]:
-        if self.auth_mode == self.AUTH_CODEX:
-            result = await self._send_codex(messages)
-            self.last_auth_source = "codex"
-            return result
-        if self.auth_mode == self.AUTH_CODEX_WITH_API_FALLBACK:
-            try:
-                result = await self._send_codex(messages)
-                self.last_auth_source = "codex"
-                return result
-            except Exception:
-                result = await self._send_api(messages)
-                self.last_auth_source = "api_key_fallback"
-                return result
-        result = await self._send_api(messages)
-        self.last_auth_source = "api_key"
-        return result
-
     async def generate_chat_title(self, prompt: str) -> str:
         if self.auth_mode == self.AUTH_CODEX:
             if self.codex_client is None:
@@ -460,34 +386,6 @@ class OpenAIHandler(BaseLLMHandler):
             self._api_client(), self._api_title_response_kwargs(prompt)
         )
         return self._response_text(resp)
-
-    async def update_session_data(self, sessions_data, user_prompt) -> str:
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
-        # The payload rides in the system message, so the update turn only has
-        # to say that it changed — resending it inline would duplicate it.
-        update_prompt = self._build_system_text(
-            self.update_session_data_notice.format(username=self.username)
-        )
-        messages = self._messages_from_history(
-            new_user_message=user_prompt, system_text=update_prompt
-        )
-
-        try:
-            result = await self._send_with_priority(messages)
-        except Exception as e:
-            result = {
-                "text": f"OpenAI error: {e}",
-                "sources": [],
-                "usage": {"prompt": 0, "response": 0, "cached": 0},
-                "source": self.last_auth_source,
-            }
-
-        self.conversation_history.append({"role": "system", "content": update_prompt})
-        self.conversation_history.append({"role": "user", "content": user_prompt})
-        self._append_assistant_result(result)
-        return result["text"]
 
     async def stream_update_session_data(
         self, sessions_data, user_prompt, attachments=None
@@ -528,30 +426,6 @@ class OpenAIHandler(BaseLLMHandler):
             "usage": {"prompt": 0, "response": 0, "cached": 0},
             "source": self.last_auth_source,
         })
-
-    async def send_message(self, message) -> str:
-        if not any(m.get("role") == "system" for m in self.conversation_history):
-            # Stored so a resumed chat can recover it — a fresh handler on turn
-            # 2+ never calls initialize_chat.
-            self.conversation_history.append(
-                {"role": "system", "content": self._active_system_text()}
-            )
-
-        messages = self._messages_from_history(new_user_message=message)
-
-        try:
-            result = await self._send_with_priority(messages)
-        except Exception as e:
-            result = {
-                "text": f"OpenAI error: {e}",
-                "sources": [],
-                "usage": {"prompt": 0, "response": 0, "cached": 0},
-                "source": self.last_auth_source,
-            }
-
-        self.conversation_history.append({"role": "user", "content": message})
-        self._append_assistant_result(result)
-        return result["text"]
 
     async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
         if not any(m.get("role") == "system" for m in self.conversation_history):

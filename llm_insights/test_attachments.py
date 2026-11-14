@@ -141,10 +141,7 @@ class AttachmentApiTests(TransactionTestCase):
             def initialize_chat(self, username, sessions):
                 pass
 
-            async def send_message(self, message):
-                raise NotImplementedError
-
-            async def update_session_data(self, sessions_data, user_prompt):
+            def stream_update_session_data(self, sessions_data, user_prompt, attachments=None):
                 raise NotImplementedError
 
             async def stream_message(self, message, attachments=None):
