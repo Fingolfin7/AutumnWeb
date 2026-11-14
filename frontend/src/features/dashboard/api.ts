@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, queryOptions, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { keys } from "@/api/keys";
 import type { components } from "@/api/schema";
@@ -14,13 +14,15 @@ export type DashboardCommitment = components["schemas"]["DashboardCommitment"];
 
 export const RANGE_DAYS: Record<TimelineRange, number> = { today: 1, d3: 3, wk: 7 };
 
-export function useDashboard() {
-  const { contextIdsParam } = useActiveContext();
-  return useQuery({
+export const dashboardQuery = (contextIdsParam: string | undefined) =>
+  queryOptions({
     queryKey: keys.dashboard(contextIdsParam),
     queryFn: () =>
       unwrap(api.GET("/api/v2/dashboard/", { params: { query: contextIdsParam ? { context: contextIdsParam } : {} } })),
   });
+
+export function useDashboard() {
+  return useQuery(dashboardQuery(useActiveContext().contextIdsParam));
 }
 
 /* Day range ending today, in the browser's calendar. */

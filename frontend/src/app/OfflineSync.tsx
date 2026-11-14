@@ -5,6 +5,7 @@ import { useInvalidate } from "@/api/sync";
 import { flushQueue, hasUnsavedChanges, isFlushing, queuedOps, subscribe } from "@/lib/offlineQueue";
 import { pluralize } from "@/lib/format";
 import { useOnline } from "@/lib/useOnline";
+import { isUnreachable, subscribeUnreachable } from "./savedData";
 import { useToast } from "./toasts";
 
 const RETRY_MS = 20_000;
@@ -14,7 +15,9 @@ const RETRY_MS = 20_000;
    anything is waiting. Shows a small pill while offline or unsynced. */
 export function OfflineSync() {
   const ops = useSyncExternalStore(subscribe, queuedOps);
-  const online = useOnline();
+  /* No connection, or one that can't reach Autumn. */
+  const unreachable = useSyncExternalStore(subscribeUnreachable, isUnreachable);
+  const online = useOnline() && !unreachable;
   const unsaved = useSyncExternalStore(subscribe, hasUnsavedChanges);
   const invalidate = useInvalidate();
   const toast = useToast();

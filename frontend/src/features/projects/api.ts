@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { errorMessage } from "@/api/errors";
 import { keys } from "@/api/keys";
@@ -22,10 +22,9 @@ export interface ProjectLists {
    ordering; only "only these projects" is applied to the fetched set here.
    With a search, a second request with related=true supplies the related
    matches. */
-export function useProjectLists(filters: ProjectFilters) {
-  const { contextIdsParam } = useActiveContext();
+export function projectListsQuery(filters: ProjectFilters, contextIdsParam: string | undefined) {
   const query = serverQuery(filters, contextIdsParam);
-  return useQuery({
+  return queryOptions({
     queryKey: keys.projects({ list: { query, only: filters.projectMode === "include" ? filters.projects : [] } }),
     queryFn: async (): Promise<ProjectLists> => {
       const direct = await fetchAllProjects(query);
@@ -36,6 +35,10 @@ export function useProjectLists(filters: ProjectFilters) {
       };
     },
   });
+}
+
+export function useProjectLists(filters: ProjectFilters) {
+  return useQuery(projectListsQuery(filters, useActiveContext().contextIdsParam));
 }
 
 export function useCommitments() {
