@@ -12,8 +12,10 @@ import { useAllProjects, useContexts, useTags } from "@/api/meta";
 import { bootstrap } from "@/bootstrap";
 import { ChartCanvas } from "./ChartCanvas";
 import { semanticSearchAvailable, useChartData } from "./api";
-import { buildChart, CHART_GROUPS, CIRCULAR_KINDS, parseKind } from "./build";
-import { buildChartQuery, describeFilters, EMPTY_FILTERS, readFilters, writeFilters, type ChartFilters } from "./filters";
+import { buildChart, CHART_GROUPS, CIRCULAR_KINDS, COMPARE_SERIES_KINDS, parseKind } from "./build";
+import { CompareSummary, totalHours } from "./CompareSummary";
+import { previousRange } from "./data";
+import { buildChartQuery, describeFilters, EMPTY_FILTERS, readFilters, writeFilters, type ChartFilters, type ChartQuery } from "./filters";
 import { SimilaritySlider } from "@/features/search/SimilaritySlider";
 import { accountSimilarity, sameCutoff, similarityScale } from "@/features/search/similarity";
 
@@ -41,17 +43,38 @@ export default function ChartsPage() {
   /* Edits wait for Apply; the chart type is the exception and redraws at
      once. The draft follows the URL whenever the filters in it change. */
   const [draft, setDraft] = useState<ChartFilters>(effective);
-  const filtersKey = writeFilters({ ...effective, chart_type: EMPTY_FILTERS.chart_type }).toString();
-  useEffect(() => setDraft((current) => ({ ...effective, chart_type: current.chart_type })), [filtersKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const filtersKey = writeFilters({ ...effective, chart_type: EMPTY_FILTERS.chart_type, compare: false }).toString();
+  useEffect(() => setDraft((current) => ({ ...effective, chart_type: current.chart_type, compare: current.compare })), [filtersKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const semantic = semanticSearchAvailable();
   const query = useMemo(() => buildChartQuery(applied, defaults, contextId), [applied, defaults, contextId]);
   const chart = useChartData(query, true);
   const kind = applied.chart_type;
 
+  /* Comparing asks the same endpoint again for the window of equal length
+     just before, every other filter unchanged: daily totals of both windows
+     for the summary, and the chart's own payload for the kinds that draw the
+     previous period as a second series. */
+  const range = query.start_date && query.end_date ? { start: query.start_date, end: query.end_date } : undefined;
+  const before = applied.compare && range ? previousRange(range) : null;
+  const drawsPrevious = !!before && COMPARE_SERIES_KINDS.includes(kind);
+  const shifted = (base: ChartQuery) => ({ ...base, start_date: before?.start, end_date: before?.end });
+  const totalsQuery: ChartQuery = { ...query, chart_type: "calendar", aggregate: undefined };
+  const previousChart = useChartData(shifted(query), drawsPrevious);
+  const totals = useChartData(totalsQuery, !!before);
+  const previousTotals = useChartData(shifted(totalsQuery), !!before);
+
   const built = useMemo(
-    () => (chart.data ? buildChart(kind, chart.data.data, { projectLimit: bootstrap().profile.default_chart_project_count || 7, subprojects: !!applied.project_name }) : null),
-    [chart.data, kind, applied.project_name],
+    () =>
+      chart.data
+        ? buildChart(kind, chart.data.data, {
+            projectLimit: bootstrap().profile.default_chart_project_count || 7,
+            subprojects: !!applied.project_name,
+            range,
+            previous: drawsPrevious ? previousChart.data?.data : undefined,
+          })
+        : null,
+    [chart.data, kind, applied.project_name, range?.start, range?.end, drawsPrevious, previousChart.data], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const pills = describeFilters(
@@ -74,6 +97,10 @@ export default function ChartsPage() {
     /* No history entry: Back should leave the page, not step through types. */
     setParams(writeFilters({ ...applied, chart_type: next }), { replace: true });
   };
+  const toggleCompare = (compare: boolean) => {
+    setDraft((current) => ({ ...current, compare }));
+    setParams(writeFilters({ ...applied, compare }), { replace: true });
+  };
 
   /* The project picker narrows itself to the context and tags chosen beside
      it (option_pickers.js, EXCLUDE_PROJECT_META); a ticked project always
@@ -90,7 +117,7 @@ export default function ChartsPage() {
       .map((project) => ({ id: project.id, label: project.name }));
   }, [projects.data, draft.context, draft.tags, draft.projects, contextId]);
 
-  const loading = chart.isPending || chart.isFetching;
+  const loading = chart.isPending || chart.isFetching || (drawsPrevious && previousChart.isPending);
   const empty = !loading && !chart.isError && !built;
 
   return (
@@ -167,6 +194,10 @@ export default function ChartsPage() {
             <Icon icon={faSyncAlt} spin={chart.isFetching} />
             <span className="sr-only">Refresh</span>
           </button>
+          <label className="check-row chart-compare-toggle" title={range ? undefined : "Pick a start and end date to compare"}>
+            <input type="checkbox" checked={applied.compare} disabled={!range} onChange={(e) => toggleCompare(e.target.checked)} />
+            Compare to previous period
+          </label>
         </div>
       </form>
 
@@ -285,6 +316,15 @@ export default function ChartsPage() {
           </div>
         ) : null}
 
+        {before && !empty && !chart.isError ? (
+          <CompareSummary
+            now={totals.data ? totalHours(totals.data.data) : null}
+            previous={previousTotals.data ? totalHours(previousTotals.data.data) : null}
+            previousRange={before}
+            note={drawsPrevious ? `the previous period is the ${kind === "stacked_area" || kind === "cumulative" ? "dashed line" : "faded bars"}` : undefined}
+          />
+        ) : null}
+
         {chart.isError ? <ErrorState error={chart.error} onRetry={() => void chart.refetch()} /> : null}
 
         {empty ? (
@@ -294,7 +334,7 @@ export default function ChartsPage() {
         ) : null}
 
         {!chart.isError && !empty ? (
-          <div id="canvas_container" className={CIRCULAR_KINDS.includes(kind) ? "chart-circular" : undefined}>
+          <div id="canvas_container" className={CIRCULAR_KINDS.includes(kind) ? "chart-circular" : kind === "calendar" ? "chart-calendar" : undefined}>
             {built ? <ChartCanvas key={built.type} built={built} /> : null}
           </div>
         ) : null}

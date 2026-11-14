@@ -1,20 +1,30 @@
-import { format } from "date-fns";
+import { addDays, differenceInCalendarDays, endOfDay, format, startOfMonth, startOfWeek, subDays } from "date-fns";
+import { seriesColor, token } from "./theme";
 
 /* Shared helpers for the chart builders: palette, "top N + Other" folding,
    day parsing and the axis unit. Pure, so the data shaping is unit-tested
    without a canvas. Ported from core/static/core/js/charts/core.js. */
 
-/* The Night Ledger palette (charts/core.js generateRandomColor). */
-export const PALETTE = [
-  "#c98245", "#4e9a8e", "#b9a66a", "#7896b8",
-  "#7ca36a", "#be675f", "#9b83a7", "#8c7656",
-  "#66837f", "#a87854", "#6f8465", "#596d80",
-];
-export const OTHER_COLOR = "hsl(0, 0%, 70%)";
-
 export function paletteColor(index: number): string {
-  return PALETTE[index % PALETTE.length]!;
+  return seriesColor(index);
 }
+
+/* "Other (n)" is a remainder, not an entity: it stays grey. */
+export function otherColor(): string {
+  return token("--muted");
+}
+
+export function rowColor(row: object, index: number): string {
+  return "_isOther" in row ? otherColor() : paletteColor(index);
+}
+
+/* One hours format for ticks and tooltips. */
+export function fmtHours(hours: number): string {
+  return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)} h`;
+}
+
+/* The value axis of every hours chart: from zero, ticks in hours. */
+export const HOURS_AXIS = { beginAtZero: true, ticks: { callback: (value: number | string) => `${value} h` } };
 
 /* The same colour with an alpha channel. The old code did string surgery on
    "hsl(...)" values, which silently did nothing to the hex palette (so the
@@ -33,19 +43,43 @@ export function withAlpha(color: string, alpha: number): string {
 export interface ChartOptions {
   /** profile.default_chart_project_count: how many series before "Other". */
   projectLimit: number;
+  /** The selected range (inclusive days), when known: it pins the time axis. */
+  range?: Range;
+  /** The previous period's payload, for the kinds that draw it. */
+  previous?: unknown;
+}
+
+/* ---- periods ------------------------------------------------------------ */
+
+export interface Range {
+  start: string;
+  end: string;
+}
+
+export function periodDays({ start, end }: Range): number {
+  return differenceInCalendarDays(parseDay(end), parseDay(start)) + 1;
+}
+
+/* The window of equal length that ends the day before `range` starts, or
+   null when the range is backwards. */
+export function previousRange(range: Range): Range | null {
+  const days = periodDays(range);
+  if (days < 1) return null;
+  const start = parseDay(range.start);
+  return { start: dayKey(subDays(start, days)), end: dayKey(subDays(start, 1)) };
 }
 
 export function otherLabel(count: number): string {
   return `Other (${count})`;
 }
 
-/* Keep the top N rows by time and fold the rest into one "Other (n)" row.
-   Rows are returned untouched (not re-sorted) when there are N or fewer. */
+/* The top N rows by time, biggest first, with the rest folded into one
+   "Other (n)" row. */
 export function consolidateTopN<T extends { name: string; total_time: number }>(
   rows: T[],
   topN: number,
 ): (T | { name: string; total_time: number; _isOther: true })[] {
-  if (!rows || rows.length <= topN) return rows;
+  /* Always by time, so a project wears the same colour on every kind. */
   const sorted = [...rows].sort((a, b) => (b.total_time || 0) - (a.total_time || 0));
   const top: (T | { name: string; total_time: number; _isOther: true })[] = sorted.slice(0, topN);
   const rest = sorted.slice(topN);
@@ -110,8 +144,6 @@ export interface SeriesSet {
   other: string | null;
   /** series -> day -> hours */
   byDay: Record<string, Record<string, number>>;
-  /** Sorted unique days across every series. */
-  days: string[];
 }
 
 /* Group rows by series and day. With `topN`, series beyond the N biggest
@@ -146,6 +178,50 @@ export function buildSeries(rows: DailySeriesRow[], topN?: number): SeriesSet {
       names.push(other);
     }
   }
-  const days = [...new Set(Object.values(byDay).flatMap((series) => Object.keys(series)))].sort();
-  return { names, other, byDay, days };
+  return { names, other, byDay };
+}
+
+/* ---- time axis ---------------------------------------------------------- */
+
+export type Bucket = "day" | "week" | "month";
+
+const TOOLTIP_FORMAT: Record<Bucket, string> = { day: "EEE d MMM", week: "'Week of' d MMM", month: "MMMM yyyy" };
+
+export function bucketOf(day: Date, bucket: Bucket): Date {
+  if (bucket === "week") return startOfWeek(day, { weekStartsOn: 1 });
+  if (bucket === "month") return startOfMonth(day);
+  return day;
+}
+
+/* The x axis of the time-series kinds. It spans the selected range when there
+   is one (else the data), and names the bucket daily values are summed into:
+   the axis unit, so a quarter reads as weekly totals rather than daily
+   spikes. `buckets` lists every bucket on the axis, empty ones included. */
+export function timeAxis(dates: Date[], range?: Range) {
+  const { min, max } = range ? { min: parseDay(range.start), max: parseDay(range.end) } : dateExtent(dates);
+  const unit = getChartUnit(max, min);
+  const bucket: Bucket = unit === "day" || unit === "week" ? unit : "month";
+  const buckets = [...new Set(fillDates(min, max).map((day) => dayKey(bucketOf(day, bucket))))];
+  return {
+    bucket,
+    buckets,
+    scale: {
+      type: "time" as const,
+      min: bucketOf(min, bucket).getTime(),
+      max: endOfDay(max).getTime(),
+      time: { unit, isoWeekday: true, tooltipFormat: TOOLTIP_FORMAT[bucket] },
+      ticks: { maxRotation: 0, autoSkipPadding: 16 },
+    },
+  };
+}
+
+/* Hours per bucket of dated rows, each day first moved `shift` days on (to
+   lay the previous period over this one). */
+export function bucketTotals(rows: { date: string; hours: number | string }[], bucket: Bucket, shift = 0): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const key = dayKey(bucketOf(addDays(parseDay(row.date), shift), bucket));
+    totals.set(key, (totals.get(key) ?? 0) + Number(row.hours));
+  }
+  return totals;
 }
