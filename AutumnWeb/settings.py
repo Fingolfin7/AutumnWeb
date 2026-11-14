@@ -466,6 +466,9 @@ USE_TZ = True
 VITE_DEV_SERVER = env("VITE_DEV_SERVER", default="")
 
 STATIC_URL = "/static/"
+# Vite puts a content hash in every file name under app/assets/, so browsers
+# and the CDN may keep those indefinitely; everything else stays at 60 s.
+WHITENOISE_IMMUTABLE_FILE_TEST = r"^/static/app/assets/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static" if not DEBUG else "staticfiles")
 
 MEDIA_ROOT = env("MEDIA_ROOT", default=os.path.join(BASE_DIR, "media"))
@@ -495,6 +498,15 @@ MCP_ORIGIN = env("MCP_ORIGIN", default="https://autumn-lg0b.onrender.com").rstri
 MCP_RESOURCE = MCP_ORIGIN + "/mcp"
 OAUTH2_PROVIDER_APPLICATION_MODEL = "oauth2_provider.Application"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# Browsers send the login and CSRF cookies over HTTPS only, and remember to
+# use HTTPS for this host. On by default outside DEBUG; a deployment served
+# over plain HTTP (a LAN box) sets SECURE_COOKIES=FALSE or nobody can sign in.
+SECURE_COOKIES = env.bool("SECURE_COOKIES", default=not DEBUG)
+SESSION_COOKIE_SECURE = SECURE_COOKIES
+CSRF_COOKIE_SECURE = SECURE_COOKIES
+SECURE_HSTS_SECONDS = env.int(
+    "SECURE_HSTS_SECONDS", default=30 * 24 * 60 * 60 if SECURE_COOKIES else 0
+)
 OAUTH2_PROVIDER = {
     "OIDC_ISS_ENDPOINT": MCP_ORIGIN,
     "SCOPES": {"autumn:read": "Read the selected Autumn accounts", "autumn:write": "Change records in the selected Autumn accounts"},

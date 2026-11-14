@@ -32,7 +32,7 @@ def provider_models(user):
             ("claude-haiku-5-5", "Claude Haiku 5.5"),
             ("claude-sonnet-5-5", "Claude Sonnet 5.5"),
             ("claude-opus-5-5", "Claude Opus 5.5"),
-            ("claude-fable-5-1", "Claude Fable 5.1"),
+            ("claude-fable-5-2", "Claude Fable 5.2"),
         ]
     return models
 
@@ -76,7 +76,8 @@ def validate_selection(models, provider, model):
             "claude-haiku-4-5": "claude-haiku-5-5",
             "claude-sonnet-5": "claude-sonnet-5-5",
             "claude-opus-5": "claude-opus-5-5",
-            "claude-fable-5": "claude-fable-5-1",
+            "claude-fable-5": "claude-fable-5-2",
+            "claude-fable-5-1": "claude-fable-5-2",
         }.get(model, model)
     if not provider or provider not in models:
         provider = next(iter(models.keys()))

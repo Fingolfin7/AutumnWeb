@@ -260,56 +260,6 @@ class GeminiHandler(BaseLLMHandler):
         )
         return getattr(response, "text", "") or ""
 
-    async def update_session_data(self, sessions_data, user_prompt) -> str:
-        """Update the session data without adding to chat history"""
-        # Update stored session data
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
-        # The payload lives in system_instruction, which is fixed at chat
-        # creation — rebuild the chat so the new data takes effect.
-        update_session_data_prompt = self._build_system_text(
-            self.update_session_data_notice.format(username=self.username)
-        )
-        history_before = list(self.conversation_history)
-        self.conversation_history.append(
-            {"role": "system", "content": update_session_data_prompt}
-        )
-        self.conversation_history.append({"role": "user", "content": user_prompt})
-
-        try:
-            await self._create_chat(
-                self.model,
-                history=history_before,
-                system_text=update_session_data_prompt,
-            )
-
-            if not self.chat:
-                raise RuntimeError("Chat not initialized")
-            response = await self.chat.send_message(user_prompt)
-        except Exception as e:
-            return self._handle_error(
-                e, original_message=update_session_data_prompt, allow_fallback=True
-            )
-
-        assistant_response = response.text
-        # Safely extract sources (defensive against missing grounding metadata)
-        sources = self._extract_sources(response)
-
-        # System and user turns were appended before the call; only the
-        # assistant reply is outstanding.
-        self.conversation_history.append(
-            {
-                "role": "assistant",
-                "content": assistant_response,
-                "sources": sources,
-                "model": self.model,
-                "usage": self._usage_from_response(response),
-            }
-        )
-
-        return str(assistant_response)
-
     async def stream_update_session_data(
         self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
@@ -318,6 +268,8 @@ class GeminiHandler(BaseLLMHandler):
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
+        # The payload lives in system_instruction, which is fixed at chat
+        # creation — rebuild the chat so the new data takes effect.
         update_session_data_prompt = self._build_system_text(
             self.update_session_data_notice.format(username=self.username)
         )
@@ -375,57 +327,6 @@ class GeminiHandler(BaseLLMHandler):
             }
         )
 
-    async def send_message(self, message) -> str:
-        """Send a message to the LLM and return the response"""
-        # Same ordering rule as stream_message: this turn's system and user
-        # entries land before anything that can raise.
-        system_text = self._active_system_text()
-        history_before = list(self.conversation_history)
-        if not any(m.get("role") == "system" for m in self.conversation_history):
-            # Stored so a resumed chat can recover it — a fresh handler on
-            # turn 2+ never calls initialize_chat.
-            self.conversation_history.append(
-                {"role": "system", "content": system_text}
-            )
-        self.conversation_history.append({"role": "user", "content": message})
-
-        try:
-            if not self.chat:
-                await self._create_chat(
-                    self.model, history=history_before, system_text=system_text
-                )
-
-            if not self.chat:
-                raise RuntimeError("Chat not initialized")
-
-            try:
-                response = await self.chat.send_message(message)
-            except Exception as e:
-                return self._handle_error(
-                    e, original_message=message, allow_fallback=True
-                )
-
-            # Extract response text
-            assistant_response = response.text
-            # Safely extract sources (defensive against missing grounding metadata)
-            sources = self._extract_sources(response)
-
-            # Add assistant response to our conversation history
-            self.conversation_history.append(
-                {
-                    "role": "assistant",
-                    "content": assistant_response,
-                    "sources": sources,
-                    "model": self.model,
-                    "usage": self._usage_from_response(response),
-                }
-            )
-
-            return str(assistant_response)
-        except Exception as e:
-            # Catch any unexpected formatting/parsing errors
-            return self._handle_error(e, original_message=message, allow_fallback=False)
-
     async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
         """Send a message to Gemini and stream response text chunks."""
         # Store this turn's system and user entries before anything that can
@@ -436,6 +337,8 @@ class GeminiHandler(BaseLLMHandler):
         system_text = self._active_system_text()
         history_before = list(self.conversation_history)
         if not any(m.get("role") == "system" for m in self.conversation_history):
+            # Stored so a resumed chat can recover it — a fresh handler on
+            # turn 2+ never calls initialize_chat.
             self.conversation_history.append(
                 {"role": "system", "content": system_text}
             )

@@ -10,10 +10,6 @@ class BaseLLMHandler(ABC):
         pass
 
     @abstractmethod
-    async def send_message(self, message) -> str:
-        pass
-
-    @abstractmethod
     def get_conversation_history(self) -> list:
         pass
 
@@ -27,11 +23,6 @@ class BaseLLMHandler(ABC):
         replaced by a synthetic error pair.
         """
         self.conversation_history = list(history)
-
-    @abstractmethod
-    async def update_session_data(self, sessions_data, user_prompt) -> str:
-        """Update the session data the LLM is working with"""
-        pass
 
     def has_system_context(self) -> bool:
         """Whether this handler can produce instructions plus session data.
@@ -64,24 +55,16 @@ class BaseLLMHandler(ABC):
             entry["attachments"] = list(attachments)
         return entry
 
-    async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
-        """Stream a message response.
+    @abstractmethod
+    def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
+        """Send a message and stream the response text, recording the turn in
+        the conversation history."""
 
-        Handlers can override this for token-by-token SDK streaming. The default
-        keeps older handlers compatible by yielding the final response as one
-        chunk after send_message updates the conversation history.
-        """
-        response = await self.send_message(message)
-        if response:
-            yield response
-
-    async def stream_update_session_data(
+    @abstractmethod
+    def stream_update_session_data(
         self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
-        """Stream a response after updating the session data context."""
-        response = await self.update_session_data(sessions_data, user_prompt)
-        if response:
-            yield response
+        """Swap in new session data, then stream the response to user_prompt."""
 
     async def generate_chat_title(self, prompt: str) -> str:
         """Generate a short title without mutating the conversation history."""
