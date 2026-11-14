@@ -7,7 +7,7 @@ import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
 import { csrfToken } from "@/lib/csrf";
 import { toOffsetIso } from "@/lib/format";
-import { cancelStart, enqueueStart, enqueueStop, isNetworkFailure, overlayTimers, type QueuedStart } from "@/lib/offlineQueue";
+import { discard, enqueue, isNetworkFailure, overlayTimers, resolveRefs, type QueuedStart } from "@/lib/offlineQueue";
 import { useActiveContext } from "@/app/context";
 
 /* Running timers are the one piece of data other clients (CLI, MCP, another
@@ -146,19 +146,16 @@ export function useStartTimer() {
     networkMode: "always",
     mutationFn: async (input: StartTimerInput): Promise<Timer> => {
       const { optimistic, ...rest } = input;
-      const body = { ...rest, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() };
+      /* On a project or subproject not synced yet: queued behind it. */
+      const { body, waiting } = resolveRefs({ ...rest, start: toOffsetIso(new Date()), uuid: crypto.randomUUID() });
+      const queue = () =>
+        pendingTimer(enqueue({ kind: "start", uuid: body.uuid, body, display: optimistic ?? { projectName: "Project", subprojects: [] } }));
+      if (waiting) return queue();
       try {
-        return await unwrap(
-          api.POST("/api/v2/timers/", { body }),
-        );
+        return await unwrap(api.POST("/api/v2/timers/", { body }));
       } catch (error) {
         if (!isOffline(error)) throw error;
-        const op = enqueueStart({
-          uuid: body.uuid,
-          body,
-          display: optimistic ?? { projectName: "Project", subprojects: [] },
-        });
-        return pendingTimer(op);
+        return queue();
       }
     },
     onMutate: async (input) => {
@@ -220,7 +217,8 @@ export function useStopTimer() {
     mutationFn: async ({ timer, note, allocations, end }: StopTimerInput): Promise<Timer> => {
       const at = end ?? toOffsetIso(new Date());
       const queue = (target: { id: number } | { uuid: string }): Timer => {
-        enqueueStop({
+        enqueue({
+          kind: "stop",
           target,
           end: at,
           ...(note !== undefined ? { note } : {}),
@@ -280,7 +278,7 @@ export function useDeleteTimer() {
     mutationFn: async (timer: Timer) => {
       /* Never reached the server: just forget the queued start. */
       if (timer.pending_sync && timer.uuid) {
-        cancelStart(timer.uuid);
+        discard(timer.uuid);
         return undefined;
       }
       return unwrap(

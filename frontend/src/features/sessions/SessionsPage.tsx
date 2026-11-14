@@ -7,11 +7,11 @@ import { OptionPicker } from "@/components/OptionPicker";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { useActiveContext } from "@/app/context";
-import { useAllProjects, useContexts, useTags } from "@/api/meta";
+import { useAllProjects, useContexts, useQueuedOps, useTags } from "@/api/meta";
 import { formatDayDate, formatDuration } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "./SessionBand";
-import { useSessionList, type SessionFilters, type SessionRow } from "./api";
+import { pendingSessions, useSessionList, type SessionFilters, type SessionRow } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { RelatedSlider } from "@/features/search/RelatedSlider";
 import { useRelatedSummary } from "@/features/search/api";
@@ -96,9 +96,19 @@ export default function SessionsPage() {
   const relatedSummary = summary.data?.available ? summary.data : null;
 
   const all: SessionRow[] = list.data?.pages.flatMap((page) => page.sessions) ?? [];
-  const direct = all.filter((s) => s.match !== "related");
+  /* Sessions logged on this device that haven't synced yet join the plain
+     list (no search or filter but the header's context). */
+  const ops = useQueuedOps();
+  const filtered = !!(applied.search || applied.start_date || applied.end_date || applied.note_snippet || applied.context || applied.tags.length || applied.projects.length);
+  const waiting = filtered
+    ? []
+    : pendingSessions(ops).filter((session) => {
+        const context = projects.data?.find((project) => project.id === session.project.id)?.context?.id;
+        return !contextIdsParam || context === undefined || String(context) === contextIdsParam;
+      });
+  const direct = [...waiting, ...all.filter((s) => s.match !== "related")].sort((a, b) => (waiting.length ? Date.parse(b.end ?? "") - Date.parse(a.end ?? "") : 0));
   const related = all.filter((s) => s.match === "related");
-  const total = list.data?.pages[0]?.total ?? 0;
+  const total = (list.data?.pages[0]?.total ?? 0) + waiting.length;
   const groups = groupByDay(direct);
 
   const pills = describeFilters(applied, {

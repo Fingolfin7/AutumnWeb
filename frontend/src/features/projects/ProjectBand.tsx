@@ -1,4 +1,5 @@
-import { faPlay } from "@fortawesome/free-solid-svg-icons";
+import { faPlay, faPlus } from "@fortawesome/free-solid-svg-icons";
+import { DiscardPending } from "@/components/DiscardPending";
 import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
@@ -41,9 +42,14 @@ export function ProjectBand({
     <li className="band project" id={`project-${project.id}`}>
       <div className="u-grow">
         <div className="project-top">
-          <AppLink className="project-name" href={urls.updateProject(project.id)}>
-            {project.name}
-          </AppLink>
+          {project.pending_sync ? (
+            /* Created offline: usable, but no page to edit it until it syncs. */
+            <span className="project-name">{project.name}</span>
+          ) : (
+            <AppLink className="project-name" href={urls.updateProject(project.id)}>
+              {project.name}
+            </AppLink>
+          )}
           {running ? (
             <AppLink className="project-running" href={urls.timers()} title="A timer is already running on this project">
               <span className="live-dot" /> running
@@ -74,10 +80,24 @@ export function ProjectBand({
           </div>
         ) : null}
 
-        <p className="project-total">{formatDurationWords(project.total_minutes)}</p>
-        <p className="project-dates">
-          {formatDate(project.start_date)} &rarr; {formatDate(project.last_activity)}
-        </p>
+        {project.pending_sync ? (
+          <>
+            <p className="project-dates">Saved offline · waiting to sync</p>
+            <div className="action-row">
+              <AppLink className="btn btn--quiet" href={urls.createSubproject(project.id)}>
+                <Icon icon={faPlus} /> Subproject
+              </AppLink>
+              <DiscardPending id={project.id} name={project.name} />
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="project-total">{formatDurationWords(project.total_minutes)}</p>
+            <p className="project-dates">
+              {formatDate(project.start_date)} &rarr; {formatDate(project.last_activity)}
+            </p>
+          </>
+        )}
 
         {period ? (
           <div className="project-commit">

@@ -1,7 +1,8 @@
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { OfflineSync } from "./OfflineSync";
-import { enqueueStart, flushQueue, resetQueueForTests } from "@/lib/offlineQueue";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { enqueue, flushQueue, resetQueueForTests } from "@/lib/offlineQueue";
 
 const mocks = vi.hoisted(() => ({ invalidate: vi.fn(), toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/api/sync", () => ({ useInvalidate: () => mocks.invalidate }));
@@ -18,8 +19,8 @@ afterEach(() => {
 it("warns about memory-only changes and clears the warning after successful sync", async () => {
   vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage full"); });
   vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
-  enqueueStart({ uuid: "memory", body: { project_id: 3, start: "2026-10-14T07:00:00Z", uuid: "memory" }, display: { projectName: "Gym", subprojects: [] } });
-  render(<OfflineSync />);
+  enqueue({ kind: "start", uuid: "memory", body: { project_id: 3, start: "2026-10-14T07:00:00Z", uuid: "memory" }, display: { projectName: "Gym", subprojects: [] } });
+  render(<QueryClientProvider client={new QueryClient()}><OfflineSync /></QueryClientProvider>);
   expect(screen.getByRole("status")).toHaveTextContent("only saved in this tab");
   expect(screen.getByRole("status")).toHaveTextContent("reloading or closing it may lose them");
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response('{"id":42}', { status: 201 })));

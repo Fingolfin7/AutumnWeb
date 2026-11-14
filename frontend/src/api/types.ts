@@ -11,10 +11,12 @@ export type SessionResource = WithOptionalNoteHtml<S["SessionResource"]>;
 /* pending_sync: started while Autumn was unreachable; lives in the offline
    queue (lib/offlineQueue.ts) until the server has it. */
 export type Timer = SessionResource & { pending_sync?: boolean };
-export type Project = S["ProjectResource"];
+/* pending_sync on a project or subproject: created while Autumn was
+   unreachable and still in the offline queue (its id is temporary, < 0). */
+export type Project = S["ProjectResource"] & { pending_sync?: boolean };
 export type ProjectDetail = S["ProjectDetailResource"];
 export type ProjectSummary = S["ProjectSummary"];
-export type Subproject = S["SubprojectResource"];
+export type Subproject = S["SubprojectResource"] & { pending_sync?: boolean };
 export type SubprojectAllocation = S["SubprojectAllocation"];
 export type Context = S["ContextResource"];
 export type Tag = S["TagResource"];

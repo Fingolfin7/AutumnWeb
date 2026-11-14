@@ -26,6 +26,7 @@ from core.api_v2.serializers import (
     ProjectCreateRequestSerializer,
     ProjectDetailResourceSerializer,
     ProjectListQuerySerializer,
+    ProjectListItemSerializer,
     ProjectListResponseSerializer,
     ProjectRelatedSummaryQuerySerializer,
     ProjectMergeRequestSerializer,

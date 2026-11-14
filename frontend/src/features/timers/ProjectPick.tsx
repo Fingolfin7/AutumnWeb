@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 import { ProjectCombobox } from "@/components/ProjectCombobox";
 import { FieldErrors } from "@/features/contexts-tags/ui";
-import { useAllProjects, useSubprojects } from "@/api/meta";
+import { DiscardPending } from "@/components/DiscardPending";
+import { usePickerProjects, usePickerSubprojects } from "@/api/meta";
+import { resolveId } from "@/lib/offlineQueue";
 import type { Project } from "@/api/types";
 
 /* The project + subprojects choice shared by both modes of the New timer
-   page, so switching between "start now" and "log past" keeps it.
+   page, so switching between "start now" and "log past" keeps it. Projects
+   and subprojects created offline are offered too, marked as not synced.
    ?project_id=&subproject_id= prefill it (notification action links use
    this). */
 export function useProjectPick(params: URLSearchParams) {
-  const projects = useAllProjects();
+  const projects = usePickerProjects();
   const [project, setProject] = useState<Project | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
-  const subprojects = useSubprojects(project?.id);
+  const subprojects = usePickerSubprojects(project?.id);
 
   /* Prefill once the project list is in. */
   const [prefilled, setPrefilled] = useState(false);
@@ -34,8 +37,9 @@ export function useProjectPick(params: URLSearchParams) {
     setSelected,
     subprojects,
     subs,
-    /** The selected subprojects that belong to the project. */
-    chosen: subs.filter((s) => selected.includes(s.id)),
+    /** The selected subprojects that belong to the project (one picked
+        before it synced is found under its real id). */
+    chosen: subs.filter((s) => selected.some((id) => resolveId(id) === s.id)),
     pickProject: (next: Project | null) => {
       if (next?.id !== project?.id) setSelected([]);
       setProject(next);
@@ -52,7 +56,7 @@ export function ProjectFields({ pick, autoFocus, error }: { pick: ProjectPick; a
     <section className="slab slab-pad">
       <div className="field" id="search-projects">
         <label htmlFor="project-search">Project</label>
-        <ProjectCombobox id="project-search" value={project} onChange={pick.pickProject} autoFocus={autoFocus} />
+        <ProjectCombobox id="project-search" value={project} onChange={pick.pickProject} autoFocus={autoFocus} withPending />
         <FieldErrors errors={error} />
       </div>
       {project ? (
@@ -88,7 +92,11 @@ export function ProjectFields({ pick, autoFocus, error }: { pick: ProjectPick; a
                       setSelected((current) => (current.includes(sub.id) ? current.filter((id) => id !== sub.id) : [...current, sub.id]))
                     }
                   />
-                  <label htmlFor={`subproject-option-${sub.id}`}>{sub.name}</label>
+                  <label htmlFor={`subproject-option-${sub.id}`}>
+                    {sub.name}
+                    {sub.pending_sync ? <span className="muted"> · saved offline</span> : null}
+                  </label>
+                  {sub.pending_sync ? <DiscardPending id={sub.id} name={sub.name} /> : null}
                 </span>
               ))
             ) : (

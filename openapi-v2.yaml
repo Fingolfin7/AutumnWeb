@@ -1452,6 +1452,17 @@ paths:
           type: string
           minLength: 1
       - in: query
+        name: include
+        schema:
+          enum:
+          - subprojects
+          type: string
+          minLength: 1
+        description: |-
+          subprojects: add each project's subprojects to its row.
+
+          * `subprojects` - subprojects
+      - in: query
         name: limit
         schema:
           type: integer
@@ -5781,6 +5792,65 @@ components:
       - subprojects
       - tags
       - total_minutes
+    ProjectListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        version:
+          type: integer
+        name:
+          type: string
+        status:
+          $ref: '#/components/schemas/ProjectStatusEnum'
+        description:
+          type: string
+          readOnly: true
+        context:
+          allOf:
+          - $ref: '#/components/schemas/NamedResource'
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/NamedResource'
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          readOnly: true
+        last_activity:
+          type: string
+          format: date
+          nullable: true
+          readOnly: true
+        total_minutes:
+          type: number
+          format: double
+          readOnly: true
+        session_count:
+          type: integer
+        celebration:
+          allOf:
+          - $ref: '#/components/schemas/Celebration'
+          nullable: true
+          readOnly: true
+        subprojects:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubprojectResource'
+      required:
+      - celebration
+      - context
+      - description
+      - id
+      - last_activity
+      - name
+      - session_count
+      - start_date
+      - status
+      - tags
+      - total_minutes
     ProjectListResponse:
       type: object
       properties:
@@ -5791,7 +5861,7 @@ components:
         projects:
           type: array
           items:
-            $ref: '#/components/schemas/ProjectResource'
+            $ref: '#/components/schemas/ProjectListItem'
       required:
       - count
       - projects

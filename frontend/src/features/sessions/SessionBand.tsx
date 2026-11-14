@@ -18,6 +18,7 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
   const remove = useDeleteSession();
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
+  const pending = !!session.pending_sync;
 
   const restart = () => {
     const subprojects = session.subproject_allocations.map((a) => ({ id: a.subproject_id, name: a.name }));
@@ -50,22 +51,38 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
             ) : null}
           </div>
           <div className="session-top">
-            <AppLink className="session-project" href={urls.updateProject(session.project.id)}>
-              {session.project.name}
-            </AppLink>
-            {session.subproject_allocations.map((sub) => (
-              <Fragment key={sub.subproject_id}>
-                {" "}
-                <AppLink className="sub-chip" href={urls.updateSubproject(sub.subproject_id)}>
-                  {sub.name}
+            {pending ? (
+              /* Logged offline: nothing on the server to open or edit yet. */
+              <>
+                <span className="session-project">{session.project.name}</span>
+                {session.subproject_allocations.map((sub) => (
+                  <Fragment key={sub.subproject_id}>
+                    {" "}
+                    <span className="sub-chip">{sub.name}</span>
+                  </Fragment>
+                ))}{" "}
+                <span className="muted">Saved offline · waiting to sync</span>
+              </>
+            ) : (
+              <>
+                <AppLink className="session-project" href={urls.updateProject(session.project.id)}>
+                  {session.project.name}
                 </AppLink>
-              </Fragment>
-            ))}
+                {session.subproject_allocations.map((sub) => (
+                  <Fragment key={sub.subproject_id}>
+                    {" "}
+                    <AppLink className="sub-chip" href={urls.updateSubproject(sub.subproject_id)}>
+                      {sub.name}
+                    </AppLink>
+                  </Fragment>
+                ))}
+              </>
+            )}
           </div>
           <SessionNote id={`note-${session.id}`} html={session.note_html} text={session.note} />
           <span className="session-dur">{formatDuration(session.duration_minutes)}</span>
         </div>
-        <div className="swipe-actions">
+        <div className="swipe-actions" style={pending ? { display: "none" } : undefined}>
           <button className="btn-icon" type="button" title="Restart this project + subprojects" onClick={restart} disabled={start.isPending}>
             <Icon icon={faRedo} />
             <span className="sr-only">Restart</span>

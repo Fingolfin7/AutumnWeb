@@ -910,6 +910,11 @@ class ProjectListQuerySerializer(serializers.Serializer):
         required=False, default=100, min_value=1, max_value=500
     )
     offset = serializers.IntegerField(required=False, default=0, min_value=0)
+    include = serializers.ChoiceField(
+        required=False,
+        choices=("subprojects",),
+        help_text="subprojects: add each project's subprojects to its row.",
+    )
     ordering = serializers.ChoiceField(
         required=False,
         default="name",
@@ -950,14 +955,21 @@ class ProjectRelatedSummaryQuerySerializer(ProjectListQuerySerializer):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for field_name in ("limit", "offset", "ordering"):
+        for field_name in ("limit", "offset", "include", "ordering"):
             self.fields.pop(field_name)
+
+
+class ProjectListItemSerializer(ProjectResourceSerializer):
+    # Only with ?include=subprojects (the rows carry them prefetched).
+    subprojects = SubprojectResourceSerializer(
+        many=True, required=False, source="prefetched_subprojects"
+    )
 
 
 class ProjectListResponseSerializer(serializers.Serializer):
     count = serializers.IntegerField()
     total = serializers.IntegerField()
-    projects = ProjectResourceSerializer(many=True)
+    projects = ProjectListItemSerializer(many=True)
 
 
 class SubprojectCreateRequestSerializer(serializers.Serializer):

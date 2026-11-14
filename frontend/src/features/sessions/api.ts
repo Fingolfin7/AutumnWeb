@@ -4,7 +4,8 @@ import { keys } from "@/api/keys";
 import { useInvalidate } from "@/api/sync";
 import type { Session } from "@/api/types";
 import { useToast } from "@/app/toasts";
-import { errorMessage } from "@/api/errors";
+import { ApiError, errorMessage } from "@/api/errors";
+import { enqueue, isNetworkFailure, resolveRefs, type QueuedOp } from "@/lib/offlineQueue";
 
 export interface SessionFilters {
   search?: string;
@@ -21,7 +22,9 @@ export interface SessionFilters {
 
 /* Session rows as the list pages need them. note_html is the server's
    sanitised markdown rendering (see components/SessionNote). */
-export type SessionRow = Session;
+/* pending_sync: logged while Autumn was unreachable; lives in the offline
+   queue until it syncs. */
+export type SessionRow = Session & { pending_sync?: boolean };
 
 export const SESSION_PAGE = 30;
 
@@ -73,10 +76,59 @@ export interface LogSessionInput {
 
 const postSession = (body: LogSessionInput) => unwrap(api.POST("/api/v2/sessions/", { body })) as Promise<SessionRow>;
 
-/** Record a session that already happened (Log past session). */
+/** Record a session that already happened (Log past session). Kept on the
+    device when Autumn can't be reached, or when it is on a project or
+    subproject that hasn't synced yet; then it resolves to "queued". */
 export function useLogSession() {
   const invalidate = useInvalidate();
-  return useMutation({ mutationFn: postSession, onSuccess: () => invalidate("sessions") });
+  return useMutation({
+    networkMode: "always",
+    mutationFn: async ({
+      projectName,
+      subprojects,
+      ...input
+    }: LogSessionInput & { projectName: string; subprojects?: { id: number; name: string }[] }): Promise<SessionRow | "queued"> => {
+      const { body, waiting } = resolveRefs(input);
+      const queue = () => (enqueue({ kind: "session", body, display: { projectName, subprojects } }), "queued" as const);
+      if (waiting) return queue();
+      try {
+        return await postSession(body);
+      } catch (error) {
+        if (!(error instanceof ApiError && isNetworkFailure(error.status))) throw error;
+        return queue();
+      }
+    },
+    onSuccess: (result) => {
+      if (result !== "queued") invalidate("sessions");
+    },
+  });
+}
+
+/** Sessions logged on this device that haven't synced, as list rows. */
+export function pendingSessions(ops: QueuedOp[]): SessionRow[] {
+  return ops.flatMap((op) => {
+    if (op.kind !== "session") return [];
+    const names = new Map((op.display.subprojects ?? []).map((sub) => [sub.id, sub.name]));
+    const body = op.body as LogSessionInput;
+    const ids = body.subproject_allocations?.map((a) => a.subproject_id) ?? body.subproject_ids ?? [];
+    const row = {
+      id: -Date.parse(op.queuedAt),
+      uuid: body.uuid,
+      version: 0,
+      project: { id: body.project_id, name: op.display.projectName },
+      subproject_allocations: ids.map((id) => ({
+        subproject_id: id,
+        name: names.get(id) ?? "Subproject",
+        allocation_bp: body.subproject_allocations?.find((a) => a.subproject_id === id)?.allocation_bp ?? Math.floor(10000 / ids.length),
+      })),
+      start: body.start,
+      end: body.end,
+      duration_minutes: (Date.parse(body.end) - Date.parse(body.start)) / 60_000,
+      note: body.note ?? null,
+      pending_sync: true,
+    };
+    return [row as unknown as SessionRow];
+  });
 }
 
 /* Delete with undo: the toast's Undo re-records the same session (same uuid,
@@ -131,7 +183,6 @@ export function useDeleteSession() {
 /* ---- Single-session reads and edits (edit / delete pages) ---------------- */
 
 import { useQuery } from "@tanstack/react-query";
-import { ApiError } from "@/api/errors";
 import type { SessionPatch } from "@/api/types";
 
 const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;
