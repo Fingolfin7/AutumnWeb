@@ -20,42 +20,12 @@ import { Icon } from "./Icon";
                        page language, then the browser's)
      onBlur            Plain textarea blur, e.g. to flush an autosave.
      error             A message or list of messages shown as a field error.
-     draftKey          A carry-over key, e.g. a timer id. On mount, a draft
-                       stashed for it (see stashNoteDraft) replaces `value`
-                       once and is removed, and the status line says so. The
-                       timers page stashes the live note when you press Stop;
-                       the stop page passes the same key. Mount the editor
-                       once the note's starting value is known, so the draft
-                       is not overwritten by a late initial value.
 
    Toolbar: B wraps the selection in **, I in *, the link button asks for a
    URL and inserts [selected or "link text"](url). With nothing selected the
    caret lands between the markers. Ctrl/Cmd+B and Ctrl/Cmd+I do the same.
    Dictation inserts at the caret, replacing the selection, and keeps
    listening across the browser's automatic stops until you press Stop. */
-
-export const NOTE_DRAFT_KEY_PREFIX = "autumn:timer-note-draft:";
-
-/** Stash the current note for the next page to pick up (see `draftKey`). */
-export function stashNoteDraft(key: string | number, value: string): void {
-  try {
-    window.sessionStorage.setItem(NOTE_DRAFT_KEY_PREFIX + key, value);
-  } catch {
-    /* Storage can be unavailable (locked-down browsers); the server copy remains. */
-  }
-}
-
-/** Read and remove a stashed draft; null when there is none. */
-export function takeNoteDraft(key: string | number): string | null {
-  try {
-    const stored = window.sessionStorage.getItem(NOTE_DRAFT_KEY_PREFIX + key);
-    if (stored === null) return null;
-    window.sessionStorage.removeItem(NOTE_DRAFT_KEY_PREFIX + key);
-    return stored;
-  } catch {
-    return null;
-  }
-}
 
 export function NoteEditor({
   value,
@@ -70,7 +40,6 @@ export function NoteEditor({
   lang,
   onBlur,
   error,
-  draftKey,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -84,7 +53,6 @@ export function NoteEditor({
   lang?: string;
   onBlur?: () => void;
   error?: string | string[] | null;
-  draftKey?: string | number;
 }) {
   const generated = useId();
   const textareaId = id ?? `note-${generated}`;
@@ -117,14 +85,6 @@ export function NoteEditor({
       dictation.current = null;
     };
   }, [supported]);
-
-  useEffect(() => {
-    if (draftKey === undefined) return;
-    const draft = takeNoteDraft(draftKey);
-    if (draft === null) return;
-    onChangeRef.current(draft);
-    setStatus("Current timer note carried over.");
-  }, [draftKey]);
 
   const apply = (edit: (textarea: HTMLTextAreaElement) => void) => {
     const textarea = textareaRef.current;

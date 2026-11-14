@@ -315,6 +315,8 @@ export async function saveTimerNote(timer: Pick<Timer, "id" | "version">, note: 
       "If-Match": String(timer.version),
     },
     body: JSON.stringify({ note }),
+  }).catch(() => {
+    throw toApiError(0, undefined);
   });
   const body = await response.json().catch(() => undefined);
   if (!response.ok) throw toApiError(response.status, body);

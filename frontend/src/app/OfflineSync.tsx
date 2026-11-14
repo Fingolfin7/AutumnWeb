@@ -4,15 +4,17 @@ import { Icon } from "@/components/Icon";
 import { useInvalidate } from "@/api/sync";
 import { flushQueue, hasUnsavedChanges, isFlushing, queuedOps, subscribe } from "@/lib/offlineQueue";
 import { pluralize } from "@/lib/format";
+import { subscribeNoteDrafts, syncNoteDrafts, waitingNoteDrafts } from "@/lib/noteDrafts";
 import { useOnline } from "@/lib/useOnline";
 import { isUnreachable, subscribeUnreachable } from "./savedData";
 import { useToast } from "./toasts";
 
 const RETRY_MS = 20_000;
 
-/* Replays timer starts/stops queued while Autumn was unreachable: at load,
-   when the connection returns, when the tab comes back, and every 20 s while
-   anything is waiting. Shows a small pill while offline or unsynced. */
+/* Replays timer starts/stops queued while Autumn was unreachable, then sends
+   timer notes still only on this device (lib/noteDrafts): at load, when the
+   connection returns, when the tab comes back, and every 20 s while anything
+   is waiting. Shows a small pill while offline or unsynced. */
 export function OfflineSync() {
   const ops = useSyncExternalStore(subscribe, queuedOps);
   /* No connection, or one that can't reach Autumn. */
@@ -21,7 +23,7 @@ export function OfflineSync() {
   const unsaved = useSyncExternalStore(subscribe, hasUnsavedChanges);
   const invalidate = useInvalidate();
   const toast = useToast();
-  const waiting = ops.length;
+  const waiting = ops.length + useSyncExternalStore(subscribeNoteDrafts, waitingNoteDrafts);
   /* Each synced op changes `waiting` and re-runs the effect mid-flush, so
      only unmounting (not a re-run) should silence the report. */
   const mounted = useRef(true);
@@ -37,17 +39,26 @@ export function OfflineSync() {
     const flush = () => {
       /* Already running: its own caller reports it. */
       if (document.hidden || !navigator.onLine || isFlushing()) return;
-      void flushQueue().then((report) => {
-        if (!mounted.current) return;
-        if (report.synced) {
+      void flushQueue()
+        .then((report) => {
+          if (!mounted.current) return;
+          if (report.synced) {
+            invalidate("timers", "sessions");
+            if (!report.remaining) toast.success(`Synced ${pluralize(report.synced, "offline change")}.`);
+          }
+          for (const drop of report.dropped) {
+            const what = drop.op.kind === "start" ? `start of ${drop.op.display.projectName}` : "timer stop";
+            toast.error(`Couldn't sync the offline ${what}: ${drop.message}`);
+          }
+        })
+        .then(syncNoteDrafts)
+        .then((notes) => {
+          if (!mounted.current || !(notes.saved.length + notes.merged.length)) return;
           invalidate("timers", "sessions");
-          if (!report.remaining) toast.success(`Synced ${pluralize(report.synced, "offline change")}.`);
-        }
-        for (const drop of report.dropped) {
-          const what = drop.op.kind === "start" ? `start of ${drop.op.display.projectName}` : "timer stop";
-          toast.error(`Couldn't sync the offline ${what}: ${drop.message}`);
-        }
-      });
+          for (const draft of notes.merged) {
+            toast.info(`The ${draft.project} note changed elsewhere, so what you wrote on this device was added below it.`);
+          }
+        });
     };
     flush();
     const id = window.setInterval(flush, RETRY_MS);
