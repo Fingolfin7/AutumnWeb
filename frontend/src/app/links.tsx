@@ -25,6 +25,7 @@ export const urls = {
   projects: () => "/projects/",
   timers: () => "/timers/",
   startTimer: () => "/start_timer/",
+  logSession: () => "/start_timer/?mode=log",
   stopTimer: (id: number) => `/stop_timer/${id}/`,
   sessions: () => "/sessions/",
   updateSession: (id: number) => `/update_session/${id}/`,

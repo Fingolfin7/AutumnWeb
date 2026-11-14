@@ -201,3 +201,12 @@
 }
 .timers-outside-context-show:hover,
 .timers-outside-context-show:focus-visible { color: var(--ink); }
+
+/* Home's running-timer card: link to the note on the Timers page. */
+.focus-note-link {
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.focus-note-link:hover,
+.focus-note-link:focus-visible { color: var(--brand); }

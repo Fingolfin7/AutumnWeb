@@ -58,6 +58,27 @@ export function sessionListQuery(filters: SessionFilters) {
 
 export const useSessionList = (filters: SessionFilters) => useInfiniteQuery(sessionListQuery(filters));
 
+/* A finished session as the track endpoint takes it: plain data, so it can
+   be queued and replayed. The server dedupes on `uuid`, so a replay or a
+   double submit records one session. */
+export interface LogSessionInput {
+  uuid: string;
+  project_id: number;
+  start: string;
+  end: string;
+  note?: string | null;
+  subproject_ids?: number[];
+  subproject_allocations?: { subproject_id: number; allocation_bp: number }[];
+}
+
+const postSession = (body: LogSessionInput) => unwrap(api.POST("/api/v2/sessions/", { body })) as Promise<SessionRow>;
+
+/** Record a session that already happened (Log past session). */
+export function useLogSession() {
+  const invalidate = useInvalidate();
+  return useMutation({ mutationFn: postSession, onSuccess: () => invalidate("sessions") });
+}
+
 /* Delete with undo: the toast's Undo re-records the same session (same uuid,
    instants, note and allocations) through the track endpoint. */
 export function useDeleteSession() {
@@ -66,26 +87,17 @@ export function useDeleteSession() {
   const toast = useToast();
 
   const restore = useMutation({
-    mutationFn: async (session: SessionRow) =>
-      unwrap(
-        api.POST("/api/v2/sessions/", {
-          body: {
-            project_id: session.project.id,
-            start: session.start,
-            end: session.end!,
-            note: session.note ?? null,
-            ...(session.uuid ? { uuid: session.uuid } : {}),
-            ...(session.subproject_allocations.length
-              ? {
-                  subproject_allocations: session.subproject_allocations.map((a) => ({
-                    subproject_id: a.subproject_id,
-                    allocation_bp: a.allocation_bp,
-                  })),
-                }
-              : {}),
-          },
-        }),
-      ),
+    mutationFn: (session: SessionRow) =>
+      postSession({
+        uuid: session.uuid ?? crypto.randomUUID(),
+        project_id: session.project.id,
+        start: session.start,
+        end: session.end!,
+        note: session.note ?? null,
+        ...(session.subproject_allocations.length
+          ? { subproject_allocations: session.subproject_allocations.map(({ subproject_id, allocation_bp }) => ({ subproject_id, allocation_bp })) }
+          : {}),
+      }),
     onSuccess: () => toast.success("Session restored."),
     onError: (error) => toast.error(`Couldn't restore the session: ${errorMessage(error)}`),
     onSettled: () => invalidate("sessions"),
