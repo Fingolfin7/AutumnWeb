@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { faArrowRight, faCalendarAlt, faHistory, faPlay } from "@fortawesome/free-solid-svg-icons";
+import { faArrowRight, faCalendarAlt, faHistory, faEdit, faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { Disclose } from "@/components/Disclose";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
-import { formatDayDate, formatDuration } from "@/lib/format";
+import { formatDayDate, formatDuration, pluralize } from "@/lib/format";
+import type { Timer } from "@/api/types";
 import { FocusCard } from "@/features/timers/FocusCard";
 import { FocusDeck } from "@/features/timers/FocusDeck";
 import { useNow, useStartTimer, useTimers } from "@/features/timers/api";
@@ -75,7 +76,9 @@ function HomeContent({ data }: { data: Dashboard }) {
 
       <FocusDeck label="What you are working on right now">
         {running.map((timer) => (
-          <FocusCard key={timer.id} timer={timer} now={now} />
+          <FocusCard key={timer.id} timer={timer} now={now}>
+            <NoteLink timer={timer} />
+          </FocusCard>
         ))}
         <StartCard quickStarts={data.quick_starts} />
       </FocusDeck>
@@ -127,6 +130,20 @@ function HomeContent({ data }: { data: Dashboard }) {
         </aside>
       </div>
     </>
+  );
+}
+
+/* The note is written on the Timers page; Home links to it and says how far
+   it has got, without the editor. */
+function NoteLink({ timer }: { timer: Timer }) {
+  const words = timer.note?.trim() ? timer.note.trim().split(/\s+/).length : 0;
+  return (
+    <p className="focus-autostop">
+      <AppLink className="focus-note-link" href={`${urls.timers()}#timer-note-${timer.id}`}>
+        <Icon icon={faEdit} /> {words ? "Continue note" : "Add a note"}
+      </AppLink>
+      {words ? <span>{pluralize(words, "word")}</span> : null}
+    </p>
   );
 }
 

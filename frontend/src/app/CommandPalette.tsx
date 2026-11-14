@@ -98,6 +98,7 @@ export function CommandPalette() {
       ["Home", urls.home()],
       ["Timers", urls.timers()],
       ["New timer", urls.startTimer()],
+      ["Log past session", urls.logSession()],
       ["Sessions", urls.sessions()],
       ["Projects", urls.projects()],
       ["Charts", urls.charts()],

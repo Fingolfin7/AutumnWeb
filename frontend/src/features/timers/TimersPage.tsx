@@ -1,4 +1,6 @@
-import { faPlay } from "@fortawesome/free-solid-svg-icons";
+import { useEffect } from "react";
+import { useLocation } from "react-router";
+import { faHistory, faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { ErrorState, Skeleton } from "@/components/states";
 import { AppLink, urls } from "@/app/links";
@@ -16,6 +18,13 @@ import { useNow, useOutsideContextTimerCount, useTimers } from "./api";
 export default function TimersPage() {
   const timers = useTimers();
   const now = useNow();
+  const { hash } = useLocation();
+  const loaded = !!timers.data;
+
+  /* Home's "Note" link lands on #timer-note-<id>: focus that note. */
+  useEffect(() => {
+    if (loaded && hash) document.getElementById(decodeURIComponent(hash.slice(1)))?.focus();
+  }, [loaded, hash]);
 
   return (
     <>
@@ -37,6 +46,9 @@ export default function TimersPage() {
                 <div className="focus-actions">
                   <AppLink className="btn btn--primary btn--lg" href={urls.startTimer()}>
                     <Icon icon={faPlay} /> New timer
+                  </AppLink>
+                  <AppLink className="btn btn--ghost btn--lg" href={urls.logSession()}>
+                    <Icon icon={faHistory} /> Log past session
                   </AppLink>
                 </div>
               </article>

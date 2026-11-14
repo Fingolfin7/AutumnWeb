@@ -51,6 +51,27 @@ test("timer lifecycle: start, see it running, stop with a note, find the session
   expect(problems()).toEqual([]);
 });
 
+test("log a past session from the Timers page and find it on Sessions", async ({ page }, testInfo) => {
+  const problems = trackErrors(page);
+  const note = `Logged after the fact ${testInfo.project.name} ${testInfo.retry}.${testInfo.repeatEachIndex}
+
+Second paragraph.`;
+
+  await page.goto("/timers/");
+  await page.getByRole("link", { name: "Log past session" }).click();
+  await expect(page).toHaveURL(/\/start_timer\/\?mode=log$/);
+  await pickProject(page, "Piano Practice");
+  await page.getByRole("button", { name: "45m" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "logged" })).toHaveText("45 minutes logged");
+  await page.getByRole("textbox", { name: "Note", exact: true }).fill(note);
+  await page.getByRole("button", { name: "Log session" }).click();
+
+  await expect(page).toHaveURL(/\/sessions\/\?start_date=/);
+  await expect(toasts(page).getByText("Logged 45 minutes of Piano Practice.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Sessions" }).getByText("Second paragraph.").first()).toBeVisible();
+  expect(problems()).toEqual([]);
+});
+
 test.describe("offline", () => {
   test.use({ serviceWorkers: "allow" });
 
