@@ -1,5 +1,6 @@
 import WordCloud from "wordcloud";
 import type { WordRow } from "./payloads";
+import { token } from "./theme";
 
 /* Word cloud of session notes (core/static/core/js/charts/wordcloud.js).
    Not a Chart.js chart: it paints straight onto the canvas. */
@@ -20,9 +21,11 @@ export function fontSizer(words: [string, number][], canvasWidth: number): (weig
   return (weight) => (range ? min + ((weight - smallest) / range) * (max - min) : max);
 }
 
-/* Warmer for more frequent words: hue 200 (blue) down to 40 (orange). */
+/* Three tiers by frequency: the accent for the words that dominate, note
+   ochre for the middle, quiet ink for the rest. */
 export function wordColor(weight: number, maxWeight: number): string {
-  return `hsl(${200 - (weight / maxWeight) * 160}, 80%, 55%)`;
+  const share = weight / maxWeight;
+  return token(share > 0.6 ? "--brand" : share > 0.3 ? "--note" : "--ink-2");
 }
 
 export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width: number, height: number) {
@@ -35,7 +38,8 @@ export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width:
     list: words,
     gridSize: Math.round(((words.length > 50 ? 8 : 16) * width) / 1024),
     weightFactor: fontSizer(words, width),
-    fontFamily: "Inter, system-ui, sans-serif",
+    fontFamily: token("--font-ui"),
+    fontWeight: "600",
     color: (_word, weight) => wordColor(weight, maxWeight),
     rotateRatio: 0.4,
     rotationSteps: 2,

@@ -19,6 +19,8 @@ export interface ChartFilters {
   tags: number[];
   projects: number[];
   projectMode: "include" | "exclude";
+  /** Compare with the previous period of equal length (a view option, like the chart type). */
+  compare: boolean;
 }
 
 export const EMPTY_FILTERS: ChartFilters = {
@@ -33,6 +35,7 @@ export const EMPTY_FILTERS: ChartFilters = {
   tags: [],
   projects: [],
   projectMode: "exclude",
+  compare: false,
 };
 
 const TRUTHY = new Set(["1", "true", "on", "yes"]);
@@ -58,6 +61,7 @@ export function readFilters(params: URLSearchParams): ChartFilters {
     tags: ids("tags"),
     projects: include.length ? include : exclude,
     projectMode: include.length ? "include" : "exclude",
+    compare: TRUTHY.has((params.get("compare") ?? "").toLowerCase()),
   };
 }
 
@@ -74,6 +78,7 @@ export function writeFilters(state: ChartFilters): URLSearchParams {
   for (const tag of state.tags) params.append("tags", String(tag));
   const projectKey = state.projectMode === "include" ? "include_projects" : "exclude_projects";
   for (const project of state.projects) params.append(projectKey, String(project));
+  if (state.compare) params.set("compare", "on");
   return params;
 }
 

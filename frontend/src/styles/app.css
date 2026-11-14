@@ -210,3 +210,19 @@
 }
 .focus-note-link:hover,
 .focus-note-link:focus-visible { color: var(--brand); }
+/* Charts: the compare toggle sits with the chart picker; the period summary
+   heads the chart panel. */
+.chart-bar { flex-wrap: wrap; }
+.fields label.chart-compare-toggle { gap: var(--s2); padding: 0; color: var(--ink-2); cursor: pointer; }
+.chart-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s1) var(--s4);
+  margin-bottom: var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.chart-compare p { margin: 0; }
+.chart-compare-total .mono { font-size: var(--fs-xl); font-weight: 600; color: var(--duration); }
+.chart-compare-change .mono { color: var(--ink); }

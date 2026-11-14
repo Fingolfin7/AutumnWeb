@@ -2664,6 +2664,8 @@ img.brand-mark {
   margin-inline: auto;
 }
 #canvas_container.chart-circular canvas { max-width: 100%; max-height: 100%; }
+/* The calendar keeps its grid's proportions, so it sizes to its width. */
+#canvas_container.chart-calendar { height: auto; }
 
 /* The chart-type picker is this page's primary control, so it stays on the
    page rather than going in the filter sheet with the narrowing controls. */

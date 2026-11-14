@@ -1,52 +1,43 @@
-import { paletteColor, withAlpha } from "./data";
+import { fmtHours, HOURS_AXIS, paletteColor, withAlpha, type ChartOptions } from "./data";
+import { token } from "./theme";
 import type { AnyConfig, TT, BubbleRow, HistogramRow, RadarRow } from "./payloads";
 
 /* Session histogram, project radar and tag bubble
    (core/static/core/js/charts/analysis.js). */
 
-export function histogramConfig(data: HistogramRow[]): AnyConfig {
+/* One hue: the bars differ by height, not identity. A previous period is a
+   faded twin beside each bar. */
+export function histogramConfig(data: HistogramRow[], { previous }: ChartOptions): AnyConfig {
   const labels = data.map((row) => row.label);
   const counts = data.map((row) => Number(row.count));
   const total = counts.reduce((a, b) => a + b, 0);
-  /* Short sessions cool, long ones warm. */
-  const colors = labels.map((_, i) => `hsl(${Math.max(0, 200 - i * 30)}, 70%, 55%)`);
+  const brand = token("--brand");
+  const datasets = [{ label: "This period", data: counts, backgroundColor: brand }];
+  if (previous) {
+    const before = new Map((previous as HistogramRow[]).map((row) => [row.label, Number(row.count)] as const));
+    datasets.push({ label: "Previous period", data: labels.map((label) => before.get(label) ?? 0), backgroundColor: withAlpha(brand, 0.3) });
+  }
 
   return {
     type: "bar",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Number of Sessions",
-          data: counts,
-          backgroundColor: colors,
-          borderWidth: 1,
-          borderColor: colors.map((color) => color.replace("55%", "45%")),
-        },
-      ],
-    },
+    data: { labels, datasets },
     options: {
-      responsive: true,
       plugins: {
-        title: { display: true, text: "Session Duration Distribution" },
         legend: { display: false },
         tooltip: {
           callbacks: {
             label(context: TT) {
               const count = context.parsed.y!;
-              const pct = total > 0 ? ((count / total) * 100).toFixed(1) : "0";
+              if (context.datasetIndex) return `Previous period: ${count} sessions`;
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0;
               return `${count} sessions (${pct}%)`;
             },
           },
         },
       },
       scales: {
-        x: { title: { display: true, text: "Session Duration" } },
-        y: {
-          beginAtZero: true,
-          title: { display: true, text: "Number of Sessions" },
-          ticks: { stepSize: 1, callback: (value: number | string) => (Number.isInteger(value) ? value : undefined) },
-        },
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: "Sessions" } },
       },
     },
   };
@@ -106,18 +97,18 @@ export function radarConfig(data: RadarRow[]): AnyConfig | null {
           (m.recency / max.recency) * 100,
         ],
         borderColor: paletteColor(i),
-        /* The old string surgery left these fills opaque, hiding every
-           project behind the biggest; 0.2 is what it meant. */
-        backgroundColor: withAlpha(paletteColor(i), 0.2),
-        borderWidth: 2,
+        backgroundColor: withAlpha(paletteColor(i), 0.1),
         pointBackgroundColor: paletteColor(i),
+        pointRadius: 2.5,
+        /* Monotone smoothing (the line default) needs points in x order,
+           which a radial scale has not got. */
+        cubicInterpolationMode: "default",
       })),
     },
     options: {
       responsive: true,
       plugins: {
-        title: { display: true, text: `Project Comparison (Top ${metrics.length})` },
-        legend: { position: "top" },
+        title: { display: true, align: "center", text: `Top ${metrics.length} projects, each axis scaled to the largest` },
         tooltip: {
           callbacks: {
             label(context: TT) {
@@ -135,7 +126,7 @@ export function radarConfig(data: RadarRow[]): AnyConfig | null {
         },
       },
       scales: {
-        r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, display: false }, pointLabels: { font: { size: 12 } } },
+        r: { beginAtZero: true, max: 100, ticks: { stepSize: 25, display: false }, angleLines: { color: token("--hairline") }, pointLabels: { color: token("--ink-2"), font: { size: 12 } } },
       },
     },
   };
@@ -158,33 +149,32 @@ export function bubbleConfig(data: BubbleRow[]): AnyConfig | null {
         {
           label: "Tags",
           data: bubbles,
-          backgroundColor: bubbles.map((b) => withAlpha(b.color, 0.6)),
+          backgroundColor: bubbles.map((b) => withAlpha(b.color, 0.55)),
           borderColor: bubbles.map((b) => b.color),
-          borderWidth: 2,
+          borderWidth: 1.5,
         },
       ],
     },
     options: {
       responsive: true,
       plugins: {
-        title: { display: true, text: "Tags by Project Count vs Time" },
         legend: { display: false },
         tooltip: {
           callbacks: {
             label(context: TT) {
               const point = context.raw as { name: string; x: number; y: number };
-              return [`Tag: ${point.name}`, `Projects: ${point.x}`, `Total Time: ${point.y.toFixed(1)} hours`];
+              return [point.name, `${point.x} ${point.x === 1 ? "project" : "projects"}`, fmtHours(point.y)];
             },
           },
         },
       },
       scales: {
         x: {
-          title: { display: true, text: "Number of Projects" },
+          title: { display: true, text: "Projects with the tag" },
           beginAtZero: true,
-          ticks: { stepSize: 1, callback: (value: number | string) => (Number.isInteger(value) ? value : undefined) },
+          ticks: { precision: 0 },
         },
-        y: { title: { display: true, text: "Total Hours" }, beginAtZero: true },
+        y: HOURS_AXIS,
       },
     },
   };

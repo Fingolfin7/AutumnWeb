@@ -38,37 +38,42 @@ export function isEmptyPayload(kind: ChartKind, data: unknown): boolean {
   return false;
 }
 
+/* The kinds that draw the previous period as a second, quieter series; the
+   rest show only the period summary when comparing. */
+export const COMPARE_SERIES_KINDS: ChartKind[] = ["bar", "context", "histogram", "stacked_area", "cumulative"];
+
 /* Turn a payload into something drawable, or null when it has no data.
    `subprojects` (an explicit project-name filter) swaps scatter, line and
    stacked area for their subproject breakdowns. */
 export function buildChart(kind: ChartKind, data: unknown, options: ChartOptions & { subprojects: boolean }): Built | null {
   if (isEmptyPayload(kind, data)) return null;
   const chart = (config: AnyConfig | null): Built | null => (config ? { type: "chart", config } : null);
+  const sub = options.subprojects;
   switch (kind) {
     case "pie":
       return chart(pieConfig(data as TallyRow[], options));
     case "bar":
       return chart(barConfig(data as TallyRow[], options));
     case "scatter":
-      return chart(options.subprojects ? scatterSubprojectsConfig(data as ScatterRow[]) : scatterProjectsConfig(data as ScatterRow[], options));
+      return chart((sub ? scatterSubprojectsConfig : scatterProjectsConfig)(data as ScatterRow[], options));
     case "line":
-      return chart(options.subprojects ? lineSubprojectsConfig(data as DailySeriesRow[]) : lineProjectsConfig(data as DailySeriesRow[], options));
+      return chart((sub ? lineSubprojectsConfig : lineProjectsConfig)(data as DailySeriesRow[], options));
     case "calendar":
-      return chart(calendarConfig(data as DailyTotalRow[]));
+      return chart(calendarConfig(data as DailyTotalRow[], options));
     case "heatmap":
       return chart(heatmapConfig(data as HeatmapRow[]));
     case "stacked_area":
-      return chart(options.subprojects ? stackedAreaSubprojectsConfig(data as DailySeriesRow[]) : stackedAreaProjectsConfig(data as DailySeriesRow[], options));
+      return chart((sub ? stackedAreaSubprojectsConfig : stackedAreaProjectsConfig)(data as DailySeriesRow[], options));
     case "cumulative":
-      return chart(cumulativeConfig(data as DailyTotalRow[]));
+      return chart(cumulativeConfig(data as DailyTotalRow[], options));
     case "treemap":
       return chart(treemapConfig(data as HierarchyNode | TallyRow[]));
     case "status":
       return chart(statusConfig(data as StatusRow[]));
     case "context":
-      return chart(contextConfig(data as TallyRow[]));
+      return chart(contextConfig(data as TallyRow[], options));
     case "histogram":
-      return chart(histogramConfig(data as HistogramRow[]));
+      return chart(histogramConfig(data as HistogramRow[], options));
     case "radar":
       return chart(radarConfig(data as RadarRow[]));
     case "bubble":

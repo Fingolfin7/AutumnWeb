@@ -1,52 +1,70 @@
-import { buildSeries, consolidateTopN, dateExtent, getChartUnit, OTHER_COLOR, otherLabel, paletteColor, parseDay, type ChartOptions, type DailySeriesRow } from "./data";
+import { bucketOf, buildSeries, consolidateTopN, dayKey, fmtHours, HOURS_AXIS, otherColor, otherLabel, paletteColor, parseDay, rowColor, timeAxis, withAlpha, type ChartOptions, type DailySeriesRow, type Range } from "./data";
+import { token } from "./theme";
 import type { AnyConfig, TT, ScatterRow, StatusRow, TallyRow } from "./payloads";
 
 /* Pie, bar, scatter, line, status and context charts
    (core/static/core/js/charts/basic.js). */
 
-export function pieConfig(data: TallyRow[], { projectLimit }: ChartOptions): AnyConfig {
-  const rows = consolidateTopN(data, projectLimit);
+const share = (context: TT) => {
+  const total = (context.dataset.data as number[]).reduce((sum, value) => sum + value, 0);
+  return total ? ` (${Math.round(((context.parsed as number) / total) * 100)}%)` : "";
+};
+
+function doughnut(labels: string[], values: number[], colors: string[]): AnyConfig {
   return {
     type: "doughnut",
-    data: {
-      labels: rows.map((row) => row.name),
-      datasets: [
-        {
-          data: rows.map((row) => row.total_time / 60),
-          backgroundColor: rows.map((row, i) => ("_isOther" in row ? OTHER_COLOR : paletteColor(i))),
-          borderWidth: 0.5,
-        },
-      ],
-    },
+    data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
     options: {
-      responsive: true,
-      plugins: {
-        title: { display: true, text: "Project Time Distribution" },
-        legend: { position: "top" },
-      },
-      cutout: "40%",
+      plugins: { tooltip: { callbacks: { label: (context: TT) => `${context.label}: ${fmtHours(context.parsed as number)}${share(context)}` } } },
     },
   };
 }
 
-export function barConfig(data: TallyRow[], { projectLimit }: ChartOptions): AnyConfig {
+export function pieConfig(data: TallyRow[], { projectLimit }: ChartOptions): AnyConfig {
   const rows = consolidateTopN(data, projectLimit);
+  return doughnut(
+    rows.map((row) => row.name),
+    rows.map((row) => row.total_time / 60),
+    rows.map(rowColor),
+  );
+}
+
+/* The previous period's hours for each bar, matched by name; "Other (n)"
+   takes whatever the named bars do not account for. */
+export function previousTallies(rows: { name: string }[], previous: TallyRow[]): number[] {
+  const byName = new Map(previous.map((row) => [row.name, row.total_time] as const));
+  const total = previous.reduce((sum, row) => sum + row.total_time, 0);
+  const named = rows.reduce((sum, row) => sum + ("_isOther" in row ? 0 : (byName.get(row.name) ?? 0)), 0);
+  return rows.map((row) => ("_isOther" in row ? total - named : (byName.get(row.name) ?? 0)) / 60);
+}
+
+/* Horizontal bars of hours by name (projects or contexts); with a previous
+   period, each bar gets a faded twin underneath. The axis names the bars,
+   so there is no legend. */
+function tallyBars(rows: (TallyRow & { _isOther?: true })[], previous: TallyRow[] | undefined): AnyConfig {
+  const colors = rows.map(rowColor);
+  const datasets = [{ label: "This period", data: rows.map((row) => row.total_time / 60), backgroundColor: colors }];
+  if (previous) {
+    datasets.push({ label: "Previous period", data: previousTallies(rows, previous), backgroundColor: colors.map((color) => withAlpha(color, 0.3)) });
+  }
   return {
     type: "bar",
-    data: {
-      labels: rows.map((row) => row.name),
-      datasets: [
-        {
-          label: "Project Totals",
-          data: rows.map((row) => row.total_time / 60),
-          backgroundColor: rows.map((row, i) => ("_isOther" in row ? OTHER_COLOR : paletteColor(i))),
-          borderWidth: 0.5,
-        },
-      ],
+    data: { labels: rows.map((row) => row.name), datasets },
+    options: {
+      indexAxis: "y",
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (context: TT) => `${previous ? `${context.dataset.label}: ` : ""}${fmtHours(context.parsed.x!)}` } },
+      },
+      scales: { x: HOURS_AXIS, y: { grid: { display: false }, ticks: { color: token("--ink-2") } } },
     },
-    options: { responsive: true, indexAxis: "y" },
   };
 }
+
+export const barConfig = (data: TallyRow[], { projectLimit, previous }: ChartOptions) =>
+  tallyBars(consolidateTopN(data, projectLimit), previous as TallyRow[] | undefined);
+export const contextConfig = (data: TallyRow[], { previous }: ChartOptions) =>
+  tallyBars([...data].sort((a, b) => b.total_time - a.total_time), previous as TallyRow[] | undefined);
 
 interface ScatterGroup {
   name: string;
@@ -79,135 +97,84 @@ export function groupScatter(rows: ScatterRow[], topN?: number): ScatterGroup[] 
   return result;
 }
 
-function scatterConfig(rows: ScatterRow[], topN: number | undefined): AnyConfig {
-  const groups = groupScatter(rows, topN);
-  const { min, max } = dateExtent(rows.map((row) => new Date(row.x)));
-  const unit = topN === undefined ? "h" : "hours";
+function scatterConfig(rows: ScatterRow[], topN: number | undefined, range: Range | undefined): AnyConfig {
+  const axis = timeAxis(rows.map((row) => new Date(row.x)), range);
   return {
     type: "scatter",
     data: {
-      datasets: groups.map((group, i) => ({
+      datasets: groupScatter(rows, topN).map((group, i) => ({
         label: group.name,
         data: group.points,
-        backgroundColor: group.other ? OTHER_COLOR : paletteColor(i),
+        backgroundColor: withAlpha(group.other ? otherColor() : paletteColor(i), 0.85),
+        pointRadius: 4,
         pointHoverRadius: 6,
-        pointStyle: "rect",
-        pointRotation: 45,
       })),
     },
     options: {
-      responsive: true,
-      scales: {
-        x: { type: "time", time: { unit: getChartUnit(max, min) }, title: { display: true, text: "Date" } },
-        y: { beginAtZero: true, title: { display: true, text: "Duration (hours)" } },
-      },
-      plugins: {
-        tooltip: {
-          callbacks: { label: (context: TT) => `${context.dataset.label ?? ""}: ${context.parsed.y!.toFixed(2)} ${unit}` },
-        },
-      },
+      scales: { x: { ...axis.scale, time: { ...axis.scale.time, tooltipFormat: "EEE d MMM, HH:mm" } }, y: HOURS_AXIS },
+      plugins: { tooltip: { callbacks: { label: (context: TT) => `${context.dataset.label ?? ""}: ${fmtHours(context.parsed.y!)}` } } },
     },
   };
 }
 
-export const scatterProjectsConfig = (data: ScatterRow[], { projectLimit }: ChartOptions) => scatterConfig(data, projectLimit);
-export const scatterSubprojectsConfig = (data: ScatterRow[]) => scatterConfig(data, undefined);
+export const scatterProjectsConfig = (data: ScatterRow[], { projectLimit, range }: ChartOptions) => scatterConfig(data, projectLimit, range);
+export const scatterSubprojectsConfig = (data: ScatterRow[], { range }: ChartOptions) => scatterConfig(data, undefined, range);
 
-function lineConfig(rows: DailySeriesRow[], topN: number | undefined): AnyConfig {
-  const set = buildSeries(rows, topN);
-  const { min, max } = dateExtent(set.days.map((day) => parseDay(day)));
+/* Index tooltips of the multi-series time charts: biggest first, empty
+   series left out. */
+export const SERIES_TOOLTIP = {
+  itemSort: (a: TT, b: TT) => b.parsed.y! - a.parsed.y!,
+  filter: (item: TT) => item.parsed.y! > 0,
+  callbacks: { label: (context: TT) => `${context.dataset.label}: ${fmtHours(context.parsed.y!)}` },
+};
+
+/* Daily series summed into the axis's buckets, with every bucket on the
+   axis present (zero where nothing was tracked) so lines do not bridge gaps. */
+export function bucketedSeries(rows: DailySeriesRow[], topN: number | undefined, range: Range | undefined) {
+  const axis = timeAxis(rows.map((row) => parseDay(row.date)), range);
+  const set = buildSeries(rows.map((row) => ({ ...row, date: dayKey(bucketOf(parseDay(row.date), axis.bucket)) })), topN);
+  const series = set.names.map((name, i) => ({
+    name,
+    color: name === set.other ? otherColor() : paletteColor(i),
+    data: axis.buckets.map((day) => ({ x: parseDay(day), y: set.byDay[name]![day] ?? 0 })),
+  }));
+  return { axis, series };
+}
+
+function lineConfig(rows: DailySeriesRow[], topN: number | undefined, range: Range | undefined): AnyConfig {
+  const { axis, series } = bucketedSeries(rows, topN, range);
   return {
     type: "line",
     data: {
-      datasets: set.names.map((name, i) => {
-        const color = name === set.other ? OTHER_COLOR : paletteColor(i);
-        const days = set.byDay[name]!;
-        return {
-          label: name,
-          data: set.days.map((day) => ({ x: parseDay(day), y: days[day] ?? 0 })).filter((point) => point.y > 0),
-          borderColor: color,
-          backgroundColor: color,
-          fill: false,
-          tension: 0.1,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-        };
-      }),
+      datasets: series.map(({ name, color, data }) => ({
+        label: name,
+        data,
+        borderColor: color,
+        backgroundColor: color,
+        pointRadius: data.length > 1 ? 0 : 4,
+      })),
     },
     options: {
-      responsive: true,
-      scales: {
-        x: { type: "time", time: { unit: getChartUnit(max, min) }, title: { display: true, text: "Date" } },
-        y: { beginAtZero: true, title: { display: true, text: "Duration (hours)" } },
-      },
-      plugins: {
-        tooltip: { callbacks: { label: (context: TT) => `${context.dataset.label}: ${context.parsed.y!.toFixed(2)} hours` } },
-      },
+      interaction: { mode: "index", intersect: false },
+      scales: { x: axis.scale, y: HOURS_AXIS },
+      plugins: { tooltip: SERIES_TOOLTIP },
     },
   };
 }
 
-export const lineProjectsConfig = (data: DailySeriesRow[], { projectLimit }: ChartOptions) => lineConfig(data, projectLimit);
-export const lineSubprojectsConfig = (data: DailySeriesRow[]) => lineConfig(data, undefined);
+export const lineProjectsConfig = (data: DailySeriesRow[], { projectLimit, range }: ChartOptions) => lineConfig(data, projectLimit, range);
+export const lineSubprojectsConfig = (data: DailySeriesRow[], { range }: ChartOptions) => lineConfig(data, undefined, range);
 
-const STATUS_COLORS: Record<string, string> = {
-  active: "hsl(120, 70%, 50%)",
-  paused: "hsl(45, 90%, 55%)",
-  complete: "hsl(210, 70%, 55%)",
-  archived: "hsl(0, 0%, 60%)",
-};
-const STATUS_ORDER = ["active", "paused", "complete", "archived"];
+/* Project status in the app's own hues: growing green, paused ochre, done
+   blue, archived grey. */
+const STATUS_TOKENS = { active: "--duration", paused: "--note", complete: "--sub", archived: "--muted" } as const;
+const STATUS_ORDER = ["active", "paused", "complete", "archived"] as const;
 
 export function statusConfig(data: StatusRow[]): AnyConfig {
   const rows = STATUS_ORDER.map((status) => data.find((row) => row.status === status)).filter((row): row is StatusRow => !!row);
-  return {
-    type: "doughnut",
-    data: {
-      labels: rows.map((row) => `${row.status} (${row.count})`),
-      datasets: [
-        {
-          data: rows.map((row) => row.total_time / 60),
-          backgroundColor: rows.map((row) => STATUS_COLORS[row.status] ?? "#999"),
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        title: { display: true, text: "Time by Project Status" },
-        legend: { position: "top" },
-        tooltip: { callbacks: { label: (context: TT) => `${context.label}: ${(context.parsed as number).toFixed(1)} hours` } },
-      },
-      cutout: "50%",
-    },
-  };
-}
-
-export function contextConfig(data: TallyRow[]): AnyConfig {
-  const rows = [...data].sort((a, b) => b.total_time - a.total_time);
-  return {
-    type: "bar",
-    data: {
-      labels: rows.map((row) => row.name),
-      datasets: [
-        {
-          label: "Hours by Context",
-          data: rows.map((row) => row.total_time / 60),
-          backgroundColor: rows.map((_, i) => paletteColor(i)),
-          borderWidth: 1,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      indexAxis: "y",
-      plugins: {
-        title: { display: true, text: "Time by Context" },
-        legend: { display: false },
-        tooltip: { callbacks: { label: (context: TT) => `${context.parsed.x!.toFixed(1)} hours` } },
-      },
-      scales: { x: { title: { display: true, text: "Hours" }, beginAtZero: true } },
-    },
-  };
+  return doughnut(
+    rows.map((row) => `${row.status} (${row.count})`),
+    rows.map((row) => row.total_time / 60),
+    rows.map((row) => token(STATUS_TOKENS[row.status as keyof typeof STATUS_TOKENS])),
+  );
 }
