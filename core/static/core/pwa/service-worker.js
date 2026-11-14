@@ -314,9 +314,21 @@ self.addEventListener("fetch", function (event) {
    header) is remembered as the offline shell; leaving for the login page
    (signed out, session expired) forgets it, so a signed-out device never
    opens someone's cached app. With no network, the shell stands in for any
-   page, and the static offline page for the rest. */
+   page, and the static offline page for the rest.
+
+   A weak signal doesn't fail, it hangs. For the pages the app is opened on
+   (the tab bar and notification links) the saved shell is shown after
+   SHELL_WAIT_MS instead; the reply, if it comes, still refreshes the saved
+   copy. Only those paths: a slow server-rendered page (sign-in, OAuth, a
+   download) must never be swapped for the app. */
+const SHELL_WAIT_MS = 4000;
+const SHELL_FAST_PATHS = ["/", "/timers/", "/sessions/", "/projects/", "/start_timer/"];
+
 function navigate(request) {
-    return fetch(request).then(function (response) {
+    var savedShell = caches.open(SHELL).then(function (cache) {
+        return cache.match(SHELL_KEY);
+    });
+    var network = fetch(request).then(function (response) {
         var path = new URL(response.url || request.url).pathname;
         if (response.ok && response.headers.get("X-Autumn-Shell") === "1") {
             var copy = response.clone();
@@ -325,12 +337,23 @@ function navigate(request) {
             caches.delete(SHELL);
         }
         return response;
-    }).catch(function () {
-        return caches.open(SHELL).then(function (cache) {
-            return cache.match(SHELL_KEY);
-        }).then(function (shell) {
+    });
+    var offline = function () {
+        return savedShell.then(function (shell) {
             return shell || caches.match(OFFLINE_URL);
         });
+    };
+    if (!SHELL_FAST_PATHS.includes(new URL(request.url).pathname)) {
+        return network.catch(offline);
+    }
+    return new Promise(function (resolve) {
+        var timer = setTimeout(function () {
+            savedShell.then(function (shell) { if (shell) resolve(shell); });
+        }, SHELL_WAIT_MS);
+        network.then(
+            function (response) { clearTimeout(timer); resolve(response); },
+            function () { clearTimeout(timer); resolve(offline()); }
+        );
     });
 }
 

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { api, unwrap } from "./client";
 import { keys } from "./keys";
 import type { Context, Project, ProjectListQuery, Subproject, Tag } from "./types";
@@ -22,25 +22,26 @@ export async function fetchAllProjects(query: Omit<ProjectListQuery, "limit" | "
   return all;
 }
 
-export function useAllProjects() {
-  return useQuery({ queryKey: keys.projects({ all: true }), queryFn: () => fetchAllProjects(), staleTime: META_STALE });
-}
+export const allProjectsQuery = () =>
+  queryOptions({ queryKey: keys.projects({ all: true }), queryFn: () => fetchAllProjects(), staleTime: META_STALE });
 
-export function useTags() {
-  return useQuery({
+export const tagsQuery = () =>
+  queryOptions({
     queryKey: keys.tags(),
     queryFn: async (): Promise<Tag[]> => (await unwrap(api.GET("/api/v2/tags/"))).tags,
     staleTime: META_STALE,
   });
-}
 
-export function useContexts() {
-  return useQuery({
+export const contextsQuery = () =>
+  queryOptions({
     queryKey: keys.contexts(),
     queryFn: async (): Promise<Context[]> => (await unwrap(api.GET("/api/v2/contexts/"))).contexts,
     staleTime: META_STALE,
   });
-}
+
+export const useAllProjects = () => useQuery(allProjectsQuery());
+export const useTags = () => useQuery(tagsQuery());
+export const useContexts = () => useQuery(contextsQuery());
 
 export function useSubprojects(projectId: number | null | undefined) {
   return useQuery({

@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
 import { keys } from "@/api/keys";
 import { useInvalidate } from "@/api/sync";
@@ -28,10 +28,10 @@ export const SESSION_PAGE = 30;
 /* One ranked list shared with API v2 and MCP (core.search.rank_sessions):
    with a search term and related=true the server returns direct matches
    newest first, then related matches best first, each tagged by `match`. */
-export function useSessionList(filters: SessionFilters) {
+export function sessionListQuery(filters: SessionFilters) {
   const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as SessionFilters;
   const searching = !!query.search;
-  return useInfiniteQuery({
+  return infiniteQueryOptions({
     queryKey: keys.sessions({ list: query }),
     initialPageParam: 0,
     queryFn: async ({ pageParam }) =>
@@ -55,6 +55,8 @@ export function useSessionList(filters: SessionFilters) {
     },
   });
 }
+
+export const useSessionList = (filters: SessionFilters) => useInfiniteQuery(sessionListQuery(filters));
 
 /* Delete with undo: the toast's Undo re-records the same session (same uuid,
    instants, note and allocations) through the track endpoint. */

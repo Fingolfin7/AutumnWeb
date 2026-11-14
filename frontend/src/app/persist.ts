@@ -9,7 +9,8 @@ import { bootstrap } from "@/bootstrap";
 
 const PREFIX = "autumn:query-cache:";
 const KEPT = new Set(["timers", "dashboard", "projects", "sessions", "tags", "contexts", "commitments"]);
-export const MAX_AGE = 3 * 24 * 60 * 60_000;
+/* Under setTimeout's 24.8-day ceiling: this is also the queries' gcTime. */
+export const MAX_AGE = 21 * 24 * 60 * 60_000;
 
 export function persistOptions(): Omit<PersistQueryClientOptions, "queryClient"> | null {
   let storage: Storage;

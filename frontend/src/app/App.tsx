@@ -15,9 +15,11 @@ import { LiveTitle } from "./LiveTitle";
 import { CommandPalette } from "./CommandPalette";
 import { OfflineSync } from "./OfflineSync";
 import { MAX_AGE, persistOptions } from "./persist";
+import { savedDataCache, useWarmSavedData } from "./savedData";
 
 export function makeQueryClient() {
   return new QueryClient({
+    queryCache: savedDataCache(),
     defaultOptions: {
       queries: {
         /* Revisiting a page shows the last data instantly and refreshes
@@ -45,10 +47,16 @@ function ProgressBar() {
   return <div className="route-progress" aria-hidden="true" />;
 }
 
+function WarmSavedData() {
+  useWarmSavedData();
+  return null;
+}
+
 function Layout() {
   useCrossTabSync();
   return (
     <ActiveContextProvider>
+      <WarmSavedData />
       <ProgressBar />
       <LiveTitle />
       <CommandPalette />
