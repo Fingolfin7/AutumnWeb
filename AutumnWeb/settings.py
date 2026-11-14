@@ -467,7 +467,7 @@ VITE_DEV_SERVER = env("VITE_DEV_SERVER", default="")
 
 STATIC_URL = "/static/"
 # Vite puts a content hash in every file name under app/assets/, so browsers
-# and the CDN may keep those for a year; everything else stays at 60 s.
+# and the CDN may keep those indefinitely; everything else stays at 60 s.
 WHITENOISE_IMMUTABLE_FILE_TEST = r"^/static/app/assets/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static" if not DEBUG else "staticfiles")
 
