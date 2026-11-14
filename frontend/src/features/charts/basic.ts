@@ -27,15 +27,21 @@ function doughnut(names: string[], values: number[], colors: string[], previous?
       options: { plugins: { tooltip: { callbacks: { label: ({ dataIndex: i }: TT) => `${names[i]}: ${fmtHours(values[i]!)}${share(values, i)}` } } } },
     };
   }
-  datasets.push({ label: "Previous period", data: previous, backgroundColor: colors.map((color) => withAlpha(color, 0.4)) });
+  /* A clear band between the rings, so they read as two, not one. */
+  datasets.push({ label: "", data: [1], backgroundColor: ["transparent"], weight: 0.12 } as never, {
+    label: "Previous period",
+    data: previous,
+    backgroundColor: colors.map((color) => withAlpha(color, 0.5)),
+  });
   return {
     type: "doughnut",
     data: { labels: names.map((name, i) => `${name} · ${changeLabel(values[i]!, previous[i]!)}`), datasets },
     options: {
-      cutout: "38%",
+      cutout: "36%",
       plugins: {
         tooltip: {
           displayColors: false,
+          filter: (item: TT) => !!item.dataset.label,
           callbacks: {
             title: (items: TT[]) => names[items[0]?.dataIndex ?? 0] ?? "",
             label: ({ dataIndex: i }: TT) => [

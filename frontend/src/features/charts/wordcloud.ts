@@ -46,7 +46,9 @@ export function drawWordcloud(canvas: HTMLCanvasElement, rows: WordRow[], width:
     rotationSteps: 2,
     backgroundColor: "transparent",
     drawOutOfBound: false,
-    shrinkToFit: true,
+    /* Shrinking to fit would break the shared scale between two periods'
+       clouds, so there a word that does not fit is left out instead. */
+    shrinkToFit: !extent,
   });
 }
 

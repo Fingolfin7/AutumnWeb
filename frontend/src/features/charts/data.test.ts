@@ -1,9 +1,9 @@
 import { bucketTotals, buildSeries, consolidateTopN, dayKey, getChartUnit, parseDay, periodDays, previousRange, withAlpha } from "./data";
-import { groupScatter, previousTallies } from "./basic";
+import { groupScatter, pieConfig, previousTallies } from "./basic";
 import { flattenHierarchy } from "./hierarchy";
 import { radarMetrics } from "./analysis";
 import { fontSizer } from "./wordcloud";
-import { buildChart, isEmptyPayload, parseKind } from "./build";
+import { buildChart, CHART_KINDS, COMPARE, isEmptyPayload, NO_COMPARE, parseKind, valueExtent } from "./build";
 
 describe("top N + Other", () => {
   const rows = [
@@ -100,6 +100,19 @@ describe("previous period", () => {
   it("matches previous bars by name and folds the rest into Other", () => {
     const rows = [{ name: "a", total_time: 60 }, { name: "Other (2)", total_time: 30, _isOther: true as const }];
     expect(previousTallies(rows, [{ name: "a", total_time: 120 }, { name: "b", total_time: 60 }, { name: "z", total_time: 30 }])).toEqual([2, 1.5]);
+  });
+  it("is offered on every kind with a comparison, and refused with a reason on the rest", () => {
+    for (const kind of CHART_KINDS) expect(!!COMPARE[kind] !== !!NO_COMPARE[kind]).toBe(true);
+    expect(Object.keys(NO_COMPARE).sort()).toEqual(["bubble", "line", "radar", "treemap"]);
+  });
+  it("nests the previous ring, with a slice for time spent only before", () => {
+    const config = pieConfig([{ name: "a", total_time: 60 }], { projectLimit: 5, previous: [{ name: "a", total_time: 30 }, { name: "b", total_time: 90 }] });
+    expect(config.data.labels).toEqual(["a · ▲ 0.5 h", "Only in the previous period · ▼ 1.5 h"]);
+    expect(config.data.datasets.at(-1).data).toEqual([0.5, 1.5]);
+  });
+  it("finds the value range two panels share", () => {
+    expect(valueExtent("heatmap", [{ weekday: 0, hour: 1, average_hours: "0.5" }, { weekday: 1, hour: 2, average_hours: 2 }])).toEqual([0.5, 2]);
+    expect(valueExtent("wordcloud", [])).toEqual([0, 0]);
   });
 });
 
