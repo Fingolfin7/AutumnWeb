@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { discardTimers, pickProject, toasts, trackErrors } from "./helpers";
+import { buildSavedOffline, discardTimers, pickProject, toasts, trackErrors } from "./helpers";
 
 test.beforeEach(async ({ page }) => {
   await discardTimers(page);
@@ -80,13 +80,7 @@ test.describe("offline", () => {
     await page.goto("/timers/");
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
-    await page.waitForFunction(async () => {
-      if (!navigator.serviceWorker.controller) return false;
-      const names = (await caches.keys()).filter((name) => name.startsWith("autumn-pwa-app"));
-      if (!names.length) return false;
-      const cache = await caches.open(names[0]!);
-      return (await cache.keys()).length > 5;
-    });
+    await buildSavedOffline(page);
     await page.goto("/start_timer/");
     await expect(page.getByRole("combobox", { name: "Project" })).toBeVisible();
     await page.waitForLoadState("networkidle");
@@ -112,13 +106,7 @@ test.describe("offline", () => {
     await page.goto("/create_project/");
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
-    // Going offline before the service worker has saved the pages visited
-    // below would leave them unable to load.
-    await page.waitForFunction(async () => {
-      if (!navigator.serviceWorker.controller) return false;
-      const urls = (await Promise.all((await caches.keys()).map(async (name) => (await (await caches.open(name)).keys()).map((r) => r.url)))).flat();
-      return ["ProjectsPage-", "TimersPage-"].every((chunk) => urls.some((url) => url.includes(`/assets/${chunk}`)));
-    });
+    await buildSavedOffline(page);
     await page.waitForLoadState("networkidle");
 
     await context.setOffline(true);
@@ -149,11 +137,7 @@ test.describe("offline", () => {
     await page.goto("/timers/");
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
-    await page.waitForFunction(async () => {
-      if (!navigator.serviceWorker.controller) return false;
-      const urls = (await Promise.all((await caches.keys()).map(async (name) => (await (await caches.open(name)).keys()).map((r) => r.url)))).flat();
-      return ["SessionsPage-", "StartTimerPage-"].every((chunk) => urls.some((url) => url.includes(`/assets/${chunk}`)));
-    });
+    await buildSavedOffline(page);
     await page.getByRole("link", { name: "Sessions" }).first().click();
     await expect(page.getByRole("region", { name: "Sessions" })).toBeVisible();
     await page.waitForLoadState("networkidle");

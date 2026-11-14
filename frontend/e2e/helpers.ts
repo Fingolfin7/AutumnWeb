@@ -36,3 +36,24 @@ export async function discardTimers(page: Page): Promise<void> {
     expect(removed.ok(), `discard timer ${timer.id}`).toBeTruthy();
   }
 }
+
+/** Resolves once the service worker controls the page and has saved every
+    file of the build. Going offline earlier leaves pages that cannot load: a
+    page's own file may be saved while a shared file it imports is not. */
+export async function buildSavedOffline(page: Page) {
+  await page.waitForFunction(
+    async () => {
+      if (!navigator.serviceWorker.controller) return false;
+      const manifest = (await (await fetch("/static/app/manifest.json")).json()) as Record<string, { file?: string; css?: string[]; assets?: string[] }>;
+      const wanted = Object.values(manifest)
+        .flatMap((chunk) => [chunk.file, ...(chunk.css ?? []), ...(chunk.assets ?? [])])
+        .filter((file): file is string => !!file)
+        .map((file) => new URL(`/static/app/${file}`, location.origin).href);
+      const names = await caches.keys();
+      const saved = new Set((await Promise.all(names.map(async (name) => (await (await caches.open(name)).keys()).map((r) => r.url)))).flat());
+      return wanted.every((url) => saved.has(url));
+    },
+    undefined,
+    { polling: 500, timeout: 30_000 },
+  );
+}
