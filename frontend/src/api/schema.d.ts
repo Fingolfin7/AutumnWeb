@@ -2079,10 +2079,28 @@ export interface components {
             readonly celebration?: components["schemas"]["Celebration"] | null;
             readonly subprojects: components["schemas"]["SubprojectResource"][];
         };
+        ProjectListItem: {
+            id: number;
+            version?: number;
+            name: string;
+            status: components["schemas"]["ProjectStatusEnum"];
+            readonly description: string;
+            context: components["schemas"]["NamedResource"] | null;
+            readonly tags: components["schemas"]["NamedResource"][];
+            /** Format: date */
+            readonly start_date: string;
+            /** Format: date */
+            readonly last_activity: string | null;
+            /** Format: double */
+            readonly total_minutes: number;
+            session_count: number;
+            readonly celebration: components["schemas"]["Celebration"] | null;
+            subprojects?: components["schemas"]["SubprojectResource"][];
+        };
         ProjectListResponse: {
             count: number;
             total: number;
-            projects: components["schemas"]["ProjectResource"][];
+            projects: components["schemas"]["ProjectListItem"][];
         };
         ProjectMergeRequest: {
             source_ids: number[];
@@ -3922,6 +3940,12 @@ export interface operations {
                 /** @description Latest project start date (inclusive). */
                 end_date?: string;
                 exclude_project_ids?: string;
+                /**
+                 * @description subprojects: add each project's subprojects to its row.
+                 *
+                 *     * `subprojects` - subprojects
+                 */
+                include?: "subprojects";
                 limit?: number;
                 offset?: number;
                 /**

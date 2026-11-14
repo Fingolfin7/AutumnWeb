@@ -1,7 +1,9 @@
 from datetime import datetime, timedelta, timezone as datetime_timezone
 
 from django.contrib.auth.models import User
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
@@ -375,6 +377,33 @@ class V2ProjectSubprojectTests(TestCase):
             [project["name"] for project in by_name.json()["projects"]],
             ["Alpha match", "Beta match", "Gamma match", "Zeta"],
         )
+        self.assertNotIn("subprojects", by_name.json()["projects"][0])
+
+    def test_list_includes_subprojects_in_constant_queries(self):
+        def listing():
+            with CaptureQueriesContext(connection) as queries:
+                response = self.client.get(
+                    reverse("api_v2:projects"), {"include": "subprojects"}
+                )
+            self.assertEqual(response.status_code, 200)
+            return response.json()["projects"], len(queries)
+
+        first = self._project("Garden")
+        SubProjects.objects.create(user=self.user, parent_project=first, name="Beds")
+        _, few = listing()
+        for name in ("Kiln", "Loom"):
+            project = self._project(name)
+            for sub in ("Glaze", "Throw"):
+                SubProjects.objects.create(
+                    user=self.user, parent_project=project, name=sub
+                )
+        projects, many = listing()
+        self.assertEqual(many, few)
+        self.assertEqual(
+            {p["name"]: [s["name"] for s in p["subprojects"]] for p in projects},
+            {"Garden": ["Beds"], "Kiln": ["Glaze", "Throw"], "Loom": ["Glaze", "Throw"]},
+        )
+        self.assertEqual(projects[0]["subprojects"][0]["project_id"], first.id)
 
 
     def test_project_and_subproject_if_match_conflicts_are_optional(self):

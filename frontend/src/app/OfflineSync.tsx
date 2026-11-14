@@ -1,8 +1,10 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { faCloudUploadAlt, faWifi } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
+import { seedSynced } from "@/api/meta";
 import { useInvalidate } from "@/api/sync";
-import { flushQueue, hasUnsavedChanges, isFlushing, queuedOps, subscribe } from "@/lib/offlineQueue";
+import { describeOp, flushQueue, hasUnsavedChanges, isFlushing, onSynced, queuedOps, subscribe } from "@/lib/offlineQueue";
 import { pluralize } from "@/lib/format";
 import { subscribeNoteDrafts, syncNoteDrafts, waitingNoteDrafts } from "@/lib/noteDrafts";
 import { useOnline } from "@/lib/useOnline";
@@ -11,7 +13,8 @@ import { useToast } from "./toasts";
 
 const RETRY_MS = 20_000;
 
-/* Replays timer starts/stops queued while Autumn was unreachable, then sends
+/* Replays what was queued while Autumn was unreachable (timer starts and
+   stops, logged sessions, new projects and subprojects), then sends
    timer notes still only on this device (lib/noteDrafts): at load, when the
    connection returns, when the tab comes back, and every 20 s while anything
    is waiting. Shows a small pill while offline or unsynced. */
@@ -22,7 +25,9 @@ export function OfflineSync() {
   const online = useOnline() && !unreachable;
   const unsaved = useSyncExternalStore(subscribe, hasUnsavedChanges);
   const invalidate = useInvalidate();
+  const client = useQueryClient();
   const toast = useToast();
+  useEffect(() => onSynced((op, record) => seedSynced(client, op, record)), [client]);
   const waiting = ops.length + useSyncExternalStore(subscribeNoteDrafts, waitingNoteDrafts);
   /* Each synced op changes `waiting` and re-runs the effect mid-flush, so
      only unmounting (not a re-run) should silence the report. */
@@ -42,13 +47,12 @@ export function OfflineSync() {
       void flushQueue()
         .then((report) => {
           if (!mounted.current) return;
-          if (report.synced) {
-            invalidate("timers", "sessions");
-            if (!report.remaining) toast.success(`Synced ${pluralize(report.synced, "offline change")}.`);
+          if (report.synced || report.dropped.length) {
+            invalidate("timers", "sessions", "projects");
+            if (report.synced && !report.remaining) toast.success(`Synced ${pluralize(report.synced, "offline change")}.`);
           }
           for (const drop of report.dropped) {
-            const what = drop.op.kind === "start" ? `start of ${drop.op.display.projectName}` : "timer stop";
-            toast.error(`Couldn't sync the offline ${what}: ${drop.message}`);
+            toast.error(`Couldn't sync the offline ${describeOp(drop.op)}: ${drop.message}`);
           }
         })
         .then(syncNoteDrafts)
@@ -75,7 +79,7 @@ export function OfflineSync() {
   return (
     <div className="offline-banner" role="status">
       {unsaved ? (
-        <>Offline timer changes are only saved in this tab. Keep it open until they sync; reloading or closing it may lose them.</>
+        <>Offline changes are only saved in this tab. Keep it open until they sync; reloading or closing it may lose them.</>
       ) : online ? (
         <>
           <Icon icon={faCloudUploadAlt} /> {pluralize(waiting, "change")} waiting to sync

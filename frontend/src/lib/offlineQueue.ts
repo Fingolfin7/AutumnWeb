@@ -1,13 +1,21 @@
 import { bootstrap } from "@/bootstrap";
+import { errorMessage, toApiError } from "@/api/errors";
 import { csrfToken } from "@/lib/csrf";
 
-/* Timer starts and stops made while Autumn can't be reached (no signal at the
-   gym, the server waking from sleep) are kept here and replayed in order once
-   it answers. Both carry their own instants, so the record is what you tapped,
-   not when it synced. A start carries a client uuid the server deduplicates
-   on, so replaying it twice (two tabs, a retry after a lost response) never
-   makes two timers; a stop of an already-stopped timer is answered 404/409
-   and simply dropped. */
+/* What you do while Autumn can't be reached (no signal at the gym, the server
+   waking from sleep) is kept here and replayed in order once it answers:
+   timer starts and stops, logged sessions, new projects and subprojects. Each
+   carries its own instants, so the record is what you tapped, not when it
+   synced, and each is safe to send twice: starts and sessions carry a client
+   uuid the server deduplicates on, a create whose name already exists takes
+   the existing record, and a stop of an already-stopped timer is answered
+   404/409 and simply dropped.
+
+   An op can use what an earlier op creates before the server has it. A
+   queued project or subproject gets a temporary negative id (a start has its
+   uuid); later ops carry that ref, and replay rewrites it to the server's id
+   through the persisted `synced` map. If the server rejects a creation for
+   good, everything that uses it is dropped and reported with it. */
 
 export interface QueuedStart {
   kind: "start";
@@ -31,11 +39,44 @@ export interface QueuedStop {
   subproject_allocations?: { subproject_id: number; allocation_bp: number }[];
 }
 
-export type QueuedOp = QueuedStart | QueuedStop;
+export interface QueuedProject {
+  kind: "project";
+  key: string;
+  queuedAt: string;
+  /** Negative: stands for the project until the server gives it an id. */
+  tempId: number;
+  body: { name: string; description: string; status: string; context_id: number | null; tag_ids: number[] };
+  display: { context: { id: number; name: string } | null; tags: { id: number; name: string }[] };
+}
+
+export interface QueuedSubproject {
+  kind: "subproject";
+  key: string;
+  queuedAt: string;
+  tempId: number;
+  /** The parent: a server id or a queued project's temporary id. */
+  project_id: number;
+  body: { name: string; description: string };
+  display: { projectName: string };
+}
+
+/** A past session (Log past session): the POST /api/v2/sessions/ body. */
+export interface QueuedSession {
+  kind: "session";
+  key: string;
+  queuedAt: string;
+  body: { uuid: string; project_id: number; start: string; end: string; [field: string]: unknown };
+  display: { projectName: string };
+}
+
+export type QueuedOp = QueuedStart | QueuedStop | QueuedProject | QueuedSubproject | QueuedSession;
+type Fresh<T> = T extends QueuedOp ? Omit<T, "key" | "queuedAt"> : never;
+export type NewOp = Fresh<QueuedOp>;
 
 interface QueueState {
   ops: QueuedOp[];
-  /** uuid -> server id for starts that synced, so later stops can find them. */
+  /** Ref -> server id for creations that synced (a start's uuid, a
+      project's or subproject's temporary id), so later ops can find them. */
   synced: Record<string, number>;
 }
 
@@ -74,6 +115,9 @@ function entries(s: QueueState): Map<string, string> {
     ...Object.entries(s.synced).map(([uuid, id]): [string, string] => [`${entryPrefix()}id:${uuid}`, JSON.stringify(id)]),
   ]);
 }
+
+/* Creators before what uses them, should two ever share an instant. */
+const RANK: Record<QueuedOp["kind"], number> = { project: 0, subproject: 1, start: 2, session: 3, stop: 4 };
 
 function read(): QueueState {
   const values = new Map<string, string>();
@@ -116,8 +160,7 @@ function read(): QueueState {
       else if (key.startsWith(`${entryPrefix()}id:`)) result.synced[key.slice(`${entryPrefix()}id:`.length)] = JSON.parse(value) as number;
     } catch { /* Ignore an individually corrupt entry, preserving the rest. */ }
   }
-  result.ops.sort((a, b) => a.queuedAt.localeCompare(b.queuedAt) ||
-    (a.kind === b.kind ? a.key.localeCompare(b.key) : a.kind === "start" ? -1 : 1));
+  result.ops.sort((a, b) => a.queuedAt.localeCompare(b.queuedAt) || (RANK[a.kind] ?? 9) - (RANK[b.kind] ?? 9) || a.key.localeCompare(b.key));
   return result;
 }
 
@@ -164,30 +207,117 @@ export function queuedOps(): QueuedOp[] {
   return current().ops;
 }
 
-const newKey = () => crypto.randomUUID();
+/* ------------------------------------------------- refs between queued ops */
 
-export function enqueueStart(op: Omit<QueuedStart, "kind" | "key" | "queuedAt">): QueuedStart {
-  const item: QueuedStart = { ...op, kind: "start", key: newKey(), queuedAt: new Date().toISOString() };
+/* Ids of projects and subprojects sit in these fields of an op. */
+const REF_FIELDS = new Set(["project_id", "subproject_id", "subproject_ids"]);
+
+/** A temporary id for a project or subproject created on this device. */
+export const newTempId = () => -1 - Math.floor(Math.random() * 2 ** 52);
+
+/** What an op creates that later ops can use. */
+function createdRef(op: QueuedOp): string | null {
+  if (op.kind === "project" || op.kind === "subproject") return String(op.tempId);
+  return op.kind === "start" ? op.uuid : null;
+}
+
+/** The temporary ids (and, for a stop, the start uuid) an op uses. */
+function refsOf(op: QueuedOp): string[] {
+  const refs: string[] = [];
+  const walk = (value: unknown, field?: string) => {
+    if (typeof value === "number") {
+      if (value < 0 && field && REF_FIELDS.has(field)) refs.push(String(value));
+    } else if (Array.isArray(value)) for (const item of value) walk(item, field);
+    else if (value && typeof value === "object") for (const [key, inner] of Object.entries(value)) walk(inner, key);
+  };
+  walk(op);
+  if (op.kind === "stop" && "uuid" in op.target) refs.push(op.target.uuid);
+  return refs;
+}
+
+/** `value` with each temporary id the server has an id for replaced by it. */
+function rewrite<T>(value: T, synced: Record<string, number>, field?: string): T {
+  if (typeof value === "number") return (value < 0 && field && REF_FIELDS.has(field) ? (synced[String(value)] ?? value) : value) as T;
+  if (Array.isArray(value)) return value.map((item) => rewrite(item, synced, field)) as T;
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, inner]) => [key, rewrite(inner, synced, key)])) as T;
+  }
+  return value;
+}
+
+/** The server's id for a temporary one that synced (else the id itself). */
+export function resolveId(id: number): number {
+  return id < 0 ? (current().synced[String(id)] ?? id) : id;
+}
+
+/** A request body with synced temporary ids rewritten. `waiting` when it
+    still uses a creation queued here: then it has to be queued behind it. */
+export function resolveRefs<T extends object>(body: T): { body: T; waiting: boolean } {
+  const s = current();
+  const resolved = rewrite(body, s.synced);
+  const left = refsOf(resolved as unknown as QueuedOp);
+  const queued = new Set(s.ops.map(createdRef));
+  if (left.some((ref) => !queued.has(ref))) throw new Error("A project or subproject it uses was discarded before it synced.");
+  return { body: resolved, waiting: left.length > 0 };
+}
+
+/** `root` and every queued op that uses what it creates, directly or not
+    (ops are in creation order, so one pass finds them all). */
+function withDependents(ops: QueuedOp[], root: QueuedOp): QueuedOp[] {
+  const gone = new Set<string>();
+  const out: QueuedOp[] = [];
+  for (const op of ops) {
+    if (op.key !== root.key && !refsOf(op).some((ref) => gone.has(ref))) continue;
+    out.push(op);
+    const ref = createdRef(op);
+    if (ref) gone.add(ref);
+  }
+  return out;
+}
+
+/** What discarding the creation of `ref` would take with it. */
+export function dependentsOf(ref: string): QueuedOp[] {
+  const ops = current().ops;
+  const root = ops.find((op) => createdRef(op) === ref);
+  return root ? withDependents(ops, root).filter((op) => op !== root) : [];
+}
+
+/** An op in words, for reports and confirmations. */
+export function describeOp(op: QueuedOp): string {
+  switch (op.kind) {
+    case "project":
+      return `project ${op.body.name}`;
+    case "subproject":
+      return `subproject ${op.body.name} of ${op.display.projectName}`;
+    case "start":
+      return `timer on ${op.display.projectName}`;
+    case "session":
+      return `logged session on ${op.display.projectName}`;
+    default:
+      return "timer stop";
+  }
+}
+
+/* ------------------------------------------------------------- the queue */
+
+export function enqueue<T extends NewOp>(op: T): T & { key: string; queuedAt: string } {
   const s = refresh();
-  write({ ...s, ops: [...s.ops, item] });
+  /* After everything already queued, even if the clock stepped back: replay
+     order is the order things were done. */
+  const last = Math.max(0, ...s.ops.map((o) => Date.parse(o.queuedAt) || 0));
+  const item = { ...op, key: crypto.randomUUID(), queuedAt: new Date(Math.max(Date.now(), last + 1)).toISOString() };
+  write({ ...s, ops: [...s.ops, item as unknown as QueuedOp] });
   return item;
 }
 
-export function enqueueStop(op: Omit<QueuedStop, "kind" | "key" | "queuedAt">): QueuedStop {
-  const item: QueuedStop = { ...op, kind: "stop", key: newKey(), queuedAt: new Date().toISOString() };
+/** Forget something that never reached the server (a timer removed, a
+    creation discarded), with everything queued that uses it. */
+export function discard(ref: string) {
   const s = refresh();
-  write({ ...s, ops: [...s.ops, item] });
-  return item;
-}
-
-/** Drop a start that never reached the server (the user removed the timer),
-    with any stop queued for it. */
-export function cancelStart(uuid: string) {
-  const s = refresh();
-  write({
-    ...s,
-    ops: s.ops.filter((op) => !(op.kind === "start" && op.uuid === uuid) && !(op.kind === "stop" && "uuid" in op.target && op.target.uuid === uuid)),
-  });
+  const root = s.ops.find((op) => createdRef(op) === ref);
+  if (!root) return;
+  const gone = new Set(withDependents(s.ops, root).map((op) => op.key));
+  write({ ...s, ops: s.ops.filter((op) => !gone.has(op.key)) });
 }
 
 /** Correct the start instant of a start that hasn't synced yet. */
@@ -228,21 +358,21 @@ export function isNetworkFailure(status: number) {
   return status === 0 || status === 408 || status === 429 || (status >= 500 && status < 600);
 }
 
-interface PostResult { status: number; data: unknown; retryAt?: number }
+interface Answer { status: number; data: unknown; retryAt?: number }
 
-async function post(url: string, body: unknown): Promise<PostResult> {
+/* A GET without a body, else a POST. */
+async function request(url: string, body?: unknown): Promise<Answer> {
   let response: Response;
   try {
     response = await fetch(url, {
-      method: "POST",
+      method: body === undefined ? "GET" : "POST",
       credentials: "same-origin",
       headers: {
-        "Content-Type": "application/json",
+        ...(body === undefined ? {} : { "Content-Type": "application/json", "X-CSRFToken": csrfToken() }),
         Accept: "application/json",
         "X-Requested-With": "XMLHttpRequest",
-        "X-CSRFToken": csrfToken(),
       },
-      body: JSON.stringify(body),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
   } catch {
     return { status: 0, data: undefined };
@@ -255,64 +385,127 @@ async function post(url: string, body: unknown): Promise<PostResult> {
   return { status: response.status, data, retryAt };
 }
 
-function messageOf(data: unknown): string {
-  const error = (data as { error?: { message?: string } } | undefined)?.error;
-  return error?.message ?? "The server refused it.";
+/* The server's reason, with its field details, as the forms show it. */
+const messageOf = (answer: Answer) => errorMessage(toApiError(answer.status, answer.data));
+
+const isNameTaken = (answer: Answer) =>
+  answer.status === 409 && (answer.data as { error?: { code?: string } } | undefined)?.error?.code === "conflict";
+
+/* The server said a create's name is taken (unique per account; a
+   subproject's per project): the record with that exact name is the result.
+   A replay whose first answer was lost ends up here too. */
+async function existing(list: "projects" | "subprojects", url: string, name: string, taken: Answer): Promise<Answer> {
+  for (let offset = 0; ; offset += 500) {
+    const page = await request(list === "projects" ? `${url}?ordering=id&limit=500&offset=${offset}` : url);
+    if (page.status !== 200) return page;
+    const rows = (page.data as Record<string, { id: number; name: string }[] | undefined> | undefined)?.[list] ?? [];
+    const found = rows.find((row) => row.name === name);
+    if (found) return { status: 200, data: found };
+    if (list === "subprojects" || rows.length < 500) return taken;
+  }
+}
+
+/* One op, with its temporary ids already rewritten. Null: nothing to send. */
+async function send(op: QueuedOp, synced: Record<string, number>): Promise<Answer | null> {
+  switch (op.kind) {
+    case "project": {
+      const answer = await request("/api/v2/projects/", op.body);
+      return isNameTaken(answer) ? existing("projects", "/api/v2/projects/", op.body.name, answer) : answer;
+    }
+    case "subproject": {
+      const url = `/api/v2/projects/${op.project_id}/subprojects/`;
+      const answer = await request(url, op.body);
+      return isNameTaken(answer) ? existing("subprojects", url, op.body.name, answer) : answer;
+    }
+    case "start":
+      return request("/api/v2/timers/", op.body);
+    case "session":
+      return request("/api/v2/sessions/", op.body);
+    case "stop": {
+      const id = "id" in op.target ? op.target.id : synced[op.target.uuid];
+      /* Its start was rejected, so there is nothing to stop. */
+      if (id === undefined) return null;
+      return request(`/api/v2/timers/${id}/stop/`, {
+        end: op.end,
+        ...(op.note !== undefined ? { note: op.note } : {}),
+        ...(op.subproject_allocations ? { subproject_allocations: op.subproject_allocations } : {}),
+      });
+    }
+  }
+}
+
+type SyncedListener = (op: QueuedOp, record: unknown) => void;
+const syncedListeners = new Set<SyncedListener>();
+
+/** Told of each op the server accepted, with its answer, just before the op
+    leaves the queue: a screen can put the real record in place without a
+    moment where it is missing. */
+export function onSynced(listener: SyncedListener): () => void {
+  syncedListeners.add(listener);
+  return () => syncedListeners.delete(listener);
 }
 
 let flushing: Promise<FlushReport> | null = null;
 let retryAt = 0;
+let pruned = false;
 
 export function isFlushing(): boolean {
   return flushing !== null;
 }
 
 /** Replay the queue in order. Stops at the first op the server can't be
-    reached for; drops (and reports) ops the server rejects. */
+    reached for; drops (and reports) ops the server rejects, with what uses
+    them. */
 export function flushQueue(): Promise<FlushReport> {
   if (!flushing) {
     const run = async (): Promise<FlushReport> => {
       const report: FlushReport = { synced: 0, dropped: [], remaining: 0 };
+      /* Once per page load, forget ids nothing queued uses. Until then they
+         serve screens still showing a temporary id or a pending timer. */
+      if (!pruned) {
+        pruned = true;
+        const s = refresh();
+        const wanted = new Set(s.ops.flatMap(refsOf));
+        write({ ...s, synced: Object.fromEntries(Object.entries(s.synced).filter(([ref]) => wanted.has(ref))) });
+      }
       for (;;) {
         const s = refresh();
         if (Date.now() < retryAt) break;
         const op = s.ops[0];
         if (!op) break;
-        let result: PostResult;
-        let syncedId: number | undefined;
-        if (op.kind === "start") {
-          result = await post("/api/v2/timers/", op.body);
-          syncedId = (result.data as { id?: number } | undefined)?.id;
-        } else {
-          const id = "id" in op.target ? op.target.id : s.synced[op.target.uuid];
-          if (id === undefined) {
-            /* Its start was rejected, so there is nothing to stop. */
-            write({ ...s, ops: s.ops.slice(1) });
-            continue;
-          }
-          result = await post(`/api/v2/timers/${id}/stop/`, {
-            end: op.end,
-            ...(op.note !== undefined ? { note: op.note } : {}),
-            ...(op.subproject_allocations ? { subproject_allocations: op.subproject_allocations } : {}),
-          });
-        }
-        if (isNetworkFailure(result.status) || result.status === 401 || result.status === 403) {
+        const sent = rewrite(op, s.synced);
+        const queued = new Set(s.ops.map(createdRef));
+        /* Uses a creation that is no longer queued and never synced. */
+        const orphan = refsOf(sent).some((ref) => ref.startsWith("-") && !queued.has(ref));
+        const answer: Answer | null = orphan
+          ? { status: 410, data: { error: { message: "Something it used was discarded before it synced." } } }
+          : await send(sent, s.synced);
+        if (answer && (isNetworkFailure(answer.status) || answer.status === 401 || answer.status === 403)) {
           /* Offline, temporary server failure, or signed out: keep everything. */
-          if (result.retryAt && Number.isFinite(result.retryAt)) retryAt = result.retryAt;
+          if (answer.retryAt && Number.isFinite(answer.retryAt)) retryAt = answer.retryAt;
           break;
         }
         const after = refresh();
         const synced = { ...after.synced };
-        if (result.status >= 200 && result.status < 300) {
+        let ops = after.ops.filter((o) => o.key !== op.key);
+        if (answer && answer.status >= 200 && answer.status < 300) {
           report.synced += 1;
-          if (op.kind === "start" && syncedId) synced[op.uuid] = syncedId;
-        } else if (!(op.kind === "stop" && (result.status === 404 || result.status === 409))) {
-          report.dropped.push({ op, status: result.status, message: messageOf(result.data) });
+          const ref = createdRef(op);
+          const id = (answer.data as { id?: number } | undefined)?.id;
+          if (ref && id) synced[ref] = id;
+          for (const listener of syncedListeners) listener(sent, answer.data);
+        } else if (answer && !(op.kind === "stop" && (answer.status === 404 || answer.status === 409))) {
+          report.dropped.push({ op, status: answer.status, message: messageOf(answer) });
+          const gone = withDependents(after.ops, op).filter((o) => o.key !== op.key);
+          for (const dependent of gone) {
+            /* A stop goes with its start, which is already reported. */
+            if (dependent.kind !== "stop") {
+              report.dropped.push({ op: dependent, status: 0, message: `it used the ${describeOp(op)}, which couldn't sync.` });
+            }
+          }
+          const keys = new Set(gone.map((o) => o.key));
+          ops = ops.filter((o) => !keys.has(o.key));
         }
-        const ops = after.ops.filter((o) => o.key !== op.key);
-        /* Forget uuid mappings nothing queued refers to any more. */
-        const wanted = new Set(ops.flatMap((o) => (o.kind === "stop" && "uuid" in o.target ? [o.target.uuid] : [])));
-        for (const uuid of Object.keys(synced)) if (!wanted.has(uuid)) delete synced[uuid];
         write({ ops, synced });
       }
       report.remaining = current().ops.length;
@@ -337,5 +530,7 @@ export function resetQueueForTests() {
   storageFailed = false;
   migratedLegacy = null;
   retryAt = 0;
+  pruned = false;
   listeners.clear();
+  syncedListeners.clear();
 }

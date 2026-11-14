@@ -8,7 +8,7 @@ import type { ProjectPick } from "./ProjectPick";
 const mutate = vi.hoisted(() => vi.fn());
 vi.mock("@/features/sessions/api", () => ({ useLogSession: () => ({ mutate, isPending: false }) }));
 vi.mock("@/app/toasts", () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
-vi.mock("@/api/meta", () => ({ useAllProjects: () => ({ data: [] }) }));
+vi.mock("@/api/meta", () => ({ useAllProjects: () => ({ data: [] }), useQueuedOps: () => [], withPendingProjects: (projects: unknown[]) => projects }));
 
 const subs = [
   { id: 8, name: "Scales" },

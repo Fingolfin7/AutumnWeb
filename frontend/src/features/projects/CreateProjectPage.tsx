@@ -34,8 +34,9 @@ export default function CreateProjectPage() {
     create.mutate(
       { ...values, name: values.name.trim() },
       {
-        onSuccess: () => {
-          toast.success("Project created successfully");
+        onSuccess: (result) => {
+          if (result === "queued") toast.info(`Saved ${values.name.trim()} on this device. It syncs when Autumn can be reached.`);
+          else toast.success("Project created successfully");
           navigate(urls.projects());
         },
         onError: (error) => {

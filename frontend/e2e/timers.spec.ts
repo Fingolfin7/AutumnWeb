@@ -106,6 +106,37 @@ test.describe("offline", () => {
     await expect(card.getByText("Running · saved offline")).toHaveCount(0);
     await expect(card.getByText("Running", { exact: true })).toBeVisible();
   });
+
+  test("a project created offline can take a timer before it syncs, and syncs once", async ({ page, context }, testInfo) => {
+    const name = `Bouldering ${testInfo.project.name} ${testInfo.retry}.${testInfo.repeatEachIndex}`;
+    await page.goto("/create_project/");
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller);
+    await page.waitForLoadState("networkidle");
+
+    await context.setOffline(true);
+    await page.getByLabel("Name").fill(name);
+    await page.getByRole("button", { name: "Create project" }).click();
+    await expect(page).toHaveURL(/\/projects\/$/);
+    await expect(toasts(page).getByText(`Saved ${name} on this device.`, { exact: false })).toBeVisible();
+    const band = page.locator(".band", { hasText: name });
+    await expect(band.getByText("Saved offline · waiting to sync")).toBeVisible();
+
+    await band.getByRole("button", { name: `Start a timer on ${name}` }).click();
+    await page.getByRole("link", { name: "Timers" }).first().click();
+    const card = page.getByRole("article", { name: `Running timer: ${name}` });
+    await expect(card.getByText("Running · saved offline")).toBeVisible();
+
+    await context.setOffline(false);
+    await expect(toasts(page).getByText(/Synced 2 offline changes/)).toBeVisible({ timeout: 30_000 });
+    await expect(card.getByText("Running", { exact: true })).toBeVisible();
+    const listed = (await (await page.request.get("/api/v2/projects/?limit=500")).json()) as { projects: { id: number; name: string }[] };
+    const created = listed.projects.filter((project) => project.name === name);
+    expect(created).toHaveLength(1);
+    const timers = (await (await page.request.get("/api/v2/timers/")).json()) as { timers: { project: { id: number } }[] };
+    expect(timers.timers.map((timer) => timer.project.id)).toEqual([created[0]!.id]);
+  });
 });
 
 test("a timer started outside the active context is announced, and Show all reveals it", async ({ page }) => {

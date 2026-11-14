@@ -68,7 +68,9 @@ def _filtered_projects(request, serializer_class):
         user=request.user,
     )
 
-    queryset = _project_queryset(request.user)
+    queryset = _project_queryset(
+        request.user, include_subprojects=data.get("include") == "subprojects"
+    )
     if "status" in data:
         queryset = queryset.filter(status=data["status"])
     if context_ids is not None:
@@ -172,7 +174,7 @@ class ProjectsView(V2APIView):
             {
                 "count": len(projects),
                 "total": total,
-                "projects": ProjectResourceSerializer(projects, many=True).data,
+                "projects": ProjectListItemSerializer(projects, many=True).data,
             }
         )
 

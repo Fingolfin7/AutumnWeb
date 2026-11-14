@@ -1,5 +1,5 @@
 import { useId, useMemo, useRef, useState } from "react";
-import { useAllProjects } from "@/api/meta";
+import { useAllProjects, useQueuedOps, withPendingProjects } from "@/api/meta";
 import type { Project } from "@/api/types";
 
 /* Rank projects for a typed query: exact name, then prefix, then word
@@ -40,6 +40,7 @@ export function ProjectCombobox({
   placeholder = "Start typing a project name...",
   autoFocus,
   invalid,
+  withPending,
 }: {
   id: string;
   value: Project | null;
@@ -48,8 +49,12 @@ export function ProjectCombobox({
   placeholder?: string;
   autoFocus?: boolean;
   invalid?: boolean;
+  /** Also offer projects created offline that haven't synced. */
+  withPending?: boolean;
 }) {
-  const projects = useAllProjects();
+  const saved = useAllProjects().data;
+  const ops = useQueuedOps();
+  const list = useMemo(() => (withPending ? withPendingProjects(saved ?? [], ops) : (saved ?? [])), [withPending, saved, ops]);
   const [text, setText] = useState(value?.name ?? "");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -63,7 +68,7 @@ export function ProjectCombobox({
     if (value && value.name !== text) setText(value.name);
   }
 
-  const matches = useMemo(() => rankProjects(projects.data ?? [], text), [projects.data, text]);
+  const matches = useMemo(() => rankProjects(list, text), [list, text]);
 
   const choose = (project: Project) => {
     setText(project.name);
@@ -75,7 +80,7 @@ export function ProjectCombobox({
     setText(next);
     setOpen(true);
     setActive(0);
-    const exact = (projects.data ?? []).find((p) => p.name.toLowerCase() === next.trim().toLowerCase());
+    const exact = list.find((p) => p.name.toLowerCase() === next.trim().toLowerCase());
     onChange(exact ?? null, next);
   };
 
@@ -133,6 +138,7 @@ export function ProjectCombobox({
               >
                 {project.name}
                 {project.status !== "active" ? <span className="muted"> · {project.status}</span> : null}
+                {project.pending_sync ? <span className="muted"> · saved offline</span> : null}
               </div>
             </li>
           ))}

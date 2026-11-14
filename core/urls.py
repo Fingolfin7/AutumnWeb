@@ -1,5 +1,5 @@
 # urls.py
-from django.urls import path
+from django.urls import path, re_path
 from django.http import JsonResponse
 from core.views.recommendation_usage import recommendation_usage
 from core.views.contexts_tags import switch_context
@@ -44,7 +44,8 @@ urlpatterns = [
     # is ever used to build links, so nothing referenced the wrong path, but it
     # made the address bar lie on the create-project page.
     path("create_project/", spa, name="create_project"),
-    path("create_subproject/<int:pk>/", spa, name="create_subproject"),
+    # A project created offline has a negative id until it syncs.
+    re_path(r"^create_subproject/(?P<pk>-?\d+)/$", spa, name="create_subproject"),
     path("update_project/<int:pk>/", spa, name="update_project"),
     path("update_subproject/<int:pk>/", spa, name="update_subproject"),
     path("delete_project/<int:pk>/", spa, name="delete_project"),

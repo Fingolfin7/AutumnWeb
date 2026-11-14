@@ -4,31 +4,33 @@ import { faArrowLeft, faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
-import { useTags } from "@/api/meta";
+import { usePickerProjects, useTags } from "@/api/meta";
+import type { Project } from "@/api/types";
+import { resolveId } from "@/lib/offlineQueue";
 import { failure, useCreateSubproject, useProject } from "./api";
 import { splitErrors } from "./forms";
 import { FieldError, FormErrors, LoadState, PageHead } from "./Parts";
 
 export default function CreateSubprojectPage() {
-  const projectId = Number(useParams().projectId);
+  /* A project created offline has a temporary id until it syncs. The saved
+     project list stands in for its details with no connection. */
+  const projectId = resolveId(Number(useParams().projectId));
   const project = useProject(projectId);
-  return (
-    <LoadState query={project}>
-      {project.data ? <CreateSubprojectForm projectId={projectId} /> : null}
-    </LoadState>
-  );
+  const listed = usePickerProjects().data?.find((p) => p.id === projectId);
+  const shown = project.data ?? listed;
+  if (shown) return <CreateSubprojectForm project={shown} />;
+  return <LoadState query={project}>{null}</LoadState>;
 }
 
-function CreateSubprojectForm({ projectId }: { projectId: number }) {
+function CreateSubprojectForm({ project }: { project: Project }) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { data: project } = useProject(projectId);
   const tags = useTags();
-  const create = useCreateSubproject(projectId);
+  const create = useCreateSubproject(project);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const errors = splitErrors(create.error, ["name", "description"], "name");
-  if (!project) return null;
+  const back = project.pending_sync ? urls.projects() : urls.updateProject(project.id);
 
   const tagColor = (id: number) => tags.data?.find((tag) => tag.id === id)?.color;
 
@@ -37,8 +39,9 @@ function CreateSubprojectForm({ projectId }: { projectId: number }) {
     create.mutate(
       { name: name.trim(), description },
       {
-        onSuccess: () => {
-          toast.success("Subproject created successfully");
+        onSuccess: (result) => {
+          if (result === "queued") toast.info(`Saved ${name.trim()} on this device. It syncs when Autumn can be reached.`);
+          else toast.success("Subproject created successfully");
           navigate(urls.projects());
         },
         onError: (error) => {
@@ -52,7 +55,7 @@ function CreateSubprojectForm({ projectId }: { projectId: number }) {
     <>
       <PageHead
         eyebrow={
-          <AppLink className="text-red" href={urls.updateProject(project.id)}>
+          <AppLink className="text-red" href={back}>
             {project.name}
           </AppLink>
         }
@@ -92,7 +95,7 @@ function CreateSubprojectForm({ projectId }: { projectId: number }) {
         </section>
 
         <div className="form-actions">
-          <AppLink className="btn btn--ghost" href={urls.updateProject(project.id)}>
+          <AppLink className="btn btn--ghost" href={back}>
             <Icon icon={faArrowLeft} /> Back
           </AppLink>
           <button className="btn btn--primary btn--spacer" type="submit" id="create-subproject" disabled={create.isPending}>

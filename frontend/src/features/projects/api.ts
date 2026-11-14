@@ -1,10 +1,12 @@
+import { useMemo } from "react";
 import { queryOptions, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, unwrap } from "@/api/client";
-import { errorMessage } from "@/api/errors";
+import { ApiError, errorMessage } from "@/api/errors";
 import { keys } from "@/api/keys";
-import { fetchAllProjects } from "@/api/meta";
+import { fetchAllProjects, useQueuedOps, withPendingProjects, withPendingSubprojects } from "@/api/meta";
 import { useInvalidate } from "@/api/sync";
-import type { Commitment, Project, ProjectDetail, ProjectStatus, Subproject } from "@/api/types";
+import type { Commitment, Context, Project, ProjectDetail, ProjectStatus, Subproject, Tag } from "@/api/types";
+import { enqueue, isNetworkFailure, newTempId, queuedOps, resolveRefs } from "@/lib/offlineQueue";
 import { useActiveContext } from "@/app/context";
 import { conflictCurrent } from "./forms";
 import { onlyIncluded, relatedOnly, serverQuery, type ProjectFilters } from "./logic";
@@ -37,8 +39,27 @@ export function projectListsQuery(filters: ProjectFilters, contextIdsParam: stri
   });
 }
 
+/* Projects not synced yet join the plain list (no search or filter but the
+   context), newest first. */
 export function useProjectLists(filters: ProjectFilters) {
-  return useQuery(projectListsQuery(filters, useActiveContext().contextIdsParam));
+  const { contextIdsParam } = useActiveContext();
+  const query = useQuery(projectListsQuery(filters, contextIdsParam));
+  const ops = useQueuedOps();
+  const asked = serverQuery(filters, contextIdsParam);
+  const plain = !asked.search && !asked.start_date && !asked.end_date && !asked.tag_ids && !filters.projects.length;
+  const context_ids = asked.context_ids;
+  const data = useMemo(() => {
+    if (!plain) return query.data;
+    const saved = query.data ?? { direct: [], related: [] };
+    const contexts = context_ids?.split(",").map(Number);
+    const direct = withPendingProjects(saved.direct, ops).filter(
+      (project) => !project.pending_sync || !contexts || contexts.includes(project.context?.id ?? 0),
+    );
+    return direct.length === saved.direct.length ? query.data : { ...saved, direct };
+  }, [plain, query.data, ops, context_ids]);
+  /* Nothing saved on this device yet, but projects created here: show them. */
+  if (data && !query.data) return { ...query, data, isPending: false, isError: false };
+  return { ...query, data };
 }
 
 export function useCommitments() {
@@ -121,16 +142,44 @@ export interface ProjectInput {
   tag_ids: number[];
 }
 
+/* With no connection, a create is kept on the device (lib/offlineQueue) and
+   the hook resolves to "queued"; the new record shows at once, marked
+   pending_sync, and can be used before it syncs. A name already taken in
+   what the device knows is refused as the server would refuse it. */
+const nameTaken = (what: string) => new ApiError(409, "conflict", `${what} name already exists`);
+const offline = (error: unknown) => error instanceof ApiError && isNetworkFailure(error.status);
+
 export function useCreateProject() {
   const { invalidate } = useMutationEffects();
+  const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: ProjectInput) =>
-      unwrap(
-        api.POST("/api/v2/projects/", {
-          body: { ...input, status: input.status ?? "active" },
-        }),
-      ),
-    onSuccess: () => invalidate("projects"),
+    networkMode: "always",
+    mutationFn: async (input: ProjectInput): Promise<Project | "queued"> => {
+      const body = { ...input, status: input.status ?? "active" };
+      try {
+        return await unwrap(api.POST("/api/v2/projects/", { body }));
+      } catch (error) {
+        if (!offline(error)) throw error;
+        const known = withPendingProjects(client.getQueryData<Project[]>(keys.projects({ all: true })) ?? [], queuedOps());
+        if (known.some((project) => project.name === body.name)) throw nameTaken("Project");
+        const contexts = client.getQueryData<Context[]>(keys.contexts()) ?? [];
+        const tags = client.getQueryData<Tag[]>(keys.tags()) ?? [];
+        const context = contexts.find((c) => c.id === body.context_id);
+        enqueue({
+          kind: "project",
+          tempId: newTempId(),
+          body: { ...body, description: body.description ?? "" },
+          display: {
+            context: context ? { id: context.id, name: context.name } : null,
+            tags: tags.filter((tag) => body.tag_ids.includes(tag.id)).map((tag) => ({ id: tag.id, name: tag.name })),
+          },
+        });
+        return "queued";
+      }
+    },
+    onSuccess: (result) => {
+      if (result !== "queued") invalidate("projects");
+    },
   });
 }
 
@@ -186,12 +235,31 @@ export function useMergeProjects() {
   });
 }
 
-export function useCreateSubproject(projectId: number) {
+/** `project` may be one created offline that hasn't synced yet. */
+export function useCreateSubproject(project: Pick<Project, "id" | "name">) {
   const { invalidate } = useMutationEffects();
+  const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: { name: string; description: string }) =>
-      unwrap(api.POST("/api/v2/projects/{project_id}/subprojects/", { params: { path: { project_id: projectId } }, body: input })),
-    onSuccess: () => invalidate("projects"),
+    networkMode: "always",
+    mutationFn: async (input: { name: string; description: string }): Promise<Subproject | "queued"> => {
+      const { body: { project_id }, waiting } = resolveRefs({ project_id: project.id });
+      const queue = () => {
+        const known = withPendingSubprojects(project_id, client.getQueryData<Subproject[]>(keys.subprojects(project_id)) ?? [], queuedOps());
+        if (known.some((sub) => sub.name === input.name)) throw nameTaken("Subproject");
+        enqueue({ kind: "subproject", tempId: newTempId(), project_id, body: input, display: { projectName: project.name } });
+        return "queued" as const;
+      };
+      if (waiting) return queue();
+      try {
+        return await unwrap(api.POST("/api/v2/projects/{project_id}/subprojects/", { params: { path: { project_id } }, body: input }));
+      } catch (error) {
+        if (!offline(error)) throw error;
+        return queue();
+      }
+    },
+    onSuccess: (result) => {
+      if (result !== "queued") invalidate("projects");
+    },
   });
 }
 

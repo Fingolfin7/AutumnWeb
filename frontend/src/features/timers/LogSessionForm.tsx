@@ -63,8 +63,13 @@ export function LogSessionForm({ pick, autoFocus }: { pick: ProjectPick; autoFoc
       note: note.trim() ? note : null,
       ...(allocations ? { subproject_allocations: allocations } : { subproject_ids: chosen.map((s) => s.id) }),
     };
-    log.mutate(input, {
-      onSuccess: () => {
+    log.mutate({ ...input, projectName: project.name }, {
+      onSuccess: (result) => {
+        if (result === "queued") {
+          toast.info(`Saved ${formatDurationWords(minutes)} of ${project.name} on this device. It syncs when Autumn can be reached.`);
+          navigate(urls.timers());
+          return;
+        }
         toast.success(`Logged ${formatDurationWords(minutes)} of ${project.name}.`);
         const day = (iso: string) => localDateKey(new Date(iso));
         navigate(`${urls.sessions()}?start_date=${day(input.start)}&end_date=${day(input.end)}`);

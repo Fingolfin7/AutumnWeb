@@ -4,7 +4,8 @@ import { keys } from "@/api/keys";
 import { useInvalidate } from "@/api/sync";
 import type { Session } from "@/api/types";
 import { useToast } from "@/app/toasts";
-import { errorMessage } from "@/api/errors";
+import { ApiError, errorMessage } from "@/api/errors";
+import { enqueue, isNetworkFailure, resolveRefs } from "@/lib/offlineQueue";
 
 export interface SessionFilters {
   search?: string;
@@ -73,10 +74,28 @@ export interface LogSessionInput {
 
 const postSession = (body: LogSessionInput) => unwrap(api.POST("/api/v2/sessions/", { body })) as Promise<SessionRow>;
 
-/** Record a session that already happened (Log past session). */
+/** Record a session that already happened (Log past session). Kept on the
+    device when Autumn can't be reached, or when it is on a project or
+    subproject that hasn't synced yet; then it resolves to "queued". */
 export function useLogSession() {
   const invalidate = useInvalidate();
-  return useMutation({ mutationFn: postSession, onSuccess: () => invalidate("sessions") });
+  return useMutation({
+    networkMode: "always",
+    mutationFn: async ({ projectName, ...input }: LogSessionInput & { projectName: string }): Promise<SessionRow | "queued"> => {
+      const { body, waiting } = resolveRefs(input);
+      const queue = () => (enqueue({ kind: "session", body, display: { projectName } }), "queued" as const);
+      if (waiting) return queue();
+      try {
+        return await postSession(body);
+      } catch (error) {
+        if (!(error instanceof ApiError && isNetworkFailure(error.status))) throw error;
+        return queue();
+      }
+    },
+    onSuccess: (result) => {
+      if (result !== "queued") invalidate("sessions");
+    },
+  });
 }
 
 /* Delete with undo: the toast's Undo re-records the same session (same uuid,
@@ -131,7 +150,6 @@ export function useDeleteSession() {
 /* ---- Single-session reads and edits (edit / delete pages) ---------------- */
 
 import { useQuery } from "@tanstack/react-query";
-import { ApiError } from "@/api/errors";
 import type { SessionPatch } from "@/api/types";
 
 const UUID_RE = /^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i;

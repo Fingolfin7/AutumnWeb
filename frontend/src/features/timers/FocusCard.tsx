@@ -54,15 +54,20 @@ export function FocusCard({
         <span className="live-dot" /> {pending ? "Starting…" : timer.pending_sync ? "Running · saved offline" : "Running"}
       </p>
       <h2 className="focus-project">
-        <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink>
+        {/* A project created offline has no page until it syncs. */}
+        {timer.project.id > 0 ? <AppLink href={urls.updateProject(timer.project.id)}>{timer.project.name}</AppLink> : timer.project.name}
       </h2>
       {timer.subproject_allocations.length ? (
         <div className="focus-subs">
           {timer.subproject_allocations.map((sub) => (
             <Fragment key={sub.subproject_id}>
-              <AppLink className="sub-chip" href={urls.updateSubproject(sub.subproject_id)}>
-                {sub.name}
-              </AppLink>{" "}
+              {sub.subproject_id > 0 ? (
+                <AppLink className="sub-chip" href={urls.updateSubproject(sub.subproject_id)}>
+                  {sub.name}
+                </AppLink>
+              ) : (
+                <span className="sub-chip">{sub.name}</span>
+              )}{" "}
             </Fragment>
           ))}
         </div>

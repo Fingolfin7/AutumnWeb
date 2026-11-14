@@ -45,12 +45,13 @@ export function savedDataCache(): QueryCache {
 
 const WARM_DELAY_MS = 3_000;
 const WARM_FRESH_MS = 5 * 60_000;
+let projectsWarmedAt = 0;
 
 /* Saves the screens you'd want with no signal (Home, the project list and
-   picker, the latest sessions with their notes) a few seconds after each
-   load, whichever page you opened. Without it only pages visited since the
-   last deploy would be on the device. Anything fetched in the last five
-   minutes is skipped. */
+   picker with every project's subprojects, the latest sessions with their
+   notes) a few seconds after each load, whichever page you opened. Without
+   it only pages visited since the last deploy would be on the device.
+   Anything fetched in the last five minutes is skipped. */
 async function warm(client: QueryClient, contextIdsParam: string | undefined) {
   const [meta, dashboard, sessions, projects, projectLogic] = await Promise.all([
     import("@/api/meta"),
@@ -62,7 +63,12 @@ async function warm(client: QueryClient, contextIdsParam: string | undefined) {
   const fresh = { staleTime: WARM_FRESH_MS };
   /* One at a time: this is background work, not a burst. */
   for (const run of [
-    () => client.prefetchQuery({ ...meta.allProjectsQuery(), ...fresh }),
+    /* Every project with its subprojects, so any one can be picked offline. */
+    async () => {
+      if (Date.now() - projectsWarmedAt < WARM_FRESH_MS) return;
+      await meta.warmProjects(client);
+      projectsWarmedAt = Date.now();
+    },
     () => client.prefetchQuery({ ...meta.tagsQuery(), ...fresh }),
     () => client.prefetchQuery({ ...meta.contextsQuery(), ...fresh }),
     () => client.prefetchQuery({ ...dashboard.dashboardQuery(contextIdsParam), ...fresh }),
