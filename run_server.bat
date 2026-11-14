@@ -74,6 +74,10 @@ if errorlevel 1 (
 
 :migrated
 echo.
+rem This serves plain HTTP on this machine, so the login cookies must not be
+rem HTTPS-only (the default when DEBUG is off). A SECURE_COOKIES line in .env wins.
+if not defined SECURE_COOKIES set "SECURE_COOKIES=FALSE"
+
 echo Starting AutumnWeb at http://127.0.0.1:8000/
 echo Press Ctrl+C to stop the server.
 echo.
