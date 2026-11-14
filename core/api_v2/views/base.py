@@ -84,7 +84,9 @@ from core.session_canonical import (
 from core.totals import (
     annotate_project_totals,
     annotate_subproject_totals,
+    project_session_count,
     rounded_session_minutes,
+    subproject_session_count,
 )
 from core.utils import stop_expired_timers
 
@@ -276,11 +278,7 @@ def _even_allocation_pairs(subprojects):
 def _subproject_queryset(user):
     return annotate_subproject_totals(
         SubProjects.objects.filter(user=user).annotate(
-            completed_session_count=Count(
-                "sessions",
-                filter=Q(sessions__end_time__isnull=False),
-                distinct=True,
-            )
+            completed_session_count=subproject_session_count()
         )
     )
 
@@ -289,13 +287,7 @@ def _project_queryset(user, *, include_subprojects=False):
     queryset = annotate_project_totals(
         Projects.objects.filter(user=user)
         .select_related("context")
-        .annotate(
-            completed_session_count=Count(
-                "sessions",
-                filter=Q(sessions__end_time__isnull=False),
-                distinct=True,
-            )
-        )
+        .annotate(completed_session_count=project_session_count())
     ).prefetch_related(
         Prefetch(
             "tags",

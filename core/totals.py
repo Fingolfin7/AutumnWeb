@@ -7,10 +7,12 @@ weighted analytics helpers in :mod:`core.attribution` have different semantics.
 from __future__ import annotations
 
 from django.db.models import (
+    Count,
     DateTimeField,
     F,
     FloatField,
     Func,
+    IntegerField,
     Max,
     OuterRef,
     Q,
@@ -153,6 +155,51 @@ def _subproject_last_updated_subquery():
         .values("subproject_id")
         .annotate(latest=Max("session__end_time"))
         .values("latest")
+    )
+
+
+def project_session_count():
+    """Completed sessions per project, for annotating a Projects queryset.
+
+    A subquery, not Count("sessions"): the join that Count needs puts the
+    totals subqueries in a GROUP BY, and the database then runs them once
+    per session row instead of once per project.
+    """
+
+    return Coalesce(
+        Subquery(
+            Sessions.objects.filter(
+                user_id=OuterRef("user_id"),
+                project_id=OuterRef("pk"),
+                end_time__isnull=False,
+            )
+            .order_by()
+            .values("project_id")
+            .annotate(n=Count("pk"))
+            .values("n"),
+            output_field=IntegerField(),
+        ),
+        Value(0),
+    )
+
+
+def subproject_session_count():
+    """Completed sessions per subproject; see project_session_count."""
+
+    return Coalesce(
+        Subquery(
+            SessionSubproject.objects.filter(
+                subproject_id=OuterRef("pk"),
+                session__user_id=OuterRef("user_id"),
+                session__end_time__isnull=False,
+            )
+            .order_by()
+            .values("subproject_id")
+            .annotate(n=Count("pk"))
+            .values("n"),
+            output_field=IntegerField(),
+        ),
+        Value(0),
     )
 
 
