@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { NoteEditor, resolveRecognitionLanguage, stashNoteDraft, takeNoteDraft } from "./NoteEditor";
+import { NoteEditor, resolveRecognitionLanguage } from "./NoteEditor";
 
-function Harness({ initial = "", draftKey }: { initial?: string; draftKey?: string }) {
+function Harness({ initial = "" }: { initial?: string }) {
   const [value, setValue] = useState(initial);
-  return <NoteEditor value={value} onChange={setValue} draftKey={draftKey} />;
+  return <NoteEditor value={value} onChange={setValue} />;
 }
 
 const box = () => screen.getByRole("textbox") as HTMLTextAreaElement;
@@ -57,18 +57,6 @@ it("link does nothing when the prompt is cancelled", async () => {
   expect(box().value).toBe("x");
 });
 
-it("restores a stashed draft once, removing it, and says so", () => {
-  stashNoteDraft(7, "carried over text");
-  render(<Harness initial="server copy" draftKey="7" />);
-  expect(box().value).toBe("carried over text");
-  expect(screen.getByText("Current timer note carried over.")).toBeInTheDocument();
-  expect(takeNoteDraft(7)).toBeNull();
-});
-
-it("keeps the value when there is no draft", () => {
-  render(<Harness initial="server copy" draftKey="8" />);
-  expect(box().value).toBe("server copy");
-});
 
 it("disables dictation where the browser has no speech recognition", () => {
   render(<Harness />);

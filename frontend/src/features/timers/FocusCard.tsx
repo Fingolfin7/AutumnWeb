@@ -10,7 +10,6 @@ import type { Timer } from "@/api/types";
 import { elapsedSeconds, formatClock, formatTime, heroParts, parseInstant } from "@/lib/format";
 import { useDeleteTimer, useRestartTimer } from "./api";
 
-export const NOTE_DRAFT_KEY_PREFIX = "autumn:timer-note-draft:";
 
 /* A running timer as a .focus-card (partials/active_timers_*.html). Live
    figures are computed from `now`, which the parent ticks once a second, so
@@ -20,13 +19,11 @@ export function FocusCard({
   timer,
   now,
   children,
-  beforeStop,
 }: {
   timer: Timer;
   now: number;
   children?: ReactNode;
   /** Runs before navigating to the stop page (e.g. stash an unsaved note). */
-  beforeStop?: () => void;
 }) {
   const toast = useToast();
   const navigate = useNavigate();
@@ -108,7 +105,6 @@ export function FocusCard({
             if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
             const stopRequestedAt = Date.now();
-            beforeStop?.();
             navigate(urls.stopTimer(timer.id), { state: { stopRequestedAt } });
           }}
         >

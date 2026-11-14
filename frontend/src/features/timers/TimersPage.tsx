@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useLocation } from "react-router";
 import { faHistory, faPlay } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
@@ -81,16 +81,10 @@ function OutsideContextNotice() {
 }
 
 function TimerCard({ timer, now }: { timer: Timer; now: number }) {
-  const stash = useRef<() => void>(() => undefined);
   return (
-    <FocusCard timer={timer} now={now} beforeStop={() => stash.current()}>
+    <FocusCard timer={timer} now={now}>
       <TimerReminders timer={timer} />
-      <TimerNoteEditor
-        timer={timer}
-        registerStash={(fn) => {
-          stash.current = fn;
-        }}
-      />
+      <TimerNoteEditor timer={timer} />
     </FocusCard>
   );
 }

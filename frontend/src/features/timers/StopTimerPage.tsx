@@ -14,6 +14,7 @@ import { useInvalidate } from "@/api/sync";
 import type { Timer } from "@/api/types";
 import { elapsedSeconds, formatDurationWords, toDateTimeLocal } from "@/lib/format";
 import { updateQueuedStart } from "@/lib/offlineQueue";
+import { clearNoteDraft, holdNoteDraft, mergeNote, readNoteDraft, writeNoteDraft } from "@/lib/noteDrafts";
 import { useStopTimer, useTimers } from "./api";
 
 /* Stop a timer (stop_timer.html): adjust start/end, write the note (a draft
@@ -63,7 +64,18 @@ function StopForm({ timer, requestedAt, onSubmitting }: { timer: Timer; requeste
   const [start, setStart] = useState(initialStart);
   const [end, setEnd] = useState(() => toDateTimeLocal(openedAt.current));
   const [endTouched, setEndTouched] = useState(false);
-  const [note, setNote] = useState(timer.note ?? "");
+  /* Text typed on the Timers page that hasn't reached the server is on this
+     device (lib/noteDrafts); it carries over, and edits here are kept the
+     same way until the stop is recorded. */
+  const [note, setNoteText] = useState(() => {
+    const draft = readNoteDraft(timer.uuid);
+    return draft ? mergeNote(timer.note ?? "", draft.base, draft.note) : (timer.note ?? "");
+  });
+  const setNote = (next: string) => {
+    setNoteText(next);
+    if (timer.uuid) writeNoteDraft({ uuid: timer.uuid, project: timer.project.name, note: next, base: timer.note ?? "" });
+  };
+  useEffect(() => (timer.uuid ? holdNoteDraft(timer.uuid) : undefined), [timer.uuid]);
   const [allocations, setAllocations] = useState<{ subproject_id: number; allocation_bp: number }[] | null>(null);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [busy, setBusy] = useState(false);
@@ -112,11 +124,7 @@ function StopForm({ timer, requestedAt, onSubmitting }: { timer: Timer; requeste
         ...(allocations ? { allocations } : {}),
         end: endIso!,
       })) as Timer & { celebration?: { kind: Celebration; message: string } | null };
-      try {
-        window.sessionStorage.removeItem(`autumn:timer-note-draft:${timer.id}`);
-      } catch {
-        /* storage unavailable */
-      }
+      clearNoteDraft(timer.uuid);
       if (result.pending_sync) {
         toast.info("Stopped. Saved on this device; it syncs when Autumn is reachable.");
       } else if (result.celebration) {
@@ -201,7 +209,7 @@ function StopForm({ timer, requestedAt, onSubmitting }: { timer: Timer; requeste
               {endTouched ? <LocalTimeNotice field={endTime} label="the end" /> : null}
             </div>
           </div>
-          <NoteEditor id="id_note" value={note} onChange={setNote} draftKey={timer.id} placeholder="Session Note..." error={errors.note} />
+          <NoteEditor id="id_note" value={note} onChange={setNote} placeholder="Session Note..." error={errors.note} />
           <AllocationEditor items={items} onChange={setAllocations} collapsible />
         </section>
         <div className="form-actions">
