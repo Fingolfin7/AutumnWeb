@@ -498,8 +498,9 @@ export function flushQueue(): Promise<FlushReport> {
           report.dropped.push({ op, status: answer.status, message: messageOf(answer) });
           const gone = withDependents(after.ops, op).filter((o) => o.key !== op.key);
           for (const dependent of gone) {
-            /* A stop goes with its start, which is already reported. */
-            if (dependent.kind !== "stop") {
+            /* A stop goes with its start, which is already reported, unless
+               it carries a note the user would otherwise lose. */
+            if (dependent.kind !== "stop" || dependent.note) {
               report.dropped.push({ op: dependent, status: 0, message: `it used the ${describeOp(op)}, which couldn't sync.` });
             }
           }

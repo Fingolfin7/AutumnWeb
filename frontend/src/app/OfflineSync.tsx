@@ -52,7 +52,13 @@ export function OfflineSync() {
             if (report.synced && !report.remaining) toast.success(`Synced ${pluralize(report.synced, "offline change")}.`);
           }
           for (const drop of report.dropped) {
-            toast.error(`Couldn't sync the offline ${describeOp(drop.op)}: ${drop.message}`);
+            /* What was typed must not go with it: the message stays up and
+               offers the note. */
+            const note = (drop.op.kind === "stop" ? drop.op.note : drop.op.kind === "session" ? (drop.op.body.note as string | null | undefined) : null)?.trim();
+            toast.error(
+              `Couldn't sync the offline ${describeOp(drop.op)}: ${drop.message}`,
+              note ? { duration: 0, action: { label: "Copy its note", run: () => void navigator.clipboard?.writeText(note) } } : undefined,
+            );
           }
         })
         .then(syncNoteDrafts)

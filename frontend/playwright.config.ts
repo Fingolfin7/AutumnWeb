@@ -20,6 +20,9 @@ export default defineConfig({
   expect: { timeout: 7_500 },
   use: {
     baseURL,
+    // The demo profile is in UTC; a browser in another zone disagrees with it
+    // about "today" for a few hours around midnight.
+    timezoneId: "UTC",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },

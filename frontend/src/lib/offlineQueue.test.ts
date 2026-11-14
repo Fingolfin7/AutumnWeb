@@ -316,6 +316,8 @@ describe("ops that use what earlier ops create", () => {
       "project Bouldering: Unknown context.",
       "subproject Overhang of Bouldering: it used the project Bouldering, which couldn't sync.",
       "timer on Bouldering: it used the project Bouldering, which couldn't sync.",
+      /* Its stop carries a note, so it is named too and the note can be copied. */
+      "timer stop: it used the project Bouldering, which couldn't sync.",
       "logged session on Bouldering: it used the project Bouldering, which couldn't sync.",
     ]);
     expect(calls.map((c) => c.url)).toEqual(["/api/v2/projects/", "/api/v2/timers/"]);
