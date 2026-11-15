@@ -4,6 +4,7 @@ declare module "wordcloud" {
     gridSize?: number;
     weightFactor?: number | ((weight: number) => number);
     fontFamily?: string;
+    fontWeight?: string;
     color?: string | ((word: string, weight: number) => string);
     rotateRatio?: number;
     rotationSteps?: number;

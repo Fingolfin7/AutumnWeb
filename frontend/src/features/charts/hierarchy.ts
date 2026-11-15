@@ -1,4 +1,5 @@
-import { paletteColor } from "./data";
+import { fmtHours, paletteColor, withAlpha } from "./data";
+import { token } from "./theme";
 import type { AnyConfig, HierarchyNode, TallyRow } from "./payloads";
 
 /* Treemap (core/static/core/js/charts/hierarchy.js). The server sends
@@ -19,23 +20,23 @@ export function flattenHierarchy(data: HierarchyNode | TallyRow[]): { leaves: Tr
   const colorFor = (project: string) => (colors[project] ??= paletteColor(colorIndex++));
 
   if (!Array.isArray(data)) {
-    for (const context of data.children ?? []) {
-      for (const project of context.children ?? []) {
-        if (!((project.total_time ?? 0) > 0)) continue;
-        colorFor(project.name);
-        const subprojects = (project.children ?? []).filter((child) => (child.total_time ?? 0) > 0);
-        if (project.children?.length) {
-          for (const child of subprojects) leaves.push({ name: child.name, project: project.name, value: child.total_time! / 60 });
-        } else {
-          leaves.push({ name: project.name, project: project.name, value: project.total_time! / 60 });
-        }
+    /* Biggest project first, so each wears the colour it has on every kind. */
+    const projects = (data.children ?? []).flatMap((context) => context.children ?? []).sort((a, b) => (b.total_time ?? 0) - (a.total_time ?? 0));
+    for (const project of projects) {
+      if (!((project.total_time ?? 0) > 0)) continue;
+      colorFor(project.name);
+      const subprojects = (project.children ?? []).filter((child) => (child.total_time ?? 0) > 0);
+      if (project.children?.length) {
+        for (const child of subprojects) leaves.push({ name: child.name, project: project.name, value: child.total_time! / 60 });
+      } else {
+        leaves.push({ name: project.name, project: project.name, value: project.total_time! / 60 });
       }
     }
   }
 
   /* No hierarchy: fall back to flat project rows. */
   if (!leaves.length && Array.isArray(data)) {
-    data.forEach((row, index) => {
+    [...data].sort((a, b) => b.total_time - a.total_time).forEach((row, index) => {
       if (row.total_time > 0) {
         leaves.push({ name: row.name, project: row.name, value: row.total_time / 60 });
         colors[row.name] ??= paletteColor(index);
@@ -67,6 +68,9 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
   const { leaves, colors } = flattenHierarchy(data);
   if (!leaves.length) return null;
 
+  /* Projects are quiet tinted frames with their name as a caption; their
+     subprojects are solid tiles in the project's colour, with dark labels
+     (light text on these mid-tone fills is hard to read). */
   return {
     type: "treemap",
     data: {
@@ -75,52 +79,42 @@ export function treemapConfig(data: HierarchyNode | TallyRow[]): AnyConfig | nul
           tree: leaves,
           key: "value",
           groups: ["project", "name"],
-          spacing: 1,
-          borderWidth: 2,
-          borderColor: "rgba(255,255,255,0.8)",
+          spacing: 2,
+          borderWidth: 0,
+          borderRadius: 4,
           backgroundColor(context: TreemapContext) {
             if (context.type !== "data") return "transparent";
-            const project = projectOf(context.raw);
-            return project ? (colors[project] ?? "hsl(200, 70%, 60%)") : "transparent";
+            const color = colors[projectOf(context.raw) ?? ""] ?? token("--muted");
+            return context.raw._data?.name ? color : withAlpha(color, 0.22);
           },
+          captions: { display: true, align: "left", color: token("--ink"), font: { size: 12, weight: "600" }, padding: 4 },
           labels: {
             display: true,
-            align: "center",
-            position: "middle",
+            align: "left",
+            position: "top",
+            overflow: "hidden",
             formatter(context: TreemapContext) {
-              if (context.type !== "data") return "";
               const item = context.raw;
               const value = item.v || item.value || 0;
-              if (value < 0.5) return ""; // no labels on tiny boxes
-              /* A leaf carries its record in _data; a project container only
-                 has its group name in g. */
-              if (item._data?.name) return `${item._data.name}\n${value.toFixed(1)}h`;
-              if (item.g) return item.g;
-              return "";
+              return item._data?.name ? [item._data.name, fmtHours(value)] : "";
             },
-            color: "white",
-            font: { size: 11, weight: "bold" },
+            color: token("--ink-invert"),
+            font: [{ size: 12, weight: "600" }, { size: 11 }],
           },
         },
       ],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
       plugins: {
-        title: { display: true, text: "Time Distribution (Treemap)" },
         legend: { display: false },
         tooltip: {
           callbacks: {
             title(items: { raw: TreemapRaw }[]) {
-              if (!items.length) return "";
-              const item = items[0]!.raw;
-              return projectOf(item) || "";
+              return items.length ? projectOf(items[0]!.raw) || "" : "";
             },
             label(context: TreemapContext) {
               const item = context.raw;
-              const value = item.v || item.value || 0;
-              return `${item._data?.name || item.g || ""}: ${value.toFixed(2)} hours`;
+              return `${item._data?.name || item.g || ""}: ${fmtHours(item.v || item.value || 0)}`;
             },
           },
         },

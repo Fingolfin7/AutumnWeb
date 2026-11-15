@@ -210,3 +210,37 @@
 }
 .focus-note-link:hover,
 .focus-note-link:focus-visible { color: var(--brand); }
+/* Charts: the compare toggle sits with the chart picker; the period summary
+   heads the chart panel. */
+.chart-bar { flex-wrap: wrap; }
+.fields label.chart-compare-toggle { gap: var(--s2); padding: 0; color: var(--ink-2); cursor: pointer; }
+.chart-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s1) var(--s4);
+  margin-bottom: var(--s4);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.chart-compare p { margin: 0; }
+.chart-compare-total .mono { font-size: var(--fs-xl); font-weight: 600; color: var(--duration); }
+.chart-compare-change .mono { color: var(--ink); }
+/* Comparing in two panels (calendar, heatmap, wordcloud): one per period,
+   side by side where there is room for both, stacked on a phone. */
+#canvas_container.chart-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-items: start;
+  gap: var(--s4) var(--s5);
+  height: auto;
+}
+#canvas_container.chart-panels--stack { grid-template-columns: 1fr; }
+.chart-panel { margin: 0; min-width: 0; }
+.chart-panel figcaption { margin-bottom: var(--s2); font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.chart-panel + .chart-panel figcaption { color: var(--ink-2); font-weight: 400; }
+.chart-panel-box { position: relative; height: min(30rem, 58vh); }
+.chart-panels--calendar .chart-panel-box { height: auto; }
+.chart-panels--wordcloud .chart-panel-box { height: min(24rem, 48vh); }
+.chart-panel-box .empty { margin: 0; }
+.chart-compare-toggle .muted { font-size: var(--fs-sm); }

@@ -1,9 +1,9 @@
-import { buildSeries, consolidateTopN, dayKey, getChartUnit, parseDay, withAlpha } from "./data";
-import { groupScatter } from "./basic";
+import { bucketTotals, buildSeries, consolidateTopN, dayKey, getChartUnit, parseDay, periodDays, previousRange, withAlpha } from "./data";
+import { groupScatter, pieConfig, previousTallies } from "./basic";
 import { flattenHierarchy } from "./hierarchy";
 import { radarMetrics } from "./analysis";
 import { fontSizer } from "./wordcloud";
-import { buildChart, isEmptyPayload, parseKind } from "./build";
+import { buildChart, CHART_KINDS, COMPARE, isEmptyPayload, NO_COMPARE, parseKind, valueExtent } from "./build";
 
 describe("top N + Other", () => {
   const rows = [
@@ -18,8 +18,8 @@ describe("top N + Other", () => {
     expect(out.map((r) => r.name)).toEqual(["b", "c", "Other (3)"]);
     expect(out[2]).toMatchObject({ total_time: 16, _isOther: true });
   });
-  it("leaves short lists untouched", () => {
-    expect(consolidateTopN(rows, 5)).toBe(rows);
+  it("sorts short lists by time without folding", () => {
+    expect(consolidateTopN(rows, 5).map((r) => r.name)).toEqual(["b", "c", "a", "d", "e"]);
   });
 });
 
@@ -37,7 +37,6 @@ describe("daily series", () => {
     expect(set.other).toBe("Other (2)");
     expect(set.byDay["Other (2)"]).toEqual({ "2026-10-02": 0.5, "2026-10-03": 0.25 });
     expect(set.byDay["c"]).toBeUndefined();
-    expect(set.days).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
   });
   it("keeps every subproject series, sorted by name", () => {
     const set = buildSeries(rows);
@@ -82,6 +81,38 @@ describe("dates", () => {
     expect(withAlpha("#c98245", 0.2)).toBe("rgba(201, 130, 69, 0.2)");
     expect(withAlpha("hsl(210, 70%, 55%)", 0.6)).toBe("hsla(210, 70%, 55%, 0.6)");
     expect(withAlpha("red", 0.5)).toBe("red");
+  });
+});
+
+describe("previous period", () => {
+  it("is the same number of days, ending the day before", () => {
+    expect(previousRange({ start: "2026-10-01", end: "2026-10-31" })).toEqual({ start: "2026-08-31", end: "2026-09-30" });
+    expect(previousRange({ start: "2026-11-14", end: "2026-11-14" })).toEqual({ start: "2026-11-13", end: "2026-11-13" });
+    // Across a year end and a leap day.
+    expect(previousRange({ start: "2028-01-01", end: "2028-03-01" })).toEqual({ start: "2027-11-01", end: "2027-12-31" });
+    expect(previousRange({ start: "2026-10-02", end: "2026-10-01" })).toBeNull();
+  });
+  it("lays the previous period over this one", () => {
+    const shift = periodDays({ start: "2026-10-01", end: "2026-10-07" });
+    expect(shift).toBe(7);
+    expect([...bucketTotals([{ date: "2026-09-24", hours: 1 }, { date: "2026-09-24", hours: "0.5" }], "day", shift)]).toEqual([["2026-10-01", 1.5]]);
+  });
+  it("matches previous bars by name and folds the rest into Other", () => {
+    const rows = [{ name: "a", total_time: 60 }, { name: "Other (2)", total_time: 30, _isOther: true as const }];
+    expect(previousTallies(rows, [{ name: "a", total_time: 120 }, { name: "b", total_time: 60 }, { name: "z", total_time: 30 }])).toEqual([2, 1.5]);
+  });
+  it("is offered on every kind with a comparison, and refused with a reason on the rest", () => {
+    for (const kind of CHART_KINDS) expect(!!COMPARE[kind] !== !!NO_COMPARE[kind]).toBe(true);
+    expect(Object.keys(NO_COMPARE).sort()).toEqual(["bubble", "line", "radar", "treemap"]);
+  });
+  it("nests the previous ring, with a slice for time spent only before", () => {
+    const config = pieConfig([{ name: "a", total_time: 60 }], { projectLimit: 5, previous: [{ name: "a", total_time: 30 }, { name: "b", total_time: 90 }] });
+    expect(config.data.labels).toEqual(["a · ▲ 0.5 h", "Only in the previous period · ▼ 1.5 h"]);
+    expect(config.data.datasets.at(-1).data).toEqual([0.5, 1.5]);
+  });
+  it("finds the value range two panels share", () => {
+    expect(valueExtent("heatmap", [{ weekday: 0, hour: 1, average_hours: "0.5" }, { weekday: 1, hour: 2, average_hours: 2 }])).toEqual([0.5, 2]);
+    expect(valueExtent("wordcloud", [])).toEqual([0, 0]);
   });
 });
 
@@ -140,13 +171,13 @@ describe("payload handling", () => {
     expect(buildChart("treemap", { name: "All", children: [] }, { projectLimit: 7, subprojects: false })).toBeNull();
   });
   it("swaps in the subproject variants only for a project-name filter", () => {
-    const rows = [{ date: "2026-10-01", series: "a", hours: 1 }];
-    const titleOf = (subprojects: boolean) => {
-      const built = buildChart("stacked_area", rows, { projectLimit: 7, subprojects });
-      return built?.type === "chart" ? built.config.options?.plugins?.title?.text : undefined;
+    const rows = ["a", "b"].map((series) => ({ date: "2026-10-01", series, hours: 1 }));
+    const labelsOf = (subprojects: boolean) => {
+      const built = buildChart("stacked_area", rows, { projectLimit: 1, subprojects });
+      return built?.type === "chart" ? built.config.data.datasets.map((d: { label?: string }) => d.label) : [];
     };
-    expect(titleOf(false)).toBe("Daily Time by Project (Stacked)");
-    expect(titleOf(true)).toBe("Daily Time by Subproject (Stacked)");
+    expect(labelsOf(false)).toEqual(["a", "Other (1)"]);
+    expect(labelsOf(true)).toEqual(["a", "b"]);
   });
   it("builds every chart kind from a minimal payload", () => {
     const opts = { projectLimit: 7, subprojects: false };
