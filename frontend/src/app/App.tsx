@@ -8,6 +8,7 @@ import { Shell } from "./Shell";
 import { pages } from "./routePatterns";
 import { Skeleton } from "@/components/states";
 import { NotFound } from "./NotFound";
+import { PageError, PageLoadError } from "./PageError";
 import { ApiError } from "@/api/errors";
 import { useCrossTabSync } from "@/api/sync";
 import { setPageTitle } from "./title";
@@ -81,11 +82,17 @@ export function buildRoutes(): RouteObject[] {
   return [
     {
       element: <Layout />,
+      errorElement: <PageError />,
       children: [
         ...pages.map((page) => {
-          const Page = lazy(page.load);
+          const Page = lazy(() =>
+            page.load().catch((cause: unknown) => {
+              throw new PageLoadError(`Couldn't load ${page.title}`, { cause });
+            }),
+          );
           const Titled = titled(Page, page.title);
-          return { path: page.path, element: <Titled /> };
+          /* Its own error element, so the shell and its navigation stay. */
+          return { path: page.path, element: <Titled />, errorElement: <PageError /> };
         }),
         { path: "*", element: <NotFound /> },
       ],

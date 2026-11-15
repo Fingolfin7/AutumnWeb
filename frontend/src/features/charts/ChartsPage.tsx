@@ -122,8 +122,11 @@ export default function ChartsPage() {
       .map((project) => ({ id: project.id, label: project.name }));
   }, [projects.data, draft.context, draft.tags, draft.projects, contextId]);
 
-  const loading = chart.isPending || chart.isFetching || (!!before && previousChart.isPending);
-  const empty = !loading && !chart.isError && !built;
+  /* Offline with nothing saved for these filters: the request waits for a
+     connection, so say that rather than load forever. */
+  const waitingOffline = chart.isPending && chart.isPaused;
+  const loading = !waitingOffline && (chart.isPending || chart.isFetching || (!!before && previousChart.isPending && !previousChart.isPaused));
+  const empty = !loading && !waitingOffline && !chart.isError && !built;
 
   return (
     <>
@@ -322,7 +325,7 @@ export default function ChartsPage() {
           </div>
         ) : null}
 
-        {before && !empty && !chart.isError ? (
+        {before && !empty && !waitingOffline && !chart.isError ? (
           <CompareSummary
             now={totals.data ? totalHours(totals.data.data) : null}
             previous={previousTotals.data ? totalHours(previousTotals.data.data) : null}
@@ -332,6 +335,12 @@ export default function ChartsPage() {
         ) : null}
 
         {chart.isError ? <ErrorState error={chart.error} onRetry={() => void chart.refetch()} /> : null}
+
+        {waitingOffline ? (
+          <p className="empty" role="status">
+            You're offline, and this chart hasn't been saved on this device yet. It will load when you're back online.
+          </p>
+        ) : null}
 
         {empty ? (
           <p id="chart-empty" className="empty">
