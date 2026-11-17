@@ -305,7 +305,6 @@ class CommitmentAdmin(admin.ModelAdmin):
         "balance",
         "max_balance",
         "min_balance",
-        "last_reconciled",
     )
     list_filter = (
         "aggregation_type",
@@ -347,7 +346,6 @@ class CommitmentAdmin(admin.ModelAdmin):
         "min_balance",
         "active",
         "balance",
-        "last_reconciled",
         "needs_recompute",
         "ledger_start_at",
         "generation",
@@ -355,6 +353,12 @@ class CommitmentAdmin(admin.ModelAdmin):
     )
     list_editable = ()
     actions = ()
+
+    @admin.display(description="Balance")
+    def balance(self, obj):
+        from core.commitments import current_balance
+
+        return current_balance(obj)
 
     def has_add_permission(self, request):
         return False

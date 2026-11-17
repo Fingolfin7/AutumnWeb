@@ -6,8 +6,10 @@ from django.urls import reverse
 from freezegun import freeze_time
 from rest_framework.test import APIClient
 
+from core.commitments import current_balance
 from core.models import (
     Commitment,
+    CommitmentAdjustment,
     CommitmentPeriod,
     CommitmentRevision,
     Context,
@@ -473,9 +475,16 @@ class V2CommitmentRestartScopeTests(TestCase):
             commitment_type="time",
             period="weekly",
             target=300,
-            balance=-60,
+            ledger_start_at=datetime(2026, 1, 1, tzinfo=UTC),
             start_date="2026-01-01",
             active=False,
+        )
+        CommitmentAdjustment.objects.create(
+            commitment=commitment,
+            seq=1,
+            kind=CommitmentAdjustment.KIND_OPENING,
+            amount=-60,
+            effective_at=commitment.ledger_start_at,
         )
 
         response = self.client.post(
@@ -494,7 +503,7 @@ class V2CommitmentRestartScopeTests(TestCase):
         self.assertEqual(commitment.aggregation_type, "context")
         self.assertEqual(commitment.context, new_context)
         self.assertIsNone(commitment.project)
-        self.assertEqual(commitment.balance, -60)
+        self.assertEqual(current_balance(commitment), -60)
         self.assertEqual(
             response.json()["target"],
             {"kind": "context", "id": new_context.pk, "name": "Exercise"},
