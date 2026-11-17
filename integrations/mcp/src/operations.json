@@ -1650,6 +1650,19 @@
       },
       {
         "in": "query",
+        "name": "include",
+        "schema": {
+          "enum": [
+            "subprojects"
+          ],
+          "type": "string",
+          "minLength": 1
+        },
+        "description": "subprojects: add each project's subprojects to its row.\n\n* `subprojects` - subprojects",
+        "argument": "include"
+      },
+      {
+        "in": "query",
         "name": "limit",
         "schema": {
           "type": "integer",
@@ -1769,6 +1782,14 @@
           "type": "string",
           "minLength": 1,
           "description": "Comma-separated numeric IDs, resolved with the corresponding list tool."
+        },
+        "include": {
+          "enum": [
+            "subprojects"
+          ],
+          "type": "string",
+          "minLength": 1,
+          "description": "subprojects: add each project's subprojects to its row.\n\n* `subprojects` - subprojects"
         },
         "limit": {
           "type": "integer",
