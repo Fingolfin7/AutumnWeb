@@ -123,6 +123,24 @@ PUSH_ALLOWED_ENDPOINT_SUFFIXES = tuple(
 # Single-user install: registration is closed unless explicitly enabled.
 ALLOW_REGISTRATION = env.bool("ALLOW_REGISTRATION", default=False)
 
+# Use SMTP when configured; local development prints mail to the console.
+EMAIL_HOST = env("EMAIL_HOST", default="")
+EMAIL_PORT = env.int("EMAIL_PORT", default=587)
+EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS", default=True)
+EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="Autumn <noreply@localhost>")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_BACKEND = env(
+    "EMAIL_BACKEND",
+    default=(
+        "django.core.mail.backends.smtp.EmailBackend"
+        if EMAIL_HOST
+        else "django.core.mail.backends.console.EmailBackend"
+    ),
+)
+
 # Application definition
 
 INSTALLED_APPS = [

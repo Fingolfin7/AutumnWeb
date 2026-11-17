@@ -27,6 +27,7 @@
     </div>
 
     <div class="form-actions">
+        <a class="btn btn--ghost" href="{% url 'password_reset' %}">Forgot password?</a>
         {% if allow_registration %}
         <a class="btn btn--ghost" href="{% url 'register' %}">
             <i class="fa fa-user-plus" aria-hidden="true"></i> Register
