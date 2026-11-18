@@ -3598,13 +3598,14 @@
         "schema": {
           "enum": [
             "relevance",
-            "newest"
+            "newest",
+            "best"
           ],
           "type": "string",
           "default": "relevance",
           "minLength": 1
         },
-        "description": "relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. Without search the two are the same.\n\n* `relevance` - relevance\n* `newest` - newest",
+        "description": "relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. best: all matches (direct and related) by similarity to the search, best first; sessions without a vector follow newest first. Without search or when meaning-based search is unavailable (no key, AI off, no vectors, embedding failure), best is the same as relevance.\n\n* `relevance` - relevance\n* `newest` - newest\n* `best` - best",
         "argument": "ordering"
       },
       {
@@ -3742,12 +3743,13 @@
         "ordering": {
           "enum": [
             "relevance",
-            "newest"
+            "newest",
+            "best"
           ],
           "type": "string",
           "default": "relevance",
           "minLength": 1,
-          "description": "relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. Without search the two are the same.\n\n* `relevance` - relevance\n* `newest` - newest"
+          "description": "relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. best: all matches (direct and related) by similarity to the search, best first; sessions without a vector follow newest first. Without search or when meaning-based search is unavailable (no key, AI off, no vectors, embedding failure), best is the same as relevance.\n\n* `relevance` - relevance\n* `newest` - newest\n* `best` - best"
         },
         "project_ids": {
           "type": "string",
@@ -3797,7 +3799,7 @@
       "required": [],
       "additionalProperties": false
     },
-    "description": "Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Search needs every word (any order); quote a phrase to match it exactly. Add related=true with search to also include sessions that match it by meaning (similarity, 0.25 loose to 0.60 strict, sets how close; default: the account setting): the match field of each result says direct (the text contains the search) or related, and the default relevance ordering lists direct matches newest first, then related ones best first, as the Sessions page does; ordering=newest sorts all by date. Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
+    "description": "Search completed or active sessions by IDs, dates, search (project, subproject and note text) or note_snippet. Search needs every word (any order); quote a phrase to match it exactly. Add related=true with search to also include sessions that match it by meaning (similarity, 0.25 loose to 0.60 strict, sets how close; default: the account setting): the match field of each result says direct (the text contains the search) or related, and the default relevance ordering lists direct matches newest first, then related ones best first, as the Sessions page does; ordering=newest sorts all by date; ordering=best sorts all matches by similarity, with unembedded matches newest last (falls back to relevance when semantic search is unavailable). Set include=\"note\" when notes are needed. Responses include count and total; advance the offset using the returned count until the total is covered. Do not assume one page is the complete history. Set account explicitly for another Autumn account; resolve IDs in that same account.",
     "annotations": {
       "readOnlyHint": true,
       "destructiveHint": false,

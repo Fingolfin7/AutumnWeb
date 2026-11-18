@@ -7,7 +7,7 @@ from django.test import SimpleTestCase
 import httpx
 from openai import OpenAI
 
-from core.services.rerank import rerank
+from core.services.rerank import decision_scores, rerank
 
 
 def scored(pk, score):
@@ -18,7 +18,7 @@ def scored(pk, score):
 
 
 class RerankTests(SimpleTestCase):
-    def call(self, candidates, answers, *, status=200, **kwargs):
+    def call(self, candidates, answers, *, status=200, strict=False, **kwargs):
         requests = []
 
         def handle(request):
@@ -29,7 +29,8 @@ class RerankTests(SimpleTestCase):
         client = OpenAI(api_key="fictional-test-key", max_retries=0,
                         http_client=httpx.Client(transport=httpx.MockTransport(handle)))
         with patch("core.services.rerank.OpenAI", return_value=client):
-            result = rerank("fictional search", candidates, api_key="fictional-test-key", **kwargs)
+            fn = decision_scores if strict else rerank
+            result = fn("fictional search", candidates, api_key="fictional-test-key", **kwargs)
         return result, requests
 
     def test_scores_reorder_stably_and_build_bounded_request(self):
@@ -70,3 +71,12 @@ class RerankTests(SimpleTestCase):
             self.assertEqual(result[prefix:], list(range(prefix, count)))
             self.assertCountEqual(result, range(count))
             self.assertEqual(len(requests[0]["questions"]), prefix)
+
+    def test_decision_scores_preserves_refusals_and_raises_on_failure(self):
+        scores, _ = self.call([(1, "practice"), (2, "scales")],
+                              [scored(1, 3), {"type": "refusal", "name": "c2"}], strict=True)
+        self.assertEqual(scores, {1: 3, 2: None})
+        with self.assertRaises(ValueError):
+            self.call([(1, "practice")], [], strict=True)
+        with self.assertRaises(Exception):
+            self.call([(1, "practice")], [], status=503, strict=True)

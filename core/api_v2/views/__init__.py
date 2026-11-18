@@ -17,7 +17,7 @@ from .recommendations import (
     RecommendationUsageView,
     TimerRecommendationsView,
 )
-from .sessions import SessionDetailView, SessionRelatedSummaryView, SessionsView
+from .sessions import SessionBestMatchOrderView, SessionDetailView, SessionRelatedSummaryView, SessionsView
 from .timers import (
     TimerDetailView,
     TimerReminderDetailView,

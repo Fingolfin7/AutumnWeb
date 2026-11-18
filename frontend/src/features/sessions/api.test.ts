@@ -1,6 +1,6 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { QueuedOp } from "@/lib/offlineQueue";
-import { pendingSessions } from "./api";
+import { pendingSessions, readSessionOrder, saveSessionOrder } from "./api";
 
 it("lists a session logged offline as a row, with its note, length and subprojects", () => {
   const op = {
@@ -29,4 +29,19 @@ it("lists a session logged offline as a row, with its note, length and subprojec
     ],
   });
   expect(row!.id).toBeLessThan(0);
+});
+
+it("uses the device order only when the URL has no explicit choice, including blocked storage", () => {
+  saveSessionOrder("best");
+  expect(readSessionOrder(new URLSearchParams("search=piano"))).toBe("best");
+  expect(readSessionOrder(new URLSearchParams("search=piano&order=newest"))).toBe("newest");
+  const read = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+  try {
+    expect(readSessionOrder(new URLSearchParams("search=piano"))).toBe("newest");
+    expect(readSessionOrder(new URLSearchParams("search=piano&order=best"))).toBe("best");
+    expect(() => saveSessionOrder("best")).not.toThrow();
+  } finally {
+    read.mockRestore(); write.mockRestore(); localStorage.removeItem("autumn.sessions.order");
+  }
 });

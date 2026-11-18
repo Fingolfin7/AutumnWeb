@@ -71,7 +71,7 @@ CANDIDATE_LIMIT = 50
 # (?related_page= on Sessions and Projects). Sessions search (core.search.rank_sessions) and counted related
 # matches (Charts/Insights "Include related", the API's related=true) pass
 # limit=None: every match above the cutoff is kept, so nothing is silently
-# truncated. The cutoff is the only relevance control.
+# truncated. Optional Best match AI ordering can also admit near misses.
 RELATED_LIMIT = 5
 RRF_K = 60
 # Session vectors are scored this many rows at a time, so a search's memory
@@ -773,6 +773,7 @@ class RelatedOutcome:
     # slider can show how many a looser or stricter cutoff would give.
     collect_scores: bool = False
     scores: list = field(default_factory=list)
+    session_scores: dict = field(default_factory=dict)
 
     @property
     def unavailable(self):
@@ -794,7 +795,7 @@ class RelatedOutcome:
 
 
 def related_session_ids(
-    user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT, cutoff=None, outcome=None
+    user, sessions, keyword_sessions, term, *, limit=RELATED_LIMIT, cutoff=None, outcome=None, best=False
 ):
     """Ids of sessions in ``sessions`` that mean ``term`` but keyword search missed.
 
@@ -824,8 +825,13 @@ def related_session_ids(
     if outcome is not None:
         outcome.included = True
         outcome.cutoff = cutoff
-    floor = _scoring_floor(cutoff, outcome)
+    # Best match also scores direct matches below the related cutoff, with
+    # this same vector. The AI near-miss pool uses these scores too.
+    floor = -1.0 if best else _scoring_floor(cutoff, outcome)
     scores = session_scores(user, sessions, vector, cutoff=floor)
+    if best and outcome is not None:
+        outcome.session_scores = scores
+    scores = {pk: score for pk, score in scores.items() if score >= _scoring_floor(cutoff, outcome)}
     ranked = sorted(scores, key=lambda pk: (-scores[pk], pk))
 
     def keep(chunk):

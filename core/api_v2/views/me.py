@@ -79,6 +79,7 @@ def _preferences_payload(user):
         "luna_recommendation_effort": profile.luna_recommendation_effort,
         "ai_features_enabled": profile.ai_features_enabled,
         "related_similarity": profile.related_similarity,
+        "search_ranker": profile.search_ranker,
         "related_similarity_default": server_min_similarity(),
         "related_similarity_min": SIMILARITY_FLOOR,
         "related_similarity_max": SIMILARITY_CEILING,

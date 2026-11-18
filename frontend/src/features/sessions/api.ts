@@ -9,6 +9,7 @@ import { enqueue, isNetworkFailure, resolveRefs, type QueuedOp } from "@/lib/off
 
 export interface SessionFilters {
   search?: string;
+  ordering?: "best" | "relevance";
   start_date?: string;
   end_date?: string;
   context_ids?: string;
@@ -30,7 +31,8 @@ export const SESSION_PAGE = 30;
 
 /* One ranked list shared with API v2 and MCP (core.search.rank_sessions):
    with a search term and related=true the server returns direct matches
-   newest first, then related matches best first, each tagged by `match`. */
+   newest first, then related matches best first, or all by similarity with
+   ordering=best, each tagged by `match`. */
 export function sessionListQuery(filters: SessionFilters) {
   const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as SessionFilters;
   const searching = !!query.search;
@@ -47,7 +49,7 @@ export function sessionListQuery(filters: SessionFilters) {
               include: "note,note_html",
               limit: SESSION_PAGE,
               offset: pageParam,
-              ...(searching ? { related: true, ordering: "relevance" as const } : { ordering: "newest" as const }),
+              ...(searching ? { related: true, ordering: query.ordering ?? "relevance" } : { ordering: "newest" as const }),
             },
           },
         }),
@@ -60,6 +62,36 @@ export function sessionListQuery(filters: SessionFilters) {
 }
 
 export const useSessionList = (filters: SessionFilters) => useInfiniteQuery(sessionListQuery(filters));
+
+/** Explicit URL choice wins; older links use the last choice on this device. */
+export function readSessionOrder(params: URLSearchParams): "best" | "newest" {
+  const order = params.get("order");
+  if (order === "best" || order === "newest") return order;
+  try {
+    return localStorage.getItem("autumn.sessions.order") === "best" ? "best" : "newest";
+  } catch {
+    return "newest";
+  }
+}
+
+export function saveSessionOrder(order: "best" | "newest") {
+  try { localStorage.setItem("autumn.sessions.order", order); } catch { /* device storage unavailable */ }
+}
+
+export function useBestMatchOrder(filters: SessionFilters, depth: string, enabled: boolean) {
+  const { ordering: _ordering, ...rest } = filters;
+  const query = Object.fromEntries(Object.entries(rest).filter(([, value]) => value)) as typeof rest;
+  return useQuery({
+    queryKey: keys.sessions({ bestMatchOrder: query, depth }),
+    enabled,
+    staleTime: 10 * 60_000,
+    gcTime: 10 * 60_000,
+    retry: false,
+    queryFn: () => unwrap(api.GET("/api/v2/sessions/best-match-order/", {
+      params: { query: { ...query, related: true, active: false, include: "note,note_html" } },
+    })),
+  });
+}
 
 /* A finished session as the track endpoint takes it: plain data, so it can
    be queued and replayed. The server dedupes on `uuid`, so a replay or a

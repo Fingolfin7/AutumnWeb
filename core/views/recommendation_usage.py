@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from core.models import RecommendationUsage
+from core.services.recommendation_usage import provider_label
 
 
 @login_required
@@ -39,6 +40,7 @@ def recommendation_usage(request):
             cost_total=Sum("estimated_cost_usd"), average_ms=Avg("duration_ms"),
         ).order_by("provider", "auth_route")
         hits = rows.filter(event="cache_hit").values("provider").annotate(count=Count("id")).order_by("provider")
+        summary = [dict(row, provider_label=provider_label(row["provider"])) for row in summary]
         response = render(request, "core/recommendation_usage.html", {"summary": summary, "hits": hits, "days": days})
     response["Cache-Control"] = "no-store"
     return response

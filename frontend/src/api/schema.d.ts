@@ -860,6 +860,22 @@ export interface paths {
         patch: operations["sessions_partial_update"];
         trace?: never;
     };
+    "/api/v2/sessions/best-match-order/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["sessions_best_match_order_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/sessions/related-summary/": {
         parameters: {
             query?: never;
@@ -1949,6 +1965,7 @@ export interface components {
             bing_background?: boolean;
             nasa_apod_background?: boolean;
             luna_recommendation_effort?: components["schemas"]["LunaEffortEnum"];
+            search_ranker?: components["schemas"]["SearchRankerEnum"];
             ai_features_enabled?: boolean;
             /**
              * Format: double
@@ -2036,6 +2053,7 @@ export interface components {
             bing_background: boolean;
             nasa_apod_background: boolean;
             luna_recommendation_effort: string;
+            search_ranker: components["schemas"]["SearchRankerEnum"];
             ai_features_enabled: boolean;
             /** Format: double */
             related_similarity: number | null;
@@ -2181,6 +2199,7 @@ export interface components {
             cache_hits: components["schemas"]["RecommendationCacheHit"][];
         };
         RecommendationUsageSummary: {
+            provider_label: string;
             provider: string;
             model: string | null;
             effort: string | null;
@@ -2322,6 +2341,18 @@ export interface components {
             cadence: components["schemas"]["CadenceEnum"];
             message?: string;
             version?: number;
+        };
+        /**
+         * @description * `off` - off
+         *     * `top` - top
+         *     * `near` - near
+         * @enum {string}
+         */
+        SearchRankerEnum: "off" | "top" | "near";
+        SessionBestMatchOrderResponse: {
+            reranked: boolean;
+            added: number;
+            sessions: components["schemas"]["SessionListItem"][];
         };
         SessionListItem: {
             id: number;
@@ -4652,12 +4683,13 @@ export interface operations {
                 note_snippet?: string;
                 offset?: number;
                 /**
-                 * @description relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. Without search the two are the same.
+                 * @description relevance (default): direct matches newest first, then related matches best first, the order the Sessions page shows. newest: all by end time, newest first. best: all matches (direct and related) by similarity to the search, best first; sessions without a vector follow newest first. Without search or when meaning-based search is unavailable (no key, AI off, no vectors, embedding failure), best is the same as relevance.
                  *
                  *     * `relevance` - relevance
                  *     * `newest` - newest
+                 *     * `best` - best
                  */
-                ordering?: "relevance" | "newest";
+                ordering?: "relevance" | "newest" | "best";
                 project_ids?: string;
                 /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
                 related?: boolean;
@@ -4800,6 +4832,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionResource"];
+                };
+            };
+        };
+    };
+    sessions_best_match_order_retrieve: {
+        parameters: {
+            query?: {
+                active?: boolean;
+                context_ids?: string;
+                end_date?: string;
+                exclude_project_ids?: string;
+                exclude_subproject_ids?: string;
+                exclude_tag_ids?: string;
+                /** @description Comma-separated session IDs. */
+                ids?: string;
+                include?: string;
+                note_snippet?: string;
+                project_ids?: string;
+                /** @description With search, also include completed sessions that match it by meaning. Needs AI features and an OpenAI key on the account; otherwise ignored. */
+                related?: boolean;
+                /** @description Search project names, assigned subproject names and session notes. Every word must appear (in any of them, in any order); put a phrase in double quotes to match it as written. Common words such as "it" and "the" are ignored. */
+                search?: string;
+                /** @description How close a meaning-based match must be to count as related, from 0.25 (loose) to 0.60 (strict). Defaults to the account's setting (0.45 unless changed in Profile). Only used with search and related=true; the cutoff applied is echoed in the X-Autumn-Related-Similarity header. */
+                similarity?: number;
+                start_date?: string;
+                subproject_ids?: string;
+                tag_ids?: string;
+                uuid?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionBestMatchOrderResponse"];
                 };
             };
         };

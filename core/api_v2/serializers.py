@@ -391,14 +391,32 @@ class SessionListQuerySerializer(serializers.Serializer):
     ordering = serializers.ChoiceField(
         required=False,
         default="relevance",
-        choices=("relevance", "newest"),
+        choices=("relevance", "newest", "best"),
         help_text=(
             "relevance (default): direct matches newest first, then related "
             "matches best first, the order the Sessions page shows. newest: all "
-            "by end time, newest first. Without search the two are the same."
+            "by end time, newest first. best: all matches (direct and related) by "
+            "similarity to the search, best first; sessions without a vector follow "
+            "newest first. Without search or when meaning-based search is unavailable "
+            "(no key, AI off, no vectors, embedding failure), best is the same as relevance."
         ),
     )
     uuid = serializers.UUIDField(required=False)
+
+
+class SessionBestMatchOrderQuerySerializer(SessionListQuerySerializer):
+    """The same filters and representation as the list, without paging/order."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name in ("limit", "offset", "ordering"):
+            self.fields.pop(name)
+
+
+class SessionBestMatchOrderResponseSerializer(serializers.Serializer):
+    reranked = serializers.BooleanField()
+    added = serializers.IntegerField()
+    sessions = SessionListItemSerializer(many=True)
 
 
 class SessionRelatedSummaryQuerySerializer(SessionListQuerySerializer):
@@ -1200,6 +1218,7 @@ class PreferencesRequestSerializer(serializers.Serializer):
     luna_recommendation_effort = serializers.ChoiceField(
         required=False, choices=("low", "medium", "high", "xhigh", "max")
     )
+    search_ranker = serializers.ChoiceField(required=False, choices=("off", "top", "near"))
     ai_features_enabled = serializers.BooleanField(required=False)
     related_similarity = similarity_field(allow_null=True)
     active_context_id = serializers.IntegerField(required=False, allow_null=True, min_value=1)
@@ -1240,6 +1259,7 @@ class PreferencesResponseSerializer(PreferencesRequestSerializer):
     bing_background = serializers.BooleanField()
     nasa_apod_background = serializers.BooleanField()
     luna_recommendation_effort = serializers.CharField()
+    search_ranker = serializers.ChoiceField(choices=("off", "top", "near"))
     ai_features_enabled = serializers.BooleanField()
     related_similarity = serializers.FloatField(allow_null=True)
     related_similarity_default = serializers.FloatField()
@@ -1297,6 +1317,7 @@ class RecommendationUsageRequestSerializer(serializers.Serializer):
 
 
 class RecommendationUsageSummarySerializer(serializers.Serializer):
+    provider_label = serializers.CharField()
     provider = serializers.CharField()
     model = serializers.CharField(allow_null=True)
     effort = serializers.CharField(allow_null=True)

@@ -534,6 +534,8 @@ function ProfileEditor({
                 [provider]: { ...current[provider], ...patch },
               }))
             }
+            searchRanker={prefsD.searchRanker}
+            onSearchRanker={(searchRanker) => patchPrefsDraft({ searchRanker })}
             luna={prefsD.luna}
             onLuna={(luna) => patchPrefsDraft({ luna })}
             errors={errors}

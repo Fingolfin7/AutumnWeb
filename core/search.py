@@ -71,7 +71,7 @@ def search_projects(projects, term):
     return projects
 
 
-#: The one order for session lists: newest first, ties by id.
+#: Newest order for session lists, ties by id.
 SESSION_ORDER = ("-end_time", "-id")
 
 DIRECT = "direct"
@@ -84,7 +84,7 @@ class SessionSearch:
 
     ``direct`` is the keyword matches; ``related_ids`` the sessions that match
     the term by meaning but not by keyword, best first, every one above the
-    similarity cutoff. Ranked order is the direct matches newest first, then
+    similarity cutoff. Default order is the direct matches newest first, then
     the related ones best first, so an equivalent request lists the same
     sessions in the same order wherever it is made; each interface only
     chooses how much of it to show at a time.
@@ -93,6 +93,8 @@ class SessionSearch:
     sessions: QuerySet
     direct: QuerySet
     related_ids: list = field(default_factory=list)
+    ordered_ids: list | None = None
+    near_ids: list = field(default_factory=list)
 
     @cached_property
     def direct_total(self):
@@ -113,6 +115,10 @@ class SessionSearch:
 
     def page(self, offset, limit):
         """[(session, DIRECT|RELATED)] for ``offset``..``offset + limit`` of the ranked order."""
+        if self.ordered_ids is not None:
+            related = set(self.related_ids)
+            return [(session, RELATED if session.pk in related else DIRECT)
+                    for session in self.related_sessions(self.ordered_ids[offset:offset + limit])]
         rows = []
         if offset < self.direct_total:
             direct = self.direct.order_by(*SESSION_ORDER)[offset : offset + limit]
@@ -140,7 +146,7 @@ def keyword_sessions(sessions, term):
     return sessions
 
 
-def rank_sessions(sessions, term, *, user=None, related=False, cutoff=None, outcome=None):
+def rank_sessions(sessions, term, *, user=None, related=False, cutoff=None, outcome=None, best=False):
     """The SessionSearch of ``term`` within ``sessions``.
 
     With ``related`` (and the ``user`` whose OpenAI key pays for the query),
@@ -148,23 +154,43 @@ def rank_sessions(sessions, term, *, user=None, related=False, cutoff=None, outc
     matches; see core.services.semantic_search. ``sessions`` must already
     carry every other filter, because related matches are drawn from it.
     ``cutoff`` overrides the account's similarity cutoff. ``outcome`` (a
-    RelatedOutcome) records whether they could be added.
+    RelatedOutcome) records whether they could be added. ``best`` orders all
+    matches by similarity using the same query vector; unembedded direct
+    matches follow newest first. AI ordering may separately admit near misses.
     """
     term = (term or "").strip()
     direct = keyword_sessions(sessions, term)
     related_ids = []
-    if term and related:
+    if term and (related or best):
         if user is None:
             if outcome is not None:
                 outcome.requested = True
         else:
-            from core.services.semantic_search import related_session_ids
+            from core.services.semantic_search import RelatedOutcome, related_session_ids
+
+            if outcome is None:
+                outcome = RelatedOutcome()
 
             # Counted, not previewed: every match above the cutoff, no cap.
             related_ids = related_session_ids(
-                user, sessions, direct, term, limit=None, cutoff=cutoff, outcome=outcome
+                user, sessions, direct, term, limit=None, cutoff=cutoff, outcome=outcome, best=best
             )
-    return SessionSearch(sessions=sessions, direct=direct, related_ids=related_ids)
+            if not related:
+                related_ids = []
+    result = SessionSearch(sessions=sessions, direct=direct, related_ids=related_ids)
+    if best and outcome is not None and outcome.included:
+        direct_ids = list(direct.order_by(*SESSION_ORDER).values_list("pk", flat=True))
+        scores = outcome.session_scores
+        result.ordered_ids = sorted(direct_ids + related_ids, key=lambda pk: -scores.get(pk, -2))
+        matched = set(result.ordered_ids)
+        from core.services.semantic_search import SIMILARITY_FLOOR
+
+        result.near_ids = sorted(
+            (pk for pk, score in scores.items()
+             if pk not in matched and SIMILARITY_FLOOR <= score < outcome.cutoff),
+            key=lambda pk: (-scores[pk], pk),
+        )
+    return result
 
 
 def search_sessions(sessions, term, *, user=None, related=False, cutoff=None, outcome=None):

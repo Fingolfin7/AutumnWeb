@@ -66,6 +66,18 @@ def capture_usage(usage):
         row["estimated_cost_usd"] = cost.quantize(Decimal("0.00000001"))
         row["pricing"] = {"usd_per_million": {"input": rate}, "as_of": "2026-10-11",
                           "source": "https://developers.openai.com/api/docs/pricing"}
+    if row["provider"] == "luna-search" and "input_tokens" in row:
+        inputs = row["input_tokens"]
+        cached = min(row.get("cached_input_tokens", 0), inputs)
+        writes = min(row.get("cache_write_tokens", 0), inputs - cached)
+        rates = {"input": "0.10", "cached": "0.01", "write": "0.125", "output": "0"}
+        cost = ((inputs - cached - writes) * Decimal(rates["input"])
+                + cached * Decimal(rates["cached"]) + writes * Decimal(rates["write"])) / Decimal(1000000)
+        row["output_tokens"] = row.get("output_tokens", 0)
+        row["estimated_cost_usd"] = cost.quantize(Decimal("0.00000001"))
+        row["pricing"] = {"usd_per_million": rates, "as_of": "2026-11-18",
+                          "source": "https://developers.openai.com/api/docs/guides/decisions"}
+        return
     # Reasoning tokens are already included in output_tokens: never add twice.
     if row["model"] in {"gpt-5.6-luna", "gpt-6-luna"} and all(k in row for k in ("input_tokens", "output_tokens")):
         inputs, outputs = row["input_tokens"], row["output_tokens"]
@@ -87,3 +99,7 @@ def capture_usage(usage):
                           "source": "https://developers.openai.com/api/docs/pricing",
                           "cache_detail_reported": details is not None,
                           "unreported_cache_writes": "not included"}
+
+
+def provider_label(provider):
+    return {"luna-search": "Luna search ordering"}.get(provider, provider.title())
