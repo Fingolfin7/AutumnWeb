@@ -14,6 +14,7 @@ export interface Bootstrap {
     default_chart_end_date: string;
     openai_key_configured: boolean;
     related_similarity: number | null;
+    search_ranker: "off" | "top" | "near";
   };
   semantic_search: {
     default_similarity: number;
@@ -43,6 +44,7 @@ const FALLBACK: Bootstrap = {
     default_chart_end_date: "",
     openai_key_configured: false,
     related_similarity: null,
+    search_ranker: "off",
   },
   semantic_search: {
     default_similarity: 0.45,

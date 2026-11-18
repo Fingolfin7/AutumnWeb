@@ -21,10 +21,11 @@ export function applyMe(profile: Bootstrap["profile"], me: components["schemas"]
 /* The rest of the profile the app reads from the bootstrap, straight from a
    fresh preferences response. */
 export function applyPrefs(
-  fresh: Pick<Prefs, "timezone" | "default_chart_project_count" | "ai_features_enabled" | "related_similarity">,
+  fresh: Pick<Prefs, "timezone" | "default_chart_project_count" | "ai_features_enabled" | "related_similarity" | "search_ranker">,
 ) {
   const profile = bootstrap().profile;
   profile.related_similarity = fresh.related_similarity;
+  profile.search_ranker = fresh.search_ranker;
   profile.timezone = fresh.timezone;
   profile.default_chart_project_count = fresh.default_chart_project_count;
   profile.ai_features_enabled = fresh.ai_features_enabled;

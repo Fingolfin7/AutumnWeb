@@ -14,6 +14,7 @@ from core.api_v2.serializers import (
 )
 from core.models import RecommendationCache, RecommendationUsage
 from core.services import timer_suggestions
+from core.services.recommendation_usage import provider_label
 
 
 def _suggestion_payload(suggestion):
@@ -176,4 +177,6 @@ class RecommendationUsageView(V2APIView):
             .annotate(count=Count("id"))
             .order_by("provider")
         )
+        for row in summary:
+            row["provider_label"] = provider_label(row["provider"])
         return Response({"days": days, "summary": summary, "cache_hits": hits})

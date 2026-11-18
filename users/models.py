@@ -79,6 +79,11 @@ class Profile(models.Model):
         choices=(("low", "Low"), ("medium", "Medium"), ("high", "High"),
                  ("xhigh", "xHigh"), ("max", "Max")),
     )
+    search_ranker = models.CharField(
+        max_length=4, default="off",
+        choices=(("off", "Off"), ("top", "Top 30"),
+                 ("near", "Top 30 + near misses")),
+    )
     ai_features_enabled = models.BooleanField(
         # Off by default so a fresh account must not get AI access until the
         # operator grants it.

@@ -136,6 +136,7 @@ def bootstrap_payload(request):
             "default_chart_end_date": default_chart_end_date.isoformat(),
             "openai_key_configured": bool(profile.openai_api_key_enc),
             "related_similarity": profile.related_similarity,
+            "search_ranker": profile.search_ranker,
         },
         "semantic_search": {
             "default_similarity": server_min_similarity(),

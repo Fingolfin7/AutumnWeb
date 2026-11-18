@@ -30,6 +30,7 @@ const prefs = {
   bing_background: false,
   nasa_apod_background: false,
   luna_recommendation_effort: "xhigh",
+  search_ranker: "off",
   ai_features_enabled: false,
   related_similarity: null,
   related_similarity_default: 0.45,

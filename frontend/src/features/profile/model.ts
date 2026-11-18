@@ -51,6 +51,7 @@ export interface PrefsDraft {
   insightsUnit: FilterUnit;
   chartCount: string;
   luna: LunaEffort;
+  searchRanker: Prefs["search_ranker"];
   /** The Related slider's starting cutoff (the server default when unset). */
   similarity: number;
 }
@@ -80,6 +81,7 @@ export function prefsDraft(prefs: Prefs): PrefsDraft {
     insightsUnit: prefs.insights_default_filter_unit as FilterUnit,
     chartCount: String(prefs.default_chart_project_count),
     luna: prefs.luna_recommendation_effort as LunaEffort,
+    searchRanker: prefs.search_ranker,
     similarity: prefs.related_similarity ?? prefs.related_similarity_default,
   };
 }
@@ -172,6 +174,9 @@ export function prefsChanges(draft: PrefsDraft, server: Prefs): PrefsPatch | nul
   }
   if (server.ai_features_enabled && draft.luna !== server.luna_recommendation_effort) {
     patch.luna_recommendation_effort = draft.luna;
+  }
+  if (server.ai_features_enabled && draft.searchRanker !== server.search_ranker) {
+    patch.search_ranker = draft.searchRanker;
   }
   // Stored as null at the server default, so a later change of that default applies.
   const similarity =

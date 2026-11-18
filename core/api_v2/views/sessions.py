@@ -1,4 +1,15 @@
+import logging
+from statistics import median
+
 from .base import *
+from core.api_v2.serializers import SessionBestMatchOrderQuerySerializer, SessionBestMatchOrderResponseSerializer
+from core.models import RecommendationUsage
+from core.services import rerank
+from core.services.recommendation_usage import collect_attempts, provider_attempt
+from core.services.semantic_search import session_texts
+
+logger = logging.getLogger(__name__)
+
 class SessionsView(V2APIView):
     permission_classes = [IsAuthenticated]
 
@@ -29,6 +40,7 @@ class SessionsView(V2APIView):
             _session_queryset(request.user).filter(end_time__isnull=False),
             user=request.user,
             outcome=related_outcome(request),
+            best=pagination.validated_data["ordering"] == "best",
         )
         if pagination.validated_data["ordering"] == "newest":
             queryset = search.combined().order_by(*SESSION_ORDER)
@@ -108,6 +120,66 @@ class SessionsView(V2APIView):
             fields["uuid"] = data["uuid"]
         session = SessionMutationService.create_session(**fields)
         return Response(_serialize(session), status=status.HTTP_201_CREATED)
+
+
+class SessionBestMatchOrderView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="sessions_best_match_order_retrieve",
+        parameters=[SessionBestMatchOrderQuerySerializer],
+        responses=SessionBestMatchOrderResponseSerializer,
+    )
+    def get(self, request):
+        query = SessionBestMatchOrderQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        include = set(query.validated_data.get("include", []))
+        spec = SessionFilterSpec.from_query_params(request.query_params, request.user)
+        outcome = related_outcome(request)
+        search = spec.rank(
+            _session_queryset(request.user).filter(end_time__isnull=False),
+            user=request.user, outcome=outcome, best=True,
+        )
+        rows = search.page(0, rerank.LIMIT)
+        reranked, added = False, 0
+        depth = request.user.profile.search_ranker
+        # included confirms AI access, fresh vectors and a successful query
+        # embedding. No candidate text is sent without all three.
+        if depth in {"top", "near"} and outcome.included and rows:
+            api_key = request.user.profile.get_api_key("openai")
+            if api_key:
+                ids = [session.pk for session, _ in rows]
+                near = search.near_ids[:rerank.NEAR_MISS_POOL] if depth == "near" else []
+                texts = session_texts(search.sessions.filter(pk__in=ids + near))
+                with collect_attempts() as attempts:
+                    try:
+                        with provider_attempt("luna-search", rerank.MODEL, effort=depth, auth_route="api_key"):
+                            scores = rerank.decision_scores(
+                                spec.search, [(pk, texts[pk]) for pk in ids + near], api_key=api_key,
+                            )
+                        admitted = [pk for pk in near if scores[pk] is not None
+                                    and scores[pk] >= rerank.NEAR_MISS_THRESHOLD]
+                        answered = [score for score in scores.values() if score is not None]
+                        neutral = median(answered) if answered else 0
+                        best_order = sorted(ids + admitted, key=lambda pk: -outcome.session_scores.get(pk, -2))
+                        ordered = sorted(best_order, key=lambda pk: -(scores[pk] if scores[pk] is not None else neutral))
+                        found = {session.pk: (session, match) for session, match in rows}
+                        found.update((session.pk, (session, RELATED)) for session in search.related_sessions(admitted))
+                        rows = [found[pk] for pk in ordered]
+                        reranked, added = True, len(admitted)
+                    except Exception as exc:
+                        logger.warning("Best match AI ordering failed (%s); retaining similarity order", type(exc).__name__)
+                    finally:
+                        RecommendationUsage.objects.bulk_create([
+                            RecommendationUsage(user=request.user, **attempt) for attempt in attempts
+                        ])
+        sessions = []
+        for session, match in rows:
+            row = _serialize(session, include_note="note" in include, include_note_html="note_html" in include)
+            if spec.search is not None:
+                row["match"] = match
+            sessions.append(row)
+        return Response({"reranked": reranked, "added": added, "sessions": sessions})
 
 
 class SessionRelatedSummaryView(V2APIView):

@@ -42,11 +42,15 @@ export function AiSection({
   onKeyDraft,
   luna,
   onLuna,
+  searchRanker,
+  onSearchRanker,
   errors,
 }: {
   prefs: Prefs;
   keyDrafts: Record<KeyProvider, KeyDraft>;
   onKeyDraft: (provider: KeyProvider, patch: Partial<KeyDraft>) => void;
+  searchRanker: Prefs["search_ranker"];
+  onSearchRanker: (value: Prefs["search_ranker"]) => void;
   luna: LunaEffort;
   onLuna: (value: LunaEffort) => void;
   errors: Record<string, string[]>;
@@ -243,6 +247,19 @@ export function AiSection({
           );
         })}
       </div>
+
+      {prefs.ai_features_enabled && configured.openai ? (
+        <div className="profile-default-item profile-luna">
+          <label htmlFor="search_ranker">AI ordering for Best match</label>
+          <select id="search_ranker" value={searchRanker} onChange={(event) => onSearchRanker(event.target.value as Prefs["search_ranker"])}>
+            <option value="off">Off</option>
+            <option value="top">Top 30</option>
+            <option value="near">Top 30 + near misses</option>
+          </select>
+          <p className="muted">Uses your OpenAI key, gpt-6-luna, about $0.0005 per search. Reorders the top 30 Best match results 2–3 s after they load; "near misses" also checks 20 entries just below the cutoff and adds the relevant ones.</p>
+          <FieldErrors lines={errors.search_ranker} />
+        </div>
+      ) : null}
 
       <div className="profile-default-item profile-luna">
         <label htmlFor="luna_recommendation_effort">Luna recommendation effort</label>

@@ -101,6 +101,7 @@ MCP_EXCLUDED_OPERATION_IDS = {
     "timers_reminders_destroy",
     "timers_reminders_retrieve",
     "sessions_related_summary_retrieve",
+    "sessions_best_match_order_retrieve",
 }
 
 

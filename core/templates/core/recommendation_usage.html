@@ -6,7 +6,7 @@
   <p>API-equivalent USD estimates, not an OAuth bill. Output includes reasoning tokens; reasoning is not charged twice. Missing usage is unknown, not zero. Failed attempts with reported usage are included. Totals may undercount failures without usage and unreported cache-write charges.</p>
   {% for row in summary %}
   <section class="suggest-group">
-    <h2>{{ row.provider|title }} · {{ row.model }} {{ row.effort }} · {{ row.auth_route }}</h2>
+    <h2>{{ row.provider_label }} · {{ row.model }} {{ row.effort }} · {{ row.auth_route }}</h2>
     <p>{{ row.calls }} provider attempts · {{ row.failures }} failed · average {{ row.average_ms|floatformat:0 }} ms</p>
     <p>Input: {{ row.input_total|default_if_none:'unknown' }} · cached input: {{ row.cached_total|default_if_none:'unknown' }} · output: {{ row.output_total|default_if_none:'unknown' }} · reasoning (within output): {{ row.reasoning_total|default_if_none:'unknown' }}</p>
     <p>Estimated cost: {% if row.cost_total != None %}${{ row.cost_total|floatformat:6 }}{% else %}unknown{% endif %} · usage reported for {{ row.known_usage }}/{{ row.calls }} attempts · cost estimated for {{ row.known_cost }}/{{ row.calls }}</p>

@@ -16,6 +16,7 @@ from core.api_v2.views import (
     RecommendationUsageView,
     SessionDetailView,
     SessionRelatedSummaryView,
+    SessionBestMatchOrderView,
     SessionsView,
     TimerDetailView,
     TimerReminderDetailView,
@@ -252,6 +253,11 @@ urlpatterns = [
         name="timer-restart",
     ),
     path("sessions/", SessionsView.as_view(), name="sessions"),
+    path(
+        "sessions/best-match-order/",
+        SessionBestMatchOrderView.as_view(),
+        name="sessions-best-match-order",
+    ),
     path(
         "sessions/related-summary/",
         SessionRelatedSummaryView.as_view(),

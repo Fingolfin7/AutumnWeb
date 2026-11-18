@@ -22,12 +22,19 @@ the no-match query.
 Sessions score as in production: the better of the whole-note vector and the
 best passage of a long note. Pass --whole-only to score whole notes alone and
 compare (b9 buries the relevant sentence in a long log).
+
+--rerank compares the same page Related candidates and hybrid top 30 after
+Decisions scoring, without changing membership or the chosen cutoff. Requires
+OPENAI_API_KEY. --rerank-dry-run never calls a provider: it previews exact
+request bodies using keyword matches plus the fictional corpus as a stand-in
+candidate pool (semantic candidates and their cutoff need live embeddings).
 """
 
 import argparse
 from datetime import timedelta
 import json
 import logging
+import math
 import os
 import sys
 
@@ -48,7 +55,12 @@ from django.test.utils import setup_test_environment  # noqa: E402
 from django.utils import timezone  # noqa: E402
 
 from core.models import Projects, RecommendationUsage, Sessions, SubProjects  # noqa: E402
-from core.search import search_sessions  # noqa: E402
+from core.search import search_sessions, search_words  # noqa: E402
+from core.services.rerank import (  # noqa: E402
+    INPUT_COST_PER_MILLION,
+    build_request,
+    rerank,
+)
 from core.services.semantic_search import (  # noqa: E402
     RELATED_LIMIT,
     Embedder,
@@ -56,6 +68,7 @@ from core.services.semantic_search import (  # noqa: E402
     encode_vector,
     reciprocal_rank_fusion,
     session_scores,
+    session_text,
     sync_embeddings,
 )
 
@@ -173,6 +186,8 @@ def evaluate(keyword, semantic, grades, cutoff):
         return next((i for i, k in enumerate(ranking, 1) if k in relevant), None)
 
     return {
+        "page": keyword + related,
+        "hybrid": hybrid,
         "relevant": len(relevant),
         "keyword_recall": recall(keyword),
         "page_recall": recall(page),
@@ -218,6 +233,86 @@ def aggregate(rows):
 
 def pct(value):
     return "  -  " if value is None or value != value else f"{value * 100:5.1f}"
+
+
+def fictional_candidates(ranking):
+    return [(key, session_text(*CORPUS[key][:3])) for key in ranking]
+
+
+def ranking_metrics(ranking, grades):
+    relevant = {key for key, grade in grades.items() if grade >= 2}
+    rank = next((i for i, key in enumerate(ranking, 1) if key in relevant), None)
+    return {
+        "recall": len(relevant & set(ranking)) / len(relevant) if relevant else None,
+        "top5": len(relevant & set(ranking[:5])) / len(relevant) if relevant else None,
+        "rank": rank,
+        "mrr": (1 / rank if rank else 0) if relevant else None,
+    }
+
+
+def compare_reranking(rows, api_key):
+    usage = {"requests": 0, "failures": 0, "input_tokens": 0}
+    comparisons = []
+    print("\nDecisions comparison (same candidates/cutoff; @5 is recall@5):")
+    print(f"{'query / list':46} recall before/after   @5 before/after  first-hit before/after")
+    for (term, grades), row in zip(QUERIES, rows):
+        related = rerank(term, fictional_candidates(row["related"]), api_key=api_key, usage=usage)
+        hybrid = rerank(term, fictional_candidates(row["hybrid"]), api_key=api_key, usage=usage)
+        keyword_count = len(row["page"]) - len(row["related"])
+        reordered_page = row["page"][:keyword_count] + related
+        lists = {"Related": (row["related"], related), "page": (row["page"], reordered_page),
+                 "hybrid": (row["hybrid"], hybrid)}
+        comparison = {}
+        for label, (before, after) in lists.items():
+            assert len(before) == len(after) and set(before) == set(after)
+            original, reordered = ranking_metrics(before, grades), ranking_metrics(after, grades)
+            comparison[label] = {"before": original, "after": reordered, "ids": after}
+            print(f"{term + ' / ' + label:46} {pct(original['recall'])}/{pct(reordered['recall'])}  "
+                  f"{pct(original['top5'])}/{pct(reordered['top5'])}  "
+                  f"{original['rank'] or '-':>5}/{reordered['rank'] or '-':<5}")
+        comparisons.append(comparison)
+    totals = {}
+    print("\nlist       recall before/after   @5 before/after    MRR before/after")
+    for label in ("Related", "page", "hybrid"):
+        totals[label] = {
+            side: {metric: mean(c[label][side][metric] for c in comparisons)
+                   for metric in ("recall", "top5", "mrr")}
+            for side in ("before", "after")
+        }
+        before, after = totals[label]["before"], totals[label]["after"]
+        print(f"{label:10} {pct(before['recall'])}/{pct(after['recall'])}  "
+              f"{pct(before['top5'])}/{pct(after['top5'])}  {before['mrr']:.3f}/{after['mrr']:.3f}")
+    usage["estimated_cost_usd"] = usage["input_tokens"] * INPUT_COST_PER_MILLION / 1_000_000
+    print(f"Decisions: {usage['requests']} requests, {usage['failures']} fallback(s), "
+          f"{usage['input_tokens']} input tokens, estimated cost ${usage['estimated_cost_usd']:.6f} "
+          "(uncached rate; failed requests may have unreported usage).")
+    return {"aggregate": totals, "queries": dict(zip([t for t, _ in QUERIES], comparisons)), "usage": usage}
+
+
+def rerank_dry_run(args):
+    print("No network or database access. Candidate pools are keyword + fictional corpus stand-ins; "
+          "live semantic membership/cutoff may differ. Token estimates use JSON characters / 4, "
+          "including question instructions and levels; not a tokenizer or billing prediction.")
+    newest = sorted(CORPUS, key=lambda key: (CORPUS[key][3], list(CORPUS).index(key)))
+    texts = dict(fictional_candidates(newest))
+    requests, total_tokens = [], 0
+    for term, _ in QUERIES:
+        words = search_words(term)
+        keyword = [key for key in newest if all(word.casefold() in texts[key].casefold() for word in words)]
+        pools = {"Related": [key for key in newest if key not in keyword],
+                 "hybrid": keyword + [key for key in newest if key not in keyword]}
+        for label, ranking in pools.items():
+            body = build_request(term, fictional_candidates(ranking))
+            tokens = math.ceil(len(json.dumps(body, ensure_ascii=False)) / 4)
+            total_tokens += tokens
+            requests.append({"query": term, "list": label, "approx_input_tokens": tokens, "body": body})
+            print(f"{term} / {label}: {len(body['questions'])} questions, ~{tokens} input tokens")
+            print(json.dumps(body, ensure_ascii=False))
+    print(f"Dry run: {len(requests)} request bodies, ~{total_tokens} input tokens, "
+          f"estimated uncached cost ~${total_tokens * INPUT_COST_PER_MILLION / 1_000_000:.6f}.")
+    if args.json:
+        with open(args.json, "w", encoding="utf-8") as handle:
+            json.dump(requests, handle, indent=2, ensure_ascii=False)
 
 
 def run(args):
@@ -276,6 +371,8 @@ def run(args):
     print(f"  Related: {total['related_shown']} shown, precision {pct(total['related_precision'])}%, "
           f"shown for the no-match query: {total['empty_query_related']}")
 
+    reranked = compare_reranking(rows, api_key) if args.rerank else None
+
     if not args.keyword_only:
         print("\ncutoff  page-rec  hyb@5  related  precision  F0.5  no-match")
         for c in CUTOFFS:
@@ -289,7 +386,7 @@ def run(args):
         with open(args.json, "w", encoding="utf-8") as handle:
             json.dump({"cutoff": chosen, "aggregate": total, "sweep": sweep,
                        "queries": dict(zip([t for t, _ in QUERIES], rows)),
-                       "semantic": semantic}, handle, indent=2, default=str)
+                       "semantic": semantic, "rerank": reranked}, handle, indent=2, default=str)
 
 
 def main(argv=None):
@@ -298,7 +395,15 @@ def main(argv=None):
     parser.add_argument("--whole-only", action="store_true", help="Score whole notes only, without passages.")
     parser.add_argument("--cutoff", type=float, help="Report at this cutoff instead of the recommended one.")
     parser.add_argument("--json", help="Also write full results to this file.")
+    rerank_mode = parser.add_mutually_exclusive_group()
+    rerank_mode.add_argument("--rerank", action="store_true", help="Score fictional candidates with Decisions.")
+    rerank_mode.add_argument("--rerank-dry-run", action="store_true", help="Preview Decisions bodies without network.")
     args = parser.parse_args(argv)
+    if args.rerank and args.keyword_only:
+        parser.error("--rerank requires hybrid retrieval; omit --keyword-only.")
+    if args.rerank_dry_run:
+        rerank_dry_run(args)
+        return
 
     setup_test_environment()
     old_name = connection.settings_dict["NAME"]

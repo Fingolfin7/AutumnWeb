@@ -11,16 +11,18 @@ import { useAllProjects, useContexts, useQueuedOps, useTags } from "@/api/meta";
 import { formatDayDate, formatDuration } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
 import { SessionBand } from "./SessionBand";
-import { pendingSessions, useSessionList, type SessionFilters, type SessionRow } from "./api";
+import { readSessionOrder, saveSessionOrder, useBestMatchOrder, pendingSessions, useSessionList, type SessionFilters, type SessionRow } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { RelatedSlider } from "@/features/search/RelatedSlider";
 import { useRelatedSummary } from "@/features/search/api";
 import { fixed2, parseSimilarity, similarityScale } from "@/features/search/similarity";
+import { bootstrap } from "@/bootstrap";
 
 /* URL <-> filter state. The URL is the source of truth so a filtered view can
    be bookmarked, shared between devices and survives a reload. */
 interface FilterState {
   search: string;
+  order: "newest" | "best";
   start_date: string;
   end_date: string;
   context: string;
@@ -43,6 +45,7 @@ function readFilters(params: URLSearchParams): FilterState {
   const exclude = ids("exclude_projects");
   return {
     search: params.get("search") ?? "",
+    order: readSessionOrder(params),
     start_date: params.get("start_date") ?? "",
     end_date: params.get("end_date") ?? "",
     context: params.get("context") ?? "",
@@ -59,6 +62,7 @@ function writeFilters(state: FilterState): URLSearchParams {
   for (const key of ["search", "start_date", "end_date", "context", "note_snippet"] as const) {
     if (state[key]) params.set(key, state[key]);
   }
+  if (state.search) params.set("order", state.order);
   if (state.tags.length) params.set("tags", state.tags.join(","));
   if (state.projects.length) params.set(state.projectMode === "include" ? "include_projects" : "exclude_projects", state.projects.join(","));
   if (state.search && state.similarity !== null) params.set("similarity", fixed2(state.similarity));
@@ -78,7 +82,9 @@ export default function SessionsPage() {
   const tags = useTags();
   const contexts = useContexts();
 
+  const best = !!applied.search && semanticSearchAvailable() && applied.order === "best";
   const apiFilters: SessionFilters = {
+    ordering: best ? "best" : "relevance",
     search: applied.search,
     start_date: applied.start_date,
     end_date: applied.end_date,
@@ -95,7 +101,16 @@ export default function SessionsPage() {
   const summary = useRelatedSummary("sessions", relatedQuery, !!applied.search && semanticSearchAvailable());
   const relatedSummary = summary.data?.available ? summary.data : null;
 
-  const all: SessionRow[] = list.data?.pages.flatMap((page) => page.sessions) ?? [];
+  const depth = bootstrap().profile.search_ranker ?? "off";
+  const aiOrder = useBestMatchOrder(apiFilters, depth, best && depth !== "off" && list.isSuccess);
+  const ordered = best && aiOrder.data?.reranked ? aiOrder.data : null;
+  const seen = new Set<number>();
+  const all: SessionRow[] = (list.data?.pages.flatMap((page, index) => index === 0 && ordered ? ordered.sessions : page.sessions) ?? [])
+    .filter((row) => {
+      if (seen.has(row.id)) return false;
+      seen.add(row.id);
+      return true;
+    });
   /* Sessions logged on this device that haven't synced yet join the plain
      list (no search or filter but the header's context). */
   const ops = useQueuedOps();
@@ -108,7 +123,7 @@ export default function SessionsPage() {
       });
   const direct = [...waiting, ...all.filter((s) => s.match !== "related")].sort((a, b) => (waiting.length ? Date.parse(b.end ?? "") - Date.parse(a.end ?? "") : 0));
   const related = all.filter((s) => s.match === "related");
-  const total = (list.data?.pages[0]?.total ?? 0) + waiting.length;
+  const total = (list.data?.pages[0]?.total ?? 0) + waiting.length + (ordered?.added ?? 0);
   const groups = groupByDay(direct);
 
   const pills = describeFilters(applied, {
@@ -162,6 +177,16 @@ export default function SessionsPage() {
 
         <p className="filter-summary">
           <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
+          {applied.search && semanticSearchAvailable() ? (
+            <span role="group" aria-label="Search order">
+              {(["newest", "best"] as const).map((order) => (
+                <button key={order} className="btn btn--quiet" type="button" aria-pressed={applied.order === order}
+                  onClick={() => { saveSessionOrder(order); apply({ ...applied, order }); }}>
+                  {order === "best" ? "Best match" : "Newest"}
+                </button>
+              ))}
+            </span>
+          ) : null}
           {pills.map((pill) => (
             <span key={pill.label} className="filter-pill">
               {pill.label} <b>{pill.value}</b>
@@ -251,6 +276,18 @@ export default function SessionsPage() {
         </section>
       ) : list.isError ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
+      ) : best ? (
+        <section className="slab session-list" aria-label="Best match sessions">
+          <header className="day-head">
+            <span className="day-date">Best match</span>
+            <span className="muted" role="status">{ordered ? "AI-ordered" : aiOrder.isFetching ? "Ordering with AI…" : ""}</span>
+            <span className="day-total">{all.length < total ? `${all.length} of ${total}` : total}</span>
+          </header>
+          {relatedSummary ? <RelatedSlider summary={relatedSummary} loading={list.isFetching && !list.isFetchingNextPage} /> : null}
+          {all.length ? <ul className="band-list">
+            {all.map((session) => <SessionBand key={session.id} session={session} showDate showMatch />)}
+          </ul> : <Empty>No sessions match these filters.</Empty>}
+        </section>
       ) : groups.length ? (
         <section className="slab session-list" aria-label="Sessions">
           {groups.map((group) => (
@@ -279,7 +316,7 @@ export default function SessionsPage() {
         </section>
       ) : null}
 
-      {related.length || relatedSummary ? (
+      {!best && (related.length || relatedSummary) ? (
         <section className="slab session-list" aria-label="Related sessions">
           <header className="day-head">
             <span className="day-date">Related</span>

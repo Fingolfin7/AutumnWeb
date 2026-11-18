@@ -244,3 +244,5 @@
 .chart-panels--wordcloud .chart-panel-box { height: min(24rem, 48vh); }
 .chart-panel-box .empty { margin: 0; }
 .chart-compare-toggle .muted { font-size: var(--fs-sm); }
+
+.filter-summary [aria-pressed="true"] { color: var(--ink); background: var(--raised-2); }

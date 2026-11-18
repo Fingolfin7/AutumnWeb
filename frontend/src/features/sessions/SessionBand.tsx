@@ -13,7 +13,7 @@ import { useDeleteSession, type SessionRow } from "./api";
 /* One session row (partials/session_band.html). On phones the actions sit
    behind a horizontal swipe (CSS scroll-snap); on desktop they appear on
    hover/focus. `showDate` prefixes the day for rows outside a day group. */
-export function SessionBand({ session, showDate }: { session: SessionRow; showDate?: boolean }) {
+export function SessionBand({ session, showDate, showMatch }: { session: SessionRow; showDate?: boolean; showMatch?: boolean }) {
   const start = useStartTimer();
   const remove = useDeleteSession();
   const toast = useToast();
@@ -51,6 +51,7 @@ export function SessionBand({ session, showDate }: { session: SessionRow; showDa
             ) : null}
           </div>
           <div className="session-top">
+            {showMatch && session.match === "related" ? <small className="muted context-chip">related</small> : null}
             {pending ? (
               /* Logged offline: nothing on the server to open or edit yet. */
               <>
