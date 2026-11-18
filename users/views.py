@@ -1,7 +1,7 @@
-from .forms import UserRegisterForm
+from .forms import UserRegisterForm, UserPasswordResetForm
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib import messages
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView, PasswordResetView
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.http import HttpResponse, FileResponse, HttpResponseBadRequest
@@ -14,6 +14,7 @@ import logging
 import mimetypes
 import os
 import requests
+import smtplib
 
 logger = logging.getLogger('main')
 
@@ -35,6 +36,18 @@ def register(request):
     else:
         form = UserRegisterForm()
     return render(request, 'users/register.html', {'form': form})
+
+
+class CustomPasswordResetView(PasswordResetView):
+    form_class = UserPasswordResetForm
+
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except (smtplib.SMTPException, OSError):
+            logger.exception("Failed to send password reset email")
+            form.add_error(None, "Couldn't send the email right now. Try again later.")
+            return self.form_invalid(form)
 
 
 class CustomLoginView(LoginView):

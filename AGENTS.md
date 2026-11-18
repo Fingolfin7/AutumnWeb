@@ -129,6 +129,15 @@ VITE_DEV_SERVER=http://localhost:5173  # Dev only: load the UI from Vite instead
 ALLOWED_HOSTS=autumn.example.com,localhost  # Comma-separated; defaults to *
 SECURE_COOKIES=FALSE  # Only for a deployment served over plain HTTP; defaults to on when DEBUG is off (HTTPS-only login/CSRF cookies, 30-day HSTS via SECURE_HSTS_SECONDS)
 ALLOW_REGISTRATION=FALSE  # Registration is closed unless explicitly enabled
+# Email: configured provider is Brevo SMTP; no EMAIL_HOST uses the dev console backend.
+EMAIL_HOST=smtp-relay.brevo.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=<Brevo SMTP login>
+EMAIL_HOST_PASSWORD=<Brevo SMTP key>
+EMAIL_USE_TLS=TRUE
+EMAIL_TIMEOUT=10  # Seconds
+DEFAULT_FROM_EMAIL=Autumn <noreply@localhost>  # Use your verified sender in production; SERVER_EMAIL follows this
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend  # Optional override; otherwise chosen from EMAIL_HOST
 GOOGLE_OAUTH_CLIENT_ID=<google-web-client-id>
 GOOGLE_OAUTH_CLIENT_SECRET=<google-web-client-secret>
 GITHUB_OAUTH_CLIENT_ID=<github-oauth-client-id>

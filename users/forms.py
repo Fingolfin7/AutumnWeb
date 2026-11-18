@@ -1,7 +1,24 @@
 from django import forms
 from .models import DEFAULT_FILTER_UNIT_CHOICES, Profile
 from django.contrib.auth.models import User
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, UsernameField
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, UsernameField, PasswordResetForm
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+
+
+class UserPasswordResetForm(PasswordResetForm):
+    def send_mail(
+        self, subject_template_name, email_template_name, context,
+        from_email, to_email, html_email_template_name=None,
+    ):
+        # Django's default swallows send failures. Let the view show a retry error,
+        # while retaining Django's account filtering and token generation.
+        subject = "".join(render_to_string(subject_template_name, context).splitlines())
+        body = render_to_string(email_template_name, context)
+        message = EmailMultiAlternatives(subject, body, from_email, [to_email])
+        if html_email_template_name:
+            message.attach_alternative(render_to_string(html_email_template_name, context), "text/html")
+        message.send()
 
 
 class UserRegisterForm(UserCreationForm):
