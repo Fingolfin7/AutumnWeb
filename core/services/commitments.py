@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from core.commitments import (
     _ensure_ledger_initialized,
+    current_balance,
     snapshot_commitment_definition,
 )
 from core.models import (
@@ -149,7 +150,6 @@ class CommitmentEditService:
             "min_balance": definition.get("min_balance", -600),
             "active": definition.get("active", True),
             "notifications_enabled": definition.get("notifications_enabled", False),
-            "balance": 0,
             "generation": 1,
             "ledger_start_at": now,
             "needs_recompute": True,
@@ -340,14 +340,7 @@ class CommitmentEditService:
             recompute_commitment(commitment)
             commitment.refresh_from_db()
 
-        latest_balance = (
-            commitment.period_rows.filter(generation=prior_generation)
-            .order_by("-period_end", "-pk")
-            .values_list("balance_out", flat=True)
-            .first()
-        )
-        if latest_balance is None:
-            latest_balance = commitment.balance
+        latest_balance = current_balance(commitment)
 
         if "aggregation_type" in changes:
             new_aggregation = changes["aggregation_type"]
@@ -375,7 +368,7 @@ class CommitmentEditService:
         _validate_target(commitment.target)
         commitment.generation = prior_generation + 1
         commitment.ledger_start_at = now
-        commitment.balance = latest_balance if keep_balance else 0
+        commitment.__dict__.pop("_current_balance", None)
         commitment.needs_recompute = True
         commitment.version += 1
         commitment.full_clean()

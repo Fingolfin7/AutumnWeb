@@ -8,6 +8,7 @@ from freezegun import freeze_time
 from rest_framework.test import APIClient
 
 from core.commitments import (
+    current_balance,
     mutation_affects_ledger,
     reconcile_commitment,
     recompute_commitment,
@@ -40,7 +41,6 @@ class CommitmentReplayTests(TestCase):
             "period": "daily",
             "start_date": timezone.localdate(),
             "target": 100,
-            "balance": 0,
             "max_balance": 600,
             "min_balance": -600,
             "banking_enabled": True,
@@ -166,7 +166,7 @@ class CommitmentReplayTests(TestCase):
 
     @freeze_time("2026-04-01 12:00:00+00:00")
     def test_pre_anchor_mutation_is_accounting_noop(self):
-        commitment = self.commitment(balance=77, start_date=date(2026, 1, 1))
+        commitment = self.commitment(start_date=date(2026, 1, 1))
         anchor = timezone.now()
         definition = snapshot_commitment_definition(commitment)
         commitment.ledger_start_at = anchor
@@ -198,7 +198,7 @@ class CommitmentReplayTests(TestCase):
         recompute_commitment(commitment)
         commitment.refresh_from_db()
 
-        self.assertEqual(commitment.balance, 77)
+        self.assertEqual(current_balance(commitment), 77)
         self.assertFalse(commitment.needs_recompute)
         self.assertFalse(commitment.period_rows.exists())
 
@@ -224,10 +224,18 @@ class CommitmentReplayTests(TestCase):
     @freeze_time("2026-07-03 12:00:00+00:00")
     def test_non_banking_periods_record_accrual_without_moving_balance(self):
         commitment = self.commitment(
-            balance=42,
             banking_enabled=False,
             start_date=date(2026, 7, 1),
             target=10,
+        )
+        commitment.ledger_start_at = datetime(2026, 7, 1, tzinfo=UTC)
+        commitment.save(update_fields=["ledger_start_at"])
+        CommitmentAdjustment.objects.create(
+            commitment=commitment,
+            seq=1,
+            kind=CommitmentAdjustment.KIND_OPENING,
+            amount=42,
+            effective_at=commitment.ledger_start_at,
         )
         self.session(
             datetime(2026, 7, 1, 8, tzinfo=UTC),
@@ -240,4 +248,32 @@ class CommitmentReplayTests(TestCase):
         self.assertTrue(rows)
         self.assertEqual(rows[0].accrued_numerator, 600_000)
         self.assertTrue(all(row.balance_out == 42 for row in rows))
-        self.assertEqual(commitment.balance, 42)
+        self.assertEqual(current_balance(commitment), 42)
+
+    @freeze_time("2026-07-03 12:00:00+00:00")
+    def test_current_balance_matches_replay_and_ignores_future_adjustments(self):
+        commitment = self.commitment(start_date=date(2026, 7, 1))
+        self.assertEqual(current_balance(commitment), 0)
+        recompute_commitment(commitment)
+        CommitmentAdjustment.objects.create(
+            commitment=commitment,
+            seq=2,
+            kind=CommitmentAdjustment.KIND_MANUAL,
+            amount=17,
+            effective_at=timezone.now(),
+        )
+        CommitmentAdjustment.objects.create(
+            commitment=commitment,
+            seq=3,
+            kind=CommitmentAdjustment.KIND_MANUAL,
+            amount=1000,
+            effective_at=timezone.now() + timedelta(days=1),
+        )
+        fresh = Commitment.objects.get(pk=commitment.pk)
+        expected = current_balance(fresh)
+        self.assertEqual(expected, -183)
+        recompute_commitment(commitment)
+        with self.assertNumQueries(0):
+            self.assertEqual(current_balance(commitment), expected)
+        self.assertEqual(current_balance(Commitment.objects.get(pk=commitment.pk)), expected)
+        self.assertFalse(recompute_commitment(commitment))

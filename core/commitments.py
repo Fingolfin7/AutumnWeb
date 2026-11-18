@@ -296,11 +296,10 @@ def _local_midnight(day, zone):
 
 
 def _ensure_ledger_initialized(commitment: Commitment, now):
-    """Bootstrap commitments created after the data migration.
+    """Anchor directly-created commitments at their start-date midnight.
 
-    The migration itself anchors existing rows at its cutover instant. Until the
-    revision-edit service lands, newly-created legacy/v1 rows are anchored at
-    their start-date midnight so their first reconciliation retains v1 math.
+    Service-created commitments already have an anchor and a revision. Initial
+    credit, when present, is represented solely by an opening adjustment.
     """
     revision = (
         commitment.revisions.filter(
@@ -328,23 +327,6 @@ def _ensure_ledger_initialized(commitment: Commitment, now):
             effective_from_instant=anchor,
             status=CommitmentRevision.STATUS_ACTIVE,
             **definition,
-        )
-    if not commitment.adjustments.filter(
-        kind=CommitmentAdjustment.KIND_OPENING
-    ).exists():
-        next_seq = (
-            commitment.adjustments.order_by("-seq")
-            .values_list("seq", flat=True)
-            .first()
-            or 0
-        ) + 1
-        CommitmentAdjustment.objects.create(
-            commitment=commitment,
-            seq=next_seq,
-            kind=CommitmentAdjustment.KIND_OPENING,
-            amount=commitment.balance,
-            effective_at=anchor,
-            reason="Initial commitment opening balance",
         )
     return revision
 
@@ -501,9 +483,7 @@ def _revision_actual(revision, period_start, period_end, reference_instant):
 def _balance_at(commitment, reference_instant):
     """Read the persisted ledger balance through ``reference_instant``.
 
-    ``Commitment.balance`` is the current post-replay value.  An explicit
-    evaluation instant can be earlier than that value, so use the same event
-    ordering as :func:`recompute_commitment` for an as-of balance.  Closed rows
+    Use the same event ordering as :func:`recompute_commitment`. Closed rows
     already contain the canonical replay result; only adjustments after the
     latest closed row need to be applied here.  This keeps banking decisions
     tied to the canonical ledger without duplicating its clamp/accrual math.
@@ -511,7 +491,9 @@ def _balance_at(commitment, reference_instant):
     reference_instant = _aware_instant(reference_instant)
     anchor = commitment.ledger_start_at
     if anchor is None:
-        return commitment.balance
+        # Direct model creation starts at zero; nonzero openings are ledger
+        # adjustments, never a second source of balance state.
+        return 0
 
     rows = commitment.period_rows.filter(
         generation=commitment.generation,
@@ -539,6 +521,13 @@ def _balance_at(commitment, reference_instant):
         else:
             running += adjustment.amount
     return running
+
+
+def current_balance(commitment: Commitment) -> int:
+    """Read the current ledger balance, reusing a replay on this instance."""
+    if hasattr(commitment, "_current_balance"):
+        return commitment._current_balance
+    return _balance_at(commitment, timezone.now())
 
 
 def commitment_banking(evaluation):
@@ -579,7 +568,7 @@ def get_commitment_evaluation(commitment, reference_instant=None) -> dict:
             commitment.period, reference_instant
         )
         actual = commitment_actual(commitment, period_start, min(period_end, reference_instant))
-        balance = commitment.balance
+        balance = _balance_at(commitment, reference_instant)
         result = {
             "actual": round(actual, 2) if commitment.commitment_type == "time" else actual,
             "target": commitment.target,
@@ -730,13 +719,13 @@ def recompute_commitment(commitment: Commitment) -> bool:
     """Rebuild current-generation derived periods and replay their event stream."""
     locked = Commitment.objects.select_for_update().get(pk=commitment.pk)
     now = timezone.now()
-    old_balance = locked.balance
+    old_balance = _balance_at(locked, now)
     was_dirty = locked.needs_recompute
 
     if not locked.active:
         locked.needs_recompute = False
         locked.save(update_fields=["needs_recompute"])
-        commitment.balance = locked.balance
+        commitment._current_balance = old_balance
         commitment.needs_recompute = False
         commitment.ledger_start_at = locked.ledger_start_at
         commitment.generation = locked.generation
@@ -805,7 +794,9 @@ def recompute_commitment(commitment: Commitment) -> bool:
         derived_changed = True
 
     events = []
-    for adjustment in locked.adjustments.filter(effective_at__gte=anchor):
+    for adjustment in locked.adjustments.filter(
+        effective_at__gte=anchor, effective_at__lte=now
+    ):
         events.append((adjustment.effective_at, 0, adjustment.seq, adjustment))
     for row in period_rows:
         events.append((row.period_end, 1, row.period_start, row))
@@ -851,11 +842,10 @@ def recompute_commitment(commitment: Commitment) -> bool:
     # Manual adjustments are effective immediately and remain unclamped until a
     # period-close event. ``running`` is therefore the authoritative post-replay
     # balance even when the final event is an adjustment.
-    locked.balance = running
     locked.needs_recompute = False
-    locked.save(update_fields=["balance", "needs_recompute"])
+    locked.save(update_fields=["needs_recompute"])
 
-    commitment.balance = locked.balance
+    commitment._current_balance = running
     commitment.needs_recompute = False
     commitment.ledger_start_at = locked.ledger_start_at
     commitment.generation = locked.generation
@@ -865,7 +855,7 @@ def recompute_commitment(commitment: Commitment) -> bool:
     commitment.min_balance = locked.min_balance
     if activated:
         commitment._prefetched_objects_cache = {}
-    return derived_changed or was_dirty or old_balance != locked.balance
+    return derived_changed or was_dirty or old_balance != running
 
 
 def get_commitment_progress(commitment, reference_instant=None) -> dict:
@@ -1119,6 +1109,7 @@ def calculate_commitment_streak(commitment, num_periods=8) -> dict:
 
 def reconcile_commitment(commitment, force: bool = False) -> bool:
     """Compatibility wrapper for all v1/web lazy reconciliation call sites."""
+    commitment.__dict__.pop("_current_balance", None)
     state = Commitment.objects.only(
         "needs_recompute", "ledger_start_at", "generation"
     ).get(pk=commitment.pk)

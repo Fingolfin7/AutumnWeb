@@ -32,6 +32,7 @@ from core.commitments import (
     commitment_applies_to_project,
     commitment_applies_to_subproject,
     commitment_applies_to_tag,
+    current_balance,
     get_commitment_progress,
     reconcile_commitment,
 )
@@ -282,7 +283,7 @@ def serialize_commitment(commitment, *, reconcile=True, include_streak=False):
         "notifications_enabled": commitment.notifications_enabled,
         "max_balance": _unit_value(commitment.commitment_type, commitment.max_balance),
         "min_balance": _unit_value(commitment.commitment_type, commitment.min_balance),
-        "balance": _unit_value(commitment.commitment_type, commitment.balance),
+        "balance": _unit_value(commitment.commitment_type, current_balance(commitment)),
         "current_surplus": _unit_value(
             commitment.commitment_type,
             current_period["accrued"] - current_period["target"],
@@ -637,7 +638,7 @@ class CommitmentAdjustmentsView(V2APIView):
                 "effective_at": _iso(adjustment.effective_at),
                 "reason": adjustment.reason,
                 "balance": _unit_value(
-                    commitment.commitment_type, commitment.balance
+                    commitment.commitment_type, current_balance(commitment)
                 ),
             },
             status=status.HTTP_201_CREATED,

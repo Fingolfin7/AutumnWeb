@@ -1058,7 +1058,6 @@ class Commitment(models.Model):
     target = models.PositiveIntegerField(help_text='Minutes (time) or count (sessions)')
 
     # Banking
-    balance = models.IntegerField(default=0)
     max_balance = models.PositiveIntegerField(default=600, help_text='Maximum balance cap (10 hours default)')
     min_balance = models.IntegerField(default=-600, help_text='Minimum balance cap (10 hours deficit default)')
     banking_enabled = models.BooleanField(default=True)
@@ -1066,7 +1065,6 @@ class Commitment(models.Model):
 
     active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    last_reconciled = models.DateTimeField(null=True, blank=True)
     needs_recompute = models.BooleanField(default=False, db_default=False)
     ledger_start_at = models.DateTimeField(null=True, blank=True)
     generation = models.IntegerField(default=1, db_default=1)

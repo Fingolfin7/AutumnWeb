@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from freezegun import freeze_time
 
-from core.commitments import recompute_commitment
+from core.commitments import current_balance, recompute_commitment
 from core.models import (
     CommitmentAdjustment,
     CommitmentRevision,
@@ -106,20 +106,27 @@ class CommitmentRevisionServiceTests(TestCase):
                 keep.pk, user=self.user, changes={"target": 30}
             )
         with freeze_time("2026-01-02 13:00:00+00:00"):
+            CommitmentAdjustment.objects.create(
+                commitment=keep,
+                seq=1,
+                kind=CommitmentAdjustment.KIND_MANUAL,
+                amount=17,
+                effective_at=datetime(2026, 1, 2, 12, 30, tzinfo=UTC),
+            )
             CommitmentEditService.restart(
                 keep.pk, user=self.user, keep_balance=True, changes=None
             )
 
         keep.refresh_from_db()
         carry = keep.adjustments.get(kind=CommitmentAdjustment.KIND_RESTART_CARRY)
-        self.assertEqual(carry.amount, 60)
+        self.assertEqual(carry.amount, 77)
         self.assertFalse(keep.revisions.filter(status="pending").exists())
         self.assertEqual(keep.period_rows.filter(generation=1).count(), 1)
         self.assertFalse(keep.period_rows.filter(generation=2).exists())
         with freeze_time("2026-01-03 12:00:00+00:00"):
             recompute_commitment(keep)
         new_keep_row = keep.period_rows.get(generation=2)
-        self.assertEqual((new_keep_row.carryover_in, new_keep_row.balance_out), (60, 0))
+        self.assertEqual((new_keep_row.carryover_in, new_keep_row.balance_out), (77, 17))
 
         reset_project = self.project("Reset")
         with freeze_time("2026-01-01 12:00:00+00:00"):
@@ -208,7 +215,7 @@ class CommitmentRevisionServiceTests(TestCase):
         with freeze_time("2026-01-02 12:00:00+00:00"):
             recompute_commitment(commitment)
             commitment.refresh_from_db()
-            frozen_balance = commitment.balance
+            frozen_balance = current_balance(commitment)
             frozen_count = commitment.period_rows.count()
             CommitmentEditService.edit(
                 commitment.pk, user=self.user, changes={"active": False}
@@ -229,7 +236,7 @@ class CommitmentRevisionServiceTests(TestCase):
 
         commitment.refresh_from_db()
         self.assertEqual(commitment.period_rows.filter(generation=1).count(), frozen_count)
-        self.assertEqual(commitment.balance, frozen_balance)
+        self.assertEqual(current_balance(commitment), frozen_balance)
         self.assertTrue(commitment.active)
         self.assertEqual(commitment.generation, 2)
         self.assertEqual(commitment.version, 3)
