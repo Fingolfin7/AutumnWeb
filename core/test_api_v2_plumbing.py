@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.http import QueryDict
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from freezegun import freeze_time
@@ -24,6 +24,27 @@ class ValidationProbeView(V2APIView):
 
     def get(self, request):
         raise ValidationError({"project_ids": ["Invalid project IDs."]})
+
+
+class SessionCorsTests(SimpleTestCase):
+    @override_settings(CORS_ALLOWED_ORIGINS=["https://fingolfin7.github.io"])
+    def test_cross_origin_session_patch_accepts_if_match(self):
+        origin = "https://fingolfin7.github.io"
+        response = self.client.options(
+            reverse("api_v2:session-detail", args=[1]),
+            HTTP_ORIGIN=origin,
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="PATCH",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization,content-type,if-match",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["Access-Control-Allow-Origin"], origin)
+        self.assertIn("PATCH", response.headers["Access-Control-Allow-Methods"])
+        allowed_headers = {
+            value.strip().lower()
+            for value in response.headers["Access-Control-Allow-Headers"].split(",")
+        }
+        self.assertTrue({"authorization", "content-type", "if-match"} <= allowed_headers)
 
 
 class V2EndpointTests(TestCase):
