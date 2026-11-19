@@ -133,7 +133,7 @@ export function Composer({
             {note.profileLink ? (
               <>
                 {" "}
-                <AppLink href={urls.profile()} className="plain-link">
+                <AppLink href={urls.settings("ai")} className="plain-link">
                   Profile
                 </AppLink>
                 .

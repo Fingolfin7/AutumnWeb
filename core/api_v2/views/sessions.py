@@ -6,9 +6,27 @@ from core.api_v2.serializers import SessionBestMatchOrderQuerySerializer, Sessio
 from core.models import RecommendationUsage
 from core.services import rerank
 from core.services.recommendation_usage import collect_attempts, provider_attempt
-from core.services.semantic_search import session_texts
+from core.services.semantic_search import matching_passages, session_texts
 
 logger = logging.getLogger(__name__)
+
+
+def _list_rows(request, rows, *, searching, include_note, include_note_html):
+    """List rows; a search tags each match, and a related one with a note
+    also carries the passage it matched on."""
+    passages = {}
+    if searching and (include_note or include_note_html):
+        related = [session for session, match in rows if match == RELATED]
+        passages = matching_passages(request.user, related, related_outcome(request).query_embedding)
+    out = []
+    for session, match in rows:
+        row = _serialize(session, include_note=include_note, include_note_html=include_note_html)
+        if searching:
+            row["match"] = match
+            if session.pk in passages:
+                row["match_passage"] = passages[session.pk]
+        out.append(row)
+    return out
 
 class SessionsView(V2APIView):
     permission_classes = [IsAuthenticated]
@@ -53,16 +71,9 @@ class SessionsView(V2APIView):
         else:
             total = search.total
             rows = search.page(offset, limit)
-        sessions = []
-        for session, match in rows:
-            row = _serialize(
-                session,
-                include_note=include_note,
-                include_note_html=include_note_html,
-            )
-            if spec.search is not None:
-                row["match"] = match
-            sessions.append(row)
+        sessions = _list_rows(
+            request, rows, searching=spec.search is not None, include_note=include_note, include_note_html=include_note_html
+        )
         return Response({"count": len(sessions), "total": total, "sessions": sessions})
 
     @extend_schema(
@@ -173,12 +184,9 @@ class SessionBestMatchOrderView(V2APIView):
                         RecommendationUsage.objects.bulk_create([
                             RecommendationUsage(user=request.user, **attempt) for attempt in attempts
                         ])
-        sessions = []
-        for session, match in rows:
-            row = _serialize(session, include_note="note" in include, include_note_html="note_html" in include)
-            if spec.search is not None:
-                row["match"] = match
-            sessions.append(row)
+        sessions = _list_rows(
+            request, rows, searching=spec.search is not None, include_note="note" in include, include_note_html="note_html" in include
+        )
         return Response({"reranked": reranked, "added": added, "sessions": sessions})
 
 

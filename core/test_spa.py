@@ -61,6 +61,14 @@ class SpaViewTests(TestCase):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get("/no/such/page/").status_code, 404)
 
+    def test_old_settings_bookmarks_redirect_with_their_query(self, _manifest):
+        self.client.force_login(self.user)
+        for old, section in (("profile", "account"), ("contexts", "contexts"), ("tags", "tags"), ("notifications", "notifications"), ("import", "import"), ("export", "export")):
+            with self.subTest(old=old):
+                self.assertRedirects(self.client.get(f"/{old}/?edit=7"), f"/settings/{section}/?edit=7")
+        self.assertContains(self.client.get("/settings/ai/"), 'id="autumn-bootstrap"')
+        self.assertEqual(self.client.get("/settings/unknown/").status_code, 404)
+
     def test_api_and_static_paths_are_not_swallowed(self, _manifest):
         self.client.force_login(self.user)
         self.assertEqual(self.client.get("/api/v2/definitely-missing/").status_code, 404)

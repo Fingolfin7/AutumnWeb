@@ -5,13 +5,15 @@ import { Icon } from "@/components/Icon";
 import { Sheet } from "@/components/Sheet";
 import { OptionPicker } from "@/components/OptionPicker";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
+import { SegmentedControl } from "@/components/ui";
+import { JournalDensityControl } from "@/components/SessionNote";
 import { AppLink, urls } from "@/app/links";
 import { useActiveContext } from "@/app/context";
 import { useAllProjects, useContexts, useQueuedOps, useTags } from "@/api/meta";
-import { formatDayDate, formatDuration } from "@/lib/format";
+import { formatJournalDate, formatJournalDuration, localDateKey } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
-import { SessionBand } from "./SessionBand";
-import { readSessionOrder, saveSessionOrder, useBestMatchOrder, pendingSessions, useSessionList, type SessionFilters, type SessionRow } from "./api";
+import { JournalDay, SessionBand } from "./SessionBand";
+import { readSessionOrder, saveSessionOrder, useBestMatchOrder, pendingSessions, useSessionList, useSessionTotals, type SessionFilters, type SessionRow } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { RelatedSlider } from "@/features/search/RelatedSlider";
 import { useRelatedSummary } from "@/features/search/api";
@@ -125,6 +127,11 @@ export default function SessionsPage() {
   const related = all.filter((s) => s.match === "related");
   const total = (list.data?.pages[0]?.total ?? 0) + waiting.length + (ordered?.added ?? 0);
   const groups = groupByDay(direct);
+  const totals = useSessionTotals(apiFilters, filtered);
+  const preset = PRESETS.find((label) => {
+    const range = sessionRange(label);
+    return applied.start_date === range.start_date && applied.end_date === range.end_date;
+  }) ?? (applied.start_date || applied.end_date ? "Custom" : "All");
 
   const pills = describeFilters(applied, {
     projects: projects.data ?? [],
@@ -142,69 +149,101 @@ export default function SessionsPage() {
     apply({ ...applied, search: searchText.trim() });
   };
 
+  const clearPill = (label: string) => {
+    const reset = readFilters(new URLSearchParams());
+    const fields: Record<string, (keyof FilterState)[]> = { From: ["start_date"], To: ["end_date"], Context: ["context"], Note: ["note_snippet"], Tags: ["tags"], Only: ["projects"], Excluding: ["projects"] };
+    const next = { ...applied };
+    for (const key of fields[label] ?? []) Object.assign(next, { [key]: reset[key] });
+    setParams(writeFilters(next));
+  };
+
   return (
-    <>
-      <h1 className="sr-only">Sessions</h1>
-      <form className="fields" onSubmit={onSearch} role="search">
-        <div className="searchbar">
-          <Icon icon={faSearch} className="muted" />
-          <label className="sr-only" htmlFor="content-search">
-            Search projects, subprojects, and session notes
-          </label>
-          <input
-            id="content-search"
-            type="search"
-            placeholder="Projects, subprojects, or notes"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-          />
-          <button className="btn btn--primary" type="submit">
-            Search
-          </button>
+    <div className="sessions-page">
+      <div className="journal-title">
+        <h1 className="page-title">Sessions</h1>
+        {all.length || waiting.length ? <JournalDensityControl /> : null}
+      </div>
+      <form className="fields journal-search" onSubmit={onSearch} role="search">
+        <div className="journal-controls">
+          <div className="searchbar">
+            <Icon icon={faSearch} className="muted" />
+            <label className="sr-only" htmlFor="content-search">
+              Search projects, subprojects, and session notes
+            </label>
+            <input
+              id="content-search"
+              type="search"
+              enterKeyHint="search"
+              placeholder="Search sessions"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+            />
+            {searchText ? (
+              <button className="search-clear btn-icon" type="button" aria-label="Clear search" onClick={() => { setSearchText(""); apply({ ...applied, search: "" }); }}>
+                &times;
+              </button>
+            ) : null}
+          </div>
           <button
             className="filter-launcher"
             type="button"
             aria-haspopup="dialog"
+            aria-label={`Filters${pills.length ? `, ${pills.length} active` : ""}`}
             onClick={() => {
               setDraft(applied);
               setSheetOpen(true);
             }}
           >
-            <Icon icon={faSlidersH} /> Filters
+            <Icon icon={faSlidersH} /> <span>Filters</span>
             {pills.length ? <span className="filter-count">{pills.length}</span> : null}
           </button>
+          <SegmentedControl
+            label="Session dates"
+            value={preset}
+            options={["All", ...PRESETS, ...(preset === "Custom" ? ["Custom"] : [])].map((label) => ({ value: label, label }))}
+            onChange={(value) => {
+              if (value === "Custom") return;
+              apply({ ...applied, ...(value === "All" ? { start_date: "", end_date: "" } : sessionRange(value)) });
+            }}
+          />
         </div>
 
-        <p className="filter-summary">
-          <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
-          {applied.search && semanticSearchAvailable() ? (
-            <span role="group" aria-label="Search order">
-              {(["newest", "best"] as const).map((order) => (
-                <button key={order} className="btn btn--quiet" type="button" aria-pressed={applied.order === order}
-                  onClick={() => { saveSessionOrder(order); apply({ ...applied, order }); }}>
-                  {order === "best" ? "Best match" : "Newest"}
-                </button>
-              ))}
-            </span>
-          ) : null}
-          {pills.map((pill) => (
-            <span key={pill.label} className="filter-pill">
-              {pill.label} <b>{pill.value}</b>
-            </span>
-          ))}
-          {pills.length || applied.search ? (
-            <button
-              className="btn btn--quiet"
-              type="button"
-              onClick={() => {
-                setSearchText("");
-                setParams(new URLSearchParams());
-              }}
-            >
-              Clear
-            </button>
-          ) : null}
-        </p>
+        {filtered ? (
+          <div className="journal-filter-line">
+            <p className="filter-summary">
+              <span className="result-count">{list.isPending ? "…" : total}</span> session{total === 1 ? "" : "s"}
+              {totals.data ? <> · <strong className="journal-filter-total">{formatJournalDuration(totals.data.total_minutes)}</strong></> : null}
+            </p>
+            {applied.search && semanticSearchAvailable() ? (
+              <span className="journal-order" role="group" aria-label="Search order">
+                {(["newest", "best"] as const).map((order) => (
+                  <button key={order} className="btn btn--quiet" type="button" aria-pressed={applied.order === order}
+                    onClick={() => { saveSessionOrder(order); apply({ ...applied, order }); }}>
+                    {order === "best" ? "Best match" : "Newest"}
+                  </button>
+                ))}
+              </span>
+            ) : null}
+            {pills.map((pill) => (
+              <span key={pill.label} className="filter-pill">
+                <span title={`${pill.label}: ${pill.value}`}>{pill.label} <b>{pill.value}</b></span>
+                <button className="btn btn--quiet" type="button" aria-label={`Clear ${pill.label} filter`} onClick={() => clearPill(pill.label)}>&times;</button>
+              </span>
+            ))}
+            {pills.length + (applied.search ? 1 : 0) > 1 ? (
+              <button
+                className="btn btn--quiet filter-clear-all"
+                type="button"
+                onClick={() => {
+                  setSearchText("");
+                  setParams(new URLSearchParams());
+                }}
+              >
+                Clear all
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </form>
 
       <Sheet className="filter-sheet" open={sheetOpen} onClose={() => setSheetOpen(false)} title="Filter sessions">
@@ -277,7 +316,7 @@ export default function SessionsPage() {
       ) : list.isError ? (
         <ErrorState error={list.error} onRetry={() => void list.refetch()} />
       ) : best ? (
-        <section className="slab session-list" aria-label="Best match sessions">
+        <section className="session-list" aria-label="Best match sessions">
           <header className="day-head">
             <span className="day-date">Best match</span>
             <span className="muted" role="status">{ordered ? "AI-ordered" : aiOrder.isFetching ? "Ordering with AI…" : ""}</span>
@@ -285,23 +324,17 @@ export default function SessionsPage() {
           </header>
           {relatedSummary ? <RelatedSlider summary={relatedSummary} loading={list.isFetching && !list.isFetchingNextPage} /> : null}
           {all.length ? <ul className="band-list">
-            {all.map((session) => <SessionBand key={session.id} session={session} showDate showMatch />)}
+            {all.map((session) => <SessionBand key={session.id} session={session} showDate search={applied.search} />)}
           </ul> : <Empty>No sessions match these filters.</Empty>}
         </section>
       ) : groups.length ? (
-        <section className="slab session-list" aria-label="Sessions">
+        <section className="session-list" aria-label="Sessions">
           {groups.map((group) => (
-            <div className="day-group" key={group.date}>
-              <header className="day-head">
-                <span className="day-date">{formatDayDate(group.date)}</span>
-                <span className="day-total">{formatDuration(group.totalMinutes)}</span>
-              </header>
-              <ul className="band-list">
-                {group.sessions.map((session) => (
-                  <SessionBand key={session.id} session={session} />
-                ))}
-              </ul>
-            </div>
+            <JournalDay key={group.date} date={group.date} minutes={group.totalMinutes}>
+              {group.sessions.map((session) => (
+                <SessionBand key={session.id} session={session} search={applied.search} />
+              ))}
+            </JournalDay>
           ))}
         </section>
       ) : !related.length ? (
@@ -317,7 +350,7 @@ export default function SessionsPage() {
       ) : null}
 
       {!best && (related.length || relatedSummary) ? (
-        <section className="slab session-list" aria-label="Related sessions">
+        <section className="session-list session-related" aria-label="Related sessions">
           <header className="day-head">
             <span className="day-date">Related</span>
             {relatedSummary ? (
@@ -332,12 +365,12 @@ export default function SessionsPage() {
           {related.length ? (
             <ul className="band-list">
               {related.map((session) => (
-                <SessionBand key={session.id} session={session} showDate />
+                <SessionBand key={session.id} session={session} showDate search={applied.search} />
               ))}
             </ul>
           ) : relatedSummary?.count && list.hasNextPage ? (
             /* One ranked list: related matches follow every direct one. */
-            <p className="muted slab-pad">They follow the direct matches. Show more below to reach them.</p>
+            <p className="muted session-related-note">They follow the direct matches. Show more below to reach them.</p>
           ) : null}
         </section>
       ) : null}
@@ -349,7 +382,7 @@ export default function SessionsPage() {
           </button>
         </div>
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -360,8 +393,8 @@ function describeFilters(
   const names = (ids: number[], items: { id: number; name: string }[]) =>
     ids.map((id) => items.find((item) => item.id === id)?.name ?? `#${id}`).join(", ");
   const pills: { label: string; value: string }[] = [];
-  if (state.start_date) pills.push({ label: "From", value: state.start_date });
-  if (state.end_date) pills.push({ label: "To", value: state.end_date });
+  if (state.start_date) pills.push({ label: "From", value: formatJournalDate(state.start_date) });
+  if (state.end_date) pills.push({ label: "To", value: formatJournalDate(state.end_date) });
   if (state.context) {
     pills.push({
       label: "Context",
@@ -374,4 +407,21 @@ function describeFilters(
     pills.push({ label: state.projectMode === "include" ? "Only" : "Excluding", value: names(state.projects, lookup.projects) });
   }
   return pills;
+}
+
+const PRESETS = ["This week", "Last week", "30 days"];
+
+/* Local calendar dates: Monday-first weeks, or the last 30 days with today. */
+function sessionRange(label: string) {
+  const end = new Date();
+  const start = new Date(end);
+  if (label === "30 days") start.setDate(start.getDate() - 29);
+  else {
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7) - (label === "Last week" ? 7 : 0));
+    if (label === "Last week") {
+      end.setTime(start.getTime());
+      end.setDate(start.getDate() + 6);
+    }
+  }
+  return { start_date: localDateKey(start), end_date: localDateKey(end) };
 }

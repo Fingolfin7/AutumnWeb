@@ -110,7 +110,9 @@ export function CommandPalette() {
       ["New commitment", urls.createCommitment()],
       ["Import", urls.import()],
       ["Export", urls.export()],
-      ["Profile", urls.profile()],
+      ["Settings", urls.settings()],
+      ["Account", urls.profile()],
+      ["AI connections", urls.settings("ai")],
     ];
     for (const [label, href] of pages) {
       if (!q || label.toLowerCase().includes(q)) {
