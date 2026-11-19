@@ -117,7 +117,7 @@ def disconnect_social_account(request, provider):
             f'{provider.title()} could not be disconnected.',
         )
         messages.error(request, error)
-    return redirect('profile')
+    return redirect('settings_account')
 
 
 
@@ -167,11 +167,11 @@ def download_background(request):
             title = nasa_apod_title() or 'nasa_apod'
         else:
             messages.error(request, 'No automatic background source selected.')
-            return redirect('profile')
+            return redirect('settings_account')
 
         if not url:
             messages.error(request, 'No automatic background image available right now.')
-            return redirect('profile')
+            return redirect('settings_account')
 
         try:
             resp = requests.get(url, timeout=10)
@@ -185,7 +185,7 @@ def download_background(request):
         except Exception as e:
             logger.error('Failed to fetch automatic background for download: %s', e)
             messages.error(request, 'Failed to download automatic background image.')
-            return redirect('profile')
+            return redirect('settings_account')
 
     # Manual uploaded background
     if profile.background_image:
@@ -196,7 +196,7 @@ def download_background(request):
         except Exception as e:
             logger.error('Failed to open manual background for download: %s', e)
             messages.error(request, 'Failed to download background image.')
-            return redirect('profile')
+            return redirect('settings_account')
 
     messages.error(request, 'No background image to download.')
-    return redirect('profile')
+    return redirect('settings_account')

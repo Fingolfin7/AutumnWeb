@@ -85,11 +85,11 @@ function NoAccess({ aiEnabled }: { aiEnabled: boolean }) {
         <Empty>
           {aiEnabled ? (
             <>
-              Add an AI provider API key or connect Codex in your <AppLink href={urls.profile()}>Profile</AppLink> to use Insights.
+              Add an AI provider API key or connect Codex in your <AppLink href={urls.settings("ai")}>Settings</AppLink> to use Insights.
             </>
           ) : (
             <>
-              AI features are disabled for this account. You can switch them on in your <AppLink href={urls.profile()}>Profile</AppLink>.
+              AI features are disabled for this account. You can switch them on in your <AppLink href={urls.settings("ai")}>Settings</AppLink>.
             </>
           )}
         </Empty>
@@ -505,7 +505,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                 />
               ) : (
                 <p className="empty">
-                  No AI provider is set up. Add a key in your <AppLink href={urls.profile()}>Profile</AppLink>.
+                  No AI provider is set up. Add a key in your <AppLink href={urls.settings("ai")}>Settings</AppLink>.
                 </p>
               )}
             </div>

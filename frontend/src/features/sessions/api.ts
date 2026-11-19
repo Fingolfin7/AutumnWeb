@@ -63,6 +63,18 @@ export function sessionListQuery(filters: SessionFilters) {
 
 export const useSessionList = (filters: SessionFilters) => useInfiniteQuery(sessionListQuery(filters));
 
+/** The filtered list's whole duration, whatever pages are loaded. */
+export function useSessionTotals(filters: SessionFilters, enabled: boolean) {
+  const { ordering: _ordering, ...rest } = filters;
+  const query = Object.fromEntries(Object.entries(rest).filter(([, value]) => value)) as Omit<SessionFilters, "ordering">;
+  const params = { ...query, active: "false", ...(query.search ? { related: true } : {}) };
+  return useQuery({
+    queryKey: keys.reports("totals", params),
+    queryFn: () => unwrap(api.GET("/api/v2/reports/totals/", { params: { query: params } })),
+    enabled,
+  });
+}
+
 /** Explicit URL choice wins; older links use the last choice on this device. */
 export function readSessionOrder(params: URLSearchParams): "best" | "newest" {
   const order = params.get("order");
@@ -263,6 +275,12 @@ export function useSession(param: string | undefined) {
 function writeSessionCache(client: ReturnType<typeof useQueryClient>, session: SessionRow) {
   client.setQueryData(keys.session(session.id), session);
   if (session.uuid) client.setQueryData(uuidKey(session.uuid), session);
+  /* Lists show the change at once; the refetch after brings note_html. */
+  client.setQueriesData<{ pages: { sessions: SessionRow[] }[] }>({ queryKey: keys.sessions() }, (data) =>
+    data && Array.isArray(data.pages)
+      ? { ...data, pages: data.pages.map((page) => ({ ...page, sessions: page.sessions.map((row) => (row.id === session.id ? { ...row, ...session, note_html: session.note_html ?? undefined } : row)) })) }
+      : data,
+  );
 }
 
 /* PATCH with the version the form was opened on (If-Match): the server

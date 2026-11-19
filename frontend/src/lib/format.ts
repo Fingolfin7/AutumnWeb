@@ -110,6 +110,28 @@ export function formatShortDate(value: string | Date | null | undefined, now = n
   return date.getFullYear() === now.getFullYear() ? base : `${base} ${date.getFullYear()}`;
 }
 
+/* The session journal reads at a glance: "3h 15m", "40m", "<1m". */
+export function formatJournalDuration(minutes: number | null | undefined): string {
+  const value = minutes ?? 0;
+  const whole = Math.max(0, Math.floor(Math.round(value * 60_000) / 60_000));
+  if (value > 0 && whole === 0) return "<1m";
+  const hours = Math.floor(whole / 60);
+  return hours ? `${hours}h${whole % 60 ? ` ${whole % 60}m` : ""}` : `${whole}m`;
+}
+
+/** "Fri 6 Nov", with the year when it isn't this one. */
+export function formatJournalDate(value: string | Date | null | undefined, now = new Date()): string {
+  const date = value instanceof Date ? value : parseDateish(value);
+  if (!date) return "";
+  const year = date.getFullYear() !== now.getFullYear();
+  return date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", ...(year ? { year: "numeric" } : {}) }).replaceAll(",", "").replace("Sept", "Sep");
+}
+
+/** "10:47–11:27". */
+export function formatTimeRange(start: string | Date | null | undefined, end: string | Date | null | undefined): string {
+  return `${formatTime(start, false)}–${formatTime(end, false)}`;
+}
+
 /* "2026-10-14" is a calendar date, not midnight UTC: parse it as local. */
 export function parseDateish(value: string | null | undefined): Date | null {
   if (!value) return null;

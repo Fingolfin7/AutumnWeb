@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 import { trackErrors } from "./helpers";
 
 const PAGES = [
-  "/", "/timers/", "/sessions/", "/projects/", "/charts/", "/contexts/", "/tags/",
-  "/notifications/", "/review/weekly/", "/import/", "/export/", "/profile/", "/insights/",
+  "/", "/timers/", "/sessions/", "/projects/", "/charts/", "/review/weekly/", "/insights/",
+  "/settings/account/", "/settings/appearance/", "/settings/defaults/", "/settings/notifications/",
+  "/settings/contexts/", "/settings/tags/", "/settings/ai/", "/settings/import/", "/settings/export/",
 ];
 
 test("every main page loads without page or console errors", async ({ page }) => {

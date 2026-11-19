@@ -2,21 +2,15 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router";
 import {
   faAdjust,
-  faBell,
   faBrain,
   faChartPie,
+  faCog,
   faEllipsisH,
-  faFileExport,
-  faFileImport,
   faFolderOpen,
   faHome,
-  faLayerGroup,
   faListUl,
-  faPlug,
   faSignOutAlt,
   faStopwatch,
-  faTags,
-  faUserCircle,
   faCalendarCheck,
   type IconDefinition,
 } from "@fortawesome/free-solid-svg-icons";
@@ -103,7 +97,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="header-right">
             <ContextSwitch />
             <DimControl initial={boot.profile.background_dimming} />
-            <AppLink className="avatar" href={urls.profile()} title={boot.user.username}>
+            <AppLink className="avatar" href={urls.settings()} title={`${boot.user.username} · Settings`}>
               <img src={boot.profile.avatar_url} alt={boot.user.username} />
             </AppLink>
           </div>
@@ -140,13 +134,7 @@ export function Shell({ children }: { children: ReactNode }) {
           {boot.profile.insights_access_enabled ? <SheetLink href={urls.insights()} icon={faBrain} label="Insights" /> : null}
           <SheetLink href={urls.charts()} icon={faChartPie} label="Charts" />
           <SheetLink href={urls.weeklyReview()} icon={faCalendarCheck} label="Weekly review" />
-          <SheetLink href={urls.notifications()} icon={faBell} label="Notifications" />
-          <SheetLink href={urls.contexts()} icon={faLayerGroup} label="Contexts" />
-          <SheetLink href={urls.tags()} icon={faTags} label="Tags" />
-          <SheetLink href={urls.import()} icon={faFileImport} label="Import" />
-          <SheetLink href={urls.export()} icon={faFileExport} label="Export" />
-          <SheetLink href={urls.mcpConnections()} icon={faPlug} label="AI connections" />
-          <SheetLink href={urls.profile()} icon={faUserCircle} label="Profile & backdrop" />
+          <SheetLink href={urls.settings()} icon={faCog} label="Settings" />
           <form method="POST" action={urls.logout()} onSubmit={clearPersistedQueries}>
             <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} />
             <button className="sheet-item" type="submit">

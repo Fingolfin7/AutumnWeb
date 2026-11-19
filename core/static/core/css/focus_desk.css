@@ -65,6 +65,14 @@
    ============================================================================ */
 
 /* ---------------------------------------------------------------- TOKENS -- */
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader-reading.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 :root {
   /* --- semantic hues (LOAD-BEARING — meanings are fixed) ---------------- */
   --project:        #d0796f;   /* PROJECT names        (from #be675f, +L)   */
@@ -140,6 +148,7 @@
   /* --- type ------------------------------------------------------------- */
   --font-ui:   "Aptos", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-reading: "Newsreader", Georgia, serif;   /* session notes, read as a journal */
   --fs-hero:  clamp(3.25rem, 15vw, 4.75rem);
   --fs-xxl:   2rem;
   --fs-xl:    1.5rem;
@@ -740,32 +749,6 @@ body.bg-active .dim-control { display: flex; }
   font-size: var(--fs-sm); color: var(--duration); margin-left: auto;
 }
 
-/* Swipe-to-reveal row actions. CSS-only on touch (scroll-snap); on pointer
-   devices the actions simply sit at the right and fade in on hover.        */
-.swipe { position: relative; }
-.swipe-track {
-  display: flex; overflow-x: auto;
-  scroll-snap-type: x mandatory; scrollbar-width: none;
-}
-.swipe-track::-webkit-scrollbar { display: none; }
-.swipe-face { flex: 0 0 100%; scroll-snap-align: start; min-width: 0; }
-.swipe-actions {
-  flex: 0 0 auto; scroll-snap-align: end;
-  display: flex; align-items: center; gap: .35rem;
-  padding: var(--s3) var(--s4) var(--s3) var(--s2);
-}
-/* right-edge cue: "there is more here, drag me" */
-.swipe-hint {
-  position: absolute; top: 0; right: 0; bottom: 0; width: 2.5rem;
-  pointer-events: none;
-  display: grid; place-items: center;
-  background: linear-gradient(to right, rgba(18,21,24,0), rgba(18,21,24,.92));
-}
-.swipe-hint::after {
-  content: "\2039\2039";                /* ‹‹ */
-  font-size: .95rem; color: var(--muted); opacity: .75;
-}
-
 .session { padding: var(--s4); }
 .session-top { display: flex; align-items: baseline; gap: var(--s3); }
 .session-project {
@@ -795,21 +778,13 @@ body.bg-active .dim-control { display: flex; }
   background: rgba(120,150,184,.14);
   box-shadow: inset 0 0 0 1px rgba(120,150,184,.22);
 }
-.session-note {
-  margin-top: .5rem; font-size: var(--fs-sm); color: var(--note);
-  line-height: 1.45;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  overflow: hidden;                 /* clamp, never marquee */
-}
-.session-note.is-open { -webkit-line-clamp: unset; display: block; }
+.session-note { color: var(--note); }
 .session-note a { color: var(--time); text-decoration: underline; text-underline-offset: 2px; }
 .session-note strong { color: var(--note); font-weight: 700; }
-/* Notes render through the markdown filter, so their real content is block
-   elements. Flatten the first paragraph so a one-line note still sits on the
-   baseline the clamp expects. */
 .session-note p { margin: 0; }
 .session-note p + p { margin-top: .35rem; }
 .session-note ul, .session-note ol { padding-left: 1.1rem; list-style: disc; }
+.session-note ol { list-style: decimal; }
 .session-note code {
   font-family: var(--font-mono); font-size: .9em;
   padding: .05rem .3rem; border-radius: var(--r-xs); background: var(--sunken);
@@ -1053,12 +1028,6 @@ body.bg-active .dim-control { display: flex; }
   .screen { padding: 0 var(--s5); }
   .slab { margin-bottom: var(--s5); }
   .stat-value { font-size: var(--fs-lg); }
-  /* pointer devices: no swiping needed, actions live at the right edge */
-  .swipe-track { overflow: visible; }
-  .swipe-face { flex: 1 1 auto; }
-  .swipe-actions { opacity: 0; pointer-events: none; transition: opacity .16s var(--ease); }
-  .swipe:hover .swipe-actions, .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
-  .swipe-hint { display: none; }
 }
 
 /* ------------------------------------------------------- REDUCED MOTION -- */
@@ -1282,22 +1251,7 @@ body.bg-active .dim-control { display: flex; }
   .desk { grid-template-columns: minmax(0, 2fr) minmax(22rem, .85fr); }
 }
 
-/* ============================================================================
-   SESSION ROWS — two shapes, chosen by the LIST's width
-   ----------------------------------------------------------------------------
-   The same list is ~860px wide inside the dashboard's desk and ~1370px on the
-   Sessions page. A viewport media query asks the wrong question: at 1100px the
-   window is "desktop" but the desk's primary track is still narrow, and the
-   four-column row squeezed the note down to about ninety pixels of ellipsis.
-
-   So the shape is chosen by a CONTAINER query on .session-list. Below the
-   threshold the row is the stacked mobile card; above it, aligned columns.
-   ==========================================================================*/
-
-.session-list { container-type: inline-size; }
-
-/* Default: stacked. Project and duration share the top line, times and note
-   run full width beneath — the mobile-first shape. */
+/* The delete page's summary of the session it is about to remove. */
 .session {
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
   column-gap: var(--s3);
@@ -1306,40 +1260,6 @@ body.bg-active .dim-control { display: flex; }
 .session-dur  { grid-column: 2; grid-row: 1; text-align: right; }
 .session-mid  { grid-column: 1 / -1; }
 .session-note { grid-column: 1 / -1; }
-
-@container (min-width: 46rem) {
-  .session-list .swipe-track { display: block; overflow: visible; scroll-snap-type: none; }
-  .session-list .swipe-face { flex: initial; }
-  .session-list .swipe-hint { display: none; }
-  /* Hover actions sit just left of the duration column (5.5rem + gap), over
-     the tail of the note, so the duration is never covered. */
-  .session-list .swipe-actions {
-    position: absolute; top: 50%; right: calc(var(--s4) * 2 + 5.5rem); transform: translateY(-50%);
-    padding: 0 0 0 var(--s5); gap: .3rem;
-    opacity: 0; pointer-events: none;
-    background: linear-gradient(to right, rgba(18,21,24,0) 0, rgba(20,24,27,.96) 18%);
-    transition: opacity .16s var(--ease);
-  }
-  .session-list .swipe:hover .swipe-actions,
-  .session-list .swipe:focus-within .swipe-actions { opacity: 1; pointer-events: auto; }
-
-  .session-list .session {
-    grid-template-columns: 10.5rem minmax(7rem, 11rem) minmax(0, 1fr) 5.5rem;
-    align-items: baseline; gap: var(--s4);
-    padding: var(--s3) var(--s4);
-  }
-  /* Columns are assigned EXPLICITLY, not left to auto-placement. A session
-     with no note renders no .session-note element at all, and auto-placement
-     would then slide the duration left into the empty note column — so the
-     right-hand figures only lined up on rows that happened to have notes. */
-  .session-list .session-mid   { grid-column: 1; grid-row: 1; margin-top: 0; }
-  .session-list .session-top   { grid-column: 2; grid-row: 1; display: block; }
-  .session-list .session-note  { grid-column: 3; grid-row: 1; margin-top: 0; }
-  .session-list .session-dur   { grid-column: 4; grid-row: 1; text-align: right; justify-self: end; }
-
-  /* keep the day header aligned with the new grid */
-  .session-list .day-head { padding-left: var(--s4); padding-right: var(--s4); }
-}
 
 /* ============================================================================
    TIMELINE  — Focus Desk dialect
@@ -2315,7 +2235,7 @@ img.brand-mark {
 
 /* ============================================================================
    SESSIONS PAGE
-   The list itself reuses .session-list / .day-group / .band / .swipe from the
+   The list itself shares its journal rows (app.css) with the
    dashboard. What is new here is the filter surface: per the nav model, a
    page never wears an eight-control filter row. One search field plus a
    launcher that opens the filter .sheet.
