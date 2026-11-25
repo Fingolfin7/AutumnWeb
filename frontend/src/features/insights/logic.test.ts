@@ -158,7 +158,9 @@ describe("model selection", () => {
     ["claude", "claude-haiku-4-5", "claude-haiku-5-5"],
     ["claude", "claude-sonnet-5", "claude-sonnet-5-5"],
     ["claude", "claude-opus-5", "claude-opus-5-5"],
-    ["claude", "claude-fable-5", "claude-fable-5-1"],
+    ["openai", "gpt-5.5", "gpt-6.2-sol"],
+    ["gemini", "gemini-3.1-pro-preview", "gemini-4-carbon"],
+    ["claude", "claude-fable-5", "claude-fable-5-2"],
   ])("keeps a saved %s %s selection on its replacement", (provider, oldModel, newModel) => {
     const efforts = provider === "openai" ? ["low", "high", "max"] : [];
     const upgradedOptions = {
