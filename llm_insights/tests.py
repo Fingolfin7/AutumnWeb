@@ -60,10 +60,11 @@ class InsightsViewProviderModelsTests(TestCase):
             provider_models["openai"],
             [
                 ("gpt-6-luna", "GPT-6 Luna"),
-                ("gpt-6.1-sol", "GPT-6.1 Sol"),
                 ("gpt-6.1-terra", "GPT-6.1 Terra"),
+                ("gpt-6.1-sol", "GPT-6.1 Sol"),
+                ("gpt-6.2-sol", "GPT-6.2 Sol"),
                 ("gpt-6-astra", "GPT-6 Astra"),
-                ("gpt-5.5", "GPT-5.5"),
+                ("gpt-6.2-astra", "GPT-6.2 Astra"),
             ],
         )
 
@@ -103,7 +104,7 @@ class InsightsViewProviderModelsTests(TestCase):
         )
 
     def test_saved_models_follow_replacements(self):
-        for provider in ("openai", "claude"):
+        for provider in ("openai", "gemini", "claude"):
             self.user.profile.set_api_key(provider, "test-key")
         self.user.profile.save()
         models = insight_handlers.provider_models(self.user)
@@ -112,6 +113,9 @@ class InsightsViewProviderModelsTests(TestCase):
             ("openai", "gpt-5.6-sol", "gpt-6.1-sol"),
             ("openai", "gpt-5.6", "gpt-6.1-sol"),
             ("openai", "gpt-5.6-terra", "gpt-6.1-terra"),
+            ("openai", "gpt-5.5", "gpt-6.2-sol"),
+            ("gemini", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"),
+            ("gemini", "gemini-3.1-pro-preview", "gemini-4-carbon"),
             ("claude", "claude-haiku-4-5", "claude-haiku-5-5"),
             ("claude", "claude-sonnet-5", "claude-sonnet-5-5"),
             ("claude", "claude-opus-5", "claude-opus-5-5"),
@@ -120,7 +124,7 @@ class InsightsViewProviderModelsTests(TestCase):
         ):
             with self.subTest(model=old):
                 self.assertEqual(insight_handlers.validate_selection(models, provider, old), (provider, new))
-        self.assertEqual(insight_handlers.validate_reasoning_effort("openai", "max", "gpt-6.1-sol"), "max")
+        self.assertEqual(insight_handlers.validate_reasoning_effort("openai", "max", "gpt-6.2-astra"), "max")
         self.assertEqual(insight_handlers.validate_reasoning_effort("openai", "max", "gpt-5.5"), "high")
 
 
@@ -158,7 +162,7 @@ class InsightsAccessAndUsageApiTests(TestCase):
 
     def test_another_users_chat_is_not_found(self):
         owner = self._user("owner")
-        chat = LLMChat.objects.create(user=owner, title="Private", model="gemini:gemini-3.1-flash-lite")
+        chat = LLMChat.objects.create(user=owner, title="Private", model="gemini:gemini-3.5-flash-lite")
         client = Client()
         client.force_login(self._user("intruder"))
         self.assertEqual(client.get(f"/api/v2/insights/chats/{chat.id}").status_code, 404)
@@ -330,7 +334,7 @@ class CachedTokenAccountingTests(SimpleTestCase):
 
 class GeminiFailurePathTests(SimpleTestCase):
     def build_handler(self):
-        handler = GeminiHandler(model="gemini-3.1-flash-lite", api_key="k")
+        handler = GeminiHandler(model="gemini-3.5-flash-lite", api_key="k")
         handler.username = "kuda"
         handler.session_data = "PAYLOAD_V1"
 

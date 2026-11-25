@@ -17,15 +17,20 @@ def provider_models(user):
     ):
         models["openai"] = [
             ("gpt-6-luna", "GPT-6 Luna"),
-            ("gpt-6.1-sol", "GPT-6.1 Sol"),
             ("gpt-6.1-terra", "GPT-6.1 Terra"),
+            ("gpt-6.1-sol", "GPT-6.1 Sol"),
+            ("gpt-6.2-sol", "GPT-6.2 Sol"),
             ("gpt-6-astra", "GPT-6 Astra"),
-            ("gpt-5.5", "GPT-5.5"),
+            ("gpt-6.2-astra", "GPT-6.2 Astra"),
         ]
     if profile and profile.gemini_api_key_enc:
         models["gemini"] = [
-            ("gemini-3.1-flash-lite", "Gemini 3.1 Flash Lite"),
-            ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
+            ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite"),
+            ("gemini-3.8-flash", "Gemini 3.8 Flash"),
+            ("gemini-4-hydrogen", "Gemini 4 Hydrogen"),
+            ("gemini-4-argon", "Gemini 4 Argon"),
+            ("gemini-4-neon", "Gemini 4 Neon"),
+            ("gemini-4-carbon", "Gemini 4 Carbon"),
         ]
     if profile and profile.claude_api_key_enc:
         models["claude"] = [
@@ -70,6 +75,12 @@ def validate_selection(models, provider, model):
             "gpt-5.6": "gpt-6.1-sol",
             "gpt-5.6-terra": "gpt-6.1-terra",
             "gpt-6-sol": "gpt-6.1-sol",
+            "gpt-5.5": "gpt-6.2-sol",
+        }.get(model, model)
+    elif provider == "gemini":
+        model = {
+            "gemini-3.1-flash-lite": "gemini-3.5-flash-lite",
+            "gemini-3.1-pro-preview": "gemini-4-carbon",
         }.get(model, model)
     elif provider == "claude":
         model = {
@@ -89,7 +100,7 @@ def validate_selection(models, provider, model):
 
 
 def openai_reasoning_efforts(model):
-    if model and not model.startswith(("gpt-5.6", "gpt-6-", "gpt-6.1-")):
+    if model and not model.startswith(("gpt-5.6", "gpt-6")):
         return OPENAI_REASONING_EFFORTS[:-1]
     return OPENAI_REASONING_EFFORTS
 

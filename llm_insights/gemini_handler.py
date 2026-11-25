@@ -10,7 +10,7 @@ from .base_handler import BaseLLMHandler
 class GeminiHandler(BaseLLMHandler):
     """Handler for Google's Gemini API"""
 
-    def __init__(self, model="gemini-2.5-flash", api_key: str | None = None):
+    def __init__(self, model="gemini-3.5-flash-lite", api_key: str | None = None):
         self.model = model
         if not api_key:
             raise RuntimeError("Gemini API key is not configured.")
