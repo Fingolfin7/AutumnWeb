@@ -133,7 +133,7 @@ export function Transcript({
   modelName,
 }: {
   items: Item[];
-  /** Display name for a model ID, for the notes marking which model answered. */
+  /** Display name for a model ID, for the notes marking a change of model. */
   modelName: (model: string) => string;
   selecting: boolean;
   selected: ReadonlySet<string>;
@@ -144,7 +144,6 @@ export function Transcript({
   const stick = useRef(true);
   const last = items[items.length - 1];
   const changes = modelChanges(items);
-  let changeCount = 0;
   const signature = `${items.length}:${last?.plain?.length ?? last?.html.length ?? 0}:${last?.streaming}`;
 
   /* Follow the answer as it grows, unless you scrolled up to read. */
@@ -169,7 +168,7 @@ export function Transcript({
       {items.length ? (
         items.map((item) => {
           const changed = changes.get(item.key);
-          const note = changed ? `${changeCount++ ? "Switched to" : "Answered by"} ${modelName(changed)}` : null;
+          const note = changed ? `Switched from ${modelName(changed.from)} to ${modelName(changed.to)}` : null;
           return (
             <Fragment key={item.key}>
               {note ? <p className="model-note">{note}</p> : null}

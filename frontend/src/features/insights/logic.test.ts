@@ -251,7 +251,7 @@ describe("transcript", () => {
     expect(turns[1]!.sources).toHaveLength(1);
   });
 
-  it("notes which model answered at the start and wherever it changes", () => {
+  it("notes each change of model, not the first one", () => {
     const item = (key: string, role: string, model = "") => ({ key, role, model });
     const changes = modelChanges([
       item("q1", "user"), item("a1", "assistant", "gpt-a"),
@@ -259,7 +259,7 @@ describe("transcript", () => {
       item("q3", "user"), item("a3", "assistant", "claude-x"),
       item("a4", "assistant", "gpt-b"),
     ]);
-    expect([...changes]).toEqual([["q1", "gpt-a"], ["q3", "claude-x"], ["a4", "gpt-b"]]);
+    expect([...changes]).toEqual([["q3", { from: "gpt-a", to: "claude-x" }], ["a4", { from: "claude-x", to: "gpt-b" }]]);
     expect(modelLabel(options, "claude-x")).toBe("Claude X");
     expect(modelLabel(options, "gpt-5.5")).toBe("gpt-5.5");
   });
