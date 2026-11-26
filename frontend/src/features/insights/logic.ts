@@ -333,6 +333,29 @@ export function visibleTurns(messages: ChatMessage[], fallbackModel: string): Tu
     }));
 }
 
+/* A model's name as the picker shows it; one no longer offered keeps its ID. */
+export function modelLabel(options: InsightOptions, value: string): string {
+  for (const provider of options.providers) {
+    const model = provider.models.find((m) => m.value === value);
+    if (model) return model.label;
+  }
+  return value;
+}
+
+/* Where the chat's model changes: the key of the item each such exchange
+   starts on (its question, else the answer itself) to the model that answered. */
+export function modelChanges(items: { key: string; role: string; model: string }[]): Map<string, string> {
+  const changes = new Map<string, string>();
+  let current = "";
+  items.forEach((item, index) => {
+    if (item.role !== "assistant" || !item.model || item.model === current) return;
+    const question = items[index - 1];
+    changes.set(question?.role === "user" ? question.key : item.key, item.model);
+    current = item.model;
+  });
+  return changes;
+}
+
 /* "Copy chat" / "Copy (n)": each message under its sender, divided by rules. */
 export function buildTranscript(turns: (Pick<Turn, "role" | "content" | "model"> & { attachments?: AttachmentView[] })[], username: string): string {
   return turns

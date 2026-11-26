@@ -5,6 +5,8 @@ import {
   EMPTY_SELECTION,
   formatUsage,
   mergeChatPages,
+  modelChanges,
+  modelLabel,
   nextChatOffset,
   openaiConnectionNote,
   pickEffort,
@@ -247,6 +249,19 @@ describe("transcript", () => {
       ["assistant", "fallback-model", false],
     ]);
     expect(turns[1]!.sources).toHaveLength(1);
+  });
+
+  it("notes which model answered at the start and wherever it changes", () => {
+    const item = (key: string, role: string, model = "") => ({ key, role, model });
+    const changes = modelChanges([
+      item("q1", "user"), item("a1", "assistant", "gpt-a"),
+      item("q2", "user"), item("a2", "assistant", "gpt-a"),
+      item("q3", "user"), item("a3", "assistant", "claude-x"),
+      item("a4", "assistant", "gpt-b"),
+    ]);
+    expect([...changes]).toEqual([["q1", "gpt-a"], ["q3", "claude-x"], ["a4", "gpt-b"]]);
+    expect(modelLabel(options, "claude-x")).toBe("Claude X");
+    expect(modelLabel(options, "gpt-5.5")).toBe("gpt-5.5");
   });
 
   it("builds the copied transcript with senders and rules, skipping empty messages", () => {

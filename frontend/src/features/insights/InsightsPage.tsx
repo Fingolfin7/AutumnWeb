@@ -27,6 +27,7 @@ import {
   describeSelection,
   EMPTY_SELECTION,
   formatUsage,
+  modelLabel,
   readSelection,
   resolveSelection,
   selectionFromChat,
@@ -190,7 +191,8 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const preview = useInsightSelection(selectionQuery(selection, defaults, contextId), true);
   const count = preview.data?.count;
 
-  const turns = useMemo(() => visibleTurns(chat?.messages ?? [], model?.model ?? ""), [chat, model?.model]);
+  /* An answer saved without its model was written by the chat's first one. */
+  const turns = useMemo(() => visibleTurns(chat?.messages ?? [], splitChatModel(chat?.model).model ?? ""), [chat]);
   const shownRun = run && showsRun(run, chatId, turns.length) ? run : null;
   const items = useMemo(() => [...savedItems(turns), ...(shownRun ? runItems(shownRun) : [])], [turns, shownRun]);
   const live = !!run && isLive(run) && (run.chatId === (chatId ?? null) || ownRun.current === run.id);
@@ -475,6 +477,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             <div className="chat-form" id="chat-form">
               <Transcript
                 items={items}
+                modelName={(value) => modelLabel(options, value)}
                 selecting={selecting}
                 selected={picked}
                 onToggle={togglePicked}

@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { faCheck, faCopy } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { MessageAttachments } from "./AttachmentList";
 import type { Run } from "./run";
-import type { Turn } from "./logic";
+import { modelChanges, type Turn } from "./logic";
 
 /* One row of the conversation, whether it came from the server or is the
    exchange being streamed right now. */
@@ -130,8 +130,11 @@ export function Transcript({
   selected,
   onToggle,
   empty,
+  modelName,
 }: {
   items: Item[];
+  /** Display name for a model ID, for the notes marking which model answered. */
+  modelName: (model: string) => string;
   selecting: boolean;
   selected: ReadonlySet<string>;
   onToggle: (key: string) => void;
@@ -140,6 +143,8 @@ export function Transcript({
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
   const last = items[items.length - 1];
+  const changes = modelChanges(items);
+  let changeCount = 0;
   const signature = `${items.length}:${last?.plain?.length ?? last?.html.length ?? 0}:${last?.streaming}`;
 
   /* Follow the answer as it grows, unless you scrolled up to read. */
@@ -162,7 +167,16 @@ export function Transcript({
       }}
     >
       {items.length ? (
-        items.map((item) => <Message key={item.key} item={item} selecting={selecting} selected={selected.has(item.key)} onToggle={() => onToggle(item.key)} />)
+        items.map((item) => {
+          const changed = changes.get(item.key);
+          const note = changed ? `${changeCount++ ? "Switched to" : "Answered by"} ${modelName(changed)}` : null;
+          return (
+            <Fragment key={item.key}>
+              {note ? <p className="model-note">{note}</p> : null}
+              <Message item={item} selecting={selecting} selected={selected.has(item.key)} onToggle={() => onToggle(item.key)} />
+            </Fragment>
+          );
+        })
       ) : (
         empty
       )}

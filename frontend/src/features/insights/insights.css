@@ -155,3 +155,11 @@
   .attach-chip, .chat-dropzone { animation: none; }
   .msg-image img { transition: none; }
 }
+
+/* Which model answered: once at the top of a chat and wherever it changes. */
+.model-note {
+  display: flex; align-items: center; gap: var(--s2);
+  margin: 0; color: var(--muted); font-size: var(--fs-xs);
+}
+.model-note::before,
+.model-note::after { content: ""; flex: 1; border-top: 1px solid var(--hairline); }
