@@ -342,15 +342,16 @@ export function modelLabel(options: InsightOptions, value: string): string {
   return value;
 }
 
-/* Where the chat's model changes: the key of the item each such exchange
-   starts on (its question, else the answer itself) to the models before and after. */
+/* The chat's first model and each change after it: the key of the item each
+   such exchange starts on (its question, else the answer itself) to the models
+   before ("" for the first) and after. */
 export function modelChanges(items: { key: string; role: string; model: string }[]): Map<string, { from: string; to: string }> {
   const changes = new Map<string, { from: string; to: string }>();
   let current = "";
   items.forEach((item, index) => {
     if (item.role !== "assistant" || !item.model || item.model === current) return;
     const question = items[index - 1];
-    if (current) changes.set(question?.role === "user" ? question.key : item.key, { from: current, to: item.model });
+    changes.set(question?.role === "user" ? question.key : item.key, { from: current, to: item.model });
     current = item.model;
   });
   return changes;

@@ -133,7 +133,7 @@ export function Transcript({
   modelName,
 }: {
   items: Item[];
-  /** Display name for a model ID, for the notes marking a change of model. */
+  /** Display name for a model ID, for the notes marking which model answered. */
   modelName: (model: string) => string;
   selecting: boolean;
   selected: ReadonlySet<string>;
@@ -168,7 +168,7 @@ export function Transcript({
       {items.length ? (
         items.map((item) => {
           const changed = changes.get(item.key);
-          const note = changed ? `Switched from ${modelName(changed.from)} to ${modelName(changed.to)}` : null;
+          const note = !changed ? null : changed.from ? `Switched from ${modelName(changed.from)} to ${modelName(changed.to)}` : `Answered by ${modelName(changed.to)}`;
           return (
             <Fragment key={item.key}>
               {note ? <p className="model-note">{note}</p> : null}
