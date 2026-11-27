@@ -12,6 +12,11 @@ test("downloads a backup, previews a missing project, and restores it", async ({
 
   await page.goto("/settings/backup/");
   await expect(page.getByRole("heading", { name: "Backup & restore" })).toBeVisible();
+  const insights = page.getByRole("switch", { name: "Include Insights chats" });
+  const files = page.getByRole("switch", { name: "Include files attached to Insights chats" });
+  await expect(insights).not.toBeChecked();
+  await expect(files).not.toBeChecked();
+  await expect(files).toBeDisabled();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download backup" }).click();
   const archive = await download;

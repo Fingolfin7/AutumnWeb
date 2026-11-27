@@ -33,7 +33,7 @@ export default function BackupPage() {
 function BackupDownload() {
   const toast = useToast();
   const summary = useBackupSummary();
-  const [insights, setInsights] = useState(true);
+  const [insights, setInsights] = useState(false);
   const [attachments, setAttachments] = useState(false);
   const [busy, setBusy] = useState(false);
   const files = summary.data?.attachment_count ?? 0;
@@ -77,7 +77,7 @@ function BackupDownload() {
           />
           <p className="backup-hint" id="backup-files-hint">
             {!insights
-              ? "Files belong to chats, so they come with the chats."
+              ? "Enable Insights chats to include their files."
               : summary.isPending
                 ? "Checking your files…"
                 : summary.isError

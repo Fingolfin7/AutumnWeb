@@ -53,7 +53,7 @@ class BackupSummarySerializer(serializers.Serializer):
 
 class BackupQuerySerializer(serializers.Serializer):
     include_insights = serializers.BooleanField(
-        required=False, default=True, help_text="Include Insights chats and their messages."
+        required=False, default=False, help_text="Include Insights chats and their messages."
     )
     include_attachments = serializers.BooleanField(
         required=False,
@@ -172,8 +172,6 @@ class BackupView(V2APIView):
         },
     )
     def get(self, request):
-        # A plain dict: DRF reads a missing boolean in a QueryDict as false,
-        # which would drop the include_insights default.
         query = BackupQuerySerializer(data=request.query_params.dict())
         query.is_valid(raise_exception=True)
         try:

@@ -81,7 +81,7 @@ Autumn includes pie, bar, scatter, line, calendar, heatmap, stacked area, cumula
 
 ### Back up your account
 
-**Settings → Data → Backup & restore** downloads a versioned ZIP with a readable manifest. It includes all projects and completed sessions, context and tag metadata, commitment history, reminder schedules, portable preferences and profile images. Insights conversations are included by default. Select the attachment option to carry their files as well.
+**Settings → Data → Backup & restore** downloads a versioned ZIP with a readable manifest. It includes all projects and completed sessions, context and tag metadata, commitment history, reminder schedules, portable preferences and profile images. Select **Include Insights chats** to add conversations, and also select **Include files attached to Insights chats** to carry their files.
 
 Choose the ZIP on the same page to see the destination account, the records it would add and any conflicts. Resolve conflicts in the destination before applying the restore. Complete a running timer before backing it up. Sign-in credentials, AI keys, connected apps and browser notification subscriptions are set up separately on the destination.
 

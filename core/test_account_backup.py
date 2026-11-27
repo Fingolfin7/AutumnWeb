@@ -33,7 +33,8 @@ class AccountBackupTests(TransactionTestCase):
 
     def download(self, *, files=False):
         self.api.force_authenticate(self.source)
-        response = self.api.get(f"/api/v2/backup/?include_attachments={str(files).lower()}", HTTP_ACCEPT="application/zip")
+        options = "?include_insights=true&include_attachments=true" if files else ""
+        response = self.api.get(f"/api/v2/backup/{options}", HTTP_ACCEPT="application/zip")
         self.assertEqual(response.status_code, 200, getattr(response, "data", None))
         self.assertEqual(response["Content-Type"], "application/zip")
         self.assertIn("no-store", response["Cache-Control"])
@@ -51,6 +52,14 @@ class AccountBackupTests(TransactionTestCase):
         response = self.submit("preview", data)
         self.assertEqual(response.status_code, 200, response.data)
         return response.data
+
+    def test_backup_omits_existing_insights_by_default(self):
+        LLMChat.objects.create(user=self.source, title="Private discussion", model="example")
+        with ZipFile(io.BytesIO(self.download())) as archive:
+            manifest = json.loads(archive.read("manifest.json"))
+        self.assertFalse(manifest["includes_insights"])
+        self.assertFalse(manifest["includes_attachments"])
+        self.assertEqual(manifest["records"]["insight_chats"], [])
 
     def test_round_trip_and_replay(self):
         at = datetime(2026, 10, 5, 8, tzinfo=UTC)

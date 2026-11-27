@@ -24,7 +24,7 @@ paths:
         name: include_insights
         schema:
           type: boolean
-          default: true
+          default: false
         description: Include Insights chats and their messages.
       tags:
       - backup

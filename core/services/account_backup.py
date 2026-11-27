@@ -204,7 +204,7 @@ def _record(section, obj, ids, *, record_id=None, archive=None, known=None):
     return record
 
 
-def build_backup(user, *, include_insights=True, include_attachments=False):
+def build_backup(user, *, include_insights=False, include_attachments=False):
     if include_attachments and not include_insights:
         raise BackupError("Include Insights chats to back up their attachments.")
 
