@@ -13,6 +13,7 @@ import NotificationsPage from "@/features/notifications/NotificationsPage";
 import { useBrowserPushState } from "@/features/notifications/BrowserPush";
 import ImportPage from "@/features/import-export/ImportPage";
 import ExportPage from "@/features/import-export/ExportPage";
+import BackupPage from "@/features/backup/BackupPage";
 
 const sections = [
   { id: "account", title: "Account", description: "Your details, timezone and sign-in", icon: faUserCircle },
@@ -25,7 +26,17 @@ const sections = [
   { id: "ai", title: "AI connections", description: "Model providers, related search and connected apps", icon: faPlug },
   { id: "import", title: "Import", description: "Bring your existing time into Autumn", icon: faFileImport },
   { id: "export", title: "Export", description: "Take your projects and journal with you", icon: faFileExport },
+  { id: "backup", title: "Backup & restore", description: "A complete copy of your account, and putting one back", icon: faFileExport },
 ] as const;
+
+/* Settings > Data: the account backup, then the CLI-compatible JSON import
+   and export it sits beside. */
+const DATA_SECTIONS = ["backup", "import", "export"];
+const DATA_LINKS = [
+  { id: "backup", title: "Backup & restore" },
+  { id: "import", title: "Import" },
+  { id: "export", title: "Export" },
+];
 
 const navigation = [
   { id: "account", title: "Account", icon: faUserCircle },
@@ -35,7 +46,7 @@ const navigation = [
   { id: "contexts", title: "Contexts", icon: faLayerGroup },
   { id: "tags", title: "Tags", icon: faTags },
   { id: "ai", title: "AI", icon: faPlug },
-  { id: "import", title: "Data", icon: faFileExport },
+  { id: "backup", title: "Data", icon: faFileExport },
 ] as const;
 
 export default function SettingsPage() {
@@ -48,12 +59,13 @@ export default function SettingsPage() {
     if (id === "ai" && connected !== null) return `${connected} connected`;
     if (id === "notifications" && push.data) return ({ denied: "Blocked", granted: "Allowed", default: "Not enabled", unavailable: "Unavailable", loading: "Checking" } as Record<string, string>)[push.data.state];
     if (id === "account") return account.data?.username;
+    if (id === "backup") return "Backup, restore, import and export";
     if (id === "appearance" && prefs.data) return prefs.data.automatic_background ? "Daily backdrop" : prefs.data.background.image_url ? "Custom backdrop" : "Night Ledger";
     return undefined;
   };
   const id = location.pathname.split("/")[2] || (window.matchMedia("(min-width: 1000px)").matches ? "account" : undefined);
   const section = sections.find((item) => item.id === id);
-  const activeId = id === "search" ? "ai" : id === "export" ? "import" : id;
+  const activeId = id === "search" ? "ai" : DATA_SECTIONS.includes(id ?? "") ? "backup" : id;
   return <div className={`settings-page${section ? " settings-page--section" : ""}`}>
     <header className="settings-heading">
       {section ? <AppLink className="settings-back" href="/settings/" aria-label="All settings"><span aria-hidden="true">&lsaquo;</span></AppLink> : null}
@@ -67,8 +79,8 @@ export default function SettingsPage() {
         </AppLink>)}
       </nav>
       <div className="settings-content" key={id ?? "index"}>
-        {id === "import" || id === "export" ? <div className="settings-data-links"><AppLink className="text-link" aria-current={id === "import" ? "page" : undefined} href="/settings/import/">Import</AppLink><AppLink className="text-link" aria-current={id === "export" ? "page" : undefined} href="/settings/export/">Export</AppLink></div> : null}
-        {["account", "appearance", "defaults", "search"].includes(id ?? "") ? <ProfilePage section={id as "account" | "appearance" | "defaults" | "search"} /> : id === "ai" ? <ProfilePage section="ai" /> : id === "contexts" ? <ContextsPage /> : id === "tags" ? <TagsPage /> : id === "notifications" ? <NotificationsPage /> : id === "import" ? <ImportPage /> : id === "export" ? <ExportPage /> : <section className="settings-overview slab slab-pad"><h2>Your workspace</h2><dl><div><dt>Signed in as</dt><dd>{account.data?.username ?? bootstrap().user.username}</dd></div><div><dt>Timezone</dt><dd>{prefs.data?.timezone ?? bootstrap().profile.timezone}</dd></div><div><dt>Backdrop</dt><dd>{prefs.data?.automatic_background ? "A new photo every day" : prefs.data?.background.image_url ? "Your uploaded photo" : "Night Ledger"}</dd></div><div><dt>Reporting range</dt><dd>{prefs.data ? prefs.data.default_filter_unit.endsWith("_to_date") ? prefs.data.default_filter_unit.replaceAll("_", " ") : `${prefs.data.default_filter_value} ${prefs.data.default_filter_value === 1 ? prefs.data.default_filter_unit.slice(0, -1) : prefs.data.default_filter_unit}` : "Loading…"}</dd></div></dl><AppLink className="btn btn--secondary" href="/settings/account/">Edit account</AppLink></section>}
+        {DATA_SECTIONS.includes(id ?? "") ? <nav className="settings-data-links" aria-label="Data">{DATA_LINKS.map((link) => <AppLink key={link.id} className="text-link" aria-current={id === link.id ? "page" : undefined} href={`/settings/${link.id}/`}>{link.title}</AppLink>)}</nav> : null}
+        {["account", "appearance", "defaults", "search"].includes(id ?? "") ? <ProfilePage section={id as "account" | "appearance" | "defaults" | "search"} /> : id === "ai" ? <ProfilePage section="ai" /> : id === "contexts" ? <ContextsPage /> : id === "tags" ? <TagsPage /> : id === "notifications" ? <NotificationsPage /> : id === "import" ? <ImportPage /> : id === "export" ? <ExportPage /> : id === "backup" ? <BackupPage /> :<section className="settings-overview slab slab-pad"><h2>Your workspace</h2><dl><div><dt>Signed in as</dt><dd>{account.data?.username ?? bootstrap().user.username}</dd></div><div><dt>Timezone</dt><dd>{prefs.data?.timezone ?? bootstrap().profile.timezone}</dd></div><div><dt>Backdrop</dt><dd>{prefs.data?.automatic_background ? "A new photo every day" : prefs.data?.background.image_url ? "Your uploaded photo" : "Night Ledger"}</dd></div><div><dt>Reporting range</dt><dd>{prefs.data ? prefs.data.default_filter_unit.endsWith("_to_date") ? prefs.data.default_filter_unit.replaceAll("_", " ") : `${prefs.data.default_filter_value} ${prefs.data.default_filter_value === 1 ? prefs.data.default_filter_unit.slice(0, -1) : prefs.data.default_filter_unit}` : "Loading…"}</dd></div></dl><AppLink className="btn btn--secondary" href="/settings/account/">Edit account</AppLink></section>}
       </div>
     </div>
     {location.pathname === "/settings/" ? <form className="settings-logout" method="POST" action="/logout/" onSubmit={clearPersistedQueries}><input type="hidden" name="csrfmiddlewaretoken" value={csrfToken()} /><button className="btn btn--quiet" type="submit">Log out</button></form> : null}

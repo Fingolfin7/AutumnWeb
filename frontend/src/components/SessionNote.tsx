@@ -84,12 +84,13 @@ function plainHtml(text: string) {
    sanitises it with nh3 (include=note_html), so the HTML here is trusted
    output of that one sanitiser; plain notes fall back to escaped text. With a
    search, the note opens at the matching paragraph (or the passage a related
-   match was found by) and marks the words; "Read full note" shows the rest. */
-export function SessionNote({ html, text, id, passage, search }: { html?: string | null; text?: string | null; id?: string; passage?: string | null; search?: string }) {
+   match was found by) and marks the words; "Read full note" shows the rest.
+   `clamp` opens it as a preview whatever the device's journal density. */
+export function SessionNote({ html, text, id, passage, search, clamp }: { html?: string | null; text?: string | null; id?: string; passage?: string | null; search?: string; clamp?: boolean }) {
   const generated = useId();
   const noteId = id ?? `note-${generated}`;
   const [open, setOpen] = useState(false);
-  const compact = useSyncExternalStore(subscribeDensity, readDensity) === "preview";
+  const compact = useSyncExternalStore(subscribeDensity, readDensity) === "preview" || !!clamp;
   const [overflow, setOverflow] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const words = useMemo(() => searchWords(search), [search]);

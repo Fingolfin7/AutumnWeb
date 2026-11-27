@@ -8,6 +8,7 @@ import { useToast } from "@/app/toasts";
 import { formatDate, formatDurationWords } from "@/lib/format";
 import type { Project, ProjectDetail } from "@/api/types";
 import { useCommitmentsAppliedTo } from "@/features/commitments/api";
+import { LastSessionNote } from "@/features/sessions/LastSessionNote";
 import { failure, useProject, useUpdateProject } from "./api";
 import { CommitmentsPanel } from "./CommitmentsPanel";
 import { conflictCurrent, splitErrors } from "./forms";
@@ -145,6 +146,8 @@ function ProjectDetailView({ project }: { project: ProjectDetail }) {
           </div>
         </section>
       </div>
+
+      <LastSessionNote projectId={project.id} />
 
       <CommitmentsPanel
         commitments={related}

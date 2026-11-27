@@ -2,3 +2,15 @@
 .nx-week-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); margin-top: var(--s3); }
 .nx-week-nav .btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 .nx-review-dim { opacity: .55; transition: opacity .15s var(--ease); }
+.nx-week-project-head { flex-wrap: wrap; gap: var(--s2); }
+.nx-review-notes { margin-top: var(--s2); }
+.nx-review-notes > summary { display: list-item; width: fit-content; padding: var(--s2) 0; }
+.nx-review-notes > summary::marker { color: var(--muted); }
+.nx-review-grid:has(.nx-review-notes[open]) { grid-template-columns: minmax(0, 1fr); }
+.nx-review-notes-list .session-note-body { max-width: 68ch; }
+@media (pointer: coarse) {
+  .nx-review-notes > summary { min-height: 44px; align-content: center; }
+}
+.nx-review-notes-list { margin: var(--s2) 0 0; padding: 0; list-style: none; }
+.nx-review-notes-list > li { border-top: 1px solid var(--hairline); padding: var(--s3) 0; }
+.nx-review-note-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--s2); }

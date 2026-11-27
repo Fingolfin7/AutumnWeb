@@ -3,15 +3,17 @@ import { useNavigate, useSearchParams } from "react-router";
 import { faArrowLeft } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { LocalTimeNotice, useLocalTime } from "@/components/LocalTimeNotice";
-import { AppLink, urls } from "@/app/links";
+import { AppLink, isAppPath, urls } from "@/app/links";
 import { useToast } from "@/app/toasts";
 import { errorMessage } from "@/api/errors";
 import { bootstrap } from "@/bootstrap";
+import { parseInstant } from "@/lib/format";
+import { LastSessionNote } from "@/features/sessions/LastSessionNote";
 import { useStartTimer } from "./api";
 import { minutesOf, planReminders, type DurationUnit, type ReminderMode } from "./reminderPlan";
 import { PushPermission } from "./PushPermission";
 import { ProjectFields, useProjectPick, type ProjectPick } from "./ProjectPick";
-import { LogSessionForm } from "./LogSessionForm";
+import { LogSessionForm, type LogPrefill } from "./LogSessionForm";
 
 const PRESETS: Record<DurationUnit, { value: number; label: string }[]> = {
   minutes: [15, 25, 30, 45, 60].map((value) => ({ value, label: `${value}m` })),
@@ -33,10 +35,24 @@ const numberOrNull = (value: string) => {
 /* New timer (start_timer.html + timer_search_projects.js + timer_reminders.js),
    or, with ?mode=log, a session that already happened. Both modes share the
    project choice and its ?project_id=&subproject_id= prefill. */
+/* ?start=&end= (ISO instants) open Log past on that stretch; ?next= (an app
+   path, nothing else) is where saving or Back returns to. An unreadable or
+   backwards pair is ignored, leaving the usual "an hour, just now". */
+export function readLogPrefill(params: URLSearchParams): LogPrefill | null {
+  const start = params.get("start");
+  const end = params.get("end");
+  const from = parseInstant(start);
+  const until = parseInstant(end);
+  if (!start || !end || !from || !until || until.getTime() <= from.getTime()) return null;
+  const next = params.get("next");
+  return { start, end, next: next && isAppPath(next) ? next : null };
+}
+
 export default function StartTimerPage() {
   const [params, setParams] = useSearchParams();
   const logMode = params.get("mode") === "log";
   const pick = useProjectPick(params);
+  const [prefill] = useState(() => readLogPrefill(params));
   const autoFocus = !params.get("project_id");
   const setMode = (log: boolean) =>
     setParams(
@@ -73,7 +89,7 @@ export default function StartTimerPage() {
           ))}
         </div>
       </div>
-      {logMode ? <LogSessionForm pick={pick} autoFocus={autoFocus} /> : <StartForm pick={pick} autoFocus={autoFocus} />}
+      {logMode ? <LogSessionForm pick={pick} autoFocus={autoFocus} prefill={prefill} /> : <StartForm pick={pick} autoFocus={autoFocus} />}
     </>
   );
 }
@@ -168,6 +184,7 @@ function StartForm({ pick, autoFocus }: { pick: ProjectPick; autoFocus: boolean 
     <form className="fields desk" onSubmit={submit}>
       <div className="desk-main">
         <ProjectFields pick={pick} autoFocus={autoFocus} />
+        {project ? <LastSessionNote projectId={project.id} /> : null}
 
         <section className="slab slab-pad">
           <label className="check-row">

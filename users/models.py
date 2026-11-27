@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import uuid
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.db import models
@@ -48,6 +49,7 @@ def get_fernet():
 
 class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
+    backup_namespace = models.UUIDField(default=uuid.uuid4, editable=False, unique=True, null=True)
     active_context = models.ForeignKey(
         "core.Context",
         null=True,

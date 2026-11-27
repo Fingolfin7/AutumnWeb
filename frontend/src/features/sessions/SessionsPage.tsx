@@ -7,13 +7,15 @@ import { OptionPicker } from "@/components/OptionPicker";
 import { Empty, ErrorState, Skeleton } from "@/components/states";
 import { SegmentedControl } from "@/components/ui";
 import { JournalDensityControl } from "@/components/SessionNote";
+import { MarkdownActions } from "@/components/MarkdownActions";
 import { AppLink, urls } from "@/app/links";
 import { useActiveContext } from "@/app/context";
 import { useAllProjects, useContexts, useQueuedOps, useTags } from "@/api/meta";
 import { formatJournalDate, formatJournalDuration, localDateKey } from "@/lib/format";
 import { groupByDay } from "@/lib/sessions";
+import { sessionListMarkdown } from "@/lib/journalMarkdown";
 import { JournalDay, SessionBand } from "./SessionBand";
-import { readSessionOrder, saveSessionOrder, useBestMatchOrder, pendingSessions, useSessionList, useSessionTotals, type SessionFilters, type SessionRow } from "./api";
+import { fetchAllSessionPages, mergeSessionPages, readSessionOrder, saveSessionOrder, useBestMatchOrder, pendingSessions, useSessionList, useSessionTotals, type SessionFilters } from "./api";
 import { semanticSearchAvailable } from "@/features/charts/api";
 import { RelatedSlider } from "@/features/search/RelatedSlider";
 import { useRelatedSummary } from "@/features/search/api";
@@ -106,13 +108,7 @@ export default function SessionsPage() {
   const depth = bootstrap().profile.search_ranker ?? "off";
   const aiOrder = useBestMatchOrder(apiFilters, depth, best && depth !== "off" && list.isSuccess);
   const ordered = best && aiOrder.data?.reranked ? aiOrder.data : null;
-  const seen = new Set<number>();
-  const all: SessionRow[] = (list.data?.pages.flatMap((page, index) => index === 0 && ordered ? ordered.sessions : page.sessions) ?? [])
-    .filter((row) => {
-      if (seen.has(row.id)) return false;
-      seen.add(row.id);
-      return true;
-    });
+  const all = mergeSessionPages(list.data?.pages ?? [], ordered?.sessions);
   /* Sessions logged on this device that haven't synced yet join the plain
      list (no search or filter but the header's context). */
   const ops = useQueuedOps();
@@ -128,6 +124,18 @@ export default function SessionsPage() {
   const total = (list.data?.pages[0]?.total ?? 0) + waiting.length + (ordered?.added ?? 0);
   const groups = groupByDay(direct);
   const totals = useSessionTotals(apiFilters, filtered);
+  const loadMarkdown = async (signal: AbortSignal) => {
+    const pages = await fetchAllSessionPages(apiFilters, { signal, loadedPages: list.data?.pages });
+    // Reuse the visible ranking only if the base first page still matches.
+    const originalIds = list.data?.pages[0]?.sessions.map(row => row.id).join(",");
+    const freshIds = pages[0]?.sessions.map(row => row.id).join(",");
+    if (ordered && originalIds !== freshIds) throw new Error("The ranked results changed. Refresh Sessions and try again.");
+    const sessions = mergeSessionPages(pages, ordered?.sessions);
+    const rows = waiting.length
+      ? [...waiting, ...sessions].sort((a, b) => Date.parse(b.end ?? "") - Date.parse(a.end ?? ""))
+      : sessions;
+    return sessionListMarkdown(rows, { best, search: applied.search });
+  };
   const preset = PRESETS.find((label) => {
     const range = sessionRange(label);
     return applied.start_date === range.start_date && applied.end_date === range.end_date;
@@ -161,6 +169,16 @@ export default function SessionsPage() {
     <div className="sessions-page">
       <div className="journal-title">
         <h1 className="page-title">Sessions</h1>
+        {total && !list.isError ? (
+          <MarkdownActions
+            key={JSON.stringify(apiFilters)}
+            copyLabel={`Copy ${total.toLocaleString()} session${total === 1 ? "" : "s"} as Markdown`}
+            filename="autumn-sessions.md"
+            load={loadMarkdown}
+            disabled={aiOrder.isPending && best && depth !== "off"}
+            showDownload
+          />
+        ) : null}
         {all.length || waiting.length ? <JournalDensityControl /> : null}
       </div>
       <form className="fields journal-search" onSubmit={onSearch} role="search">

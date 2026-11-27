@@ -29,31 +29,40 @@ export type SessionRow = Session & { pending_sync?: boolean };
 
 export const SESSION_PAGE = 30;
 
+interface SessionPage {
+  sessions: SessionRow[];
+  total: number;
+}
+
+const cleanFilters = (filters: SessionFilters) =>
+  Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as SessionFilters;
+
+function fetchSessionPage(query: SessionFilters, offset: number, limit: number, includeHtml: boolean, signal: AbortSignal): Promise<SessionPage> {
+  return unwrap(api.GET("/api/v2/sessions/", {
+    signal,
+    params: {
+      query: {
+        ...query,
+        active: false,
+        include: includeHtml ? "note,note_html" : "note",
+        limit,
+        offset,
+        ...(query.search ? { related: true, ordering: query.ordering ?? "relevance" } : { ordering: "newest" as const }),
+      },
+    },
+  }));
+}
+
 /* One ranked list shared with API v2 and MCP (core.search.rank_sessions):
    with a search term and related=true the server returns direct matches
    newest first, then related matches best first, or all by similarity with
    ordering=best, each tagged by `match`. */
 export function sessionListQuery(filters: SessionFilters) {
-  const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) as SessionFilters;
-  const searching = !!query.search;
+  const query = cleanFilters(filters);
   return infiniteQueryOptions({
     queryKey: keys.sessions({ list: query }),
     initialPageParam: 0,
-    queryFn: async ({ pageParam }) =>
-      unwrap(
-        api.GET("/api/v2/sessions/", {
-          params: {
-            query: {
-              ...query,
-              active: false,
-              include: "note,note_html",
-              limit: SESSION_PAGE,
-              offset: pageParam,
-              ...(searching ? { related: true, ordering: query.ordering ?? "relevance" } : { ordering: "newest" as const }),
-            },
-          },
-        }),
-      ),
+    queryFn: ({ pageParam, signal }) => fetchSessionPage(query, pageParam, SESSION_PAGE, true, signal),
     getNextPageParam: (last, all) => {
       const loaded = all.reduce((sum, page) => sum + page.sessions.length, 0);
       return last.sessions.length && loaded < last.total ? loaded : undefined;
@@ -62,6 +71,50 @@ export function sessionListQuery(filters: SessionFilters) {
 }
 
 export const useSessionList = (filters: SessionFilters) => useInfiniteQuery(sessionListQuery(filters));
+
+/** Reuse the visible pages when exporting, fetching the rest without adding
+ * them to the journal. A shift in the list while paging can otherwise look
+ * like a successful export with some sessions missing. */
+export async function fetchAllSessionPages(filters: SessionFilters, {
+  signal,
+  loadedPages = [],
+  includeHtml = false,
+}: { signal: AbortSignal; loadedPages?: readonly SessionPage[]; includeHtml?: boolean }): Promise<SessionPage[]> {
+  const query = cleanFilters(filters);
+  const attempt = (loaded: readonly SessionPage[]) => collectSessionPages(query, loaded, includeHtml, signal);
+  const pages = await attempt(loadedPages) ?? await attempt([]);
+  if (!pages) throw new Error("Sessions changed while preparing the export. Try again.");
+  return pages;
+}
+
+async function collectSessionPages(
+  query: SessionFilters, loaded: readonly SessionPage[], includeHtml: boolean, signal: AbortSignal,
+): Promise<SessionPage[] | null> {
+  const pages = [...loaded];
+  let offset = pages.reduce((sum, page) => sum + page.sessions.length, 0);
+  let total = pages[0]?.total;
+  while (total === undefined || offset < total) {
+    // Best-match reranking replaces the first journal-sized page.
+    const limit = offset === 0 && query.ordering === "best" ? SESSION_PAGE : 500;
+    const page = await fetchSessionPage(query, offset, limit, includeHtml, signal);
+    total ??= page.total;
+    if (page.total !== total || (!page.sessions.length && offset < total)) return null;
+    pages.push(page);
+    offset += page.sessions.length;
+  }
+  if (pages.some((page) => page.total !== total) || offset !== total || mergeSessionPages(pages).length !== total) return null;
+  return pages;
+}
+
+/** The AI order replaces the first ranked page and may add related matches. */
+export function mergeSessionPages(pages: readonly SessionPage[], orderedHead?: SessionRow[]): SessionRow[] {
+  const seen = new Set<number>();
+  return pages.flatMap((page, index) => index === 0 && orderedHead ? orderedHead : page.sessions).filter((row) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
+}
 
 /** The filtered list's whole duration, whatever pages are loaded. */
 export function useSessionTotals(filters: SessionFilters, enabled: boolean) {

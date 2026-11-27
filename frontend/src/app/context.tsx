@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { bootstrap } from "@/bootstrap";
+import { BOOTSTRAP_REFRESHED, bootstrap } from "@/bootstrap";
 import { requestJson } from "@/api/client";
 import { useToast } from "./toasts";
 import { errorMessage } from "@/api/errors";
@@ -28,9 +28,20 @@ export function useActiveContext(): ActiveContextValue {
 export function ActiveContextProvider({ children }: { children: ReactNode }) {
   const initial = bootstrap();
   const [contextId, setLocal] = useState<number | null>(initial.active_context_id);
-  const [contexts] = useState(initial.contexts);
+  const [contexts, setContexts] = useState(initial.contexts);
   const queryClient = useQueryClient();
   const toast = useToast();
+
+  /* Something replaced the account's data in place (a backup restore) and
+     refreshed the bootstrap blob: follow it without a reload. */
+  useEffect(() => {
+    const follow = () => {
+      setContexts(bootstrap().contexts);
+      setLocal(bootstrap().active_context_id);
+    };
+    window.addEventListener(BOOTSTRAP_REFRESHED, follow);
+    return () => window.removeEventListener(BOOTSTRAP_REFRESHED, follow);
+  }, []);
 
   const setContextId = useCallback(
     async (id: number | null) => {

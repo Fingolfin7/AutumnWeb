@@ -1,0 +1,42 @@
+/* Settings > Data > Backup & restore. Two slabs in the settings column; the
+   preview reads as a ledger: facts, then the counts table, then conflicts. */
+.backup-page { display: grid; gap: var(--s5); }
+.backup-block { display: grid; gap: var(--s3); }
+.backup-title { margin: 0; font-size: var(--fs-lg); font-weight: 650; }
+.backup-lede { margin: 0; max-width: 62ch; color: var(--ink-2); font-size: var(--fs-sm); }
+.backup-hint { margin: 0; color: var(--muted); font-size: var(--fs-xs); }
+.backup-options { display: grid; gap: var(--s1); }
+.backup-options .backup-hint { padding-left: calc(44px + var(--s3)); }
+.backup-block .form-actions { margin-top: var(--s1); }
+.backup-problem { align-items: center; flex-wrap: wrap; gap: var(--s2) var(--s3); }
+.backup-done { margin: 0; color: var(--duration); font-size: var(--fs-sm); }
+.backup-notice { margin: 0; padding-left: var(--s3); border-left: 2px solid var(--note); color: var(--ink); font-size: var(--fs-sm); }
+
+.backup-preview { display: grid; gap: var(--s4); padding-top: var(--s4); border-top: 1px solid var(--hairline); }
+.backup-facts { display: grid; gap: 0; margin: 0; }
+.backup-facts > div { display: grid; grid-template-columns: 8rem minmax(0, 1fr); gap: var(--s3); padding-block: var(--s2); border-bottom: 1px solid var(--hairline); }
+.backup-facts dt { color: var(--muted); font-size: var(--fs-sm); }
+.backup-facts dd { margin: 0; overflow-wrap: anywhere; }
+
+.backup-inventory { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.backup-inventory th, .backup-inventory td { padding: var(--s2) var(--s2); border-bottom: 1px solid var(--hairline); text-align: right; font-variant-numeric: tabular-nums; }
+.backup-inventory :is(thead th, tbody th, tfoot th):first-child { padding-left: 0; text-align: left; }
+.backup-inventory :is(th, td):last-child { padding-right: 0; }
+.backup-inventory thead th { color: var(--muted); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.backup-inventory tbody th { font-weight: 500; color: var(--ink-2); }
+.backup-inventory td { color: var(--ink); }
+.backup-inventory tfoot :is(th, td) { border-bottom: 0; font-weight: 650; color: var(--ink); }
+.backup-inventory .is-conflict { color: var(--project); font-weight: 650; }
+
+.backup-conflicts h3 { margin: 0 0 var(--s2); color: var(--project); font-size: var(--fs-sm); font-weight: 650; }
+.backup-conflicts ul { display: grid; gap: 0; max-height: 18rem; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.backup-conflicts li { padding-block: var(--s2); border-bottom: 1px solid var(--hairline); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.backup-conflict-section { margin-right: var(--s2); color: var(--muted); font-size: var(--fs-xs); }
+
+@media (max-width: 999px) {
+  .backup-facts > div { grid-template-columns: minmax(6rem, .8fr) minmax(0, 1.5fr); }
+  .backup-inventory thead th { letter-spacing: 0; text-transform: none; }
+}
+@media (max-width: 420px) {
+  .backup-inventory th, .backup-inventory td { padding-inline: var(--s1); }
+}

@@ -25,7 +25,17 @@ export const urls = {
   projects: () => "/projects/",
   timers: () => "/timers/",
   startTimer: () => "/start_timer/",
-  logSession: () => "/start_timer/?mode=log",
+  /* With start/end (exact ISO instants) the form opens on that stretch; with
+     next it returns there after saving. */
+  logSession: (prefill?: { start: string; end: string; next?: string }) => {
+    const query = new URLSearchParams({ mode: "log" });
+    if (prefill) {
+      query.set("start", prefill.start);
+      query.set("end", prefill.end);
+      if (prefill.next) query.set("next", prefill.next);
+    }
+    return `/start_timer/?${query}`;
+  },
   stopTimer: (id: number) => `/stop_timer/${id}/`,
   sessions: () => "/sessions/",
   updateSession: (id: number) => `/update_session/${id}/`,
@@ -51,6 +61,7 @@ export const urls = {
   deleteCommitment: (id: number) => `/delete_commitment/${id}/`,
   import: () => "/settings/import/",
   export: () => "/settings/export/",
+  backup: () => "/settings/backup/",
   profile: () => "/settings/account/",
   settings: (section = "") => `/settings/${section && `${section}/`}`,
   mcpConnections: () => "/mcp/connections/",

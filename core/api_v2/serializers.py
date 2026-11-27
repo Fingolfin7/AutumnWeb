@@ -1353,6 +1353,8 @@ class TimelineTickSerializer(serializers.Serializer):
 
 
 class TimelineGapSerializer(serializers.Serializer):
+    start = UTCDateTimeField()
+    end = UTCDateTimeField()
     minutes = serializers.IntegerField()
     label = serializers.CharField()
     start_pct = serializers.FloatField()

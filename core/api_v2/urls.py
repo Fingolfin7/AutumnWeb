@@ -73,6 +73,7 @@ from core.api_v2.import_export import (
     ImportUploadView,
     ImportView,
 )
+from core.api_v2.backup import BackupPreviewView, BackupRestoreView, BackupSummaryView, BackupView
 
 
 app_name = "api_v2"
@@ -186,6 +187,10 @@ urlpatterns = [
         name="recommendation-usage",
     ),
     path("export/", ExportView.as_view(), name="export"),
+    path("backup/", BackupView.as_view(), name="backup"),
+    path("backup/summary/", BackupSummaryView.as_view(), name="backup-summary"),
+    path("backup/preview/", BackupPreviewView.as_view(), name="backup-preview"),
+    path("backup/restore/", BackupRestoreView.as_view(), name="backup-restore"),
     path("import/", ImportView.as_view(), name="import"),
     path("import/uploads/", ImportUploadView.as_view(), name="import-upload"),
     path(

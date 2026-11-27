@@ -72,5 +72,9 @@ export function bootstrap(): Bootstrap {
   return cached;
 }
 
+/** Window event fired after code rewrites the cached blob in place (a backup
+ *  restore), for the parts of the shell that copied it at startup. */
+export const BOOTSTRAP_REFRESHED = "autumn:bootstrap-refreshed";
+
 /* Tests build on the fallback without a DOM blob. */
 export { FALLBACK as EMPTY_BOOTSTRAP };
