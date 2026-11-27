@@ -8,8 +8,10 @@ from unittest.mock import AsyncMock, patch
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import User
 from django.contrib.sessions.backends.signed_cookies import SessionStore
+from django.core.cache import caches
 from django.core.management import call_command
 from django.test import RequestFactory, TransactionTestCase
+from toon import encode
 
 from core.models import Context, Projects, Sessions
 from core.utils import set_active_context
@@ -19,7 +21,9 @@ from llm_insights.models import LLMChat, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.services.context import build_post_context
 from llm_insights.services.streaming import _prepare_stream_context, _run_stream_worker, stream_insights_response
-from llm_insights.session_context import SESSION_DATA_SLOT, compact_session_prompt
+from llm_insights.session_context import (
+    MIN_CACHE_SESSIONS, SESSION_DATA_SLOT, compact_session_prompt, encode_session_data,
+)
 
 
 class InsightsSessionContextTests(TransactionTestCase):
@@ -35,6 +39,47 @@ class InsightsSessionContextTests(TransactionTestCase):
 
     def handler(self):
         return OpenAIHandler(api_key="test-key")
+
+    def test_large_session_payload_reuses_encoding_until_forced_or_edited(self):
+        cache = caches["insights_session_data"]
+        cache.clear()
+        self.addCleanup(cache.clear)
+        Sessions.objects.bulk_create([
+            Sessions(
+                user=self.user, project=self.project, start_time=self.session.start_time - timedelta(hours=i),
+                end_time=self.session.end_time - timedelta(hours=i), note="Fictional cached session.",
+            )
+            for i in range(1, MIN_CACHE_SESSIONS)
+        ])
+        selection = Sessions.objects.filter(user=self.user).select_related("project").prefetch_related("subprojects")
+        sessions = list(selection.all())
+        with patch("llm_insights.session_context.encode", wraps=encode) as encoder:
+            first = encode_session_data(sessions, username=self.user.username)
+            self.assertIn("Original note.", first)
+            self.assertEqual(encode_session_data(sessions, username=self.user.username), first)
+            self.assertEqual(encoder.call_count, 1)
+
+            refreshed = encode_session_data(
+                sessions, username=self.user.username, force_refresh=True,
+            )
+            self.assertEqual(refreshed, first)
+            self.assertEqual(encoder.call_count, 2)
+
+            Sessions.objects.filter(pk=self.session.pk).update(note="Edited note.")
+            sessions = list(selection.all())
+            edited = encode_session_data(sessions, username=self.user.username)
+            self.assertIn("Edited note.", edited)
+            self.assertNotIn("Original note.", edited)
+            self.assertEqual(encoder.call_count, 3)
+
+            self.assertEqual(encode_session_data(sessions, username="another-account"), edited)
+            self.assertEqual(encoder.call_count, 4)
+
+    def test_small_session_payload_bypasses_cache(self):
+        with patch("llm_insights.session_context.encode", wraps=encode) as encoder:
+            first = encode_session_data([self.session], username=self.user.username)
+            self.assertEqual(encode_session_data([self.session], username=self.user.username), first)
+            self.assertEqual(encoder.call_count, 2)
 
     def test_all_providers_rebuild_stored_instructions_without_resetting_history(self):
         for handler_class in (OpenAIHandler, ClaudeHandler, GeminiHandler):
@@ -137,6 +182,9 @@ class InsightsSessionContextTests(TransactionTestCase):
                 stack.enter_context(patch(f"{stream_module}.get_llm_handler", return_value=handler))
                 stack.enter_context(patch(f"{stream_module}.get_chat_title_handler", return_value=handler))
                 stack.enter_context(patch.object(handler, "generate_chat_title", AsyncMock(return_value="")))
+                initialize = stack.enter_context(
+                    patch.object(handler, "initialize_chat", wraps=handler.initialize_chat)
+                )
                 if provider == "openai":
                     stack.enter_context(patch.object(handler, "_stream_with_priority_events", openai_stream))
                 elif provider == "claude":
@@ -148,6 +196,7 @@ class InsightsSessionContextTests(TransactionTestCase):
                 events, done = Queue(), object()
                 async_to_sync(_run_stream_worker)(stream_context, events, done)
 
+            self.assertEqual(initialize.call_args.kwargs["force_refresh"], filters is not None)
             received = []
             while (event := events.get_nowait()) is not done:
                 received.append(event)
@@ -180,6 +229,10 @@ class InsightsSessionContextTests(TransactionTestCase):
         self.assertNotIn("Edited note.", updated.content)
         self.assertEqual(updated.metadata["session_filters"], new_filters)
         self.assertIn("Edited note.", outbound[2][0])
+        # Applying the same filters is still a deliberate reload.
+        turn("Refresh the same selection", new_filters)
+        self.assertEqual(chat.messages.filter(role="system").count(), 3)
+        self.assertEqual(outbound[3][0], outbound[2][0])
 
     def test_cleanup_recognizes_old_toon_and_json_and_preserves_the_rest(self):
         handler = self.handler()

@@ -245,7 +245,13 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",  # was running into issues with PickleCache due to thread locking
         "LOCATION": "unique-snowflake",
-    }
+    },
+    "insights_session_data": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "insights-session-data",
+        "TIMEOUT": 180,
+        "OPTIONS": {"MAX_ENTRIES": 4},
+    },
 }
 
 ROOT_URLCONF = "AutumnWeb.urls"

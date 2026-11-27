@@ -1,7 +1,5 @@
-from toon import encode
 from anthropic import NOT_GIVEN, AsyncAnthropic
 from typing import Any, AsyncIterator
-from core.utils import build_project_json_from_sessions
 from .attachments import claude_content
 from .base_handler import BaseLLMHandler
 from .session_context import render_session_prompt
@@ -57,12 +55,6 @@ class ClaudeHandler(BaseLLMHandler):
         {username} has updated their session data.
         Refer to the new session data for the remainder of the conversation.
         """
-
-    def initialize_chat(self, username, sessions_data):
-        self.username = username
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
 
     def _max_tokens(self) -> int:
         return self.MAX_OUTPUT_TOKENS.get(self.model, self.DEFAULT_MAX_OUTPUT_TOKENS)
@@ -207,9 +199,7 @@ class ClaudeHandler(BaseLLMHandler):
         self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
         """Update session data and stream the assistant response."""
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
+        self.initialize_chat(self.username, sessions_data, force_refresh=True)
         update_prompt = self._build_system_text(
             self.update_session_data_notice.format(username=self.username)
         )

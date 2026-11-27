@@ -1,9 +1,7 @@
 from typing import Any, AsyncIterator
 
 from openai import AsyncOpenAI
-from toon import encode
 
-from core.utils import build_project_json_from_sessions
 from users.codex_auth import CODEX_CHATGPT_BASE_URL
 
 from .attachments import openai_content
@@ -67,12 +65,6 @@ class OpenAIHandler(BaseLLMHandler):
         if self.codex_token:
             return self.AUTH_CODEX
         return self.AUTH_API
-
-    def initialize_chat(self, username, sessions_data):
-        self.username = username
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
 
 
     def _messages_from_history(
@@ -369,9 +361,7 @@ class OpenAIHandler(BaseLLMHandler):
     async def stream_update_session_data(
         self, sessions_data, user_prompt, attachments=None
     ) -> AsyncIterator[str]:
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
+        self.initialize_chat(self.username, sessions_data, force_refresh=True)
         update_prompt = self._build_system_text(
             self.update_session_data_notice.format(username=self.username)
         )

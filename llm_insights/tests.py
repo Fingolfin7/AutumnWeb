@@ -401,7 +401,7 @@ class FakeStreamingHandler(BaseLLMHandler):
         self.initialized = False
         self.username = None
 
-    def initialize_chat(self, username, sessions):
+    def initialize_chat(self, username, sessions, *, force_refresh=False):
         self.initialized = True
 
     def stream_update_session_data(self, sessions_data, user_prompt, attachments=None):

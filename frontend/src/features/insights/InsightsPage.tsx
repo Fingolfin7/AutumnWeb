@@ -18,6 +18,7 @@ import { filesFrom, useAttachmentDrafts } from "./attachments";
 import { Composer } from "./Composer";
 import { FilterSheet } from "./FilterSheet";
 import { Sidebar } from "./Sidebar";
+import { insightKeys } from "./keys";
 import { runItems, savedItems, Transcript } from "./Transcript";
 import { chatPath } from "./paths";
 import { isLive, showsRun } from "./run";
@@ -169,6 +170,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   /* The selection changed since the chat last saw it: send it with the next
      question so the model is handed the new sessions. */
   const [reselected, setReselected] = useState(false);
+  const selectionRevision = useRef(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const needsSessionSelection = !!chat && chat.filters?.context === undefined && !reselected;
 
@@ -218,10 +220,15 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   );
 
   const select = (next: SelectionFilters) => {
+    selectionRevision.current += 1;
     setSelection(next);
     setDraft(next);
     setReselected(true);
     setSheetOpen(false);
+    void client.invalidateQueries({
+      queryKey: insightKeys.selection(selectionQuery(next, defaults, contextId)),
+      exact: true,
+    });
     toast.success("Session selection updated.");
   };
   const onSelect = (event: FormEvent) => {
@@ -255,17 +262,24 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
     const sentFiles = attach.views;
     attach.clear();
     const base = turns.length;
-    void startRun({
+    const sentSelectionRevision = selectionRevision.current;
+    const sending = startRun({
       client,
       body,
       baseCount: base,
       chatModel: `${model.provider}:${model.model}`,
       seedFilters: { ...selectionRequest(selection, defaults, contextId), reasoning_effort: model.effort },
       attachments: sentFiles,
-    }).then(() => {
-      if (currentRun()?.status !== "error") setReselected(false);
     });
-    ownRun.current = currentRun()?.id ?? null;
+    const sentRun = currentRun();
+    ownRun.current = sentRun?.id ?? null;
+    void sending.then(() => {
+      const finished = currentRun();
+      if (finished?.status === "done" && finished.id === sentRun?.id
+          && selectionRevision.current === sentSelectionRevision) {
+        setReselected(false);
+      }
+    });
   };
 
   const toggleSidebar = () => {

@@ -1,13 +1,19 @@
 """Keep the Insights instructions while rebuilding their session payload per request."""
 
+import hashlib
 import json
 import re
 
+from django.core.cache import caches
 from toon import decode, encode
+
+from core.utils import build_project_json_from_sessions
 
 
 SESSION_DATA_SLOT = "[Autumn inserts current filtered sessions here.]"
 SESSION_FILTERS_KEY = "session_filters"
+MIN_CACHE_SESSIONS = 300
+MAX_CACHED_BYTES = 4 * 1024 * 1024
 
 _PROMPT_START = re.compile(
     r"\A\s*(?:You are an expert project and time tracking analyst\. "
@@ -27,6 +33,34 @@ _PROJECT_FIELDS = {
     "Start Date", "Last Updated", "Total Time", "Status", "Description",
     "Sub Projects", "Session History",
 }
+
+
+def encode_session_data(sessions, *, username, force_refresh=False):
+    """Reuse TOON encoding only when the current model-visible data matches."""
+    projects = build_project_json_from_sessions(sessions, autumn_compatible=True)
+    if len(sessions) < MIN_CACHE_SESSIONS:
+        return encode(projects)
+
+    # Include names, notes, ordering and rendered times, so database edits,
+    # timezone changes and related-search results need no separate invalidation.
+    try:
+        source = json.dumps([username, projects], ensure_ascii=True, separators=(",", ":")).encode()
+    except (TypeError, ValueError):
+        return encode(projects)
+    if len(source) > MAX_CACHED_BYTES:
+        return encode(projects)
+
+    key = hashlib.sha256(source).hexdigest()
+    cache = caches["insights_session_data"]
+    if not force_refresh:
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+
+    payload = encode(projects)
+    if len(payload.encode("utf-8")) <= MAX_CACHED_BYTES:
+        cache.set(key, payload)
+    return payload
 
 
 def compact_session_prompt(content):

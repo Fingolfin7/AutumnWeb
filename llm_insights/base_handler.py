@@ -1,15 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import AsyncIterator
 
-from .session_context import SESSION_DATA_SLOT, render_session_prompt
+from .session_context import SESSION_DATA_SLOT, encode_session_data, render_session_prompt
 
 
 class BaseLLMHandler(ABC):
     """Abstract base class for LLM handlers"""
 
-    @abstractmethod
-    def initialize_chat(self, username, sessions_data):
-        pass
+    def initialize_chat(self, username, sessions_data, *, force_refresh=False):
+        self.username = username
+        self.session_data = encode_session_data(
+            sessions_data, username=username, force_refresh=force_refresh
+        )
 
     @abstractmethod
     def get_conversation_history(self) -> list:

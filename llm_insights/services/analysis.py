@@ -20,7 +20,7 @@ async def perform_llm_analysis_stream(
             sessions, user_prompt=user_prompt, attachments=attachments
         )
     elif user_prompt:
-        llm_handler.initialize_chat(username, sessions)
+        llm_handler.initialize_chat(username, sessions, force_refresh=sessions_updated)
         stream = llm_handler.stream_message(user_prompt, attachments=attachments)
     else:
         return

@@ -1,8 +1,6 @@
-from toon import encode
 from google import genai
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
 from typing import Any, AsyncIterator
-from core.utils import build_project_json_from_sessions
 from .attachments import gemini_parts
 from .base_handler import BaseLLMHandler
 from .session_context import render_session_prompt
@@ -92,13 +90,6 @@ class GeminiHandler(BaseLLMHandler):
             "cached": getattr(metadata, "cached_content_token_count", 0) or 0,
         }
 
-
-    def initialize_chat(self, username, sessions_data):
-        """Initialize a new chat with username and session data"""
-        self.username = username
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
 
     def _parse_error(self, e):
         """Attempt to extract structured data from the Gemini error."""
@@ -244,9 +235,7 @@ class GeminiHandler(BaseLLMHandler):
     ) -> AsyncIterator[str]:
         """Update session data and stream the assistant response."""
         result = None
-        self.session_data = encode(
-            build_project_json_from_sessions(sessions_data, autumn_compatible=True)
-        )
+        self.initialize_chat(self.username, sessions_data, force_refresh=True)
         # The payload lives in system_instruction, which is fixed at chat
         # creation — rebuild the chat so the new data takes effect.
         update_session_data_prompt = self._build_system_text(
