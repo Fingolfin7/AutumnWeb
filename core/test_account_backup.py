@@ -7,7 +7,7 @@ from zipfile import ZipFile
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TransactionTestCase
 from PIL import Image
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
@@ -20,7 +20,7 @@ from llm_insights.attachments import create_attachment
 from llm_insights.models import LLMChat, LLMMessage
 
 
-class AccountBackupTests(TestCase):
+class AccountBackupTests(TransactionTestCase):
     def setUp(self):
         self.api = APIClient()
         self.source = User.objects.create_user("source", email="source@example.test")
@@ -35,10 +35,8 @@ class AccountBackupTests(TestCase):
         self.assertEqual(response.status_code, 200, getattr(response, "data", None))
         self.assertEqual(response["Content-Type"], "application/zip")
         self.assertIn("no-store", response["Cache-Control"])
-        try:
-            return b"".join(response.streaming_content)
-        finally:
-            response.close()
+        # Django's test client closes a streaming response when consumed.
+        return b"".join(response.streaming_content)
 
     def submit(self, stage, data, token=None, *, user=None):
         self.api.force_authenticate(user or self.destination)

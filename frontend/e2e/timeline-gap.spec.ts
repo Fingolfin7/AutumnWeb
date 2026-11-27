@@ -39,9 +39,10 @@ test("fill part of a timeline gap and pick up the new note on that project", asy
   await expect(page.getByLabel("End time")).toHaveValue(day + "T10:20:11");
   await page.getByLabel("End time").fill(day + "T10:10:11");
   const projectField = page.getByRole("combobox", { name: "Project" });
+  await projectField.click();
+  await expect(page.getByRole("listbox")).toBeVisible();
   await projectField.fill(projectName);
-  await expect(page.getByRole("option", { name: projectName })).toBeVisible();
-  await projectField.press("Enter");
+  await expect(page.getByRole("button", { name: "Log session" })).toBeEnabled();
   const note = "Recheck the diagrams after the next import.";
   await page.getByRole("textbox", { name: "Note", exact: true }).fill(note);
   await page.getByRole("button", { name: "Log session" }).click();
