@@ -1,12 +1,14 @@
 import io
 import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from zipfile import ZipFile
 
 from django.contrib.auth.models import User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
 from django.test import TransactionTestCase
 from PIL import Image
 from rest_framework.authtoken.models import Token
@@ -176,3 +178,24 @@ class AccountBackupTests(TransactionTestCase):
             response = self.submit("preview", buffer.getvalue())
             self.assertEqual(response.status_code, 400, response.data)
         self.assertFalse(Projects.objects.filter(user=self.destination, name="Would be added").exists())
+
+    def test_recovery_command_previews_creates_account_and_replays(self):
+        Projects.objects.create(user=self.source, name="Archived work", status="archived")
+        data = self.download()
+        with TemporaryDirectory() as directory:
+            archive = Path(directory) / "backup.zip"
+            archive.write_bytes(data)
+            args = ("recovering", str(archive), "--create-user", "recovery@example.test")
+            preview = io.StringIO()
+            call_command("restore_account_backup", *args, stdout=preview)
+            self.assertIn("Preview only", preview.getvalue())
+            self.assertFalse(User.objects.filter(username="recovering").exists())
+
+            call_command("restore_account_backup", *args, "--apply", stdout=io.StringIO())
+            recovered = User.objects.get(username="recovering")
+            self.assertFalse(recovered.has_usable_password())
+            self.assertEqual(Projects.objects.get(user=recovered, name="Archived work").status, "archived")
+
+            repeated = io.StringIO()
+            call_command("restore_account_backup", *args, "--apply", stdout=repeated)
+            self.assertIn("Restored 0 record(s)", repeated.getvalue())

@@ -85,6 +85,19 @@ Autumn includes pie, bar, scatter, line, calendar, heatmap, stacked area, cumula
 
 Choose the ZIP on the same page to see the destination account, the records it would add and any conflicts. Resolve conflicts in the destination before applying the restore. Complete a running timer before backing it up. Sign-in credentials, AI keys, connected apps and browser notification subscriptions are set up separately on the destination.
 
+#### Recover after database loss
+
+Keep your ZIP outside the database and deployment. Point a replacement AutumnWeb installation at a fresh database and a writable media store. Use the backup ZIP to recreate your account before starting the web server:
+
+```text
+python manage.py migrate
+python manage.py restore_account_backup YOUR_USERNAME autumn-backup.zip --create-user you@example.com
+python manage.py restore_account_backup YOUR_USERNAME autumn-backup.zip --create-user you@example.com --apply
+python manage.py changepassword YOUR_USERNAME
+```
+
+The first restore command previews the records. The second creates the account and restores them. If the account already exists, Autumn uses it and checks for conflicts. You can configure the replacement installation with a new Django secret key. Each ZIP covers one account.
+
 ---
 
 ### Local Setup
