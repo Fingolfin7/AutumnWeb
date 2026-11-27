@@ -4,6 +4,77 @@
  */
 
 export interface paths {
+    "/api/v2/backup/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["backup_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/backup/preview/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Check a backup and compare it with this account. Changes nothing. */
+        post: operations["backup_preview_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/backup/restore/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Add what the preview showed, in one transaction. Records already
+         *     here are left as they are; nothing in this account is replaced or
+         *     removed.
+         */
+        post: operations["backup_restore_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/backup/summary/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description What the optional attachments choice would add to a backup. */
+        get: operations["backup_summary_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/commitments/": {
         parameters: {
             query?: never;
@@ -1091,6 +1162,82 @@ export interface components {
          * @enum {string}
          */
         BackgroundModeEnum: "upload" | "bing" | "apod" | "none";
+        BackupConflict: {
+            section: components["schemas"]["SectionEnum"];
+            /**
+             * Format: uuid
+             * @description The record's ID in the backup.
+             */
+            id: string;
+            label: string;
+        };
+        BackupPreview: {
+            version: number;
+            /** @description Username of the account the backup was made from. */
+            source_account: string;
+            /** @description Username of this account. */
+            destination_account: string;
+            same_account: boolean;
+            /** @description False while any conflict remains. */
+            can_restore: boolean;
+            includes_insights: boolean;
+            includes_attachments: boolean;
+            /** @description Per section, in restore order: records to add, already here, and in conflict. */
+            counts: {
+                [key: string]: components["schemas"]["BackupSectionCounts"];
+            };
+            /** @description Records in both with different contents (at most 100 listed). */
+            conflicts: components["schemas"]["BackupConflict"][];
+            /** @description Send with the same file to restore. Valid for an hour, for this account and file only. */
+            preview_token: string;
+        };
+        BackupRestoreRequest: {
+            /**
+             * Format: binary
+             * @description An Autumn account backup ZIP.
+             */
+            file: string;
+            /** @description The preview_token from previewing this same file in this account. */
+            preview_token: string;
+        };
+        BackupRestoreResult: {
+            version: number;
+            /** @description Username of the account the backup was made from. */
+            source_account: string;
+            /** @description Username of this account. */
+            destination_account: string;
+            same_account: boolean;
+            /** @description False while any conflict remains. */
+            can_restore: boolean;
+            includes_insights: boolean;
+            includes_attachments: boolean;
+            /** @description Per section, in restore order: records to add, already here, and in conflict. */
+            counts: {
+                [key: string]: components["schemas"]["BackupSectionCounts"];
+            };
+            /** @description Records in both with different contents (at most 100 listed). */
+            conflicts: components["schemas"]["BackupConflict"][];
+            /** @description Records added. 0 when everything was already here. */
+            restored: number;
+        };
+        BackupSectionCounts: {
+            add: number;
+            identical: number;
+            conflict: number;
+        };
+        BackupSummary: {
+            /** @description Insights files sent in chats. */
+            attachment_count: number;
+            /** @description Their total size in bytes. */
+            attachment_bytes: number;
+        };
+        BackupUpload: {
+            /**
+             * Format: binary
+             * @description An Autumn account backup ZIP.
+             */
+            file: string;
+        };
         /**
          * @description * `project` - project
          *     * `subproject` - subproject
@@ -2349,6 +2496,25 @@ export interface components {
          * @enum {string}
          */
         SearchRankerEnum: "off" | "top" | "near";
+        /**
+         * @description * `contexts` - contexts
+         *     * `tags` - tags
+         *     * `projects` - projects
+         *     * `subprojects` - subprojects
+         *     * `sessions` - sessions
+         *     * `commitments` - commitments
+         *     * `commitment_revisions` - commitment_revisions
+         *     * `commitment_periods` - commitment_periods
+         *     * `commitment_adjustments` - commitment_adjustments
+         *     * `profile` - profile
+         *     * `notification_preferences` - notification_preferences
+         *     * `reminder_schedules` - reminder_schedules
+         *     * `insight_chats` - insight_chats
+         *     * `insight_messages` - insight_messages
+         *     * `insight_attachments` - insight_attachments
+         * @enum {string}
+         */
+        SectionEnum: "contexts" | "tags" | "projects" | "subprojects" | "sessions" | "commitments" | "commitment_revisions" | "commitment_periods" | "commitment_adjustments" | "profile" | "notification_preferences" | "reminder_schedules" | "insight_chats" | "insight_messages" | "insight_attachments";
         SessionBestMatchOrderResponse: {
             reranked: boolean;
             added: number;
@@ -2560,6 +2726,16 @@ export interface components {
             width_pct: number;
         };
         TimelineGap: {
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            start: string;
+            /**
+             * Format: date-time
+             * @description ISO-8601 instant; a timestamp without an offset is interpreted as UTC.
+             */
+            end: string;
             minutes: number;
             label: string;
             /** Format: double */
@@ -2787,6 +2963,104 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    backup_retrieve: {
+        parameters: {
+            query?: {
+                format?: "json" | "zip";
+                /** @description Include the files attached to Insights chats (needs include_insights). */
+                include_attachments?: boolean;
+                /** @description Include Insights chats and their messages. */
+                include_insights?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account backup ZIP: contexts, tags, projects, completed sessions, commitments and their history, planned reminders, settings and profile images, and optionally Insights chats and files. Never passwords, API keys, connected apps or running timers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+        };
+    };
+    backup_preview_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["BackupUpload"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupPreview"];
+                };
+            };
+        };
+    };
+    backup_restore_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["BackupRestoreRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupRestoreResult"];
+                };
+            };
+            /** @description Nothing was restored: the preview token is expired or for another file or account, the account changed since the preview, or the backup has conflicts. Preview again. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    backup_summary_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupSummary"];
+                };
+            };
+        };
+    };
     commitments_list: {
         parameters: {
             query?: {

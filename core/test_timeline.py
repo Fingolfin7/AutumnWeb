@@ -12,7 +12,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from core.models import Projects, Sessions, SubProjects
+from core.models import Context, Projects, Sessions, SubProjects
 from core.timeline import build_day_timeline, build_timeline
 
 DAY = date(2026, 7, 25)
@@ -115,12 +115,47 @@ class NowMarkerTests(TimelineTestCase):
 
 
 class GapTests(TimelineTestCase):
+    def test_context_view_only_offers_genuinely_untracked_time(self):
+        context = Context.objects.create(user=self.user, name="Study")
+        self.atlas.context = context
+        self.atlas.save(update_fields=["context"])
+        self._session(self.atlas, _at(9), _at(10))
+        self._session(self.autumn, _at(10), _at(10, 50))
+        self._session(self.atlas, _at(11), _at(12))
+        timeline = build_timeline(self.user, end_day=DAY, context=context)
+        self.assertEqual([g["minutes"] for g in timeline["gaps"]], [10])
+        self.assertEqual(len(timeline["lanes"]), 1)
+
     def test_gap_between_sessions_is_reported(self):
         self._session(self.atlas, _at(9), _at(10))
         self._session(self.atlas, _at(12), _at(13))
         tl = build_day_timeline(self.user, DAY)
         self.assertEqual(len(tl["gaps"]), 1)
         self.assertEqual(tl["gaps"][0]["minutes"], 120)
+        self.assertEqual(datetime.fromisoformat(tl["gaps"][0]["start"]), _at(10))
+        self.assertEqual(datetime.fromisoformat(tl["gaps"][0]["end"]), _at(12))
+
+    def test_partial_gap_entry_leaves_the_remaining_minutes_available(self):
+        self._session(self.atlas, _at(9), _at(9, 45))
+        self._session(self.atlas, _at(9, 45), _at(10, 10))
+        self._session(self.autumn, _at(10, 20), _at(11))
+        gap, = build_day_timeline(self.user, DAY)["gaps"]
+        self.assertEqual(gap["minutes"], 10)
+        self.assertEqual(datetime.fromisoformat(gap["start"]), _at(10, 10))
+        self.assertEqual(datetime.fromisoformat(gap["end"]), _at(10, 20))
+
+    @timezone.override("Europe/Prague")
+    def test_gap_can_span_the_repeated_autumn_hour(self):
+        first_end = datetime.fromisoformat("2026-10-25T02:50:30+02:00")
+        next_start = datetime.fromisoformat("2026-10-25T02:15:30+01:00")
+        self._session(self.atlas, first_end - timedelta(minutes=20), first_end)
+        self._session(self.autumn, next_start, next_start + timedelta(minutes=20))
+        timeline = build_day_timeline(self.user, first_end.date())
+        gap, = timeline["gaps"]
+        self.assertEqual(gap["minutes"], 25)
+        self.assertEqual(datetime.fromisoformat(gap["start"]), first_end)
+        self.assertEqual(datetime.fromisoformat(gap["end"]), next_start)
+        self.assertGreater(gap["width_pct"], 0)
 
 
     def test_overlapping_sessions_on_different_projects_do_not_make_a_gap(self):

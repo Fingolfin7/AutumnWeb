@@ -21,7 +21,7 @@ so inside a view ``timezone.localtime()`` is already user-local. Tests should
 activate a timezone explicitly rather than passing one in.
 """
 
-from datetime import datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 from django.utils import timezone
 
@@ -32,8 +32,8 @@ from core.models import Sessions
 DEFAULT_WINDOW_START = 6
 DEFAULT_WINDOW_END = 22
 
-#: Gaps shorter than this are visual noise between back-to-back sessions.
-MIN_GAP_MINUTES = 20
+#: Brief pauses between tasks do not need a timeline action.
+MIN_GAP_MINUTES = 5
 
 #: Selectable ranges, in days. The keys are what the range tabs send.
 RANGE_DAYS = {"today": 1, "d3": 3, "wk": 7}
@@ -65,7 +65,10 @@ def _window_hours_for(spans, now_local, is_today):
     for span_start, span_end in spans:
         start_hour = min(start_hour, span_start.hour)
         # a session ending at 22:30 needs the axis to reach 23
-        end_hour = max(end_hour, span_end.hour + (1 if span_end.minute or span_end.second else 0))
+        ceiling = 24 if span_end.date() > span_start.date() else span_end.hour + bool(
+            span_end.minute or span_end.second or span_end.microsecond
+        )
+        end_hour = max(end_hour, ceiling)
 
     if is_today:
         start_hour = min(start_hour, now_local.hour)
@@ -76,7 +79,7 @@ def _window_hours_for(spans, now_local, is_today):
 
 def _pct(moment, window_start, window_minutes):
     """Position of ``moment`` as a percentage across the window."""
-    offset = (moment - window_start).total_seconds() / 60.0
+    offset = (moment.timestamp() - window_start.timestamp()) / 60.0
     return round(max(0.0, min(100.0, offset / window_minutes * 100.0)), 4)
 
 
@@ -101,7 +104,9 @@ def _collect_gaps(spans, window_start, window_minutes):
         return []
 
     merged = []
-    for span_start, span_end in sorted(spans):
+    # In the repeated hour at the end of DST, local times with the same
+    # tzinfo compare by wall clock. Merge on absolute instants instead.
+    for span_start, span_end in sorted((a.astimezone(UTC), b.astimezone(UTC)) for a, b in spans):
         if merged and span_start <= merged[-1][1]:
             merged[-1][1] = max(merged[-1][1], span_end)
         else:
@@ -114,6 +119,8 @@ def _collect_gaps(spans, window_start, window_minutes):
             continue
         start_pct = _pct(prev_end, window_start, window_minutes)
         gaps.append({
+            "start": prev_end.isoformat(),
+            "end": next_start.isoformat(),
             "minutes": int(round(minutes)),
             "label": _compact_minutes(minutes),
             "start_pct": start_pct,
@@ -122,21 +129,22 @@ def _collect_gaps(spans, window_start, window_minutes):
     return gaps
 
 
-def _hour_ticks(start_hour, end_hour):
+def _hour_ticks(start, end):
     """One label per hour boundary, positioned on the boundary itself.
 
     Every second label is flagged minor so a phone can thin them out — 17
     hour labels will not fit across 358px.
     """
-    span = end_hour - start_hour
-    return [
-        {
-            "label": "{:02d}".format(hour % 24),
-            "x_pct": round((hour - start_hour) / span * 100.0, 4),
+    span = end.timestamp() - start.timestamp()
+    ticks = []
+    for index in range(int(span // 3600) + 1):
+        local = datetime.fromtimestamp(start.timestamp() + index * 3600, start.tzinfo)
+        ticks.append({
+            "label": local.strftime("%H:%M" if local.minute else "%H"),
+            "x_pct": round(index * 3600 / span * 100.0, 4),
             "minor": bool(index % 2),
-        }
-        for index, hour in enumerate(range(start_hour, end_hour + 1))
-    ]
+        })
+    return ticks
 
 
 def _day_ticks(start_day, days):
@@ -209,9 +217,9 @@ def build_timeline(
         # A running timer is drawn up to now; a session crossing the window
         # edge is clipped to it, so widths always match the axis.
         raw_end = now if running else session.end_time
-        block_start = max(timezone.localtime(session.start_time), timezone.localtime(range_start))
-        block_end = min(timezone.localtime(raw_end), timezone.localtime(range_end))
-        if block_end <= block_start:
+        block_start = timezone.localtime(max(session.start_time, range_start.astimezone(UTC)))
+        block_end = timezone.localtime(min(raw_end, range_end.astimezone(UTC)))
+        if block_end.timestamp() <= block_start.timestamp():
             continue
         entries.append((session, block_start, block_end, running))
         spans.append((block_start, block_end))
@@ -226,15 +234,15 @@ def build_timeline(
         start_hour, end_hour = _window_hours_for(spans, now_local, today_in_range)
         window_start = _aware(end_day, start_hour)
         window_end = _midnight_after(end_day) if end_hour >= 24 else _aware(end_day, end_hour)
-        ticks = _hour_ticks(start_hour, end_hour)
-        grid_pct = round(100.0 / (end_hour - start_hour), 4)
+        ticks = _hour_ticks(window_start, window_end)
+        grid_pct = round(360000.0 / (window_end.timestamp() - window_start.timestamp()), 4)
         title = "{:02d}:00 – {:02d}:00".format(start_hour, end_hour % 24)
 
-    window_minutes = (window_end - window_start).total_seconds() / 60.0
+    window_minutes = (window_end.timestamp() - window_start.timestamp()) / 60.0
 
     lanes_by_project = {}
     for session, block_start, block_end, running in entries:
-        minutes = (block_end - block_start).total_seconds() / 60.0
+        minutes = (block_end.timestamp() - block_start.timestamp()) / 60.0
         start_pct = _pct(block_start, window_start, window_minutes)
         end_pct = _pct(block_end, window_start, window_minutes)
         lane = lanes_by_project.setdefault(session.project_id, {
@@ -282,6 +290,21 @@ def build_timeline(
         now_pct = _pct(now, window_start, window_minutes)
 
     tracked_minutes = sum(lane["total_minutes"] + lane["live_minutes"] for lane in lanes)
+
+    if not multi_day and context is not None and len(spans) > 1:
+        # Other contexts stay off the chart, but their recorded time is
+        # occupied. Don't offer it as a gap to fill between visible sessions.
+        first = min(start.astimezone(UTC) for start, _ in spans)
+        last = max(end.astimezone(UTC) for _, end in spans)
+        hidden = (
+            Sessions.objects.filter(user=user, start_time__lt=last)
+            .exclude(project__context=context).filter(_overlapping(first))
+            .values_list("start_time", "end_time")
+        )
+        for start, end in hidden:
+            start, end = max(first, start), min(last, end or now)
+            if start < end:
+                spans.append((start, end))
 
     return {
         "range_key": range_key,

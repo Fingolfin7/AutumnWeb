@@ -3,6 +3,120 @@ info:
   title: Autumn API v2
   version: 2.0.0
 paths:
+  /api/v2/backup/:
+    get:
+      operationId: backup_retrieve
+      parameters:
+      - in: query
+        name: format
+        schema:
+          type: string
+          enum:
+          - json
+          - zip
+      - in: query
+        name: include_attachments
+        schema:
+          type: boolean
+          default: false
+        description: Include the files attached to Insights chats (needs include_insights).
+      - in: query
+        name: include_insights
+        schema:
+          type: boolean
+          default: true
+        description: Include Insights chats and their messages.
+      tags:
+      - backup
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: 'The account backup ZIP: contexts, tags, projects, completed
+            sessions, commitments and their history, planned reminders, settings and
+            profile images, and optionally Insights chats and files. Never passwords,
+            API keys, connected apps or running timers.'
+      x-autumn-mcp: exclude
+  /api/v2/backup/preview/:
+    post:
+      operationId: backup_preview_create
+      description: Check a backup and compare it with this account. Changes nothing.
+      tags:
+      - backup
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BackupUpload'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupPreview'
+          description: ''
+      x-autumn-mcp: exclude
+  /api/v2/backup/restore/:
+    post:
+      operationId: backup_restore_create
+      description: |-
+        Add what the preview showed, in one transaction. Records already
+        here are left as they are; nothing in this account is replaced or
+        removed.
+      tags:
+      - backup
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BackupRestoreRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupRestoreResult'
+          description: ''
+        '409':
+          description: 'Nothing was restored: the preview token is expired or for
+            another file or account, the account changed since the preview, or the
+            backup has conflicts. Preview again.'
+      x-autumn-mcp: exclude
+  /api/v2/backup/summary/:
+    get:
+      operationId: backup_summary_retrieve
+      description: What the optional attachments choice would add to a backup.
+      tags:
+      - backup
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupSummary'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/commitments/:
     get:
       operationId: commitments_list
@@ -3568,6 +3682,159 @@ components:
         * `bing` - bing
         * `apod` - apod
         * `none` - none
+    BackupConflict:
+      type: object
+      properties:
+        section:
+          $ref: '#/components/schemas/SectionEnum'
+        id:
+          type: string
+          format: uuid
+          description: The record's ID in the backup.
+        label:
+          type: string
+      required:
+      - id
+      - label
+      - section
+    BackupPreview:
+      type: object
+      properties:
+        version:
+          type: integer
+        source_account:
+          type: string
+          description: Username of the account the backup was made from.
+        destination_account:
+          type: string
+          description: Username of this account.
+        same_account:
+          type: boolean
+        can_restore:
+          type: boolean
+          description: False while any conflict remains.
+        includes_insights:
+          type: boolean
+        includes_attachments:
+          type: boolean
+        counts:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/BackupSectionCounts'
+          description: 'Per section, in restore order: records to add, already here,
+            and in conflict.'
+        conflicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupConflict'
+          description: Records in both with different contents (at most 100 listed).
+        preview_token:
+          type: string
+          description: Send with the same file to restore. Valid for an hour, for
+            this account and file only.
+      required:
+      - can_restore
+      - conflicts
+      - counts
+      - destination_account
+      - includes_attachments
+      - includes_insights
+      - preview_token
+      - same_account
+      - source_account
+      - version
+    BackupRestoreRequest:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: An Autumn account backup ZIP.
+        preview_token:
+          type: string
+          description: The preview_token from previewing this same file in this account.
+      required:
+      - file
+      - preview_token
+    BackupRestoreResult:
+      type: object
+      properties:
+        version:
+          type: integer
+        source_account:
+          type: string
+          description: Username of the account the backup was made from.
+        destination_account:
+          type: string
+          description: Username of this account.
+        same_account:
+          type: boolean
+        can_restore:
+          type: boolean
+          description: False while any conflict remains.
+        includes_insights:
+          type: boolean
+        includes_attachments:
+          type: boolean
+        counts:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/BackupSectionCounts'
+          description: 'Per section, in restore order: records to add, already here,
+            and in conflict.'
+        conflicts:
+          type: array
+          items:
+            $ref: '#/components/schemas/BackupConflict'
+          description: Records in both with different contents (at most 100 listed).
+        restored:
+          type: integer
+          description: Records added. 0 when everything was already here.
+      required:
+      - can_restore
+      - conflicts
+      - counts
+      - destination_account
+      - includes_attachments
+      - includes_insights
+      - restored
+      - same_account
+      - source_account
+      - version
+    BackupSectionCounts:
+      type: object
+      properties:
+        add:
+          type: integer
+        identical:
+          type: integer
+        conflict:
+          type: integer
+      required:
+      - add
+      - conflict
+      - identical
+    BackupSummary:
+      type: object
+      properties:
+        attachment_count:
+          type: integer
+          description: Insights files sent in chats.
+        attachment_bytes:
+          type: integer
+          description: Their total size in bytes.
+      required:
+      - attachment_bytes
+      - attachment_count
+    BackupUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: An Autumn account backup ZIP.
+      required:
+      - file
     ByEnum:
       enum:
       - project
@@ -6568,6 +6835,40 @@ components:
         * `off` - off
         * `top` - top
         * `near` - near
+    SectionEnum:
+      enum:
+      - contexts
+      - tags
+      - projects
+      - subprojects
+      - sessions
+      - commitments
+      - commitment_revisions
+      - commitment_periods
+      - commitment_adjustments
+      - profile
+      - notification_preferences
+      - reminder_schedules
+      - insight_chats
+      - insight_messages
+      - insight_attachments
+      type: string
+      description: |-
+        * `contexts` - contexts
+        * `tags` - tags
+        * `projects` - projects
+        * `subprojects` - subprojects
+        * `sessions` - sessions
+        * `commitments` - commitments
+        * `commitment_revisions` - commitment_revisions
+        * `commitment_periods` - commitment_periods
+        * `commitment_adjustments` - commitment_adjustments
+        * `profile` - profile
+        * `notification_preferences` - notification_preferences
+        * `reminder_schedules` - reminder_schedules
+        * `insight_chats` - insight_chats
+        * `insight_messages` - insight_messages
+        * `insight_attachments` - insight_attachments
     SessionBestMatchOrderResponse:
       type: object
       properties:
@@ -7073,6 +7374,16 @@ components:
     TimelineGap:
       type: object
       properties:
+        start:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
+        end:
+          type: string
+          format: date-time
+          description: ISO-8601 instant; a timestamp without an offset is interpreted
+            as UTC.
         minutes:
           type: integer
         label:
@@ -7084,8 +7395,10 @@ components:
           type: number
           format: double
       required:
+      - end
       - label
       - minutes
+      - start
       - start_pct
       - width_pct
     TimelineLane:

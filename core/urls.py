@@ -24,6 +24,7 @@ urlpatterns = [
     path("settings/ai/", spa, name="settings_ai"),
     path("settings/import/", spa, name="settings_import"),
     path("settings/export/", spa, name="settings_export"),
+    path("settings/backup/", spa, name="settings_backup"),
     # pages
     path("", spa, name="home"),
     path("projects/", spa, name="projects"),

@@ -64,6 +64,7 @@ export const pages: PageEntry[] = [
   { path: "/settings/ai/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
   { path: "/settings/import/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
   { path: "/settings/export/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
+  { path: "/settings/backup/", title: "Settings", load: () => import("@/features/settings/SettingsPage") },
   { path: "/profile/", title: "Profile", load: () => import("@/features/settings/SettingsPage").then((m) => ({ default: m.LegacySettingsPage })) },
   { path: "/insights/", title: "Insights", load: () => import("@/features/insights/InsightsPage") },
   { path: "/insights/:chatId/", title: "Insights", load: () => import("@/features/insights/InsightsPage") },

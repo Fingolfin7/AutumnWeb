@@ -68,12 +68,22 @@ Autumn includes pie, bar, scatter, line, calendar, heatmap, stacked area, cumula
 * Track time spent on projects and subprojects
 * Start, stop, restart, and remove timers directly in the browser, with optional server-side auto-stop deadlines
 * Browse and search session history, including context, tag, date, note, and excluded-project filters
+* Copy or download the current Sessions view as Markdown, including every page of matching results
+* Open a project's notes in Weekly review and copy the week as Markdown
+* Pick up from a project's last session note or log a forgotten session directly from a gap on Home
 * Organize projects by hard **contexts** and soft **tags**
 * Create time-based or session-based commitments with weekly/monthly/etc. targets and banking, in the browser or API
 * Visualize data with Chart.js charts, scatter plots, heatmaps, treemaps, and word clouds
 * Export and import JSON data compatible with the old CLI version, including JSON import through the API
+* Download an account ZIP from **Settings → Data → Backup & restore**, then preview a restore before applying it
 * Ask natural-language questions about selected sessions with optional LLM integration
 * Dark Night Ledger interface with optional custom, Bing, or NASA APOD workspace backgrounds
+
+### Back up your account
+
+**Settings → Data → Backup & restore** downloads a versioned ZIP with a readable manifest. It includes all projects and completed sessions, context and tag metadata, commitment history, reminder schedules, portable preferences and profile images. Insights conversations are included by default. Select the attachment option to carry their files as well.
+
+Choose the ZIP on the same page to see the destination account, the records it would add and any conflicts. Resolve conflicts in the destination before applying the restore. Complete a running timer before backing it up. Sign-in credentials, AI keys, connected apps and browser notification subscriptions are set up separately on the destination.
 
 ---
 

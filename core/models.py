@@ -95,6 +95,22 @@ class RecommendationUsage(models.Model):
     pricing = models.JSONField(default=dict)
 
 
+class BackupIdentity(models.Model):
+    """Map backup UUIDs to rows restored into this account."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    section = models.CharField(max_length=32)
+    portable_id = models.UUIDField()
+    local_id = models.CharField(max_length=36)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "section", "portable_id"], name="unique_backup_identity"
+            ),
+        ]
+
+
 class Context(models.Model):
     """
     Hard scope for projects (e.g. Work, Personal, Study).

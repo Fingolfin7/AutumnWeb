@@ -59,6 +59,10 @@ MCP_INCLUDED_OPERATION_IDS = {
 }
 
 MCP_EXCLUDED_OPERATION_IDS = {
+    "backup_retrieve",
+    "backup_summary_retrieve",
+    "backup_preview_create",
+    "backup_restore_create",
     "me_account_partial_update",
     "me_account_retrieve",
     "me_api_keys_destroy",

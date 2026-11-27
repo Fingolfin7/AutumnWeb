@@ -1,8 +1,34 @@
-import type { CSSProperties } from "react";
+import { useId, type CSSProperties } from "react";
+import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { Icon } from "@/components/Icon";
 import { AppLink, urls } from "@/app/links";
 import { formatDuration, formatTime, parseInstant } from "@/lib/format";
 import { useNow } from "@/features/timers/api";
+import { useQueuedOps } from "@/api/meta";
+import { pendingSessions } from "@/features/sessions/api";
 import type { Timeline, TimelineRange } from "./api";
+
+/* start/end are the gap's exact instants. A timeline saved on this device
+   before the server sent them has neither: that gap is still drawn, but
+   offers no action, since its edges could only be guessed from percentages. */
+type Gap = Timeline["gaps"][number] & { start?: string | null; end?: string | null };
+
+interface GapAction {
+  href: string;
+  range: string;
+  duration: string;
+}
+
+export function gapAction(gap: Gap): GapAction | null {
+  const start = parseInstant(gap.start);
+  const end = parseInstant(gap.end);
+  if (!gap.start || !gap.end || !start || !end || end.getTime() <= start.getTime()) return null;
+  return {
+    href: urls.logSession({ start: gap.start, end: gap.end, next: urls.home() }),
+    range: `${formatTime(start, false)}–${formatTime(end, false)}`,
+    duration: gap.label,
+  };
+}
 
 const RANGES: { key: TimelineRange; label: string }[] = [
   { key: "today", label: "Today" },
@@ -37,6 +63,17 @@ export function DayTimeline({
   const valid = !Number.isNaN(windowStart) && !Number.isNaN(windowEnd) && windowEnd > windowStart;
   const pct = (stamp: number) => Math.max(0, Math.min(100, ((stamp - windowStart) / (windowEnd - windowStart)) * 100));
   const nowInWindow = valid && now >= windowStart && now <= windowEnd;
+  const gapsTitle = useId();
+  const queued = pendingSessions(useQueuedOps());
+  const gaps = timeline.gaps.map((gap) => {
+    const action = gapAction(gap);
+    const waiting = !!action && queued.some((session) =>
+      Date.parse(session.start) < Date.parse(gap.end) &&
+      Date.parse(session.end ?? "") > Date.parse(gap.start),
+    );
+    return { gap, action: waiting ? null : action };
+  });
+  const actions = gaps.flatMap(({ action }) => (action ? [action] : []));
 
   return (
     <section className="slab fd-tl-slab" id="day-timeline" aria-label="Timeline">
@@ -153,13 +190,21 @@ export function DayTimeline({
                   <span className="fd-tl-now-flag mono">{formatTime(new Date(now), false)}</span>
                 </div>
               ) : null}
-              {timeline.gaps.map((gap) => (
+              {gaps.map(({ gap, action }) => (
                 <div
                   className="fd-tl-gap"
-                  key={`${gap.start_pct}`}
+                  key={`${gap.start ?? gap.start_pct}`}
                   style={{ "--start": `${gap.start_pct}%`, "--w": `${gap.width_pct}%` } as Vars}
                 >
-                  <span>{gap.label}</span>
+                  {/* A pointer shortcut only: this layer is hidden from
+                      assistive tech, and the list below is the real action. */}
+                  {action ? (
+                    <AppLink href={action.href} tabIndex={-1} title={`Log ${action.range}`}>
+                      {gap.label}
+                    </AppLink>
+                  ) : (
+                    <span>{gap.label}</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -170,6 +215,24 @@ export function DayTimeline({
             <AppLink href={urls.startTimer()}>Start a timer</AppLink> and this fills in as you go.
           </p>
         )}
+        {timeline.lanes.length && actions.length ? (
+          <div className="fd-tl-gaps">
+            <p className="fd-tl-gaps-title" id={gapsTitle}>
+              Untracked
+            </p>
+            <ul aria-labelledby={gapsTitle}>
+              {actions.map((action) => (
+                <li key={action.href}>
+                  <AppLink className="fd-tl-gap-link" href={action.href} aria-label={`Log ${action.range}, ${action.duration} untracked`}>
+                    <Icon icon={faPlus} />
+                    <span className="mono">{action.range}</span>
+                    <span className="fd-tl-gap-dur">{action.duration}</span>
+                  </AppLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </section>
   );

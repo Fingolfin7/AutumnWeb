@@ -322,6 +322,8 @@
 .journal-title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3); margin-bottom: var(--s3); }
 .journal-title .page-title { margin: 0; }
 .journal-density { margin-left: auto; }
+.markdown-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+.markdown-copy-text { width: 100%; margin: var(--s3) 0; resize: vertical; font-family: var(--font-mono); }
 .journal-search { display: grid; gap: var(--s3); margin-bottom: var(--s5); }
 .journal-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); min-width: 0; }
 .journal-controls .searchbar {
@@ -498,3 +500,51 @@
   .backdrop-preview { height: 210px; }
   .profile-codex-row { flex-wrap: wrap; gap: var(--s2); padding-block: var(--s2); }
 }
+
+/* ------------------------------------------------- Home timeline: gaps
+   An untracked stretch between sessions opens Log past on exactly that
+   stretch. The list under the plot is the action (keyboard, screen readers,
+   touch); the label drawn in the gap is a pointer shortcut to the same link,
+   switched off on touch where a gap can be a few pixels wide. */
+.fd-tl-gap a {
+  pointer-events: auto; font-size: var(--fs-xs); color: var(--muted); white-space: nowrap;
+  text-decoration: underline dotted; text-decoration-color: var(--hairline-2); text-underline-offset: 3px;
+}
+.fd-tl-gap a:hover { color: var(--brand); text-decoration-color: currentColor; }
+.fd-tl-gaps { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); margin: var(--s4) 0 0 var(--fd-gutter); }
+.fd-tl-gaps-title {
+  margin: 0; color: var(--muted); font-size: var(--fs-label); font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+}
+.fd-tl-gaps ul { display: flex; flex-wrap: wrap; gap: var(--s2); margin: 0; padding: 0; list-style: none; }
+.fd-tl-gap-link {
+  display: inline-flex; align-items: center; gap: var(--s2); min-height: 36px; padding: 0 var(--s3);
+  border: 1px dashed var(--hairline-2); border-radius: var(--r-sm); color: var(--ink-2);
+  font-size: var(--fs-xs); text-decoration: none;
+}
+.fd-tl-gap-link .icon { width: .75em; color: var(--brand); }
+.fd-tl-gap-link:hover, .fd-tl-gap-link:focus-visible { border-color: var(--brand); background: var(--raised); color: var(--ink); }
+.fd-tl-gap-dur { color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 780px) { .fd-tl-gaps { margin-left: 0; } }
+@media (pointer: coarse) {
+  .fd-tl-gap a { pointer-events: none; text-decoration: none; }
+  .fd-tl-gap-link { min-height: 44px; }
+}
+
+/* ----------------------------------------- Last session (timer, project)
+   Where the project was left off: the latest finished session's note, as
+   written, set like the journal and opened as a preview. */
+.last-note { display: grid; gap: var(--s2); }
+.last-note-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--s1) var(--s3); }
+.last-note-title {
+  margin: 0; color: var(--muted); font-size: var(--fs-label); font-weight: 600;
+  letter-spacing: .12em; text-transform: uppercase;
+}
+.last-note-when { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); margin: 0; color: var(--muted); font-size: var(--fs-xs); }
+.last-note-when a { color: var(--ink-2); text-decoration: underline; text-decoration-color: var(--hairline-2); text-underline-offset: 3px; }
+.last-note-duration { color: var(--duration); font-weight: 600; font-variant-numeric: tabular-nums; }
+.last-note .session-note { max-width: 68ch; color: #e6dfd5; font: 400 1.0625rem/1.65 var(--font-reading); }
+.last-note .session-note strong { color: inherit; }
+.last-note .session-note p + p { margin-top: .8em; }
+.last-note .session-note.is-compact:not(.is-open) .session-note-body { -webkit-line-clamp: 6; }
+.last-note-empty { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
