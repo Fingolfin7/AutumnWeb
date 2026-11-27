@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from llm_insights.attachments import payload as attachment_payload
 from llm_insights.models import LLMAttachment, LLMChat, LLMMessage
+from llm_insights.session_context import SESSION_FILTERS_KEY, has_session_slot
 
 
 def database_sync_to_async(func):
@@ -180,26 +181,33 @@ def load_chat_history(
     ]
 
 
-async def save_llm_messages(chat_obj, messages_to_save):
+async def save_llm_messages(chat_obj, messages_to_save, *, session_filters=None):
     chat_id = getattr(chat_obj, "id", chat_obj)
 
     def create_messages():
         chat = LLMChat.objects.get(id=chat_id)
         with transaction.atomic():
             for msg in messages_to_save:
+                metadata = {
+                    "sources": msg.get("sources", []),
+                    "model": msg.get("model", ""),
+                    "usage": msg.get("usage", {}),
+                    "auth_source": msg.get("auth_source", ""),
+                    "error": msg.get("error", False),
+                    "error_message": msg.get("error_message", ""),
+                    "refusal": msg.get("refusal", False),
+                }
+                if (
+                    msg["role"] == "system"
+                    and has_session_slot(msg["content"])
+                    and session_filters is not None
+                ):
+                    metadata[SESSION_FILTERS_KEY] = session_filters
                 created = LLMMessage.objects.create(
                     chat=chat,
                     role=msg["role"],
                     content=msg["content"],
-                    metadata={
-                        "sources": msg.get("sources", []),
-                        "model": msg.get("model", ""),
-                        "usage": msg.get("usage", {}),
-                        "auth_source": msg.get("auth_source", ""),
-                        "error": msg.get("error", False),
-                        "error_message": msg.get("error_message", ""),
-                        "refusal": msg.get("refusal", False),
-                    },
+                    metadata=metadata,
                 )
                 attachment_ids = [a["id"] for a in msg.get("attachments") or []]
                 if attachment_ids:
@@ -219,6 +227,8 @@ async def save_partial_stream_messages(
     model,
     error_message,
     attachments=None,
+    *,
+    session_filters=None,
 ):
     current_history = llm_handler.get_conversation_history() if llm_handler else []
     pending_messages = (
@@ -257,4 +267,4 @@ async def save_partial_stream_messages(
         ]
 
     if pending_messages:
-        await save_llm_messages(chat_obj, pending_messages)
+        await save_llm_messages(chat_obj, pending_messages, session_filters=session_filters)

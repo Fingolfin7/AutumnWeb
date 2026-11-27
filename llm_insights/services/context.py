@@ -1,5 +1,5 @@
 from core.models import Sessions
-from core.utils import filter_by_active_context, filter_sessions_by_params
+from core.utils import filter_sessions_by_params, get_active_context
 from django.shortcuts import get_object_or_404
 
 from llm_insights.models import LLMChat
@@ -59,10 +59,22 @@ def filter_insights_sessions(request, user, current_filters, *, outcome=None):
         Sessions.objects.filter(end_time__isnull=False, user=user)
         .select_related("project", "project__context")
         .prefetch_related("subprojects", "project__tags")
+        .order_by("-end_time", "-pk")
     )
-    queryset = filter_by_active_context(
-        queryset, request, override_context_id=current_filters.get("context")
-    )
+    context_filter = (current_filters["context"] or "all") if "context" in current_filters else None
+    try:
+        context_id = int(context_filter)
+    except (TypeError, ValueError):
+        context_id = None
+    if context_id is not None:
+        # Numeric filters are saved IDs. A deleted ID cannot match a name.
+        queryset = queryset.filter(project__context_id=context_id, project__context__user=user)
+    else:
+        context, _ = get_active_context(request, override_context_id=context_filter)
+        if context is not None:
+            queryset = queryset.filter(project__context=context)
+        elif context_filter and str(context_filter).lower() != "all":
+            return queryset.none()
     return filter_sessions_by_params(
         request,
         queryset,
@@ -79,15 +91,20 @@ def build_post_context(request, user, chat_id=None):
 
     current_filters = extract_filter_params(request)
     is_filtering = "filter" in request.POST
-    if not is_filtering and chat_obj and chat_obj.filters:
-        current_filters = chat_obj.filters
+    if not is_filtering and chat_obj:
+        current_filters = dict(chat_obj.filters or {})
     elif not chat_obj and not any(current_filters.get(key) for key in FILTER_KEYS):
         apply_default_date_filters(current_filters, user)
 
+    needs_context_confirmation = bool(chat_obj and not is_filtering and "context" not in current_filters)
+    if "context" not in current_filters and not needs_context_confirmation:
+        context, _ = get_active_context(request)
+        current_filters["context"] = str(context.pk) if context else "all"
+
     related_outcome = RelatedOutcome()
     request._related_outcome = related_outcome
-    queryset = filter_insights_sessions(
-        request, user, current_filters, outcome=related_outcome
+    sessions = [] if needs_context_confirmation else list(
+        filter_insights_sessions(request, user, current_filters, outcome=related_outcome)
     )
 
     sessions_updated = request.session.get("sessions_updated", False)
@@ -95,7 +112,8 @@ def build_post_context(request, user, chat_id=None):
         sessions_updated = True
 
     return {
-        "sessions": list(queryset),
+        "sessions": sessions,
+        "needs_context_confirmation": needs_context_confirmation,
         "sessions_updated": sessions_updated,
         "provider_models": provider_models(user),
         "api_keys": build_api_keys(user),

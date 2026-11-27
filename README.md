@@ -85,6 +85,8 @@ Autumn includes pie, bar, scatter, line, calendar, heatmap, stacked area, cumula
 
 Choose the ZIP on the same page to see the destination account, the records it would add and any conflicts. Resolve conflicts in the destination before applying the restore. Complete a running timer before backing it up. Sign-in credentials, AI keys, connected apps and browser notification subscriptions are set up separately on the destination.
 
+Insights backups preserve questions, replies, system instructions and recorded filters. Autumn uses those filters to select current session records when you continue a chat. If a chat predates saved context selection, select sessions once before continuing it. To measure the duplicated data in recognised older prompts, run `python manage.py compact_insights_prompts --username YOUR_USERNAME`. Add `--apply` to remove the identified copies in the database.
+
 #### Recover after database loss
 
 Keep your ZIP outside the database and deployment. Point a replacement AutumnWeb installation at a fresh database and a writable media store. Use the backup ZIP to recreate your account before starting the web server:

@@ -8,6 +8,7 @@ from users.codex_auth import CODEX_CHATGPT_BASE_URL
 
 from .attachments import openai_content
 from .base_handler import BaseLLMHandler
+from .session_context import render_session_prompt
 
 
 class OpenAIHandler(BaseLLMHandler):
@@ -59,28 +60,6 @@ class OpenAIHandler(BaseLLMHandler):
         {username} has updated their session data.
         Refer to the new session data for the remainder of the conversation.
         """
-
-    def _build_system_text(self, notice: str = "") -> str:
-        body = self.system_prompt_template.format(
-            username=self.username, session_data=self.session_data
-        )
-        return f"{notice.strip()}\n{body}" if notice.strip() else body
-
-    def _active_system_text(self) -> str:
-        """The system message for this request.
-
-        The stored snapshot wins: every path that changes the session data also
-        stores a fresh system turn, so the last one is always current — and
-        reusing it verbatim keeps the cached prefix byte-identical across turns.
-        Rebuilding is the fallback for a history that has no system turn yet
-        (turn one, or a chat predating stored system turns).
-        """
-        for message in reversed(self.conversation_history):
-            if message.get("role") == "system":
-                return message.get("content") or ""
-        if self.username and self.session_data is not None:
-            return self._build_system_text()
-        return ""
 
     def _default_auth_mode(self) -> str:
         if self.codex_token and self.api_key:
@@ -398,7 +377,7 @@ class OpenAIHandler(BaseLLMHandler):
         )
         messages = self._messages_from_history(
             new_user_message=user_prompt,
-            system_text=update_prompt,
+            system_text=render_session_prompt(update_prompt, self.session_data),
             new_attachments=attachments,
         )
 
@@ -428,11 +407,9 @@ class OpenAIHandler(BaseLLMHandler):
         })
 
     async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
-        if not any(m.get("role") == "system" for m in self.conversation_history):
-            # Stored so a resumed chat can recover it — a fresh handler on turn
-            # 2+ never calls initialize_chat.
+        if not self.has_system_context():
             self.conversation_history.append(
-                {"role": "system", "content": self._active_system_text()}
+                {"role": "system", "content": self._build_system_text()}
             )
 
         messages = self._messages_from_history(

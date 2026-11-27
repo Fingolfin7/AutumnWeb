@@ -20,6 +20,8 @@ from core.models import (
 )
 from llm_insights.attachments import create_attachment
 from llm_insights.models import LLMChat, LLMMessage
+from llm_insights.openai_handler import OpenAIHandler
+from llm_insights.session_context import SESSION_DATA_SLOT
 
 
 class AccountBackupTests(TransactionTestCase):
@@ -60,6 +62,60 @@ class AccountBackupTests(TransactionTestCase):
         self.assertFalse(manifest["includes_insights"])
         self.assertFalse(manifest["includes_attachments"])
         self.assertEqual(manifest["records"]["insight_chats"], [])
+
+    def test_insights_backup_compacts_legacy_payload_and_remaps_historical_filters(self):
+        at = datetime(2026, 10, 5, 8, tzinfo=UTC)
+        context = Context.objects.create(user=self.source, name="Studio")
+        project = Projects.objects.create(user=self.source, name="Project", context=context)
+        session = Sessions.objects.create(
+            user=self.source, project=project, start_time=at,
+            end_time=at + timedelta(hours=1), note="Passage that belongs in the session record.",
+        )
+        filters = {"context": str(context.pk), "include_projects": [str(project.pk)]}
+        chat = LLMChat.objects.create(user=self.source, model="example", filters=filters)
+        handler = OpenAIHandler(api_key="test-key")
+        handler.initialize_chat(self.source.username, [session])
+        instructions = handler._build_system_text()
+        legacy_content = instructions.replace(SESSION_DATA_SLOT, handler.session_data)
+        LLMMessage.objects.create(
+            chat=chat, role="system", content=legacy_content,
+            metadata={"session_filters": filters},
+        )
+        LLMMessage.objects.create(chat=chat, role="user", content="Question")
+        LLMMessage.objects.create(chat=chat, role="assistant", content="**Reply**")
+
+        with ZipFile(io.BytesIO(self.download(files=True))) as archive:
+            manifest = json.loads(archive.read("manifest.json"))
+        records = manifest["records"]
+        system = next(row for row in records["insight_messages"] if row["role"] == "system")
+        self.assertEqual(system["content"], instructions)
+        self.assertEqual(system["metadata"]["session_filters"], records["insight_chats"][0]["filters"])
+        self.assertEqual(records["sessions"][0]["note"], session.note)
+
+        # An existing archive created before compaction should restore too.
+        system["content"] = legacy_content
+        old_archive = io.BytesIO()
+        with ZipFile(old_archive, "w") as archive:
+            archive.writestr("manifest.json", json.dumps(manifest))
+        data = old_archive.getvalue()
+        preview = self.preview(data)
+        restored = self.submit("restore", data, preview["preview_token"])
+        self.assertEqual(restored.status_code, 200, restored.data)
+        new_chat = LLMChat.objects.get(user=self.destination)
+        self.assertNotEqual(new_chat.pk, chat.pk)
+        new_session = Sessions.objects.get(user=self.destination)
+        self.assertEqual(new_session.note, session.note)
+        new_system = new_chat.messages.get(role="system")
+        self.assertEqual(new_system.content, instructions)
+        self.assertEqual(new_system.metadata["session_filters"], {
+            "context": str(new_session.project.context_id),
+            "include_projects": [str(new_session.project_id)],
+        })
+        self.assertEqual(
+            list(new_chat.messages.exclude(role="system").values_list("content", flat=True)),
+            ["Question", "**Reply**"],
+        )
+        self.assertTrue(self.preview(data)["can_restore"])
 
     def test_round_trip_and_replay(self):
         at = datetime(2026, 10, 5, 8, tzinfo=UTC)

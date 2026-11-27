@@ -28,6 +28,7 @@ from core.services.proactive_notifications import (
 )
 from llm_insights.attachments import MAX_STORED_BYTES_PER_USER
 from llm_insights.models import LLMAttachment
+from llm_insights.session_context import SESSION_FILTERS_KEY, compact_session_prompt
 from users.models import Profile
 
 
@@ -201,6 +202,15 @@ def _record(section, obj, ids, *, record_id=None, archive=None, known=None):
         record["filters"] = _encode_chat_filters(obj.filters, ids.encode_historical)
     elif section == "insight_messages":
         record["metadata"] = obj.metadata
+        if obj.role == "system":
+            record["content"] = compact_session_prompt(obj.content)
+            if SESSION_FILTERS_KEY in obj.metadata:
+                record["metadata"] = {
+                    **obj.metadata,
+                    SESSION_FILTERS_KEY: _encode_chat_filters(
+                        obj.metadata[SESSION_FILTERS_KEY], ids.encode_historical
+                    ),
+                }
     return record
 
 
@@ -286,6 +296,10 @@ def _validate_chat_filters(filters):
 def _validate_message(row):
     if row["role"] not in {"system", "user", "assistant"} or not isinstance(row["metadata"], dict):
         raise BackupError("Invalid Insights message.")
+    if row["role"] == "system":
+        if SESSION_FILTERS_KEY in row["metadata"]:
+            _validate_chat_filters(row["metadata"][SESSION_FILTERS_KEY])
+        row["content"] = compact_session_prompt(row["content"])
     sources = row["metadata"].get("sources", [])
     if not isinstance(sources, list):
         raise BackupError("Invalid Insights message sources.")
@@ -596,6 +610,13 @@ class RestorePlan:
             values["filters"] = _decode_chat_filters(row["filters"], historical)
         elif section == "insight_messages":
             values["metadata"] = row["metadata"]
+            if row["role"] == "system" and SESSION_FILTERS_KEY in row["metadata"]:
+                values["metadata"] = {
+                    **row["metadata"],
+                    SESSION_FILTERS_KEY: _decode_chat_filters(
+                        row["metadata"][SESSION_FILTERS_KEY], historical
+                    ),
+                }
         elif section == "reminder_schedules" and row["active"]:
             reminder = spec.model(**values)
             if row["cadence"] == "once":

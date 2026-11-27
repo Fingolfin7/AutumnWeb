@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import AsyncIterator
 
+from .session_context import SESSION_DATA_SLOT, render_session_prompt
+
 
 class BaseLLMHandler(ABC):
     """Abstract base class for LLM handlers"""
@@ -25,23 +27,34 @@ class BaseLLMHandler(ABC):
         self.conversation_history = list(history)
 
     def has_system_context(self) -> bool:
-        """Whether this handler can produce instructions plus session data.
+        return any(
+            message.get("role") == "system" and message.get("content")
+            for message in self.conversation_history
+        )
 
-        False for a resumed chat whose stored history carries no system turn —
-        a chat from before system turns were stored, or one whose first turn
-        failed before storing it. Without re-seeding, the model would answer
-        with no instructions and no session data at all.
-        """
-        active = getattr(self, "_active_system_text", None)
-        return bool(active()) if callable(active) else True
+    def _build_system_text(self, notice: str = "") -> str:
+        body = self.system_prompt_template.format(
+            username=self.username, session_data=SESSION_DATA_SLOT
+        )
+        return f"{notice.strip()}\n{body}" if notice.strip() else body
+
+    def _active_system_text(self) -> str:
+        """Use the most recent stored instructions with this request's sessions."""
+        for message in reversed(self.conversation_history):
+            if message.get("role") == "system" and message.get("content"):
+                stored = message["content"]
+                rendered = render_session_prompt(stored, self.session_data)
+                if self.session_data is None or rendered != stored:
+                    return rendered
+                # Keep unrecognised text in history. Build a fresh prompt
+                # instead of sending a possible frozen session copy.
+                break
+        if self.username and self.session_data is not None:
+            return render_session_prompt(self._build_system_text(), self.session_data)
+        return ""
 
     def set_username(self, username):
-        """Re-seed the display name on a resumed chat.
-
-        initialize_chat only runs for new chats, so a handler built to answer
-        turn 2+ starts with username unset — and the prompt templates
-        interpolate it.
-        """
+        """Set the display name before a filter update builds new instructions."""
         if username and not getattr(self, "username", None):
             self.username = username
 

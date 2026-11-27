@@ -170,6 +170,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
      question so the model is handed the new sessions. */
   const [reselected, setReselected] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const needsSessionSelection = !!chat && chat.filters?.context === undefined && !reselected;
 
   const [model, setModel] = useState<ModelSelection | null>(() => {
     const stored = splitChatModel(chat?.model);
@@ -232,6 +233,10 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const send = () => {
     const message = prompt.trim();
     if (!message || !model || live || attach.uploading) return;
+    if (needsSessionSelection) {
+      setSheetOpen(true);
+      return;
+    }
     const body: StreamRequest = {
       message,
       ...(attach.ids.length ? { attachment_ids: attach.ids } : {}),
@@ -370,6 +375,10 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             <Icon icon={faCheck} /> Select sessions
           </button>
         </div>
+
+        {needsSessionSelection ? (
+          <p className="filter-summary">Select sessions before continuing this chat.</p>
+        ) : null}
 
         {pills.length ? (
           <p className="filter-summary">

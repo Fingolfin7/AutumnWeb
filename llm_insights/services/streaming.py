@@ -64,9 +64,15 @@ def _error_stream(message, status):
     )
 
 
+class ContextConfirmationRequired(Exception):
+    pass
+
+
 def _prepare_stream_context(request, user, chat_id):
     post_data = request.POST.copy()
     data = build_post_context(request, user, chat_id)
+    if data["needs_context_confirmation"]:
+        raise ContextConfirmationRequired("Select sessions in Filters before continuing this chat.")
     selected_provider, selected_model = validate_selection(
         data["provider_models"], post_data.get("provider"), post_data.get("model")
     )
@@ -195,6 +201,7 @@ async def _run_stream_worker(stream_context, event_queue, stream_done):
             sessions_updated=stream_context["sessions_updated"],
             chat_obj=stream_context["chat_id"],
             attachments=stream_context["attachments"],
+            session_filters=stream_context["current_filters"],
         ):
             if chunk:
                 streamed_chunks.append(chunk)
@@ -262,6 +269,7 @@ async def _run_stream_worker(stream_context, event_queue, stream_done):
                     stream_context["model"],
                     error_message,
                     attachments=stream_context["attachments"],
+                    session_filters=stream_context["current_filters"],
                 )
             except Exception as save_exc:
                 assistant_content = (
@@ -299,6 +307,8 @@ def stream_insights_response(request, chat_id, access_check):
         )
     try:
         stream_context = _prepare_stream_context(request, user, chat_id)
+    except ContextConfirmationRequired as exc:
+        return _error_stream(str(exc), 400)
     except Exception as exc:
         return _error_stream(str(exc), 500)
 

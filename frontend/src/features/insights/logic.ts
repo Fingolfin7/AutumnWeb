@@ -115,8 +115,7 @@ export function selectionRequest(
   if (start) body.start_date = start;
   if (end) body.end_date = end;
   if (filters.note_snippet) body.note_snippet = filters.note_snippet;
-  const context = filters.context === "all" ? "all" : filters.context ? Number(filters.context) : activeContextId;
-  if (context) body.context = context;
+  body.context = filters.context === "all" ? "all" : filters.context ? Number(filters.context) : activeContextId ?? "all";
   if (filters.tags.length) body.tags = filters.tags;
   if (filters.projects.length) {
     if (filters.projectMode === "include") body.include_projects = filters.projects;

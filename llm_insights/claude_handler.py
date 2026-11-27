@@ -4,6 +4,7 @@ from typing import Any, AsyncIterator
 from core.utils import build_project_json_from_sessions
 from .attachments import claude_content
 from .base_handler import BaseLLMHandler
+from .session_context import render_session_prompt
 
 
 class ClaudeHandler(BaseLLMHandler):
@@ -62,28 +63,6 @@ class ClaudeHandler(BaseLLMHandler):
         self.session_data = encode(
             build_project_json_from_sessions(sessions_data, autumn_compatible=True)
         )
-
-    def _build_system_text(self, notice: str = "") -> str:
-        body = self.system_prompt_template.format(
-            username=self.username, session_data=self.session_data
-        )
-        return f"{notice.strip()}\n{body}" if notice.strip() else body
-
-    def _active_system_text(self) -> str:
-        """The system prompt for this request.
-
-        The stored snapshot wins: every path that changes the session data also
-        stores a fresh system turn, so the last one is always current — and
-        reusing it verbatim keeps the cached prefix byte-identical across turns.
-        Rebuilding is the fallback for a history that has no system turn yet
-        (turn one, or a chat predating stored system turns).
-        """
-        for message in reversed(self.conversation_history):
-            if message.get("role") == "system":
-                return message.get("content") or ""
-        if self.username and self.session_data is not None:
-            return self._build_system_text()
-        return ""
 
     def _max_tokens(self) -> int:
         return self.MAX_OUTPUT_TOKENS.get(self.model, self.DEFAULT_MAX_OUTPUT_TOKENS)
@@ -240,7 +219,8 @@ class ClaudeHandler(BaseLLMHandler):
 
         result = None
         try:
-            async for event in self._stream_message_response(msgs, update_prompt):
+            system_text = render_session_prompt(update_prompt, self.session_data)
+            async for event in self._stream_message_response(msgs, system_text):
                 if event.get("type") == "delta":
                     yield event.get("text", "")
                 elif event.get("type") == "final":
@@ -270,11 +250,9 @@ class ClaudeHandler(BaseLLMHandler):
     async def stream_message(self, message, attachments=None) -> AsyncIterator[str]:
         """Send a message to Claude and stream response text chunks."""
         system_text = self._active_system_text()
-        if not any(m.get("role") == "system" for m in self.conversation_history):
-            # Stored so a resumed chat can recover it — a fresh handler on turn 2+
-            # never calls initialize_chat and has no session data of its own.
+        if not self.has_system_context():
             self.conversation_history.append(
-                {"role": "system", "content": system_text}
+                {"role": "system", "content": self._build_system_text()}
             )
         msgs = self._api_messages(new_user_message=message, new_attachments=attachments)
 

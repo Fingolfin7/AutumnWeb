@@ -5,6 +5,7 @@ from typing import Any, AsyncIterator
 from core.utils import build_project_json_from_sessions
 from .attachments import gemini_parts
 from .base_handler import BaseLLMHandler
+from .session_context import render_session_prompt
 
 
 class GeminiHandler(BaseLLMHandler):
@@ -43,28 +44,6 @@ class GeminiHandler(BaseLLMHandler):
         {username} has updated their session data.
         Refer to the new session data for the remainder of the conversation.
         """
-
-    def _build_system_text(self, notice: str = "") -> str:
-        body = self.system_prompt_template.format(
-            username=self.username, session_data=self.session_data
-        )
-        return f"{notice.strip()}\n{body}" if notice.strip() else body
-
-    def _active_system_text(self) -> str:
-        """The system instruction for this request.
-
-        The stored snapshot wins: every path that changes the session data also
-        stores a fresh system turn, so the last one is always current — and
-        reusing it verbatim keeps the cached prefix byte-identical across turns.
-        Rebuilding is the fallback for a history that has no system turn yet
-        (turn one, or a chat predating stored system turns).
-        """
-        for message in reversed(self.conversation_history):
-            if message.get("role") == "system":
-                return message.get("content") or ""
-        if self.username and self.session_data is not None:
-            return self._build_system_text()
-        return ""
 
     async def _create_chat(self, model, history=None, system_text=None):
         """Helper to (re)create a chat for a given model.
@@ -283,7 +262,7 @@ class GeminiHandler(BaseLLMHandler):
             await self._create_chat(
                 self.model,
                 history=history_before,
-                system_text=update_session_data_prompt,
+                system_text=render_session_prompt(update_session_data_prompt, self.session_data),
             )
 
             if not self.chat:
@@ -336,11 +315,9 @@ class GeminiHandler(BaseLLMHandler):
         # the current snapshot.
         system_text = self._active_system_text()
         history_before = list(self.conversation_history)
-        if not any(m.get("role") == "system" for m in self.conversation_history):
-            # Stored so a resumed chat can recover it — a fresh handler on
-            # turn 2+ never calls initialize_chat.
+        if not self.has_system_context():
             self.conversation_history.append(
-                {"role": "system", "content": system_text}
+                {"role": "system", "content": self._build_system_text()}
             )
         self.conversation_history.append(self._user_entry(message, attachments))
 

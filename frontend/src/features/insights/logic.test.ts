@@ -54,7 +54,7 @@ describe("selection <-> request", () => {
   });
 
   it("sends only what is set, with related only alongside a search, and the header context", () => {
-    expect(selectionRequest({ ...EMPTY_SELECTION, related: true }, defaults, null)).toEqual({ start_date: defaults.start, end_date: defaults.end });
+    expect(selectionRequest({ ...EMPTY_SELECTION, related: true }, defaults, null)).toEqual({ start_date: defaults.start, end_date: defaults.end, context: "all" });
     expect(selectionRequest({ ...EMPTY_SELECTION, search: "a", related: true, tags: [1], projects: [2], projectMode: "include" }, defaults, 6)).toEqual({
       search: "a",
       related: true,
@@ -98,7 +98,7 @@ describe("selectionQuery", () => {
   it("passes all contexts, and the chosen context over the header's", () => {
     expect(selectionQuery({ ...EMPTY_SELECTION, context: "all" }, defaults, 5).context).toBe("all");
     expect(selectionQuery({ ...EMPTY_SELECTION, context: "8" }, defaults, 5).context).toBe(8);
-    expect(selectionQuery(EMPTY_SELECTION, defaults, null)).not.toHaveProperty("context");
+    expect(selectionQuery(EMPTY_SELECTION, defaults, null).context).toBe("all");
   });
 });
 
