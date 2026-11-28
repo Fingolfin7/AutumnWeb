@@ -306,6 +306,7 @@ export function chatStamp(value: string, now = new Date()): string {
 /* ---- transcript ----------------------------------------------------------- */
 
 export interface Turn {
+  id?: number;
   role: "user" | "assistant";
   content: string;
   html: string;
@@ -321,6 +322,7 @@ export function visibleTurns(messages: ChatMessage[], fallbackModel: string): Tu
   return messages
     .filter((m) => m.role === "user" || m.role === "assistant")
     .map((m) => ({
+      id: m.id,
       role: m.role as "user" | "assistant",
       content: m.content,
       html: m.html,

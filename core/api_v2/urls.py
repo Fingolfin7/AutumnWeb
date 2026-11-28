@@ -33,6 +33,7 @@ from core.api_v2.views import (
     InsightAttachmentDetailView,
     InsightAttachmentsView,
     InsightChatDetailView,
+    InsightChatBranchView,
     InsightChatsView,
     InsightOptionsView,
     InsightSelectionView,
@@ -110,6 +111,7 @@ urlpatterns = [
         name="me-social-account-detail",
     ),
     path("insights/chats/", InsightChatsView.as_view(), name="insights-chats"),
+    path("insights/chats/<uuid:chat_id>/branch/", InsightChatBranchView.as_view(), name="insights-chat-branch"),
     path(
         "insights/chats/<uuid:chat_id>",
         InsightChatDetailView.as_view(),

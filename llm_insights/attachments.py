@@ -22,7 +22,6 @@ from xml.etree import ElementTree
 
 from django.core.files.base import ContentFile
 from django.db import transaction
-from django.db.models import Sum
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.utils import timezone
@@ -64,16 +63,18 @@ def clean_name(filename):
     return f"{stem[:100]}{ext[:10].lower()}"
 
 
+def stored_bytes(user):
+    """Bytes the account keeps in storage. A branch's copies share their
+    original's file, so each stored file counts once."""
+    return sum(size for _, size in LLMAttachment.objects.filter(user=user).values_list("file", "size").distinct())
+
+
 def create_attachment(user, upload):
     """Validate an uploaded file, extract what the models need and store it."""
     name = clean_name(getattr(upload, "name", ""))
     if upload.size > MAX_FILE_BYTES:
         raise AttachmentError(f"{name} is larger than 10 MB.")
-    stored = (
-        LLMAttachment.objects.filter(user=user).aggregate(total=Sum("size"))["total"]
-        or 0
-    )
-    if stored + upload.size > MAX_STORED_BYTES_PER_USER:
+    if stored_bytes(user) + upload.size > MAX_STORED_BYTES_PER_USER:
         raise AttachmentError(
             "You've used your 500 MB of Insights attachments. Delete older chats to make room."
         )
@@ -272,7 +273,13 @@ def delete_attachment_file(sender, instance, **kwargs):
     once that delete commits (a rolled-back delete keeps it)."""
     name, storage = instance.file.name, instance.file.storage
     if name:
-        transaction.on_commit(lambda: storage.delete(name))
+        def delete_if_unused():
+            # Branches have independent message attachments pointing at the
+            # same immutable upload. The last committed deletion owns cleanup.
+            if not LLMAttachment.objects.filter(file=name).exists():
+                storage.delete(name)
+
+        transaction.on_commit(delete_if_unused)
 
 
 # ---- what the models are sent -------------------------------------------------

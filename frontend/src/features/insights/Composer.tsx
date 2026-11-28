@@ -15,6 +15,7 @@ export function Composer({
   prompt,
   onPrompt,
   busy,
+  answerSaved,
   onSend,
   onStop,
   drafts,
@@ -28,6 +29,7 @@ export function Composer({
   prompt: string;
   onPrompt: (value: string) => void;
   busy: boolean;
+  answerSaved: boolean;
   onSend: () => void;
   onStop: () => void;
   drafts: Draft[];
@@ -37,7 +39,7 @@ export function Composer({
 }) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
-  const canSend = !!prompt.trim() && !busy && !uploading;
+  const canSend = (!!prompt.trim() || answerSaved) && !busy && !uploading;
   const provider = options.providers.find((p) => p.provider === selection.provider);
   const efforts = effortsFor(options, selection.provider, selection.model);
   const note = openaiConnectionNote(options.openai_source, options.providers.some((p) => p.provider === "openai"));
@@ -175,7 +177,7 @@ export function Composer({
           name="prompt"
           ref={textarea}
           rows={1}
-          placeholder={drafts.length ? "Ask about these files and your sessions…" : "Ask a question about your sessions…"}
+          placeholder={answerSaved ? "Answer the question above or write a follow-up…" : drafts.length ? "Ask about these files and your sessions…" : "Ask a question about your sessions…"}
           value={prompt}
           readOnly={busy}
           onChange={(e) => onPrompt(e.target.value)}
@@ -187,8 +189,8 @@ export function Composer({
             <Icon icon={faStop} /> <span className="composer-btn-label">Stop</span>
           </button>
         ) : (
-          <button type="submit" className="btn btn--primary" title={uploading ? "Waiting for files to finish uploading" : "Send (Enter)"} disabled={!canSend}>
-            <Icon icon={faPaperPlane} /> <span className="composer-btn-label">Send</span>
+          <button type="submit" className="btn btn--primary" title={uploading ? "Waiting for files to finish uploading" : answerSaved ? "Answer the saved question (Enter)" : "Send (Enter)"} disabled={!canSend}>
+            <Icon icon={faPaperPlane} /> <span className="composer-btn-label">{answerSaved ? "Answer" : "Send"}</span>
           </button>
         )}
       </div>

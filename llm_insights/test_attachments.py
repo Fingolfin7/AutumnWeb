@@ -18,9 +18,10 @@ from PIL import Image
 from llm_insights.attachments import docx_text, files_to_send, gemini_parts, transcript_text
 from llm_insights.base_handler import BaseLLMHandler
 from llm_insights.claude_handler import ClaudeHandler
-from llm_insights.models import LLMAttachment, LLMMessage
+from llm_insights.models import LLMAttachment, LLMChat, LLMMessage
 from llm_insights.openai_handler import OpenAIHandler
 from llm_insights.services.analysis import perform_llm_analysis_stream
+from llm_insights.services.chats import QuestionAlreadyAnswered
 from llm_insights.services.streaming import _prepare_stream_context
 
 W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
@@ -190,6 +191,74 @@ class AttachmentApiTests(TransactionTestCase):
         self.assertTrue(default_storage.exists(stored))
         self.client.delete(f"/api/v2/insights/chats/{chat.id}")
         self.assertFalse(LLMMessage.objects.filter(chat=chat).exists())
+        self.assertFalse(default_storage.exists(stored))
+
+    def test_a_branch_answers_its_saved_question_with_the_original_files(self):
+        attachment_id = self._upload("standup.txt", b"Ada is blocked on review.").json()["id"]
+        chat = LLMChat.objects.create(user=self.user, title="Standup", model="claude:claude-opus-5-5",
+                                     filters={"context": "all"})
+        LLMMessage.objects.create(chat=chat, role="system", content="system")
+        question = LLMMessage.objects.create(chat=chat, role="user", content="Who is blocked?")
+        LLMAttachment.objects.filter(pk=attachment_id).update(message=question)
+        LLMMessage.objects.create(chat=chat, role="assistant", content="Ada.")
+
+        response = self.client.post(f"/api/v2/insights/chats/{chat.id}/branch/", {"message_id": question.pk},
+                                    content_type="application/json")
+        self.assertEqual(response.status_code, 201)
+        branch = LLMChat.objects.get(pk=response.json()["id"])
+        self.assertEqual(branch.branched_from_id, chat.id)
+        self.assertEqual([m.role for m in branch.messages.all()], ["system", "user"])
+        saved_question = branch.messages.last()
+
+        seen = {}
+
+        class AnsweringHandler(BaseLLMHandler):
+            def __init__(self):
+                self.conversation_history = []
+
+            def initialize_chat(self, username, sessions, *, force_refresh=False):
+                pass
+
+            def stream_update_session_data(self, sessions_data, user_prompt, attachments=None):
+                raise NotImplementedError
+
+            async def stream_message(self, message, attachments=None):
+                seen.update(message=message, files=[a["name"] for a in attachments])
+                self.conversation_history.append(self._user_entry(message, attachments))
+                self.conversation_history.append({"role": "assistant", "content": "Still Ada."})
+                yield "Still Ada."
+
+            def get_conversation_history(self):
+                return self.conversation_history
+
+        def answer():
+            request = RequestFactory().post("/api/v2/insights/stream/", {
+                "prompt": "Who is blocked?", "chat_id": str(branch.id), "answer_message_id": saved_question.pk,
+            })
+            request.user, request.session = self.user, self.client.session
+            context = _prepare_stream_context(request, self.user, branch.id)
+
+            async def run():
+                async for _ in perform_llm_analysis_stream(
+                    llm_handler=AnsweringHandler(), sessions=context["sessions"], user_prompt=context["user_prompt"],
+                    username="attacher", conversation_history=context["history"], chat_obj=context["chat_id"],
+                    attachments=context["attachments"], answer_message_id=context["answer_message_id"],
+                ):
+                    pass
+
+            async_to_sync(run)()
+
+        answer()
+        self.assertEqual(seen, {"message": "Who is blocked?", "files": ["standup.txt"]})
+        self.assertEqual([m.content for m in branch.messages.all()][1:], ["Who is blocked?", "Still Ada."])
+        with self.assertRaises(QuestionAlreadyAnswered):
+            answer()
+
+        # Both chats point at one stored file; it leaves with the last of them.
+        stored = LLMAttachment.objects.get(pk=attachment_id).file.name
+        self.client.delete(f"/api/v2/insights/chats/{chat.id}")
+        self.assertTrue(default_storage.exists(stored))
+        self.client.delete(f"/api/v2/insights/chats/{branch.id}")
         self.assertFalse(default_storage.exists(stored))
 
 

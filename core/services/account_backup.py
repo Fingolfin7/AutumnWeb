@@ -26,8 +26,7 @@ from core.services.backup_records import (
 from core.services.proactive_notifications import (
     _next_reminder_slot, local_wall_to_utc, reschedule_notification_preferences,
 )
-from llm_insights.attachments import MAX_STORED_BYTES_PER_USER
-from llm_insights.models import LLMAttachment
+from llm_insights.attachments import MAX_STORED_BYTES_PER_USER, stored_bytes
 from llm_insights.session_context import SESSION_FILTERS_KEY, compact_session_prompt
 from users.models import Profile
 
@@ -533,7 +532,7 @@ class RestorePlan:
                 counts[status] += 1
                 self.entries[section].append((row, obj, status))
 
-        existing_bytes = LLMAttachment.objects.filter(user=self.user).aggregate(total=Sum("size", default=0))["total"]
+        existing_bytes = stored_bytes(self.user)
         added_bytes = sum(row["size"] for row, _, status in self.entries["insight_attachments"] if status == "add")
         if added_bytes and existing_bytes + added_bytes > MAX_STORED_BYTES_PER_USER:
             for row, _, status in self.entries["insight_attachments"]:

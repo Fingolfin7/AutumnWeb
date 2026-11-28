@@ -127,6 +127,7 @@ def serialize_message(
     *,
     include_metadata=False,
     include_auth_source=False,
+    include_id=False,
     include_attachments=False,
     send_files=None,
 ):
@@ -136,6 +137,8 @@ def serialize_message(
         "sources": message.metadata.get("sources", []),
         "model": message.metadata.get("model", ""),
     }
+    if include_id:
+        data["id"] = message.pk
     if include_metadata:
         data["metadata"] = message.metadata
     else:
@@ -161,6 +164,7 @@ def load_chat_history(
     include_metadata=False,
     include_auth_source=False,
     include_attachments=False,
+    include_ids=False,
     send_files=None,
 ):
     """include_attachments reads attached files back from storage, for the
@@ -172,6 +176,7 @@ def load_chat_history(
     return [
         serialize_message(
             message,
+            include_id=include_ids,
             include_metadata=include_metadata,
             include_auth_source=include_auth_source,
             include_attachments=include_attachments,
@@ -181,13 +186,23 @@ def load_chat_history(
     ]
 
 
-async def save_llm_messages(chat_obj, messages_to_save, *, session_filters=None):
+class QuestionAlreadyAnswered(ValueError):
+    pass
+
+
+async def save_llm_messages(chat_obj, messages_to_save, *, session_filters=None, answer_message_id=None):
     chat_id = getattr(chat_obj, "id", chat_obj)
 
     def create_messages():
-        chat = LLMChat.objects.get(id=chat_id)
         with transaction.atomic():
+            chat = LLMChat.objects.select_for_update().get(id=chat_id)
+            if answer_message_id is not None and chat.messages.last().pk != answer_message_id:
+                raise QuestionAlreadyAnswered("This question already has a reply. Refresh the chat.")
             for msg in messages_to_save:
+                if answer_message_id is not None and msg["role"] == "user":
+                    # The provider needed the question as its new input. Its
+                    # original row and attached files are already in the chat.
+                    continue
                 metadata = {
                     "sources": msg.get("sources", []),
                     "model": msg.get("model", ""),
@@ -229,6 +244,7 @@ async def save_partial_stream_messages(
     attachments=None,
     *,
     session_filters=None,
+    answer_message_id=None,
 ):
     current_history = llm_handler.get_conversation_history() if llm_handler else []
     pending_messages = (
@@ -267,4 +283,5 @@ async def save_partial_stream_messages(
         ]
 
     if pending_messages:
-        await save_llm_messages(chat_obj, pending_messages, session_filters=session_filters)
+        await save_llm_messages(chat_obj, pending_messages, session_filters=session_filters,
+                                answer_message_id=answer_message_id)

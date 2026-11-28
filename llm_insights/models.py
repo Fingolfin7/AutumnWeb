@@ -2,10 +2,13 @@ from django.db import models
 from django.contrib.auth.models import User
 import uuid
 
+from django_cleanup import cleanup
+
 
 class LLMChat(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="llm_chats")
+    branched_from = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     title = models.CharField(max_length=255, default="New Chat")
     model = models.CharField(max_length=100)
     filters = models.JSONField(default=dict, blank=True)
@@ -29,7 +32,7 @@ class LLMMessage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["created_at", "pk"]
 
     def __str__(self):
         return f"{self.role}: {self.content[:50]}..."
@@ -39,6 +42,7 @@ def attachment_upload_to(instance, filename):
     return f"insights/attachments/{instance.user_id}/{instance.id}/{filename}"
 
 
+@cleanup.ignore  # Branches share stored files; llm_insights.attachments deletes the last one's.
 class LLMAttachment(models.Model):
     """A file added to an Insights question: a screenshot, a PDF, or a text
     document whose text was extracted once at upload (``text``) so every

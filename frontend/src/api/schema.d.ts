@@ -339,6 +339,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/insights/chats/{chat_id}/branch/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["insights_chats_branch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/insights/options/": {
         parameters: {
             query?: never;
@@ -1847,9 +1863,14 @@ export interface components {
              */
             file: string;
         };
+        InsightBranchRequest: {
+            message_id: number;
+        };
         InsightChatDetail: {
             /** Format: uuid */
             id: string;
+            /** Format: uuid */
+            branched_from: string | null;
             title: string;
             model: string;
             readonly filters: components["schemas"]["InsightFilters"];
@@ -1898,6 +1919,7 @@ export interface components {
             reasoning_effort?: string;
         };
         InsightMessage: {
+            id: number;
             role: components["schemas"]["RoleEnum"];
             content: string;
             html: string;
@@ -1948,6 +1970,8 @@ export interface components {
         InsightStreamRequest: {
             /** Format: uuid */
             chat_id?: string;
+            /** @description Answer this chat's final saved question with its original attachments. */
+            answer_message_id?: number;
             message: string;
             /** @description Files uploaded with POST /api/v2/insights/attachments/ to send with this message. */
             attachment_ids?: string[];
@@ -3623,6 +3647,33 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    insights_chats_branch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InsightBranchRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["InsightBranchRequest"];
+                "multipart/form-data": components["schemas"]["InsightBranchRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InsightChatSummary"];
+                };
             };
         };
     };

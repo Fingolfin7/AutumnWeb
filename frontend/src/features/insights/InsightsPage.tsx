@@ -13,7 +13,7 @@ import { ApiError } from "@/api/errors";
 import { bootstrap } from "@/bootstrap";
 import { formatDayDate } from "@/lib/format";
 import { semanticSearchAvailable } from "@/features/charts/api";
-import { useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useInsightSelection } from "./api";
+import { useBranchChat, useDeleteChat, useInsightChat, useInsightChats, useInsightOptions, useInsightSelection } from "./api";
 import { filesFrom, useAttachmentDrafts } from "./attachments";
 import { Composer } from "./Composer";
 import { FilterSheet } from "./FilterSheet";
@@ -159,6 +159,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   const semantic = semanticSearchAvailable();
   const chats = useInsightChats(true);
   const deleteChat = useDeleteChat();
+  const branchChat = useBranchChat(chatId);
   const run = useRun();
 
   /* What the model is grounded in. A chat opens on the filters it was started
@@ -237,8 +238,12 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
   };
   const clearSelection = () => select({ ...EMPTY_SELECTION, start_date: defaults.start, end_date: defaults.end });
 
+  const last = turns.at(-1);
+  /* A stopped answer may still be finishing on the server: don't offer to pay for a second one. */
+  const answerStopped = !!run?.answeringSaved && run.status === "stopped" && run.chatId === (chatId ?? null);
+  const unanswered = last?.role === "user" && last.id && !answerStopped && !prompt.trim() && !attach.drafts.length ? last : undefined;
   const send = () => {
-    const message = prompt.trim();
+    const message = unanswered?.content || prompt.trim();
     if (!message || !model || live || attach.uploading) return;
     if (needsSessionSelection) {
       setSheetOpen(true);
@@ -246,6 +251,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
     }
     const body: StreamRequest = {
       message,
+      ...(unanswered ? { answer_message_id: unanswered.id } : {}),
       ...(attach.ids.length ? { attachment_ids: attach.ids } : {}),
       provider: model.provider,
       model: model.model,
@@ -451,6 +457,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
             {(count ?? 0) > 0 || hasHistory ? (
               <>
                 <div className="chat-header-meta">
+                  {chat?.branched_from ? <AppLink className="plain-link" href={chatPath(chat.branched_from)}>Original chat</AppLink> : null}
                   <h3>{count ? `${count} ${sessionLabel}` : "Conversation"}</h3>
                   {count && preview.data?.first_date && preview.data.last_date ? (
                     <span className="chat-header-range muted">
@@ -504,6 +511,8 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                 selecting={selecting}
                 selected={picked}
                 onToggle={togglePicked}
+                branching={branchChat.isPending}
+                onBranch={(id) => branchChat.mutate(id, { onSuccess: (branch) => navigate(chatPath(branch.id)) })}
                 empty={
                   <div className="empty-state-container">
                     <Icon icon={faComments} className="muted" />
@@ -522,6 +531,7 @@ function Desk({ chatId, chat, options }: { chatId: string | undefined; chat: Cha
                   prompt={prompt}
                   onPrompt={setPrompt}
                   busy={live}
+                  answerSaved={!!unanswered}
                   onSend={send}
                   onStop={stopStream}
                   drafts={attach.drafts}

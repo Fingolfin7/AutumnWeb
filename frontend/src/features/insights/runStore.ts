@@ -111,6 +111,7 @@ export async function startRun({ client, body, baseCount, chatModel, seedFilters
   let run = startRunState({
     id: nextId++,
     chatId: body.chat_id ?? null,
+    answeringSaved: !!body.answer_message_id,
     prompt: body.message,
     attachments,
     model: body.model ?? "",

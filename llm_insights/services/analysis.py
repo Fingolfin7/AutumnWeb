@@ -11,6 +11,7 @@ async def perform_llm_analysis_stream(
     chat_obj=None,
     attachments=None,
     session_filters=None,
+    answer_message_id=None,
 ):
     llm_handler.set_username(username)
     already_persisted = len(llm_handler.get_conversation_history())
@@ -32,4 +33,5 @@ async def perform_llm_analysis_stream(
             chat_obj,
             llm_handler.get_conversation_history()[already_persisted:],
             session_filters=session_filters,
+            answer_message_id=answer_message_id,
         )

@@ -62,6 +62,19 @@ export function useDeleteChat() {
   });
 }
 
+export function useBranchChat(chatId: string | undefined) {
+  const client = useQueryClient();
+  const toast = useToast();
+  return useMutation({
+    mutationFn: (messageId: number) => unwrap(api.POST("/api/v2/insights/chats/{chat_id}/branch/", {
+      params: { path: { chat_id: chatId! } },
+      body: { message_id: messageId },
+    })),
+    onSuccess: () => { void client.invalidateQueries({ queryKey: insightKeys.chats() }); },
+    onError: (error) => toast.error(`Couldn't create the branch: ${errorMessage(error)}`),
+  });
+}
+
 /* How many sessions the filters select, over what dates, and whether related
    matches were included: the header line the old page computed server-side. */
 export function useInsightSelection(query: SelectionQuery, enabled: boolean) {

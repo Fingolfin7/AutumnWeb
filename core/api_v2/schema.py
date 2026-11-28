@@ -83,6 +83,7 @@ MCP_EXCLUDED_OPERATION_IDS = {
     "insights_attachments_destroy",
     "insights_attachments_retrieve",
     "insights_chats_destroy",
+    "insights_chats_branch",
     "insights_chats_list",
     "insights_chats_retrieve",
     "insights_options_retrieve",

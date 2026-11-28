@@ -12,6 +12,23 @@
   .delete-chat-btn { opacity: .7; }
 }
 
+/* Branch from a saved message: quiet until the message is hovered. */
+.branch-message-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  margin-top: var(--s2); padding: .2rem 0;
+  background: none; border: 0; cursor: pointer;
+  font-size: var(--fs-xs); color: var(--muted);
+  opacity: 0; transition: opacity .16s var(--ease), color .16s var(--ease);
+}
+.user-message:hover .branch-message-btn,
+.assistant-message:hover .branch-message-btn,
+.branch-message-btn:focus-visible { opacity: 1; }
+.branch-message-btn:hover { color: var(--brand); }
+.branch-message-btn:disabled { cursor: progress; }
+@media (hover: none) {
+  .branch-message-btn { opacity: .7; }
+}
+
 .empty-state-container .icon { width: 3rem; height: 3rem; }
 
 /* Phones: three selects do not fit one line; wrap rather than clip Effort. */

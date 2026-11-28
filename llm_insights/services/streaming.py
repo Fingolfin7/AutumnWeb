@@ -13,6 +13,7 @@ from llm_insights.attachments import files_to_send, payload as attachment_payloa
 from llm_insights.models import LLMAttachment, LLMChat
 from llm_insights.services.analysis import perform_llm_analysis_stream
 from llm_insights.services.chats import (
+    QuestionAlreadyAnswered,
     database_sync_to_async,
     fallback_chat_title,
     generate_and_save_chat_title,
@@ -84,6 +85,11 @@ def _prepare_stream_context(request, user, chat_id):
     reset_requested = "reset_conversation" in post_data
     user_prompt = (post_data.get("prompt") or "").strip()
     new_attachments = _new_attachments(user, post_data.getlist("attachment_ids"))
+    answer_message_id = None
+    if "answer_message_id" in post_data:
+        if not chat_obj or not post_data["answer_message_id"].isdigit():
+            raise QuestionAlreadyAnswered("Only the final unanswered question of a saved chat can be answered.")
+        answer_message_id = int(post_data["answer_message_id"])
     if not chat_obj:
         chat_obj = LLMChat.objects.create(
             user=user,
@@ -94,12 +100,6 @@ def _prepare_stream_context(request, user, chat_id):
                 "reasoning_effort": selected_reasoning_effort,
             },
         )
-    elif data["is_filtering"]:
-        chat_obj.filters = {
-            **data["current_filters"],
-            "reasoning_effort": selected_reasoning_effort,
-        }
-        chat_obj.save()
 
     # The newest files first: this question's, then back through the chat.
     earlier = LLMAttachment.objects.filter(message__chat=chat_obj).order_by(
@@ -109,6 +109,17 @@ def _prepare_stream_context(request, user, chat_id):
     attachments = [
         attachment_payload(a, send_file=a.id in send_files) for a in new_attachments
     ]
+    history = load_chat_history(chat_obj, include_auth_source=True, include_attachments=True,
+                                include_ids=answer_message_id is not None, send_files=send_files)
+    if answer_message_id is not None:
+        if not history or history[-1]["id"] != answer_message_id or history[-1]["role"] != "user":
+            raise QuestionAlreadyAnswered("Only the final unanswered question can be answered. Refresh the chat.")
+        question = history.pop()
+        user_prompt = question["content"]
+        attachments = question.get("attachments", [])
+    if data["is_filtering"]:
+        chat_obj.filters = {**data["current_filters"], "reasoning_effort": selected_reasoning_effort}
+        chat_obj.save(update_fields=["filters", "updated_at"])
 
     chat_url = reverse("insights_detail", kwargs={"chat_id": chat_obj.id})
     stream_url = reverse("insights_detail_stream", kwargs={"chat_id": chat_obj.id})
@@ -117,12 +128,8 @@ def _prepare_stream_context(request, user, chat_id):
         "chat_id": chat_obj.id,
         "chat_url": chat_url,
         "current_filters": data["current_filters"],
-        "history": load_chat_history(
-            chat_obj,
-            include_auth_source=True,
-            include_attachments=True,
-            send_files=send_files,
-        ),
+        "history": history,
+        "answer_message_id": answer_message_id,
         "attachments": attachments,
         "model": selected_model,
         "provider": selected_provider,
@@ -202,6 +209,7 @@ async def _run_stream_worker(stream_context, event_queue, stream_done):
             chat_obj=stream_context["chat_id"],
             attachments=stream_context["attachments"],
             session_filters=stream_context["current_filters"],
+            answer_message_id=stream_context.get("answer_message_id"),
         ):
             if chunk:
                 streamed_chunks.append(chunk)
@@ -250,6 +258,8 @@ async def _run_stream_worker(stream_context, event_queue, stream_done):
                 },
             )
         )
+    except QuestionAlreadyAnswered as exc:
+        event_queue.put(stream_event("error", {"message": str(exc)}))
     except Exception as exc:
         error_message = str(exc)
         partial_content = "".join(streamed_chunks).strip()
@@ -270,6 +280,7 @@ async def _run_stream_worker(stream_context, event_queue, stream_done):
                     error_message,
                     attachments=stream_context["attachments"],
                     session_filters=stream_context["current_filters"],
+                    answer_message_id=stream_context.get("answer_message_id"),
                 )
             except Exception as save_exc:
                 assistant_content = (
@@ -309,6 +320,8 @@ def stream_insights_response(request, chat_id, access_check):
         stream_context = _prepare_stream_context(request, user, chat_id)
     except ContextConfirmationRequired as exc:
         return _error_stream(str(exc), 400)
+    except QuestionAlreadyAnswered as exc:
+        return _error_stream(str(exc), 409)
     except Exception as exc:
         return _error_stream(str(exc), 500)
 

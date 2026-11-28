@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { faCheck, faCopy } from "@fortawesome/free-solid-svg-icons";
+import { faCheck, faCodeBranch, faCopy } from "@fortawesome/free-solid-svg-icons";
 import { Icon } from "@/components/Icon";
 import { MessageAttachments } from "./AttachmentList";
 import type { Run } from "./run";
@@ -22,8 +22,9 @@ export function savedItems(turns: Turn[]): Item[] {
 /* The run's question and (partial) answer, drawn after the saved messages. */
 export function runItems(run: Run): Item[] {
   const answered = run.status === "done" && !!run.html;
+  const question: Item = { key: `run-${run.id}-q`, role: "user", content: run.prompt, html: "", plain: run.prompt, model: "", sources: [], error: false, attachments: run.attachments, streaming: false, stopped: false };
   return [
-    { key: `run-${run.id}-q`, role: "user", content: run.prompt, html: "", plain: run.prompt, model: "", sources: [], error: false, attachments: run.attachments, streaming: false, stopped: false },
+    ...(run.answeringSaved ? [] : [question]),
     {
       key: `run-${run.id}-a`,
       role: "assistant",
@@ -63,7 +64,10 @@ export function CopyButton({ text }: { text: string }) {
   );
 }
 
-function Message({ item, selecting, selected, onToggle }: { item: Item; selecting: boolean; selected: boolean; onToggle: () => void }) {
+function Message({ item, selecting, selected, onToggle, onBranch, branching }: {
+  item: Item; selecting: boolean; selected: boolean; onToggle: () => void;
+  onBranch: (id: number) => void; branching: boolean;
+}) {
   const className = [
     item.role === "user" ? "user-message" : "assistant-message",
     item.streaming ? "streaming" : "",
@@ -120,6 +124,11 @@ function Message({ item, selecting, selected, onToggle }: { item: Item; selectin
           ))}
         </small>
       ) : null}
+      {item.id && !selecting ? (
+        <button className="branch-message-btn" type="button" disabled={branching} onClick={() => onBranch(item.id!)}>
+          <Icon icon={faCodeBranch} /> Branch from here
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -129,6 +138,8 @@ export function Transcript({
   selecting,
   selected,
   onToggle,
+  onBranch,
+  branching,
   empty,
   modelName,
 }: {
@@ -138,6 +149,8 @@ export function Transcript({
   selecting: boolean;
   selected: ReadonlySet<string>;
   onToggle: (key: string) => void;
+  onBranch: (id: number) => void;
+  branching: boolean;
   empty: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -172,7 +185,8 @@ export function Transcript({
           return (
             <Fragment key={item.key}>
               {note ? <p className="model-note">{note}</p> : null}
-              <Message item={item} selecting={selecting} selected={selected.has(item.key)} onToggle={() => onToggle(item.key)} />
+              <Message item={item} selecting={selecting} selected={selected.has(item.key)} onToggle={() => onToggle(item.key)}
+                       onBranch={onBranch} branching={branching} />
             </Fragment>
           );
         })

@@ -857,6 +857,42 @@ paths:
         '204':
           description: Chat deleted.
       x-autumn-mcp: exclude
+  /api/v2/insights/chats/{chat_id}/branch/:
+    post:
+      operationId: insights_chats_branch
+      parameters:
+      - in: path
+        name: chat_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - insights
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsightBranchRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/InsightBranchRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/InsightBranchRequest'
+        required: true
+      security:
+      - basicAuth: []
+      - cookieAuth: []
+      - tokenAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsightChatSummary'
+          description: ''
+      x-autumn-mcp: exclude
   /api/v2/insights/options/:
     get:
       operationId: insights_options_retrieve
@@ -5207,12 +5243,24 @@ components:
             .pdf, .png, .srt, .tsv, .txt, .vtt, .webp).'
       required:
       - file
+    InsightBranchRequest:
+      type: object
+      properties:
+        message_id:
+          type: integer
+          minimum: 1
+      required:
+      - message_id
     InsightChatDetail:
       type: object
       properties:
         id:
           type: string
           format: uuid
+        branched_from:
+          type: string
+          format: uuid
+          nullable: true
         title:
           type: string
         model:
@@ -5232,6 +5280,7 @@ components:
           items:
             $ref: '#/components/schemas/InsightMessage'
       required:
+      - branched_from
       - created_at
       - filters
       - id
@@ -5333,6 +5382,8 @@ components:
     InsightMessage:
       type: object
       properties:
+        id:
+          type: integer
         role:
           $ref: '#/components/schemas/RoleEnum'
         content:
@@ -5353,6 +5404,7 @@ components:
       - content
       - created_at
       - html
+      - id
       - metadata
       - role
     InsightMessageMetadata:
@@ -5464,6 +5516,10 @@ components:
         chat_id:
           type: string
           format: uuid
+        answer_message_id:
+          type: integer
+          minimum: 1
+          description: Answer this chat's final saved question with its original attachments.
         message:
           type: string
         attachment_ids:

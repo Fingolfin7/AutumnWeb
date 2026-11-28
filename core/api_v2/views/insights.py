@@ -21,6 +21,7 @@ from llm_insights.attachments import (
     create_attachment,
 )
 from llm_insights.models import LLMAttachment, LLMChat
+from llm_insights.services.branching import branch_chat
 from llm_insights.services.chats import group_chats_by_recency
 from llm_insights.services.handlers import (
     openai_connection_source,
@@ -117,6 +118,7 @@ def _attachment_data(attachment):
 
 
 class InsightMessageSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     role = serializers.ChoiceField(choices=("system", "user", "assistant"))
     content = serializers.CharField()
     html = serializers.CharField()
@@ -168,6 +170,7 @@ class InsightFiltersSerializer(serializers.Serializer):
 
 class InsightChatDetailSerializer(serializers.Serializer):
     id = serializers.UUIDField()
+    branched_from = serializers.UUIDField(allow_null=True)
     title = serializers.CharField()
     model = serializers.CharField()
     filters = serializers.SerializerMethodField()
@@ -203,6 +206,7 @@ class InsightOptionsSerializer(serializers.Serializer):
 
 class InsightStreamRequestSerializer(serializers.Serializer):
     chat_id = serializers.UUIDField(required=False)
+    answer_message_id = serializers.IntegerField(min_value=1, required=False, help_text="Answer this chat's final saved question with its original attachments.")
     message = serializers.CharField(allow_blank=False)
     attachment_ids = serializers.ListField(
         child=serializers.UUIDField(),
@@ -355,6 +359,7 @@ class InsightChatDetailView(V2APIView):
         return Response(
             {
                 "id": chat.id,
+                "branched_from": chat.branched_from_id,
                 "title": chat.title,
                 "model": chat.model,
                 "filters": chat.filters,
@@ -362,6 +367,7 @@ class InsightChatDetailView(V2APIView):
                 "updated_at": chat.updated_at,
                 "messages": [
                     {
+                        "id": message.pk,
                         "role": message.role,
                         "content": message.content,
                         "html": render_markdown(message.content),
@@ -386,6 +392,23 @@ class InsightChatDetailView(V2APIView):
         _require_access(request.user)
         self._chat(request, chat_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class InsightBranchRequestSerializer(serializers.Serializer):
+    message_id = serializers.IntegerField(min_value=1)
+
+
+class InsightChatBranchView(V2APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(operation_id="insights_chats_branch", request=InsightBranchRequestSerializer,
+                   responses={201: InsightChatSummarySerializer})
+    def post(self, request, chat_id):
+        _require_access(request.user)
+        data = InsightBranchRequestSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        branch = branch_chat(request.user, chat_id, data.validated_data["message_id"])
+        return Response(InsightChatSummarySerializer(branch).data, status=status.HTTP_201_CREATED)
 
 
 class InsightOptionsView(V2APIView):
@@ -500,6 +523,10 @@ class InsightStreamView(V2APIView):
                 }
             )
         post = _as_insights_post(data)
+        if "answer_message_id" in data:
+            if not chat_id or attachment_ids:
+                raise ValidationError("Answering a saved question requires its chat and uses its saved files.")
+            post["answer_message_id"] = str(data["answer_message_id"])
         post["prompt"] = data["message"]
         request._request._post = post
         response = stream_insights_response(

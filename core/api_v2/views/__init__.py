@@ -30,6 +30,7 @@ from .insights import (
     InsightAttachmentDetailView,
     InsightAttachmentsView,
     InsightChatDetailView,
+    InsightChatBranchView,
     InsightChatsView,
     InsightOptionsView,
     InsightSelectionView,

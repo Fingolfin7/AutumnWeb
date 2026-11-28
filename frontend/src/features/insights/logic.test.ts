@@ -225,6 +225,7 @@ describe("chat list", () => {
 
 describe("transcript", () => {
   const message = (role: ChatMessage["role"], content: string, metadata: ChatMessage["metadata"] = {}): ChatMessage => ({
+    id: 1,
     role,
     content,
     html: `<p>${content}</p>`,

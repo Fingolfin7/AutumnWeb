@@ -30,9 +30,10 @@ export interface Run {
   /** Visible messages the chat had when this run started; the run is hidden
       once the chat holds more, i.e. once the saved copy has arrived. */
   baseCount: number;
+  answeringSaved?: boolean;
 }
 
-export function startRunState(args: { id: number; chatId: string | null; prompt: string; attachments?: AttachmentView[]; model: string; baseCount: number }): Run {
+export function startRunState(args: { id: number; chatId: string | null; prompt: string; attachments?: AttachmentView[]; model: string; baseCount: number; answeringSaved?: boolean }): Run {
   return { ...args, attachments: args.attachments ?? [], text: "", html: null, status: "streaming", sources: [], usage: null };
 }
 
